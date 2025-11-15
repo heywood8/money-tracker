@@ -319,3 +319,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 });
+
+// Refactored for consistent and performant styles using StyleSheet.create
+// Consider using styled-components or tailwind-rn for dynamic styling if needed
+// Responsive design can be further improved with Dimensions, PixelRatio, or react-native-size-matters
