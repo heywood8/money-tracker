@@ -6,11 +6,14 @@ import CategoriesScreen from './CategoriesScreen';
 import GraphsScreen from './GraphsScreen';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import Header from './Header';
+import SettingsModal from './SettingsModal';
 
 export default function SimpleTabs() {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const [active, setActive] = React.useState('Operations');
+  const [settingsVisible, setSettingsVisible] = React.useState(false);
 
   const TABS = [
     { key: 'Operations', label: t('operations') || 'Operations' },
@@ -36,7 +39,9 @@ export default function SimpleTabs() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}> 
+      <Header onOpenSettings={() => setSettingsVisible(true)} />
       <View style={styles.content}>{renderActive()}</View>
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
       <View style={[styles.tabBar, { borderTopColor: colors.border, backgroundColor: colors.surface }]}> 
         {TABS.map(tab => (
           <TouchableOpacity
