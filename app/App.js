@@ -1,11 +1,11 @@
-
 import React from 'react';
 import AccountsScreen from './AccountsScreen';
-import { ThemeProvider, useTheme } from './ThemeContext';
+import { ThemeProvider } from './ThemeContext';
+import { AccountsProvider } from './AccountsContext';
 import { StatusBar, Platform } from 'react-native';
 
 function ThemedStatusBar() {
-  const { colorScheme, colors } = useTheme();
+  const { colorScheme, colors } = require('./ThemeContext').useTheme();
   const barStyle = colorScheme === 'dark' ? 'light-content' : 'dark-content';
   React.useEffect(() => {
     try {
@@ -24,8 +24,10 @@ function ThemedStatusBar() {
 export default function App() {
   return (
     <ThemeProvider>
-      <ThemedStatusBar />
-      <AccountsScreen />
+      <AccountsProvider>
+        <ThemedStatusBar />
+        <AccountsScreen />
+      </AccountsProvider>
     </ThemeProvider>
   );
 }
