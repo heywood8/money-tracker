@@ -68,19 +68,24 @@ export default function AccountsScreen() {
     );
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.accountRow, { borderColor: colors.border }]}
-      onPress={() => startEdit(item.id)}
-      accessibilityLabel={t('edit_account') || 'Edit Account'}
-    >
-      <View style={styles.accountInfo}>
-        <Text style={[styles.accountText, { color: colors.text }]}> 
-          {item.name} {item.balance} {currencies[item.currency]?.symbol || item.currency}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  // ...existing code...
+  const renderItem = ({ item, index }) => {
+    const isEven = index % 2 === 0;
+    const rowBg = isEven ? colors.background : colors.altRow;
+    return (
+      <TouchableOpacity
+        style={[styles.accountRow, { borderColor: colors.border, backgroundColor: rowBg }]}
+        onPress={() => startEdit(item.id)}
+        accessibilityLabel={t('edit_account') || 'Edit Account'}
+      >
+        <View style={styles.accountInfo}>
+          <Text style={[styles.accountText, { color: colors.text }]}> 
+            {item.name} {item.balance} {currencies[item.currency]?.symbol || item.currency}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>  
@@ -228,10 +233,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderColor: '#eee',
-    paddingBottom: 8,
+    // marginBottom removed for full background fill
+    // paddingBottom replaced by paddingVertical
+    minHeight: 56,
   },
   accountInfo: {
     flex: 1,

@@ -21,6 +21,7 @@ const lightTheme = {
     inputBorder: '#cccccc',
     danger: 'red',
     selected: '#c0e0ff',
+    altRow: '#f6f8fa', // Added for alternating rows
   },
 };
 
@@ -40,6 +41,7 @@ const darkTheme = {
     inputBorder: '#555555',
     danger: 'red',
     selected: '#005fa3',
+    altRow: '#181c20', // Added for alternating rows
   },
 };
 
