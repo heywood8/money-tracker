@@ -58,6 +58,10 @@ export default function SettingsModal({ visible, onClose }) {
   );
 }
 
+// Styles are defined using StyleSheet.create for performance and consistency.
+// For dynamic styling, consider using styled-components or tailwind-rn.
+// For responsive design, consider Dimensions, PixelRatio, or react-native-size-matters.
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
