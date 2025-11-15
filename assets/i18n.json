@@ -1,7 +1,9 @@
 {
   "en": {
     "accounts": "Accounts",
+    "graphs": "Graphs",
     "operations": "Operations",
+    "categories": "Categories",
     "settings": "Settings",
     "language": "Language",
     "theme": "Theme",
@@ -23,6 +25,8 @@
   },
   "ru": {
     "accounts": "Счета",
+    "graphs": "Графики",
+    "categories": "Категории",
     "operations": "Операции",
     "settings": "Настройки",
     "language": "Язык",
