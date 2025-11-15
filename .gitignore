@@ -1,0 +1,90 @@
+# React Native
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# macOS
+.DS_Store
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+android/local.properties
+android/.cxx/
+android/.externalNativeBuild/
+android/.settings/
+android/.project
+android/.classpath
+
+# iOS
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/
+ios/.DS_Store
+
+# Metro
+.expo/
+.expo-shared/
+.expo/web-build/
+*.expo
+*.expo-shared
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Misc
+*.log
+*.tmp
+*.swp
+*.swo
+*.swn
+*.orig
+
+# VSCode
+.vscode/
+
+# Buck
+buck-out/
+\.buckd/
+*.keystore
+
+# Test coverage
+coverage/
+*.lcov
+
+# Env files
+.env
+.env.*
+
+# Watchman
+.watchmanconfig
+
+# Firebase
+firebase-debug.log
+
+# React Native Packager
+react-native-debugger.json
+
+# CocoaPods
+ios/Podfile.lock
+
+# Sentry
+.sentryclirc
+
+# Miscellaneous
+.idea/
+*.iml
+*.hprof
