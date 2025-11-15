@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
-import currencies from './assets/currencies.json';
+import currencies from '../assets/currencies.json';
 
 const ACCOUNT_STORAGE_KEY = 'accounts';
 const AccountsContext = createContext();
