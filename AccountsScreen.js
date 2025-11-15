@@ -78,9 +78,15 @@ export default function AccountsScreen() {
         onPress={() => startEdit(item.id)}
         accessibilityLabel={t('edit_account') || 'Edit Account'}
       >
-        <View style={styles.accountInfo}>
-          <Text style={[styles.accountText, { color: colors.text }]}> 
-            {item.name} {item.balance} {currencies[item.currency]?.symbol || item.currency}
+        <View style={styles.accountNameWrapper}>
+          <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+            {item.name}
+          </Text>
+        </View>
+        <View style={styles.verticalDivider} />
+        <View style={styles.accountValueWrapper}>
+          <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
+            {item.balance} {currencies[item.currency]?.symbol || item.currency}
           </Text>
         </View>
       </TouchableOpacity>
@@ -204,6 +210,13 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
+    verticalDivider: {
+      width: 1,
+      height: '70%',
+      backgroundColor: 'rgba(120,120,120,0.13)', // subtle vertical divider
+      alignSelf: 'center',
+      marginHorizontal: 2,
+    },
   container: { flex: 1, padding: 16 },
   headerRow: {
     flexDirection: 'row',
@@ -232,18 +245,23 @@ const styles = StyleSheet.create({
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderColor: '#eee',
-    // marginBottom removed for full background fill
-    // paddingBottom replaced by paddingVertical
+    borderColor: 'rgba(120,120,120,0.13)', // slightly visible divider
     minHeight: 56,
   },
-  accountInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  accountNameWrapper: {
+    flex: 7,
+    justifyContent: 'center',
+    paddingLeft: 16,
+    paddingRight: 8,
+  },
+  accountValueWrapper: {
+    flex: 3,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 16,
+    paddingLeft: 8,
   },
   buttonGroup: {
     flexDirection: 'row',
