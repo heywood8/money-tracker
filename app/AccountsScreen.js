@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
-import SettingsModal from './SettingsModal';
 
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
@@ -11,7 +10,6 @@ export default function AccountsScreen() {
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
-  const [settingsVisible, setSettingsVisible] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
   const { colorScheme, colors } = useTheme();
   const { accounts, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
@@ -95,18 +93,7 @@ export default function AccountsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>  
-      <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: colors.text }]}>{t('accounts')}</Text>
-        <TouchableOpacity
-          style={[styles.hamburgerButton, { backgroundColor: colors.secondary }]}
-          onPress={() => setSettingsVisible(true)}
-          accessibilityLabel={t('settings')}
-        >
-          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
-          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
-          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
-        </TouchableOpacity>
-      </View>
+      {/* Header is rendered globally by app/Header; per-screen header removed */}
       <FlatList
         data={accounts}
         renderItem={renderItem}
@@ -204,7 +191,7 @@ export default function AccountsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
+      {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
   );
 }
