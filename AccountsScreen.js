@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
 import SettingsModal from './SettingsModal';
+
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
+import { useLocalization } from './LocalizationContext';
 
 export default function AccountsScreen() {
+
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -12,6 +15,7 @@ export default function AccountsScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const { colorScheme, colors } = useTheme();
   const { accounts, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
+  const { t } = useLocalization();
 
   const startEdit = (id) => {
     setEditingId(id);
@@ -44,12 +48,12 @@ export default function AccountsScreen() {
 
   const deleteAccountHandler = (id) => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete this account?',
+      t('delete_account') || 'Delete Account',
+      t('delete_account_confirm') || 'Are you sure you want to delete this account?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel') || 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('delete') || 'Delete',
           style: 'destructive',
           onPress: () => {
             deleteAccount(id);
@@ -73,10 +77,10 @@ export default function AccountsScreen() {
       </View>
       <View style={styles.buttonGroup}>
         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => startEdit(item.id)}>
-          <Text style={[styles.buttonText, { color: colors.text }]}>Edit</Text>
+          <Text style={[styles.buttonText, { color: colors.text }]}>{t('edit') || 'Edit'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => deleteAccountHandler(item.id)}>
-          <Text style={[styles.buttonText, { color: colors.text }]}>Delete</Text>
+          <Text style={[styles.buttonText, { color: colors.text }]}>{t('delete') || 'Delete'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -85,11 +89,11 @@ export default function AccountsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>  
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: colors.text }]}>Accounts</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('accounts')}</Text>
         <TouchableOpacity
           style={[styles.hamburgerButton, { backgroundColor: colors.secondary }]}
           onPress={() => setSettingsVisible(true)}
-          accessibilityLabel="Settings"
+          accessibilityLabel={t('settings')}
         >
           <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
           <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
@@ -100,10 +104,10 @@ export default function AccountsScreen() {
         data={accounts}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        ListEmptyComponent={<Text style={{ color: colors.mutedText }}>No accounts yet.</Text>}
+        ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
       />
       <View style={styles.addButtonWrapper}>
-        <Button title="Add Account" onPress={addAccountHandler} color={colors.primary} />
+        <Button title={t('add_account') || 'Add Account'} onPress={addAccountHandler} color={colors.primary} />
       </View>
       <Modal
         visible={!!editingId}
@@ -114,7 +118,7 @@ export default function AccountsScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => { setEditingId(null); setErrors({}); }}>
           <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Account</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('edit_account') || 'Edit Account'}</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -123,7 +127,7 @@ export default function AccountsScreen() {
                 ]}
                 value={editValues.name}
                 onChangeText={text => setEditValues(v => ({ ...v, name: text }))}
-                placeholder="Account Name"
+                placeholder={t('account_name') || 'Account Name'}
                   placeholderTextColor={colors.mutedText}
                 autoFocus
               />
@@ -136,7 +140,7 @@ export default function AccountsScreen() {
                 ]}
                 value={editValues.balance}
                 onChangeText={text => setEditValues(v => ({ ...v, balance: text }))}
-                placeholder="Balance"
+                placeholder={t('balance') || 'Balance'}
                   placeholderTextColor={colors.mutedText}
                 keyboardType="numeric"
               />
@@ -144,7 +148,7 @@ export default function AccountsScreen() {
                 <View style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}> 
                   <Pressable onPress={() => setPickerVisible(true)} style={styles.pickerDisplay}>
                     <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
-                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : 'Select currency'}
+                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
                     </Text>
                   </Pressable>
                   <Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
@@ -166,7 +170,7 @@ export default function AccountsScreen() {
                           }}
                         />
                         <Pressable style={styles.closeButton} onPress={() => setPickerVisible(false)}>
-                          <Text style={{ color: colors.primary }}>Close</Text>
+                          <Text style={{ color: colors.primary }}>{t('close') || 'Close'}</Text>
                         </Pressable>
                       </Pressable>
                     </Pressable>
@@ -176,10 +180,10 @@ export default function AccountsScreen() {
             </View>
               <View style={[styles.modalButtonRowSticky, { backgroundColor: colors.card }]}> 
                 <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={() => { setEditingId(null); setErrors({}); }}>
-                  <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
+                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
                 </Pressable>
                 <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
-                  <Text style={[styles.buttonText, { color: colors.text }]}>Save</Text>
+                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('save') || 'Save'}</Text>
                 </Pressable>
               </View>
           </Pressable>

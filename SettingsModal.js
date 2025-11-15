@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './ThemeContext';
+import { useLocalization } from './LocalizationContext';
 
-const options = [
+const themeOptions = [
   { label: 'System', value: 'system' },
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
@@ -11,11 +12,16 @@ const options = [
 
 export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
+  const { t, language, setLanguage, availableLanguages } = useLocalization();
   const [localSelection, setLocalSelection] = useState(theme);
+  const [localLang, setLocalLang] = useState(language);
 
   useEffect(() => {
-    if (visible) setLocalSelection(theme);
-  }, [visible, theme]);
+    if (visible) {
+      setLocalSelection(theme);
+      setLocalLang(language);
+    }
+  }, [visible, theme, language]);
 
   return (
     <Modal
@@ -24,12 +30,11 @@ export default function SettingsModal({ visible, onClose }) {
       transparent={true}
       onRequestClose={onClose}
     >
-      
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={[styles.content, { backgroundColor: colors.card }]} onPress={() => {}}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
-          <Text style={[styles.subtitle, { color: colors.text }]}>Theme</Text>
-          {options.map(opt => (
+          <Text style={[styles.title, { color: colors.text }]}>{t('settings')}</Text>
+          <Text style={[styles.subtitle, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
+          {themeOptions.map(opt => (
             <Pressable
               key={opt.value}
               style={({ pressed }) => [
@@ -44,12 +49,35 @@ export default function SettingsModal({ visible, onClose }) {
               {localSelection === opt.value && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
             </Pressable>
           ))}
+          <Text style={[styles.subtitle, { color: colors.text, marginTop: 16 }]}>{t('language')}</Text>
+          {availableLanguages.map(lng => (
+            <Pressable
+              key={lng}
+              style={({ pressed }) => [
+                styles.option,
+                { backgroundColor: colors.secondary },
+                localLang === lng && { backgroundColor: colors.primary },
+                pressed && { opacity: 0.9 },
+              ]}
+              onPress={() => setLocalLang(lng)}
+            >
+              <Text style={[styles.optionText, { color: localLang === lng ? colors.card : colors.text }]}>{t(lng === 'en' ? 'english' : 'russian')}</Text>
+              {localLang === lng && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
+            </Pressable>
+          ))}
           <View style={styles.modalButtonRow}>
             <Pressable style={[styles.modalButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-              <Text style={[styles.closeText, { color: colors.text }]}>Cancel</Text>
+              <Text style={[styles.closeText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
             </Pressable>
-            <Pressable style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => { setTheme(localSelection); onClose(); }}>
-              <Text style={[styles.closeText, { color: colors.card }]}>Save</Text>
+            <Pressable
+              style={[styles.modalButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setTheme(localSelection);
+                setLanguage(localLang);
+                onClose();
+              }}
+            >
+              <Text style={[styles.closeText, { color: colors.card }]}>{t('save') || 'Save'}</Text>
             </Pressable>
           </View>
         </Pressable>

@@ -10,6 +10,7 @@
 - Evaluate the use of dynamic styling libraries like `styled-components` or `tailwind-rn`.
 - Ensure responsive design using `Dimensions`, `PixelRatio`, or `react-native-size-matters`.
 
+
 ## 3. **Testing**
 - Set up Jest for unit testing.
 - Use `react-native-testing-library` for component testing.
@@ -23,6 +24,7 @@
 - Audit components for accessibility compliance.
 - Add accessibility props like `accessible`, `accessibilityLabel`, and `accessibilityHint`.
 - Test the app with screen readers (VoiceOver for iOS, TalkBack for Android).
+
 
 ## 6. **Localization and Internationalization**
 - Integrate a library like `react-intl` or `i18next` for multi-language support.
