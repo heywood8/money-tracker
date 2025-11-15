@@ -136,8 +136,8 @@ export default function AccountsScreen() {
         transparent={true}
         onRequestClose={() => setEditingId(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}> 
+        <Pressable style={styles.modalOverlay} onPress={() => { setEditingId(null); setErrors({}); }}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <View style={{ flex: 1 }}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Account</Text>
               <TextInput
@@ -173,8 +173,8 @@ export default function AccountsScreen() {
                     </Text>
                   </Pressable>
                   <Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
-                    <View style={styles.modalOverlay}>
-                      <View style={[styles.pickerModalContent, { backgroundColor: colors.card }]}> 
+                    <Pressable style={styles.modalOverlay} onPress={() => setPickerVisible(false)}>
+                      <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
                         <FlatList
                           data={Object.entries(currencies)}
                           keyExtractor={([code]) => code}
@@ -193,8 +193,8 @@ export default function AccountsScreen() {
                         <Pressable style={styles.closeButton} onPress={() => setPickerVisible(false)}>
                           <Text style={{ color: colors.primary }}>Close</Text>
                         </Pressable>
-                      </View>
-                    </View>
+                      </Pressable>
+                    </Pressable>
                   </Modal>
                 </View>
               {errors.currency && <Text style={styles.error}>{errors.currency}</Text>}
@@ -207,8 +207,8 @@ export default function AccountsScreen() {
                   <Text style={[styles.buttonText, { color: colors.text }]}>Save</Text>
                 </Pressable>
               </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </View>

@@ -25,8 +25,8 @@ export default function SettingsModal({ visible, onClose }) {
       onRequestClose={onClose}
     >
       
-      <View style={styles.overlay}>
-        <View style={[styles.content, { backgroundColor: colors.card }]}> 
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={[styles.content, { backgroundColor: colors.card }]} onPress={() => {}}>
           <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
           <Text style={[styles.subtitle, { color: colors.text }]}>Theme</Text>
           {options.map(opt => (
@@ -52,8 +52,8 @@ export default function SettingsModal({ visible, onClose }) {
               <Text style={[styles.closeText, { color: colors.card }]}>Save</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
