@@ -110,3 +110,71 @@ Before starting a new task in the above plan, update progress in the plan.
 - Work through each checklist item systematically.
 - Keep communication concise and focused.
 - Follow development best practices.
+
+- **Code Structure and Organization**:
+  - Use a modular structure to separate concerns (e.g., components, screens, services, contexts).
+  - Keep reusable components in a `components/` directory.
+  - Organize assets (images, fonts, etc.) in a dedicated `assets/` folder.
+
+- **State Management**:
+  - Use React Context API, Redux, or Zustand for global state management.
+  - Avoid prop drilling by leveraging context or state libraries.
+
+- **Styling**:
+  - Use `StyleSheet.create` for consistent and performant styles.
+  - Consider using libraries like `styled-components` or `tailwind-rn` for dynamic styling.
+  - Ensure responsive design using `Dimensions`, `PixelRatio`, or libraries like `react-native-size-matters`.
+
+- **Navigation**:
+  - Use `react-navigation` for handling navigation.
+  - Structure navigation with stacks, tabs, and drawers as needed.
+  - Handle deep linking and navigation state persistence.
+
+- **Platform-Specific Code**:
+  - Use `Platform` API to handle platform-specific logic.
+  - Keep platform-specific styles and components in separate files (e.g., `Component.ios.js`, `Component.android.js`).
+
+- **Performance Optimization**:
+  - Use `useMemo` and `useCallback` to optimize re-renders.
+  - Avoid anonymous functions in render methods.
+  - Use FlatList or SectionList for rendering large lists efficiently.
+  - Optimize images using `react-native-fast-image`.
+
+- **Testing**:
+  - Write unit tests using Jest.
+  - Use `react-native-testing-library` for component testing.
+  - Test on both iOS and Android devices/emulators.
+
+- **Error Handling**:
+  - Use `ErrorBoundary` for catching runtime errors.
+  - Implement logging with tools like Sentry or Bugsnag.
+
+- **Dependencies**:
+  - Keep dependencies up-to-date.
+  - Use `npm audit` or `yarn audit` to check for vulnerabilities.
+
+- **Accessibility**:
+  - Use accessibility props like `accessible`, `accessibilityLabel`, and `accessibilityHint`.
+  - Test with screen readers (VoiceOver for iOS, TalkBack for Android).
+
+- **Localization and Internationalization**:
+  - Use libraries like `react-intl` or `i18next` for multi-language support.
+  - Store translations in JSON files.
+
+- **Build and Deployment**:
+  - Use `react-native-config` for managing environment variables.
+  - Automate builds with CI/CD tools like GitHub Actions or Bitrise.
+  - Test release builds on real devices.
+
+- **Documentation**:
+  - Maintain a clear and updated `README.md`.
+  - Document components and utilities with comments and tools like Storybook.
+
+- **Security**:
+  - Avoid storing sensitive data in plain text.
+  - Use secure storage libraries like `react-native-keychain` or `react-native-encrypted-storage`.
+  - Validate user inputs to prevent injection attacks.
+
+- **Community and Updates**:
+  - Follow React Native's official blog and changelog.
+  - Engage with the community on GitHub, Stack Overflow, and forums.
