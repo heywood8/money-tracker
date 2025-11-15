@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './ThemeContext';
 
@@ -10,9 +10,13 @@ const options = [
 
 
 export default function SettingsModal({ visible, onClose }) {
-  const { theme, setTheme, colorScheme } = useTheme();
+  const { theme, setTheme, colorScheme, colors } = useTheme();
+  const [localSelection, setLocalSelection] = useState(theme);
 
-  const isDark = colorScheme === 'dark';
+  useEffect(() => {
+    if (visible) setLocalSelection(theme);
+  }, [visible, theme]);
+
   return (
     <Modal
       visible={visible}
@@ -20,26 +24,34 @@ export default function SettingsModal({ visible, onClose }) {
       transparent={true}
       onRequestClose={onClose}
     >
+      
       <View style={styles.overlay}>
-        <View style={[styles.content, isDark && { backgroundColor: '#222' }]}> 
-          <Text style={[styles.title, isDark && { color: '#fff' }]}>Settings</Text>
-          <Text style={[styles.subtitle, isDark && { color: '#fff' }]}>Theme</Text>
+        <View style={[styles.content, { backgroundColor: colors.card }]}> 
+          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+          <Text style={[styles.subtitle, { color: colors.text }]}>Theme</Text>
           {options.map(opt => (
             <Pressable
               key={opt.value}
-              style={[
+              style={({ pressed }) => [
                 styles.option,
-                theme === opt.value && (isDark ? styles.selectedDark : styles.selected),
-                isDark && { backgroundColor: '#333' },
+                { backgroundColor: colors.secondary },
+                localSelection === opt.value && { backgroundColor: colors.primary },
+                pressed && { opacity: 0.9 },
               ]}
-              onPress={() => setTheme(opt.value)}
+              onPress={() => setLocalSelection(opt.value)}
             >
-              <Text style={[styles.optionText, isDark && { color: '#fff' }]}>{opt.label}</Text>
+              <Text style={[styles.optionText, { color: localSelection === opt.value ? colors.card : colors.text }]}>{opt.label}</Text>
+              {localSelection === opt.value && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
             </Pressable>
           ))}
-          <Pressable style={styles.closeButton} onPress={onClose}>
-            <Text style={[styles.closeText, isDark && { color: '#4da3ff' }]}>Close</Text>
-          </Pressable>
+          <View style={styles.modalButtonRow}>
+            <Pressable style={[styles.modalButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+              <Text style={[styles.closeText, { color: colors.text }]}>Cancel</Text>
+            </Pressable>
+            <Pressable style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => { setTheme(localSelection); onClose(); }}>
+              <Text style={[styles.closeText, { color: colors.card }]}>Save</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -55,7 +67,6 @@ const styles = StyleSheet.create({
   },
   content: {
     width: '85%',
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 24,
     alignItems: 'stretch',
@@ -73,10 +84,13 @@ const styles = StyleSheet.create({
   },
   option: {
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   selected: {
     backgroundColor: '#c0e0ff',
@@ -95,5 +109,17 @@ const styles = StyleSheet.create({
   closeText: {
     color: '#007AFF',
     fontSize: 16,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  modalButton: {
+    flex: 1,
+    marginHorizontal: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });
