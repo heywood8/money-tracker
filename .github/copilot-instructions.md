@@ -1,26 +1,32 @@
 <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+- [ ] Verify that the copilot-instructions.md file in the .github directory is created.
 
 - [ ] Clarify Project Requirements
-	<!-- Ask for project type, language, and frameworks if not specified. Skip if already provided. -->
+	- This project is a React Native mobile app using JavaScript.
+	- If the user request does not match this context, clarify the intended project type, language, or frameworks before proceeding.
+	- If the user is unsure, suggest React Native and JavaScript as defaults for this workspace.
 
 - [ ] Scaffold the Project
-	<!--
-	Ensure that the previous step has been marked as completed.
-	Call project setup tool with projectType parameter.
-	Run scaffolding command to create project files and folders.
-	Use '.' as the working directory.
-	If no appropriate projectType is available, search documentation using available tools.
-	Otherwise, create the project structure manually using available file creation tools.
-	-->
+  - Ensure the previous step is completed.
+  - For this project, the React Native structure and files already exist in the `app/` directory.
+  - If additional scaffolding is needed, use React Native CLI or Expo CLI with the working directory set to `.`.
+  - Confirm that `package.json`, `App.js`, and entry files are present in the `app/` directory.
+  - If any core files are missing, create them using standard React Native templates.
+  - Do not create a new folder; use the current directory as the project root.
 
 - [ ] Customize the Project
-	<!--
-	Verify that all previous steps have been completed successfully and you have marked the step as completed.
-	Develop a plan to modify codebase according to user requirements.
-	Apply modifications using appropriate tools and user-provided references.
-	Skip this step for "Hello World" projects.
-	-->
+	- Verify that all previous steps have been completed successfully and marked as completed.
+	- Review user requirements and develop a plan to modify the codebase accordingly.
+	- Follow React Native and JavaScript best practices:
+		- Use functional components and React hooks where possible.
+		- Organize components, screens, and utilities logically within the `app/` directory.
+		- Use consistent code style and formatting (e.g., Prettier, ESLint if configured).
+		- Keep UI components reusable and maintainable.
+		- Store assets (images, data files) in the appropriate subfolders under `app/assets/`.
+		- Use context or state management (e.g., React Context API) for shared state.
+		- Write clear comments and documentation for complex logic.
+	- Apply modifications using appropriate tools and user-provided references.
+	- Skip this step for "Hello World" projects.
 
 - [ ] Install Required Extensions
 	<!-- ONLY install extensions provided mentioned in the get_project_setup_info. Skip this step otherwise and mark as completed. -->
