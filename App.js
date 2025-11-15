@@ -1,12 +1,12 @@
 import React from 'react';
-import AccountsScreen from './AccountsScreen';
-import { ThemeProvider } from './ThemeContext';
-import { AccountsProvider } from './AccountsContext';
-import { LocalizationProvider } from './LocalizationContext';
+import AccountsScreen from './app/AccountsScreen';
+import { ThemeProvider } from './app/ThemeContext';
+import { AccountsProvider } from './app/AccountsContext';
+import { LocalizationProvider } from './app/LocalizationContext';
 import { StatusBar, Platform } from 'react-native';
 
 function ThemedStatusBar() {
-  const { colorScheme, colors } = require('./ThemeContext').useTheme();
+  const { colorScheme, colors } = require('./app/ThemeContext').useTheme();
   const barStyle = colorScheme === 'dark' ? 'light-content' : 'dark-content';
   React.useEffect(() => {
     try {
