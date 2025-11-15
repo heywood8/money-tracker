@@ -1,42 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
 import SettingsModal from './SettingsModal';
 import { useTheme } from './ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import uuid from 'react-native-uuid';
-import currencies from './assets/currencies.json';
-
-const ACCOUNT_STORAGE_KEY = 'accounts';
-
-function validateAccount(account) {
-  const errors = {};
-  if (!account.name.trim()) errors.name = 'Name required';
-  if (isNaN(Number(account.balance)) || account.balance === '') errors.balance = 'Balance must be a number';
-  if (!account.currency) errors.currency = 'Currency required';
-  return errors;
-}
-
+import { useAccounts } from './AccountsContext';
 
 export default function AccountsScreen() {
-  const [accounts, setAccounts] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
   const { colorScheme, colors } = useTheme();
-
-  useEffect(() => {
-    // Load accounts from storage
-    AsyncStorage.getItem(ACCOUNT_STORAGE_KEY).then(data => {
-      if (data) setAccounts(JSON.parse(data));
-    });
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(accounts));
-  }, [accounts]);
+  const { accounts, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
 
   const startEdit = (id) => {
     setEditingId(id);
@@ -52,22 +27,22 @@ export default function AccountsScreen() {
       return;
     }
     if (editingId === 'new') {
-      setAccounts(accs => [...accs, { ...editValues, balance: String(editValues.balance) }]);
+      addAccount(editValues);
     } else {
-      setAccounts(accs => accs.map(a => a.id === editingId ? { ...editValues, balance: String(editValues.balance) } : a));
+      updateAccount(editingId, editValues);
     }
     setEditingId(null);
     setEditValues({});
     setErrors({});
   };
 
-  const addAccount = () => {
+  const addAccountHandler = () => {
     setEditingId('new');
-    setEditValues({ id: uuid.v4(), name: '', balance: '', currency: Object.keys(currencies)[0] });
+    setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0] });
     setErrors({});
   };
 
-  const deleteAccount = (id) => {
+  const deleteAccountHandler = (id) => {
     Alert.alert(
       'Delete Account',
       'Are you sure you want to delete this account?',
@@ -77,7 +52,7 @@ export default function AccountsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setAccounts(accs => accs.filter(a => a.id !== id));
+            deleteAccount(id);
             if (editingId === id) {
               setEditingId(null);
               setEditValues({});
@@ -100,7 +75,7 @@ export default function AccountsScreen() {
         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => startEdit(item.id)}>
           <Text style={[styles.buttonText, { color: colors.text }]}>Edit</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => deleteAccount(item.id)}>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => deleteAccountHandler(item.id)}>
           <Text style={[styles.buttonText, { color: colors.text }]}>Delete</Text>
         </TouchableOpacity>
       </View>
@@ -128,7 +103,7 @@ export default function AccountsScreen() {
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>No accounts yet.</Text>}
       />
       <View style={styles.addButtonWrapper}>
-        <Button title="Add Account" onPress={addAccount} color={colors.primary} />
+        <Button title="Add Account" onPress={addAccountHandler} color={colors.primary} />
       </View>
       <Modal
         visible={!!editingId}
