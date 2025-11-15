@@ -1,6 +1,7 @@
 {
   "en": {
     "accounts": "Accounts",
+    "operations": "Operations",
     "settings": "Settings",
     "language": "Language",
     "theme": "Theme",
@@ -22,6 +23,7 @@
   },
   "ru": {
     "accounts": "Счета",
+    "operations": "Операции",
     "settings": "Настройки",
     "language": "Язык",
     "theme": "Тема",
@@ -42,3 +44,4 @@
     "english": "Английский"
   }
 }
+
