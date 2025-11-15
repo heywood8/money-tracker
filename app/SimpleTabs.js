@@ -67,8 +67,8 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 80 : 56,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 0,
+    height: 80,
+    paddingBottom: 24,
   },
   tab: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   tabText: { fontSize: 13 },
