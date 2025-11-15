@@ -1,0 +1,3 @@
+// This file is required for icon usage in AccountsScreen.js
+// Install react-native-vector-icons and link if not already done.
+// See: https://github.com/oblador/react-native-vector-icons
