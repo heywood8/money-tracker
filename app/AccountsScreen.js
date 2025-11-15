@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, 
 import SettingsModal from './SettingsModal';
 import { useTheme } from './ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
+
 import uuid from 'react-native-uuid';
 import currencies from './assets/currencies.json';
 
@@ -24,7 +24,8 @@ export default function AccountsScreen() {
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const { colorScheme } = useTheme();
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const { colorScheme, colors } = useTheme();
 
   useEffect(() => {
     // Load accounts from storage
@@ -89,45 +90,45 @@ export default function AccountsScreen() {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.accountRow}>
+    <View style={[styles.accountRow, { borderColor: colors.border }]}> 
       <View style={styles.accountInfo}>
-        <Text style={[styles.accountText, colorScheme === 'dark' && { color: '#fff' }]}> 
+        <Text style={[styles.accountText, { color: colors.text }]}> 
           {item.name} {item.balance} {currencies[item.currency]?.symbol || item.currency}
         </Text>
       </View>
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => startEdit(item.id)}>
-          <Text style={[styles.buttonText, colorScheme === 'dark' && { color: '#111' }]}>Edit</Text>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => startEdit(item.id)}>
+          <Text style={[styles.buttonText, { color: colors.text }]}>Edit</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => deleteAccount(item.id)}>
-          <Text style={[styles.buttonText, colorScheme === 'dark' && { color: '#111' }]}>Delete</Text>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => deleteAccount(item.id)}>
+          <Text style={[styles.buttonText, { color: colors.text }]}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <View style={[styles.container, colorScheme === 'dark' ? { backgroundColor: '#111' } : { backgroundColor: '#fff' }]}>  
+    <View style={[styles.container, { backgroundColor: colors.background }]}>  
       <View style={styles.headerRow}>
-        <Text style={[styles.title, colorScheme === 'dark' && { color: '#fff' }]}>Accounts</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Accounts</Text>
         <TouchableOpacity
-          style={styles.hamburgerButton}
+          style={[styles.hamburgerButton, { backgroundColor: colors.secondary }]}
           onPress={() => setSettingsVisible(true)}
           accessibilityLabel="Settings"
         >
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
+          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
+          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
+          <View style={[styles.hamburgerLine, { backgroundColor: colors.text }]} />
         </TouchableOpacity>
       </View>
       <FlatList
         data={accounts}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        ListEmptyComponent={<Text style={colorScheme === 'dark' ? { color: '#fff' } : {}}>No accounts yet.</Text>}
+        ListEmptyComponent={<Text style={{ color: colors.mutedText }}>No accounts yet.</Text>}
       />
       <View style={styles.addButtonWrapper}>
-        <Button title="Add Account" onPress={addAccount} />
+        <Button title="Add Account" onPress={addAccount} color={colors.primary} />
       </View>
       <Modal
         visible={!!editingId}
@@ -136,19 +137,19 @@ export default function AccountsScreen() {
         onRequestClose={() => setEditingId(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, colorScheme === 'dark' && { backgroundColor: '#222' }]}> 
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}> 
             <View style={{ flex: 1 }}>
-              <Text style={[styles.modalTitle, colorScheme === 'dark' && { color: '#fff' }]}>Edit Account</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Account</Text>
               <TextInput
                 style={[
                   styles.input,
                   errors.name && styles.inputError,
-                  colorScheme === 'dark' && { color: '#fff', backgroundColor: '#333', borderColor: '#555' }
+                    { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
                 ]}
                 value={editValues.name}
                 onChangeText={text => setEditValues(v => ({ ...v, name: text }))}
                 placeholder="Account Name"
-                placeholderTextColor={colorScheme === 'dark' ? '#aaa' : undefined}
+                  placeholderTextColor={colors.mutedText}
                 autoFocus
               />
               {errors.name && <Text style={styles.error}>{errors.name}</Text>}
@@ -156,47 +157,56 @@ export default function AccountsScreen() {
                 style={[
                   styles.input,
                   errors.balance && styles.inputError,
-                  colorScheme === 'dark' && { color: '#fff', backgroundColor: '#333', borderColor: '#555' }
+                    { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
                 ]}
                 value={editValues.balance}
                 onChangeText={text => setEditValues(v => ({ ...v, balance: text }))}
                 placeholder="Balance"
-                placeholderTextColor={colorScheme === 'dark' ? '#aaa' : undefined}
+                  placeholderTextColor={colors.mutedText}
                 keyboardType="numeric"
               />
               {errors.balance && <Text style={styles.error}>{errors.balance}</Text>}
-              <View style={[styles.pickerWrapper, colorScheme === 'dark' && { backgroundColor: '#333' }]}> 
-                <Picker
-                  selectedValue={editValues.currency}
-                  style={[
-                    styles.picker,
-                    colorScheme === 'dark' && { color: '#fff', backgroundColor: '#333' },
-                    { fontSize: 22, fontWeight: '500' }
-                  ]}
-                  onValueChange={val => setEditValues(v => ({ ...v, currency: val }))}
-                  dropdownIconColor={colorScheme === 'dark' ? '#fff' : undefined}
-                >
-                  {Object.entries(currencies).map(([code, cur]) => (
-                    <Picker.Item
-                      key={code}
-                      label={`${cur.name} (${cur.symbol})`}
-                      value={code}
-                      color={colorScheme === 'dark' ? '#fff' : '#000'}
-                      style={{ fontSize: 22, fontWeight: '500' }}
-                    />
-                  ))}
-                </Picker>
-              </View>
+                <View style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}> 
+                  <Pressable onPress={() => setPickerVisible(true)} style={styles.pickerDisplay}>
+                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
+                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : 'Select currency'}
+                    </Text>
+                  </Pressable>
+                  <Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.pickerModalContent, { backgroundColor: colors.card }]}> 
+                        <FlatList
+                          data={Object.entries(currencies)}
+                          keyExtractor={([code]) => code}
+                          renderItem={({ item }) => {
+                            const [code, cur] = item;
+                            return (
+                              <Pressable
+                                onPress={() => { setEditValues(v => ({ ...v, currency: code })); setPickerVisible(false); }}
+                                style={({ pressed }) => [styles.pickerOption, { borderColor: colors.border }, pressed && { backgroundColor: colors.selected }]}
+                              >
+                                <Text style={{ color: colors.text, fontSize: 18 }}>{cur.name} ({cur.symbol})</Text>
+                              </Pressable>
+                            );
+                          }}
+                        />
+                        <Pressable style={styles.closeButton} onPress={() => setPickerVisible(false)}>
+                          <Text style={{ color: colors.primary }}>Close</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Modal>
+                </View>
               {errors.currency && <Text style={styles.error}>{errors.currency}</Text>}
             </View>
-            <View style={[styles.modalButtonRowSticky, colorScheme === 'dark' && { backgroundColor: '#222' }]}> 
-              <Pressable style={[styles.actionButton, styles.modalButton]} onPress={() => { setEditingId(null); setErrors({}); }}>
-                <Text style={[styles.buttonText, colorScheme === 'dark' && { color: '#111' }]}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.actionButton, styles.modalButton]} onPress={saveEdit}>
-                <Text style={[styles.buttonText, colorScheme === 'dark' && { color: '#111' }]}>Save</Text>
-              </Pressable>
-            </View>
+              <View style={[styles.modalButtonRowSticky, { backgroundColor: colors.card }]}> 
+                <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={() => { setEditingId(null); setErrors({}); }}>
+                  <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
+                  <Text style={[styles.buttonText, { color: colors.text }]}>Save</Text>
+                </Pressable>
+              </View>
           </View>
         </View>
       </Modal>
@@ -222,12 +232,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 6,
     borderRadius: 18,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'transparent',
   },
   hamburgerLine: {
     width: 20,
     height: 3,
-    backgroundColor: '#333',
+    backgroundColor: '#000',
     marginVertical: 2,
     borderRadius: 2,
   },
@@ -251,7 +261,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   actionButton: {
-    backgroundColor: '#e0e0e0',
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#000',
   },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 8, marginBottom: 4 },
   inputError: { borderColor: 'red' },
@@ -269,7 +278,25 @@ const styles = StyleSheet.create({
   accountText: { fontSize: 22, fontWeight: '500', marginBottom: 4 },
   link: { color: 'blue', marginLeft: 8 },
   picker: { height: 80, width: '100%' },
-  pickerWrapper: { marginBottom: 4, marginTop: 4, backgroundColor: '#fff', borderRadius: 4, overflow: 'hidden' },
+  pickerWrapper: { marginBottom: 4, marginTop: 4, borderRadius: 4, overflow: 'hidden' },
+  pickerDisplay: { padding: 12, justifyContent: 'center' },
+  pickerModalContent: {
+    width: '90%',
+    maxHeight: '70%',
+    borderRadius: 12,
+    padding: 12,
+  },
+  pickerOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+  },
+  closeButton: {
+    marginTop: 8,
+    alignSelf: 'center',
+    padding: 10,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.3)',
