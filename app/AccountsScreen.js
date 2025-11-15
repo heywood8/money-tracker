@@ -27,6 +27,7 @@ export default function AccountsScreen() {
   const { colorScheme } = useTheme();
 
   useEffect(() => {
+    // Load accounts from storage
     AsyncStorage.getItem(ACCOUNT_STORAGE_KEY).then(data => {
       if (data) setAccounts(JSON.parse(data));
     });
@@ -167,12 +168,22 @@ export default function AccountsScreen() {
               <View style={[styles.pickerWrapper, colorScheme === 'dark' && { backgroundColor: '#333' }]}> 
                 <Picker
                   selectedValue={editValues.currency}
-                  style={[styles.picker, colorScheme === 'dark' && { color: '#fff', backgroundColor: '#333' }]}
+                  style={[
+                    styles.picker,
+                    colorScheme === 'dark' && { color: '#fff', backgroundColor: '#333' },
+                    { fontSize: 22, fontWeight: '500' }
+                  ]}
                   onValueChange={val => setEditValues(v => ({ ...v, currency: val }))}
                   dropdownIconColor={colorScheme === 'dark' ? '#fff' : undefined}
                 >
                   {Object.entries(currencies).map(([code, cur]) => (
-                    <Picker.Item key={code} label={`${cur.name} (${cur.symbol})`} value={code} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+                    <Picker.Item
+                      key={code}
+                      label={`${cur.name} (${cur.symbol})`}
+                      value={code}
+                      color={colorScheme === 'dark' ? '#fff' : '#000'}
+                      style={{ fontSize: 22, fontWeight: '500' }}
+                    />
                   ))}
                 </Picker>
               </View>
