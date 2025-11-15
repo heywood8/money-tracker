@@ -69,21 +69,17 @@ export default function AccountsScreen() {
   };
 
   const renderItem = ({ item }) => (
-    <View style={[styles.accountRow, { borderColor: colors.border }]}> 
+    <TouchableOpacity
+      style={[styles.accountRow, { borderColor: colors.border }]}
+      onPress={() => startEdit(item.id)}
+      accessibilityLabel={t('edit_account') || 'Edit Account'}
+    >
       <View style={styles.accountInfo}>
         <Text style={[styles.accountText, { color: colors.text }]}> 
           {item.name} {item.balance} {currencies[item.currency]?.symbol || item.currency}
         </Text>
       </View>
-      <View style={styles.buttonGroup}>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => startEdit(item.id)}>
-          <Text style={[styles.buttonText, { color: colors.text }]}>{t('edit') || 'Edit'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary }]} onPress={() => deleteAccountHandler(item.id)}>
-          <Text style={[styles.buttonText, { color: colors.text }]}>{t('delete') || 'Delete'}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -182,6 +178,14 @@ export default function AccountsScreen() {
                 <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={() => { setEditingId(null); setErrors({}); }}>
                   <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
                 </Pressable>
+                {editingId !== 'new' && (
+                  <Pressable
+                    style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.delete || '#d9534f' }]}
+                    onPress={() => deleteAccountHandler(editingId)}
+                  >
+                    <Text style={[styles.buttonText, { color: colors.card }]}>{t('delete') || 'Delete'}</Text>
+                  </Pressable>
+                )}
                 <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
                   <Text style={[styles.buttonText, { color: colors.text }]}>{t('save') || 'Save'}</Text>
                 </Pressable>
