@@ -2,6 +2,7 @@ import React from 'react';
 import AccountsScreen from './AccountsScreen';
 import { ThemeProvider } from './ThemeContext';
 import { AccountsProvider } from './AccountsContext';
+import { LocalizationProvider } from './LocalizationContext';
 import { StatusBar, Platform } from 'react-native';
 
 function ThemedStatusBar() {
@@ -23,11 +24,13 @@ function ThemedStatusBar() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AccountsProvider>
-        <ThemedStatusBar />
-        <AccountsScreen />
-      </AccountsProvider>
-    </ThemeProvider>
+    <LocalizationProvider>
+      <ThemeProvider>
+        <AccountsProvider>
+          <ThemedStatusBar />
+          <AccountsScreen />
+        </AccountsProvider>
+      </ThemeProvider>
+    </LocalizationProvider>
   );
 }
