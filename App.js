@@ -1,5 +1,5 @@
 import React from 'react';
-import AccountsScreen from './app/AccountsScreen';
+import SimpleTabs from './app/SimpleTabs';
 import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
 import { LocalizationProvider } from './app/LocalizationContext';
@@ -28,7 +28,7 @@ export default function App() {
       <ThemeProvider>
         <AccountsProvider>
           <ThemedStatusBar />
-          <AccountsScreen />
+          <SimpleTabs />
         </AccountsProvider>
       </ThemeProvider>
     </LocalizationProvider>
