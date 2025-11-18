@@ -1,4 +1,5 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
+import * as Currency from './currency';
 
 /**
  * Get all accounts
@@ -116,10 +117,24 @@ export const updateAccount = async (id, updates) => {
  * Delete an account
  * @param {string} id
  * @returns {Promise<void>}
+ * @throws {Error} If account has associated operations
  */
 export const deleteAccount = async (id) => {
   try {
-    // Foreign key constraints will handle cascade deletion of related operations
+    // Check if account has any operations (expense, income, or transfers)
+    const operationCheck = await queryFirst(
+      `SELECT COUNT(*) as count FROM operations
+       WHERE account_id = ? OR to_account_id = ?`,
+      [id, id]
+    );
+
+    if (operationCheck && operationCheck.count > 0) {
+      throw new Error(
+        `Cannot delete account: ${operationCheck.count} transaction(s) are associated with this account. Please delete or reassign the transactions first.`
+      );
+    }
+
+    // Safe to delete - no operations are linked to this account
     await executeQuery('DELETE FROM accounts WHERE id = ?', [id]);
   } catch (error) {
     console.error('Failed to delete account:', error);
@@ -146,13 +161,13 @@ export const updateAccountBalance = async (id, delta) => {
         throw new Error(`Account ${id} not found`);
       }
 
-      const currentBalance = parseFloat(account.balance) || 0;
-      const newBalance = currentBalance + delta;
+      // Use Currency utilities for precise arithmetic
+      const newBalance = Currency.add(account.balance, delta);
 
       // Update balance
       await db.runAsync(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-        [newBalance.toString(), new Date().toISOString(), id]
+        [newBalance, new Date().toISOString(), id]
       );
     });
   } catch (error) {
@@ -189,13 +204,13 @@ export const batchUpdateBalances = async (balanceChanges) => {
           continue;
         }
 
-        const currentBalance = parseFloat(account.balance) || 0;
-        const newBalance = currentBalance + delta;
+        // Use Currency utilities for precise arithmetic
+        const newBalance = Currency.add(account.balance, delta);
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance.toString(), now, accountId]
+          [newBalance, now, accountId]
         );
       }
     });
