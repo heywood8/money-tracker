@@ -61,6 +61,12 @@ const CategoriesScreen = () => {
     return flattened;
   }, [categories, expandedIds, getChildren]);
 
+  const getItemLayout = useCallback((data, index) => ({
+    length: 56,
+    offset: 56 * index,
+    index,
+  }), []);
+
   const renderCategory = useCallback(({ item }) => {
     const category = item;
     const depth = item.depth;
@@ -163,6 +169,7 @@ const CategoriesScreen = () => {
         data={flattenedCategories}
         renderItem={renderCategory}
         keyExtractor={item => item.id}
+        getItemLayout={getItemLayout}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
@@ -170,8 +177,9 @@ const CategoriesScreen = () => {
         }
         contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : null}
         windowSize={10}
-        maxToRenderPerBatch={15}
+        maxToRenderPerBatch={10}
         initialNumToRender={15}
+        updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
       />
 
@@ -216,9 +224,11 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   expandButton: {
-    width: 24,
+    width: 44,  // Increased to minimum touch target
+    height: 44, // Increased to minimum touch target
     marginRight: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryIcon: {
     marginRight: 12,
@@ -241,7 +251,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   deleteButton: {
-    padding: 4,
+    width: 44,  // Increased to minimum touch target
+    height: 44, // Increased to minimum touch target
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,

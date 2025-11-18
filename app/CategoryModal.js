@@ -9,6 +9,9 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -66,6 +69,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
   }, [validateCategory, values, isNew, addCategory, updateCategory, category, onClose]);
 
   const handleClose = useCallback(() => {
+    Keyboard.dismiss();
     setErrors({});
     onClose();
   }, [onClose]);
@@ -108,9 +112,17 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
       transparent={true}
       onRequestClose={handleClose}
     >
-      <Pressable style={styles.modalOverlay} onPress={handleClose}>
-        <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleClose}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {isNew ? t('add_category') : t('edit_category')}
             </Text>
@@ -126,6 +138,8 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               placeholder={t('category_name')}
               placeholderTextColor={colors.mutedText}
               autoFocus
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
 
             {/* Type Picker */}
@@ -198,6 +212,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
           </View>
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
 
       {/* Icon Picker Modal */}
       <IconPicker
