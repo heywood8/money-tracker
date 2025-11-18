@@ -257,5 +257,31 @@ export const idb = {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
+  },
+
+  /**
+   * Execute multiple operations in a single atomic transaction
+   * @param {string} storeName - The object store name
+   * @param {Function} operations - Async function that receives the store
+   * @returns {Promise<any>}
+   */
+  async transaction(storeName, operations) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const db = await getDatabase();
+        const transaction = db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+
+        let result;
+        transaction.oncomplete = () => resolve(result);
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(new Error('Transaction aborted'));
+
+        // Execute operations with store access
+        result = await operations(store);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 };
