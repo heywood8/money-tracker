@@ -350,6 +350,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '90%',
     maxHeight: '80%',
+    minHeight: '60%',
     borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
@@ -357,9 +358,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+    flexDirection: 'column',
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
   },
   scrollContent: {
     paddingBottom: 20,
