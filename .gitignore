@@ -38,6 +38,7 @@ ios/.DS_Store
 .expo/web-build/
 *.expo
 *.expo-shared
+dist/
 
 # Fastlane
 fastlane/report.xml
