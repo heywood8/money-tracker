@@ -1,9 +1,85 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
+import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
+import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, ActivityIndicator } from 'react-native';
 
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
 import { useLocalization } from './LocalizationContext';
+
+// Memoized currency picker modal component
+const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
+  const renderCurrencyItem = useCallback(({ item }) => {
+    const [code, cur] = item;
+
+    const handlePress = useCallback(() => {
+      onSelect(code);
+    }, [code]);
+
+    return (
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.pickerOption,
+          { borderColor: colors.border },
+          pressed && { backgroundColor: colors.selected }
+        ]}
+      >
+        <Text style={{ color: colors.text, fontSize: 18 }}>{cur.name} ({cur.symbol})</Text>
+      </Pressable>
+    );
+  }, [colors.border, colors.text, colors.selected, onSelect]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+          <FlatList
+            data={Object.entries(currencies)}
+            keyExtractor={([code]) => code}
+            renderItem={renderCurrencyItem}
+          />
+          <Pressable style={styles.closeButton} onPress={onClose}>
+            <Text style={{ color: colors.primary }}>{t('close') || 'Close'}</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+CurrencyPickerModal.displayName = 'CurrencyPickerModal';
+
+// Memoized account row component
+const AccountRow = memo(({ item, index, colors, onPress, t }) => {
+  const isEven = index % 2 === 0;
+  const rowBg = isEven ? colors.background : colors.altRow;
+
+  const handlePress = useCallback(() => {
+    onPress(item.id);
+  }, [onPress, item.id]);
+
+  return (
+    <TouchableOpacity
+      style={[styles.accountRow, { borderColor: colors.border, backgroundColor: rowBg }]}
+      onPress={handlePress}
+      accessibilityLabel={t('edit_account') || 'Edit Account'}
+      accessibilityRole="button"
+    >
+      <View style={styles.accountNameWrapper}>
+        <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+          {item.name}
+        </Text>
+      </View>
+      <View style={styles.verticalDivider} />
+      <View style={styles.accountValueWrapper}>
+        <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
+          {item.balance} {item.currencySymbol}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+AccountRow.displayName = 'AccountRow';
 
 export default function AccountsScreen() {
 
@@ -12,17 +88,19 @@ export default function AccountsScreen() {
   const [errors, setErrors] = useState({});
   const [pickerVisible, setPickerVisible] = useState(false);
   const { colorScheme, colors } = useTheme();
-  const { accounts, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
+  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
   const { t } = useLocalization();
 
-  const startEdit = (id) => {
+  const balanceInputRef = useRef(null);
+
+  const startEdit = useCallback((id) => {
     setEditingId(id);
     const acc = accounts.find(a => a.id === id);
     setEditValues({ ...acc });
     setErrors({});
-  };
+  }, [accounts]);
 
-  const saveEdit = () => {
+  const saveEdit = useCallback(() => {
     const validation = validateAccount(editValues);
     if (Object.keys(validation).length) {
       setErrors(validation);
@@ -36,15 +114,15 @@ export default function AccountsScreen() {
     setEditingId(null);
     setEditValues({});
     setErrors({});
-  };
+  }, [validateAccount, editValues, editingId, addAccount, updateAccount]);
 
-  const addAccountHandler = () => {
+  const addAccountHandler = useCallback(() => {
     setEditingId('new');
     setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0] });
     setErrors({});
-  };
+  }, [currencies]);
 
-  const deleteAccountHandler = (id) => {
+  const deleteAccountHandler = useCallback((id) => {
     Alert.alert(
       t('delete_account') || 'Delete Account',
       t('delete_account_confirm') || 'Are you sure you want to delete this account?',
@@ -64,40 +142,92 @@ export default function AccountsScreen() {
         },
       ]
     );
-  };
+  }, [t, deleteAccount, editingId]);
 
-  // ...existing code...
-  const renderItem = ({ item, index }) => {
-    const isEven = index % 2 === 0;
-    const rowBg = isEven ? colors.background : colors.altRow;
+  const handleCloseModal = useCallback(() => {
+    Keyboard.dismiss();
+    setEditingId(null);
+    setErrors({});
+  }, []);
+
+  const handleOpenPicker = useCallback(() => {
+    setPickerVisible(true);
+  }, []);
+
+  const handleClosePicker = useCallback(() => {
+    setPickerVisible(false);
+  }, []);
+
+  const handleNameChange = useCallback((text) => {
+    setEditValues(v => ({ ...v, name: text }));
+  }, []);
+
+  const handleBalanceChange = useCallback((text) => {
+    setEditValues(v => ({ ...v, balance: text }));
+  }, []);
+
+  const handleCurrencySelect = useCallback((code) => {
+    setEditValues(v => ({ ...v, currency: code }));
+    setPickerVisible(false);
+  }, []);
+
+  // Enhance accounts with currency symbol for better performance
+  const enhancedAccounts = useMemo(() => {
+    return accounts.map(acc => ({
+      ...acc,
+      currencySymbol: currencies[acc.currency]?.symbol || acc.currency
+    }));
+  }, [accounts, currencies]);
+
+  const renderItem = useCallback(({ item, index }) => (
+    <AccountRow
+      item={item}
+      index={index}
+      colors={colors}
+      onPress={startEdit}
+      t={t}
+    />
+  ), [colors, startEdit, t]);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: 56,
+    offset: 56 * index,
+    index,
+  }), []);
+
+  if (loading) {
     return (
-      <TouchableOpacity
-        style={[styles.accountRow, { borderColor: colors.border, backgroundColor: rowBg }]}
-        onPress={() => startEdit(item.id)}
-        accessibilityLabel={t('edit_account') || 'Edit Account'}
-      >
-        <View style={styles.accountNameWrapper}>
-          <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-            {item.name}
-          </Text>
-        </View>
-        <View style={styles.verticalDivider} />
-        <View style={styles.accountValueWrapper}>
-          <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
-            {item.balance} {currencies[item.currency]?.symbol || item.currency}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+          {t('loading_accounts') || 'Loading accounts...'}
+        </Text>
+      </View>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.delete }]}>
+          {t('error_loading_accounts') || 'Failed to load accounts'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>  
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header is rendered globally by app/Header; per-screen header removed */}
       <FlatList
-        data={accounts}
+        data={enhancedAccounts}
         renderItem={renderItem}
         keyExtractor={item => item.id}
+        getItemLayout={getItemLayout}
+        windowSize={10}
+        maxToRenderPerBatch={10}
+        initialNumToRender={10}
+        removeClippedSubviews={true}
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
       />
       <View style={styles.addButtonWrapper}>
@@ -107,89 +237,88 @@ export default function AccountsScreen() {
         visible={!!editingId}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setEditingId(null)}
+        onRequestClose={handleCloseModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => { setEditingId(null); setErrors({}); }}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('edit_account') || 'Edit Account'}</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.name && styles.inputError,
-                    { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
-                ]}
-                value={editValues.name}
-                onChangeText={text => setEditValues(v => ({ ...v, name: text }))}
-                placeholder={t('account_name') || 'Account Name'}
-                  placeholderTextColor={colors.mutedText}
-                autoFocus
-              />
-              {errors.name && <Text style={styles.error}>{errors.name}</Text>}
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.balance && styles.inputError,
-                    { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
-                ]}
-                value={editValues.balance}
-                onChangeText={text => setEditValues(v => ({ ...v, balance: text }))}
-                placeholder={t('balance') || 'Balance'}
-                  placeholderTextColor={colors.mutedText}
-                keyboardType="numeric"
-              />
-              {errors.balance && <Text style={styles.error}>{errors.balance}</Text>}
-                <View style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}> 
-                  <Pressable onPress={() => setPickerVisible(true)} style={styles.pickerDisplay}>
-                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
-                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
-                    </Text>
-                  </Pressable>
-                  <Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
-                    <Pressable style={styles.modalOverlay} onPress={() => setPickerVisible(false)}>
-                      <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-                        <FlatList
-                          data={Object.entries(currencies)}
-                          keyExtractor={([code]) => code}
-                          renderItem={({ item }) => {
-                            const [code, cur] = item;
-                            return (
-                              <Pressable
-                                onPress={() => { setEditValues(v => ({ ...v, currency: code })); setPickerVisible(false); }}
-                                style={({ pressed }) => [styles.pickerOption, { borderColor: colors.border }, pressed && { backgroundColor: colors.selected }]}
-                              >
-                                <Text style={{ color: colors.text, fontSize: 18 }}>{cur.name} ({cur.symbol})</Text>
-                              </Pressable>
-                            );
-                          }}
-                        />
-                        <Pressable style={styles.closeButton} onPress={() => setPickerVisible(false)}>
-                          <Text style={{ color: colors.primary }}>{t('close') || 'Close'}</Text>
-                        </Pressable>
-                      </Pressable>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <Pressable style={styles.modalOverlay} onPress={handleCloseModal}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <ScrollView
+                style={{ flex: 1 }}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>{t('edit_account') || 'Edit Account'}</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.name && styles.inputError,
+                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
+                  ]}
+                  value={editValues.name}
+                  onChangeText={handleNameChange}
+                  placeholder={t('account_name') || 'Account Name'}
+                    placeholderTextColor={colors.mutedText}
+                  autoFocus
+                  returnKeyType="next"
+                  onSubmitEditing={() => balanceInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+                {errors.name && <Text style={styles.error}>{errors.name}</Text>}
+                <TextInput
+                  ref={balanceInputRef}
+                  style={[
+                    styles.input,
+                    errors.balance && styles.inputError,
+                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
+                  ]}
+                  value={editValues.balance}
+                  onChangeText={handleBalanceChange}
+                  placeholder={t('balance') || 'Balance'}
+                    placeholderTextColor={colors.mutedText}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                />
+                {errors.balance && <Text style={styles.error}>{errors.balance}</Text>}
+                  <View style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
+                    <Pressable onPress={handleOpenPicker} style={styles.pickerDisplay}>
+                      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
+                        {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
+                      </Text>
                     </Pressable>
-                  </Modal>
-                </View>
-              {errors.currency && <Text style={styles.error}>{errors.currency}</Text>}
-            </View>
-              <View style={[styles.modalButtonRowSticky, { backgroundColor: colors.card }]}> 
-                <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={() => { setEditingId(null); setErrors({}); }}>
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
-                </Pressable>
-                {editingId !== 'new' && (
-                  <Pressable
-                    style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.delete || '#d9534f' }]}
-                    onPress={() => deleteAccountHandler(editingId)}
-                  >
-                    <Text style={[styles.buttonText, { color: colors.card }]}>{t('delete') || 'Delete'}</Text>
+                    <CurrencyPickerModal
+                      visible={pickerVisible}
+                      onClose={handleClosePicker}
+                      currencies={currencies}
+                      colors={colors}
+                      t={t}
+                      onSelect={handleCurrencySelect}
+                    />
+                  </View>
+                {errors.currency && <Text style={styles.error}>{errors.currency}</Text>}
+              </ScrollView>
+                <View style={[styles.modalButtonRowSticky, { backgroundColor: colors.card }]}>
+                  <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={handleCloseModal}>
+                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
                   </Pressable>
-                )}
-                <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('save') || 'Save'}</Text>
-                </Pressable>
-              </View>
+                  {editingId !== 'new' && (
+                    <Pressable
+                      style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.delete }]}
+                      onPress={() => deleteAccountHandler(editingId)}
+                    >
+                      <Text style={[styles.buttonText, { color: colors.card }]}>{t('delete') || 'Delete'}</Text>
+                    </Pressable>
+                  )}
+                  <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
+                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('save') || 'Save'}</Text>
+                  </Pressable>
+                </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
       {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
@@ -205,6 +334,22 @@ const styles = StyleSheet.create({
       marginHorizontal: 2,
     },
   container: { flex: 1, padding: 16 },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
