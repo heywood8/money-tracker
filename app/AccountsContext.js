@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import currencies from '../assets/currencies.json';
+import * as AccountsDB from './services/AccountsDB';
+import { performMigration, isMigrationComplete } from './services/migration';
 
-const ACCOUNT_STORAGE_KEY = 'accounts';
 const AccountsContext = createContext();
 
 function validateAccount(account) {
@@ -24,20 +24,24 @@ export const AccountsProvider = ({ children }) => {
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const data = await AsyncStorage.getItem(ACCOUNT_STORAGE_KEY);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            setAccounts(parsed);
-          } catch (parseError) {
-            console.error('Failed to parse accounts:', parseError);
-            setAccounts([]);
-            setError('Failed to load accounts data');
-          }
+        // Check and perform migration if needed
+        const migrated = await isMigrationComplete();
+        if (!migrated) {
+          console.log('Performing first-time migration...');
+          await performMigration();
         }
+
+        // Load accounts from SQLite
+        const accountsData = await AccountsDB.getAllAccounts();
+        setAccounts(accountsData);
       } catch (err) {
         console.error('Failed to load accounts:', err);
         setError(err.message);
+        Alert.alert(
+          'Load Error',
+          'Failed to load accounts from database.',
+          [{ text: 'OK' }]
+        );
       } finally {
         setLoading(false);
         setDataLoaded(true);
@@ -46,31 +50,65 @@ export const AccountsProvider = ({ children }) => {
     loadAccounts();
   }, []);
 
-  useEffect(() => {
-    // Only save if data has been loaded (prevents race condition on initial load)
-    if (dataLoaded) {
-      AsyncStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(accounts))
-        .catch(err => {
-          console.error('Failed to save accounts:', err);
-          Alert.alert(
-            'Save Failed',
-            'Unable to save your accounts. Your changes may be lost.',
-            [{ text: 'OK' }]
-          );
-        });
+  const addAccount = useCallback(async (account) => {
+    try {
+      const newAccount = {
+        ...account,
+        id: uuid.v4(),
+        balance: String(account.balance),
+      };
+
+      await AccountsDB.createAccount(newAccount);
+      setAccounts(accs => [...accs, newAccount]);
+    } catch (err) {
+      console.error('Failed to add account:', err);
+      Alert.alert(
+        'Error',
+        'Failed to create account. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw err;
     }
-  }, [accounts, dataLoaded]);
-
-  const addAccount = useCallback((account) => {
-    setAccounts(accs => [...accs, { ...account, id: uuid.v4(), balance: String(account.balance) }]);
   }, []);
 
-  const updateAccount = useCallback((id, updated) => {
-    setAccounts(accs => accs.map(a => a.id === id ? { ...a, ...updated, balance: String(updated.balance) } : a));
+  const updateAccount = useCallback(async (id, updated) => {
+    try {
+      const updates = { ...updated, balance: String(updated.balance) };
+      await AccountsDB.updateAccount(id, updates);
+      setAccounts(accs => accs.map(a => a.id === id ? { ...a, ...updates } : a));
+    } catch (err) {
+      console.error('Failed to update account:', err);
+      Alert.alert(
+        'Error',
+        'Failed to update account. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw err;
+    }
   }, []);
 
-  const deleteAccount = useCallback((id) => {
-    setAccounts(accs => accs.filter(a => a.id !== id));
+  const deleteAccount = useCallback(async (id) => {
+    try {
+      await AccountsDB.deleteAccount(id);
+      setAccounts(accs => accs.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Failed to delete account:', err);
+      Alert.alert(
+        'Error',
+        'Failed to delete account. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw err;
+    }
+  }, []);
+
+  const reloadAccounts = useCallback(async () => {
+    try {
+      const accountsData = await AccountsDB.getAllAccounts();
+      setAccounts(accountsData);
+    } catch (err) {
+      console.error('Failed to reload accounts:', err);
+    }
   }, []);
 
   const value = useMemo(() => ({
@@ -80,9 +118,10 @@ export const AccountsProvider = ({ children }) => {
     addAccount,
     updateAccount,
     deleteAccount,
+    reloadAccounts,
     validateAccount,
     currencies,
-  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount]);
+  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts]);
 
   return (
     <AccountsContext.Provider value={value}>
