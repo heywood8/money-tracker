@@ -2,6 +2,7 @@ import React from 'react';
 import SimpleTabs from './app/SimpleTabs';
 import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
+import { CategoriesProvider } from './app/CategoriesContext';
 import { LocalizationProvider } from './app/LocalizationContext';
 import { StatusBar, Platform } from 'react-native';
 
@@ -27,8 +28,10 @@ export default function App() {
     <LocalizationProvider>
       <ThemeProvider>
         <AccountsProvider>
-          <ThemedStatusBar />
-          <SimpleTabs />
+          <CategoriesProvider>
+            <ThemedStatusBar />
+            <SimpleTabs />
+          </CategoriesProvider>
         </AccountsProvider>
       </ThemeProvider>
     </LocalizationProvider>

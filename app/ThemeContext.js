@@ -20,6 +20,7 @@ const lightTheme = {
     inputBackground: '#fff',
     inputBorder: '#cccccc',
     danger: 'red',
+    delete: '#d9534f',
     selected: '#c0e0ff',
     altRow: '#f6f8fa', // Added for alternating rows
   },
@@ -40,6 +41,7 @@ const darkTheme = {
     inputBackground: '#333333',
     inputBorder: '#555555',
     danger: 'red',
+    delete: '#ff6b6b',
     selected: '#005fa3',
     altRow: '#181c20', // Added for alternating rows
   },
