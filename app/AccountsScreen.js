@@ -10,13 +10,9 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
   const renderCurrencyItem = useCallback(({ item }) => {
     const [code, cur] = item;
 
-    const handlePress = useCallback(() => {
-      onSelect(code);
-    }, [code]);
-
     return (
       <Pressable
-        onPress={handlePress}
+        onPress={() => onSelect(code)}
         style={({ pressed }) => [
           styles.pickerOption,
           { borderColor: colors.border },

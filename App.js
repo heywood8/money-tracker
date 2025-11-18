@@ -3,6 +3,7 @@ import SimpleTabs from './app/SimpleTabs';
 import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
 import { CategoriesProvider } from './app/CategoriesContext';
+import { OperationsProvider } from './app/OperationsContext';
 import { LocalizationProvider } from './app/LocalizationContext';
 import ErrorBoundary from './app/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
@@ -33,8 +34,10 @@ export default function App() {
           <ThemeProvider>
             <AccountsProvider>
               <CategoriesProvider>
-                <ThemedStatusBar />
-                <SimpleTabs />
+                <OperationsProvider>
+                  <ThemedStatusBar />
+                  <SimpleTabs />
+                </OperationsProvider>
               </CategoriesProvider>
             </AccountsProvider>
           </ThemeProvider>

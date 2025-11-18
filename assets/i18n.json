@@ -70,7 +70,20 @@
     "business": "Business",
     "investments": "Investments",
     "gifts": "Gifts",
-    "other_income": "Other Income"
+    "other_income": "Other Income",
+    "add_operation": "Add Operation",
+    "edit_operation": "Edit Operation",
+    "amount": "Amount",
+    "description": "Description",
+    "date": "Date",
+    "select_account": "Select Account",
+    "select_category": "Select Category",
+    "no_operations": "No operations yet.",
+    "delete_operation": "Delete Operation",
+    "delete_operation_confirm": "Are you sure you want to delete this operation?",
+    "loading_operations": "Loading operations...",
+    "transfer": "Transfer",
+    "to_account": "To Account"
   },
   "ru": {
     "accounts": "Счета",
@@ -143,7 +156,20 @@
     "business": "Бизнес",
     "investments": "Инвестиции",
     "gifts": "Подарки",
-    "other_income": "Другие доходы"
+    "other_income": "Другие доходы",
+    "add_operation": "Добавить операцию",
+    "edit_operation": "Редактировать операцию",
+    "amount": "Сумма",
+    "description": "Описание",
+    "date": "Дата",
+    "select_account": "Выберите счет",
+    "select_category": "Выберите категорию",
+    "no_operations": "Операций пока нет.",
+    "delete_operation": "Удалить операцию",
+    "delete_operation_confirm": "Вы уверены, что хотите удалить эту операцию?",
+    "loading_operations": "Загрузка операций...",
+    "transfer": "Перевод",
+    "to_account": "На счет"
   }
 }
 
