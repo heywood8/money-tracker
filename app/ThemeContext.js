@@ -23,6 +23,12 @@ const lightTheme = {
     delete: '#d9534f',
     selected: '#c0e0ff',
     altRow: '#f6f8fa', // Added for alternating rows
+    expense: '#ff4444',
+    income: '#44aa44',
+    transfer: '#4444ff',
+    expenseBackground: '#ffe5e5',
+    incomeBackground: '#e5ffe5',
+    transferBackground: '#e5e5ff',
   },
 };
 
@@ -44,6 +50,12 @@ const darkTheme = {
     delete: '#ff6b6b',
     selected: '#005fa3',
     altRow: '#181c20', // Added for alternating rows
+    expense: '#ff6b6b',
+    income: '#66dd66',
+    transfer: '#6b6bff',
+    expenseBackground: '#4a2020',
+    incomeBackground: '#204a20',
+    transferBackground: '#20204a',
   },
 };
 
