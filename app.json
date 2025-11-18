@@ -28,7 +28,8 @@
       "package": "com.heywood8.monkeep"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "webpack"
     },
     "extra": {
       "eas": {
