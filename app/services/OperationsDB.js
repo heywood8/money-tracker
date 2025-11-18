@@ -1,4 +1,5 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
+import * as Currency from './currency';
 
 /**
  * Get all operations
@@ -186,13 +187,13 @@ export const createOperation = async (operation) => {
           continue;
         }
 
-        const currentBalance = parseFloat(account.balance) || 0;
-        const newBalance = currentBalance + delta;
+        // Use Currency utilities for precise arithmetic
+        const newBalance = Currency.add(account.balance, delta);
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance.toString(), updateTime, accountId]
+          [newBalance, updateTime, accountId]
         );
       }
     });
@@ -303,13 +304,13 @@ export const updateOperation = async (id, updates) => {
           continue;
         }
 
-        const currentBalance = parseFloat(account.balance) || 0;
-        const newBalance = currentBalance + delta;
+        // Use Currency utilities for precise arithmetic
+        const newBalance = Currency.add(account.balance, delta);
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance.toString(), updateTime, accountId]
+          [newBalance, updateTime, accountId]
         );
       }
     });
@@ -363,13 +364,13 @@ export const deleteOperation = async (id) => {
           continue;
         }
 
-        const currentBalance = parseFloat(account.balance) || 0;
-        const newBalance = currentBalance + delta;
+        // Use Currency utilities for precise arithmetic
+        const newBalance = Currency.add(account.balance, delta);
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance.toString(), updateTime, accountId]
+          [newBalance, updateTime, accountId]
         );
       }
     });
