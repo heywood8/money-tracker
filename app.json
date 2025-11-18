@@ -12,6 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "packagerOpts": {
+      "hostType": "tunnel"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.heywood8.monkeep",
