@@ -20,6 +20,7 @@ import { useLocalization } from './LocalizationContext';
 import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
+import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 
 export default function OperationModal({ visible, onClose, operation, isNew }) {
   const { colors } = useTheme();
@@ -46,24 +47,43 @@ export default function OperationModal({ visible, onClose, operation, isNew }) {
   });
 
   useEffect(() => {
-    if (operation && !isNew) {
-      setValues({ ...operation });
-    } else if (isNew) {
-      const defaultAccountId = accounts.length === 1 ? accounts[0].id : '';
-      setValues({
-        type: 'expense',
-        amount: '',
-        accountId: defaultAccountId,
-        categoryId: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0],
-        toAccountId: '',
-      });
+    let cancelled = false;
+    async function setDefaultAccount() {
+      if (operation && !isNew) {
+        setValues({ ...operation });
+      } else if (isNew) {
+        let defaultAccountId = '';
+        if (accounts.length === 1) {
+          defaultAccountId = accounts[0].id;
+        } else if (accounts.length > 1) {
+          // Try to get last accessed from AsyncStorage
+          const lastId = await getLastAccessedAccount();
+          if (lastId && accounts.some(acc => acc.id === lastId)) {
+            defaultAccountId = lastId;
+          } else {
+            // Fallback: lowest ID (lexicographically)
+            defaultAccountId = accounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+          }
+        }
+        if (!cancelled) {
+          setValues({
+            type: 'expense',
+            amount: '',
+            accountId: defaultAccountId,
+            categoryId: '',
+            description: '',
+            date: new Date().toISOString().split('T')[0],
+            toAccountId: '',
+          });
+        }
+      }
+      if (!cancelled) setErrors({});
     }
-    setErrors({});
+    setDefaultAccount();
+    return () => { cancelled = true; };
   }, [operation, isNew, visible, accounts]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const error = validateOperation(values);
     if (error) {
       setErrors({ general: error });
@@ -71,9 +91,14 @@ export default function OperationModal({ visible, onClose, operation, isNew }) {
     }
 
     if (isNew) {
-      addOperation(values);
+      await addOperation(values);
     } else {
-      updateOperation(operation.id, values);
+      await updateOperation(operation.id, values);
+    }
+
+    // Save last accessed account
+    if (values.accountId) {
+      setLastAccessedAccount(values.accountId);
     }
 
     onClose();

@@ -21,6 +21,19 @@ npm run web            # Run in web browser
 npm test               # Run Jest tests (if configured)
 ```
 
+### Web Development Setup
+
+**Important:** Always run `npm install` after switching branches or cloning the repository to ensure all dependencies are installed.
+
+For detailed web development instructions, see [WEB_SETUP.md](./WEB_SETUP.md).
+
+**Quick Start:**
+1. Install dependencies: `npm install`
+2. Start web server: `npm run web` or `npx expo start --web`
+3. Open http://localhost:8081 in your browser
+
+**Note:** Expo SDK 54 uses Metro bundler for web (not webpack). The server may appear "stuck" on "Waiting on http://localhost:8081" - this is normal. Just open the URL in your browser.
+
 ## Architecture
 
 ### Context-Based State Management
@@ -67,12 +80,29 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Data Persistence
 
-All persistent data uses AsyncStorage:
-- Accounts: key `'accounts'`
+**Database Layer** (SQLite/IndexedDB):
+- **Native (iOS/Android)**: SQLite database (`money_tracker.db`)
+- **Web**: IndexedDB (`money_tracker` database)
+- Platform-specific implementations: `*.js` for native, `*.web.js` for web
+- Database modules: `db.js`, `AccountsDB.js`, `OperationsDB.js`, `CategoriesDB.js`
+- Automatic migration from AsyncStorage on first run
+
+**Application Preferences** (AsyncStorage):
 - Theme: key `'theme_preference'`
 - Language: key `'app_language'`
+- Migration backup: key `'migration_backup'`
 
-Data is loaded on context mount and saved automatically on state changes.
+**Database Services**:
+- `app/services/db.js` - SQLite wrapper with transaction support
+- `app/services/db.web.js` - IndexedDB wrapper matching SQLite API
+- `app/services/currency.js` - Precise currency calculations (avoids floating-point errors)
+- `app/services/migration.js` - AsyncStorage to SQLite migration with rollback support
+
+**Data Integrity**:
+- Atomic transactions for all multi-step operations
+- Foreign key constraints with deletion safeguards
+- Precise currency arithmetic using integer cents internally
+- Automatic migration rollback on failure
 
 ### Styling Patterns
 
