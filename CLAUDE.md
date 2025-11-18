@@ -21,6 +21,19 @@ npm run web            # Run in web browser
 npm test               # Run Jest tests (if configured)
 ```
 
+### Web Development Setup
+
+**Important:** Always run `npm install` after switching branches or cloning the repository to ensure all dependencies are installed.
+
+For detailed web development instructions, see [WEB_SETUP.md](./WEB_SETUP.md).
+
+**Quick Start:**
+1. Install dependencies: `npm install`
+2. Start web server: `npm run web` or `npx expo start --web`
+3. Open http://localhost:8081 in your browser
+
+**Note:** Expo SDK 54 uses Metro bundler for web (not webpack). The server may appear "stuck" on "Waiting on http://localhost:8081" - this is normal. Just open the URL in your browser.
+
 ## Architecture
 
 ### Context-Based State Management
