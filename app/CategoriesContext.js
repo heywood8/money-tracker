@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import defaultCategories from '../assets/defaultCategories.json';
+import * as CategoriesDB from './services/CategoriesDB';
 
 const CategoriesContext = createContext();
 
@@ -21,34 +21,34 @@ export const CategoriesProvider = ({ children }) => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  // Load categories from AsyncStorage on mount
+  // Load categories from SQLite on mount
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const stored = await AsyncStorage.getItem('categories');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            setCategories(parsed);
-          } catch (parseError) {
-            console.error('Failed to parse categories:', parseError);
-            // Corrupted data - reset to defaults
-            setCategories(defaultCategories);
-            await AsyncStorage.setItem('categories', JSON.stringify(defaultCategories));
-          }
-        } else {
+        const categoriesData = await CategoriesDB.getAllCategories();
+
+        if (categoriesData.length === 0) {
           // Initialize with default categories
-          setCategories(defaultCategories);
-          try {
-            await AsyncStorage.setItem('categories', JSON.stringify(defaultCategories));
-          } catch (saveError) {
-            console.error('Failed to save default categories:', saveError);
-            Alert.alert('Storage Error', 'Unable to save categories. Changes may not persist.');
+          console.log('Initializing default categories...');
+          for (const category of defaultCategories) {
+            try {
+              await CategoriesDB.createCategory(category);
+            } catch (err) {
+              console.error('Failed to create default category:', category.id, err);
+            }
           }
+          setCategories(defaultCategories);
+        } else {
+          setCategories(categoriesData);
         }
       } catch (error) {
         console.error('Failed to load categories:', error);
         setCategories(defaultCategories);
+        Alert.alert(
+          'Load Error',
+          'Failed to load categories from database.',
+          [{ text: 'OK' }]
+        );
       } finally {
         setLoading(false);
         setDataLoaded(true);
@@ -57,60 +57,82 @@ export const CategoriesProvider = ({ children }) => {
     loadCategories();
   }, []);
 
-  // Save categories to AsyncStorage whenever they change
-  useEffect(() => {
-    // Only save if data has been loaded (prevents race condition on initial load)
-    if (dataLoaded && categories.length > 0) {
-      AsyncStorage.setItem('categories', JSON.stringify(categories))
-        .then(() => {
-          setSaveError(null);
-        })
-        .catch(error => {
-          console.error('Failed to save categories:', error);
-          setSaveError(error.message);
-          Alert.alert(
-            'Save Failed',
-            'Unable to save your categories. Your changes may be lost.',
-            [{ text: 'OK' }]
-          );
-        });
-    }
-  }, [categories, dataLoaded]);
-
-  const addCategory = useCallback((category) => {
-    const newCategory = {
-      ...category,
-      id: uuid.v4(),
-    };
-    setCategories(cats => [...cats, newCategory]);
-    return newCategory;
-  }, []);
-
-  const updateCategory = useCallback((id, updates) => {
-    setCategories(cats =>
-      cats.map(cat => (cat.id === id ? { ...cat, ...updates } : cat))
-    );
-  }, []);
-
-  const deleteCategory = useCallback((id) => {
-    // Also delete all children (cascade delete)
-    setCategories(cats => {
-      const toDelete = new Set([id]);
-
-      // Find all descendants recursively
-      const findDescendants = (parentId) => {
-        cats.forEach(cat => {
-          if (cat.parentId === parentId) {
-            toDelete.add(cat.id);
-            findDescendants(cat.id);
-          }
-        });
+  const addCategory = useCallback(async (category) => {
+    try {
+      const newCategory = {
+        ...category,
+        id: uuid.v4(),
       };
 
-      findDescendants(id);
+      await CategoriesDB.createCategory(newCategory);
+      setCategories(cats => [...cats, newCategory]);
+      setSaveError(null);
+      return newCategory;
+    } catch (error) {
+      console.error('Failed to add category:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to create category. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
+  }, []);
 
-      return cats.filter(cat => !toDelete.has(cat.id));
-    });
+  const updateCategory = useCallback(async (id, updates) => {
+    try {
+      await CategoriesDB.updateCategory(id, updates);
+      setCategories(cats =>
+        cats.map(cat => (cat.id === id ? { ...cat, ...updates } : cat))
+      );
+      setSaveError(null);
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to update category. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
+  }, []);
+
+  const deleteCategory = useCallback(async (id) => {
+    try {
+      // SQLite will handle cascade deletion of children via foreign keys
+      await CategoriesDB.deleteCategory(id);
+
+      // Update local state to remove deleted category and its children
+      setCategories(cats => {
+        const toDelete = new Set([id]);
+
+        // Find all descendants recursively
+        const findDescendants = (parentId) => {
+          cats.forEach(cat => {
+            if (cat.parentId === parentId) {
+              toDelete.add(cat.id);
+              findDescendants(cat.id);
+            }
+          });
+        };
+
+        findDescendants(id);
+
+        return cats.filter(cat => !toDelete.has(cat.id));
+      });
+      setSaveError(null);
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to delete category. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
   }, []);
 
   const toggleExpanded = useCallback((id) => {

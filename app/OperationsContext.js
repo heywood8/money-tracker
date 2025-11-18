@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
+import * as OperationsDB from './services/OperationsDB';
 import { useAccounts } from './AccountsContext';
 
 const OperationsContext = createContext();
@@ -19,25 +19,21 @@ export const OperationsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  const { updateAccount, accounts } = useAccounts();
+  const { reloadAccounts } = useAccounts();
 
-  // Load operations from AsyncStorage on mount
+  // Load operations from SQLite on mount
   useEffect(() => {
     const loadOperations = async () => {
       try {
-        const stored = await AsyncStorage.getItem('operations');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            setOperations(parsed);
-          } catch (parseError) {
-            console.error('Failed to parse operations:', parseError);
-            setOperations([]);
-          }
-        }
+        const operationsData = await OperationsDB.getAllOperations();
+        setOperations(operationsData);
       } catch (error) {
         console.error('Failed to load operations:', error);
-        Alert.alert('Load Error', 'Unable to load operations data.');
+        Alert.alert(
+          'Load Error',
+          'Failed to load operations from database.',
+          [{ text: 'OK' }]
+        );
       } finally {
         setLoading(false);
         setDataLoaded(true);
@@ -46,169 +42,86 @@ export const OperationsProvider = ({ children }) => {
     loadOperations();
   }, []);
 
-  // Save operations to AsyncStorage with retry logic
-  const saveOperations = useCallback(async (data, retryCount = 0) => {
-    const MAX_RETRIES = 3;
+  const addOperation = useCallback(async (operation) => {
     try {
-      await AsyncStorage.setItem('operations', JSON.stringify(data));
-      setSaveError(null);
-      return true;
-    } catch (error) {
-      console.error(`Failed to save operations (attempt ${retryCount + 1}):`, error);
-
-      if (retryCount < MAX_RETRIES) {
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = Math.pow(2, retryCount) * 1000;
-        return new Promise((resolve) => {
-          setTimeout(async () => {
-            const result = await saveOperations(data, retryCount + 1);
-            resolve(result);
-          }, delay);
-        });
-      } else {
-        // Max retries reached
-        setSaveError(error);
-        Alert.alert(
-          'Save Failed',
-          'Unable to save your operations after multiple attempts. Your changes may be lost.',
-          [
-            {
-              text: 'Retry',
-              onPress: () => saveOperations(data, 0)
-            },
-            { text: 'OK', style: 'cancel' }
-          ]
-        );
-        return false;
-      }
-    }
-  }, []);
-
-  // Save operations whenever they change
-  useEffect(() => {
-    if (dataLoaded) {
-      saveOperations(operations);
-    }
-  }, [operations, dataLoaded, saveOperations]);
-
-  // Helper function to apply balance changes in batch
-  const applyBalanceChanges = useCallback((balanceChanges) => {
-    balanceChanges.forEach((change, accountId) => {
-      if (change !== 0) {
-        const account = accounts.find(acc => acc.id === accountId);
-        if (account) {
-          const currentBalance = parseFloat(account.balance) || 0;
-          const newBalance = currentBalance + change;
-          updateAccount(accountId, { balance: newBalance.toString() });
-        }
-      }
-    });
-  }, [accounts, updateAccount]);
-
-  const addOperation = useCallback((operation) => {
-    const newOperation = {
-      ...operation,
-      id: uuid.v4(),
-      createdAt: new Date().toISOString(),
-    };
-
-    // Calculate balance changes
-    const balanceChanges = new Map();
-    const amount = parseFloat(operation.amount) || 0;
-
-    if (operation.type === 'expense') {
-      balanceChanges.set(operation.accountId, -amount);
-    } else if (operation.type === 'income') {
-      balanceChanges.set(operation.accountId, amount);
-    } else if (operation.type === 'transfer') {
-      balanceChanges.set(operation.accountId, -amount);
-      if (operation.toAccountId) {
-        const toChange = balanceChanges.get(operation.toAccountId) || 0;
-        balanceChanges.set(operation.toAccountId, toChange + amount);
-      }
-    }
-
-    // Apply all balance changes in batch
-    applyBalanceChanges(balanceChanges);
-
-    setOperations(ops => [newOperation, ...ops]);
-    return newOperation;
-  }, [applyBalanceChanges]);
-
-  const updateOperation = useCallback((id, updates) => {
-    const balanceChanges = new Map();
-
-    setOperations(ops => {
-      const oldOperation = ops.find(op => op.id === id);
-      if (!oldOperation) return ops;
-
-      // Helper to add balance change
-      const addBalanceChange = (accountId, amount) => {
-        const current = balanceChanges.get(accountId) || 0;
-        balanceChanges.set(accountId, current + amount);
+      const newOperation = {
+        ...operation,
+        id: uuid.v4(),
+        createdAt: new Date().toISOString(),
       };
 
-      // Reverse old operation's effect
-      const oldAmount = parseFloat(oldOperation.amount) || 0;
-      if (oldOperation.type === 'expense') {
-        addBalanceChange(oldOperation.accountId, oldAmount);
-      } else if (oldOperation.type === 'income') {
-        addBalanceChange(oldOperation.accountId, -oldAmount);
-      } else if (oldOperation.type === 'transfer') {
-        addBalanceChange(oldOperation.accountId, oldAmount);
-        if (oldOperation.toAccountId) {
-          addBalanceChange(oldOperation.toAccountId, -oldAmount);
-        }
-      }
+      // Create operation in DB (handles balance updates automatically)
+      await OperationsDB.createOperation(newOperation);
 
-      // Apply new operation's effect
-      const newOperation = { ...oldOperation, ...updates };
-      const newAmount = parseFloat(newOperation.amount) || 0;
-      if (newOperation.type === 'expense') {
-        addBalanceChange(newOperation.accountId, -newAmount);
-      } else if (newOperation.type === 'income') {
-        addBalanceChange(newOperation.accountId, newAmount);
-      } else if (newOperation.type === 'transfer') {
-        addBalanceChange(newOperation.accountId, -newAmount);
-        if (newOperation.toAccountId) {
-          addBalanceChange(newOperation.toAccountId, newAmount);
-        }
-      }
+      setOperations(ops => [newOperation, ...ops]);
+      setSaveError(null);
 
-      return ops.map(op => (op.id === id ? newOperation : op));
-    });
+      // Reload accounts to reflect balance changes
+      await reloadAccounts();
 
-    // Apply all balance changes in batch after state update
-    applyBalanceChanges(balanceChanges);
-  }, [applyBalanceChanges]);
+      return newOperation;
+    } catch (error) {
+      console.error('Failed to add operation:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to create operation. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
+  }, [reloadAccounts]);
 
-  const deleteOperation = useCallback((id) => {
-    const balanceChanges = new Map();
+  const updateOperation = useCallback(async (id, updates) => {
+    try {
+      // Update operation in DB (handles balance updates automatically)
+      await OperationsDB.updateOperation(id, updates);
 
-    setOperations(ops => {
-      const operation = ops.find(op => op.id === id);
-      if (!operation) return ops;
+      setOperations(ops => {
+        return ops.map(op => {
+          if (op.id === id) {
+            return { ...op, ...updates };
+          }
+          return op;
+        });
+      });
+      setSaveError(null);
 
-      // Reverse the operation's effect
-      const amount = parseFloat(operation.amount) || 0;
-      if (operation.type === 'expense') {
-        balanceChanges.set(operation.accountId, amount);
-      } else if (operation.type === 'income') {
-        balanceChanges.set(operation.accountId, -amount);
-      } else if (operation.type === 'transfer') {
-        balanceChanges.set(operation.accountId, amount);
-        if (operation.toAccountId) {
-          const toChange = balanceChanges.get(operation.toAccountId) || 0;
-          balanceChanges.set(operation.toAccountId, toChange - amount);
-        }
-      }
+      // Reload accounts to reflect balance changes
+      await reloadAccounts();
+    } catch (error) {
+      console.error('Failed to update operation:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to update operation. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
+  }, [reloadAccounts]);
 
-      return ops.filter(op => op.id !== id);
-    });
+  const deleteOperation = useCallback(async (id) => {
+    try {
+      // Delete operation from DB (handles balance updates automatically)
+      await OperationsDB.deleteOperation(id);
 
-    // Apply balance changes in batch
-    applyBalanceChanges(balanceChanges);
-  }, [applyBalanceChanges]);
+      setOperations(ops => ops.filter(op => op.id !== id));
+      setSaveError(null);
+
+      // Reload accounts to reflect balance changes
+      await reloadAccounts();
+    } catch (error) {
+      console.error('Failed to delete operation:', error);
+      setSaveError(error.message);
+      Alert.alert(
+        'Error',
+        'Failed to delete operation. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw error;
+    }
+  }, [reloadAccounts]);
 
   const validateOperation = useCallback((operation) => {
     if (!operation.type) {
