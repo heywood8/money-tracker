@@ -1,4 +1,5 @@
 import { idb } from './db.web';
+import * as Currency from './currency';
 
 const STORE_NAME = 'accounts';
 
@@ -89,9 +90,23 @@ export const updateAccount = async (id, updates) => {
  * Delete an account
  * @param {string} id
  * @returns {Promise<void>}
+ * @throws {Error} If account has associated operations
  */
 export const deleteAccount = async (id) => {
   try {
+    // Check if account has any operations (expense, income, or transfers)
+    const operations = await idb.getAll('operations');
+    const linkedOperations = operations.filter(
+      op => op.account_id === id || op.to_account_id === id
+    );
+
+    if (linkedOperations.length > 0) {
+      throw new Error(
+        `Cannot delete account: ${linkedOperations.length} transaction(s) are associated with this account. Please delete or reassign the transactions first.`
+      );
+    }
+
+    // Safe to delete - no operations are linked to this account
     await idb.delete(STORE_NAME, id);
   } catch (error) {
     console.error('Failed to delete account:', error);
@@ -112,11 +127,11 @@ export const updateAccountBalance = async (id, delta) => {
       throw new Error(`Account ${id} not found`);
     }
 
-    const currentBalance = parseFloat(account.balance) || 0;
-    const newBalance = currentBalance + delta;
+    // Use Currency utilities for precise arithmetic
+    const newBalance = Currency.add(account.balance, delta);
 
     await updateAccount(id, {
-      balance: newBalance.toString(),
+      balance: newBalance,
     });
   } catch (error) {
     console.error('Failed to update account balance:', error);
@@ -137,24 +152,45 @@ export const batchUpdateBalances = async (balanceChanges) => {
   try {
     const now = new Date().toISOString();
 
-    for (const [accountId, delta] of balanceChanges.entries()) {
-      if (delta === 0) continue;
+    // Use a single transaction for all balance updates to ensure atomicity
+    await idb.transaction(STORE_NAME, async (store) => {
+      const updates = [];
 
-      const account = await idb.get(STORE_NAME, accountId);
-      if (!account) {
-        console.warn(`Account ${accountId} not found, skipping balance update`);
-        continue;
+      // Collect all get requests
+      for (const [accountId, delta] of balanceChanges.entries()) {
+        if (delta === 0) continue;
+
+        updates.push(
+          new Promise((resolve, reject) => {
+            const getRequest = store.get(accountId);
+            getRequest.onsuccess = () => {
+              const account = getRequest.result;
+              if (!account) {
+                console.warn(`Account ${accountId} not found, skipping balance update`);
+                resolve();
+                return;
+              }
+
+              // Use Currency utilities for precise arithmetic
+              const newBalance = Currency.add(account.balance, delta);
+
+              const putRequest = store.put({
+                ...account,
+                balance: newBalance,
+                updated_at: now,
+              });
+
+              putRequest.onsuccess = () => resolve();
+              putRequest.onerror = () => reject(putRequest.error);
+            };
+            getRequest.onerror = () => reject(getRequest.error);
+          })
+        );
       }
 
-      const currentBalance = parseFloat(account.balance) || 0;
-      const newBalance = currentBalance + delta;
-
-      await idb.put(STORE_NAME, {
-        ...account,
-        balance: newBalance.toString(),
-        updated_at: now,
-      });
-    }
+      // Wait for all operations to complete
+      await Promise.all(updates);
+    });
   } catch (error) {
     console.error('Failed to batch update balances:', error);
     throw error;
