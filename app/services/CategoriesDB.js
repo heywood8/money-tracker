@@ -171,12 +171,35 @@ export const updateCategory = async (id, updates) => {
  * Delete a category
  * @param {string} id
  * @returns {Promise<void>}
+ * @throws {Error} If category has child categories or associated operations
  */
 export const deleteCategory = async (id) => {
   try {
-    // Foreign key constraints will handle:
-    // - CASCADE deletion of child categories
-    // - SET NULL for operations using this category
+    // Check if category has child categories
+    const childCheck = await queryFirst(
+      'SELECT COUNT(*) as count FROM categories WHERE parent_id = ?',
+      [id]
+    );
+
+    if (childCheck && childCheck.count > 0) {
+      throw new Error(
+        `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`
+      );
+    }
+
+    // Check if category is used in any operations
+    const operationCheck = await queryFirst(
+      'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
+      [id]
+    );
+
+    if (operationCheck && operationCheck.count > 0) {
+      throw new Error(
+        `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`
+      );
+    }
+
+    // Safe to delete - no child categories or operations are linked
     await executeQuery('DELETE FROM categories WHERE id = ?', [id]);
   } catch (error) {
     console.error('Failed to delete category:', error);
