@@ -5,36 +5,65 @@ import { createCategory } from './CategoriesDB';
 import { createOperation } from './OperationsDB';
 
 /**
- * Check if migration has been completed
- * @returns {Promise<boolean>}
+ * Get migration status
+ * @returns {Promise<string|null>} 'completed', 'in_progress', 'failed', or null
  */
-export const isMigrationComplete = async () => {
+export const getMigrationStatus = async () => {
   try {
     const db = await getDatabase();
     const result = await db.getFirstAsync(
       'SELECT value FROM app_metadata WHERE key = ?',
-      ['migration_complete']
+      ['migration_status']
     );
-    return result && result.value === 'true';
+    return result ? result.value : null;
   } catch (error) {
-    console.error('Failed to check migration status:', error);
-    return false;
+    console.error('Failed to get migration status:', error);
+    return null;
   }
 };
 
 /**
- * Mark migration as complete
+ * Set migration status
+ * @param {string} status - 'in_progress', 'completed', or 'failed'
  */
-const setMigrationComplete = async () => {
+const setMigrationStatus = async (status) => {
   try {
     const db = await getDatabase();
     await db.runAsync(
       'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
-      ['migration_complete', 'true', new Date().toISOString()]
+      ['migration_status', status, new Date().toISOString()]
     );
-    console.log('Migration marked as complete');
+    console.log(`Migration status set to: ${status}`);
   } catch (error) {
-    console.error('Failed to mark migration as complete:', error);
+    console.error('Failed to set migration status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if migration has been completed
+ * @returns {Promise<boolean>}
+ */
+export const isMigrationComplete = async () => {
+  const status = await getMigrationStatus();
+  return status === 'completed';
+};
+
+/**
+ * Clear all SQLite data (for rollback)
+ */
+const clearSQLiteData = async () => {
+  try {
+    const db = await getDatabase();
+    await db.execAsync(`
+      DELETE FROM operations;
+      DELETE FROM categories;
+      DELETE FROM accounts;
+      DELETE FROM app_metadata WHERE key = 'migration_status';
+    `);
+    console.log('SQLite data cleared for rollback');
+  } catch (error) {
+    console.error('Failed to clear SQLite data:', error);
     throw error;
   }
 };
@@ -240,8 +269,8 @@ export const performMigration = async () => {
     console.log('Starting migration from AsyncStorage to SQLite...');
 
     // Check if already migrated
-    const alreadyMigrated = await isMigrationComplete();
-    if (alreadyMigrated) {
+    const status = await getMigrationStatus();
+    if (status === 'completed') {
       console.log('Migration already complete');
       return {
         success: true,
@@ -252,6 +281,18 @@ export const performMigration = async () => {
       };
     }
 
+    // Check if migration failed previously - offer rollback
+    if (status === 'failed') {
+      console.warn('Previous migration attempt failed. Attempting rollback...');
+      await rollbackMigration();
+    }
+
+    // Check if migration is in progress - offer rollback
+    if (status === 'in_progress') {
+      console.warn('Migration was interrupted. Attempting rollback...');
+      await rollbackMigration();
+    }
+
     const results = {
       success: false,
       accounts: 0,
@@ -260,36 +301,85 @@ export const performMigration = async () => {
       errors: [],
     };
 
-    // Migrate in order: accounts -> categories -> operations
+    // Step 1: Backup AsyncStorage data
+    console.log('Creating backup of AsyncStorage data...');
+    await backupAsyncStorageData();
+
+    // Step 2: Mark migration as in progress
+    await setMigrationStatus('in_progress');
+
     try {
+      // Migrate in order: accounts -> categories -> operations
+      console.log('Migrating accounts...');
       results.accounts = await migrateAccounts();
-    } catch (error) {
-      results.errors.push({ stage: 'accounts', error: error.message });
-    }
 
-    try {
+      console.log('Migrating categories...');
       results.categories = await migrateCategories();
-    } catch (error) {
-      results.errors.push({ stage: 'categories', error: error.message });
-    }
 
-    try {
+      console.log('Migrating operations...');
       // Reset balances before migrating operations
       await resetAccountBalances();
       results.operations = await migrateOperations();
+
+      // Mark migration as complete
+      await setMigrationStatus('completed');
+
+      results.success = true;
+      console.log('Migration complete:', results);
+
+      // Keep backup for safety - don't delete AsyncStorage data yet
+      console.log('Migration successful. AsyncStorage data preserved as backup.');
+
+      return results;
     } catch (error) {
-      results.errors.push({ stage: 'operations', error: error.message });
+      console.error('Migration failed:', error);
+      results.errors.push({ stage: 'migration', error: error.message });
+
+      // Mark as failed
+      await setMigrationStatus('failed');
+
+      // Attempt rollback
+      console.log('Attempting automatic rollback...');
+      try {
+        await rollbackMigration();
+        console.log('Rollback successful - restored from backup');
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError);
+        results.errors.push({ stage: 'rollback', error: rollbackError.message });
+      }
+
+      throw error;
     }
-
-    // Mark migration as complete
-    await setMigrationComplete();
-
-    results.success = true;
-    console.log('Migration complete:', results);
-
-    return results;
   } catch (error) {
     console.error('Migration failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Rollback migration - clear SQLite and restore AsyncStorage from backup
+ * @returns {Promise<void>}
+ */
+export const rollbackMigration = async () => {
+  try {
+    console.log('Rolling back migration...');
+
+    // Clear SQLite data
+    await clearSQLiteData();
+
+    // Restore AsyncStorage from backup
+    await restoreFromBackup();
+
+    // Clear migration status
+    const db = await getDatabase();
+    await db.runAsync(
+      'DELETE FROM app_metadata WHERE key = ?',
+      ['migration_status']
+    );
+
+    console.log('Migration rollback complete');
+  } catch (error) {
+    console.error('Rollback failed:', error);
     throw error;
   }
 };
