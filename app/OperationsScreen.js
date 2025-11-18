@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Button, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
@@ -67,23 +68,21 @@ const OperationsScreen = () => {
     return [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [operations]);
 
-  // Format date
-  const formatDate = (dateString) => {
+  // Format date (memoized)
+  const formatDate = useCallback((dateString) => {
     const date = new Date(dateString);
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    // Reset time for comparison
     today.setHours(0, 0, 0, 0);
-    yesterday.setHours(0, 0, 0, 0);
+
     const compareDate = new Date(date);
     compareDate.setHours(0, 0, 0, 0);
 
-    if (compareDate.getTime() === today.getTime()) {
-      return 'Today';
-    } else if (compareDate.getTime() === yesterday.getTime()) {
-      return 'Yesterday';
+    const diffDays = Math.floor((today - compareDate) / 86400000);
+
+    if (diffDays === 0) {
+      return t('today');
+    } else if (diffDays === 1) {
+      return t('yesterday');
     } else {
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
@@ -91,7 +90,28 @@ const OperationsScreen = () => {
         day: 'numeric'
       });
     }
-  };
+  }, [t]);
+
+  // Format amount with currency (memoized)
+  const formatCurrency = useCallback((accountId, amount) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return amount;
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return amount;
+
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: account.currency || 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(numAmount);
+    } catch (error) {
+      // Fallback if currency is invalid
+      return `${numAmount.toFixed(2)} ${account.currency || 'USD'}`;
+    }
+  }, [accounts]);
 
   const getItemLayout = useCallback((data, index) => ({
     length: 72,
@@ -107,13 +127,26 @@ const OperationsScreen = () => {
     const isIncome = operation.type === 'income';
     const isTransfer = operation.type === 'transfer';
 
+    // Build comprehensive accessibility label
+    const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
+    let accessibilityLabel = `${typeLabel}, ${categoryInfo.name}, ${formatCurrency(operation.accountId, operation.amount)}, ${accountName}, ${formatDate(operation.date)}`;
+
+    if (isTransfer && operation.toAccountId) {
+      const toAccountName = getAccountName(operation.toAccountId);
+      accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}, ${formatDate(operation.date)}`;
+    }
+
+    if (operation.description) {
+      accessibilityLabel += `, note: ${operation.description}`;
+    }
+
     return (
       <TouchableOpacity
         style={[styles.operationRow, { borderBottomColor: colors.border }]}
         onPress={() => handleEditOperation(operation)}
         accessibilityRole="button"
-        accessibilityLabel={`${categoryInfo.name} operation, ${operation.amount}`}
-        accessibilityHint="Double tap to edit"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={t('edit_operation_hint')}
       >
         <View style={styles.operationContent}>
           {/* Category Icon */}
@@ -160,15 +193,15 @@ const OperationsScreen = () => {
                 styles.amount,
                 {
                   color: isExpense
-                    ? colors.expense || '#ff4444'
+                    ? colors.expense
                     : isIncome
-                    ? colors.income || '#44aa44'
+                    ? colors.income
                     : colors.text,
                 },
               ]}
             >
               {isExpense ? '-' : isIncome ? '+' : ''}
-              {operation.amount}
+              {formatCurrency(operation.accountId, operation.amount)}
             </Text>
             <Text style={[styles.date, { color: colors.mutedText }]}>
               {formatDate(operation.date)}
@@ -179,32 +212,32 @@ const OperationsScreen = () => {
           <TouchableOpacity
             onPress={() => handleDeleteOperation(operation)}
             style={styles.deleteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
-            accessibilityLabel={`Delete ${categoryInfo.name} operation`}
-            accessibilityHint="Deletes this operation"
+            accessibilityLabel={t('delete_operation_accessibility')}
+            accessibilityHint={t('delete_hint')}
           >
-            <Icon name="delete-outline" size={20} color={colors.delete} accessible={false} />
+            <Icon name="delete-outline" size={22} color={colors.delete} accessible={false} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
-  }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, handleDeleteOperation, formatDate]);
+  }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, handleDeleteOperation, formatDate, formatCurrency]);
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.mutedText }]}>
           {t('loading_operations')}
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <FlatList
+        contentInsetAdjustmentBehavior="automatic"
         data={sortedOperations}
         renderItem={renderOperation}
         keyExtractor={item => item.id}
@@ -226,11 +259,17 @@ const OperationsScreen = () => {
       />
 
       <View style={styles.addButtonWrapper}>
-        <Button
-          title={t('add_operation')}
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
           onPress={handleAddOperation}
-          color={colors.primary}
-        />
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('add_operation')}
+          accessibilityHint={t('add_operation_hint')}
+        >
+          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
+          <Text style={styles.addButtonText}>{t('add_operation')}</Text>
+        </TouchableOpacity>
       </View>
 
       <OperationModal
@@ -239,7 +278,7 @@ const OperationsScreen = () => {
         operation={editingOperation}
         isNew={isNew}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -302,10 +341,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   deleteButton: {
-    width: 44,
-    height: 44,
+    minWidth: 48,
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 4,
   },
   emptyContainer: {
     flex: 1,
@@ -322,7 +362,28 @@ const styles = StyleSheet.create({
   },
   addButtonWrapper: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 8,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addButtonIcon: {
+    marginRight: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
