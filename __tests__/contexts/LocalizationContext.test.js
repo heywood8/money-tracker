@@ -96,10 +96,10 @@ describe('LocalizationContext', () => {
     it('translates keys to English', () => {
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
-      expect(result.current.t('app_name')).toBeDefined();
       expect(result.current.t('accounts')).toBeDefined();
       expect(result.current.t('operations')).toBeDefined();
       expect(result.current.t('categories')).toBeDefined();
+      expect(result.current.t('graphs')).toBeDefined();
     });
 
     it('translates keys to Russian when language is ru', async () => {
@@ -109,8 +109,8 @@ describe('LocalizationContext', () => {
         await result.current.setLanguage('ru');
       });
 
-      expect(result.current.t('app_name')).toBeDefined();
-      expect(result.current.t('app_name')).not.toBe('app_name'); // Should be translated
+      expect(result.current.t('accounts')).toBeDefined();
+      expect(result.current.t('accounts')).not.toBe('accounts'); // Should be translated
     });
 
     it('returns key itself when translation is missing', () => {
@@ -238,23 +238,17 @@ describe('LocalizationContext', () => {
     });
 
     it('gracefully handles AsyncStorage errors', async () => {
-      // Mock AsyncStorage to throw error
-      const originalSetItem = AsyncStorage.setItem;
-      AsyncStorage.setItem = jest.fn().mockRejectedValue(new Error('Storage error'));
-
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
+      // Mock AsyncStorage to throw error after component is mounted
+      jest.spyOn(AsyncStorage, 'setItem').mockRejectedValue(new Error('Storage error'));
+
       // Should not throw error
-      await expect(
-        act(async () => {
-          await result.current.setLanguage('ru');
-        })
-      ).resolves.not.toThrow();
+      await act(async () => {
+        await result.current.setLanguage('ru');
+      });
 
       expect(result.current.language).toBe('ru'); // Language should still change in memory
-
-      // Restore
-      AsyncStorage.setItem = originalSetItem;
     });
   });
 });
