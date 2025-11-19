@@ -23,24 +23,19 @@ export const CategoriesProvider = ({ children }) => {
   const [saveError, setSaveError] = useState(null);
 
   // Reload categories from database
-  const reloadCategories = useCallback(async () => {
+  const reloadCategories = useCallback(async (language = 'en') => {
     try {
       setLoading(true);
       const categoriesData = await CategoriesDB.getAllCategories();
 
       if (categoriesData.length === 0) {
-        // Initialize with default categories
-        console.log('Initializing default categories...');
-        const createdCategories = [];
-        for (const category of defaultCategories) {
-          try {
-            await CategoriesDB.createCategory(category);
-            createdCategories.push(category);
-          } catch (err) {
-            console.error('Failed to create default category:', category.id, err);
-          }
-        }
-        setCategories(createdCategories);
+        // Initialize with default categories in the specified language
+        console.log(`Initializing default categories in ${language}...`);
+        await CategoriesDB.initializeDefaultCategories(language);
+
+        // Reload to get the newly created categories
+        const newCategories = await CategoriesDB.getAllCategories();
+        setCategories(newCategories);
       } else {
         setCategories(categoriesData);
       }
