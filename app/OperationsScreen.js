@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -9,6 +9,139 @@ import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import OperationModal from './OperationModal';
+
+// Separate memoized component for the quick add form
+const QuickAddForm = memo(({
+  colors,
+  t,
+  quickAddValues,
+  setQuickAddValues,
+  accounts,
+  filteredCategories,
+  getAccountName,
+  getCategoryName,
+  openPicker,
+  handleQuickAdd,
+  TYPES
+}) => {
+  return (
+    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.quickAddTitle, { color: colors.text }]}>{t('add_operation')}</Text>
+
+      {/* Type Selector */}
+      <View style={styles.typeSelector}>
+        {TYPES.map(type => (
+          <TouchableOpacity
+            key={type.key}
+            style={[
+              styles.typeButton,
+              {
+                backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
+                borderColor: colors.border,
+              }
+            ]}
+            onPress={() => setQuickAddValues(v => ({
+              ...v,
+              type: type.key,
+              categoryId: type.key === 'transfer' ? '' : v.categoryId,
+              toAccountId: type.key !== 'transfer' ? '' : v.toAccountId,
+            }))}
+          >
+            <Icon
+              name={type.icon}
+              size={18}
+              color={quickAddValues.type === type.key ? '#fff' : colors.text}
+            />
+            <Text style={[
+              styles.typeButtonText,
+              { color: quickAddValues.type === type.key ? '#fff' : colors.text }
+            ]}>
+              {type.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Account Picker */}
+      <Pressable
+        style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+        onPress={() => openPicker('account', accounts)}
+      >
+        <Icon name="wallet" size={18} color={colors.mutedText} />
+        <Text style={[styles.formInputText, { color: colors.text }]}>
+          {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+        </Text>
+        <Icon name="chevron-down" size={18} color={colors.mutedText} />
+      </Pressable>
+
+      {/* To Account Picker (only for transfers) */}
+      {quickAddValues.type === 'transfer' && (
+        <Pressable
+          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== quickAddValues.accountId))}
+        >
+          <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
+          <Text style={[styles.formInputText, { color: colors.text }]}>
+            {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+          </Text>
+          <Icon name="chevron-down" size={18} color={colors.mutedText} />
+        </Pressable>
+      )}
+
+      {/* Amount Input */}
+      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+        <Icon name="currency-usd" size={18} color={colors.mutedText} />
+        <TextInput
+          style={[styles.formTextInput, { color: colors.text }]}
+          value={quickAddValues.amount}
+          onChangeText={text => setQuickAddValues(v => ({ ...v, amount: text }))}
+          placeholder={t('amount')}
+          placeholderTextColor={colors.mutedText}
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Description Input */}
+      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+        <Icon name="text" size={18} color={colors.mutedText} />
+        <TextInput
+          style={[styles.formTextInput, { color: colors.text }]}
+          value={quickAddValues.description}
+          onChangeText={text => setQuickAddValues(v => ({ ...v, description: text }))}
+          placeholder={t('description')}
+          placeholderTextColor={colors.mutedText}
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Category Picker */}
+      {quickAddValues.type !== 'transfer' && (
+        <Pressable
+          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={() => openPicker('category', filteredCategories)}
+        >
+          <Icon name="tag" size={18} color={colors.mutedText} />
+          <Text style={[styles.formInputText, { color: colors.text }]}>
+            {getCategoryName(quickAddValues.categoryId)}
+          </Text>
+          <Icon name="chevron-down" size={18} color={colors.mutedText} />
+        </Pressable>
+      )}
+
+      {/* Add Button */}
+      <TouchableOpacity
+        style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
+        onPress={handleQuickAdd}
+      >
+        <Icon name="plus" size={20} color="#fff" />
+        <Text style={styles.quickAddButtonText}>{t('add')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+QuickAddForm.displayName = 'QuickAddForm';
 
 const OperationsScreen = () => {
   const { colors } = useTheme();
@@ -209,129 +342,27 @@ const OperationsScreen = () => {
     index,
   }), []);
 
-  const TYPES = [
+  const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
     { key: 'income', label: t('income'), icon: 'plus-circle' },
     { key: 'transfer', label: t('transfer'), icon: 'swap-horizontal' },
-  ];
+  ], [t]);
 
-  const renderAddOperationForm = useCallback(() => {
-    return (
-      <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.quickAddTitle, { color: colors.text }]}>{t('add_operation')}</Text>
-
-        {/* Type Selector */}
-        <View style={styles.typeSelector}>
-          {TYPES.map(type => (
-            <TouchableOpacity
-              key={type.key}
-              style={[
-                styles.typeButton,
-                {
-                  backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
-                  borderColor: colors.border,
-                }
-              ]}
-              onPress={() => setQuickAddValues(v => ({
-                ...v,
-                type: type.key,
-                categoryId: type.key === 'transfer' ? '' : v.categoryId,
-                toAccountId: type.key !== 'transfer' ? '' : v.toAccountId,
-              }))}
-            >
-              <Icon
-                name={type.icon}
-                size={18}
-                color={quickAddValues.type === type.key ? '#fff' : colors.text}
-              />
-              <Text style={[
-                styles.typeButtonText,
-                { color: quickAddValues.type === type.key ? '#fff' : colors.text }
-              ]}>
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Account Picker */}
-        <Pressable
-          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={() => openPicker('account', accounts)}
-        >
-          <Icon name="wallet" size={18} color={colors.mutedText} />
-          <Text style={[styles.formInputText, { color: colors.text }]}>
-            {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-          </Text>
-          <Icon name="chevron-down" size={18} color={colors.mutedText} />
-        </Pressable>
-
-        {/* To Account Picker (only for transfers) */}
-        {quickAddValues.type === 'transfer' && (
-          <Pressable
-            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== quickAddValues.accountId))}
-          >
-            <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
-            <Text style={[styles.formInputText, { color: colors.text }]}>
-              {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
-            </Text>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
-          </Pressable>
-        )}
-
-        {/* Amount Input */}
-        <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-          <Icon name="currency-usd" size={18} color={colors.mutedText} />
-          <TextInput
-            style={[styles.formTextInput, { color: colors.text }]}
-            value={quickAddValues.amount}
-            onChangeText={text => setQuickAddValues(v => ({ ...v, amount: text }))}
-            placeholder={t('amount')}
-            placeholderTextColor={colors.mutedText}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
-          />
-        </View>
-
-        {/* Description Input */}
-        <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-          <Icon name="text" size={18} color={colors.mutedText} />
-          <TextInput
-            style={[styles.formTextInput, { color: colors.text }]}
-            value={quickAddValues.description}
-            onChangeText={text => setQuickAddValues(v => ({ ...v, description: text }))}
-            placeholder={t('description')}
-            placeholderTextColor={colors.mutedText}
-            returnKeyType="done"
-          />
-        </View>
-
-        {/* Category Picker */}
-        {quickAddValues.type !== 'transfer' && (
-          <Pressable
-            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('category', filteredCategories)}
-          >
-            <Icon name="tag" size={18} color={colors.mutedText} />
-            <Text style={[styles.formInputText, { color: colors.text }]}>
-              {getCategoryName(quickAddValues.categoryId)}
-            </Text>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
-          </Pressable>
-        )}
-
-        {/* Add Button */}
-        <TouchableOpacity
-          style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-          onPress={handleQuickAdd}
-        >
-          <Icon name="plus" size={20} color="#fff" />
-          <Text style={styles.quickAddButtonText}>{t('add')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }, [colors, t, quickAddValues, accounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+  const quickAddFormComponent = useMemo(() => (
+    <QuickAddForm
+      colors={colors}
+      t={t}
+      quickAddValues={quickAddValues}
+      setQuickAddValues={setQuickAddValues}
+      accounts={accounts}
+      filteredCategories={filteredCategories}
+      getAccountName={getAccountName}
+      getCategoryName={getCategoryName}
+      openPicker={openPicker}
+      handleQuickAdd={handleQuickAdd}
+      TYPES={TYPES}
+    />
+  ), [colors, t, quickAddValues, accounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   const renderOperation = useCallback(({ item }) => {
     const operation = item;
@@ -451,7 +482,7 @@ const OperationsScreen = () => {
         keyExtractor={item => item.id}
         extraData={[accounts, categories]}
         getItemLayout={getItemLayout}
-        ListHeaderComponent={renderAddOperationForm}
+        ListHeaderComponent={quickAddFormComponent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
