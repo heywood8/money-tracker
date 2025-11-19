@@ -159,7 +159,6 @@ const GraphsScreen = () => {
               selectedValue={selectedCategory}
               onValueChange={(value) => setSelectedCategory(value)}
               style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.text}
             >
               <Picker.Item label={t('all')} value="all" />
               {topLevelCategories.map(category => (
@@ -174,7 +173,6 @@ const GraphsScreen = () => {
               selectedValue={selectedCurrency}
               onValueChange={(value) => setSelectedCurrency(value)}
               style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.text}
             >
               {currencies.map(currency => (
                 <Picker.Item key={currency} label={currency} value={currency} />
@@ -188,7 +186,6 @@ const GraphsScreen = () => {
               selectedValue={selectedYear}
               onValueChange={(value) => setSelectedYear(value)}
               style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.text}
             >
               {years.map(year => (
                 <Picker.Item key={year} label={year.toString()} value={year} />
@@ -202,7 +199,6 @@ const GraphsScreen = () => {
               selectedValue={selectedMonth}
               onValueChange={(value) => setSelectedMonth(value)}
               style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.text}
             >
               {monthKeys.map((key, index) => (
                 <Picker.Item key={index} label={t(key)} value={index} />
@@ -264,29 +260,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
-    justifyContent: 'center',
     ...Platform.select({
       web: {
-        height: 40,
+        height: 36,
       },
       default: {
-        height: 48,
+        height: 44,
       },
     }),
   },
   picker: {
-    flex: 1,
     ...Platform.select({
       web: {
-        height: 40,
-        paddingVertical: 0,
+        height: 36,
+        padding: 0,
         margin: 0,
+        lineHeight: 36,
+        fontSize: 14,
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        backgroundImage: 'none',
       },
       android: {
-        height: 48,
+        height: 44,
+        padding: 0,
+        margin: 0,
       },
       ios: {
-        height: 48,
+        height: 44,
       },
     }),
   },
