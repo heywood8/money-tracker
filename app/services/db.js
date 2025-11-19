@@ -299,19 +299,24 @@ const initializeDatabase = async (db) => {
     );
 
     const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
+    const isNewDatabase = currentVersion === 0;
+    let didMigrate = false;
 
     // Run migrations BEFORE creating tables
     if (currentVersion > 0 && currentVersion < 2) {
       console.log('Migrating database from version', currentVersion, 'to version 2...');
       await migrateToV2(db);
+      didMigrate = true;
     }
     if (currentVersion >= 2 && currentVersion < 3) {
       console.log('Migrating database from version', currentVersion, 'to version 3...');
       await migrateToV3(db);
+      didMigrate = true;
     }
     if (currentVersion >= 3 && currentVersion < 4) {
       console.log('Migrating database from version', currentVersion, 'to version 4...');
       await migrateToV4(db);
+      didMigrate = true;
     }
 
     // Now create or update tables
@@ -381,7 +386,13 @@ const initializeDatabase = async (db) => {
       );
     }
 
-    console.log('Database initialized successfully');
+    // Log appropriate message based on what happened
+    if (isNewDatabase) {
+      console.log(`Database created successfully (v${DB_VERSION})`);
+    } else if (didMigrate) {
+      console.log(`Database migrated successfully (v${currentVersion} → v${DB_VERSION})`);
+    }
+    // No log for normal opens - database is ready silently
   } catch (error) {
     console.error('Failed to initialize database:', error);
     throw error;
