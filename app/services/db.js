@@ -4,6 +4,7 @@ const DB_NAME = 'money_tracker.db';
 const DB_VERSION = 1;
 
 let dbInstance = null;
+let initPromise = null;
 
 /**
  * Get or create the database instance
@@ -14,14 +15,28 @@ export const getDatabase = async () => {
     return dbInstance;
   }
 
-  try {
-    dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
-    await initializeDatabase(dbInstance);
+  // If initialization is in progress, wait for it
+  if (initPromise) {
+    await initPromise;
     return dbInstance;
-  } catch (error) {
-    console.error('Failed to open database:', error);
-    throw error;
   }
+
+  // Start initialization
+  initPromise = (async () => {
+    try {
+      dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
+      await initializeDatabase(dbInstance);
+    } catch (error) {
+      console.error('Failed to open database:', error);
+      dbInstance = null;
+      initPromise = null;
+      throw error;
+    }
+  })();
+
+  await initPromise;
+  initPromise = null;
+  return dbInstance;
 };
 
 /**
@@ -97,7 +112,7 @@ const initializeDatabase = async (db) => {
 
     if (!versionResult) {
       await db.runAsync(
-        'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+        'INSERT OR IGNORE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
         ['db_version', DB_VERSION.toString(), new Date().toISOString()]
       );
     }
