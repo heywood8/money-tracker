@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import * as OperationsDB from './services/OperationsDB';
 import { useAccounts } from './AccountsContext';
+import { appEvents, EVENTS } from './services/eventEmitter';
 
 const OperationsContext = createContext();
 
@@ -21,26 +22,34 @@ export const OperationsProvider = ({ children }) => {
   const [saveError, setSaveError] = useState(null);
   const { reloadAccounts } = useAccounts();
 
+  // Reload operations from database
+  const reloadOperations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const operationsData = await OperationsDB.getAllOperations();
+      setOperations(operationsData);
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Failed to reload operations:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Load operations from SQLite on mount
   useEffect(() => {
-    const loadOperations = async () => {
-      try {
-        const operationsData = await OperationsDB.getAllOperations();
-        setOperations(operationsData);
-      } catch (error) {
-        console.error('Failed to load operations:', error);
-        Alert.alert(
-          'Load Error',
-          'Failed to load operations from database.',
-          [{ text: 'OK' }]
-        );
-      } finally {
-        setLoading(false);
-        setDataLoaded(true);
-      }
-    };
-    loadOperations();
-  }, []);
+    reloadOperations();
+  }, [reloadOperations]);
+
+  // Listen for reload events
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
+      console.log('Reloading operations due to RELOAD_ALL event');
+      reloadOperations();
+    });
+
+    return unsubscribe;
+  }, [reloadOperations]);
 
   const addOperation = useCallback(async (operation) => {
     try {
@@ -177,6 +186,7 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByAccount,
     getOperationsByCategory,
     getOperationsByDateRange,
+    reloadOperations,
   }), [
     operations,
     loading,
@@ -187,6 +197,7 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByAccount,
     getOperationsByCategory,
     getOperationsByDateRange,
+    reloadOperations,
   ]);
 
   return (
