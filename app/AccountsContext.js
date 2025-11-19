@@ -188,8 +188,38 @@ export const AccountsProvider = ({ children }) => {
 
       Alert.alert(
         'Success',
-        'Database has been reset successfully.',
-        [{ text: 'OK' }]
+        'Database has been reset successfully. The app will now reload.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              // Reload the app to reinitialize all contexts
+              try {
+                // Try to use expo-updates for production builds
+                const Updates = await import('expo-updates');
+                if (Updates.default && !__DEV__) {
+                  await Updates.default.reloadAsync();
+                } else {
+                  // Use DevSettings for development mode
+                  const { Platform } = await import('react-native');
+                  if (Platform.OS !== 'web') {
+                    const DevSettings = require('react-native').DevSettings;
+                    DevSettings.reload();
+                  } else {
+                    // For web, use window.location.reload()
+                    window.location.reload();
+                  }
+                }
+              } catch (reloadErr) {
+                console.error('Failed to reload app:', reloadErr);
+                // Fallback: try to manually reload on web
+                if (typeof window !== 'undefined') {
+                  window.location.reload();
+                }
+              }
+            },
+          },
+        ]
       );
     } catch (err) {
       console.error('Failed to reset database:', err);
