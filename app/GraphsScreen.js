@@ -4,7 +4,7 @@ import { PieChart } from 'react-native-chart-kit';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
-import { getSpendingByCategoryAndCurrency } from './services/OperationsDB';
+import { getSpendingByCategoryAndCurrency, getAvailableMonths } from './services/OperationsDB';
 import { getAllCategories } from './services/CategoriesDB';
 import SimplePicker from './components/SimplePicker';
 
@@ -28,6 +28,7 @@ const GraphsScreen = () => {
   const [categories, setCategories] = useState([]);
   const [topLevelCategories, setTopLevelCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [availableMonths, setAvailableMonths] = useState([]);
 
   // Month names translation keys
   const monthKeys = [
@@ -36,8 +37,15 @@ const GraphsScreen = () => {
     'month_september', 'month_october', 'month_november', 'month_december'
   ];
 
-  // Generate list of years (current year and 5 years back)
-  const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
+  // Get available years from database (extract unique years from availableMonths)
+  const availableYears = useMemo(() => {
+    if (availableMonths.length === 0) {
+      // If no operations, return current year as fallback
+      return [now.getFullYear()];
+    }
+    const uniqueYears = [...new Set(availableMonths.map(m => m.year))];
+    return uniqueYears.sort((a, b) => b - a); // Sort descending
+  }, [availableMonths]);
 
   // Initialize default currency from first account
   useEffect(() => {
@@ -66,6 +74,34 @@ const GraphsScreen = () => {
     };
     loadCategories();
   }, []);
+
+  // Load available months from database
+  useEffect(() => {
+    const loadAvailableMonths = async () => {
+      try {
+        const months = await getAvailableMonths();
+        setAvailableMonths(months);
+      } catch (error) {
+        console.error('Failed to load available months:', error);
+      }
+    };
+    loadAvailableMonths();
+  }, []);
+
+  // Ensure selected month is valid for selected year
+  useEffect(() => {
+    if (availableMonths.length === 0) return;
+
+    const monthsForYear = availableMonths
+      .filter(m => m.year === selectedYear)
+      .map(m => m.month);
+
+    // If current selected month is not available for this year, select the first available month
+    if (monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
+      const sortedMonths = monthsForYear.sort((a, b) => b - a); // Sort descending
+      setSelectedMonth(sortedMonths[0]);
+    }
+  }, [selectedYear, availableMonths, selectedMonth]);
 
   // Load expense data
   const loadExpenseData = useCallback(async () => {
@@ -164,13 +200,28 @@ const GraphsScreen = () => {
   );
 
   const yearItems = useMemo(() =>
-    years.map(year => ({ label: year.toString(), value: year })),
-    [years]
+    availableYears.map(year => ({ label: year.toString(), value: year })),
+    [availableYears]
   );
 
+  // Get available months for the selected year
+  const availableMonthsForYear = useMemo(() => {
+    if (availableMonths.length === 0) {
+      // If no operations, return current month as fallback
+      return [now.getMonth()];
+    }
+    const monthsForYear = availableMonths
+      .filter(m => m.year === selectedYear)
+      .map(m => m.month);
+    return monthsForYear.sort((a, b) => b - a); // Sort descending
+  }, [availableMonths, selectedYear]);
+
   const monthItems = useMemo(() =>
-    monthKeys.map((key, index) => ({ label: t(key), value: index })),
-    [monthKeys, t]
+    availableMonthsForYear.map(monthIndex => ({
+      label: t(monthKeys[monthIndex]),
+      value: monthIndex
+    })),
+    [availableMonthsForYear, t, monthKeys]
   );
 
   // Calculate total expenses

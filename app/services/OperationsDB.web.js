@@ -463,6 +463,57 @@ export const getIncomeByCategory = async (startDate, endDate) => {
 };
 
 /**
+ * Get spending by category filtered by currency and date range
+ * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
+ * @param {string} startDate - ISO date string
+ * @param {string} endDate - ISO date string
+ * @returns {Promise<Array>}
+ */
+export const getSpendingByCategoryAndCurrency = async (currency, startDate, endDate) => {
+  try {
+    const allOperations = await idb.getAll(STORE_NAME);
+    const allAccounts = await idb.getAll('accounts');
+
+    // Create a map of account_id to currency
+    const accountCurrencyMap = new Map();
+    for (const account of allAccounts) {
+      accountCurrencyMap.set(account.id, account.currency);
+    }
+
+    // Filter operations by currency, date range, and type
+    const filtered = allOperations.filter(op => {
+      const accountCurrency = accountCurrencyMap.get(op.account_id);
+      return (
+        op.type === 'expense' &&
+        accountCurrency === currency &&
+        op.date >= startDate &&
+        op.date <= endDate &&
+        op.category_id
+      );
+    });
+
+    // Group by category
+    const categoryTotals = new Map();
+    for (const op of filtered) {
+      const current = categoryTotals.get(op.category_id) || 0;
+      categoryTotals.set(op.category_id, current + parseFloat(op.amount));
+    }
+
+    // Convert to array and sort by total DESC
+    const results = Array.from(categoryTotals.entries()).map(([category_id, total]) => ({
+      category_id,
+      total,
+    }));
+    results.sort((a, b) => b.total - a.total);
+
+    return results;
+  } catch (error) {
+    console.error('Failed to get spending by category and currency:', error);
+    throw error;
+  }
+};
+
+/**
  * Check if operation exists
  * @param {string} id
  * @returns {Promise<boolean>}
@@ -473,6 +524,45 @@ export const operationExists = async (id) => {
     return !!operation;
   } catch (error) {
     console.error('Failed to check operation existence:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get distinct year/month combinations that have operations
+ * @returns {Promise<Array<{year: number, month: number}>>}
+ */
+export const getAvailableMonths = async () => {
+  try {
+    const allOperations = await idb.getAll(STORE_NAME);
+
+    // Extract unique year/month combinations
+    const yearMonthSet = new Set();
+    for (const op of allOperations) {
+      const date = new Date(op.date);
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-11
+      yearMonthSet.add(`${year}-${month}`);
+    }
+
+    // Convert to array of objects
+    const results = Array.from(yearMonthSet).map(key => {
+      const [year, month] = key.split('-');
+      return {
+        year: parseInt(year, 10),
+        month: parseInt(month, 10)
+      };
+    });
+
+    // Sort by year DESC, month DESC
+    results.sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+
+    return results;
+  } catch (error) {
+    console.error('Failed to get available months:', error);
     throw error;
   }
 };

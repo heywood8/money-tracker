@@ -537,3 +537,27 @@ export const operationExists = async (id) => {
     throw error;
   }
 };
+
+/**
+ * Get distinct year/month combinations that have operations
+ * @returns {Promise<Array<{year: number, month: number}>>}
+ */
+export const getAvailableMonths = async () => {
+  try {
+    const results = await queryAll(
+      `SELECT DISTINCT
+         CAST(strftime('%Y', date) AS INTEGER) as year,
+         CAST(strftime('%m', date) AS INTEGER) as month
+       FROM operations
+       ORDER BY year DESC, month DESC`
+    );
+
+    return (results || []).map(row => ({
+      year: row.year,
+      month: row.month - 1 // Convert to 0-based month (0-11) for JavaScript Date
+    }));
+  } catch (error) {
+    console.error('Failed to get available months:', error);
+    throw error;
+  }
+};
