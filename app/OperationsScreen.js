@@ -28,6 +28,7 @@ const OperationsScreen = () => {
     accountId: '',
     categoryId: '',
     description: '',
+    toAccountId: '',
   });
   const [pickerState, setPickerState] = useState({
     visible: false,
@@ -111,6 +112,7 @@ const OperationsScreen = () => {
         accountId: quickAddValues.accountId,
         categoryId: '',
         description: '',
+        toAccountId: '',
       });
 
       Keyboard.dismiss();
@@ -234,6 +236,7 @@ const OperationsScreen = () => {
                 ...v,
                 type: type.key,
                 categoryId: type.key === 'transfer' ? '' : v.categoryId,
+                toAccountId: type.key !== 'transfer' ? '' : v.toAccountId,
               }))}
             >
               <Icon
@@ -262,6 +265,20 @@ const OperationsScreen = () => {
           </Text>
           <Icon name="chevron-down" size={18} color={colors.mutedText} />
         </Pressable>
+
+        {/* To Account Picker (only for transfers) */}
+        {quickAddValues.type === 'transfer' && (
+          <Pressable
+            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== quickAddValues.accountId))}
+          >
+            <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
+            <Text style={[styles.formInputText, { color: colors.text }]}>
+              {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+            </Text>
+            <Icon name="chevron-down" size={18} color={colors.mutedText} />
+          </Pressable>
+        )}
 
         {/* Amount Input */}
         <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
@@ -464,11 +481,15 @@ const OperationsScreen = () => {
               data={pickerState.data}
               keyExtractor={(item) => item.id || item.key}
               renderItem={({ item }) => {
-                if (pickerState.type === 'account') {
+                if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
                   return (
                     <Pressable
                       onPress={() => {
-                        setQuickAddValues(v => ({ ...v, accountId: item.id }));
+                        if (pickerState.type === 'account') {
+                          setQuickAddValues(v => ({ ...v, accountId: item.id }));
+                        } else {
+                          setQuickAddValues(v => ({ ...v, toAccountId: item.id }));
+                        }
                         closePicker();
                       }}
                       style={({ pressed }) => [
