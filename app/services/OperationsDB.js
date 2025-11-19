@@ -2,6 +2,27 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
 
 /**
+ * Map database field names to camelCase for application use
+ * @param {Object} dbOperation - Operation object from database with snake_case fields
+ * @returns {Object} Operation object with camelCase fields
+ */
+const mapOperationFields = (dbOperation) => {
+  if (!dbOperation) return null;
+
+  return {
+    id: dbOperation.id,
+    type: dbOperation.type,
+    amount: dbOperation.amount,
+    accountId: dbOperation.account_id,
+    categoryId: dbOperation.category_id,
+    toAccountId: dbOperation.to_account_id,
+    date: dbOperation.date,
+    description: dbOperation.description,
+    createdAt: dbOperation.created_at,
+  };
+};
+
+/**
  * Get all operations
  * @returns {Promise<Array>}
  */
@@ -10,7 +31,7 @@ export const getAllOperations = async () => {
     const operations = await queryAll(
       'SELECT * FROM operations ORDER BY date DESC, created_at DESC'
     );
-    return operations || [];
+    return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations:', error);
     throw error;
@@ -28,7 +49,7 @@ export const getOperationById = async (id) => {
       'SELECT * FROM operations WHERE id = ?',
       [id]
     );
-    return operation;
+    return mapOperationFields(operation);
   } catch (error) {
     console.error('Failed to get operation:', error);
     throw error;
@@ -46,7 +67,7 @@ export const getOperationsByAccount = async (accountId) => {
       'SELECT * FROM operations WHERE account_id = ? OR to_account_id = ? ORDER BY date DESC, created_at DESC',
       [accountId, accountId]
     );
-    return operations || [];
+    return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations by account:', error);
     throw error;
@@ -64,7 +85,7 @@ export const getOperationsByCategory = async (categoryId) => {
       'SELECT * FROM operations WHERE category_id = ? ORDER BY date DESC, created_at DESC',
       [categoryId]
     );
-    return operations || [];
+    return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations by category:', error);
     throw error;
@@ -83,7 +104,7 @@ export const getOperationsByDateRange = async (startDate, endDate) => {
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
       [startDate, endDate]
     );
-    return operations || [];
+    return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations by date range:', error);
     throw error;
@@ -101,7 +122,7 @@ export const getOperationsByType = async (type) => {
       'SELECT * FROM operations WHERE type = ? ORDER BY date DESC, created_at DESC',
       [type]
     );
-    return operations || [];
+    return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations by type:', error);
     throw error;
