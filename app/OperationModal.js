@@ -22,7 +22,7 @@ import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 
-export default function OperationModal({ visible, onClose, operation, isNew }) {
+export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { addOperation, updateOperation, validateOperation } = useOperations();
@@ -109,6 +109,13 @@ export default function OperationModal({ visible, onClose, operation, isNew }) {
     setErrors({});
     onClose();
   }, [onClose]);
+
+  const handleDelete = useCallback(() => {
+    if (onDelete && operation) {
+      onDelete(operation);
+      onClose();
+    }
+  }, [onDelete, operation, onClose]);
 
   const openPicker = useCallback((type, data) => {
     Keyboard.dismiss();
@@ -304,6 +311,19 @@ export default function OperationModal({ visible, onClose, operation, isNew }) {
                     </Text>
                   </Pressable>
                 </View>
+
+                {/* Delete Button (only for editing) */}
+                {!isNew && onDelete && (
+                  <Pressable
+                    style={[styles.deleteButtonContainer, { backgroundColor: colors.card }]}
+                    onPress={handleDelete}
+                  >
+                    <Icon name="delete-outline" size={20} color={colors.delete || '#ff6b6b'} />
+                    <Text style={[styles.deleteButtonText, { color: colors.delete || '#ff6b6b' }]}>
+                      {t('delete_operation')}
+                    </Text>
+                  </Pressable>
+                )}
               </Pressable>
             </Pressable>
           </KeyboardAvoidingView>
@@ -560,5 +580,18 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  deleteButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+    gap: 8,
+    minHeight: 48,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
