@@ -121,11 +121,16 @@ const OperationsScreen = () => {
 
   const renderOperation = useCallback(({ item }) => {
     const operation = item;
-    const categoryInfo = getCategoryInfo(operation.categoryId);
-    const accountName = getAccountName(operation.accountId);
     const isExpense = operation.type === 'expense';
     const isIncome = operation.type === 'income';
     const isTransfer = operation.type === 'transfer';
+
+    // For transfers, use transfer icon and localized name instead of category
+    const categoryInfo = isTransfer
+      ? { name: t('transfer'), icon: 'swap-horizontal' }
+      : getCategoryInfo(operation.categoryId);
+
+    const accountName = getAccountName(operation.accountId);
 
     // Build comprehensive accessibility label
     const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
