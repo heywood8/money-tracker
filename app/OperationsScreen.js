@@ -212,21 +212,10 @@ const OperationsScreen = () => {
               {formatDate(operation.date)}
             </Text>
           </View>
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            onPress={() => handleDeleteOperation(operation)}
-            style={styles.deleteButton}
-            accessibilityRole="button"
-            accessibilityLabel={t('delete_operation_accessibility')}
-            accessibilityHint={t('delete_hint')}
-          >
-            <Icon name="delete-outline" size={22} color={colors.delete} accessible={false} />
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
-  }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, handleDeleteOperation, formatDate, formatCurrency]);
+  }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, formatDate, formatCurrency]);
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
@@ -283,6 +272,7 @@ const OperationsScreen = () => {
         onClose={() => setModalVisible(false)}
         operation={editingOperation}
         isNew={isNew}
+        onDelete={handleDeleteOperation}
       />
     </SafeAreaView>
   );
@@ -345,13 +335,6 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 12,
-  },
-  deleteButton: {
-    minWidth: 48,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
   },
   emptyContainer: {
     flex: 1,
