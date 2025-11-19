@@ -186,32 +186,53 @@ export const AccountsProvider = ({ children }) => {
       setAccounts(defaultAccounts);
       console.log('Default accounts initialized');
 
+      // Determine reload message based on platform
+      const { Platform } = require('react-native');
+      const isWeb = typeof window !== 'undefined' && window.location;
+      const isProduction = !__DEV__;
+
+      let message = 'Database has been reset successfully.';
+      let canAutoReload = false;
+
+      if (isWeb) {
+        message += ' The app will now reload.';
+        canAutoReload = true;
+      } else if (!isProduction) {
+        // Development mode on native
+        message += ' The app will now reload.';
+        canAutoReload = true;
+      } else {
+        // Production mode on native (standalone APK/IPA)
+        message += ' Please close and restart the app to see the changes.';
+        canAutoReload = false;
+      }
+
       Alert.alert(
         'Success',
-        'Database has been reset successfully. The app will now reload.',
+        message,
         [
           {
             text: 'OK',
             onPress: () => {
+              if (!canAutoReload) {
+                // Production build - can't auto-reload, user must restart manually
+                return;
+              }
+
               // Reload the app to reinitialize all contexts
               try {
-                // Check if we're on web
-                if (typeof window !== 'undefined' && window.location) {
+                if (isWeb) {
                   window.location.reload();
                 } else {
-                  // For React Native (iOS/Android), use DevSettings
-                  const { Platform } = require('react-native');
-                  if (Platform.OS !== 'web') {
-                    const DevSettings = require('react-native').DevSettings;
-                    DevSettings.reload();
-                  }
+                  // Development mode - use DevSettings
+                  const DevSettings = require('react-native').DevSettings;
+                  DevSettings.reload();
                 }
               } catch (reloadErr) {
                 console.error('Failed to reload app:', reloadErr);
-                // Ask user to manually reload if automatic reload fails
                 Alert.alert(
                   'Manual Reload Required',
-                  'Please manually reload the app to see the changes.',
+                  'Please close and restart the app to see the changes.',
                   [{ text: 'OK' }]
                 );
               }
