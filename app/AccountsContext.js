@@ -192,30 +192,28 @@ export const AccountsProvider = ({ children }) => {
         [
           {
             text: 'OK',
-            onPress: async () => {
+            onPress: () => {
               // Reload the app to reinitialize all contexts
               try {
-                // Try to use expo-updates for production builds
-                const Updates = await import('expo-updates');
-                if (Updates.default && !__DEV__) {
-                  await Updates.default.reloadAsync();
+                // Check if we're on web
+                if (typeof window !== 'undefined' && window.location) {
+                  window.location.reload();
                 } else {
-                  // Use DevSettings for development mode
-                  const { Platform } = await import('react-native');
+                  // For React Native (iOS/Android), use DevSettings
+                  const { Platform } = require('react-native');
                   if (Platform.OS !== 'web') {
                     const DevSettings = require('react-native').DevSettings;
                     DevSettings.reload();
-                  } else {
-                    // For web, use window.location.reload()
-                    window.location.reload();
                   }
                 }
               } catch (reloadErr) {
                 console.error('Failed to reload app:', reloadErr);
-                // Fallback: try to manually reload on web
-                if (typeof window !== 'undefined') {
-                  window.location.reload();
-                }
+                // Ask user to manually reload if automatic reload fails
+                Alert.alert(
+                  'Manual Reload Required',
+                  'Please manually reload the app to see the changes.',
+                  [{ text: 'OK' }]
+                );
               }
             },
           },
