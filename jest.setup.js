@@ -1,0 +1,58 @@
+// Mock AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
+// Mock expo-sqlite
+jest.mock('expo-sqlite', () => ({
+  openDatabaseSync: jest.fn(() => ({
+    execSync: jest.fn(),
+    runSync: jest.fn(),
+    getFirstSync: jest.fn(),
+    getAllSync: jest.fn(),
+    closeSync: jest.fn(),
+  })),
+}));
+
+// Mock react-native-uuid
+jest.mock('react-native-uuid', () => ({
+  v4: jest.fn(() => 'test-uuid-1234'),
+}));
+
+// Mock Appearance API
+jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
+  getColorScheme: jest.fn(() => 'light'),
+  addChangeListener: jest.fn(),
+  removeChangeListener: jest.fn(),
+}));
+
+// Mock DateTimePicker
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: () => React.createElement('DateTimePicker'),
+  };
+});
+
+// Mock react-native-chart-kit
+jest.mock('react-native-chart-kit', () => ({
+  LineChart: () => 'LineChart',
+  PieChart: () => 'PieChart',
+}));
+
+// Mock react-native-svg
+jest.mock('react-native-svg', () => ({
+  Svg: 'Svg',
+  Circle: 'Circle',
+  Rect: 'Rect',
+  Path: 'Path',
+  G: 'G',
+  Text: 'Text',
+}));
+
+// Mock ViewConfigIgnore to avoid Flow syntax issues
+jest.mock('react-native/Libraries/NativeComponent/ViewConfigIgnore', () => ({
+  ConditionallyIgnoredEventHandlers: (value) => value,
+  DynamicallyInjectedByGestureHandler: (value) => value,
+}));
