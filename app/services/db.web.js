@@ -47,11 +47,19 @@ const openIndexedDB = () => {
           const getAllRequest = categoriesStore.getAll();
           getAllRequest.onsuccess = () => {
             const categories = getAllRequest.result;
-            categories.forEach(cat => {
-              // Add category_type if missing
-              if (!cat.category_type) {
-                let categoryType = cat.categoryType || 'expense';
 
+            // Determine which categories have children
+            const categoryIdsWithChildren = new Set(
+              categories
+                .filter(cat => cat.parent_id !== null && cat.parent_id !== undefined)
+                .map(cat => cat.parent_id)
+            );
+
+            categories.forEach(cat => {
+              // Determine category_type if missing
+              let categoryType = cat.category_type || cat.categoryType || 'expense';
+
+              if (!cat.category_type) {
                 if (cat.type === 'expense' || cat.type === 'income') {
                   categoryType = cat.type;
                 }
@@ -70,14 +78,18 @@ const openIndexedDB = () => {
                     }
                   }
                 }
-
-                // Update the category
-                categoriesStore.put({
-                  ...cat,
-                  type: 'folder',
-                  category_type: categoryType
-                });
               }
+
+              // Determine type: 'entry' for leaf categories, 'folder' for parents
+              const isLeaf = !categoryIdsWithChildren.has(cat.id);
+              const newType = isLeaf ? 'entry' : 'folder';
+
+              // Update the category
+              categoriesStore.put({
+                ...cat,
+                type: newType,
+                category_type: categoryType
+              });
             });
           };
         }
