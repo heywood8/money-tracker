@@ -8,6 +8,11 @@ import { useAccounts } from './AccountsContext';
 import { getSpendingByCategoryAndCurrency } from './services/OperationsDB';
 import { getAllCategories } from './services/CategoriesDB';
 
+// Import web-specific picker styles
+if (Platform.OS === 'web') {
+  require('./picker-styles.web');
+}
+
 const GraphsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -159,6 +164,7 @@ const GraphsScreen = () => {
               selectedValue={selectedCategory}
               onValueChange={(value) => setSelectedCategory(value)}
               style={[styles.picker, { color: colors.text }]}
+              itemStyle={styles.pickerItem}
             >
               <Picker.Item label={t('all')} value="all" />
               {topLevelCategories.map(category => (
@@ -173,6 +179,7 @@ const GraphsScreen = () => {
               selectedValue={selectedCurrency}
               onValueChange={(value) => setSelectedCurrency(value)}
               style={[styles.picker, { color: colors.text }]}
+              itemStyle={styles.pickerItem}
             >
               {currencies.map(currency => (
                 <Picker.Item key={currency} label={currency} value={currency} />
@@ -186,6 +193,7 @@ const GraphsScreen = () => {
               selectedValue={selectedYear}
               onValueChange={(value) => setSelectedYear(value)}
               style={[styles.picker, { color: colors.text }]}
+              itemStyle={styles.pickerItem}
             >
               {years.map(year => (
                 <Picker.Item key={year} label={year.toString()} value={year} />
@@ -199,6 +207,7 @@ const GraphsScreen = () => {
               selectedValue={selectedMonth}
               onValueChange={(value) => setSelectedMonth(value)}
               style={[styles.picker, { color: colors.text }]}
+              itemStyle={styles.pickerItem}
             >
               {monthKeys.map((key, index) => (
                 <Picker.Item key={index} label={t(key)} value={index} />
@@ -262,7 +271,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Platform.select({
       web: {
-        height: 32,
+        height: 38,
         display: 'flex',
         alignItems: 'center',
       },
@@ -275,7 +284,7 @@ const styles = StyleSheet.create({
   picker: {
     ...Platform.select({
       web: {
-        height: '100%',
+        height: 38,
         width: '100%',
         border: 'none',
         outline: 'none',
@@ -284,18 +293,30 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 0,
         margin: 0,
-        fontSize: 13,
+        lineHeight: '38px',
+        fontSize: 14,
         fontFamily: 'inherit',
         cursor: 'pointer',
         appearance: 'none',
         WebkitAppearance: 'none',
         MozAppearance: 'none',
         background: 'transparent',
-        backgroundImage: 'none',
+        backgroundImage: 'none !important',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right center',
+        textIndent: 0,
+        verticalAlign: 'middle',
       },
       android: {
         height: 40,
       },
+      ios: {
+        height: 40,
+      },
+    }),
+  },
+  pickerItem: {
+    ...Platform.select({
       ios: {
         height: 40,
       },
