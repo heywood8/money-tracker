@@ -4,6 +4,7 @@ import uuid from 'react-native-uuid';
 import currencies from '../assets/currencies.json';
 import * as AccountsDB from './services/AccountsDB';
 import { performMigration, isMigrationComplete } from './services/migration';
+import { appEvents, EVENTS } from './services/eventEmitter';
 
 const AccountsContext = createContext();
 
@@ -152,23 +153,46 @@ export const AccountsProvider = ({ children }) => {
       setLoading(true);
 
       // Drop and reinitialize the database
-      const { dropAllTables, getDatabase } = await import('./services/db');
+      const { dropAllTables, getDatabase, executeQuery } = await import('./services/db');
       await dropAllTables();
 
       // Force re-initialization by getting database again
-      await getDatabase();
+      // This will create all tables with proper schema
+      const db = await getDatabase();
+      console.log('Database reinitialized successfully');
 
-      // Clear migration status from AsyncStorage
+      // Clear migration status from database to prevent migration from running
+      await executeQuery(
+        'DELETE FROM app_metadata WHERE key = ?',
+        ['migration_status']
+      );
+
+      // Set migration status to completed so migration doesn't run
+      await executeQuery(
+        'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+        ['migration_status', 'completed', new Date().toISOString()]
+      );
+
+      // Clear migration backup from AsyncStorage
       const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       await AsyncStorage.removeItem('migration_backup');
 
-      // Reload categories (they will be auto-created)
-      const { getAllCategories } = await import('./services/CategoriesDB');
-      await getAllCategories();
+      // Initialize default categories first
+      const { initializeDefaultCategories } = await import('./services/CategoriesDB');
+      await initializeDefaultCategories();
+      console.log('Default categories initialized');
 
       // Create default accounts
       const defaultAccounts = await initializeDefaultAccounts();
       setAccounts(defaultAccounts);
+      console.log('Default accounts initialized');
+
+      // Reload accounts to ensure consistency
+      await reloadAccounts();
+
+      // Trigger reload of all other contexts (Categories, Operations)
+      console.log('Emitting RELOAD_ALL event to refresh all contexts');
+      appEvents.emit(EVENTS.RELOAD_ALL);
 
       Alert.alert(
         'Success',
@@ -179,7 +203,7 @@ export const AccountsProvider = ({ children }) => {
       console.error('Failed to reset database:', err);
       Alert.alert(
         'Error',
-        'Failed to reset database. Please try again.',
+        `Failed to reset database: ${err.message}`,
         [{ text: 'OK' }]
       );
       throw err;

@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import defaultCategories from '../assets/defaultCategories.json';
 import * as CategoriesDB from './services/CategoriesDB';
+import { appEvents, EVENTS } from './services/eventEmitter';
 
 const CategoriesContext = createContext();
 
@@ -21,43 +22,51 @@ export const CategoriesProvider = ({ children }) => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
+  // Reload categories from database
+  const reloadCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      const categoriesData = await CategoriesDB.getAllCategories();
+
+      if (categoriesData.length === 0) {
+        // Initialize with default categories
+        console.log('Initializing default categories...');
+        const createdCategories = [];
+        for (const category of defaultCategories) {
+          try {
+            await CategoriesDB.createCategory(category);
+            createdCategories.push(category);
+          } catch (err) {
+            console.error('Failed to create default category:', category.id, err);
+          }
+        }
+        setCategories(createdCategories);
+      } else {
+        setCategories(categoriesData);
+      }
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Failed to reload categories:', error);
+      setCategories(defaultCategories);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Load categories from SQLite on mount
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const categoriesData = await CategoriesDB.getAllCategories();
+    reloadCategories();
+  }, [reloadCategories]);
 
-        if (categoriesData.length === 0) {
-          // Initialize with default categories
-          console.log('Initializing default categories...');
-          const createdCategories = [];
-          for (const category of defaultCategories) {
-            try {
-              await CategoriesDB.createCategory(category);
-              createdCategories.push(category);
-            } catch (err) {
-              console.error('Failed to create default category:', category.id, err);
-            }
-          }
-          setCategories(createdCategories);
-        } else {
-          setCategories(categoriesData);
-        }
-      } catch (error) {
-        console.error('Failed to load categories:', error);
-        setCategories(defaultCategories);
-        Alert.alert(
-          'Load Error',
-          'Failed to load categories from database.',
-          [{ text: 'OK' }]
-        );
-      } finally {
-        setLoading(false);
-        setDataLoaded(true);
-      }
-    };
-    loadCategories();
-  }, []);
+  // Listen for reload events
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
+      console.log('Reloading categories due to RELOAD_ALL event');
+      reloadCategories();
+    });
+
+    return unsubscribe;
+  }, [reloadCategories]);
 
   const addCategory = useCallback(async (category) => {
     try {
@@ -189,6 +198,7 @@ export const CategoriesProvider = ({ children }) => {
     getChildren,
     getCategoryPath,
     validateCategory,
+    reloadCategories,
     saveError,
   }), [
     categories,
@@ -201,6 +211,7 @@ export const CategoriesProvider = ({ children }) => {
     getChildren,
     getCategoryPath,
     validateCategory,
+    reloadCategories,
     saveError,
   ]);
 
