@@ -183,11 +183,17 @@ const CategoriesScreen = () => {
       />
 
       <View style={styles.addButtonWrapper}>
-        <Button
-          title={t('add_category')}
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
           onPress={handleAddCategory}
-          color={colors.primary}
-        />
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('add_category')}
+          accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
+        >
+          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
+          <Text style={styles.addButtonText}>{t('add_category')}</Text>
+        </TouchableOpacity>
       </View>
 
       <CategoryModal
@@ -266,7 +272,28 @@ const styles = StyleSheet.create({
   },
   addButtonWrapper: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 8,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addButtonIcon: {
+    marginRight: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
