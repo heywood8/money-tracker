@@ -89,6 +89,3 @@ ios/Podfile.lock
 .idea/
 *.iml
 *.hprof
-
-# Ignore Android Studio specific files
-android/
