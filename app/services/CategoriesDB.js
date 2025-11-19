@@ -35,19 +35,19 @@ export const getCategoryById = async (id) => {
 };
 
 /**
- * Get categories by type
- * @param {string} type - 'expense', 'income', or 'folder'
+ * Get categories by category_type (expense or income)
+ * @param {string} categoryType - 'expense' or 'income'
  * @returns {Promise<Array>}
  */
-export const getCategoriesByType = async (type) => {
+export const getCategoriesByCategoryType = async (categoryType) => {
   try {
     const categories = await queryAll(
-      'SELECT * FROM categories WHERE type = ? ORDER BY created_at ASC',
-      [type]
+      'SELECT * FROM categories WHERE category_type = ? ORDER BY created_at ASC',
+      [categoryType]
     );
     return categories || [];
   } catch (error) {
-    console.error('Failed to get categories by type:', error);
+    console.error('Failed to get categories by category_type:', error);
     throw error;
   }
 };
@@ -88,8 +88,9 @@ export const createCategory = async (category) => {
     const categoryData = {
       id: category.id,
       name: category.name,
-      type: category.type,
-      parent_id: category.parentId || null,
+      type: category.type || 'folder',
+      category_type: category.category_type || category.categoryType || 'expense',
+      parent_id: category.parentId || category.parent_id || null,
       icon: category.icon || null,
       color: category.color || null,
       created_at: now,
@@ -97,11 +98,12 @@ export const createCategory = async (category) => {
     };
 
     await executeQuery(
-      'INSERT INTO categories (id, name, type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         categoryData.id,
         categoryData.name,
         categoryData.type,
+        categoryData.category_type,
         categoryData.parent_id,
         categoryData.icon,
         categoryData.color,
@@ -137,6 +139,10 @@ export const updateCategory = async (id, updates) => {
     if (updates.type !== undefined) {
       fields.push('type = ?');
       values.push(updates.type);
+    }
+    if (updates.category_type !== undefined || updates.categoryType !== undefined) {
+      fields.push('category_type = ?');
+      values.push(updates.category_type || updates.categoryType);
     }
     if (updates.parentId !== undefined) {
       fields.push('parent_id = ?');
