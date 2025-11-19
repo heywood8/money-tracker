@@ -29,24 +29,26 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     type: 'folder',
     parentId: null,
     icon: 'folder',
-    categoryType: 'expense',
+    category_type: 'expense',
   });
   const [errors, setErrors] = useState({});
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
-  const [typePickerVisible, setTypePickerVisible] = useState(false);
   const [parentPickerVisible, setParentPickerVisible] = useState(false);
   const [categoryTypePickerVisible, setCategoryTypePickerVisible] = useState(false);
 
   useEffect(() => {
     if (category && !isNew) {
-      setValues({ ...category });
+      setValues({
+        ...category,
+        category_type: category.category_type || category.categoryType || 'expense'
+      });
     } else if (isNew) {
       setValues({
         name: '',
         type: 'folder',
         parentId: null,
         icon: 'folder',
-        categoryType: 'expense',
+        category_type: 'expense',
       });
     }
     setErrors({});
@@ -74,31 +76,19 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     onClose();
   }, [onClose]);
 
-  // Get potential parents based on selected type
+  // Get potential parents - all folders of the same category_type
   const potentialParents = useMemo(() => {
-    if (values.type === 'folder') {
-      return [];
-    }
-    if (values.type === 'subfolder') {
-      return categories.filter(c => c.type === 'folder');
-    }
-    if (values.type === 'entry') {
-      return categories.filter(c => c.type === 'folder' || c.type === 'subfolder');
-    }
-    return [];
-  }, [categories, values.type]);
+    return categories.filter(c => {
+      const catType = c.category_type || c.categoryType;
+      return catType === values.category_type && c.id !== category?.id;
+    });
+  }, [categories, values.category_type, category]);
 
   const getParentName = useCallback((parentId) => {
-    if (!parentId) return t('select_parent');
+    if (!parentId) return t('none');
     const parent = categories.find(c => c.id === parentId);
-    return parent ? (parent.nameKey ? t(parent.nameKey) : parent.name) : t('select_parent');
+    return parent ? (parent.nameKey ? t(parent.nameKey) : parent.name) : t('none');
   }, [categories, t]);
-
-  const TYPES = [
-    { key: 'folder', label: t('folder') },
-    { key: 'subfolder', label: t('subfolder') },
-    { key: 'entry', label: t('entry') },
-  ];
 
   const CATEGORY_TYPES = [
     { key: 'expense', label: t('expense') },
@@ -142,40 +132,37 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               onSubmitEditing={Keyboard.dismiss}
             />
 
-            {/* Type Picker */}
-            <Pressable
-              style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => setTypePickerVisible(true)}
-            >
-              <Text style={{ color: colors.text }}>
-                {t('select_type')}: {TYPES.find(tp => tp.key === values.type)?.label}
-              </Text>
-              <Icon name="chevron-down" size={20} color={colors.text} />
-            </Pressable>
-
             {/* Category Type Picker (Income/Expense) */}
             <Pressable
               style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
               onPress={() => setCategoryTypePickerVisible(true)}
             >
-              <Text style={{ color: colors.text }}>
-                {CATEGORY_TYPES.find(ct => ct.key === values.categoryType)?.label}
+              <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                {t('category_type')}
               </Text>
-              <Icon name="chevron-down" size={20} color={colors.text} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <Text style={{ color: colors.text, fontSize: 16 }}>
+                  {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
+                </Text>
+                <Icon name="chevron-down" size={20} color={colors.text} />
+              </View>
             </Pressable>
 
-            {/* Parent Picker (only if not folder) */}
-            {values.type !== 'folder' && (
-              <Pressable
-                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                onPress={() => setParentPickerVisible(true)}
-              >
-                <Text style={{ color: colors.text }}>
+            {/* Parent Picker */}
+            <Pressable
+              style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              onPress={() => setParentPickerVisible(true)}
+            >
+              <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                {t('parent_category')}
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <Text style={{ color: colors.text, fontSize: 16 }}>
                   {getParentName(values.parentId)}
                 </Text>
                 <Icon name="chevron-down" size={20} color={colors.text} />
-              </Pressable>
-            )}
+              </View>
+            </Pressable>
 
             {/* Icon Picker */}
             <Pressable
@@ -222,41 +209,6 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         selectedIcon={values.icon}
       />
 
-      {/* Type Picker Modal */}
-      <Modal
-        visible={typePickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setTypePickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setTypePickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <FlatList
-              data={TYPES}
-              keyExtractor={item => item.key}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setValues(v => ({ ...v, type: item.key, parentId: item.key === 'folder' ? null : v.parentId }));
-                    setTypePickerVisible(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                  ]}
-                >
-                  <Text style={{ color: colors.text, fontSize: 18 }}>{item.label}</Text>
-                </Pressable>
-              )}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setTypePickerVisible(false)}>
-              <Text style={{ color: colors.primary }}>{t('close')}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {/* Category Type Picker Modal */}
       <Modal
         visible={categoryTypePickerVisible}
@@ -272,7 +224,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => {
-                    setValues(v => ({ ...v, categoryType: item.key }));
+                    setValues(v => ({ ...v, category_type: item.key }));
                     setCategoryTypePickerVisible(false);
                   }}
                   style={({ pressed }) => [
@@ -302,8 +254,8 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         <Pressable style={styles.modalOverlay} onPress={() => setParentPickerVisible(false)}>
           <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <FlatList
-              data={potentialParents}
-              keyExtractor={item => item.id}
+              data={[{ id: null, name: t('none'), icon: 'folder-outline' }, ...potentialParents]}
+              keyExtractor={item => item.id || 'none'}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => {
@@ -324,11 +276,6 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                   </View>
                 </Pressable>
               )}
-              ListEmptyComponent={
-                <Text style={{ color: colors.mutedText, textAlign: 'center', padding: 20 }}>
-                  {t('no_categories')}
-                </Text>
-              }
             />
             <Pressable style={styles.closeButton} onPress={() => setParentPickerVisible(false)}>
               <Text style={{ color: colors.primary }}>{t('close')}</Text>
@@ -385,9 +332,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 12,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   iconPickerButton: {
     borderWidth: 1,
