@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, ActivityIndicator } from 'react-native';
+import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { useTheme } from './ThemeContext';
@@ -46,7 +47,7 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
 CurrencyPickerModal.displayName = 'CurrencyPickerModal';
 
 // Memoized account row component
-const AccountRow = memo(({ item, index, colors, onPress, t }) => {
+const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
   const rowBg = isEven ? colors.background : colors.altRow;
 
@@ -55,24 +56,40 @@ const AccountRow = memo(({ item, index, colors, onPress, t }) => {
   }, [onPress, item.id]);
 
   return (
-    <TouchableOpacity
-      style={[styles.accountRow, { borderColor: colors.border, backgroundColor: rowBg }]}
-      onPress={handlePress}
-      accessibilityLabel={t('edit_account') || 'Edit Account'}
-      accessibilityRole="button"
+    <View
+      style={[
+        styles.accountRow,
+        { borderColor: colors.border, backgroundColor: rowBg },
+        isActive && { backgroundColor: colors.selected, opacity: 0.9 }
+      ]}
     >
-      <View style={styles.accountNameWrapper}>
-        <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-          {item.name}
-        </Text>
-      </View>
-      <View style={styles.verticalDivider} />
-      <View style={styles.accountValueWrapper}>
-        <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
-          {item.balance} {item.currencySymbol}
-        </Text>
-      </View>
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.accountContentWrapper}
+        onPress={handlePress}
+        accessibilityLabel={t('edit_account') || 'Edit Account'}
+        accessibilityRole="button"
+      >
+        <View style={styles.accountNameWrapper}>
+          <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+            {item.name}
+          </Text>
+        </View>
+        <View style={styles.verticalDivider} />
+        <View style={styles.accountValueWrapper}>
+          <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
+            {item.balance} {item.currencySymbol}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onLongPress={drag}
+        style={styles.dragHandle}
+        accessibilityLabel={t('drag_to_reorder') || 'Long press to reorder'}
+        accessibilityRole="button"
+      >
+        <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -85,7 +102,7 @@ export default function AccountsScreen() {
   const [errors, setErrors] = useState({});
   const [pickerVisible, setPickerVisible] = useState(false);
   const { colorScheme, colors } = useTheme();
-  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, validateAccount, currencies } = useAccounts();
+  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, currencies } = useAccounts();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);
@@ -176,21 +193,23 @@ export default function AccountsScreen() {
     }));
   }, [accounts, currencies]);
 
-  const renderItem = useCallback(({ item, index }) => (
+  const renderItem = useCallback(({ item, index, drag, isActive }) => (
     <AccountRow
       item={item}
       index={index}
       colors={colors}
       onPress={startEdit}
       t={t}
+      drag={drag}
+      isActive={isActive}
     />
   ), [colors, startEdit, t]);
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: 56,
-    offset: 56 * index,
-    index,
-  }), []);
+  const handleDragEnd = useCallback(({ data }) => {
+    reorderAccounts(data);
+  }, [reorderAccounts]);
+
+  const keyExtractor = useCallback((item) => item.id, []);
 
   if (loading) {
     return (
@@ -216,15 +235,12 @@ export default function AccountsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header is rendered globally by app/Header; per-screen header removed */}
-      <FlatList
+      <DraggableFlatList
         data={enhancedAccounts}
         renderItem={renderItem}
-        keyExtractor={item => item.id}
-        getItemLayout={getItemLayout}
-        windowSize={10}
-        maxToRenderPerBatch={10}
-        initialNumToRender={10}
-        removeClippedSubviews={true}
+        keyExtractor={keyExtractor}
+        onDragEnd={handleDragEnd}
+        activationDistance={20}
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
       />
       <View style={styles.addButtonWrapper}>
@@ -384,10 +400,21 @@ const styles = StyleSheet.create({
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
     borderBottomWidth: 1,
     borderColor: 'rgba(120,120,120,0.13)', // slightly visible divider
     minHeight: 56,
+  },
+  accountContentWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  dragHandle: {
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   accountNameWrapper: {
     flex: 7,
