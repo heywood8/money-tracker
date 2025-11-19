@@ -148,6 +148,32 @@ export const AccountsProvider = ({ children }) => {
     }
   }, []);
 
+  const reorderAccounts = useCallback(async (newOrder) => {
+    try {
+      // Update local state immediately for responsive UI
+      setAccounts(newOrder);
+
+      // Prepare data for database update
+      const orderedAccounts = newOrder.map((account, index) => ({
+        id: account.id,
+        display_order: index,
+      }));
+
+      // Persist to database
+      await AccountsDB.reorderAccounts(orderedAccounts);
+    } catch (err) {
+      console.error('Failed to reorder accounts:', err);
+      // Reload accounts to restore correct order
+      await reloadAccounts();
+      Alert.alert(
+        'Error',
+        'Failed to save new account order. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw err;
+    }
+  }, [reloadAccounts]);
+
   const resetDatabase = useCallback(async () => {
     try {
       setLoading(true);
@@ -220,10 +246,11 @@ export const AccountsProvider = ({ children }) => {
     updateAccount,
     deleteAccount,
     reloadAccounts,
+    reorderAccounts,
     resetDatabase,
     validateAccount,
     currencies,
-  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, resetDatabase]);
+  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, reorderAccounts, resetDatabase]);
 
   return (
     <AccountsContext.Provider value={value}>
