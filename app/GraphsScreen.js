@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { PieChart } from 'react-native-chart-kit';
 import { useTheme } from './ThemeContext';
@@ -12,6 +12,11 @@ import { getAllCategories } from './services/CategoriesDB';
 if (Platform.OS === 'web') {
   require('./picker-styles.web');
 }
+
+// Currency formatting helper
+const formatCurrency = (amount, currency) => {
+  return `${parseFloat(amount).toFixed(2)} ${currency}`;
+};
 
 const GraphsScreen = () => {
   const { colors } = useTheme();
@@ -43,6 +48,8 @@ const GraphsScreen = () => {
   useEffect(() => {
     if (accounts.length > 0 && !selectedCurrency) {
       setSelectedCurrency(accounts[0].currency);
+    } else if (accounts.length === 0 && selectedCurrency) {
+      setSelectedCurrency('');
     }
   }, [accounts, selectedCurrency]);
 
@@ -122,11 +129,11 @@ const GraphsScreen = () => {
 
       // Transform data for pie chart
       const data = filteredSpending.map((item, index) => ({
-        name: categoryMap.get(item.category_id) || t('select_category'),
+        name: categoryMap.get(item.category_id) || t('unknown_category'),
         amount: parseFloat(item.total),
         color: chartColors[index % chartColors.length],
         legendFontColor: colors.text,
-        legendFontSize: 14
+        legendFontSize: 13
       }));
 
       setChartData(data);
@@ -144,8 +151,16 @@ const GraphsScreen = () => {
     }
   }, [loadExpenseData, categories.length]);
 
-  // Get unique currencies from accounts
-  const currencies = [...new Set(accounts.map(acc => acc.currency))];
+  // Memoize unique currencies from accounts
+  const currencies = useMemo(() =>
+    [...new Set(accounts.map(acc => acc.currency))],
+    [accounts]
+  );
+
+  // Calculate total expenses
+  const totalExpenses = useMemo(() => {
+    return chartData.reduce((sum, item) => sum + item.amount, 0);
+  }, [chartData]);
 
   const screenWidth = Dimensions.get('window').width;
 
@@ -216,11 +231,26 @@ const GraphsScreen = () => {
           </View>
         </View>
 
+        {/* Total Expenses Display */}
+        {!loading && chartData.length > 0 && (
+          <View style={[styles.totalContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
+              {t('total_expenses')}:
+            </Text>
+            <Text style={[styles.totalAmount, { color: colors.text }]}>
+              {formatCurrency(totalExpenses, selectedCurrency)}
+            </Text>
+          </View>
+        )}
+
         {/* Pie Chart */}
         {loading ? (
-          <Text style={[styles.noData, { color: colors.mutedText }]}>
-            {t('loading_operations')}
-          </Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+              {t('loading_operations')}
+            </Text>
+          </View>
         ) : chartData.length > 0 ? (
           <View style={styles.chartContainer}>
             <PieChart
@@ -233,7 +263,7 @@ const GraphsScreen = () => {
               accessor="amount"
               backgroundColor="transparent"
               paddingLeft="15"
-              absolute
+              center={[0, 0]}
             />
           </View>
         ) : (
@@ -321,6 +351,32 @@ const styles = StyleSheet.create({
         height: 40,
       },
     }),
+  },
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  totalAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    marginTop: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
   },
   chartContainer: {
     marginTop: 20,
