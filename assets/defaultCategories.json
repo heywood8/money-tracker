@@ -1,290 +1,272 @@
 [
   {
-    "id": "expense-root",
-    "name": "Expenses",
-    "nameKey": "expense_categories",
-    "type": "folder",
-    "parentId": null,
-    "icon": "credit-card-outline",
-    "categoryType": "expense"
-  },
-  {
     "id": "expense-food",
     "name": "Food & Dining",
     "nameKey": "food_dining",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "food",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "food"
   },
   {
     "id": "expense-food-restaurant",
     "name": "Restaurants",
     "nameKey": "restaurants",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-food",
-    "icon": "silverware-fork-knife",
-    "categoryType": "expense"
+    "icon": "silverware-fork-knife"
   },
   {
     "id": "expense-food-groceries",
     "name": "Groceries",
     "nameKey": "groceries",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-food",
-    "icon": "cart",
-    "categoryType": "expense"
+    "icon": "cart"
   },
   {
     "id": "expense-food-cafe",
     "name": "Cafe & Coffee",
     "nameKey": "cafe_coffee",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-food",
-    "icon": "coffee",
-    "categoryType": "expense"
+    "icon": "coffee"
   },
   {
     "id": "expense-transport",
     "name": "Transportation",
     "nameKey": "transportation",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "car",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "car"
   },
   {
     "id": "expense-transport-fuel",
     "name": "Fuel",
     "nameKey": "fuel",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-transport",
-    "icon": "gas-station",
-    "categoryType": "expense"
+    "icon": "gas-station"
   },
   {
     "id": "expense-transport-public",
     "name": "Public Transport",
     "nameKey": "public_transport",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-transport",
-    "icon": "bus",
-    "categoryType": "expense"
+    "icon": "bus"
   },
   {
     "id": "expense-transport-taxi",
     "name": "Taxi & Rideshare",
     "nameKey": "taxi_rideshare",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-transport",
-    "icon": "taxi",
-    "categoryType": "expense"
+    "icon": "taxi"
   },
   {
     "id": "expense-shopping",
     "name": "Shopping",
     "nameKey": "shopping",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "shopping",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "shopping"
   },
   {
     "id": "expense-shopping-clothing",
     "name": "Clothing",
     "nameKey": "clothing",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-shopping",
-    "icon": "hanger",
-    "categoryType": "expense"
+    "icon": "hanger"
   },
   {
     "id": "expense-shopping-electronics",
     "name": "Electronics",
     "nameKey": "electronics",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-shopping",
-    "icon": "laptop",
-    "categoryType": "expense"
+    "icon": "laptop"
   },
   {
     "id": "expense-shopping-other",
     "name": "Other Shopping",
     "nameKey": "other_shopping",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-shopping",
-    "icon": "cart-outline",
-    "categoryType": "expense"
+    "icon": "cart-outline"
   },
   {
     "id": "expense-bills",
     "name": "Bills & Utilities",
     "nameKey": "bills_utilities",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "file-document",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "file-document"
   },
   {
     "id": "expense-bills-rent",
     "name": "Rent",
     "nameKey": "rent",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-bills",
-    "icon": "home",
-    "categoryType": "expense"
+    "icon": "home"
   },
   {
     "id": "expense-bills-electricity",
     "name": "Electricity",
     "nameKey": "electricity",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-bills",
-    "icon": "lightning-bolt",
-    "categoryType": "expense"
+    "icon": "lightning-bolt"
   },
   {
     "id": "expense-bills-water",
     "name": "Water",
     "nameKey": "water",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-bills",
-    "icon": "water",
-    "categoryType": "expense"
+    "icon": "water"
   },
   {
     "id": "expense-bills-internet",
     "name": "Internet & Phone",
     "nameKey": "internet_phone",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-bills",
-    "icon": "wifi",
-    "categoryType": "expense"
+    "icon": "wifi"
   },
   {
     "id": "expense-entertainment",
     "name": "Entertainment",
     "nameKey": "entertainment",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "movie",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "movie"
   },
   {
     "id": "expense-entertainment-movies",
     "name": "Movies & Shows",
     "nameKey": "movies_shows",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-entertainment",
-    "icon": "movie-open",
-    "categoryType": "expense"
+    "icon": "movie-open"
   },
   {
     "id": "expense-entertainment-games",
     "name": "Games",
     "nameKey": "games",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-entertainment",
-    "icon": "gamepad-variant",
-    "categoryType": "expense"
+    "icon": "gamepad-variant"
   },
   {
     "id": "expense-entertainment-sports",
     "name": "Sports & Hobbies",
     "nameKey": "sports_hobbies",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-entertainment",
-    "icon": "basketball",
-    "categoryType": "expense"
+    "icon": "basketball"
   },
   {
     "id": "expense-health",
     "name": "Health & Fitness",
     "nameKey": "health_fitness",
-    "type": "subfolder",
-    "parentId": "expense-root",
-    "icon": "heart-pulse",
-    "categoryType": "expense"
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "heart-pulse"
   },
   {
     "id": "expense-health-medical",
     "name": "Medical",
     "nameKey": "medical",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-health",
-    "icon": "hospital-box",
-    "categoryType": "expense"
+    "icon": "hospital-box"
   },
   {
     "id": "expense-health-pharmacy",
     "name": "Pharmacy",
     "nameKey": "pharmacy",
-    "type": "entry",
+    "type": "folder",
+    "category_type": "expense",
     "parentId": "expense-health",
-    "icon": "pill",
-    "categoryType": "expense"
+    "icon": "pill"
   },
   {
     "id": "expense-health-gym",
     "name": "Gym & Fitness",
     "nameKey": "gym_fitness",
-    "type": "entry",
-    "parentId": "expense-health",
-    "icon": "dumbbell",
-    "categoryType": "expense"
-  },
-  {
-    "id": "income-root",
-    "name": "Income",
-    "nameKey": "income_categories",
     "type": "folder",
-    "parentId": null,
-    "icon": "cash-multiple",
-    "categoryType": "income"
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "dumbbell"
   },
   {
     "id": "income-salary",
     "name": "Salary",
     "nameKey": "salary",
-    "type": "entry",
-    "parentId": "income-root",
-    "icon": "briefcase",
-    "categoryType": "income"
+    "type": "folder",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "briefcase"
   },
   {
     "id": "income-business",
     "name": "Business",
     "nameKey": "business",
-    "type": "entry",
-    "parentId": "income-root",
-    "icon": "domain",
-    "categoryType": "income"
+    "type": "folder",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "domain"
   },
   {
     "id": "income-investments",
     "name": "Investments",
     "nameKey": "investments",
-    "type": "entry",
-    "parentId": "income-root",
-    "icon": "chart-line",
-    "categoryType": "income"
+    "type": "folder",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "chart-line"
   },
   {
     "id": "income-gifts",
     "name": "Gifts",
     "nameKey": "gifts",
-    "type": "entry",
-    "parentId": "income-root",
-    "icon": "gift",
-    "categoryType": "income"
+    "type": "folder",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "gift"
   },
   {
     "id": "income-other",
     "name": "Other Income",
     "nameKey": "other_income",
-    "type": "entry",
-    "parentId": "income-root",
-    "icon": "cash",
-    "categoryType": "income"
+    "type": "folder",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "cash"
   }
 ]
