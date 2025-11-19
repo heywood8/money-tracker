@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -7,12 +7,146 @@ import { useLocalization } from './LocalizationContext';
 import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
+import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import OperationModal from './OperationModal';
+
+// Separate memoized component for the quick add form
+const QuickAddForm = memo(({
+  colors,
+  t,
+  quickAddValues,
+  setQuickAddValues,
+  accounts,
+  filteredCategories,
+  getAccountName,
+  getCategoryName,
+  openPicker,
+  handleQuickAdd,
+  TYPES
+}) => {
+  return (
+    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.quickAddTitle, { color: colors.text }]}>{t('add_operation')}</Text>
+
+      {/* Type Selector */}
+      <View style={styles.typeSelector}>
+        {TYPES.map(type => (
+          <TouchableOpacity
+            key={type.key}
+            style={[
+              styles.typeButton,
+              {
+                backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
+                borderColor: colors.border,
+              }
+            ]}
+            onPress={() => setQuickAddValues(v => ({
+              ...v,
+              type: type.key,
+              categoryId: type.key === 'transfer' ? '' : v.categoryId,
+              toAccountId: type.key !== 'transfer' ? '' : v.toAccountId,
+            }))}
+          >
+            <Icon
+              name={type.icon}
+              size={18}
+              color={quickAddValues.type === type.key ? '#fff' : colors.text}
+            />
+            <Text style={[
+              styles.typeButtonText,
+              { color: quickAddValues.type === type.key ? '#fff' : colors.text }
+            ]}>
+              {type.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Account Picker */}
+      <Pressable
+        style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+        onPress={() => openPicker('account', accounts)}
+      >
+        <Icon name="wallet" size={18} color={colors.mutedText} />
+        <Text style={[styles.formInputText, { color: colors.text }]}>
+          {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+        </Text>
+        <Icon name="chevron-down" size={18} color={colors.mutedText} />
+      </Pressable>
+
+      {/* To Account Picker (only for transfers) */}
+      {quickAddValues.type === 'transfer' && (
+        <Pressable
+          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== quickAddValues.accountId))}
+        >
+          <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
+          <Text style={[styles.formInputText, { color: colors.text }]}>
+            {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+          </Text>
+          <Icon name="chevron-down" size={18} color={colors.mutedText} />
+        </Pressable>
+      )}
+
+      {/* Amount Input */}
+      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+        <Icon name="currency-usd" size={18} color={colors.mutedText} />
+        <TextInput
+          style={[styles.formTextInput, { color: colors.text }]}
+          value={quickAddValues.amount}
+          onChangeText={text => setQuickAddValues(v => ({ ...v, amount: text }))}
+          placeholder={t('amount')}
+          placeholderTextColor={colors.mutedText}
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Description Input */}
+      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+        <Icon name="text" size={18} color={colors.mutedText} />
+        <TextInput
+          style={[styles.formTextInput, { color: colors.text }]}
+          value={quickAddValues.description}
+          onChangeText={text => setQuickAddValues(v => ({ ...v, description: text }))}
+          placeholder={t('description')}
+          placeholderTextColor={colors.mutedText}
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Category Picker */}
+      {quickAddValues.type !== 'transfer' && (
+        <Pressable
+          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          onPress={() => openPicker('category', filteredCategories)}
+        >
+          <Icon name="tag" size={18} color={colors.mutedText} />
+          <Text style={[styles.formInputText, { color: colors.text }]}>
+            {getCategoryName(quickAddValues.categoryId)}
+          </Text>
+          <Icon name="chevron-down" size={18} color={colors.mutedText} />
+        </Pressable>
+      )}
+
+      {/* Add Button */}
+      <TouchableOpacity
+        style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
+        onPress={handleQuickAdd}
+      >
+        <Icon name="plus" size={20} color="#fff" />
+        <Text style={styles.quickAddButtonText}>{t('add')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+QuickAddForm.displayName = 'QuickAddForm';
 
 const OperationsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { operations, loading: operationsLoading, deleteOperation } = useOperations();
+  const { operations, loading: operationsLoading, deleteOperation, addOperation, validateOperation } = useOperations();
   const { accounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
 
@@ -20,11 +154,38 @@ const OperationsScreen = () => {
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
 
-  const handleAddOperation = () => {
-    setEditingOperation(null);
-    setIsNew(true);
-    setModalVisible(true);
-  };
+  // Quick add form state
+  const [quickAddValues, setQuickAddValues] = useState({
+    type: 'expense',
+    amount: '',
+    accountId: '',
+    categoryId: '',
+    description: '',
+    toAccountId: '',
+  });
+  const [pickerState, setPickerState] = useState({
+    visible: false,
+    type: null,
+    data: [],
+  });
+
+  // Set default account on mount
+  useEffect(() => {
+    async function setDefaultAccount() {
+      if (accounts.length === 1) {
+        setQuickAddValues(v => ({ ...v, accountId: accounts[0].id }));
+      } else if (accounts.length > 1) {
+        const lastId = await getLastAccessedAccount();
+        if (lastId && accounts.some(acc => acc.id === lastId)) {
+          setQuickAddValues(v => ({ ...v, accountId: lastId }));
+        } else {
+          const defaultId = accounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+          setQuickAddValues(v => ({ ...v, accountId: defaultId }));
+        }
+      }
+    }
+    setDefaultAccount();
+  }, [accounts]);
 
   const handleEditOperation = (operation) => {
     setEditingOperation(operation);
@@ -47,6 +208,52 @@ const OperationsScreen = () => {
     );
   };
 
+  // Quick add handlers
+  const openPicker = useCallback((type, data) => {
+    Keyboard.dismiss();
+    setPickerState({ visible: true, type, data });
+  }, []);
+
+  const closePicker = useCallback(() => {
+    setPickerState({ visible: false, type: null, data: [] });
+  }, []);
+
+  const handleQuickAdd = useCallback(async () => {
+    const operationData = {
+      ...quickAddValues,
+      date: new Date().toISOString().split('T')[0],
+    };
+
+    const error = validateOperation(operationData);
+    if (error) {
+      Alert.alert(t('error'), error);
+      return;
+    }
+
+    try {
+      await addOperation(operationData);
+
+      // Save last accessed account
+      if (quickAddValues.accountId) {
+        setLastAccessedAccount(quickAddValues.accountId);
+      }
+
+      // Reset form but keep account and type
+      setQuickAddValues({
+        type: quickAddValues.type,
+        amount: '',
+        accountId: quickAddValues.accountId,
+        categoryId: '',
+        description: '',
+        toAccountId: '',
+      });
+
+      Keyboard.dismiss();
+    } catch (error) {
+      // Error already shown in addOperation
+    }
+  }, [quickAddValues, validateOperation, addOperation, t]);
+
   // Get account name
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(acc => acc.id === accountId);
@@ -62,6 +269,22 @@ const OperationsScreen = () => {
       icon: category.icon || 'help-circle',
     };
   }, [categories, t]);
+
+  // Get category name for form
+  const getCategoryName = useCallback((categoryId) => {
+    if (!categoryId) return t('select_category');
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return t('select_category');
+    return category.nameKey ? t(category.nameKey) : category.name;
+  }, [categories, t]);
+
+  // Filtered categories for quick add form
+  const filteredCategories = useMemo(() => {
+    return categories.filter(cat => {
+      if (quickAddValues.type === 'transfer') return false;
+      return cat.categoryType === quickAddValues.type && cat.type === 'entry';
+    });
+  }, [categories, quickAddValues.type]);
 
   // Sort operations by date (newest first)
   const sortedOperations = useMemo(() => {
@@ -118,6 +341,28 @@ const OperationsScreen = () => {
     offset: 72 * index,
     index,
   }), []);
+
+  const TYPES = useMemo(() => [
+    { key: 'expense', label: t('expense'), icon: 'minus-circle' },
+    { key: 'income', label: t('income'), icon: 'plus-circle' },
+    { key: 'transfer', label: t('transfer'), icon: 'swap-horizontal' },
+  ], [t]);
+
+  const quickAddFormComponent = useMemo(() => (
+    <QuickAddForm
+      colors={colors}
+      t={t}
+      quickAddValues={quickAddValues}
+      setQuickAddValues={setQuickAddValues}
+      accounts={accounts}
+      filteredCategories={filteredCategories}
+      getAccountName={getAccountName}
+      getCategoryName={getCategoryName}
+      openPicker={openPicker}
+      handleQuickAdd={handleQuickAdd}
+      TYPES={TYPES}
+    />
+  ), [colors, t, quickAddValues, accounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   const renderOperation = useCallback(({ item }) => {
     const operation = item;
@@ -237,6 +482,7 @@ const OperationsScreen = () => {
         keyExtractor={item => item.id}
         extraData={[accounts, categories]}
         getItemLayout={getItemLayout}
+        ListHeaderComponent={quickAddFormComponent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
@@ -253,19 +499,80 @@ const OperationsScreen = () => {
         removeClippedSubviews={true}
       />
 
-      <View style={styles.addButtonWrapper}>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={handleAddOperation}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={t('add_operation')}
-          accessibilityHint={t('add_operation_hint')}
-        >
-          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
-          <Text style={styles.addButtonText}>{t('add_operation')}</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Picker Modal for Account/Category selection */}
+      <Modal
+        visible={pickerState.visible}
+        animationType="slide"
+        transparent
+        onRequestClose={closePicker}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closePicker}>
+          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <FlatList
+              data={pickerState.data}
+              keyExtractor={(item) => item.id || item.key}
+              renderItem={({ item }) => {
+                if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        if (pickerState.type === 'account') {
+                          setQuickAddValues(v => ({ ...v, accountId: item.id }));
+                        } else {
+                          setQuickAddValues(v => ({ ...v, toAccountId: item.id }));
+                        }
+                        closePicker();
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && { backgroundColor: colors.selected },
+                      ]}
+                    >
+                      <View style={styles.accountOption}>
+                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
+                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>
+                          {item.balance} {item.currency}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                } else if (pickerState.type === 'category') {
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        setQuickAddValues(v => ({ ...v, categoryId: item.id }));
+                        closePicker();
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && { backgroundColor: colors.selected },
+                      ]}
+                    >
+                      <View style={styles.categoryOption}>
+                        <Icon name={item.icon} size={24} color={colors.text} />
+                        <Text style={[styles.pickerOptionText, { color: colors.text, marginLeft: 12 }]}>
+                          {item.nameKey ? t(item.nameKey) : item.name}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                }
+                return null;
+              }}
+              ListEmptyComponent={
+                <Text style={{ color: colors.mutedText, textAlign: 'center', padding: 20 }}>
+                  {pickerState.type === 'category' ? t('no_categories') : t('no_accounts')}
+                </Text>
+              }
+            />
+            <Pressable style={styles.closeButton} onPress={closePicker}>
+              <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <OperationModal
         visible={modalVisible}
@@ -349,28 +656,114 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
-  addButtonWrapper: {
+  quickAddForm: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
     padding: 16,
-    paddingBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  addButton: {
+  quickAddTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    gap: 8,
+  },
+  typeButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
   },
-  addButtonIcon: {
-    marginRight: 8,
+  typeButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
-  addButtonText: {
+  formInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    gap: 8,
+  },
+  formInputText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  formTextInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  quickAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 6,
+  },
+  quickAddButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerModalContent: {
+    width: '90%',
+    maxHeight: '70%',
+    borderRadius: 12,
+    padding: 12,
+  },
+  pickerOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  pickerOptionText: {
+    fontSize: 18,
+  },
+  accountOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  closeButton: {
+    marginTop: 16,
+    alignSelf: 'center',
+    minHeight: 48,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
