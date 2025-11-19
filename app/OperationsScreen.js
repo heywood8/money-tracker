@@ -246,6 +246,7 @@ const OperationsScreen = () => {
         data={sortedOperations}
         renderItem={renderOperation}
         keyExtractor={item => item.id}
+        extraData={[accounts, categories]}
         getItemLayout={getItemLayout}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
