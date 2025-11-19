@@ -93,7 +93,25 @@
     "delete_operation_accessibility": "Delete operation",
     "delete_hint": "Double tap to delete. You will be asked to confirm.",
     "select_date": "Select Date",
-    "add_operation_hint": "Opens form to create new operation"
+    "add_operation_hint": "Opens form to create new operation",
+    "select_month": "Select Month",
+    "expenses_by_category": "Expenses by Category",
+    "no_expense_data": "No expense data for this period",
+    "all": "All",
+    "unknown_category": "Unknown",
+    "total_expenses": "Total",
+    "month_january": "January",
+    "month_february": "February",
+    "month_march": "March",
+    "month_april": "April",
+    "month_may": "May",
+    "month_june": "June",
+    "month_july": "July",
+    "month_august": "August",
+    "month_september": "September",
+    "month_october": "October",
+    "month_november": "November",
+    "month_december": "December"
   },
   "ru": {
     "accounts": "Счета",
@@ -189,7 +207,25 @@
     "delete_operation_accessibility": "Удалить операцию",
     "delete_hint": "Дважды нажмите, чтобы удалить. Вам будет предложено подтвердить.",
     "select_date": "Выберите дату",
-    "add_operation_hint": "Открывает форму для создания новой операции"
+    "add_operation_hint": "Открывает форму для создания новой операции",
+    "select_month": "Выберите месяц",
+    "expenses_by_category": "Расходы по категориям",
+    "no_expense_data": "Нет данных о расходах за этот период",
+    "all": "Все",
+    "unknown_category": "Неизвестно",
+    "total_expenses": "Всего",
+    "month_january": "Январь",
+    "month_february": "Февраль",
+    "month_march": "Март",
+    "month_april": "Апрель",
+    "month_may": "Май",
+    "month_june": "Июнь",
+    "month_july": "Июль",
+    "month_august": "Август",
+    "month_september": "Сентябрь",
+    "month_october": "Октябрь",
+    "month_november": "Ноябрь",
+    "month_december": "Декабрь"
   }
 }
 
