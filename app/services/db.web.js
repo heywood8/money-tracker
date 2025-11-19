@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'money_tracker';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance = null;
 
@@ -28,11 +28,59 @@ const openIndexedDB = () => {
         accountsStore.createIndex('created_at', 'created_at', { unique: false });
       }
 
-      // Create categories store
+      // Create or upgrade categories store
       if (!db.objectStoreNames.contains('categories')) {
         const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
         categoriesStore.createIndex('parent_id', 'parent_id', { unique: false });
         categoriesStore.createIndex('type', 'type', { unique: false });
+        categoriesStore.createIndex('category_type', 'category_type', { unique: false });
+      } else {
+        // V2 -> V3 migration: add category_type index if it doesn't exist
+        const categoriesStore = transaction.objectStore('categories');
+        if (!categoriesStore.indexNames.contains('category_type')) {
+          categoriesStore.createIndex('category_type', 'category_type', { unique: false });
+        }
+
+        // Migrate existing data
+        if (event.oldVersion < 3) {
+          console.log('Migrating categories to V3 structure...');
+          const getAllRequest = categoriesStore.getAll();
+          getAllRequest.onsuccess = () => {
+            const categories = getAllRequest.result;
+            categories.forEach(cat => {
+              // Add category_type if missing
+              if (!cat.category_type) {
+                let categoryType = cat.categoryType || 'expense';
+
+                if (cat.type === 'expense' || cat.type === 'income') {
+                  categoryType = cat.type;
+                }
+
+                if (cat.id === 'expense-root' || cat.name === 'Expenses') {
+                  categoryType = 'expense';
+                } else if (cat.id === 'income-root' || cat.name === 'Income') {
+                  categoryType = 'income';
+                } else if (cat.parent_id) {
+                  const parent = categories.find(c => c.id === cat.parent_id);
+                  if (parent) {
+                    if (parent.type === 'expense' || parent.categoryType === 'expense' || parent.id === 'expense-root') {
+                      categoryType = 'expense';
+                    } else if (parent.type === 'income' || parent.categoryType === 'income' || parent.id === 'income-root') {
+                      categoryType = 'income';
+                    }
+                  }
+                }
+
+                // Update the category
+                categoriesStore.put({
+                  ...cat,
+                  type: 'folder',
+                  category_type: categoryType
+                });
+              }
+            });
+          };
+        }
       }
 
       // Create or upgrade operations store

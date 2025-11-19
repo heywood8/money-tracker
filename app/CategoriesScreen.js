@@ -45,13 +45,12 @@ const CategoriesScreen = () => {
   // Flatten the category tree based on expanded state
   const flattenedCategories = useMemo(() => {
     const flattened = [];
-    const rootCategories = categories.filter(cat => cat.type === 'folder');
+    const rootCategories = categories.filter(cat => !cat.parentId);
 
     const addWithChildren = (category, depth = 0) => {
       flattened.push({ ...category, depth });
 
-      const canExpand = category.type === 'folder' || category.type === 'subfolder';
-      if (canExpand && expandedIds.has(category.id)) {
+      if (expandedIds.has(category.id)) {
         const children = getChildren(category.id);
         children.forEach(child => addWithChildren(child, depth + 1));
       }
@@ -73,14 +72,14 @@ const CategoriesScreen = () => {
     const children = getChildren(category.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedIds.has(category.id);
-    const canExpand = category.type === 'folder' || category.type === 'subfolder';
     const indentWidth = depth * 20;
+    const categoryType = category.category_type || category.categoryType || 'expense';
 
     return (
       <TouchableOpacity
         style={[styles.categoryRow, { borderBottomColor: colors.border }]}
         onPress={() => {
-          if (canExpand && hasChildren) {
+          if (hasChildren) {
             toggleExpanded(category.id);
           } else {
             handleEditCategory(category);
@@ -88,12 +87,12 @@ const CategoriesScreen = () => {
         }}
         onLongPress={() => handleEditCategory(category)}
         accessibilityRole="button"
-        accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${category.type}`}
-        accessibilityHint={canExpand && hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
+        accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
+        accessibilityHint={hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
       >
         <View style={[styles.categoryContent, { paddingLeft: 16 + indentWidth }]}>
           {/* Expand/Collapse Icon */}
-          {canExpand && hasChildren ? (
+          {hasChildren ? (
             <TouchableOpacity
               onPress={() => toggleExpanded(category.id)}
               style={styles.expandButton}
@@ -126,13 +125,13 @@ const CategoriesScreen = () => {
             {category.nameKey ? t(category.nameKey) : category.name}
           </Text>
 
-          {/* Type Badge */}
+          {/* Category Type Badge */}
           <View
-            style={[styles.typeBadge, { backgroundColor: colors.secondary }]}
-            accessibilityLabel={`Type: ${category.type}`}
+            style={[styles.typeBadge, { backgroundColor: categoryType === 'expense' ? '#ff6b6b' : '#51cf66' }]}
+            accessibilityLabel={`Type: ${categoryType}`}
           >
-            <Text style={[styles.typeBadgeText, { color: colors.text }]}>
-              {category.type === 'folder' ? 'F' : category.type === 'subfolder' ? 'S' : 'E'}
+            <Text style={[styles.typeBadgeText, { color: '#fff' }]}>
+              {categoryType === 'expense' ? 'E' : 'I'}
             </Text>
           </View>
 
