@@ -89,6 +89,7 @@ export const createCategory = async (category) => {
       id: category.id,
       name: category.name,
       type: category.type,
+      category_type: category.categoryType || null,
       parent_id: category.parentId || null,
       icon: category.icon || null,
       color: category.color || null,
@@ -97,11 +98,12 @@ export const createCategory = async (category) => {
     };
 
     await executeQuery(
-      'INSERT INTO categories (id, name, type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         categoryData.id,
         categoryData.name,
         categoryData.type,
+        categoryData.category_type,
         categoryData.parent_id,
         categoryData.icon,
         categoryData.color,
@@ -137,6 +139,10 @@ export const updateCategory = async (id, updates) => {
     if (updates.type !== undefined) {
       fields.push('type = ?');
       values.push(updates.type);
+    }
+    if (updates.categoryType !== undefined) {
+      fields.push('category_type = ?');
+      values.push(updates.categoryType || null);
     }
     if (updates.parentId !== undefined) {
       fields.push('parent_id = ?');

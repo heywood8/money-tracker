@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'money_tracker.db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance = null;
 
@@ -20,6 +20,67 @@ export const getDatabase = async () => {
     return dbInstance;
   } catch (error) {
     console.error('Failed to open database:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate database from one version to another
+ */
+const migrateDatabase = async (db, fromVersion, toVersion) => {
+  console.log(`Migrating database from version ${fromVersion} to ${toVersion}`);
+
+  try {
+    if (fromVersion < 2) {
+      // Migration from v1 to v2: Add category_type column and update type constraint
+      console.log('Migrating to v2: Adding category_type column and updating type constraint');
+
+      // SQLite doesn't support ALTER TABLE to modify CHECK constraints
+      // We need to recreate the table with the new schema
+
+      await db.execAsync(`
+        PRAGMA foreign_keys = OFF;
+
+        BEGIN TRANSACTION;
+
+        -- Create new categories table with updated schema
+        CREATE TABLE categories_new (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('folder', 'subfolder', 'entry', 'expense', 'income')),
+          category_type TEXT CHECK(category_type IN ('expense', 'income')),
+          parent_id TEXT,
+          icon TEXT,
+          color TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
+        );
+
+        -- Copy existing data
+        INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
+        SELECT id, name, type, NULL, parent_id, icon, color, created_at, updated_at
+        FROM categories;
+
+        -- Drop old table
+        DROP TABLE categories;
+
+        -- Rename new table
+        ALTER TABLE categories_new RENAME TO categories;
+
+        -- Recreate indexes
+        CREATE INDEX idx_categories_parent ON categories(parent_id);
+        CREATE INDEX idx_categories_type ON categories(type);
+
+        COMMIT;
+
+        PRAGMA foreign_keys = ON;
+      `);
+
+      console.log('Migration to v2 completed successfully');
+    }
+  } catch (error) {
+    console.error('Migration failed:', error);
     throw error;
   }
 };
@@ -48,7 +109,8 @@ const initializeDatabase = async (db) => {
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('expense', 'income', 'folder')),
+        type TEXT NOT NULL CHECK(type IN ('folder', 'subfolder', 'entry', 'expense', 'income')),
+        category_type TEXT CHECK(category_type IN ('expense', 'income')),
         parent_id TEXT,
         icon TEXT,
         color TEXT,
@@ -95,10 +157,22 @@ const initializeDatabase = async (db) => {
       ['db_version']
     );
 
-    if (!versionResult) {
+    const currentVersion = versionResult ? parseInt(versionResult.value, 10) : 0;
+
+    if (currentVersion === 0) {
+      // New database, set version
       await db.runAsync(
         'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
         ['db_version', DB_VERSION.toString(), new Date().toISOString()]
+      );
+    } else if (currentVersion < DB_VERSION) {
+      // Migration needed
+      await migrateDatabase(db, currentVersion, DB_VERSION);
+
+      // Update version
+      await db.runAsync(
+        'UPDATE app_metadata SET value = ?, updated_at = ? WHERE key = ?',
+        [DB_VERSION.toString(), new Date().toISOString(), 'db_version']
       );
     }
 
