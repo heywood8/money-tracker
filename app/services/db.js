@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'money_tracker.db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbInstance = null;
 let initPromise = null;
@@ -37,6 +37,51 @@ export const getDatabase = async () => {
   await initPromise;
   initPromise = null;
   return dbInstance;
+};
+
+/**
+ * Migrate from V3 to V4 - Add order field to accounts
+ */
+const migrateToV4 = async (db) => {
+  try {
+    console.log('Starting migration to V4: Add order field to accounts...');
+
+    // Check if order column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
+    const hasOrderColumn = tableInfo.some(col => col.name === 'display_order');
+
+    if (hasOrderColumn) {
+      console.log('Order column already exists, skipping migration...');
+      return;
+    }
+
+    // Add order column to accounts table
+    await db.execAsync(`
+      ALTER TABLE accounts ADD COLUMN display_order INTEGER;
+    `);
+
+    // Set initial order based on created_at (oldest first)
+    const accounts = await db.getAllAsync(
+      'SELECT id FROM accounts ORDER BY created_at ASC'
+    );
+
+    for (let i = 0; i < accounts.length; i++) {
+      await db.runAsync(
+        'UPDATE accounts SET display_order = ? WHERE id = ?',
+        [i, accounts[i].id]
+      );
+    }
+
+    // Create index on display_order for efficient sorting
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+    `);
+
+    console.log('Migration to V4 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V4:', error);
+    throw error;
+  }
 };
 
 /**
@@ -264,6 +309,10 @@ const initializeDatabase = async (db) => {
       console.log('Migrating database from version', currentVersion, 'to version 3...');
       await migrateToV3(db);
     }
+    if (currentVersion >= 3 && currentVersion < 4) {
+      console.log('Migrating database from version', currentVersion, 'to version 4...');
+      await migrateToV4(db);
+    }
 
     // Now create or update tables
     await db.execAsync(`
@@ -273,6 +322,7 @@ const initializeDatabase = async (db) => {
         name TEXT NOT NULL,
         balance TEXT NOT NULL DEFAULT '0',
         currency TEXT NOT NULL DEFAULT 'USD',
+        display_order INTEGER,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -315,6 +365,7 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
       CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+      CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
     `);
 
     // Update version
