@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useAccounts } from './AccountsContext';
 
 const themeOptions = [
   { label: 'System', value: 'system' },
@@ -13,8 +14,31 @@ const themeOptions = [
 export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
+  const { resetDatabase } = useAccounts();
   const [localSelection, setLocalSelection] = useState(theme);
   const [localLang, setLocalLang] = useState(language);
+
+  const handleResetDatabase = () => {
+    Alert.alert(
+      t('reset_database') || 'Reset Database',
+      t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.',
+      [
+        { text: t('cancel') || 'Cancel', style: 'cancel' },
+        {
+          text: t('reset') || 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetDatabase();
+              onClose();
+            } catch (error) {
+              // Error already handled in resetDatabase
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (visible) {
@@ -65,6 +89,19 @@ export default function SettingsModal({ visible, onClose }) {
               {localLang === lng && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
             </Pressable>
           ))}
+
+          <Text style={[styles.subtitle, { color: colors.text, marginTop: 16 }]}>{t('database') || 'Database'}</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.resetButton,
+              { backgroundColor: '#dc3545' },
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={handleResetDatabase}
+          >
+            <Text style={[styles.resetButtonText, { color: '#ffffff' }]}>{t('reset_database') || 'Reset Database'}</Text>
+          </Pressable>
+
           <View style={styles.modalButtonRow}>
             <Pressable style={[styles.modalButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
               <Text style={[styles.closeText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
@@ -153,5 +190,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  resetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
