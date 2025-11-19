@@ -349,5 +349,11 @@ export const dropAllTables = async () => {
     DROP TABLE IF EXISTS app_metadata;
     PRAGMA foreign_keys = ON;
   `);
+
+  // Close the database connection properly
+  await db.closeAsync();
+
+  // Reset both instance and initialization promise
   dbInstance = null;
+  initPromise = null;
 };
