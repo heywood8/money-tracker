@@ -8,7 +8,7 @@ import * as Currency from './currency';
 export const getAllAccounts = async () => {
   try {
     const accounts = await queryAll(
-      'SELECT * FROM accounts ORDER BY created_at DESC'
+      'SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC'
     );
     return accounts || [];
   } catch (error) {
@@ -43,22 +43,31 @@ export const getAccountById = async (id) => {
 export const createAccount = async (account) => {
   try {
     const now = new Date().toISOString();
+
+    // Get max order value and add 1 for new account
+    const maxOrderResult = await queryFirst(
+      'SELECT MAX(display_order) as max_order FROM accounts'
+    );
+    const newOrder = (maxOrderResult?.max_order ?? -1) + 1;
+
     const accountData = {
       id: account.id,
       name: account.name,
       balance: account.balance || '0',
       currency: account.currency || 'USD',
+      display_order: account.display_order ?? newOrder,
       created_at: now,
       updated_at: now,
     };
 
     await executeQuery(
-      'INSERT INTO accounts (id, name, balance, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         accountData.id,
         accountData.name,
         accountData.balance,
         accountData.currency,
+        accountData.display_order,
         accountData.created_at,
         accountData.updated_at,
       ]
@@ -252,6 +261,29 @@ export const accountExists = async (id) => {
     return !!result;
   } catch (error) {
     console.error('Failed to check account existence:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reorder accounts
+ * @param {Array<{id: string, display_order: number}>} orderedAccounts - Array of account IDs with new order
+ * @returns {Promise<void>}
+ */
+export const reorderAccounts = async (orderedAccounts) => {
+  try {
+    await executeTransaction(async (db) => {
+      const now = new Date().toISOString();
+
+      for (const { id, display_order } of orderedAccounts) {
+        await db.runAsync(
+          'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+          [display_order, now, id]
+        );
+      }
+    });
+  } catch (error) {
+    console.error('Failed to reorder accounts:', error);
     throw error;
   }
 };
