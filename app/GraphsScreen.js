@@ -122,16 +122,14 @@ const GraphsScreen = () => {
           {t('expenses_by_category')}
         </Text>
 
-        {/* Currency Picker */}
-        <View style={[styles.pickerContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.text }]}>
-            {t('select_currency')}:
-          </Text>
-          <View style={[styles.picker, { backgroundColor: colors.surface }]}>
+        {/* Filters Row */}
+        <View style={styles.filtersRow}>
+          {/* Currency Picker */}
+          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Picker
               selectedValue={selectedCurrency}
               onValueChange={(value) => setSelectedCurrency(value)}
-              style={{ color: colors.text }}
+              style={[styles.picker, { color: colors.text }]}
               dropdownIconColor={colors.text}
             >
               {currencies.map(currency => (
@@ -139,18 +137,13 @@ const GraphsScreen = () => {
               ))}
             </Picker>
           </View>
-        </View>
 
-        {/* Year Picker */}
-        <View style={[styles.pickerContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.text }]}>
-            {t('select_date')}:
-          </Text>
-          <View style={[styles.picker, { backgroundColor: colors.surface }]}>
+          {/* Year Picker */}
+          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Picker
               selectedValue={selectedYear}
               onValueChange={(value) => setSelectedYear(value)}
-              style={{ color: colors.text }}
+              style={[styles.picker, { color: colors.text }]}
               dropdownIconColor={colors.text}
             >
               {years.map(year => (
@@ -158,18 +151,13 @@ const GraphsScreen = () => {
               ))}
             </Picker>
           </View>
-        </View>
 
-        {/* Month Picker */}
-        <View style={[styles.pickerContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.text }]}>
-            {t('select_month')}:
-          </Text>
-          <View style={[styles.picker, { backgroundColor: colors.surface }]}>
+          {/* Month Picker */}
+          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Picker
               selectedValue={selectedMonth}
               onValueChange={(value) => setSelectedMonth(value)}
-              style={{ color: colors.text }}
+              style={[styles.picker, { color: colors.text }]}
               dropdownIconColor={colors.text}
             >
               {monthKeys.map((key, index) => (
@@ -222,19 +210,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  pickerContainer: {
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 16,
+  },
+  pickerWrapper: {
+    flex: 1,
     borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        height: 40,
+      },
+      default: {
+        height: 48,
+      },
+    }),
   },
   picker: {
-    borderRadius: 4,
+    flex: 1,
     ...Platform.select({
       web: {
         height: 40,
