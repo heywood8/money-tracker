@@ -30,34 +30,16 @@ export const CategoriesProvider = ({ children }) => {
         if (categoriesData.length === 0) {
           // Initialize with default categories
           console.log('Initializing default categories...');
-          const mappedCategories = [];
+          const createdCategories = [];
           for (const category of defaultCategories) {
             try {
-              // Map the category type to match database schema
-              // defaultCategories uses: folder, subfolder, entry
-              // database expects: expense, income, folder
-              let dbType;
-              if (category.type === 'folder' || category.type === 'subfolder') {
-                dbType = 'folder';
-              } else if (category.type === 'entry') {
-                // Use categoryType (expense/income) for entries
-                dbType = category.categoryType;
-              } else {
-                dbType = category.type;
-              }
-
-              const mappedCategory = {
-                ...category,
-                type: dbType,
-              };
-
-              await CategoriesDB.createCategory(mappedCategory);
-              mappedCategories.push(mappedCategory);
+              await CategoriesDB.createCategory(category);
+              createdCategories.push(category);
             } catch (err) {
               console.error('Failed to create default category:', category.id, err);
             }
           }
-          setCategories(mappedCategories);
+          setCategories(createdCategories);
         } else {
           setCategories(categoriesData);
         }
@@ -187,11 +169,8 @@ export const CategoriesProvider = ({ children }) => {
     if (!category.name || category.name.trim() === '') {
       return 'Category name is required';
     }
-    if (!category.type) {
-      return 'Category type is required';
-    }
-    if (category.type !== 'folder' && !category.parentId) {
-      return 'Parent folder is required for subfolders and entries';
+    if (!category.category_type && !category.categoryType) {
+      return 'Category type (expense/income) is required';
     }
     if (!category.icon) {
       return 'Icon is required';

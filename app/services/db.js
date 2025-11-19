@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'money_tracker.db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance = null;
 let initPromise = null;
@@ -40,15 +40,155 @@ export const getDatabase = async () => {
 };
 
 /**
+ * Migrate from V1 to V2 - Refactor category structure
+ */
+const migrateToV2 = async (db) => {
+  try {
+    // Check if categories table exists and has the old structure
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
+    const hasCategoryTypeColumn = tableInfo.some(col => col.name === 'category_type');
+
+    if (hasCategoryTypeColumn) {
+      console.log('Migration already applied, skipping...');
+      return;
+    }
+
+    console.log('Starting category structure migration...');
+
+    // Get all existing categories
+    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
+
+    if (existingCategories.length === 0) {
+      console.log('No categories to migrate');
+      return;
+    }
+
+    // Create new categories table with updated schema
+    await db.execAsync(`
+      -- Create temporary table with new schema
+      CREATE TABLE categories_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type = 'folder'),
+        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
+        parent_id TEXT,
+        icon TEXT,
+        color TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Build a map to determine category_type for each category
+    const categoryTypeMap = new Map();
+
+    // First pass: determine category_type from old type or ID/name
+    for (const cat of existingCategories) {
+      let categoryType = 'expense'; // default
+
+      // If old type was 'expense' or 'income', use that as category_type
+      if (cat.type === 'expense' || cat.type === 'income') {
+        categoryType = cat.type;
+      }
+      // Check for root folders by ID or name
+      else if (cat.id === 'expense-root' || cat.name === 'Expenses') {
+        categoryType = 'expense';
+      } else if (cat.id === 'income-root' || cat.name === 'Income') {
+        categoryType = 'income';
+      }
+      // Check if ID starts with expense- or income-
+      else if (cat.id && cat.id.startsWith('expense-')) {
+        categoryType = 'expense';
+      } else if (cat.id && cat.id.startsWith('income-')) {
+        categoryType = 'income';
+      }
+
+      categoryTypeMap.set(cat.id, categoryType);
+    }
+
+    // Second pass: inherit category_type from parent if not determined
+    for (const cat of existingCategories) {
+      if (cat.parent_id && !categoryTypeMap.has(cat.id)) {
+        const parent = existingCategories.find(c => c.id === cat.parent_id);
+        if (parent && categoryTypeMap.has(parent.id)) {
+          categoryTypeMap.set(cat.id, categoryTypeMap.get(parent.id));
+        }
+      }
+    }
+
+    // Third pass: insert into new table
+    for (const cat of existingCategories) {
+      const categoryType = categoryTypeMap.get(cat.id) || 'expense';
+
+      await db.runAsync(
+        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          cat.id,
+          cat.name,
+          'folder', // All items are now folders
+          categoryType,
+          cat.parent_id,
+          cat.icon,
+          cat.color,
+          cat.created_at,
+          cat.updated_at
+        ]
+      );
+    }
+
+    // Drop old table and rename new one
+    await db.execAsync(`
+      DROP TABLE categories;
+      ALTER TABLE categories_new RENAME TO categories;
+
+      -- Recreate indexes
+      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+    `);
+
+    console.log('Category structure migration completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate categories:', error);
+    throw error;
+  }
+};
+
+/**
  * Initialize database schema
  */
 const initializeDatabase = async (db) => {
   try {
-    // Create tables in order (no foreign key dependencies first)
     await db.execAsync(`
       PRAGMA foreign_keys = ON;
       PRAGMA journal_mode = WAL;
 
+      -- App metadata table (create first to track version)
+      CREATE TABLE IF NOT EXISTS app_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    // Check database version before creating other tables
+    const versionResult = await db.getFirstAsync(
+      'SELECT value FROM app_metadata WHERE key = ?',
+      ['db_version']
+    );
+
+    const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
+
+    // Run migrations BEFORE creating tables
+    if (currentVersion > 0 && currentVersion < 2) {
+      console.log('Migrating database from version', currentVersion, 'to version 2...');
+      await migrateToV2(db);
+    }
+
+    // Now create or update tables
+    await db.execAsync(`
       -- Accounts table
       CREATE TABLE IF NOT EXISTS accounts (
         id TEXT PRIMARY KEY,
@@ -63,7 +203,8 @@ const initializeDatabase = async (db) => {
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('expense', 'income', 'folder')),
+        type TEXT NOT NULL CHECK(type = 'folder'),
+        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
         parent_id TEXT,
         icon TEXT,
         color TEXT,
@@ -88,13 +229,6 @@ const initializeDatabase = async (db) => {
         FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
       );
 
-      -- App metadata table
-      CREATE TABLE IF NOT EXISTS app_metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_operations_date ON operations(date DESC);
       CREATE INDEX IF NOT EXISTS idx_operations_account ON operations(account_id);
@@ -102,18 +236,19 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(type);
       CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
       CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
     `);
 
-    // Check and set database version
-    const versionResult = await db.getFirstAsync(
-      'SELECT value FROM app_metadata WHERE key = ?',
-      ['db_version']
-    );
-
+    // Update version
     if (!versionResult) {
       await db.runAsync(
-        'INSERT OR IGNORE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
+        'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
         ['db_version', DB_VERSION.toString(), new Date().toISOString()]
+      );
+    } else if (currentVersion < DB_VERSION) {
+      await db.runAsync(
+        'UPDATE app_metadata SET value = ?, updated_at = ? WHERE key = ?',
+        [DB_VERSION.toString(), new Date().toISOString(), 'db_version']
       );
     }
 
