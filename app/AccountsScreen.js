@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
+import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -13,34 +14,34 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
     const [code, cur] = item;
 
     return (
-      <Pressable
+      <TouchableRipple
         onPress={() => onSelect(code)}
-        style={({ pressed }) => [
-          styles.pickerOption,
-          { borderColor: colors.border },
-          pressed && { backgroundColor: colors.selected }
-        ]}
+        style={styles.pickerOption}
+        rippleColor="rgba(0, 0, 0, .12)"
       >
-        <Text style={{ color: colors.text, fontSize: 18 }}>{cur.name} ({cur.symbol})</Text>
-      </Pressable>
+        <Text style={{ fontSize: 16 }}>{cur.name} ({cur.symbol})</Text>
+      </TouchableRipple>
     );
-  }, [colors.border, colors.text, colors.selected, onSelect]);
+  }, [onSelect]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-          <FlatList
-            data={Object.entries(currencies)}
-            keyExtractor={([code]) => code}
-            renderItem={renderCurrencyItem}
-          />
-          <Pressable style={styles.closeButton} onPress={onClose}>
-            <Text style={{ color: colors.primary }}>{t('close') || 'Close'}</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={[styles.pickerModalContent, { backgroundColor: colors.card }]}
+      >
+        <FlatList
+          data={Object.entries(currencies)}
+          keyExtractor={([code]) => code}
+          renderItem={renderCurrencyItem}
+          style={{ maxHeight: 400 }}
+        />
+        <Button mode="text" onPress={onClose} style={{ marginTop: 8 }}>
+          {t('close') || 'Close'}
+        </Button>
+      </Modal>
+    </Portal>
   );
 });
 
@@ -56,40 +57,47 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
   }, [onPress, item.id]);
 
   return (
-    <View
+    <Card
+      mode="outlined"
       style={[
-        styles.accountRow,
-        { borderColor: colors.border, backgroundColor: rowBg },
+        styles.accountCard,
+        { backgroundColor: rowBg, borderColor: colors.border },
         isActive && { backgroundColor: colors.selected, opacity: 0.9 }
       ]}
     >
-      <TouchableOpacity
-        style={styles.accountContentWrapper}
-        onPress={handlePress}
-        accessibilityLabel={t('edit_account') || 'Edit Account'}
-        accessibilityRole="button"
-      >
-        <View style={styles.accountNameWrapper}>
-          <Text style={[styles.accountText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-            {item.name}
-          </Text>
-        </View>
-        <View style={styles.verticalDivider} />
-        <View style={styles.accountValueWrapper}>
-          <Text style={[styles.accountText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1} ellipsizeMode="tail">
-            {item.balance} {item.currencySymbol}
-          </Text>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onLongPress={drag}
-        style={styles.dragHandle}
-        accessibilityLabel={t('drag_to_reorder') || 'Long press to reorder'}
-        accessibilityRole="button"
-      >
-        <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
-      </TouchableOpacity>
-    </View>
+      <View style={styles.accountRow}>
+        <TouchableRipple
+          style={styles.accountContentWrapper}
+          onPress={handlePress}
+          rippleColor="rgba(0, 0, 0, .12)"
+          accessibilityLabel={t('edit_account') || 'Edit Account'}
+          accessibilityRole="button"
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={styles.accountNameWrapper}>
+              <Text variant="titleMedium" numberOfLines={1} ellipsizeMode="tail">
+                {item.name}
+              </Text>
+            </View>
+            <View style={styles.verticalDivider} />
+            <View style={styles.accountValueWrapper}>
+              <Text variant="titleMedium" style={{ textAlign: 'right' }} numberOfLines={1} ellipsizeMode="tail">
+                {item.balance} {item.currencySymbol}
+              </Text>
+            </View>
+          </View>
+        </TouchableRipple>
+        <TouchableRipple
+          onLongPress={drag}
+          style={styles.dragHandle}
+          rippleColor="rgba(0, 0, 0, .12)"
+          accessibilityLabel={t('drag_to_reorder') || 'Long press to reorder'}
+          accessibilityRole="button"
+        >
+          <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
+        </TouchableRipple>
+      </View>
+    </Card>
   );
 });
 
@@ -214,8 +222,8 @@ export default function AccountsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+        <ActivityIndicator size="large" />
+        <Text variant="bodyLarge" style={{ marginTop: 12, color: colors.mutedText }}>
           {t('loading_accounts') || 'Loading accounts...'}
         </Text>
       </View>
@@ -225,7 +233,7 @@ export default function AccountsScreen() {
   if (error) {
     return (
       <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.delete }]}>
+        <Text variant="bodyLarge" style={{ color: colors.delete, textAlign: 'center' }}>
           {t('error_loading_accounts') || 'Failed to load accounts'}
         </Text>
       </View>
@@ -243,172 +251,127 @@ export default function AccountsScreen() {
         activationDistance={20}
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
       />
-      <View style={styles.addButtonWrapper}>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={addAccountHandler}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={t('add_account') || 'Add Account'}
-          accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
+      <FAB
+        icon="plus"
+        label={t('add_account') || 'Add Account'}
+        style={styles.fab}
+        onPress={addAccountHandler}
+        accessibilityLabel={t('add_account') || 'Add Account'}
+        accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
+      />
+      <Portal>
+        <Modal
+          visible={!!editingId}
+          onDismiss={handleCloseModal}
+          contentContainerStyle={[styles.modalContent, { backgroundColor: colors.card }]}
         >
-          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
-          <Text style={styles.addButtonText}>{t('add_account') || 'Add Account'}</Text>
-        </TouchableOpacity>
-      </View>
-      <Modal
-        visible={!!editingId}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={handleCloseModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <Pressable style={styles.modalOverlay} onPress={handleCloseModal}>
-            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <ScrollView
-                style={{ flex: 1 }}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 20 }}
-              >
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>{t('edit_account') || 'Edit Account'}</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.name && styles.inputError,
-                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
-                  ]}
-                  value={editValues.name}
-                  onChangeText={handleNameChange}
-                  placeholder={t('account_name') || 'Account Name'}
-                    placeholderTextColor={colors.mutedText}
-                  autoFocus
-                  returnKeyType="next"
-                  onSubmitEditing={() => balanceInputRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
-                {errors.name && <Text style={styles.error}>{errors.name}</Text>}
-                <TextInput
-                  ref={balanceInputRef}
-                  style={[
-                    styles.input,
-                    errors.balance && styles.inputError,
-                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }
-                  ]}
-                  value={editValues.balance}
-                  onChangeText={handleBalanceChange}
-                  placeholder={t('balance') || 'Balance'}
-                    placeholderTextColor={colors.mutedText}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                  onSubmitEditing={Keyboard.dismiss}
-                />
-                {errors.balance && <Text style={styles.error}>{errors.balance}</Text>}
-                  <View style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
-                    <Pressable onPress={handleOpenPicker} style={styles.pickerDisplay}>
-                      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
-                        {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
-                      </Text>
-                    </Pressable>
-                    <CurrencyPickerModal
-                      visible={pickerVisible}
-                      onClose={handleClosePicker}
-                      currencies={currencies}
-                      colors={colors}
-                      t={t}
-                      onSelect={handleCurrencySelect}
-                    />
-                  </View>
-                {errors.currency && <Text style={styles.error}>{errors.currency}</Text>}
-              </ScrollView>
-                <View style={[styles.modalButtonRowSticky, { backgroundColor: colors.card }]}>
-                  <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.secondary }]} onPress={handleCloseModal}>
-                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
-                  </Pressable>
-                  {editingId !== 'new' && (
-                    <Pressable
-                      style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.delete }]}
-                      onPress={() => deleteAccountHandler(editingId)}
-                    >
-                      <Text style={[styles.buttonText, { color: colors.card }]}>{t('delete') || 'Delete'}</Text>
-                    </Pressable>
-                  )}
-                  <Pressable style={[styles.actionButton, styles.modalButton, { backgroundColor: colors.primary }]} onPress={saveEdit}>
-                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('save') || 'Save'}</Text>
-                  </Pressable>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
+              <PaperTextInput
+                mode="outlined"
+                label={t('account_name') || 'Account Name'}
+                value={editValues.name}
+                onChangeText={handleNameChange}
+                error={!!errors.name}
+                autoFocus
+                returnKeyType="next"
+                onSubmitEditing={() => balanceInputRef.current?.focus()}
+                blurOnSubmit={false}
+                style={styles.textInput}
+              />
+              {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+              <PaperTextInput
+                ref={balanceInputRef}
+                mode="outlined"
+                label={t('balance') || 'Balance'}
+                value={editValues.balance}
+                onChangeText={handleBalanceChange}
+                error={!!errors.balance}
+                keyboardType="numeric"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+                style={styles.textInput}
+              />
+              {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+              <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
+                <View style={styles.pickerDisplay}>
+                  <Text variant="bodyLarge">
+                    {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
+                  </Text>
                 </View>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+              </TouchableRipple>
+              {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+            </ScrollView>
+            <View style={styles.modalButtonRow}>
+              <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
+                {t('cancel') || 'Cancel'}
+              </Button>
+              {editingId !== 'new' && (
+                <Button
+                  mode="contained"
+                  buttonColor={colors.delete}
+                  onPress={() => deleteAccountHandler(editingId)}
+                  style={styles.modalButton}
+                >
+                  {t('delete') || 'Delete'}
+                </Button>
+              )}
+              <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
+                {t('save') || 'Save'}
+              </Button>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </Portal>
+      <CurrencyPickerModal
+        visible={pickerVisible}
+        onClose={handleClosePicker}
+        currencies={currencies}
+        colors={colors}
+        t={t}
+        onSelect={handleCurrencySelect}
+      />
       {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-    verticalDivider: {
-      width: 1,
-      height: '70%',
-      backgroundColor: 'rgba(120,120,120,0.13)', // subtle vertical divider
-      alignSelf: 'center',
-      marginHorizontal: 2,
-    },
+  verticalDivider: {
+    width: 1,
+    height: '70%',
+    backgroundColor: 'rgba(120,120,120,0.13)',
+    alignSelf: 'center',
+    marginHorizontal: 2,
+  },
   container: { flex: 1 },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
   errorContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 40,
-    marginBottom: 16,
-  },
-  title: { fontSize: 24, fontWeight: 'bold' },
-  hamburgerButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 6,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-  },
-  hamburgerLine: {
-    width: 20,
-    height: 3,
-    backgroundColor: '#000',
-    marginVertical: 2,
-    borderRadius: 2,
+  accountCard: {
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 8,
   },
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: 'rgba(120,120,120,0.13)', // slightly visible divider
     minHeight: 56,
   },
   accountContentWrapper: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   dragHandle: {
     paddingHorizontal: 12,
@@ -429,79 +392,42 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     paddingLeft: 8,
   },
-  buttonGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
+  textInput: {
+    marginBottom: 8,
   },
-  actionButton: {
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    marginLeft: 8,
+  error: {
+    color: 'red',
+    marginBottom: 8,
+    marginLeft: 12,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
+  pickerWrapper: {
+    marginBottom: 8,
+    marginTop: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 8, marginBottom: 4 },
-  inputError: { borderColor: 'red' },
-  error: { color: 'red', fontSize: 12, marginBottom: 4 },
-  text: { fontSize: 16 },
-  accountText: { fontSize: 22, fontWeight: '500', marginBottom: 4 },
-  link: { color: 'blue', marginLeft: 8 },
-  picker: { height: 80, width: '100%' },
-  pickerWrapper: { marginBottom: 4, marginTop: 4, borderRadius: 4, overflow: 'hidden' },
-  pickerDisplay: { padding: 12, justifyContent: 'center' },
+  pickerDisplay: {
+    padding: 16,
+    justifyContent: 'center',
+  },
   pickerModalContent: {
-    width: '90%',
-    maxHeight: '70%',
+    margin: 20,
+    padding: 20,
     borderRadius: 12,
-    padding: 12,
   },
   pickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  closeButton: {
-    marginTop: 8,
-    alignSelf: 'center',
-    padding: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   modalContent: {
-    width: '90%',
-    minHeight: 280,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    margin: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    borderRadius: 12,
     maxHeight: '90%',
   },
-    modalButtonRowSticky: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 16,
-      backgroundColor: '#fff',
-      paddingBottom: 0,
-    },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -509,35 +435,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
+    gap: 8,
   },
   modalButton: {
     flex: 1,
-    marginHorizontal: 8,
   },
-  addButtonWrapper: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonIcon: {
-    marginRight: 8,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
 
