@@ -18,8 +18,10 @@ const GraphsScreen = () => {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11
   const [selectedCurrency, setSelectedCurrency] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [chartData, setChartData] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [topLevelCategories, setTopLevelCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Month names translation keys
@@ -45,6 +47,12 @@ const GraphsScreen = () => {
       try {
         const cats = await getAllCategories();
         setCategories(cats);
+
+        // Filter top-level expense categories (no parent, expense type)
+        const topLevel = cats.filter(cat =>
+          cat.parentId === null && cat.categoryType === 'expense'
+        );
+        setTopLevelCategories(topLevel);
       } catch (error) {
         console.error('Failed to load categories:', error);
       }
@@ -79,6 +87,27 @@ const GraphsScreen = () => {
         categoryMap.set(cat.id, cat.name);
       });
 
+      // Filter data by selected category if not "all"
+      let filteredSpending = spending;
+      if (selectedCategory !== 'all') {
+        // Get all descendant category IDs for the selected category
+        const descendantIds = new Set([selectedCategory]);
+        const findDescendants = (parentId) => {
+          categories.forEach(cat => {
+            if (cat.parentId === parentId) {
+              descendantIds.add(cat.id);
+              findDescendants(cat.id); // Recursive
+            }
+          });
+        };
+        findDescendants(selectedCategory);
+
+        // Filter spending to only include categories in the descendant set
+        filteredSpending = spending.filter(item =>
+          descendantIds.has(item.category_id)
+        );
+      }
+
       // Chart colors (vibrant palette)
       const chartColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
@@ -87,7 +116,7 @@ const GraphsScreen = () => {
       ];
 
       // Transform data for pie chart
-      const data = spending.map((item, index) => ({
+      const data = filteredSpending.map((item, index) => ({
         name: categoryMap.get(item.category_id) || t('select_category'),
         amount: parseFloat(item.total),
         color: chartColors[index % chartColors.length],
@@ -101,7 +130,7 @@ const GraphsScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMonth, selectedCurrency, categories, colors.text, t]);
+  }, [selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors.text, t]);
 
   // Reload data when filters change
   useEffect(() => {
@@ -124,6 +153,21 @@ const GraphsScreen = () => {
 
         {/* Filters Row */}
         <View style={styles.filtersRow}>
+          {/* Category Picker */}
+          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Picker
+              selectedValue={selectedCategory}
+              onValueChange={(value) => setSelectedCategory(value)}
+              style={[styles.picker, { color: colors.text }]}
+              dropdownIconColor={colors.text}
+            >
+              <Picker.Item label={t('all')} value="all" />
+              {topLevelCategories.map(category => (
+                <Picker.Item key={category.id} label={category.name} value={category.id} />
+              ))}
+            </Picker>
+          </View>
+
           {/* Currency Picker */}
           <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Picker
@@ -220,6 +264,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
+    justifyContent: 'center',
     ...Platform.select({
       web: {
         height: 40,
@@ -234,6 +279,14 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         height: 40,
+        paddingVertical: 0,
+        margin: 0,
+      },
+      android: {
+        height: 48,
+      },
+      ios: {
+        height: 48,
       },
     }),
   },
