@@ -119,6 +119,34 @@ const OperationsScreen = () => {
     index,
   }), []);
 
+  const renderAddOperationHeader = useCallback(() => {
+    return (
+      <TouchableOpacity
+        style={[styles.addOperationHeader, {
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+        }]}
+        onPress={handleAddOperation}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={t('add_operation')}
+        accessibilityHint={t('add_operation_hint')}
+      >
+        <View style={[styles.addIconContainer, { borderColor: colors.primary }]}>
+          <Icon
+            name="plus"
+            size={28}
+            color={colors.primary}
+            accessible={false}
+          />
+        </View>
+        <Text style={[styles.addOperationText, { color: colors.primary }]}>
+          {t('add_operation')}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [colors, t, handleAddOperation]);
+
   const renderOperation = useCallback(({ item }) => {
     const operation = item;
     const isExpense = operation.type === 'expense';
@@ -237,6 +265,7 @@ const OperationsScreen = () => {
         keyExtractor={item => item.id}
         extraData={[accounts, categories]}
         getItemLayout={getItemLayout}
+        ListHeaderComponent={renderAddOperationHeader}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
@@ -252,20 +281,6 @@ const OperationsScreen = () => {
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
       />
-
-      <View style={styles.addButtonWrapper}>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={handleAddOperation}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={t('add_operation')}
-          accessibilityHint={t('add_operation_hint')}
-        >
-          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
-          <Text style={styles.addButtonText}>{t('add_operation')}</Text>
-        </TouchableOpacity>
-      </View>
 
       <OperationModal
         visible={modalVisible}
@@ -349,29 +364,30 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
-  addButtonWrapper: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  addButton: {
+  addOperationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
     borderRadius: 12,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 2,
+    borderStyle: 'dashed',
   },
-  addButtonIcon: {
-    marginRight: 8,
+  addIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  addOperationText: {
+    fontSize: 18,
     fontWeight: '600',
   },
 });
