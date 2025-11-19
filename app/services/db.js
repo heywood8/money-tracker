@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'money_tracker.db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance = null;
 let initPromise = null;
@@ -40,6 +40,80 @@ export const getDatabase = async () => {
 };
 
 /**
+ * Migrate from V2 to V3 - Allow 'entry' type categories
+ */
+const migrateToV3 = async (db) => {
+  try {
+    console.log('Starting migration to V3: Allow entry type categories...');
+
+    // Create new categories table with updated schema
+    await db.execAsync(`
+      -- Create temporary table with updated schema
+      CREATE TABLE categories_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
+        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
+        parent_id TEXT,
+        icon TEXT,
+        color TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Get all existing categories
+    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
+
+    // Determine which categories should be 'entry' (leaf categories without children)
+    const categoryIdsWithChildren = new Set(
+      existingCategories
+        .filter(cat => cat.parent_id !== null)
+        .map(cat => cat.parent_id)
+    );
+
+    // Copy data to new table, updating type for leaf categories
+    for (const cat of existingCategories) {
+      const isLeaf = !categoryIdsWithChildren.has(cat.id);
+      const newType = isLeaf ? 'entry' : 'folder';
+
+      await db.runAsync(
+        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          cat.id,
+          cat.name,
+          newType,
+          cat.category_type,
+          cat.parent_id,
+          cat.icon,
+          cat.color,
+          cat.created_at,
+          cat.updated_at
+        ]
+      );
+    }
+
+    // Drop old table and rename new one
+    await db.execAsync(`
+      DROP TABLE categories;
+      ALTER TABLE categories_new RENAME TO categories;
+
+      -- Recreate indexes
+      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+    `);
+
+    console.log('Migration to V3 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V3:', error);
+    throw error;
+  }
+};
+
+/**
  * Migrate from V1 to V2 - Refactor category structure
  */
 const migrateToV2 = async (db) => {
@@ -69,7 +143,7 @@ const migrateToV2 = async (db) => {
       CREATE TABLE categories_new (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type = 'folder'),
+        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
         category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
         parent_id TEXT,
         icon TEXT,
@@ -186,6 +260,10 @@ const initializeDatabase = async (db) => {
       console.log('Migrating database from version', currentVersion, 'to version 2...');
       await migrateToV2(db);
     }
+    if (currentVersion >= 2 && currentVersion < 3) {
+      console.log('Migrating database from version', currentVersion, 'to version 3...');
+      await migrateToV3(db);
+    }
 
     // Now create or update tables
     await db.execAsync(`
@@ -203,7 +281,7 @@ const initializeDatabase = async (db) => {
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type = 'folder'),
+        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
         category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
         parent_id TEXT,
         icon TEXT,
