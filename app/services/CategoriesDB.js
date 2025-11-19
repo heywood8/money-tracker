@@ -1,5 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import defaultCategories from '../../assets/defaultCategories.json';
+import i18nData from '../../assets/i18n.json';
 
 /**
  * Map database field names to camelCase for application use
@@ -23,11 +24,15 @@ const mapCategoryFields = (dbCategory) => {
 };
 
 /**
- * Initialize default categories in the database
+ * Initialize default categories in the database with translated names
+ * @param {string} language - Language code ('en' or 'ru')
  * @returns {Promise<void>}
  */
-export const initializeDefaultCategories = async () => {
+export const initializeDefaultCategories = async (language = 'en') => {
   try {
+    // Get translations for the specified language
+    const translations = i18nData[language] || i18nData['en'];
+
     // Sort categories to ensure parents are created before children
     const sortedCategories = [...defaultCategories].sort((a, b) => {
       // Categories without parentId (root) should come first
@@ -38,9 +43,14 @@ export const initializeDefaultCategories = async () => {
 
     for (const category of sortedCategories) {
       try {
+        // Use translated name if nameKey exists, otherwise use default name
+        const translatedName = category.nameKey
+          ? (translations[category.nameKey] || category.name)
+          : category.name;
+
         await createCategory({
           id: category.id,
-          name: category.name,
+          name: translatedName,
           type: category.type || 'folder',
           category_type: category.category_type,
           parentId: category.parentId || null,
@@ -53,7 +63,7 @@ export const initializeDefaultCategories = async () => {
       }
     }
 
-    console.log('Default categories initialized successfully');
+    console.log(`Default categories initialized successfully in ${language}`);
   } catch (error) {
     console.error('Failed to initialize default categories:', error);
     throw error;
