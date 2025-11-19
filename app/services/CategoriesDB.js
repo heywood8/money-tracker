@@ -2,6 +2,27 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import defaultCategories from '../../assets/defaultCategories.json';
 
 /**
+ * Map database field names to camelCase for application use
+ * @param {Object} dbCategory - Category object from database with snake_case fields
+ * @returns {Object} Category object with camelCase fields
+ */
+const mapCategoryFields = (dbCategory) => {
+  if (!dbCategory) return null;
+
+  return {
+    id: dbCategory.id,
+    name: dbCategory.name,
+    type: dbCategory.type,
+    categoryType: dbCategory.category_type,
+    parentId: dbCategory.parent_id,
+    icon: dbCategory.icon,
+    color: dbCategory.color,
+    createdAt: dbCategory.created_at,
+    updatedAt: dbCategory.updated_at,
+  };
+};
+
+/**
  * Initialize default categories in the database
  * @returns {Promise<void>}
  */
@@ -48,7 +69,7 @@ export const getAllCategories = async () => {
     const categories = await queryAll(
       'SELECT * FROM categories ORDER BY created_at ASC'
     );
-    return categories || [];
+    return (categories || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get categories:', error);
     throw error;
@@ -66,7 +87,7 @@ export const getCategoryById = async (id) => {
       'SELECT * FROM categories WHERE id = ?',
       [id]
     );
-    return category;
+    return mapCategoryFields(category);
   } catch (error) {
     console.error('Failed to get category:', error);
     throw error;
@@ -84,7 +105,7 @@ export const getCategoriesByCategoryType = async (categoryType) => {
       'SELECT * FROM categories WHERE category_type = ? ORDER BY created_at ASC',
       [categoryType]
     );
-    return categories || [];
+    return (categories || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get categories by category_type:', error);
     throw error;
@@ -98,18 +119,18 @@ export const getCategoriesByCategoryType = async (categoryType) => {
  */
 export const getChildCategories = async (parentId) => {
   try {
+    let categories;
     if (parentId === null) {
-      const categories = await queryAll(
+      categories = await queryAll(
         'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY created_at ASC'
       );
-      return categories || [];
     } else {
-      const categories = await queryAll(
+      categories = await queryAll(
         'SELECT * FROM categories WHERE parent_id = ? ORDER BY created_at ASC',
         [parentId]
       );
-      return categories || [];
     }
+    return (categories || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get child categories:', error);
     throw error;
@@ -151,7 +172,8 @@ export const createCategory = async (category) => {
       ]
     );
 
-    return categoryData;
+    // Return mapped fields for consistency
+    return mapCategoryFields(categoryData);
   } catch (error) {
     console.error('Failed to create category:', error);
     throw error;
@@ -285,7 +307,7 @@ export const getCategoryPath = async (id) => {
       if (!category) break;
 
       path.unshift(category);
-      currentId = category.parent_id;
+      currentId = category.parentId;
     }
 
     return path;
