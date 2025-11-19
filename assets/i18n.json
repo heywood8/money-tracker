@@ -113,7 +113,11 @@
     "month_september": "September",
     "month_october": "October",
     "month_november": "November",
-    "month_december": "December"
+    "month_december": "December",
+    "welcome_title": "Welcome to Money Keeper",
+    "welcome_subtitle": "Please select your preferred language",
+    "select_language": "Select Language",
+    "continue": "Continue"
   },
   "ru": {
     "accounts": "Счета",
@@ -229,7 +233,11 @@
     "month_september": "Сентябрь",
     "month_october": "Октябрь",
     "month_november": "Ноябрь",
-    "month_december": "Декабрь"
+    "month_december": "Декабрь",
+    "welcome_title": "Добро пожаловать в Money Keeper",
+    "welcome_subtitle": "Пожалуйста, выберите предпочитаемый язык",
+    "select_language": "Выберите язык",
+    "continue": "Продолжить"
   }
 }
 
