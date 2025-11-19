@@ -80,34 +80,46 @@ const migrateToV2 = async (db) => {
       );
     `);
 
-    // Transform and insert data
-    for (const cat of existingCategories) {
-      // Determine category_type from old structure
-      // Old structure: type can be 'expense', 'income', or 'folder'
-      // If it's a folder, check if it has categoryType field (from JSON) or infer from parent
-      let categoryType = cat.categoryType || 'expense'; // default to expense
+    // Build a map to determine category_type for each category
+    const categoryTypeMap = new Map();
 
-      // If old type was 'expense' or 'income', use that as categoryType
+    // First pass: determine category_type from old type or ID/name
+    for (const cat of existingCategories) {
+      let categoryType = 'expense'; // default
+
+      // If old type was 'expense' or 'income', use that as category_type
       if (cat.type === 'expense' || cat.type === 'income') {
         categoryType = cat.type;
       }
-
-      // If it's the root "Expenses" or "Income" folder, determine from ID or name
-      if (cat.id === 'expense-root' || cat.name === 'Expenses') {
+      // Check for root folders by ID or name
+      else if (cat.id === 'expense-root' || cat.name === 'Expenses') {
         categoryType = 'expense';
       } else if (cat.id === 'income-root' || cat.name === 'Income') {
         categoryType = 'income';
-      } else if (cat.parent_id) {
-        // Inherit from parent
+      }
+      // Check if ID starts with expense- or income-
+      else if (cat.id && cat.id.startsWith('expense-')) {
+        categoryType = 'expense';
+      } else if (cat.id && cat.id.startsWith('income-')) {
+        categoryType = 'income';
+      }
+
+      categoryTypeMap.set(cat.id, categoryType);
+    }
+
+    // Second pass: inherit category_type from parent if not determined
+    for (const cat of existingCategories) {
+      if (cat.parent_id && !categoryTypeMap.has(cat.id)) {
         const parent = existingCategories.find(c => c.id === cat.parent_id);
-        if (parent) {
-          if (parent.type === 'expense' || parent.categoryType === 'expense' || parent.id === 'expense-root') {
-            categoryType = 'expense';
-          } else if (parent.type === 'income' || parent.categoryType === 'income' || parent.id === 'income-root') {
-            categoryType = 'income';
-          }
+        if (parent && categoryTypeMap.has(parent.id)) {
+          categoryTypeMap.set(cat.id, categoryTypeMap.get(parent.id));
         }
       }
+    }
+
+    // Third pass: insert into new table
+    for (const cat of existingCategories) {
+      const categoryType = categoryTypeMap.get(cat.id) || 'expense';
 
       await db.runAsync(
         `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
