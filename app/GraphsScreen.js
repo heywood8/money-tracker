@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { PieChart } from 'react-native-chart-kit';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
 import { getSpendingByCategoryAndCurrency } from './services/OperationsDB';
 import { getAllCategories } from './services/CategoriesDB';
-
-// Import web-specific picker styles
-if (Platform.OS === 'web') {
-  require('./picker-styles.web');
-}
+import SimplePicker from './components/SimplePicker';
 
 // Currency formatting helper
 const formatCurrency = (amount, currency) => {
@@ -157,6 +152,27 @@ const GraphsScreen = () => {
     [accounts]
   );
 
+  // Prepare picker items
+  const categoryItems = useMemo(() => [
+    { label: t('all'), value: 'all' },
+    ...topLevelCategories.map(cat => ({ label: cat.name, value: cat.id }))
+  ], [topLevelCategories, t]);
+
+  const currencyItems = useMemo(() =>
+    currencies.map(cur => ({ label: cur, value: cur })),
+    [currencies]
+  );
+
+  const yearItems = useMemo(() =>
+    years.map(year => ({ label: year.toString(), value: year })),
+    [years]
+  );
+
+  const monthItems = useMemo(() =>
+    monthKeys.map((key, index) => ({ label: t(key), value: index })),
+    [monthKeys, t]
+  );
+
   // Calculate total expenses
   const totalExpenses = useMemo(() => {
     return chartData.reduce((sum, item) => sum + item.amount, 0);
@@ -175,59 +191,42 @@ const GraphsScreen = () => {
         <View style={styles.filtersRow}>
           {/* Category Picker */}
           <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Picker
-              selectedValue={selectedCategory}
-              onValueChange={(value) => setSelectedCategory(value)}
-              style={[styles.picker, { color: colors.text }]}
-              itemStyle={styles.pickerItem}
-            >
-              <Picker.Item label={t('all')} value="all" />
-              {topLevelCategories.map(category => (
-                <Picker.Item key={category.id} label={category.name} value={category.id} />
-              ))}
-            </Picker>
+            <SimplePicker
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+              items={categoryItems}
+              colors={colors}
+            />
           </View>
 
           {/* Currency Picker */}
           <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Picker
-              selectedValue={selectedCurrency}
-              onValueChange={(value) => setSelectedCurrency(value)}
-              style={[styles.picker, { color: colors.text }]}
-              itemStyle={styles.pickerItem}
-            >
-              {currencies.map(currency => (
-                <Picker.Item key={currency} label={currency} value={currency} />
-              ))}
-            </Picker>
+            <SimplePicker
+              value={selectedCurrency}
+              onValueChange={setSelectedCurrency}
+              items={currencyItems}
+              colors={colors}
+            />
           </View>
 
           {/* Year Picker */}
           <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Picker
-              selectedValue={selectedYear}
-              onValueChange={(value) => setSelectedYear(value)}
-              style={[styles.picker, { color: colors.text }]}
-              itemStyle={styles.pickerItem}
-            >
-              {years.map(year => (
-                <Picker.Item key={year} label={year.toString()} value={year} />
-              ))}
-            </Picker>
+            <SimplePicker
+              value={selectedYear}
+              onValueChange={setSelectedYear}
+              items={yearItems}
+              colors={colors}
+            />
           </View>
 
           {/* Month Picker */}
           <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Picker
-              selectedValue={selectedMonth}
-              onValueChange={(value) => setSelectedMonth(value)}
-              style={[styles.picker, { color: colors.text }]}
-              itemStyle={styles.pickerItem}
-            >
-              {monthKeys.map((key, index) => (
-                <Picker.Item key={index} label={t(key)} value={index} />
-              ))}
-            </Picker>
+            <SimplePicker
+              value={selectedMonth}
+              onValueChange={setSelectedMonth}
+              items={monthItems}
+              colors={colors}
+            />
           </View>
         </View>
 
@@ -299,58 +298,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
-    ...Platform.select({
-      web: {
-        height: 38,
-        display: 'flex',
-        alignItems: 'center',
-      },
-      default: {
-        height: 40,
-        justifyContent: 'center',
-      },
-    }),
-  },
-  picker: {
-    ...Platform.select({
-      web: {
-        height: 38,
-        width: '100%',
-        border: 'none',
-        outline: 'none',
-        paddingLeft: 8,
-        paddingRight: 8,
-        paddingTop: 0,
-        paddingBottom: 0,
-        margin: 0,
-        lineHeight: '38px',
-        fontSize: 14,
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-        appearance: 'none',
-        WebkitAppearance: 'none',
-        MozAppearance: 'none',
-        background: 'transparent',
-        backgroundImage: 'none !important',
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'right center',
-        textIndent: 0,
-        verticalAlign: 'middle',
-      },
-      android: {
-        height: 40,
-      },
-      ios: {
-        height: 40,
-      },
-    }),
-  },
-  pickerItem: {
-    ...Platform.select({
-      ios: {
-        height: 40,
-      },
-    }),
+    height: 40,
   },
   totalContainer: {
     flexDirection: 'row',
