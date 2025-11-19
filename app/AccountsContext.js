@@ -21,6 +21,35 @@ export const AccountsProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  // Initialize default accounts if none exist
+  const initializeDefaultAccounts = useCallback(async () => {
+    try {
+      const defaultAccounts = [
+        {
+          id: uuid.v4(),
+          name: 'Наличка драмы',
+          balance: '1000',
+          currency: 'AMD',
+        },
+        {
+          id: uuid.v4(),
+          name: 'Ameria',
+          balance: '5000',
+          currency: 'AMD',
+        },
+      ];
+
+      for (const account of defaultAccounts) {
+        await AccountsDB.createAccount(account);
+      }
+
+      return defaultAccounts;
+    } catch (err) {
+      console.error('Failed to create default accounts:', err);
+      throw err;
+    }
+  }, []);
+
   useEffect(() => {
     const loadAccounts = async () => {
       try {
@@ -32,7 +61,14 @@ export const AccountsProvider = ({ children }) => {
         }
 
         // Load accounts from SQLite
-        const accountsData = await AccountsDB.getAllAccounts();
+        let accountsData = await AccountsDB.getAllAccounts();
+
+        // If no accounts exist, create default ones
+        if (accountsData.length === 0) {
+          console.log('No accounts found, creating defaults...');
+          accountsData = await initializeDefaultAccounts();
+        }
+
         setAccounts(accountsData);
       } catch (err) {
         console.error('Failed to load accounts:', err);
@@ -48,7 +84,7 @@ export const AccountsProvider = ({ children }) => {
       }
     };
     loadAccounts();
-  }, []);
+  }, [initializeDefaultAccounts]);
 
   const addAccount = useCallback(async (account) => {
     try {
@@ -111,6 +147,47 @@ export const AccountsProvider = ({ children }) => {
     }
   }, []);
 
+  const resetDatabase = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // Drop and reinitialize the database
+      const { dropAllTables, getDatabase } = await import('./services/db');
+      await dropAllTables();
+
+      // Force re-initialization by getting database again
+      await getDatabase();
+
+      // Clear migration status from AsyncStorage
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.removeItem('migration_backup');
+
+      // Reload categories (they will be auto-created)
+      const { getAllCategories } = await import('./services/CategoriesDB');
+      await getAllCategories();
+
+      // Create default accounts
+      const defaultAccounts = await initializeDefaultAccounts();
+      setAccounts(defaultAccounts);
+
+      Alert.alert(
+        'Success',
+        'Database has been reset successfully.',
+        [{ text: 'OK' }]
+      );
+    } catch (err) {
+      console.error('Failed to reset database:', err);
+      Alert.alert(
+        'Error',
+        'Failed to reset database. Please try again.',
+        [{ text: 'OK' }]
+      );
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [initializeDefaultAccounts]);
+
   const value = useMemo(() => ({
     accounts,
     loading,
@@ -119,9 +196,10 @@ export const AccountsProvider = ({ children }) => {
     updateAccount,
     deleteAccount,
     reloadAccounts,
+    resetDatabase,
     validateAccount,
     currencies,
-  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts]);
+  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, resetDatabase]);
 
   return (
     <AccountsContext.Provider value={value}>
