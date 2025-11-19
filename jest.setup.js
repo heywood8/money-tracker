@@ -22,7 +22,9 @@ jest.mock('react-native-uuid', () => ({
 // Mock Appearance API
 jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   getColorScheme: jest.fn(() => 'light'),
-  addChangeListener: jest.fn(),
+  addChangeListener: jest.fn(() => ({
+    remove: jest.fn(),
+  })),
   removeChangeListener: jest.fn(),
 }));
 
