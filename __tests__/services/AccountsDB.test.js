@@ -15,17 +15,17 @@ describe('AccountsDB', () => {
   });
 
   describe('getAllAccounts', () => {
-    it('retrieves all accounts ordered by created_at DESC', async () => {
+    it('retrieves all accounts ordered by display_order and created_at', async () => {
       const mockAccounts = [
-        { id: '1', name: 'Account 1', balance: '100', currency: 'USD', created_at: '2024-01-02' },
-        { id: '2', name: 'Account 2', balance: '200', currency: 'EUR', created_at: '2024-01-01' },
+        { id: '1', name: 'Account 1', balance: '100', currency: 'USD', display_order: 0, created_at: '2024-01-02' },
+        { id: '2', name: 'Account 2', balance: '200', currency: 'EUR', display_order: 1, created_at: '2024-01-01' },
       ];
       db.queryAll.mockResolvedValue(mockAccounts);
 
       const result = await AccountsDB.getAllAccounts();
 
       expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM accounts ORDER BY created_at DESC'
+        'SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC'
       );
       expect(result).toEqual(mockAccounts);
     });
@@ -85,17 +85,19 @@ describe('AccountsDB', () => {
         currency: 'USD',
       };
 
+      db.queryFirst.mockResolvedValue({ max_order: 5 }); // Mock max order query
       db.executeQuery.mockResolvedValue(undefined);
 
       const result = await AccountsDB.createAccount(newAccount);
 
       expect(db.executeQuery).toHaveBeenCalledWith(
-        'INSERT INTO accounts (id, name, balance, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
         expect.arrayContaining([
           'test-id',
           'New Account',
           '100.50',
           'USD',
+          6, // max_order + 1
           expect.any(String), // created_at
           expect.any(String), // updated_at
         ])
@@ -103,6 +105,7 @@ describe('AccountsDB', () => {
       expect(result).toMatchObject(newAccount);
       expect(result.created_at).toBeDefined();
       expect(result.updated_at).toBeDefined();
+      expect(result.display_order).toBe(6);
     });
 
     it('creates account with default values when optional fields are missing', async () => {
@@ -111,16 +114,19 @@ describe('AccountsDB', () => {
         name: 'New Account',
       };
 
+      db.queryFirst.mockResolvedValue({ max_order: null }); // No existing accounts
       db.executeQuery.mockResolvedValue(undefined);
 
       const result = await AccountsDB.createAccount(newAccount);
 
       expect(result.balance).toBe('0');
       expect(result.currency).toBe('USD');
+      expect(result.display_order).toBe(0);
     });
 
     it('throws error when database insert fails', async () => {
       const error = new Error('Insert failed');
+      db.queryFirst.mockResolvedValue({ max_order: 0 });
       db.executeQuery.mockRejectedValue(error);
 
       await expect(AccountsDB.createAccount({ id: '1', name: 'Test' }))

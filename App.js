@@ -8,6 +8,7 @@ import { LocalizationProvider } from './app/LocalizationContext';
 import ErrorBoundary from './app/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 function ThemedStatusBar() {
   const { colorScheme, colors } = require('./app/ThemeContext').useTheme();
@@ -29,20 +30,22 @@ function ThemedStatusBar() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <LocalizationProvider>
-          <ThemeProvider>
-            <AccountsProvider>
-              <CategoriesProvider>
-                <OperationsProvider>
-                  <ThemedStatusBar />
-                  <SimpleTabs />
-                </OperationsProvider>
-              </CategoriesProvider>
-            </AccountsProvider>
-          </ThemeProvider>
-        </LocalizationProvider>
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <LocalizationProvider>
+            <ThemeProvider>
+              <AccountsProvider>
+                <CategoriesProvider>
+                  <OperationsProvider>
+                    <ThemedStatusBar />
+                    <SimpleTabs />
+                  </OperationsProvider>
+                </CategoriesProvider>
+              </AccountsProvider>
+            </ThemeProvider>
+          </LocalizationProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }
