@@ -149,11 +149,34 @@ const migrateToV2 = async (db) => {
  */
 const initializeDatabase = async (db) => {
   try {
-    // Create tables in order (no foreign key dependencies first)
     await db.execAsync(`
       PRAGMA foreign_keys = ON;
       PRAGMA journal_mode = WAL;
 
+      -- App metadata table (create first to track version)
+      CREATE TABLE IF NOT EXISTS app_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    // Check database version before creating other tables
+    const versionResult = await db.getFirstAsync(
+      'SELECT value FROM app_metadata WHERE key = ?',
+      ['db_version']
+    );
+
+    const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
+
+    // Run migrations BEFORE creating tables
+    if (currentVersion > 0 && currentVersion < 2) {
+      console.log('Migrating database from version', currentVersion, 'to version 2...');
+      await migrateToV2(db);
+    }
+
+    // Now create or update tables
+    await db.execAsync(`
       -- Accounts table
       CREATE TABLE IF NOT EXISTS accounts (
         id TEXT PRIMARY KEY,
@@ -194,13 +217,6 @@ const initializeDatabase = async (db) => {
         FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
       );
 
-      -- App metadata table
-      CREATE TABLE IF NOT EXISTS app_metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_operations_date ON operations(date DESC);
       CREATE INDEX IF NOT EXISTS idx_operations_account ON operations(account_id);
@@ -210,20 +226,6 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
     `);
-
-    // Check and set database version
-    const versionResult = await db.getFirstAsync(
-      'SELECT value FROM app_metadata WHERE key = ?',
-      ['db_version']
-    );
-
-    const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
-
-    // Run migrations
-    if (currentVersion < 2) {
-      console.log('Migrating database from version', currentVersion, 'to version 2...');
-      await migrateToV2(db);
-    }
 
     // Update version
     if (!versionResult) {
