@@ -25,7 +25,10 @@ const QuickAddForm = memo(({
   TYPES
 }) => {
   return (
-    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.quickAddForm, {
+      backgroundColor: colors.card,
+      borderColor: colors.glassBorder,
+    }]}>
       <Text style={[styles.quickAddTitle, { color: colors.text }]}>{t('add_operation')}</Text>
 
       {/* Type Selector */}
@@ -507,7 +510,13 @@ const OperationsScreen = () => {
         onRequestClose={closePicker}
       >
         <Pressable style={styles.modalOverlay} onPress={closePicker}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+          <Pressable
+            style={[styles.pickerModalContent, {
+              backgroundColor: colors.card,
+              borderColor: colors.glassBorder,
+            }]}
+            onPress={() => {}}
+          >
             <FlatList
               data={pickerState.data}
               keyExtractor={(item) => item.id || item.key}
@@ -614,6 +623,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   operationInfo: {
     flex: 1,
@@ -661,8 +675,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   quickAddTitle: {
     fontSize: 16,
@@ -681,9 +700,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   typeButtonText: {
     fontSize: 13,
@@ -713,9 +737,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginTop: 8,
     gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   quickAddButtonText: {
     color: '#fff',
@@ -724,15 +753,21 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   pickerModalContent: {
     width: '90%',
     maxHeight: '70%',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   pickerOption: {
     paddingVertical: 12,

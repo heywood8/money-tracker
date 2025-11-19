@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import OperationsScreen from './OperationsScreen';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
@@ -43,7 +44,7 @@ const TabButton = memo(({ tab, isActive, colors, onPress }) => {
 TabButton.displayName = 'TabButton';
 
 export default function SimpleTabs() {
-  const { colors } = useTheme();
+  const { colors, colorScheme } = useTheme();
   const { t } = useLocalization();
   const [active, setActive] = React.useState('Operations');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
@@ -82,21 +83,40 @@ export default function SimpleTabs() {
     }
   }, [active]);
 
+  const TabBarContainer = Platform.OS === 'web' ? View : BlurView;
+  const blurProps = Platform.OS !== 'web' ? {
+    intensity: 80,
+    tint: colorScheme === 'dark' ? 'dark' : 'light',
+  } : {};
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <Header onOpenSettings={handleOpenSettings} />
       <View style={styles.content}>{renderActive()}</View>
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
-      <SafeAreaView style={[styles.tabBar, { borderTopColor: colors.border, backgroundColor: colors.surface }]} edges={['bottom']}>
-        {TABS.map(tab => (
-          <TabButton
-            key={tab.key}
-            tab={tab}
-            isActive={active === tab.key}
-            colors={colors}
-            onPress={handleTabPress}
-          />
-        ))}
+      <SafeAreaView edges={['bottom']}>
+        <TabBarContainer
+          {...blurProps}
+          style={[styles.tabBar, {
+            borderTopColor: colors.glassBorder,
+            backgroundColor: colors.surface,
+            shadowColor: colors.glassShadow,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 8,
+          }]}
+        >
+          {TABS.map(tab => (
+            <TabButton
+              key={tab.key}
+              tab={tab}
+              isActive={active === tab.key}
+              colors={colors}
+              onPress={handleTabPress}
+            />
+          ))}
+        </TabBarContainer>
       </SafeAreaView>
     </SafeAreaView>
   );
@@ -108,6 +128,7 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
+    overflow: 'hidden',
   },
   tab: {
     flex: 1,
@@ -115,6 +136,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 56, // Ensure adequate touch target
   },
-  tabText: { fontSize: 13 },
+  tabText: {
+    fontSize: 13,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
   tabTextActive: { fontWeight: '700' },
 });

@@ -55,7 +55,13 @@ export default function SettingsModal({ visible, onClose }) {
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.content, { backgroundColor: colors.card }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.content, {
+            backgroundColor: colors.card,
+            borderColor: colors.glassBorder,
+          }]}
+          onPress={() => {}}
+        >
           <Text style={[styles.title, { color: colors.text }]}>{t('settings')}</Text>
           <Text style={[styles.subtitle, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
           {themeOptions.map(opt => (
@@ -63,9 +69,11 @@ export default function SettingsModal({ visible, onClose }) {
               key={opt.value}
               style={({ pressed }) => [
                 styles.option,
-                { backgroundColor: colors.secondary },
-                localSelection === opt.value && { backgroundColor: colors.primary },
-                pressed && { opacity: 0.9 },
+                {
+                  backgroundColor: localSelection === opt.value ? colors.primary : colors.glassBackground,
+                  borderColor: localSelection === opt.value ? colors.primary : colors.glassBorder,
+                },
+                pressed && { opacity: 0.8 },
               ]}
               onPress={() => setLocalSelection(opt.value)}
             >
@@ -79,9 +87,11 @@ export default function SettingsModal({ visible, onClose }) {
               key={lng}
               style={({ pressed }) => [
                 styles.option,
-                { backgroundColor: colors.secondary },
-                localLang === lng && { backgroundColor: colors.primary },
-                pressed && { opacity: 0.9 },
+                {
+                  backgroundColor: localLang === lng ? colors.primary : colors.glassBackground,
+                  borderColor: localLang === lng ? colors.primary : colors.glassBorder,
+                },
+                pressed && { opacity: 0.8 },
               ]}
               onPress={() => setLocalLang(lng)}
             >
@@ -130,15 +140,21 @@ export default function SettingsModal({ visible, onClose }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
     width: '85%',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 24,
     alignItems: 'stretch',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   title: {
     fontSize: 22,
@@ -154,12 +170,13 @@ const styles = StyleSheet.create({
   option: {
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 8,
     backgroundColor: 'transparent',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
   },
   selected: {
     backgroundColor: '#c0e0ff',
@@ -188,15 +205,25 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 8,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   resetButton: {
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   resetButtonText: {
     fontSize: 16,

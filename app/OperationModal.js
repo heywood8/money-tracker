@@ -175,7 +175,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             style={{ flex: 1 }}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
-              <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <Pressable
+                style={[styles.modalContent, {
+                  backgroundColor: colors.card,
+                  borderColor: colors.glassBorder,
+                }]}
+                onPress={() => {}}
+              >
                 <ScrollView
                   style={styles.scrollView}
                   contentContainerStyle={styles.scrollContent}
@@ -356,7 +362,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         onRequestClose={closePicker}
       >
         <Pressable style={styles.modalOverlay} onPress={closePicker}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+          <Pressable
+            style={[styles.pickerModalContent, {
+              backgroundColor: colors.card,
+              borderColor: colors.glassBorder,
+            }]}
+            onPress={() => {}}
+          >
             <FlatList
               data={pickerState.data}
               keyExtractor={(item) => {
@@ -457,7 +469,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -465,14 +477,15 @@ const styles = StyleSheet.create({
     width: '90%',
     maxHeight: '80%',
     minHeight: '60%',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
     flexDirection: 'column',
+    borderWidth: 1,
   },
   scrollView: {
     flexGrow: 0,
@@ -528,10 +541,15 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     marginHorizontal: 8,
-    borderRadius: 6,
+    borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     minHeight: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   buttonText: {
     fontSize: 16,
@@ -540,8 +558,14 @@ const styles = StyleSheet.create({
   pickerModalContent: {
     width: '90%',
     maxHeight: '70%',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   pickerOption: {
     paddingVertical: 12,

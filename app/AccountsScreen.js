@@ -29,7 +29,13 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.pickerModalContent, {
+            backgroundColor: colors.card,
+            borderColor: colors.glassBorder,
+          }]}
+          onPress={() => {}}
+        >
           <FlatList
             data={Object.entries(currencies)}
             keyExtractor={([code]) => code}
@@ -267,7 +273,13 @@ export default function AccountsScreen() {
           style={{ flex: 1 }}
         >
           <Pressable style={styles.modalOverlay} onPress={handleCloseModal}>
-            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <Pressable
+            style={[styles.modalContent, {
+              backgroundColor: colors.card,
+              borderColor: colors.glassBorder,
+            }]}
+            onPress={() => {}}
+          >
               <ScrollView
                 style={{ flex: 1 }}
                 keyboardShouldPersistTaps="handled"
@@ -435,10 +447,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   actionButton: {
-    borderRadius: 6,
+    borderRadius: 10,
     paddingVertical: 6,
     paddingHorizontal: 14,
     marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   buttonText: {
     fontSize: 16,
@@ -457,8 +474,14 @@ const styles = StyleSheet.create({
   pickerModalContent: {
     width: '90%',
     maxHeight: '70%',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   pickerOption: {
     paddingVertical: 12,
@@ -473,7 +496,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -481,16 +504,17 @@ const styles = StyleSheet.create({
     width: '90%',
     minHeight: 280,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
     flexDirection: 'column',
     justifyContent: 'space-between',
     maxHeight: '90%',
+    borderWidth: 1,
   },
     modalButtonRowSticky: {
       flexDirection: 'row',
@@ -523,13 +547,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   addButtonIcon: {
     marginRight: 8,
