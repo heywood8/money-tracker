@@ -1,4 +1,43 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
+import defaultCategories from '../../assets/defaultCategories.json';
+
+/**
+ * Initialize default categories in the database
+ * @returns {Promise<void>}
+ */
+export const initializeDefaultCategories = async () => {
+  try {
+    // Sort categories to ensure parents are created before children
+    const sortedCategories = [...defaultCategories].sort((a, b) => {
+      // Categories without parentId (root) should come first
+      if (!a.parentId && b.parentId) return -1;
+      if (a.parentId && !b.parentId) return 1;
+      return 0;
+    });
+
+    for (const category of sortedCategories) {
+      try {
+        await createCategory({
+          id: category.id,
+          name: category.name,
+          type: category.type || 'folder',
+          category_type: category.category_type,
+          parentId: category.parentId || null,
+          icon: category.icon || null,
+          color: category.color || null,
+        });
+      } catch (err) {
+        console.error('Failed to create default category:', category.id, err);
+        // Continue with other categories
+      }
+    }
+
+    console.log('Default categories initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize default categories:', error);
+    throw error;
+  }
+};
 
 /**
  * Get all categories
