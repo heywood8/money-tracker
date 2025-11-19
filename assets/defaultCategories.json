@@ -12,7 +12,7 @@
     "id": "expense-food-restaurant",
     "name": "Restaurants",
     "nameKey": "restaurants",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-food",
     "icon": "silverware-fork-knife"
@@ -21,7 +21,7 @@
     "id": "expense-food-groceries",
     "name": "Groceries",
     "nameKey": "groceries",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-food",
     "icon": "cart"
@@ -30,7 +30,7 @@
     "id": "expense-food-cafe",
     "name": "Cafe & Coffee",
     "nameKey": "cafe_coffee",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-food",
     "icon": "coffee"
@@ -48,7 +48,7 @@
     "id": "expense-transport-fuel",
     "name": "Fuel",
     "nameKey": "fuel",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-transport",
     "icon": "gas-station"
@@ -57,7 +57,7 @@
     "id": "expense-transport-public",
     "name": "Public Transport",
     "nameKey": "public_transport",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-transport",
     "icon": "bus"
@@ -66,7 +66,7 @@
     "id": "expense-transport-taxi",
     "name": "Taxi & Rideshare",
     "nameKey": "taxi_rideshare",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-transport",
     "icon": "taxi"
@@ -84,7 +84,7 @@
     "id": "expense-shopping-clothing",
     "name": "Clothing",
     "nameKey": "clothing",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-shopping",
     "icon": "hanger"
@@ -93,7 +93,7 @@
     "id": "expense-shopping-electronics",
     "name": "Electronics",
     "nameKey": "electronics",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-shopping",
     "icon": "laptop"
@@ -102,7 +102,7 @@
     "id": "expense-shopping-other",
     "name": "Other Shopping",
     "nameKey": "other_shopping",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-shopping",
     "icon": "cart-outline"
@@ -120,7 +120,7 @@
     "id": "expense-bills-rent",
     "name": "Rent",
     "nameKey": "rent",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-bills",
     "icon": "home"
@@ -129,7 +129,7 @@
     "id": "expense-bills-electricity",
     "name": "Electricity",
     "nameKey": "electricity",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-bills",
     "icon": "lightning-bolt"
@@ -138,7 +138,7 @@
     "id": "expense-bills-water",
     "name": "Water",
     "nameKey": "water",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-bills",
     "icon": "water"
@@ -147,7 +147,7 @@
     "id": "expense-bills-internet",
     "name": "Internet & Phone",
     "nameKey": "internet_phone",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-bills",
     "icon": "wifi"
@@ -165,7 +165,7 @@
     "id": "expense-entertainment-movies",
     "name": "Movies & Shows",
     "nameKey": "movies_shows",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-entertainment",
     "icon": "movie-open"
@@ -174,7 +174,7 @@
     "id": "expense-entertainment-games",
     "name": "Games",
     "nameKey": "games",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-entertainment",
     "icon": "gamepad-variant"
@@ -183,7 +183,7 @@
     "id": "expense-entertainment-sports",
     "name": "Sports & Hobbies",
     "nameKey": "sports_hobbies",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-entertainment",
     "icon": "basketball"
@@ -201,7 +201,7 @@
     "id": "expense-health-medical",
     "name": "Medical",
     "nameKey": "medical",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-health",
     "icon": "hospital-box"
@@ -210,7 +210,7 @@
     "id": "expense-health-pharmacy",
     "name": "Pharmacy",
     "nameKey": "pharmacy",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-health",
     "icon": "pill"
@@ -219,7 +219,7 @@
     "id": "expense-health-gym",
     "name": "Gym & Fitness",
     "nameKey": "gym_fitness",
-    "type": "folder",
+    "type": "entry",
     "category_type": "expense",
     "parentId": "expense-health",
     "icon": "dumbbell"
@@ -228,7 +228,7 @@
     "id": "income-salary",
     "name": "Salary",
     "nameKey": "salary",
-    "type": "folder",
+    "type": "entry",
     "category_type": "income",
     "parentId": null,
     "icon": "briefcase"
@@ -237,7 +237,7 @@
     "id": "income-business",
     "name": "Business",
     "nameKey": "business",
-    "type": "folder",
+    "type": "entry",
     "category_type": "income",
     "parentId": null,
     "icon": "domain"
@@ -246,7 +246,7 @@
     "id": "income-investments",
     "name": "Investments",
     "nameKey": "investments",
-    "type": "folder",
+    "type": "entry",
     "category_type": "income",
     "parentId": null,
     "icon": "chart-line"
@@ -255,7 +255,7 @@
     "id": "income-gifts",
     "name": "Gifts",
     "nameKey": "gifts",
-    "type": "folder",
+    "type": "entry",
     "category_type": "income",
     "parentId": null,
     "icon": "gift"
@@ -264,7 +264,7 @@
     "id": "income-other",
     "name": "Other Income",
     "nameKey": "other_income",
-    "type": "folder",
+    "type": "entry",
     "category_type": "income",
     "parentId": null,
     "icon": "cash"
