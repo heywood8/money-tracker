@@ -4,6 +4,7 @@ import uuid from 'react-native-uuid';
 import currencies from '../assets/currencies.json';
 import * as AccountsDB from './services/AccountsDB';
 import { performMigration, isMigrationComplete } from './services/migration';
+import { appEvents, EVENTS } from './services/eventEmitter';
 
 const AccountsContext = createContext();
 
@@ -186,59 +187,17 @@ export const AccountsProvider = ({ children }) => {
       setAccounts(defaultAccounts);
       console.log('Default accounts initialized');
 
-      // Determine reload message based on platform
-      const { Platform } = require('react-native');
-      const isWeb = typeof window !== 'undefined' && window.location;
-      const isProduction = !__DEV__;
+      // Reload accounts to ensure consistency
+      await reloadAccounts();
 
-      let message = 'Database has been reset successfully.';
-      let canAutoReload = false;
-
-      if (isWeb) {
-        message += ' The app will now reload.';
-        canAutoReload = true;
-      } else if (!isProduction) {
-        // Development mode on native
-        message += ' The app will now reload.';
-        canAutoReload = true;
-      } else {
-        // Production mode on native (standalone APK/IPA)
-        message += ' Please close and restart the app to see the changes.';
-        canAutoReload = false;
-      }
+      // Trigger reload of all other contexts (Categories, Operations)
+      console.log('Emitting RELOAD_ALL event to refresh all contexts');
+      appEvents.emit(EVENTS.RELOAD_ALL);
 
       Alert.alert(
         'Success',
-        message,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              if (!canAutoReload) {
-                // Production build - can't auto-reload, user must restart manually
-                return;
-              }
-
-              // Reload the app to reinitialize all contexts
-              try {
-                if (isWeb) {
-                  window.location.reload();
-                } else {
-                  // Development mode - use DevSettings
-                  const DevSettings = require('react-native').DevSettings;
-                  DevSettings.reload();
-                }
-              } catch (reloadErr) {
-                console.error('Failed to reload app:', reloadErr);
-                Alert.alert(
-                  'Manual Reload Required',
-                  'Please close and restart the app to see the changes.',
-                  [{ text: 'OK' }]
-                );
-              }
-            },
-          },
-        ]
+        'Database has been reset successfully.',
+        [{ text: 'OK' }]
       );
     } catch (err) {
       console.error('Failed to reset database:', err);
