@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Appbar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
@@ -10,49 +11,29 @@ export default function Header({ onOpenSettings }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View
+    <Appbar.Header
+      elevated
       style={[
         styles.container,
         {
           backgroundColor: colors.surface,
-          borderBottomColor: colors.border,
-          paddingTop: insets.top + 8,
+          paddingTop: insets.top,
         }
       ]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>{t('Money Tracker') || 'Money Tracker'}</Text>
-      <TouchableOpacity
+      <Appbar.Content title={t('Money Tracker') || 'Money Tracker'} />
+      <Appbar.Action
+        icon="cog"
         onPress={onOpenSettings}
         accessibilityLabel={t('settings')}
-        accessibilityRole="button"
         accessibilityHint="Opens settings menu"
-        style={[styles.burger, { backgroundColor: colors.secondary }]}
-        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-      >
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
-      </TouchableOpacity>
-    </View>
+      />
+    </Appbar.Header>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
+    elevation: 2,
   },
-  title: { fontSize: 18, fontWeight: '700' },
-  burger: {
-    width: 44,  // Increased to minimum touch target
-    height: 44, // Increased to minimum touch target
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  line: { width: 18, height: 2, marginVertical: 2 },
 });
