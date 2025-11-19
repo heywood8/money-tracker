@@ -16,11 +16,20 @@ const openIndexedDB = () => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      // Pass upgrade info to resolve
+      resolve({ db, wasUpgraded: false });
+    };
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       const transaction = event.target.transaction;
+      const oldVersion = event.oldVersion;
+      const newVersion = event.newVersion;
+
+      const isNewDatabase = oldVersion === 0;
+      let didMigrate = false;
 
       // Create accounts store
       if (!db.objectStoreNames.contains('accounts')) {
@@ -42,8 +51,9 @@ const openIndexedDB = () => {
         }
 
         // Migrate existing data
-        if (event.oldVersion < 3) {
-          console.log('Migrating categories to V3 structure...');
+        if (oldVersion < 3) {
+          console.log(`Migrating categories from v${oldVersion} to v3...`);
+          didMigrate = true;
           const getAllRequest = categoriesStore.getAll();
           getAllRequest.onsuccess = () => {
             const categories = getAllRequest.result;
@@ -108,6 +118,9 @@ const openIndexedDB = () => {
         const operationsStore = transaction.objectStore('operations');
         if (!operationsStore.indexNames.contains('to_account_id')) {
           operationsStore.createIndex('to_account_id', 'to_account_id', { unique: false });
+          if (oldVersion > 0) {
+            didMigrate = true;
+          }
         }
       }
 
@@ -115,6 +128,19 @@ const openIndexedDB = () => {
       if (!db.objectStoreNames.contains('app_metadata')) {
         db.createObjectStore('app_metadata', { keyPath: 'key' });
       }
+
+      // Log appropriate message based on what happened
+      transaction.oncomplete = () => {
+        if (isNewDatabase) {
+          console.log(`Database created successfully (v${newVersion})`);
+        } else if (didMigrate || oldVersion < newVersion) {
+          console.log(`Database migrated successfully (v${oldVersion} → v${newVersion})`);
+        }
+        // No log for normal opens - database is ready silently
+      };
+
+      // Store upgrade info to pass to getDatabase
+      db._wasUpgraded = true;
     };
   });
 };
@@ -128,8 +154,10 @@ export const getDatabase = async () => {
   }
 
   try {
-    dbInstance = await openIndexedDB();
-    console.log('IndexedDB initialized successfully');
+    const result = await openIndexedDB();
+    dbInstance = result.db || result; // Handle both new format and old format
+    // Note: Logging happens in onupgradeneeded callback for creates/migrations
+    // Normal opens are silent
     return dbInstance;
   } catch (error) {
     console.error('Failed to open IndexedDB:', error);
