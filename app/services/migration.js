@@ -10,8 +10,8 @@ import { createOperation } from './OperationsDB';
  */
 export const getMigrationStatus = async () => {
   try {
-    const db = await getDatabase();
-    const result = await db.getFirstAsync(
+    const { queryFirst } = await import('./db');
+    const result = await queryFirst(
       'SELECT value FROM app_metadata WHERE key = ?',
       ['migration_status']
     );
@@ -28,8 +28,8 @@ export const getMigrationStatus = async () => {
  */
 const setMigrationStatus = async (status) => {
   try {
-    const db = await getDatabase();
-    await db.runAsync(
+    const { executeQuery } = await import('./db');
+    await executeQuery(
       'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
       ['migration_status', status, new Date().toISOString()]
     );

@@ -30,14 +30,34 @@ export const CategoriesProvider = ({ children }) => {
         if (categoriesData.length === 0) {
           // Initialize with default categories
           console.log('Initializing default categories...');
+          const mappedCategories = [];
           for (const category of defaultCategories) {
             try {
-              await CategoriesDB.createCategory(category);
+              // Map the category type to match database schema
+              // defaultCategories uses: folder, subfolder, entry
+              // database expects: expense, income, folder
+              let dbType;
+              if (category.type === 'folder' || category.type === 'subfolder') {
+                dbType = 'folder';
+              } else if (category.type === 'entry') {
+                // Use categoryType (expense/income) for entries
+                dbType = category.categoryType;
+              } else {
+                dbType = category.type;
+              }
+
+              const mappedCategory = {
+                ...category,
+                type: dbType,
+              };
+
+              await CategoriesDB.createCategory(mappedCategory);
+              mappedCategories.push(mappedCategory);
             } catch (err) {
               console.error('Failed to create default category:', category.id, err);
             }
           }
-          setCategories(defaultCategories);
+          setCategories(mappedCategories);
         } else {
           setCategories(categoriesData);
         }
