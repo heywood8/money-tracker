@@ -12,9 +12,9 @@ import OperationModal from './OperationModal';
 const OperationsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { operations, loading, deleteOperation } = useOperations();
-  const { accounts } = useAccounts();
-  const { categories } = useCategories();
+  const { operations, loading: operationsLoading, deleteOperation } = useOperations();
+  const { accounts, loading: accountsLoading } = useAccounts();
+  const { categories, loading: categoriesLoading } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
@@ -228,7 +228,7 @@ const OperationsScreen = () => {
     );
   }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, handleDeleteOperation, formatDate, formatCurrency]);
 
-  if (loading) {
+  if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
       <SafeAreaView style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
