@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, ActivityIndicator } from 'react-native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
@@ -227,7 +228,17 @@ export default function AccountsScreen() {
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
       />
       <View style={styles.addButtonWrapper}>
-        <Button title={t('add_account') || 'Add Account'} onPress={addAccountHandler} color={colors.primary} />
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
+          onPress={addAccountHandler}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('add_account') || 'Add Account'}
+          accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
+        >
+          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
+          <Text style={styles.addButtonText}>{t('add_account') || 'Add Account'}</Text>
+        </TouchableOpacity>
       </View>
       <Modal
         visible={!!editingId}
@@ -477,7 +488,29 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   addButtonWrapper: {
-    marginBottom: 24,
+    padding: 16,
+    paddingBottom: 8,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addButtonIcon: {
+    marginRight: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
