@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
       alignSelf: 'center',
       marginHorizontal: 2,
     },
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1 },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
