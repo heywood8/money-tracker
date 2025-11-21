@@ -10,7 +10,7 @@ import CategoryModal from './CategoryModal';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_PADDING = 12;
 const CARD_GAP = 8;
-const NUM_COLUMNS = 5;
+const NUM_COLUMNS = 4;
 const CARD_WIDTH = (SCREEN_WIDTH - (CARD_PADDING * 2) - (CARD_GAP * (NUM_COLUMNS - 1))) / NUM_COLUMNS;
 
 const CategoriesScreen = () => {
@@ -50,23 +50,24 @@ const CategoriesScreen = () => {
   };
 
   // Organize categories into grid data structure with parent-child relationships
+  // Income categories always start on a new row
   const gridData = useMemo(() => {
     const rootCategories = categories.filter(cat => !cat.parentId);
-    const result = [];
+    const expenseCategories = [];
+    const incomeCategories = [];
 
-    rootCategories.forEach(parent => {
-      // Add parent category
-      result.push({
+    // Separate categories by type and add with children
+    const addCategoryWithChildren = (parent, targetArray) => {
+      targetArray.push({
         ...parent,
         isParent: true,
         depth: 0,
       });
 
-      // Add children if expanded
       if (expandedIds.has(parent.id)) {
         const children = getChildren(parent.id);
         children.forEach(child => {
-          result.push({
+          targetArray.push({
             ...child,
             isParent: false,
             parentCategory: parent,
@@ -74,12 +75,42 @@ const CategoriesScreen = () => {
           });
         });
       }
+    };
+
+    rootCategories.forEach(parent => {
+      const categoryType = parent.category_type || parent.categoryType || 'expense';
+      if (categoryType === 'expense') {
+        addCategoryWithChildren(parent, expenseCategories);
+      } else {
+        addCategoryWithChildren(parent, incomeCategories);
+      }
     });
+
+    // Combine expense and income, padding to start income on new row
+    const result = [...expenseCategories];
+
+    // Add spacers to fill current row before income categories
+    if (incomeCategories.length > 0 && result.length > 0) {
+      const remainder = result.length % NUM_COLUMNS;
+      if (remainder !== 0) {
+        const spacersNeeded = NUM_COLUMNS - remainder;
+        for (let i = 0; i < spacersNeeded; i++) {
+          result.push({ isSpacer: true, id: `spacer-${i}` });
+        }
+      }
+    }
+
+    result.push(...incomeCategories);
 
     return result;
   }, [categories, expandedIds, getChildren]);
 
   const renderCategoryCard = useCallback(({ item, index }) => {
+    // Return empty view for spacers
+    if (item.isSpacer) {
+      return <View style={{ width: CARD_WIDTH }} />;
+    }
+
     const category = item;
     const children = getChildren(category.id);
     const hasChildren = children.length > 0;
@@ -139,7 +170,7 @@ const CategoriesScreen = () => {
             {/* Header Row: Icon, Name, Expand */}
             <View style={styles.cardHeader}>
               <View style={[styles.iconContainer, { backgroundColor: typeColor.accent }]}>
-                <Icon name={category.icon} size={24} color="#fff" accessible={false} />
+                <Icon name={category.icon} size={22} color="#000" accessible={false} />
               </View>
 
               <View style={styles.cardTitleContainer}>
@@ -267,7 +298,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cardContent: {
-    padding: 12,
+    padding: 10,
     position: 'relative',
   },
   cardHeader: {
@@ -275,8 +306,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -287,9 +318,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   expandIconContainer: {
     width: 24,
