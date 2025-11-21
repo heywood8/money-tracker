@@ -4,6 +4,7 @@ import uuid from 'react-native-uuid';
 import defaultCategories from '../assets/defaultCategories.json';
 import * as CategoriesDB from './services/CategoriesDB';
 import { appEvents, EVENTS } from './services/eventEmitter';
+import { useLocalization } from './LocalizationContext';
 
 const CategoriesContext = createContext();
 
@@ -16,6 +17,7 @@ export const useCategories = () => {
 };
 
 export const CategoriesProvider = ({ children }) => {
+  const { isFirstLaunch, language } = useLocalization();
   const [categories, setCategories] = useState([]);
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -23,24 +25,19 @@ export const CategoriesProvider = ({ children }) => {
   const [saveError, setSaveError] = useState(null);
 
   // Reload categories from database
-  const reloadCategories = useCallback(async () => {
+  const reloadCategories = useCallback(async (language = 'en') => {
     try {
       setLoading(true);
       const categoriesData = await CategoriesDB.getAllCategories();
 
       if (categoriesData.length === 0) {
-        // Initialize with default categories
-        console.log('Initializing default categories...');
-        const createdCategories = [];
-        for (const category of defaultCategories) {
-          try {
-            await CategoriesDB.createCategory(category);
-            createdCategories.push(category);
-          } catch (err) {
-            console.error('Failed to create default category:', category.id, err);
-          }
-        }
-        setCategories(createdCategories);
+        // Initialize with default categories in the specified language
+        console.log(`Initializing default categories in ${language}...`);
+        await CategoriesDB.initializeDefaultCategories(language);
+
+        // Reload to get the newly created categories
+        const newCategories = await CategoriesDB.getAllCategories();
+        setCategories(newCategories);
       } else {
         setCategories(categoriesData);
       }
@@ -54,19 +51,38 @@ export const CategoriesProvider = ({ children }) => {
   }, []);
 
   // Load categories from SQLite on mount
+  // But skip if it's first launch - categories will be initialized after language selection
   useEffect(() => {
-    reloadCategories();
-  }, [reloadCategories]);
+    if (!isFirstLaunch) {
+      console.log('Loading categories on mount with language:', language);
+      reloadCategories(language);
+    } else {
+      console.log('Skipping initial category load - first launch detected');
+      setLoading(false);
+    }
+  }, [isFirstLaunch, language, reloadCategories]);
 
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading categories due to RELOAD_ALL event');
-      reloadCategories();
+      console.log('Reloading categories due to RELOAD_ALL event with language:', language);
+      reloadCategories(language);
     });
 
     return unsubscribe;
-  }, [reloadCategories]);
+  }, [language, reloadCategories]);
+
+  // Listen for DATABASE_RESET event to clear categories
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      console.log('CategoriesContext: Database reset detected, clearing categories');
+      // Clear categories so they can be re-initialized with the selected language
+      setCategories([]);
+      setDataLoaded(false);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const addCategory = useCallback(async (category) => {
     try {

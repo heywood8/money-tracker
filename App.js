@@ -1,5 +1,5 @@
 import React from 'react';
-import SimpleTabs from './app/SimpleTabs';
+import AppInitializer from './app/AppInitializer';
 import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
 import { CategoriesProvider } from './app/CategoriesContext';
@@ -38,7 +38,7 @@ export default function App() {
                 <CategoriesProvider>
                   <OperationsProvider>
                     <ThemedStatusBar />
-                    <SimpleTabs />
+                    <AppInitializer />
                   </OperationsProvider>
                 </CategoriesProvider>
               </AccountsProvider>
