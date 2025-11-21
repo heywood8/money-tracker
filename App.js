@@ -1,5 +1,5 @@
 import React from 'react';
-import SimpleTabs from './app/SimpleTabs';
+import AppInitializer from './app/AppInitializer';
 import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
 import { CategoriesProvider } from './app/CategoriesContext';
@@ -35,7 +35,7 @@ function AppContent() {
   return (
     <PaperProvider theme={paperTheme}>
       <ThemedStatusBar />
-      <SimpleTabs />
+      <AppInitializer />
     </PaperProvider>
   );
 }
