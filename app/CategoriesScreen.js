@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -10,7 +10,7 @@ import CategoryModal from './CategoryModal';
 const CategoriesScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { categories, loading, expandedIds, toggleExpanded, getChildren, deleteCategory } = useCategories();
+  const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -28,20 +28,6 @@ const CategoriesScreen = () => {
     setModalVisible(true);
   };
 
-  const handleDeleteCategory = (category) => {
-    Alert.alert(
-      t('delete_category'),
-      t('delete_category_confirm'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: () => deleteCategory(category.id),
-        },
-      ]
-    );
-  };
 
   // Flatten the category tree based on expanded state
   const flattenedCategories = useMemo(() => {
@@ -75,10 +61,17 @@ const CategoriesScreen = () => {
     const isExpanded = expandedIds.has(category.id);
     const indentWidth = depth * 20;
     const categoryType = category.category_type || category.categoryType || 'expense';
+    const rowBackgroundColor = categoryType === 'expense' ? colors.expenseBackground : colors.incomeBackground;
 
     return (
       <TouchableOpacity
-        style={[styles.categoryRow, { borderBottomColor: colors.border }]}
+        style={[
+          styles.categoryRow,
+          {
+            borderBottomColor: colors.border,
+            backgroundColor: rowBackgroundColor,
+          }
+        ]}
         onPress={() => {
           if (hasChildren) {
             toggleExpanded(category.id);
@@ -125,32 +118,10 @@ const CategoriesScreen = () => {
           <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
             {category.nameKey ? t(category.nameKey) : category.name}
           </Text>
-
-          {/* Category Type Badge */}
-          <View
-            style={[styles.typeBadge, { backgroundColor: categoryType === 'expense' ? '#ff6b6b' : '#51cf66' }]}
-            accessibilityLabel={`Type: ${categoryType}`}
-          >
-            <Text style={[styles.typeBadgeText, { color: '#fff' }]}>
-              {categoryType === 'expense' ? 'E' : 'I'}
-            </Text>
-          </View>
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            onPress={() => handleDeleteCategory(category)}
-            style={styles.deleteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${category.nameKey ? t(category.nameKey) : category.name}`}
-            accessibilityHint="Deletes this category and all subcategories"
-          >
-            <Icon name="delete-outline" size={20} color={colors.delete} accessible={false} />
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
-  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleDeleteCategory]);
+  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory]);
 
   if (loading) {
     return (
@@ -234,24 +205,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
-  },
-  typeBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,
