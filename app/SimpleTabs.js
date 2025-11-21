@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TouchableRipple, Text, Surface } from 'react-native-paper';
 import OperationsScreen from './OperationsScreen';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
@@ -12,31 +13,31 @@ import SettingsModal from './SettingsModal';
 
 // Memoized tab button component to prevent unnecessary re-renders
 const TabButton = memo(({ tab, isActive, colors, onPress }) => {
-  const tabStyle = useMemo(() => [
-    styles.tab,
-    isActive && { backgroundColor: colors.selected }
-  ], [isActive, colors.selected]);
-
-  const textStyle = useMemo(() => [
-    styles.tabText,
-    { color: isActive ? colors.text : colors.mutedText },
-    isActive && styles.tabTextActive
-  ], [isActive, colors.text, colors.mutedText]);
+  const textStyle = useMemo(() => ({
+    fontWeight: isActive ? '700' : 'normal',
+    color: isActive ? colors.primary : colors.mutedText,
+  }), [isActive, colors.primary, colors.mutedText]);
 
   const handlePress = useCallback(() => {
     onPress(tab.key);
   }, [onPress, tab.key]);
 
   return (
-    <TouchableOpacity
-      style={tabStyle}
+    <TouchableRipple
+      style={styles.tab}
       onPress={handlePress}
+      rippleColor="rgba(0, 0, 0, .12)"
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={tab.label}
     >
-      <Text style={textStyle}>{tab.label}</Text>
-    </TouchableOpacity>
+      <View style={styles.tabContent}>
+        <Text variant="labelMedium" style={textStyle}>
+          {tab.label}
+        </Text>
+        {isActive && <View style={[styles.indicator, { backgroundColor: colors.primary }]} />}
+      </View>
+    </TouchableRipple>
   );
 });
 
@@ -87,17 +88,19 @@ export default function SimpleTabs() {
       <Header onOpenSettings={handleOpenSettings} />
       <View style={styles.content}>{renderActive()}</View>
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
-      <SafeAreaView style={[styles.tabBar, { borderTopColor: colors.border, backgroundColor: colors.surface }]} edges={['bottom']}>
-        {TABS.map(tab => (
-          <TabButton
-            key={tab.key}
-            tab={tab}
-            isActive={active === tab.key}
-            colors={colors}
-            onPress={handleTabPress}
-          />
-        ))}
-      </SafeAreaView>
+      <Surface style={styles.tabBarSurface} elevation={3}>
+        <SafeAreaView style={styles.tabBar} edges={['bottom']}>
+          {TABS.map(tab => (
+            <TabButton
+              key={tab.key}
+              tab={tab}
+              isActive={active === tab.key}
+              colors={colors}
+              onPress={handleTabPress}
+            />
+          ))}
+        </SafeAreaView>
+      </Surface>
     </SafeAreaView>
   );
 }
@@ -105,16 +108,27 @@ export default function SimpleTabs() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
+  tabBarSurface: {
+    elevation: 3,
+  },
   tabBar: {
     flexDirection: 'row',
-    borderTopWidth: 1,
   },
   tab: {
     flex: 1,
+    minHeight: 56,
+  },
+  tabContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 56, // Ensure adequate touch target
+    position: 'relative',
   },
-  tabText: { fontSize: 13 },
-  tabTextActive: { fontWeight: '700' },
+  indicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
 });
