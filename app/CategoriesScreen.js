@@ -1,11 +1,17 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { Text, FAB, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions, Platform } from 'react-native';
+import { Text, FAB, ActivityIndicator, Card } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useCategories } from './CategoriesContext';
 import CategoryModal from './CategoryModal';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_PADDING = 12;
+const CARD_GAP = 12;
+const NUM_COLUMNS = 2;
+const CARD_WIDTH = (SCREEN_WIDTH - (CARD_PADDING * 2) - (CARD_GAP * (NUM_COLUMNS - 1))) / NUM_COLUMNS;
 
 const CategoriesScreen = () => {
   const { colors } = useTheme();
@@ -43,112 +49,168 @@ const CategoriesScreen = () => {
     );
   };
 
-  // Flatten the category tree based on expanded state
-  const flattenedCategories = useMemo(() => {
-    const flattened = [];
+  // Organize categories into grid data structure with parent-child relationships
+  const gridData = useMemo(() => {
     const rootCategories = categories.filter(cat => !cat.parentId);
+    const result = [];
 
-    const addWithChildren = (category, depth = 0) => {
-      flattened.push({ ...category, depth });
+    rootCategories.forEach(parent => {
+      // Add parent category
+      result.push({
+        ...parent,
+        isParent: true,
+        depth: 0,
+      });
 
-      if (expandedIds.has(category.id)) {
-        const children = getChildren(category.id);
-        children.forEach(child => addWithChildren(child, depth + 1));
+      // Add children if expanded
+      if (expandedIds.has(parent.id)) {
+        const children = getChildren(parent.id);
+        children.forEach(child => {
+          result.push({
+            ...child,
+            isParent: false,
+            parentCategory: parent,
+            depth: 1,
+          });
+        });
       }
-    };
+    });
 
-    rootCategories.forEach(cat => addWithChildren(cat));
-    return flattened;
+    return result;
   }, [categories, expandedIds, getChildren]);
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: 56,
-    offset: 56 * index,
-    index,
-  }), []);
-
-  const renderCategory = useCallback(({ item }) => {
+  const renderCategoryCard = useCallback(({ item, index }) => {
     const category = item;
-    const depth = item.depth;
     const children = getChildren(category.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedIds.has(category.id);
-    const indentWidth = depth * 20;
     const categoryType = category.category_type || category.categoryType || 'expense';
+    const isParent = item.isParent;
+    const isChild = item.depth > 0;
+
+    // Bento UI color palette based on type
+    const typeColor = categoryType === 'expense'
+      ? { bg: colors.expenseBackground || '#ffe0e0', accent: '#ff6b6b', text: colors.expense || '#5a3030' }
+      : { bg: colors.incomeBackground || '#e0ffe0', accent: '#51cf66', text: colors.income || '#44aa44' };
 
     return (
-      <TouchableOpacity
-        style={[styles.categoryRow, { borderBottomColor: colors.border }]}
-        onPress={() => {
-          if (hasChildren) {
-            toggleExpanded(category.id);
-          } else {
-            handleEditCategory(category);
+      <Card
+        style={[
+          styles.bentoCard,
+          {
+            backgroundColor: typeColor.bg,
+            width: isChild ? CARD_WIDTH - 20 : CARD_WIDTH,
+            marginLeft: isChild ? 20 : 0,
+            borderLeftWidth: isChild ? 4 : 0,
+            borderLeftColor: typeColor.accent,
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+              },
+              android: {
+                elevation: 4,
+              },
+              web: {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              },
+            }),
           }
-        }}
-        onLongPress={() => handleEditCategory(category)}
-        accessibilityRole="button"
-        accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
-        accessibilityHint={hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
+        ]}
+        elevation={2}
       >
-        <View style={[styles.categoryContent, { paddingLeft: 16 + indentWidth }]}>
-          {/* Expand/Collapse Icon */}
-          {hasChildren ? (
-            <TouchableOpacity
-              onPress={() => toggleExpanded(category.id)}
-              style={styles.expandButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isExpanded
-                  ? `Collapse ${category.nameKey ? t(category.nameKey) : category.name}`
-                  : `Expand ${category.nameKey ? t(category.nameKey) : category.name}`
-              }
-              accessibilityHint="Shows or hides subcategories"
-              accessibilityState={{ expanded: isExpanded }}
-            >
-              <Icon
-                name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                size={20}
-                color={colors.mutedText}
-                accessible={false}
-              />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.expandButton} />
-          )}
+        <TouchableOpacity
+          onPress={() => {
+            if (hasChildren) {
+              toggleExpanded(category.id);
+            } else {
+              handleEditCategory(category);
+            }
+          }}
+          onLongPress={() => handleEditCategory(category)}
+          style={styles.cardTouchable}
+          accessibilityRole="button"
+          accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
+          accessibilityHint={hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
+        >
+          <View style={styles.cardContent}>
+            {/* Header Row: Icon, Name, Expand */}
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconContainer, { backgroundColor: typeColor.accent }]}>
+                <Icon name={category.icon} size={28} color="#fff" accessible={false} />
+              </View>
 
-          {/* Category Icon */}
-          <Icon name={category.icon} size={24} color={colors.text} style={styles.categoryIcon} accessible={false} />
+              <View style={styles.cardTitleContainer}>
+                <Text
+                  style={[styles.cardTitle, { color: typeColor.text }]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {category.nameKey ? t(category.nameKey) : category.name}
+                </Text>
+              </View>
 
-          {/* Category Name */}
-          <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-            {category.nameKey ? t(category.nameKey) : category.name}
-          </Text>
+              {hasChildren && (
+                <TouchableOpacity
+                  onPress={() => toggleExpanded(category.id)}
+                  style={styles.expandIconContainer}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isExpanded
+                      ? `Collapse ${category.nameKey ? t(category.nameKey) : category.name}`
+                      : `Expand ${category.nameKey ? t(category.nameKey) : category.name}`
+                  }
+                  accessibilityHint="Shows or hides subcategories"
+                  accessibilityState={{ expanded: isExpanded }}
+                >
+                  <Icon
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={24}
+                    color={typeColor.accent}
+                    accessible={false}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
 
-          {/* Category Type Badge */}
-          <View
-            style={[styles.typeBadge, { backgroundColor: categoryType === 'expense' ? '#ff6b6b' : '#51cf66' }]}
-            accessibilityLabel={`Type: ${categoryType}`}
-          >
-            <Text style={[styles.typeBadgeText, { color: '#fff' }]}>
-              {categoryType === 'expense' ? 'E' : 'I'}
-            </Text>
+            {/* Footer Row: Type Badge and Actions */}
+            <View style={styles.cardFooter}>
+              <View style={[styles.bentoTypeBadge, { backgroundColor: typeColor.accent }]}>
+                <Icon
+                  name={categoryType === 'expense' ? 'minus-circle' : 'plus-circle'}
+                  size={14}
+                  color="#fff"
+                  accessible={false}
+                />
+                <Text style={styles.bentoTypeBadgeText}>
+                  {categoryType === 'expense' ? 'Expense' : 'Income'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleDeleteCategory(category)}
+                style={styles.deleteIconButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${category.nameKey ? t(category.nameKey) : category.name}`}
+                accessibilityHint="Deletes this category and all subcategories"
+              >
+                <Icon name="delete-outline" size={20} color={colors.delete} accessible={false} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Child count indicator for parents */}
+            {hasChildren && (
+              <View style={[styles.childCountBadge, { backgroundColor: typeColor.accent }]}>
+                <Text style={styles.childCountText}>{children.length}</Text>
+              </View>
+            )}
           </View>
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            onPress={() => handleDeleteCategory(category)}
-            style={styles.deleteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${category.nameKey ? t(category.nameKey) : category.name}`}
-            accessibilityHint="Deletes this category and all subcategories"
-          >
-            <Icon name="delete-outline" size={20} color={colors.delete} accessible={false} />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Card>
     );
   }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleDeleteCategory]);
 
@@ -166,21 +228,26 @@ const CategoriesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={flattenedCategories}
-        renderItem={renderCategory}
+        data={gridData}
+        renderItem={renderCategoryCard}
         keyExtractor={item => item.id}
-        getItemLayout={getItemLayout}
+        numColumns={NUM_COLUMNS}
+        columnWrapperStyle={styles.gridRow}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
+            <Icon name="folder-outline" size={64} color={colors.mutedText} />
+            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+              {t('no_categories') || 'No categories yet'}
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.mutedText }]}>
+              Tap the + button to create your first category
+            </Text>
           </View>
         }
-        contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : null}
-        windowSize={10}
-        maxToRenderPerBatch={10}
-        initialNumToRender={15}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
+        contentContainerStyle={[
+          styles.gridContainer,
+          gridData.length === 0 && styles.emptyList
+        ]}
       />
 
       <FAB
@@ -210,54 +277,111 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  categoryRow: {
-    borderBottomWidth: 1,
-    minHeight: 56,
+  gridContainer: {
+    padding: CARD_PADDING,
   },
-  categoryContent: {
+  gridRow: {
+    justifyContent: 'space-between',
+    marginBottom: CARD_GAP,
+  },
+  bentoCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: CARD_GAP,
+  },
+  cardTouchable: {
+    width: '100%',
+  },
+  cardContent: {
+    padding: 16,
+    position: 'relative',
+  },
+  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingRight: 16,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  expandButton: {
-    width: 44,
-    height: 44,
-    marginRight: 8,
-    alignItems: 'center',
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
-  },
-  categoryIcon: {
+    alignItems: 'center',
     marginRight: 12,
   },
-  categoryName: {
+  cardTitleContainer: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
+    justifyContent: 'center',
   },
-  typeBadge: {
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  expandIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bentoTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  bentoTypeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  deleteIconButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  childCountBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 24,
     height: 24,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
-  typeBadgeText: {
-    fontSize: 11,
+  childCountText: {
+    fontSize: 12,
     fontWeight: '700',
-  },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: '#fff',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 60,
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   emptyList: {
     flex: 1,
