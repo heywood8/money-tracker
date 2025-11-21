@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import i18nData from '../assets/i18n.json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appEvents, EVENTS } from './services/eventEmitter';
 
 
 const STORAGE_KEY = 'app_language';
@@ -40,6 +41,25 @@ export function LocalizationProvider({ children }) {
         setIsLoading(false);
       }
     })();
+  }, []);
+
+  // Listen for DATABASE_RESET event to reset language preference
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, async () => {
+      console.log('LocalizationContext: Database reset detected, clearing language preference');
+      try {
+        // Clear language preference from AsyncStorage
+        await AsyncStorage.removeItem(STORAGE_KEY);
+
+        // Reset to first launch state
+        setIsFirstLaunch(true);
+        setLanguageState(defaultLang);
+      } catch (e) {
+        console.error('Failed to clear language preference:', e);
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   // Save language to AsyncStorage when it changes

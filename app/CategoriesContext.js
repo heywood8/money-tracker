@@ -63,6 +63,18 @@ export const CategoriesProvider = ({ children }) => {
     return unsubscribe;
   }, [reloadCategories]);
 
+  // Listen for DATABASE_RESET event to clear categories
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      console.log('CategoriesContext: Database reset detected, clearing categories');
+      // Clear categories so they can be re-initialized with the selected language
+      setCategories([]);
+      setDataLoaded(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
   const addCategory = useCallback(async (category) => {
     try {
       const newCategory = {
