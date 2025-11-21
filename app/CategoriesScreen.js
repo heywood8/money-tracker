@@ -9,8 +9,8 @@ import CategoryModal from './CategoryModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_PADDING = 12;
-const CARD_GAP = 12;
-const NUM_COLUMNS = 2;
+const CARD_GAP = 8;
+const NUM_COLUMNS = 5;
 const CARD_WIDTH = (SCREEN_WIDTH - (CARD_PADDING * 2) - (CARD_GAP * (NUM_COLUMNS - 1))) / NUM_COLUMNS;
 
 const CategoriesScreen = () => {
@@ -88,10 +88,10 @@ const CategoriesScreen = () => {
     const isParent = item.isParent;
     const isChild = item.depth > 0;
 
-    // Bento UI color palette based on type
+    // Bento UI color palette based on type - softer, less contrasted colors
     const typeColor = categoryType === 'expense'
-      ? { bg: colors.expenseBackground || '#ffe0e0', accent: '#ff6b6b', text: colors.expense || '#5a3030' }
-      : { bg: colors.incomeBackground || '#e0ffe0', accent: '#51cf66', text: colors.income || '#44aa44' };
+      ? { bg: colors.expenseBackground || '#fef5f5', accent: '#fca5a5', text: colors.text }
+      : { bg: colors.incomeBackground || '#f0fdf4', accent: '#86efac', text: colors.text };
 
     return (
       <Card
@@ -139,7 +139,7 @@ const CategoriesScreen = () => {
             {/* Header Row: Icon, Name, Expand */}
             <View style={styles.cardHeader}>
               <View style={[styles.iconContainer, { backgroundColor: typeColor.accent }]}>
-                <Icon name={category.icon} size={28} color="#fff" accessible={false} />
+                <Icon name={category.icon} size={24} color="#fff" accessible={false} />
               </View>
 
               <View style={styles.cardTitleContainer}>
@@ -168,38 +168,12 @@ const CategoriesScreen = () => {
                 >
                   <Icon
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={24}
+                    size={20}
                     color={typeColor.accent}
                     accessible={false}
                   />
                 </TouchableOpacity>
               )}
-            </View>
-
-            {/* Footer Row: Type Badge and Actions */}
-            <View style={styles.cardFooter}>
-              <View style={[styles.bentoTypeBadge, { backgroundColor: typeColor.accent }]}>
-                <Icon
-                  name={categoryType === 'expense' ? 'minus-circle' : 'plus-circle'}
-                  size={14}
-                  color="#fff"
-                  accessible={false}
-                />
-                <Text style={styles.bentoTypeBadgeText}>
-                  {categoryType === 'expense' ? 'Expense' : 'Income'}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => handleDeleteCategory(category)}
-                style={styles.deleteIconButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Delete ${category.nameKey ? t(category.nameKey) : category.name}`}
-                accessibilityHint="Deletes this category and all subcategories"
-              >
-                <Icon name="delete-outline" size={20} color={colors.delete} accessible={false} />
-              </TouchableOpacity>
             </View>
 
             {/* Child count indicator for parents */}
@@ -293,75 +267,49 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cardContent: {
-    padding: 16,
+    padding: 12,
     position: 'relative',
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   cardTitleContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   expandIconContainer: {
-    width: 32,
-    height: 32,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,
   },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  bentoTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  bentoTypeBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  deleteIconButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
   childCountBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   childCountText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#fff',
   },
