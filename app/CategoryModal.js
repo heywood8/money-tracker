@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -22,7 +23,7 @@ import IconPicker from './IconPicker';
 export default function CategoryModal({ visible, onClose, category, isNew }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const { categories, addCategory, updateCategory, validateCategory } = useCategories();
+  const { categories, addCategory, updateCategory, deleteCategory, validateCategory } = useCategories();
 
   const [values, setValues] = useState({
     name: '',
@@ -75,6 +76,24 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     setErrors({});
     onClose();
   }, [onClose]);
+
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      t('delete_category'),
+      t('delete_category_confirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteCategory(category.id);
+            onClose();
+          },
+        },
+      ]
+    );
+  }, [category, deleteCategory, onClose, t]);
 
   // Get potential parents - all folders of the same category_type
   const potentialParents = useMemo(() => {
@@ -176,6 +195,19 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
             </Pressable>
 
             {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+
+            {/* Delete Button (only for existing categories) */}
+            {!isNew && (
+              <Pressable
+                style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
+                onPress={handleDelete}
+              >
+                <Icon name="delete-outline" size={20} color={colors.delete} />
+                <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
+                  {t('delete_category')}
+                </Text>
+              </Pressable>
+            )}
           </ScrollView>
 
           {/* Action Buttons */}
@@ -383,5 +415,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     alignSelf: 'center',
     padding: 10,
+  },
+  deleteButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 20,
+    borderTopWidth: 1,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
