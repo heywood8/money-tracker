@@ -219,9 +219,10 @@ export const AccountsProvider = ({ children }) => {
       // Reload accounts to ensure consistency
       await reloadAccounts();
 
-      // Trigger reload of all other contexts (Categories, Operations)
-      console.log('Emitting RELOAD_ALL event to refresh all contexts');
-      appEvents.emit(EVENTS.RELOAD_ALL);
+      // Note: We don't emit RELOAD_ALL here because:
+      // - Categories will be initialized after the user selects a language
+      // - Operations will be empty anyway after reset
+      // The AppInitializer will handle category initialization with the selected language
 
       Alert.alert(
         'Success',

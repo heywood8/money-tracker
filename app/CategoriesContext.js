@@ -4,6 +4,7 @@ import uuid from 'react-native-uuid';
 import defaultCategories from '../assets/defaultCategories.json';
 import * as CategoriesDB from './services/CategoriesDB';
 import { appEvents, EVENTS } from './services/eventEmitter';
+import { useLocalization } from './LocalizationContext';
 
 const CategoriesContext = createContext();
 
@@ -16,6 +17,7 @@ export const useCategories = () => {
 };
 
 export const CategoriesProvider = ({ children }) => {
+  const { isFirstLaunch, language } = useLocalization();
   const [categories, setCategories] = useState([]);
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -49,19 +51,26 @@ export const CategoriesProvider = ({ children }) => {
   }, []);
 
   // Load categories from SQLite on mount
+  // But skip if it's first launch - categories will be initialized after language selection
   useEffect(() => {
-    reloadCategories();
-  }, [reloadCategories]);
+    if (!isFirstLaunch) {
+      console.log('Loading categories on mount with language:', language);
+      reloadCategories(language);
+    } else {
+      console.log('Skipping initial category load - first launch detected');
+      setLoading(false);
+    }
+  }, [isFirstLaunch, language, reloadCategories]);
 
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading categories due to RELOAD_ALL event');
-      reloadCategories();
+      console.log('Reloading categories due to RELOAD_ALL event with language:', language);
+      reloadCategories(language);
     });
 
     return unsubscribe;
-  }, [reloadCategories]);
+  }, [language, reloadCategories]);
 
   // Listen for DATABASE_RESET event to clear categories
   useEffect(() => {
