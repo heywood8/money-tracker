@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
+import { Portal, Modal, Text, Button, RadioButton, Divider } from 'react-native-paper';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
@@ -48,158 +49,105 @@ export default function SettingsModal({ visible, onClose }) {
   }, [visible, theme, language]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.content, { backgroundColor: colors.card }]} onPress={() => {}}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('settings')}</Text>
-          <Text style={[styles.subtitle, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
+      >
+        <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
+
+        <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
+        <RadioButton.Group onValueChange={setLocalSelection} value={localSelection}>
           {themeOptions.map(opt => (
-            <Pressable
+            <RadioButton.Item
               key={opt.value}
-              style={({ pressed }) => [
-                styles.option,
-                { backgroundColor: colors.secondary },
-                localSelection === opt.value && { backgroundColor: colors.primary },
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={() => setLocalSelection(opt.value)}
-            >
-              <Text style={[styles.optionText, { color: localSelection === opt.value ? colors.card : colors.text }]}>{opt.label}</Text>
-              {localSelection === opt.value && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
-            </Pressable>
+              label={opt.label}
+              value={opt.value}
+              style={styles.radioItem}
+            />
           ))}
-          <Text style={[styles.subtitle, { color: colors.text, marginTop: 16 }]}>{t('language')}</Text>
+        </RadioButton.Group>
+
+        <Divider style={styles.divider} />
+
+        <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
+        <RadioButton.Group onValueChange={setLocalLang} value={localLang}>
           {availableLanguages.map(lng => (
-            <Pressable
+            <RadioButton.Item
               key={lng}
-              style={({ pressed }) => [
-                styles.option,
-                { backgroundColor: colors.secondary },
-                localLang === lng && { backgroundColor: colors.primary },
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={() => setLocalLang(lng)}
-            >
-              <Text style={[styles.optionText, { color: localLang === lng ? colors.card : colors.text }]}>{t(lng === 'en' ? 'english' : 'russian')}</Text>
-              {localLang === lng && <Text style={{ color: colors.card, fontSize: 18 }}>✓</Text>}
-            </Pressable>
+              label={t(lng === 'en' ? 'english' : 'russian')}
+              value={lng}
+              style={styles.radioItem}
+            />
           ))}
+        </RadioButton.Group>
 
-          <Text style={[styles.subtitle, { color: colors.text, marginTop: 16 }]}>{t('database') || 'Database'}</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.resetButton,
-              { backgroundColor: '#dc3545' },
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={handleResetDatabase}
+        <Divider style={styles.divider} />
+
+        <Text variant="titleMedium" style={styles.subtitle}>{t('database') || 'Database'}</Text>
+        <Button
+          mode="contained"
+          buttonColor="#dc3545"
+          onPress={handleResetDatabase}
+          style={styles.resetButton}
+        >
+          {t('reset_database') || 'Reset Database'}
+        </Button>
+
+        <View style={styles.modalButtonRow}>
+          <Button mode="outlined" onPress={onClose} style={styles.modalButton}>
+            {t('cancel') || 'Cancel'}
+          </Button>
+          <Button
+            mode="contained"
+            onPress={() => {
+              setTheme(localSelection);
+              setLanguage(localLang);
+              onClose();
+            }}
+            style={styles.modalButton}
           >
-            <Text style={[styles.resetButtonText, { color: '#ffffff' }]}>{t('reset_database') || 'Reset Database'}</Text>
-          </Pressable>
-
-          <View style={styles.modalButtonRow}>
-            <Pressable style={[styles.modalButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-              <Text style={[styles.closeText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setTheme(localSelection);
-                setLanguage(localLang);
-                onClose();
-              }}
-            >
-              <Text style={[styles.closeText, { color: colors.card }]}>{t('save') || 'Save'}</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+            {t('save') || 'Save'}
+          </Button>
+        </View>
+      </Modal>
+    </Portal>
   );
 }
 
-// Styles are defined using StyleSheet.create for performance and consistency.
-// For dynamic styling, consider using styled-components or tailwind-rn.
-// For responsive design, consider Dimensions, PixelRatio, or react-native-size-matters.
-
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   content: {
-    width: '85%',
+    margin: 20,
     borderRadius: 12,
     padding: 24,
-    alignItems: 'stretch',
+    maxHeight: '90%',
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  radioItem: {
+    paddingVertical: 4,
+  },
+  divider: {
+    marginVertical: 12,
+  },
+  resetButton: {
+    marginTop: 8,
     marginBottom: 8,
-  },
-  option: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selected: {
-    backgroundColor: '#c0e0ff',
-  },
-  selectedDark: {
-    backgroundColor: '#005fa3',
-  },
-  optionText: {
-    fontSize: 18,
-  },
-  closeButton: {
-    marginTop: 16,
-    alignSelf: 'center',
-    padding: 10,
-  },
-  closeText: {
-    color: '#007AFF',
-    fontSize: 16,
   },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: 16,
+    gap: 8,
   },
   modalButton: {
     flex: 1,
-    marginHorizontal: 8,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  resetButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

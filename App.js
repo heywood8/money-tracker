@@ -9,6 +9,8 @@ import ErrorBoundary from './app/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PaperProvider } from 'react-native-paper';
+import { useMaterialTheme } from './app/useMaterialTheme';
 
 function ThemedStatusBar() {
   const { colorScheme, colors } = require('./app/ThemeContext').useTheme();
@@ -27,6 +29,17 @@ function ThemedStatusBar() {
   return <StatusBar translucent={false} />;
 }
 
+function AppContent() {
+  const paperTheme = useMaterialTheme();
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <ThemedStatusBar />
+      <AppInitializer />
+    </PaperProvider>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -37,8 +50,7 @@ export default function App() {
               <AccountsProvider>
                 <CategoriesProvider>
                   <OperationsProvider>
-                    <ThemedStatusBar />
-                    <AppInitializer />
+                    <AppContent />
                   </OperationsProvider>
                 </CategoriesProvider>
               </AccountsProvider>
