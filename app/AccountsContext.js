@@ -178,6 +178,10 @@ export const AccountsProvider = ({ children }) => {
     try {
       setLoading(true);
 
+      // Emit DATABASE_RESET event to notify other contexts
+      console.log('Emitting DATABASE_RESET event');
+      appEvents.emit(EVENTS.DATABASE_RESET);
+
       // Drop and reinitialize the database
       const { dropAllTables, getDatabase, executeQuery } = await import('./services/db');
       await dropAllTables();
@@ -203,10 +207,9 @@ export const AccountsProvider = ({ children }) => {
       const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       await AsyncStorage.removeItem('migration_backup');
 
-      // Initialize default categories first
-      const { initializeDefaultCategories } = await import('./services/CategoriesDB');
-      await initializeDefaultCategories();
-      console.log('Default categories initialized');
+      // NOTE: Categories will be initialized after language selection
+      // The AppInitializer will show the language selection screen
+      // and initialize categories with the selected language
 
       // Create default accounts
       const defaultAccounts = await initializeDefaultAccounts();
