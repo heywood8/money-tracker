@@ -13,14 +13,10 @@ import SettingsModal from './SettingsModal';
 
 // Memoized tab button component to prevent unnecessary re-renders
 const TabButton = memo(({ tab, isActive, colors, onPress }) => {
-  const tabStyle = useMemo(() => [
-    styles.tab,
-    isActive && { backgroundColor: colors.selected }
-  ], [isActive, colors.selected]);
-
   const textStyle = useMemo(() => ({
     fontWeight: isActive ? '700' : 'normal',
-  }), [isActive]);
+    color: isActive ? colors.primary : colors.mutedText,
+  }), [isActive, colors.primary, colors.mutedText]);
 
   const handlePress = useCallback(() => {
     onPress(tab.key);
@@ -28,7 +24,7 @@ const TabButton = memo(({ tab, isActive, colors, onPress }) => {
 
   return (
     <TouchableRipple
-      style={tabStyle}
+      style={styles.tab}
       onPress={handlePress}
       rippleColor="rgba(0, 0, 0, .12)"
       accessibilityRole="button"
