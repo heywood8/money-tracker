@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Button, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
@@ -154,8 +155,8 @@ const CategoriesScreen = () => {
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+        <ActivityIndicator size="large" />
+        <Text variant="bodyLarge" style={{ marginTop: 12, color: colors.mutedText }}>
           {t('loading_categories') || 'Loading categories...'}
         </Text>
       </View>
@@ -182,19 +183,14 @@ const CategoriesScreen = () => {
         removeClippedSubviews={true}
       />
 
-      <View style={styles.addButtonWrapper}>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={handleAddCategory}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={t('add_category')}
-          accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
-        >
-          <Icon name="plus" size={20} color="#fff" style={styles.addButtonIcon} />
-          <Text style={styles.addButtonText}>{t('add_category')}</Text>
-        </TouchableOpacity>
-      </View>
+      <FAB
+        icon="plus"
+        label={t('add_category')}
+        style={styles.fab}
+        onPress={handleAddCategory}
+        accessibilityLabel={t('add_category')}
+        accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
+      />
 
       <CategoryModal
         visible={modalVisible}
@@ -214,10 +210,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
   categoryRow: {
     borderBottomWidth: 1,
     minHeight: 56,
@@ -229,8 +221,8 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   expandButton: {
-    width: 44,  // Increased to minimum touch target
-    height: 44, // Increased to minimum touch target
+    width: 44,
+    height: 44,
     marginRight: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -256,8 +248,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   deleteButton: {
-    width: 44,  // Increased to minimum touch target
-    height: 44, // Increased to minimum touch target
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -270,30 +262,11 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
-  addButtonWrapper: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonIcon: {
-    marginRight: 8,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
 
