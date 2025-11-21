@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalization } from './LocalizationContext';
-import { useCategories } from './CategoriesContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from './SimpleTabs';
 import { useTheme } from './ThemeContext';
@@ -12,7 +11,6 @@ import { useTheme } from './ThemeContext';
  */
 const AppInitializer = () => {
   const { isFirstLaunch, setFirstLaunchComplete, language } = useLocalization();
-  const { reloadCategories } = useCategories();
   const { colors } = useTheme();
   const [isInitializing, setIsInitializing] = useState(false);
 
@@ -21,10 +19,8 @@ const AppInitializer = () => {
       setIsInitializing(true);
 
       // Set the language preference (this marks first launch as complete)
+      // This will trigger CategoriesContext to automatically initialize categories
       await setFirstLaunchComplete(selectedLanguage);
-
-      // Initialize categories with the selected language
-      await reloadCategories(selectedLanguage);
 
       // Initialization complete, will automatically show main app
     } catch (error) {
