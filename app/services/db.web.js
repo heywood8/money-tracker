@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'money_tracker';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbInstance = null;
 
@@ -111,12 +111,14 @@ const openIndexedDB = () => {
             });
           };
         } else if (oldVersion < 4) {
-          // V3 -> V4 migration: add is_shadow field to existing categories
+          // V3 -> V4 migration: add is_shadow field to existing categories and add shadow categories
           console.log(`Migrating categories from v${oldVersion} to v4...`);
           didMigrate = true;
           const getAllRequest = categoriesStore.getAll();
           getAllRequest.onsuccess = () => {
             const categories = getAllRequest.result;
+
+            // Add is_shadow field to existing categories
             categories.forEach(cat => {
               if (cat.is_shadow === undefined) {
                 categoriesStore.put({
@@ -125,6 +127,102 @@ const openIndexedDB = () => {
                 });
               }
             });
+
+            // Check if shadow categories exist
+            const hasShadowExpense = categories.some(cat => cat.id === 'shadow-adjustment-expense');
+            const hasShadowIncome = categories.some(cat => cat.id === 'shadow-adjustment-income');
+
+            if (!hasShadowExpense || !hasShadowIncome) {
+              console.log('Adding shadow categories to IndexedDB...');
+              const now = new Date().toISOString();
+
+              // Add shadow adjustment expense category
+              if (!hasShadowExpense) {
+                categoriesStore.put({
+                  id: 'shadow-adjustment-expense',
+                  name: 'Balance Adjustment (Expense)',
+                  type: 'entry',
+                  category_type: 'expense',
+                  parent_id: null,
+                  icon: 'cash-minus',
+                  color: null,
+                  is_shadow: 1,
+                  created_at: now,
+                  updated_at: now,
+                });
+              }
+
+              // Add shadow adjustment income category
+              if (!hasShadowIncome) {
+                categoriesStore.put({
+                  id: 'shadow-adjustment-income',
+                  name: 'Balance Adjustment (Income)',
+                  type: 'entry',
+                  category_type: 'income',
+                  parent_id: null,
+                  icon: 'cash-plus',
+                  color: null,
+                  is_shadow: 1,
+                  created_at: now,
+                  updated_at: now,
+                });
+              }
+
+              console.log('Shadow categories added to IndexedDB successfully');
+            }
+          };
+        } else if (oldVersion === 4) {
+          // V4 -> V5 migration: Ensure shadow categories exist
+          console.log(`Migrating categories from v${oldVersion} to v5...`);
+          didMigrate = true;
+          const getAllRequest = categoriesStore.getAll();
+          getAllRequest.onsuccess = () => {
+            const categories = getAllRequest.result;
+
+            // Check if shadow categories exist
+            const hasShadowExpense = categories.some(cat => cat.id === 'shadow-adjustment-expense');
+            const hasShadowIncome = categories.some(cat => cat.id === 'shadow-adjustment-income');
+
+            if (!hasShadowExpense || !hasShadowIncome) {
+              console.log('Adding missing shadow categories to IndexedDB...');
+              const now = new Date().toISOString();
+
+              // Add shadow adjustment expense category if missing
+              if (!hasShadowExpense) {
+                categoriesStore.put({
+                  id: 'shadow-adjustment-expense',
+                  name: 'Balance Adjustment (Expense)',
+                  type: 'entry',
+                  category_type: 'expense',
+                  parent_id: null,
+                  icon: 'cash-minus',
+                  color: null,
+                  is_shadow: 1,
+                  created_at: now,
+                  updated_at: now,
+                });
+              }
+
+              // Add shadow adjustment income category if missing
+              if (!hasShadowIncome) {
+                categoriesStore.put({
+                  id: 'shadow-adjustment-income',
+                  name: 'Balance Adjustment (Income)',
+                  type: 'entry',
+                  category_type: 'income',
+                  parent_id: null,
+                  icon: 'cash-plus',
+                  color: null,
+                  is_shadow: 1,
+                  created_at: now,
+                  updated_at: now,
+                });
+              }
+
+              console.log('Missing shadow categories added to IndexedDB successfully');
+            } else {
+              console.log('Shadow categories already exist in IndexedDB');
+            }
           };
         }
       }
