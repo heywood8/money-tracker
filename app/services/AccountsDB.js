@@ -398,39 +398,66 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         : `Balance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`;
 
       if (existingOperation) {
-        // Update existing operation
-        console.log('Updating existing adjustment operation:', existingOperation.id);
-        await db.runAsync(
-          'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
-          [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
-        );
-        console.log('Adjustment operation updated successfully');
+        // Check if cumulative delta is 0 - if so, delete the operation
+        if (cumulativeDelta === 0) {
+          console.log('Cumulative delta is 0, deleting adjustment operation:', existingOperation.id);
 
-        // Calculate balance adjustment needed
-        // First, reverse the old operation's effect on balance
-        const oldAmount = parseFloat(existingOperation.amount);
-        const oldType = existingOperation.type;
-        let balanceAdjustment = 0;
+          // Calculate balance adjustment needed - reverse the old operation's effect
+          const oldAmount = parseFloat(existingOperation.amount);
+          const oldType = existingOperation.type;
+          let balanceAdjustment = 0;
 
-        if (oldType === 'expense') {
-          balanceAdjustment += oldAmount; // Add back the expense
-        } else if (oldType === 'income') {
-          balanceAdjustment -= oldAmount; // Remove the income
+          if (oldType === 'expense') {
+            balanceAdjustment += oldAmount; // Add back the expense
+          } else if (oldType === 'income') {
+            balanceAdjustment -= oldAmount; // Remove the income
+          }
+
+          // Delete the operation
+          await db.runAsync('DELETE FROM operations WHERE id = ?', [existingOperation.id]);
+          console.log('Adjustment operation deleted successfully');
+
+          // Update account balance
+          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          await db.runAsync(
+            'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+            [newBalanceValue, new Date().toISOString(), accountId]
+          );
+        } else {
+          // Update existing operation
+          console.log('Updating existing adjustment operation:', existingOperation.id);
+          await db.runAsync(
+            'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
+            [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
+          );
+          console.log('Adjustment operation updated successfully');
+
+          // Calculate balance adjustment needed
+          // First, reverse the old operation's effect on balance
+          const oldAmount = parseFloat(existingOperation.amount);
+          const oldType = existingOperation.type;
+          let balanceAdjustment = 0;
+
+          if (oldType === 'expense') {
+            balanceAdjustment += oldAmount; // Add back the expense
+          } else if (oldType === 'income') {
+            balanceAdjustment -= oldAmount; // Remove the income
+          }
+
+          // Then apply the new operation's effect
+          if (operationType === 'expense') {
+            balanceAdjustment -= absoluteDelta;
+          } else if (operationType === 'income') {
+            balanceAdjustment += absoluteDelta;
+          }
+
+          // Update account balance
+          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          await db.runAsync(
+            'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+            [newBalanceValue, new Date().toISOString(), accountId]
+          );
         }
-
-        // Then apply the new operation's effect
-        if (operationType === 'expense') {
-          balanceAdjustment -= absoluteDelta;
-        } else if (operationType === 'income') {
-          balanceAdjustment += absoluteDelta;
-        }
-
-        // Update account balance
-        const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
-        await db.runAsync(
-          'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalanceValue, new Date().toISOString(), accountId]
-        );
       } else {
         // Create new adjustment operation
         const operationId = uuid.v4();
