@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'money_tracker';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbInstance = null;
 
@@ -43,11 +43,18 @@ const openIndexedDB = () => {
         categoriesStore.createIndex('parent_id', 'parent_id', { unique: false });
         categoriesStore.createIndex('type', 'type', { unique: false });
         categoriesStore.createIndex('category_type', 'category_type', { unique: false });
+        categoriesStore.createIndex('is_shadow', 'is_shadow', { unique: false });
       } else {
-        // V2 -> V3 migration: add category_type index if it doesn't exist
         const categoriesStore = transaction.objectStore('categories');
+
+        // V2 -> V3 migration: add category_type index if it doesn't exist
         if (!categoriesStore.indexNames.contains('category_type')) {
           categoriesStore.createIndex('category_type', 'category_type', { unique: false });
+        }
+
+        // V3 -> V4 migration: add is_shadow index if it doesn't exist
+        if (!categoriesStore.indexNames.contains('is_shadow')) {
+          categoriesStore.createIndex('is_shadow', 'is_shadow', { unique: false });
         }
 
         // Migrate existing data
@@ -98,8 +105,25 @@ const openIndexedDB = () => {
               categoriesStore.put({
                 ...cat,
                 type: newType,
-                category_type: categoryType
+                category_type: categoryType,
+                is_shadow: cat.is_shadow || 0
               });
+            });
+          };
+        } else if (oldVersion < 4) {
+          // V3 -> V4 migration: add is_shadow field to existing categories
+          console.log(`Migrating categories from v${oldVersion} to v4...`);
+          didMigrate = true;
+          const getAllRequest = categoriesStore.getAll();
+          getAllRequest.onsuccess = () => {
+            const categories = getAllRequest.result;
+            categories.forEach(cat => {
+              if (cat.is_shadow === undefined) {
+                categoriesStore.put({
+                  ...cat,
+                  is_shadow: 0
+                });
+              }
             });
           };
         }
