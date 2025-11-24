@@ -110,12 +110,31 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     onClose();
   }, [onClose]);
 
+  // Check if operation belongs to a shadow category
+  const isShadowOperation = useMemo(() => {
+    if (!operation || !operation.categoryId) return false;
+    const category = categories.find(cat => cat.id === operation.categoryId);
+    return category?.isShadow || false;
+  }, [operation, categories]);
+
+  // Check if operation date is today (for shadow operations)
+  const isOperationToday = useMemo(() => {
+    if (!operation) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return operation.date === today;
+  }, [operation]);
+
+  // Shadow operations can only be deleted if they were made today
+  const canDeleteShadowOperation = useMemo(() => {
+    return !isShadowOperation || isOperationToday;
+  }, [isShadowOperation, isOperationToday]);
+
   const handleDelete = useCallback(() => {
-    if (onDelete && operation) {
+    if (onDelete && operation && canDeleteShadowOperation) {
       onDelete(operation);
       onClose();
     }
-  }, [onDelete, operation, onClose]);
+  }, [onDelete, operation, onClose, canDeleteShadowOperation]);
 
   const openPicker = useCallback((type, data) => {
     Keyboard.dismiss();
@@ -189,20 +208,25 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
                   {/* Type Picker */}
                   <Pressable
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    onPress={() => openPicker('type', TYPES)}
+                    style={[
+                      styles.pickerButton,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput
+                    ]}
+                    onPress={() => !isShadowOperation && openPicker('type', TYPES)}
+                    disabled={isShadowOperation}
                   >
                     <View style={styles.pickerButtonContent}>
                       <Icon
                         name={TYPES.find(tp => tp.key === values.type)?.icon || 'help-circle'}
                         size={20}
-                        color={colors.text}
+                        color={isShadowOperation ? colors.mutedText : colors.text}
                       />
-                      <Text style={[styles.pickerButtonText, { color: colors.text }]}>
+                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
                         {TYPES.find(tp => tp.key === values.type)?.label}
                       </Text>
                     </View>
-                    <Icon name="chevron-down" size={20} color={colors.text} />
+                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* Amount Input */}
@@ -210,67 +234,89 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     style={[
                       styles.input,
                       { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput
                     ]}
                     value={values.amount}
-                    onChangeText={text => setValues(v => ({ ...v, amount: text }))}
+                    onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, amount: text }))}
                     placeholder={t('amount')}
                     placeholderTextColor={colors.mutedText}
                     keyboardType="decimal-pad"
                     returnKeyType="done"
                     onSubmitEditing={Keyboard.dismiss}
+                    editable={!isShadowOperation}
                   />
 
                   {/* Account Picker */}
                   <Pressable
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    onPress={() => openPicker('account', accounts)}
+                    style={[
+                      styles.pickerButton,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput
+                    ]}
+                    onPress={() => !isShadowOperation && openPicker('account', accounts)}
+                    disabled={isShadowOperation}
                   >
-                    <Text style={{ color: colors.text }}>
+                    <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                       {getAccountName(values.accountId)}
                     </Text>
-                    <Icon name="chevron-down" size={20} color={colors.text} />
+                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* To Account Picker (only for transfers) */}
                   {values.type === 'transfer' && (
                     <Pressable
-                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                      onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                      style={[
+                        styles.pickerButton,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                        isShadowOperation && styles.disabledInput
+                      ]}
+                      onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                      disabled={isShadowOperation}
                     >
-                      <Text style={{ color: colors.text }}>
+                      <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                         {t('to_account')}: {getAccountName(values.toAccountId)}
                       </Text>
-                      <Icon name="chevron-down" size={20} color={colors.text} />
+                      <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                     </Pressable>
                   )}
 
                   {/* Category Picker (not for transfers) */}
                   {values.type !== 'transfer' && (
                     <Pressable
-                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                      onPress={() => openPicker('category', filteredCategories)}
+                      style={[
+                        styles.pickerButton,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                        isShadowOperation && styles.disabledInput
+                      ]}
+                      onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
+                      disabled={isShadowOperation}
                     >
-                      <Text style={{ color: colors.text }}>
+                      <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                         {getCategoryName(values.categoryId)}
                       </Text>
-                      <Icon name="chevron-down" size={20} color={colors.text} />
+                      <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                     </Pressable>
                   )}
 
                   {/* Date Picker Button */}
                   <Pressable
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    onPress={() => setShowDatePicker(true)}
+                    style={[
+                      styles.pickerButton,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput
+                    ]}
+                    onPress={() => !isShadowOperation && setShowDatePicker(true)}
+                    disabled={isShadowOperation}
                     accessibilityRole="button"
                     accessibilityLabel={t('select_date')}
                   >
                     <View style={styles.pickerButtonContent}>
-                      <Icon name="calendar" size={20} color={colors.text} />
-                      <Text style={[styles.pickerButtonText, { color: colors.text }]}>
+                      <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
                         {formatDateForDisplay(values.date)}
                       </Text>
                     </View>
-                    <Icon name="chevron-down" size={20} color={colors.text} />
+                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* Description Input */}
@@ -279,9 +325,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       styles.input,
                       styles.descriptionInput,
                       { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput
                     ]}
                     value={values.description}
-                    onChangeText={text => setValues(v => ({ ...v, description: text }))}
+                    onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, description: text }))}
                     placeholder={t('description')}
                     placeholderTextColor={colors.mutedText}
                     multiline
@@ -289,6 +336,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     textAlignVertical="top"
                     returnKeyType="done"
                     onSubmitEditing={Keyboard.dismiss}
+                    editable={!isShadowOperation}
                   />
 
                   {errors.general && <Text style={styles.error}>{errors.general}</Text>}
@@ -301,27 +349,43 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     onPress={handleClose}
                   >
                     <Text style={[styles.buttonText, { color: colors.text }]}>
-                      {t('cancel')}
+                      {isShadowOperation ? t('close') : t('cancel')}
                     </Text>
                   </Pressable>
-                  <Pressable
-                    style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                    onPress={handleSave}
-                  >
-                    <Text style={[styles.buttonText, { color: colors.text }]}>
-                      {t('save')}
-                    </Text>
-                  </Pressable>
+                  {!isShadowOperation && (
+                    <Pressable
+                      style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                      onPress={handleSave}
+                    >
+                      <Text style={[styles.buttonText, { color: colors.text }]}>
+                        {t('save')}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
 
                 {/* Delete Button (only for editing) */}
                 {!isNew && onDelete && (
                   <Pressable
-                    style={[styles.deleteButtonContainer, { backgroundColor: colors.card }]}
+                    style={[
+                      styles.deleteButtonContainer,
+                      { backgroundColor: colors.card },
+                      !canDeleteShadowOperation && styles.disabledButton
+                    ]}
                     onPress={handleDelete}
+                    disabled={!canDeleteShadowOperation}
                   >
-                    <Icon name="delete-outline" size={20} color={colors.delete || '#ff6b6b'} />
-                    <Text style={[styles.deleteButtonText, { color: colors.delete || '#ff6b6b' }]}>
+                    <Icon
+                      name="delete-outline"
+                      size={20}
+                      color={canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText}
+                    />
+                    <Text
+                      style={[
+                        styles.deleteButtonText,
+                        { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText }
+                      ]}
+                    >
                       {t('delete_operation')}
                     </Text>
                   </Pressable>
@@ -595,5 +659,11 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  disabledInput: {
+    opacity: 0.6,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });
