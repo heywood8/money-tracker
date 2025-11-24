@@ -189,11 +189,11 @@ const GraphsScreen = () => {
         legendFontSize: 13
       }));
 
-      // Add aggregated balance adjustments if the total is negative (expense)
-      if (shadowCategoryTotal < 0) {
+      // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
+      if (shadowCategoryTotal > 0) {
         data.push({
           name: t('balance_adjustments'),
-          amount: Math.abs(shadowCategoryTotal),
+          amount: shadowCategoryTotal,
           color: chartColors[data.length % chartColors.length],
           legendFontColor: colors.text,
           legendFontSize: 13
