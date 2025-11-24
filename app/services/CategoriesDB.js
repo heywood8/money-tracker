@@ -57,6 +57,7 @@ export const initializeDefaultCategories = async (language = 'en') => {
           parentId: category.parentId || null,
           icon: category.icon || null,
           color: category.color || null,
+          isShadow: category.isShadow || false,
         });
       } catch (err) {
         console.error('Failed to create default category:', category.id, err);
