@@ -60,12 +60,12 @@ const GraphsScreen = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const cats = await getAllCategories();
+        const cats = await getAllCategories(true); // Include shadow categories
         setCategories(cats);
 
-        // Filter top-level expense categories (no parent, expense type)
+        // Filter top-level expense categories (no parent, expense type, not shadow)
         const topLevel = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'expense'
+          cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow
         );
         setTopLevelCategories(topLevel);
       } catch (error) {
