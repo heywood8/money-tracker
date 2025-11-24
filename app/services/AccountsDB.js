@@ -303,7 +303,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
     // Import necessary modules within the function to avoid circular dependencies
     const OperationsDB = require('./OperationsDB');
     const CategoriesDB = require('./CategoriesDB');
-    const uuid = require('react-native-uuid');
+    const uuid = require('react-native-uuid').default || require('react-native-uuid');
 
     await executeTransaction(async (db) => {
       // Get current balance
