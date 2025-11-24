@@ -300,6 +300,8 @@ export const reorderAccounts = async (orderedAccounts) => {
  */
 export const adjustAccountBalance = async (accountId, newBalance, description = '') => {
   try {
+    console.log('adjustAccountBalance called:', { accountId, newBalance, description });
+
     // Import necessary modules within the function to avoid circular dependencies
     const OperationsDB = require('./OperationsDB');
     const CategoriesDB = require('./CategoriesDB');
@@ -397,10 +399,12 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
       if (existingOperation) {
         // Update existing operation
+        console.log('Updating existing adjustment operation:', existingOperation.id);
         await db.runAsync(
           'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
           [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
         );
+        console.log('Adjustment operation updated successfully');
 
         // Calculate balance adjustment needed
         // First, reverse the old operation's effect on balance
@@ -430,6 +434,13 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       } else {
         // Create new adjustment operation
         const operationId = uuid.v4();
+        console.log('Creating new adjustment operation:', {
+          id: operationId,
+          type: operationType,
+          amount: absoluteDelta.toFixed(2),
+          categoryId,
+          date: today,
+        });
 
         await db.runAsync(
           'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -445,6 +456,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
             fullDescription,
           ]
         );
+        console.log('Adjustment operation created successfully');
 
         // Update account balance based on operation type
         const delta = operationType === 'expense' ? -absoluteDelta : absoluteDelta;
@@ -456,6 +468,8 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         );
       }
     });
+
+    console.log('Account balance adjustment completed successfully');
   } catch (error) {
     console.error('Failed to adjust account balance:', error);
     throw error;
