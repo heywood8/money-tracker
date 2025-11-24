@@ -136,6 +136,9 @@ export const AccountsProvider = ({ children }) => {
         if (Object.keys(nonBalanceUpdates).length > 0) {
           await AccountsDB.updateAccount(id, nonBalanceUpdates);
         }
+
+        // Emit event to reload operations since we created/updated an adjustment operation
+        appEvents.emit(EVENTS.RELOAD_ALL);
       } else {
         // No balance change, just update normally
         await AccountsDB.updateAccount(id, updates);
