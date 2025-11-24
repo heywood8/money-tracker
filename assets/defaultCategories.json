@@ -360,15 +360,6 @@
     "icon": "gift"
   },
   {
-    "id": "expense-shopping-animals",
-    "name": "Animals",
-    "nameKey": "shopping_animals",
-    "type": "entry",
-    "category_type": "expense",
-    "parentId": "expense-shopping",
-    "icon": "paw"
-  },
-  {
     "id": "expense-shopping-other",
     "name": "Other",
     "nameKey": "shopping_other",
@@ -520,6 +511,15 @@
     "category_type": "expense",
     "parentId": "expense-health",
     "icon": "pill"
+  },
+  {
+    "id": "expense-health-veterinary",
+    "name": "Veterinary",
+    "nameKey": "veterinary",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "paw"
   },
   {
     "id": "expense-health-other",
