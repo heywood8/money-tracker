@@ -168,7 +168,7 @@
     "type": "entry",
     "category_type": "expense",
     "parentId": "expense-entertainment",
-    "icon": "theater"
+    "icon": "ticket"
   },
   {
     "id": "expense-entertainment-bars",
