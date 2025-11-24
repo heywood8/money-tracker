@@ -357,7 +357,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         ? parseFloat(adjustmentHistory[adjustmentHistory.length - 1])
         : originalBalance;
 
-      if (Math.abs(currentBalance - lastHistoryValue) > 0.01) {
+      if (Math.abs(currentBalance - lastHistoryValue) > 0.0001) {
         adjustmentHistory.push(currentBalance.toFixed(2));
       }
 
@@ -399,7 +399,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
       if (existingOperation) {
         // Check if total delta is 0 - if so, delete the operation
-        if (Math.abs(totalDelta) < 0.01) {
+        if (Math.abs(totalDelta) < 0.0001) {
           console.log('Cumulative delta is 0, deleting adjustment operation:', existingOperation.id);
 
           // Calculate balance adjustment needed - reverse the old operation's effect
