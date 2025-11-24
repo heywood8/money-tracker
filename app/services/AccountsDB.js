@@ -398,8 +398,8 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         : `Balance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`;
 
       if (existingOperation) {
-        // Check if cumulative delta is 0 - if so, delete the operation
-        if (cumulativeDelta === 0) {
+        // Check if total delta is 0 - if so, delete the operation
+        if (Math.abs(totalDelta) < 0.01) {
           console.log('Cumulative delta is 0, deleting adjustment operation:', existingOperation.id);
 
           // Calculate balance adjustment needed - reverse the old operation's effect
