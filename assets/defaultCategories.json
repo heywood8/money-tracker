@@ -63,15 +63,6 @@
     "icon": "egg-fried"
   },
   {
-    "id": "expense-food-vending-machines",
-    "name": "Vending machines",
-    "nameKey": "vending_machines",
-    "type": "entry",
-    "category_type": "expense",
-    "parentId": "expense-food",
-    "icon": "vending-machine"
-  },
-  {
     "id": "expense-food-tips",
     "name": "Tips",
     "nameKey": "tips",
@@ -79,6 +70,15 @@
     "category_type": "expense",
     "parentId": "expense-food",
     "icon": "cash-plus"
+  },
+  {
+    "id": "expense-food-other",
+    "name": "Other",
+    "nameKey": "food_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "dots-horizontal"
   },
   {
     "id": "expense-transportation",
@@ -115,6 +115,33 @@
     "category_type": "expense",
     "parentId": "expense-transportation",
     "icon": "gas-station"
+  },
+  {
+    "id": "expense-transportation-repair",
+    "name": "Repair",
+    "nameKey": "transportation_repair",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "wrench"
+  },
+  {
+    "id": "expense-transportation-car-rent",
+    "name": "Car rent",
+    "nameKey": "car_rent",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "car-key"
+  },
+  {
+    "id": "expense-transportation-other",
+    "name": "Other",
+    "nameKey": "transportation_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "dots-horizontal"
   },
   {
     "id": "expense-entertainment",
@@ -277,6 +304,15 @@
     "category_type": "expense",
     "parentId": "expense-monthly",
     "icon": "credit-card"
+  },
+  {
+    "id": "expense-monthly-other",
+    "name": "Other",
+    "nameKey": "monthly_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "dots-horizontal"
   },
   {
     "id": "expense-shopping",
@@ -486,6 +522,15 @@
     "icon": "pill"
   },
   {
+    "id": "expense-health-other",
+    "name": "Other",
+    "nameKey": "health_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "dots-horizontal"
+  },
+  {
     "id": "expense-house",
     "name": "House",
     "nameKey": "house",
@@ -520,6 +565,15 @@
     "category_type": "expense",
     "parentId": "expense-house",
     "icon": "broom"
+  },
+  {
+    "id": "expense-house-other",
+    "name": "Other",
+    "nameKey": "house_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-house",
+    "icon": "dots-horizontal"
   },
   {
     "id": "income-salary",
