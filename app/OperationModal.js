@@ -142,6 +142,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => {
       if (values.type === 'transfer') return false;
+      // Exclude shadow categories from selection
+      if (cat.isShadow) return false;
       return cat.categoryType === values.type && cat.type === 'entry';
     });
   }, [categories, values.type]);

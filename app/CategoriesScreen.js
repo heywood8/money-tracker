@@ -29,23 +29,25 @@ const CategoriesScreen = () => {
   };
 
 
-  // Flatten the category tree based on expanded state
+  // Flatten the category tree based on expanded state (excluding shadow categories)
   const flattenedCategories = useMemo(() => {
     const flattened = [];
-    const rootCategories = categories.filter(cat => !cat.parentId);
+    // Filter out shadow categories from display
+    const visibleCategories = categories.filter(cat => !cat.isShadow);
+    const rootCategories = visibleCategories.filter(cat => !cat.parentId);
 
     const addWithChildren = (category, depth = 0) => {
       flattened.push({ ...category, depth });
 
       if (expandedIds.has(category.id)) {
-        const children = getChildren(category.id);
+        const children = visibleCategories.filter(cat => cat.parentId === category.id);
         children.forEach(child => addWithChildren(child, depth + 1));
       }
     };
 
     rootCategories.forEach(cat => addWithChildren(cat));
     return flattened;
-  }, [categories, expandedIds, getChildren]);
+  }, [categories, expandedIds]);
 
   const getItemLayout = useCallback((data, index) => ({
     length: 56,
