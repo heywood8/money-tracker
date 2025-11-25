@@ -539,6 +539,35 @@ export const operationExists = async (id) => {
 };
 
 /**
+ * Get today's adjustment operation for an account
+ * @param {string} accountId
+ * @returns {Promise<Object|null>}
+ */
+export const getTodayAdjustmentOperation = async (accountId) => {
+  try {
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+
+    // Look for adjustment operations (using shadow categories)
+    const operation = await queryFirst(
+      `SELECT o.* FROM operations o
+       JOIN categories c ON o.category_id = c.id
+       WHERE o.account_id = ?
+         AND o.date = ?
+         AND c.is_shadow = 1
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
+      [accountId, today]
+    );
+
+    return mapOperationFields(operation);
+  } catch (error) {
+    console.error('Failed to get today adjustment operation:', error);
+    throw error;
+  }
+};
+
+/**
  * Get distinct year/month combinations that have operations
  * @returns {Promise<Array<{year: number, month: number}>>}
  */

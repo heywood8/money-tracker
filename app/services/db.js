@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'money_tracker.db';
-const DB_VERSION = 4;
+const DB_VERSION = 6;
 
 let dbInstance = null;
 let initPromise = null;
@@ -37,6 +37,170 @@ export const getDatabase = async () => {
   await initPromise;
   initPromise = null;
   return dbInstance;
+};
+
+/**
+ * Migrate from V4 to V5 - Add is_shadow field to categories for shadow categories
+ */
+const migrateToV5 = async (db) => {
+  try {
+    console.log('Starting migration to V5: Add is_shadow field to categories...');
+
+    // Step 1: Check if is_shadow column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
+    const hasIsShadowColumn = tableInfo.some(col => col.name === 'is_shadow');
+
+    if (!hasIsShadowColumn) {
+      console.log('Adding is_shadow column...');
+      // Add is_shadow column to categories table (defaults to 0/false)
+      await db.execAsync(`
+        ALTER TABLE categories ADD COLUMN is_shadow INTEGER DEFAULT 0;
+      `);
+
+      // Create index on is_shadow for efficient filtering
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
+      `);
+      console.log('is_shadow column added successfully');
+    } else {
+      console.log('is_shadow column already exists');
+    }
+
+    // Step 2: Check if shadow categories exist (do this regardless of column existence)
+    const shadowCategories = await db.getAllAsync(
+      'SELECT id FROM categories WHERE id IN (?, ?)',
+      ['shadow-adjustment-expense', 'shadow-adjustment-income']
+    );
+
+    if (shadowCategories.length < 2) {
+      console.log('Adding missing shadow categories...');
+      const now = new Date().toISOString();
+
+      const hasShadowExpense = shadowCategories.some(cat => cat.id === 'shadow-adjustment-expense');
+      const hasShadowIncome = shadowCategories.some(cat => cat.id === 'shadow-adjustment-income');
+
+      // Add shadow adjustment expense category if missing
+      if (!hasShadowExpense) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            'shadow-adjustment-expense',
+            'Balance Adjustment (Expense)',
+            'entry',
+            'expense',
+            null,
+            'cash-minus',
+            null,
+            1,
+            now,
+            now,
+          ]
+        );
+        console.log('Shadow expense category added');
+      }
+
+      // Add shadow adjustment income category if missing
+      if (!hasShadowIncome) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            'shadow-adjustment-income',
+            'Balance Adjustment (Income)',
+            'entry',
+            'income',
+            null,
+            'cash-plus',
+            null,
+            1,
+            now,
+            now,
+          ]
+        );
+        console.log('Shadow income category added');
+      }
+
+      console.log('Shadow categories added successfully');
+    } else {
+      console.log('Shadow categories already exist');
+    }
+
+    console.log('Migration to V5 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V5:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V5 to V6 - Ensure shadow categories exist
+ */
+const migrateToV6 = async (db) => {
+  try {
+    console.log('Starting migration to V6: Ensure shadow categories exist...');
+
+    // Check if shadow categories exist
+    const shadowCategories = await db.getAllAsync(
+      'SELECT id FROM categories WHERE id IN (?, ?)',
+      ['shadow-adjustment-expense', 'shadow-adjustment-income']
+    );
+
+    if (shadowCategories.length < 2) {
+      console.log('Adding missing shadow categories...');
+      const now = new Date().toISOString();
+
+      const hasShadowExpense = shadowCategories.some(cat => cat.id === 'shadow-adjustment-expense');
+      const hasShadowIncome = shadowCategories.some(cat => cat.id === 'shadow-adjustment-income');
+
+      // Add shadow adjustment expense category if missing
+      if (!hasShadowExpense) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            'shadow-adjustment-expense',
+            'Balance Adjustment (Expense)',
+            'entry',
+            'expense',
+            null,
+            'cash-minus',
+            null,
+            1,
+            now,
+            now,
+          ]
+        );
+        console.log('Shadow expense category added');
+      }
+
+      // Add shadow adjustment income category if missing
+      if (!hasShadowIncome) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            'shadow-adjustment-income',
+            'Balance Adjustment (Income)',
+            'entry',
+            'income',
+            null,
+            'cash-plus',
+            null,
+            1,
+            now,
+            now,
+          ]
+        );
+        console.log('Shadow income category added');
+      }
+
+      console.log('Shadow categories added successfully');
+    } else {
+      console.log('Shadow categories already exist');
+    }
+
+    console.log('Migration to V6 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V6:', error);
+    throw error;
+  }
 };
 
 /**
@@ -318,6 +482,16 @@ const initializeDatabase = async (db) => {
       await migrateToV4(db);
       didMigrate = true;
     }
+    if (currentVersion >= 4 && currentVersion < 5) {
+      console.log('Migrating database from version', currentVersion, 'to version 5...');
+      await migrateToV5(db);
+      didMigrate = true;
+    }
+    if (currentVersion >= 5 && currentVersion < 6) {
+      console.log('Migrating database from version', currentVersion, 'to version 6...');
+      await migrateToV6(db);
+      didMigrate = true;
+    }
 
     // Now create or update tables
     await db.execAsync(`
@@ -341,6 +515,7 @@ const initializeDatabase = async (db) => {
         parent_id TEXT,
         icon TEXT,
         color TEXT,
+        is_shadow INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
@@ -370,6 +545,7 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
       CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+      CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
       CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
     `);
 

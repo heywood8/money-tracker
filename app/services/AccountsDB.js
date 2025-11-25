@@ -287,3 +287,218 @@ export const reorderAccounts = async (orderedAccounts) => {
     throw error;
   }
 };
+
+/**
+ * Adjust account balance manually and create/update adjustment operation
+ * This function is used when the user manually changes the account balance
+ * to match reality (e.g., after counting cash).
+ *
+ * @param {string} accountId - Account ID
+ * @param {string} newBalance - New balance value
+ * @param {string} description - Optional description for the adjustment
+ * @returns {Promise<void>}
+ */
+export const adjustAccountBalance = async (accountId, newBalance, description = '') => {
+  try {
+    console.log('adjustAccountBalance called:', { accountId, newBalance, description });
+
+    // Import necessary modules within the function to avoid circular dependencies
+    const OperationsDB = require('./OperationsDB');
+    const CategoriesDB = require('./CategoriesDB');
+    const uuid = require('react-native-uuid').default || require('react-native-uuid');
+
+    await executeTransaction(async (db) => {
+      // Get current balance
+      const account = await db.getFirstAsync(
+        'SELECT balance FROM accounts WHERE id = ?',
+        [accountId]
+      );
+
+      if (!account) {
+        throw new Error(`Account ${accountId} not found`);
+      }
+
+      const currentBalance = parseFloat(account.balance);
+      const targetBalance = parseFloat(newBalance);
+
+      // Check if there's already an adjustment operation for today
+      const today = new Date().toISOString().split('T')[0];
+      const existingOperation = await db.getFirstAsync(
+        `SELECT o.*, c.category_type FROM operations o
+         JOIN categories c ON o.category_id = c.id
+         WHERE o.account_id = ?
+           AND o.date = ?
+           AND c.is_shadow = 1
+         ORDER BY o.created_at DESC
+         LIMIT 1`,
+        [accountId, today]
+      );
+
+      let originalBalance;
+      let adjustmentHistory = [];
+
+      if (existingOperation) {
+        // Parse the existing description to extract original balance and history
+        const descMatch = existingOperation.description?.match(/from\s+([\d.]+)/);
+        originalBalance = descMatch ? parseFloat(descMatch[1]) : currentBalance;
+
+        // Extract adjustment history from description
+        const historyMatch = existingOperation.description?.match(/→\s*([\d.\s→]+)$/);
+        if (historyMatch) {
+          adjustmentHistory = historyMatch[1].split('→').map(v => v.trim());
+        }
+      } else {
+        // First adjustment of the day - current balance is the original
+        originalBalance = currentBalance;
+      }
+
+      // Add current balance to history if it's different from the last entry
+      const lastHistoryValue = adjustmentHistory.length > 0
+        ? parseFloat(adjustmentHistory[adjustmentHistory.length - 1])
+        : originalBalance;
+
+      if (Math.abs(currentBalance - lastHistoryValue) > 0.0001) {
+        adjustmentHistory.push(currentBalance.toFixed(2));
+      }
+
+      // Add target balance to history
+      adjustmentHistory.push(targetBalance.toFixed(2));
+
+      // Calculate total adjustment from original balance
+      const totalDelta = targetBalance - originalBalance;
+      const absoluteDelta = Math.abs(totalDelta);
+
+      // Determine operation type based on cumulative delta
+      const operationType = totalDelta < 0 ? 'expense' : 'income';
+
+      // Get shadow categories
+      const shadowCategories = await db.getAllAsync(
+        'SELECT * FROM categories WHERE is_shadow = 1'
+      );
+
+      const shadowExpenseCategory = shadowCategories.find(
+        c => c.category_type === 'expense' && c.is_shadow === 1
+      );
+      const shadowIncomeCategory = shadowCategories.find(
+        c => c.category_type === 'income' && c.is_shadow === 1
+      );
+
+      if (!shadowExpenseCategory || !shadowIncomeCategory) {
+        throw new Error('Shadow categories not found. Please reinitialize the database.');
+      }
+
+      const categoryId = operationType === 'expense'
+        ? shadowExpenseCategory.id
+        : shadowIncomeCategory.id;
+
+      // Build description with adjustment history
+      const historyString = adjustmentHistory.join(' → ');
+      const fullDescription = description
+        ? `${description}\nBalance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`
+        : `Balance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`;
+
+      if (existingOperation) {
+        // Check if total delta is 0 - if so, delete the operation
+        if (Math.abs(totalDelta) < 0.0001) {
+          console.log('Cumulative delta is 0, deleting adjustment operation:', existingOperation.id);
+
+          // Calculate balance adjustment needed - reverse the old operation's effect
+          const oldAmount = parseFloat(existingOperation.amount);
+          const oldType = existingOperation.type;
+          let balanceAdjustment = 0;
+
+          if (oldType === 'expense') {
+            balanceAdjustment += oldAmount; // Add back the expense
+          } else if (oldType === 'income') {
+            balanceAdjustment -= oldAmount; // Remove the income
+          }
+
+          // Delete the operation
+          await db.runAsync('DELETE FROM operations WHERE id = ?', [existingOperation.id]);
+          console.log('Adjustment operation deleted successfully');
+
+          // Update account balance
+          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          await db.runAsync(
+            'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+            [newBalanceValue, new Date().toISOString(), accountId]
+          );
+        } else {
+          // Update existing operation
+          console.log('Updating existing adjustment operation:', existingOperation.id);
+          await db.runAsync(
+            'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
+            [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
+          );
+          console.log('Adjustment operation updated successfully');
+
+          // Calculate balance adjustment needed
+          // First, reverse the old operation's effect on balance
+          const oldAmount = parseFloat(existingOperation.amount);
+          const oldType = existingOperation.type;
+          let balanceAdjustment = 0;
+
+          if (oldType === 'expense') {
+            balanceAdjustment += oldAmount; // Add back the expense
+          } else if (oldType === 'income') {
+            balanceAdjustment -= oldAmount; // Remove the income
+          }
+
+          // Then apply the new operation's effect
+          if (operationType === 'expense') {
+            balanceAdjustment -= absoluteDelta;
+          } else if (operationType === 'income') {
+            balanceAdjustment += absoluteDelta;
+          }
+
+          // Update account balance
+          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          await db.runAsync(
+            'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+            [newBalanceValue, new Date().toISOString(), accountId]
+          );
+        }
+      } else {
+        // Create new adjustment operation
+        const operationId = uuid.v4();
+        console.log('Creating new adjustment operation:', {
+          id: operationId,
+          type: operationType,
+          amount: absoluteDelta.toFixed(2),
+          categoryId,
+          date: today,
+        });
+
+        await db.runAsync(
+          'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            operationId,
+            operationType,
+            absoluteDelta.toFixed(2),
+            accountId,
+            categoryId,
+            null,
+            today,
+            new Date().toISOString(),
+            fullDescription,
+          ]
+        );
+        console.log('Adjustment operation created successfully');
+
+        // Update account balance based on operation type
+        const delta = operationType === 'expense' ? -absoluteDelta : absoluteDelta;
+        const newBalanceValue = Currency.add(currentBalance, delta);
+
+        await db.runAsync(
+          'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+          [newBalanceValue, new Date().toISOString(), accountId]
+        );
+      }
+    });
+
+    console.log('Account balance adjustment completed successfully');
+  } catch (error) {
+    console.error('Failed to adjust account balance:', error);
+    throw error;
+  }
+};
