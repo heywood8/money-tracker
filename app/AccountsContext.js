@@ -110,9 +110,46 @@ export const AccountsProvider = ({ children }) => {
 
   const updateAccount = useCallback(async (id, updated) => {
     try {
-      const updates = { ...updated, balance: String(updated.balance) };
-      await AccountsDB.updateAccount(id, updates);
-      setAccounts(accs => accs.map(a => a.id === id ? { ...a, ...updates } : a));
+      const currentAccount = accounts.find(a => a.id === id);
+      if (!currentAccount) {
+        throw new Error('Account not found');
+      }
+
+      // Check if balance is being changed
+      const balanceChanged = updated.balance !== undefined && currentAccount.balance !== String(updated.balance);
+
+      if (balanceChanged) {
+        // Use adjustAccountBalance for balance changes to create adjustment operations
+        await AccountsDB.adjustAccountBalance(id, String(updated.balance), '');
+
+        // Update non-balance fields if changed
+        const nonBalanceUpdates = {};
+        if (updated.name !== undefined && updated.name !== currentAccount.name) {
+          nonBalanceUpdates.name = updated.name;
+        }
+        if (updated.currency !== undefined && updated.currency !== currentAccount.currency) {
+          nonBalanceUpdates.currency = updated.currency;
+        }
+
+        if (Object.keys(nonBalanceUpdates).length > 0) {
+          await AccountsDB.updateAccount(id, nonBalanceUpdates);
+        }
+
+        // Emit event to reload operations since we created/updated an adjustment operation
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      } else {
+        // No balance change, just update normally
+        // Filter out undefined values and convert balance to string if present
+        const updates = {};
+        if (updated.name !== undefined) updates.name = updated.name;
+        if (updated.currency !== undefined) updates.currency = updated.currency;
+        if (updated.balance !== undefined) updates.balance = String(updated.balance);
+
+        await AccountsDB.updateAccount(id, updates);
+      }
+
+      // Reload accounts to get the updated balance from the database
+      await reloadAccounts();
     } catch (err) {
       console.error('Failed to update account:', err);
       Alert.alert(
@@ -122,7 +159,7 @@ export const AccountsProvider = ({ children }) => {
       );
       throw err;
     }
-  }, []);
+  }, [accounts, reloadAccounts]);
 
   const deleteAccount = useCallback(async (id) => {
     try {

@@ -60,12 +60,12 @@ const GraphsScreen = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const cats = await getAllCategories();
+        const cats = await getAllCategories(true); // Include shadow categories
         setCategories(cats);
 
-        // Filter top-level expense categories (no parent, expense type)
+        // Filter top-level expense categories (no parent, expense type, not shadow)
         const topLevel = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'expense'
+          cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow
         );
         setTopLevelCategories(topLevel);
       } catch (error) {
@@ -130,6 +130,14 @@ const GraphsScreen = () => {
         categoryMap.set(cat.id, cat.name);
       });
 
+      // Create a Set of shadow category IDs for easy lookup
+      const shadowCategoryIds = new Set();
+      categories.forEach(cat => {
+        if (cat.isShadow) {
+          shadowCategoryIds.add(cat.id);
+        }
+      });
+
       // Filter data by selected category if not "all"
       let filteredSpending = spending;
       if (selectedCategory !== 'all') {
@@ -151,6 +159,20 @@ const GraphsScreen = () => {
         );
       }
 
+      // Separate shadow categories from regular categories
+      const regularSpending = [];
+      let shadowCategoryTotal = 0;
+
+      filteredSpending.forEach(item => {
+        if (shadowCategoryIds.has(item.category_id)) {
+          // Accumulate shadow category amounts
+          shadowCategoryTotal += parseFloat(item.total);
+        } else {
+          // Keep regular categories
+          regularSpending.push(item);
+        }
+      });
+
       // Chart colors (vibrant palette)
       const chartColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
@@ -158,14 +180,25 @@ const GraphsScreen = () => {
         '#FFCE56', '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0'
       ];
 
-      // Transform data for pie chart
-      const data = filteredSpending.map((item, index) => ({
+      // Transform regular categories for pie chart
+      const data = regularSpending.map((item, index) => ({
         name: categoryMap.get(item.category_id) || t('unknown_category'),
         amount: parseFloat(item.total),
         color: chartColors[index % chartColors.length],
         legendFontColor: colors.text,
         legendFontSize: 13
       }));
+
+      // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
+      if (shadowCategoryTotal > 0) {
+        data.push({
+          name: t('balance_adjustments'),
+          amount: shadowCategoryTotal,
+          color: chartColors[data.length % chartColors.length],
+          legendFontColor: colors.text,
+          legendFontSize: 13
+        });
+      }
 
       setChartData(data);
     } catch (error) {
