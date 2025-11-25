@@ -29,6 +29,7 @@ describe('AccountsContext', () => {
     isMigrationComplete.mockResolvedValue(true);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
     AccountsDB.createAccount.mockResolvedValue(undefined);
+    AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
   });
 
   const wrapper = ({ children }) => <AccountsProvider>{children}</AccountsProvider>;
@@ -181,8 +182,12 @@ describe('AccountsContext', () => {
       const mockAccounts = [
         { id: '1', name: 'Account 1', balance: '100', currency: 'USD' },
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
+      const updatedMockAccounts = [
+        { id: '1', name: 'Updated Account', balance: '200', currency: 'USD' },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValueOnce(mockAccounts).mockResolvedValueOnce(updatedMockAccounts);
       AccountsDB.updateAccount.mockResolvedValue(undefined);
+      AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -196,9 +201,11 @@ describe('AccountsContext', () => {
         await result.current.updateAccount('1', updates);
       });
 
+      // Should call adjustAccountBalance for balance change
+      expect(AccountsDB.adjustAccountBalance).toHaveBeenCalledWith('1', '200', '');
+      // Should call updateAccount for name change only
       expect(AccountsDB.updateAccount).toHaveBeenCalledWith('1', {
         name: 'Updated Account',
-        balance: '200',
       });
       expect(result.current.accounts[0]).toMatchObject(updates);
     });
@@ -207,8 +214,11 @@ describe('AccountsContext', () => {
       const mockAccounts = [
         { id: '1', name: 'Account 1', balance: '100', currency: 'USD' },
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
-      AccountsDB.updateAccount.mockResolvedValue(undefined);
+      const updatedMockAccounts = [
+        { id: '1', name: 'Account 1', balance: '150', currency: 'USD' },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValueOnce(mockAccounts).mockResolvedValueOnce(updatedMockAccounts);
+      AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -220,7 +230,10 @@ describe('AccountsContext', () => {
         await result.current.updateAccount('1', { balance: 150 });
       });
 
-      expect(AccountsDB.updateAccount).toHaveBeenCalledWith('1', { balance: '150' });
+      // Should call adjustAccountBalance with converted string balance
+      expect(AccountsDB.adjustAccountBalance).toHaveBeenCalledWith('1', '150', '');
+      // Should NOT call updateAccount since only balance changed
+      expect(AccountsDB.updateAccount).not.toHaveBeenCalled();
     });
 
     it('shows alert and throws error on update failure', async () => {
@@ -470,10 +483,23 @@ describe('AccountsContext', () => {
   describe('Regression Tests', () => {
     it('maintains state consistency after multiple operations', async () => {
       const mockAccounts = [{ id: 'existing-1', name: 'Existing', balance: '50', currency: 'USD' }];
-      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+      let currentMockAccounts = [...mockAccounts];
+
+      AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentMockAccounts]));
+      AccountsDB.createAccount.mockImplementation((account) => {
+        currentMockAccounts.push(account);
+        return Promise.resolve(undefined);
+      });
       AccountsDB.updateAccount.mockResolvedValue(undefined);
-      AccountsDB.deleteAccount.mockResolvedValue(undefined);
+      AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {
+        const account = currentMockAccounts.find(a => a.id === id);
+        if (account) account.balance = newBalance;
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.deleteAccount.mockImplementation((id) => {
+        currentMockAccounts = currentMockAccounts.filter(a => a.id !== id);
+        return Promise.resolve(undefined);
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -515,7 +541,12 @@ describe('AccountsContext', () => {
       const mockAccounts = [
         { id: '1', name: 'Account 1', balance: '100', currency: 'USD' },
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
+      const updatedMockAccounts = [
+        { id: '1', name: 'Updated', balance: '100', currency: 'USD' },
+      ];
+      AccountsDB.getAllAccounts
+        .mockResolvedValueOnce(mockAccounts)
+        .mockResolvedValueOnce(updatedMockAccounts);
       AccountsDB.updateAccount.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });

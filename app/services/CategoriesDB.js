@@ -18,6 +18,7 @@ const mapCategoryFields = (dbCategory) => {
     parentId: dbCategory.parent_id,
     icon: dbCategory.icon,
     color: dbCategory.color,
+    isShadow: dbCategory.is_shadow === 1 || dbCategory.is_shadow === true,
     createdAt: dbCategory.created_at,
     updatedAt: dbCategory.updated_at,
   };
@@ -56,6 +57,7 @@ export const initializeDefaultCategories = async (language = 'en') => {
           parentId: category.parentId || null,
           icon: category.icon || null,
           color: category.color || null,
+          isShadow: category.isShadow || false,
         });
       } catch (err) {
         console.error('Failed to create default category:', category.id, err);
@@ -71,17 +73,36 @@ export const initializeDefaultCategories = async (language = 'en') => {
 };
 
 /**
- * Get all categories
+ * Get all categories (excluding shadow categories by default)
+ * @param {boolean} includeShadow - Whether to include shadow categories (default: false)
  * @returns {Promise<Array>}
  */
-export const getAllCategories = async () => {
+export const getAllCategories = async (includeShadow = false) => {
   try {
-    const categories = await queryAll(
-      'SELECT * FROM categories ORDER BY created_at ASC'
-    );
+    const query = includeShadow
+      ? 'SELECT * FROM categories ORDER BY created_at ASC'
+      : 'SELECT * FROM categories WHERE is_shadow = 0 ORDER BY created_at ASC';
+
+    const categories = await queryAll(query);
     return (categories || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get categories:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get shadow categories
+ * @returns {Promise<Array>}
+ */
+export const getShadowCategories = async () => {
+  try {
+    const categories = await queryAll(
+      'SELECT * FROM categories WHERE is_shadow = 1 ORDER BY created_at ASC'
+    );
+    return (categories || []).map(mapCategoryFields);
+  } catch (error) {
+    console.error('Failed to get shadow categories:', error);
     throw error;
   }
 };
@@ -107,14 +128,16 @@ export const getCategoryById = async (id) => {
 /**
  * Get categories by category_type (expense or income)
  * @param {string} categoryType - 'expense' or 'income'
+ * @param {boolean} includeShadow - Whether to include shadow categories (default: false)
  * @returns {Promise<Array>}
  */
-export const getCategoriesByCategoryType = async (categoryType) => {
+export const getCategoriesByCategoryType = async (categoryType, includeShadow = false) => {
   try {
-    const categories = await queryAll(
-      'SELECT * FROM categories WHERE category_type = ? ORDER BY created_at ASC',
-      [categoryType]
-    );
+    const query = includeShadow
+      ? 'SELECT * FROM categories WHERE category_type = ? ORDER BY created_at ASC'
+      : 'SELECT * FROM categories WHERE category_type = ? AND is_shadow = 0 ORDER BY created_at ASC';
+
+    const categories = await queryAll(query, [categoryType]);
     return (categories || []).map(mapCategoryFields);
   } catch (error) {
     console.error('Failed to get categories by category_type:', error);
@@ -163,12 +186,13 @@ export const createCategory = async (category) => {
       parent_id: category.parentId || category.parent_id || null,
       icon: category.icon || null,
       color: category.color || null,
+      is_shadow: category.isShadow || category.is_shadow ? 1 : 0,
       created_at: now,
       updated_at: now,
     };
 
     await executeQuery(
-      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         categoryData.id,
         categoryData.name,
@@ -177,6 +201,7 @@ export const createCategory = async (category) => {
         categoryData.parent_id,
         categoryData.icon,
         categoryData.color,
+        categoryData.is_shadow,
         categoryData.created_at,
         categoryData.updated_at,
       ]

@@ -278,10 +278,12 @@ const OperationsScreen = () => {
     return category.nameKey ? t(category.nameKey) : category.name;
   }, [categories, t]);
 
-  // Filtered categories for quick add form
+  // Filtered categories for quick add form (excluding shadow categories)
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => {
       if (quickAddValues.type === 'transfer') return false;
+      // Exclude shadow categories from selection
+      if (cat.isShadow) return false;
       return cat.categoryType === quickAddValues.type && cat.type === 'entry';
     });
   }, [categories, quickAddValues.type]);
