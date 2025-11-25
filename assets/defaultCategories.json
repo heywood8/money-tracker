@@ -619,5 +619,25 @@
     "category_type": "income",
     "parentId": null,
     "icon": "cash"
+  },
+  {
+    "id": "shadow-adjustment-expense",
+    "name": "Balance Adjustment (Expense)",
+    "nameKey": "adjustment_expense",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "cash-minus",
+    "isShadow": true
+  },
+  {
+    "id": "shadow-adjustment-income",
+    "name": "Balance Adjustment (Income)",
+    "nameKey": "adjustment_income",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "cash-plus",
+    "isShadow": true
   }
 ]

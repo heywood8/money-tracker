@@ -28,15 +28,17 @@ export const CategoriesProvider = ({ children }) => {
   const reloadCategories = useCallback(async (language = 'en') => {
     try {
       setLoading(true);
-      const categoriesData = await CategoriesDB.getAllCategories();
+      // Load all categories including shadow categories for display purposes
+      // Shadow categories will be filtered out in UI components that allow category selection
+      const categoriesData = await CategoriesDB.getAllCategories(true);
 
       if (categoriesData.length === 0) {
         // Initialize with default categories in the specified language
         console.log(`Initializing default categories in ${language}...`);
         await CategoriesDB.initializeDefaultCategories(language);
 
-        // Reload to get the newly created categories
-        const newCategories = await CategoriesDB.getAllCategories();
+        // Reload to get the newly created categories (including shadow ones)
+        const newCategories = await CategoriesDB.getAllCategories(true);
         setCategories(newCategories);
       } else {
         setCategories(categoriesData);
