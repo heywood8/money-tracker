@@ -115,14 +115,12 @@ export const AccountsProvider = ({ children }) => {
         throw new Error('Account not found');
       }
 
-      const updates = { ...updated, balance: String(updated.balance) };
-
       // Check if balance is being changed
-      const balanceChanged = currentAccount.balance !== updates.balance;
+      const balanceChanged = updated.balance !== undefined && currentAccount.balance !== String(updated.balance);
 
       if (balanceChanged) {
         // Use adjustAccountBalance for balance changes to create adjustment operations
-        await AccountsDB.adjustAccountBalance(id, updates.balance, '');
+        await AccountsDB.adjustAccountBalance(id, String(updated.balance), '');
 
         // Update non-balance fields if changed
         const nonBalanceUpdates = {};
@@ -141,6 +139,12 @@ export const AccountsProvider = ({ children }) => {
         appEvents.emit(EVENTS.RELOAD_ALL);
       } else {
         // No balance change, just update normally
+        // Filter out undefined values and convert balance to string if present
+        const updates = {};
+        if (updated.name !== undefined) updates.name = updated.name;
+        if (updated.currency !== undefined) updates.currency = updated.currency;
+        if (updated.balance !== undefined) updates.balance = String(updated.balance);
+
         await AccountsDB.updateAccount(id, updates);
       }
 
