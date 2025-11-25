@@ -4,7 +4,7 @@ import { PieChart } from 'react-native-chart-kit';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
-import { getSpendingByCategoryAndCurrency, getAvailableMonths } from './services/OperationsDB';
+import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from './services/OperationsDB';
 import { getAllCategories } from './services/CategoriesDB';
 import SimplePicker from './components/SimplePicker';
 
@@ -24,10 +24,14 @@ const GraphsScreen = () => {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
   const [chartData, setChartData] = useState([]);
+  const [incomeChartData, setIncomeChartData] = useState([]);
   const [categories, setCategories] = useState([]);
   const [topLevelCategories, setTopLevelCategories] = useState([]);
+  const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingIncome, setLoadingIncome] = useState(true);
   const [availableMonths, setAvailableMonths] = useState([]);
 
   // Month names translation keys
@@ -68,6 +72,12 @@ const GraphsScreen = () => {
           cat.parentId === null && cat.categoryType === 'expense'
         );
         setTopLevelCategories(topLevel);
+
+        // Filter top-level income categories (no parent, income type)
+        const topLevelIncome = cats.filter(cat =>
+          cat.parentId === null && cat.categoryType === 'income'
+        );
+        setTopLevelIncomeCategories(topLevelIncome);
       } catch (error) {
         console.error('Failed to load categories:', error);
       }
@@ -175,12 +185,85 @@ const GraphsScreen = () => {
     }
   }, [selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors.text, t]);
 
+  // Load income data
+  const loadIncomeData = useCallback(async () => {
+    if (!selectedCurrency) return;
+
+    try {
+      setLoadingIncome(true);
+
+      // Calculate start and end dates for the selected month
+      const startDate = new Date(selectedYear, selectedMonth, 1);
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Get income data
+      const income = await getIncomeByCategoryAndCurrency(
+        selectedCurrency,
+        startDateStr,
+        endDateStr
+      );
+
+      // Create a map of category ID to category name
+      const categoryMap = new Map();
+      categories.forEach(cat => {
+        categoryMap.set(cat.id, cat.name);
+      });
+
+      // Filter data by selected income category if not "all"
+      let filteredIncome = income;
+      if (selectedIncomeCategory !== 'all') {
+        // Get all descendant category IDs for the selected category
+        const descendantIds = new Set([selectedIncomeCategory]);
+        const findDescendants = (parentId) => {
+          categories.forEach(cat => {
+            if (cat.parentId === parentId) {
+              descendantIds.add(cat.id);
+              findDescendants(cat.id); // Recursive
+            }
+          });
+        };
+        findDescendants(selectedIncomeCategory);
+
+        // Filter income to only include categories in the descendant set
+        filteredIncome = income.filter(item =>
+          descendantIds.has(item.category_id)
+        );
+      }
+
+      // Chart colors (vibrant palette - different from expenses)
+      const chartColors = [
+        '#4BC0C0', '#36A2EB', '#9966FF', '#FF9F40', '#FFCE56',
+        '#FF6384', '#C9CBCF', '#4BC0C0', '#FF9F40', '#FFCE56',
+        '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0', '#FF9F40'
+      ];
+
+      // Transform data for pie chart
+      const data = filteredIncome.map((item, index) => ({
+        name: categoryMap.get(item.category_id) || t('unknown_category'),
+        amount: parseFloat(item.total),
+        color: chartColors[index % chartColors.length],
+        legendFontColor: colors.text,
+        legendFontSize: 13
+      }));
+
+      setIncomeChartData(data);
+    } catch (error) {
+      console.error('Failed to load income data:', error);
+    } finally {
+      setLoadingIncome(false);
+    }
+  }, [selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors.text, t]);
+
   // Reload data when filters change
   useEffect(() => {
     if (categories.length > 0) {
       loadExpenseData();
+      loadIncomeData();
     }
-  }, [loadExpenseData, categories.length]);
+  }, [loadExpenseData, loadIncomeData, categories.length]);
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -193,6 +276,11 @@ const GraphsScreen = () => {
     { label: t('all'), value: 'all' },
     ...topLevelCategories.map(cat => ({ label: cat.name, value: cat.id }))
   ], [topLevelCategories, t]);
+
+  const incomeCategoryItems = useMemo(() => [
+    { label: t('all'), value: 'all' },
+    ...topLevelIncomeCategories.map(cat => ({ label: cat.name, value: cat.id }))
+  ], [topLevelIncomeCategories, t]);
 
   const currencyItems = useMemo(() =>
     currencies.map(cur => ({ label: cur, value: cur })),
@@ -228,6 +316,11 @@ const GraphsScreen = () => {
   const totalExpenses = useMemo(() => {
     return chartData.reduce((sum, item) => sum + item.amount, 0);
   }, [chartData]);
+
+  // Calculate total income
+  const totalIncome = useMemo(() => {
+    return incomeChartData.reduce((sum, item) => sum + item.amount, 0);
+  }, [incomeChartData]);
 
   const screenWidth = Dimensions.get('window').width;
 
@@ -319,6 +412,62 @@ const GraphsScreen = () => {
         ) : (
           <Text style={[styles.noData, { color: colors.mutedText }]}>
             {t('no_expense_data')}
+          </Text>
+        )}
+
+        {/* Income Section */}
+        <Text style={[styles.title, { color: colors.text, marginTop: 40 }]}>
+          {t('income_by_category')}
+        </Text>
+
+        {/* Income Category Picker */}
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 16 }]}>
+          <SimplePicker
+            value={selectedIncomeCategory}
+            onValueChange={setSelectedIncomeCategory}
+            items={incomeCategoryItems}
+            colors={colors}
+          />
+        </View>
+
+        {/* Total Income Display */}
+        {!loadingIncome && incomeChartData.length > 0 && (
+          <View style={[styles.totalContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
+              {t('total_income')}:
+            </Text>
+            <Text style={[styles.totalAmount, { color: colors.text }]}>
+              {formatCurrency(totalIncome, selectedCurrency)}
+            </Text>
+          </View>
+        )}
+
+        {/* Income Pie Chart */}
+        {loadingIncome ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+              {t('loading_operations')}
+            </Text>
+          </View>
+        ) : incomeChartData.length > 0 ? (
+          <View style={styles.chartContainer}>
+            <PieChart
+              data={incomeChartData}
+              width={screenWidth - 32}
+              height={220}
+              chartConfig={{
+                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+              }}
+              accessor="amount"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              center={[0, 0]}
+            />
+          </View>
+        ) : (
+          <Text style={[styles.noData, { color: colors.mutedText }]}>
+            {t('no_income_data')}
           </Text>
         )}
       </View>
