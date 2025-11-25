@@ -28,6 +28,7 @@ describe('Account Management Integration Tests', () => {
     AccountsDB.getAllAccounts.mockResolvedValue([]);
     AccountsDB.createAccount.mockResolvedValue(undefined);
     AccountsDB.updateAccount.mockResolvedValue(undefined);
+    AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
     AccountsDB.deleteAccount.mockResolvedValue(undefined);
   });
 
@@ -39,7 +40,28 @@ describe('Account Management Integration Tests', () => {
       const initialAccounts = [
         { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      let currentAccounts = [...initialAccounts];
+
+      // Setup dynamic mock that tracks state
+      AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
+      AccountsDB.createAccount.mockImplementation((account) => {
+        currentAccounts.push(account);
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.updateAccount.mockImplementation((id, updates) => {
+        const account = currentAccounts.find(a => a.id === id);
+        if (account) Object.assign(account, updates);
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {
+        const account = currentAccounts.find(a => a.id === id);
+        if (account) account.balance = newBalance;
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.deleteAccount.mockImplementation((id) => {
+        currentAccounts = currentAccounts.filter(a => a.id !== id);
+        return Promise.resolve(undefined);
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -120,7 +142,28 @@ describe('Account Management Integration Tests', () => {
       const initialAccounts = [
         { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      let currentAccounts = [...initialAccounts];
+
+      // Setup dynamic mock that tracks state
+      AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
+      AccountsDB.createAccount.mockImplementation((account) => {
+        currentAccounts.push(account);
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.updateAccount.mockImplementation((id, updates) => {
+        const account = currentAccounts.find(a => a.id === id);
+        if (account) Object.assign(account, updates);
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {
+        const account = currentAccounts.find(a => a.id === id);
+        if (account) account.balance = newBalance;
+        return Promise.resolve(undefined);
+      });
+      AccountsDB.deleteAccount.mockImplementation((id) => {
+        currentAccounts = currentAccounts.filter(a => a.id !== id);
+        return Promise.resolve(undefined);
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -329,7 +372,15 @@ describe('Account Management Integration Tests', () => {
         { id: '1', name: 'Account 1', balance: '100', currency: 'USD' },
         { id: '2', name: 'Account 2', balance: '200', currency: 'EUR' },
       ];
-      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
+      let currentAccounts = [...mockAccounts];
+
+      // Setup dynamic mock that tracks state
+      AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
+      AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {
+        const account = currentAccounts.find(a => a.id === id);
+        if (account) account.balance = newBalance;
+        return Promise.resolve(undefined);
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
