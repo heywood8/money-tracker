@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, Alert, Platform, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, StyleSheet, Alert, Platform, TouchableOpacity, Animated } from 'react-native';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -17,18 +17,32 @@ export default function SettingsModal({ visible, onClose }) {
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
   const openLanguageModal = useCallback(() => {
     setLanguageModalVisible(true);
-  }, []);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [slideAnim]);
 
   const closeLanguageModal = useCallback(() => {
-    setLanguageModalVisible(false);
-  }, []);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setLanguageModalVisible(false);
+    });
+  }, [slideAnim]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLocalLang(lng);
-    setLanguageModalVisible(false);
-  }, []);
+    closeLanguageModal();
+  }, [closeLanguageModal]);
 
   const handleResetDatabase = () => {
     Alert.alert(
@@ -131,17 +145,47 @@ export default function SettingsModal({ visible, onClose }) {
       setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
       setLanguageModalVisible(false);
+      slideAnim.setValue(0);
     }
-  }, [visible, theme, language]);
+  }, [visible, theme, language, slideAnim]);
+
+  // Interpolate animation values
+  const settingsTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -50],
+  });
+
+  const settingsOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const languageTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  const languageOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <Portal>
-      {!languageModalVisible ? (
-        <Modal
-          visible={visible}
-          onDismiss={onClose}
-          contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
-        >
+      <Modal
+        visible={visible}
+        onDismiss={languageModalVisible ? closeLanguageModal : onClose}
+        contentContainerStyle={[styles.modalWrapper, { backgroundColor: 'transparent' }]}
+      >
+        <Animated.View style={[
+          styles.content,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: settingsTranslateX }],
+            opacity: settingsOpacity,
+          },
+          languageModalVisible && styles.hidden
+        ]}>
           <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
@@ -264,13 +308,17 @@ export default function SettingsModal({ visible, onClose }) {
             {t('save') || 'Save'}
           </Button>
         </View>
-      </Modal>
-      ) : (
-        <Modal
-          visible={visible}
-          onDismiss={closeLanguageModal}
-          contentContainerStyle={[styles.languageModalContent, { backgroundColor: colors.card }]}
-        >
+        </Animated.View>
+
+        <Animated.View style={[
+          styles.languageModalContent,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: languageTranslateX }],
+            opacity: languageOpacity,
+          },
+          !languageModalVisible && styles.hidden
+        ]}>
           <View style={styles.languageModalHeader}>
             <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -301,18 +349,27 @@ export default function SettingsModal({ visible, onClose }) {
               </TouchableRipple>
             ))}
           </View>
-        </Modal>
-      )}
+        </Animated.View>
+      </Modal>
     </Portal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   content: {
     margin: 20,
     borderRadius: 12,
     padding: 24,
     maxHeight: '90%',
+  },
+  hidden: {
+    position: 'absolute',
+    opacity: 0,
+    pointerEvents: 'none',
   },
   title: {
     marginBottom: 16,
