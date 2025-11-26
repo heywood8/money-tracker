@@ -1,6 +1,6 @@
-# Money Tracker - Feature Backlog
+# Penny - Feature Backlog
 
-This document contains potential features for the Money Tracker app. Use the architect agent to design these features before implementation.
+This document contains potential features for the Penny app. Use the architect agent to design these features before implementation.
 
 ## High Priority Features
 
