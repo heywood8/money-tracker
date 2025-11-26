@@ -445,7 +445,7 @@ const GraphsScreen = () => {
                     backgroundColor="transparent"
                     paddingLeft="0"
                     hasLegend={false}
-                    center={[10, 0]}
+                    center={[20, 0]}
                   />
                 ) : (
                   <View style={styles.noDataPlaceholder}>
@@ -488,7 +488,7 @@ const GraphsScreen = () => {
                     backgroundColor="transparent"
                     paddingLeft="0"
                     hasLegend={false}
-                    center={[10, 0]}
+                    center={[20, 0]}
                   />
                 ) : (
                   <View style={styles.noDataPlaceholder}>
