@@ -1,25 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
-import { Portal, Modal, Text, Button, RadioButton, Divider } from 'react-native-paper';
+import { View, StyleSheet, Alert, Platform, TouchableOpacity } from 'react-native';
+import { Portal, Modal, Text, Button, Divider, Menu } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
 import { exportBackup, importBackup } from './services/BackupRestore';
 
-const themeOptions = [
-  { label: 'System', value: 'system' },
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' },
-];
-
 
 export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { resetDatabase } = useAccounts();
-  const [localSelection, setLocalSelection] = useState(theme);
+  const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
+  const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
 
   const handleResetDatabase = () => {
     Alert.alert(
@@ -119,8 +115,9 @@ export default function SettingsModal({ visible, onClose }) {
 
   useEffect(() => {
     if (visible) {
-      setLocalSelection(theme);
+      setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
+      setLanguageMenuVisible(false);
     }
   }, [visible, theme, language]);
 
@@ -134,30 +131,84 @@ export default function SettingsModal({ visible, onClose }) {
         <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
-        <RadioButton.Group onValueChange={setLocalSelection} value={localSelection}>
-          {themeOptions.map(opt => (
-            <RadioButton.Item
-              key={opt.value}
-              label={opt.label}
-              value={opt.value}
-              style={styles.radioItem}
+        <View style={styles.themeSwitch}>
+          <TouchableOpacity
+            style={[
+              styles.themeOption,
+              localSelection === 'light' && styles.themeOptionActive,
+              { borderColor: colors.border }
+            ]}
+            onPress={() => setLocalSelection('light')}
+            accessibilityRole="button"
+            accessibilityLabel="Light theme"
+          >
+            <Ionicons
+              name="sunny"
+              size={24}
+              color={localSelection === 'light' ? colors.primary : colors.mutedText}
             />
-          ))}
-        </RadioButton.Group>
+            <Text style={[
+              styles.themeLabel,
+              { color: localSelection === 'light' ? colors.text : colors.mutedText }
+            ]}>
+              Light
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.themeOption,
+              localSelection === 'dark' && styles.themeOptionActive,
+              { borderColor: colors.border }
+            ]}
+            onPress={() => setLocalSelection('dark')}
+            accessibilityRole="button"
+            accessibilityLabel="Dark theme"
+          >
+            <Ionicons
+              name="moon"
+              size={24}
+              color={localSelection === 'dark' ? colors.primary : colors.mutedText}
+            />
+            <Text style={[
+              styles.themeLabel,
+              { color: localSelection === 'dark' ? colors.text : colors.mutedText }
+            ]}>
+              Dark
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <RadioButton.Group onValueChange={setLocalLang} value={localLang}>
+        <Menu
+          visible={languageMenuVisible}
+          onDismiss={() => setLanguageMenuVisible(false)}
+          anchor={
+            <TouchableOpacity
+              style={[styles.dropdown, { borderColor: colors.border, backgroundColor: colors.surface }]}
+              onPress={() => setLanguageMenuVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select language"
+            >
+              <Text style={{ color: colors.text }}>
+                {t(localLang === 'en' ? 'english' : 'russian')}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={colors.text} />
+            </TouchableOpacity>
+          }
+        >
           {availableLanguages.map(lng => (
-            <RadioButton.Item
+            <Menu.Item
               key={lng}
-              label={t(lng === 'en' ? 'english' : 'russian')}
-              value={lng}
-              style={styles.radioItem}
+              onPress={() => {
+                setLocalLang(lng);
+                setLanguageMenuVisible(false);
+              }}
+              title={t(lng === 'en' ? 'english' : 'russian')}
             />
           ))}
-        </RadioButton.Group>
+        </Menu>
 
         <Divider style={styles.divider} />
 
@@ -168,9 +219,10 @@ export default function SettingsModal({ visible, onClose }) {
             mode="contained"
             onPress={handleExportBackup}
             style={styles.actionButton}
-            icon="export"
+            contentStyle={styles.exportButtonContent}
           >
             {t('export_backup') || 'Export Backup'}
+            <Ionicons name="download-outline" size={18} color="white" style={styles.iconRight} />
           </Button>
           <Button
             mode="contained"
@@ -182,18 +234,25 @@ export default function SettingsModal({ visible, onClose }) {
           </Button>
         </View>
 
-        <Button
-          mode="contained"
-          buttonColor="#dc3545"
-          onPress={handleResetDatabase}
-          style={styles.resetButton}
-          icon="delete-forever"
-        >
-          {t('reset_database') || 'Reset Database'}
-        </Button>
+        <View style={styles.resetButtonContainer}>
+          <Button
+            mode="outlined"
+            textColor="#b33"
+            onPress={handleResetDatabase}
+            style={styles.resetButton}
+            icon="delete-forever"
+          >
+            {t('reset_database') || 'Reset Database'}
+          </Button>
+        </View>
 
         <View style={styles.modalButtonRow}>
-          <Button mode="outlined" onPress={onClose} style={styles.modalButton}>
+          <Button
+            mode="outlined"
+            onPress={onClose}
+            style={styles.modalButton}
+            textColor={colors.mutedText}
+          >
             {t('cancel') || 'Cancel'}
           </Button>
           <Button
@@ -226,10 +285,42 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  radioItem: {
-    paddingVertical: 4,
+  themeSwitch: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  themeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  themeOptionActive: {
+    borderWidth: 2,
+  },
+  themeLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 8,
   },
   divider: {
     marginVertical: 12,
@@ -243,9 +334,20 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-  resetButton: {
+  exportButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconRight: {
+    marginLeft: 8,
+  },
+  resetButtonContainer: {
+    alignItems: 'center',
     marginTop: 8,
     marginBottom: 8,
+  },
+  resetButton: {
+    maxWidth: 300,
   },
   modalButtonRow: {
     flexDirection: 'row',

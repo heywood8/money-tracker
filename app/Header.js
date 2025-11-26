@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 
@@ -23,12 +24,10 @@ export default function Header({ onOpenSettings }) {
         accessibilityLabel={t('settings')}
         accessibilityRole="button"
         accessibilityHint="Opens settings menu"
-        style={[styles.burger, { backgroundColor: colors.secondary }]}
+        style={styles.settingsButton}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
-        <View style={[styles.line, { backgroundColor: colors.text }]} />
+        <Ionicons name="settings-outline" size={24} color={colors.text} />
       </TouchableOpacity>
     </View>
   );
@@ -44,12 +43,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   title: { fontSize: 14, fontWeight: '700' },
-  burger: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: 'center',
-    alignItems: 'center',
+  settingsButton: {
+    padding: 8,
   },
-  line: { width: 18, height: 2, marginVertical: 2 },
 });
