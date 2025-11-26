@@ -9,9 +9,7 @@
       ],
       "json-updates": { 
         "app.json": {
-          "expo": {
-            "version": "$" 
-          }
+          "version": "$.expo.version"
         }
       }
     }
