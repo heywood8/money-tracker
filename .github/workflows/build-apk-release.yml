@@ -35,11 +35,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure Gradle memory settings
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/gradle.properties << EOF
+          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError
+          org.gradle.daemon=false
+          org.gradle.parallel=false
+          org.gradle.configureondemand=false
+          EOF
+
       - name: Build APK
         working-directory: ./android
+        env:
+          GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError"
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --max-workers=2
 
       - name: Get tag name
         id: get_tag
