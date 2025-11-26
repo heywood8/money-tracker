@@ -111,6 +111,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
             // Only sign if keystore exists (for local builds)
             // In CI, release builds will be unsigned
             def keystoreFile = file('debug.keystore')
