@@ -4,6 +4,9 @@
   "include-component-in-tag": false,
   "packages": {
     ".": {
+      "extra-files": [
+        "app.json" 
+      ],
       "json-updates": { 
         "app.json": {
           "expo": {
