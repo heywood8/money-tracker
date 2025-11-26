@@ -181,34 +181,35 @@ export default function SettingsModal({ visible, onClose }) {
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <Menu
-          visible={languageMenuVisible}
-          onDismiss={() => setLanguageMenuVisible(false)}
-          anchor={
-            <TouchableOpacity
-              style={[styles.dropdown, { borderColor: colors.border, backgroundColor: colors.surface }]}
-              onPress={() => setLanguageMenuVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Select language"
-            >
-              <Text style={{ color: colors.text }}>
+        <View>
+          <Menu
+            visible={languageMenuVisible}
+            onDismiss={() => setLanguageMenuVisible(false)}
+            anchor={
+              <Button
+                mode="outlined"
+                onPress={() => setLanguageMenuVisible(true)}
+                style={styles.dropdown}
+                contentStyle={styles.dropdownContent}
+                icon={() => <Ionicons name="chevron-down" size={20} color={colors.text} />}
+                labelStyle={{ color: colors.text }}
+              >
                 {t(localLang === 'en' ? 'english' : 'russian')}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={colors.text} />
-            </TouchableOpacity>
-          }
-        >
-          {availableLanguages.map(lng => (
-            <Menu.Item
-              key={lng}
-              onPress={() => {
-                setLocalLang(lng);
-                setLanguageMenuVisible(false);
-              }}
-              title={t(lng === 'en' ? 'english' : 'russian')}
-            />
-          ))}
-        </Menu>
+              </Button>
+            }
+          >
+            {availableLanguages.map(lng => (
+              <Menu.Item
+                key={lng}
+                onPress={() => {
+                  setLocalLang(lng);
+                  setLanguageMenuVisible(false);
+                }}
+                title={t(lng === 'en' ? 'english' : 'russian')}
+              />
+            ))}
+          </Menu>
+        </View>
 
         <Divider style={styles.divider} />
 
@@ -219,10 +220,9 @@ export default function SettingsModal({ visible, onClose }) {
             mode="contained"
             onPress={handleExportBackup}
             style={styles.actionButton}
-            contentStyle={styles.exportButtonContent}
+            icon="export"
           >
             {t('export_backup') || 'Export Backup'}
-            <Ionicons name="download-outline" size={18} color="white" style={styles.iconRight} />
           </Button>
           <Button
             mode="contained"
@@ -250,8 +250,8 @@ export default function SettingsModal({ visible, onClose }) {
           <Button
             mode="outlined"
             onPress={onClose}
-            style={styles.modalButton}
-            textColor={colors.mutedText}
+            style={[styles.modalButton, { borderColor: '#999' }]}
+            textColor="#888"
           >
             {t('cancel') || 'Cancel'}
           </Button>
@@ -312,15 +312,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
     marginTop: 8,
     marginBottom: 8,
+  },
+  dropdownContent: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
   },
   divider: {
     marginVertical: 12,
@@ -333,13 +330,6 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-  },
-  exportButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconRight: {
-    marginLeft: 8,
   },
   resetButtonContainer: {
     alignItems: 'center',
