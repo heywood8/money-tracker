@@ -16,7 +16,7 @@ export default function Header({ onOpenSettings }) {
         {
           backgroundColor: colors.surface,
           borderBottomColor: colors.border,
-          paddingTop: insets.top + 5,
+          paddingTop: insets.top,
         }
       ]}
     >
