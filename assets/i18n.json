@@ -177,7 +177,10 @@
     "restore_confirm": "Are you sure you want to restore from backup? This will replace all current data.",
     "backup_error": "Failed to create backup",
     "restore_error": "Failed to restore backup",
-    "invalid_backup": "Invalid backup file"
+    "invalid_backup": "Invalid backup file",
+    "exchange_rate": "Exchange Rate",
+    "destination_amount": "Destination Amount",
+    "offline_rate_info": "Offline rate from"
   },
   "ru": {
     "accounts": "Счета",
@@ -357,7 +360,10 @@
     "restore_confirm": "Вы уверены, что хотите восстановить базу данных из резервной копии? Это заменит все текущие данные.",
     "backup_error": "Не удалось создать резервную копию",
     "restore_error": "Не удалось восстановить резервную копию",
-    "invalid_backup": "Неверный файл резервной копии"
+    "invalid_backup": "Неверный файл резервной копии",
+    "exchange_rate": "Курс обмена",
+    "destination_amount": "Сумма получателя",
+    "offline_rate_info": "Оффлайн курс от"
   }
 }
 

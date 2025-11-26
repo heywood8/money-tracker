@@ -21,6 +21,7 @@ import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
+import * as Currency from './services/currency';
 
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useTheme();
@@ -37,6 +38,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     description: '',
     date: new Date().toISOString().split('T')[0],
     toAccountId: '',
+    exchangeRate: '',
+    destinationAmount: '',
   });
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -84,25 +87,26 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   }, [operation, isNew, visible, accounts]);
 
   const handleSave = useCallback(async () => {
-    const error = validateOperation(values);
+    const operationData = prepareOperationData();
+    const error = validateOperation(operationData);
     if (error) {
       setErrors({ general: error });
       return;
     }
 
     if (isNew) {
-      await addOperation(values);
+      await addOperation(operationData);
     } else {
-      await updateOperation(operation.id, values);
+      await updateOperation(operation.id, operationData);
     }
 
     // Save last accessed account
-    if (values.accountId) {
-      setLastAccessedAccount(values.accountId);
+    if (operationData.accountId) {
+      setLastAccessedAccount(operationData.accountId);
     }
 
     onClose();
-  }, [validateOperation, values, isNew, addOperation, updateOperation, operation, onClose]);
+  }, [prepareOperationData, validateOperation, isNew, addOperation, updateOperation, operation, onClose]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
@@ -175,6 +179,65 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       day: 'numeric'
     });
   }, []);
+
+  // Get source and destination accounts for currency detection
+  const sourceAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.accountId);
+  }, [accounts, values.accountId]);
+
+  const destinationAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.toAccountId);
+  }, [accounts, values.toAccountId]);
+
+  // Check if this is a multi-currency transfer
+  const isMultiCurrencyTransfer = useMemo(() => {
+    if (values.type !== 'transfer') return false;
+    if (!sourceAccount || !destinationAccount) return false;
+    return sourceAccount.currency !== destinationAccount.currency;
+  }, [values.type, sourceAccount, destinationAccount]);
+
+  // Auto-populate exchange rate when accounts change
+  useEffect(() => {
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !values.exchangeRate) {
+      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+      if (rate) {
+        setValues(v => ({ ...v, exchangeRate: rate }));
+      }
+    }
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
+
+  // Auto-calculate destination amount when amount or rate changes
+  useEffect(() => {
+    if (isMultiCurrencyTransfer && values.amount && values.exchangeRate && sourceAccount && destinationAccount) {
+      const converted = Currency.convertAmount(
+        values.amount,
+        sourceAccount.currency,
+        destinationAccount.currency,
+        values.exchangeRate
+      );
+      if (converted && converted !== values.destinationAmount) {
+        setValues(v => ({ ...v, destinationAmount: converted }));
+      }
+    } else if (!isMultiCurrencyTransfer) {
+      // Clear exchange rate fields for same-currency transfers
+      if (values.exchangeRate || values.destinationAmount) {
+        setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+      }
+    }
+  }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, sourceAccount, destinationAccount]);
+
+  // Prepare operation data with currency information for saving
+  const prepareOperationData = useCallback(() => {
+    const data = { ...values };
+
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
+      data.sourceCurrency = sourceAccount.currency;
+      data.destinationCurrency = destinationAccount.currency;
+      // Exchange rate and destination amount are already in values
+    }
+
+    return data;
+  }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -264,20 +327,83 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
                   {/* To Account Picker (only for transfers) */}
                   {values.type === 'transfer' && (
-                    <Pressable
-                      style={[
-                        styles.pickerButton,
-                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                        isShadowOperation && styles.disabledInput
-                      ]}
-                      onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
-                      disabled={isShadowOperation}
-                    >
-                      <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
-                        {t('to_account')}: {getAccountName(values.toAccountId)}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                    </Pressable>
+                    <>
+                      <Pressable
+                        style={[
+                          styles.pickerButton,
+                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                          isShadowOperation && styles.disabledInput
+                        ]}
+                        onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                        disabled={isShadowOperation}
+                      >
+                        <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
+                          {t('to_account')}: {getAccountName(values.toAccountId)}
+                        </Text>
+                        <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      </Pressable>
+
+                      {/* Multi-currency transfer fields */}
+                      {isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
+                        <>
+                          {/* Currency info display */}
+                          <View style={styles.currencyInfo}>
+                            <Icon name="swap-horizontal-circle" size={16} color={colors.mutedText} />
+                            <Text style={[styles.currencyInfoText, { color: colors.mutedText }]}>
+                              {sourceAccount.currency} → {destinationAccount.currency}
+                            </Text>
+                          </View>
+
+                          {/* Exchange Rate Input */}
+                          <View style={styles.inputRow}>
+                            <Text style={[styles.inputLabel, { color: colors.text }]}>
+                              {t('exchange_rate')}:
+                            </Text>
+                            <TextInput
+                              style={[
+                                styles.smallInput,
+                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                                isShadowOperation && styles.disabledInput
+                              ]}
+                              value={values.exchangeRate}
+                              onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, exchangeRate: text }))}
+                              placeholder="0.00"
+                              placeholderTextColor={colors.mutedText}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              onSubmitEditing={Keyboard.dismiss}
+                              editable={!isShadowOperation}
+                            />
+                          </View>
+
+                          {/* Destination Amount Display */}
+                          <View style={styles.inputRow}>
+                            <Text style={[styles.inputLabel, { color: colors.text }]}>
+                              {t('destination_amount')}:
+                            </Text>
+                            <TextInput
+                              style={[
+                                styles.smallInput,
+                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                                styles.disabledInput
+                              ]}
+                              value={values.destinationAmount}
+                              placeholder="0.00"
+                              placeholderTextColor={colors.mutedText}
+                              editable={false}
+                            />
+                            <Text style={[styles.currencyLabel, { color: colors.mutedText }]}>
+                              {destinationAccount.currency}
+                            </Text>
+                          </View>
+
+                          {/* Exchange rate source info */}
+                          <Text style={[styles.rateInfo, { color: colors.mutedText }]}>
+                            {t('offline_rate_info')} ({Currency.getExchangeRatesLastUpdated()})
+                          </Text>
+                        </>
+                      )}
+                    </>
                   )}
 
                   {/* Category Picker (not for transfers) */}
@@ -665,5 +791,43 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  currencyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  currencyInfoText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  inputLabel: {
+    fontSize: 14,
+    minWidth: 110,
+  },
+  smallInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 12,
+    fontSize: 16,
+  },
+  currencyLabel: {
+    fontSize: 14,
+    minWidth: 40,
+  },
+  rateInfo: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
 });
