@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
@@ -25,7 +26,14 @@ const CustomLegend = ({ data, currency, colors }) => {
           <View key={index} style={[styles.legendItem, { borderBottomColor: colors.border }]}>
             <View style={styles.legendLeft}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-              {item.icon && <Text style={styles.legendIcon}>{item.icon}</Text>}
+              {item.icon && (
+                <Icon
+                  name={item.icon}
+                  size={18}
+                  color={colors.text}
+                  style={styles.legendIcon}
+                />
+              )}
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
