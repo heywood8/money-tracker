@@ -1,7 +1,7 @@
 /**
  * SQLite backup and restore service (Native platforms: iOS/Android)
  */
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { queryAll, executeQuery, executeTransaction } from './db';
