@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { Portal, Modal, Text, Button, RadioButton, Divider } from 'react-native-paper';
+import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
@@ -60,6 +61,25 @@ export default function SettingsModal({ visible, onClose }) {
     }
   };
 
+  const reloadApp = async () => {
+    // Close modal first
+    onClose();
+
+    // Platform-specific reload
+    if (Platform.OS === 'web') {
+      // Web: reload the page
+      window.location?.reload?.();
+    } else {
+      // Native (iOS/Android): use expo-updates to reload
+      try {
+        await Updates.reloadAsync();
+      } catch (error) {
+        console.error('Failed to reload app:', error);
+        // Fallback: just close the modal and let the app refresh naturally
+      }
+    }
+  };
+
   const handleImportBackup = () => {
     Alert.alert(
       t('restore_database') || 'Restore Database',
@@ -78,11 +98,7 @@ export default function SettingsModal({ visible, onClose }) {
                 [
                   {
                     text: t('close') || 'Close',
-                    onPress: () => {
-                      onClose();
-                      // Force app reload to reflect restored data
-                      window.location?.reload?.();
-                    },
+                    onPress: reloadApp,
                   },
                 ]
               );
