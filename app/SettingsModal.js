@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Alert, Platform, TouchableOpacity } from 'react-native';
-import { Portal, Modal, Text, Button, Divider, Menu, TouchableRipple } from 'react-native-paper';
+import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
@@ -15,14 +15,15 @@ export default function SettingsModal({ visible, onClose }) {
   const { resetDatabase } = useAccounts();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
-  const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
+  const [languageExpanded, setLanguageExpanded] = useState(false);
 
-  const openLanguageMenu = useCallback(() => setLanguageMenuVisible(true), []);
-  const closeLanguageMenu = useCallback(() => setLanguageMenuVisible(false), []);
+  const toggleLanguageExpanded = useCallback(() => {
+    setLanguageExpanded(prev => !prev);
+  }, []);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLocalLang(lng);
-    setLanguageMenuVisible(false);
+    setLanguageExpanded(false);
   }, []);
 
   const handleResetDatabase = () => {
@@ -125,7 +126,7 @@ export default function SettingsModal({ visible, onClose }) {
     if (visible) {
       setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
-      setLanguageMenuVisible(false);
+      setLanguageExpanded(false);
     }
   }, [visible, theme, language]);
 
@@ -189,35 +190,45 @@ export default function SettingsModal({ visible, onClose }) {
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <Menu
-          visible={languageMenuVisible}
-          onDismiss={closeLanguageMenu}
-          anchor={
-            <TouchableRipple
-              onPress={openLanguageMenu}
-              style={[styles.dropdownTrigger, { borderColor: colors.border }]}
-              borderless={false}
-            >
-              <View style={styles.dropdownContent}>
-                <Text style={[styles.dropdownText, { color: colors.text }]}>
-                  {t(localLang === 'en' ? 'english' : 'russian')}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-          }
-          contentStyle={{ backgroundColor: colors.surface }}
-        >
-          {availableLanguages.map(lng => (
-            <Menu.Item
-              key={lng}
-              onPress={() => handleLanguageSelect(lng)}
-              title={t(lng === 'en' ? 'english' : 'russian')}
-              titleStyle={{ color: colors.text }}
-              style={{ backgroundColor: colors.surface }}
-            />
-          ))}
-        </Menu>
+        <View style={styles.languageContainer}>
+          <TouchableRipple
+            onPress={toggleLanguageExpanded}
+            style={[styles.languageTrigger, { borderColor: colors.border, backgroundColor: colors.surface }]}
+            borderless={false}
+          >
+            <View style={styles.languageHeader}>
+              <Text style={[styles.languageText, { color: colors.text }]}>
+                {t(localLang === 'en' ? 'english' : 'russian')}
+              </Text>
+              <Ionicons
+                name={languageExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.mutedText}
+              />
+            </View>
+          </TouchableRipple>
+
+          {languageExpanded && (
+            <View style={[styles.languageOptions, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {availableLanguages.map(lng => (
+                <TouchableRipple
+                  key={lng}
+                  onPress={() => handleLanguageSelect(lng)}
+                  style={styles.languageOption}
+                >
+                  <View style={styles.languageOptionContent}>
+                    <Text style={[styles.languageOptionText, { color: colors.text }]}>
+                      {t(lng === 'en' ? 'english' : 'russian')}
+                    </Text>
+                    {localLang === lng && (
+                      <Ionicons name="checkmark" size={20} color={colors.primary} />
+                    )}
+                  </View>
+                </TouchableRipple>
+              ))}
+            </View>
+          )}
+        </View>
 
         <Divider style={styles.divider} />
 
@@ -319,21 +330,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  dropdownTrigger: {
+  languageContainer: {
     marginTop: 8,
     marginBottom: 8,
+  },
+  languageTrigger: {
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  dropdownContent: {
+  languageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  dropdownText: {
+  languageText: {
+    fontSize: 16,
+  },
+  languageOptions: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  languageOption: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  languageOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  languageOptionText: {
     fontSize: 16,
   },
   divider: {
