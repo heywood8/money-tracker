@@ -2,6 +2,7 @@
 
 This document contains potential features for the Penny app. Use the architect agent to design these features before implementation.
 
+
 ## High Priority Features
 
 ### 1. Budget Tracking
@@ -10,17 +11,18 @@ This document contains potential features for the Penny app. Use the architect a
 **User Value**: Helps users control spending and achieve financial goals.
 **Command**: Use architect agent to design budget tracking feature
 
-### 2. Recurring Transactions
+### 2. Data Export/Import
 **Status**: Not Started
-**Description**: Automate regular expenses and income (salary, rent, subscriptions, etc.).
-**User Value**: Saves time by automatically creating expected transactions.
-**Command**: Use architect agent to design recurring transactions feature
+**Description**: Allow users to export data to CSV/Excel and import from other apps.
+**User Value**: Data portability, backup, and integration with other financial tools.
+**Command**: Use architect agent to design data export/import feature
 
-### 3. Reports and Analytics
+### 3. Multi-Currency Support Enhancement
 **Status**: Not Started
-**Description**: Provide insights into spending patterns, trends over time, and financial summaries.
-**User Value**: Helps users understand their financial behavior and make better decisions.
-**Command**: Use architect agent to design reports and analytics feature
+**Description**: Add exchange rate tracking, automatic conversion, and multi-currency reporting.
+**User Value**: Better support for users with accounts in different currencies.
+**Command**: Use architect agent to design multi-currency support feature
+
 
 ## Medium Priority Features
 
@@ -30,43 +32,50 @@ This document contains potential features for the Penny app. Use the architect a
 **User Value**: Makes it easy to find specific transactions in large datasets.
 **Command**: Use architect agent to design search and filters feature
 
-### 5. Data Export/Import
-**Status**: Not Started
-**Description**: Allow users to export data to CSV/Excel and import from other apps.
-**User Value**: Data portability, backup, and integration with other financial tools.
-**Command**: Use architect agent to design data export/import feature
-
-### 6. Tags and Labels
-**Status**: Not Started
-**Description**: Add custom tags to operations for additional categorization beyond folders.
-**User Value**: More flexible organization (e.g., "tax-deductible", "business", "vacation").
-**Command**: Use architect agent to design tags and labels feature
-
-### 7. Multi-Currency Support Enhancement
-**Status**: Not Started
-**Description**: Add exchange rate tracking, automatic conversion, and multi-currency reporting.
-**User Value**: Better support for users with accounts in different currencies.
-**Command**: Use architect agent to design multi-currency support feature
-
-## Low Priority Features
-
-### 8. Attachments (Receipts/Photos)
+### 5. Attachments (Receipts/Photos)
 **Status**: Not Started
 **Description**: Allow users to attach photos of receipts or documents to operations.
 **User Value**: Keep all transaction-related information in one place.
 **Command**: Use architect agent to design attachments feature
 
-### 9. Split Transactions
-**Status**: Not Started
-**Description**: Enable dividing a single transaction across multiple categories.
-**User Value**: More accurate categorization (e.g., grocery shopping with household items).
-**Command**: Use architect agent to design split transactions feature
-
-### 10. Goals and Savings Tracking
+### 6. Goals and Savings Tracking
 **Status**: Not Started
 **Description**: Set financial goals and track progress toward them with visual indicators.
 **User Value**: Motivation and clear visibility of progress toward objectives.
 **Command**: Use architect agent to design goals and savings tracking feature
+
+### 7. Widget Support
+**Status**: Not Started
+**Description**: Home screen widgets showing balance, recent transactions, or budgets.
+**User Value**: Quick access to financial information without opening app.
+**Command**: Use architect agent to design widget support feature
+
+### 8. Tags and Labels
+**Status**: Not Started
+**Description**: Add custom tags to operations for additional categorization beyond folders.
+**User Value**: More flexible organization (e.g., "tax-deductible", "business", "vacation").
+**Command**: Use architect agent to design tags and labels feature
+
+
+## Low Priority Features
+
+### 9. Recurring Transactions
+**Status**: Not Started
+**Description**: Automate regular expenses and income (salary, rent, subscriptions, etc.).
+**User Value**: Saves time by automatically creating expected transactions.
+**Command**: Use architect agent to design recurring transactions feature
+
+### 10. Reports and Analytics
+**Status**: Not Started
+**Description**: Provide insights into spending patterns, trends over time, and financial summaries.
+**User Value**: Helps users understand their financial behavior and make better decisions.
+**Command**: Use architect agent to design reports and analytics feature
+
+### 11. Split Transactions
+**Status**: Not Started
+**Description**: Enable dividing a single transaction across multiple categories.
+**User Value**: More accurate categorization (e.g., grocery shopping with household items).
+**Command**: Use architect agent to design split transactions feature
 
 ## Future Considerations
 
