@@ -1,4 +1,4 @@
-# SQLite Migration Plan - Money Tracker
+# SQLite Migration Plan - Penny
 
 **Document Version:** 1.0
 **Created:** 2025-01-18
@@ -1824,7 +1824,7 @@ const addOperation = useCallback(async (operation) => {
 ```markdown
 ## Data Storage
 
-Money Tracker uses SQLite for financial data storage:
+Penny uses SQLite for financial data storage:
 
 - **Accounts** - User's financial accounts
 - **Categories** - Hierarchical expense/income categories
@@ -2372,7 +2372,7 @@ SQLite already compresses, but could add VACUUM on schedule
 
 ## Conclusion
 
-This migration plan provides a comprehensive, phased approach to moving Money Tracker's financial data from AsyncStorage to SQLite. The migration:
+This migration plan provides a comprehensive, phased approach to moving Penny's financial data from AsyncStorage to SQLite. The migration:
 
 1. **Preserves Data:** Automatic migration with verification
 2. **Improves Performance:** 10-50x faster for large datasets
