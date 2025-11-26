@@ -18,3 +18,4 @@ jobs:
           release-type: node
           package-name: penny
           include-v-in-tag: true
+          token: ${{ secrets.RELEASE_TOKEN }}
