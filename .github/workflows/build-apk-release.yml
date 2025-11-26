@@ -1,0 +1,70 @@
+name: Build APK and Upload to Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK and Upload to Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build APK
+        working-directory: ./android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Get tag name
+        id: get_tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Find APK file
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "APK_NAME=penny-${{ steps.get_tag.outputs.TAG }}.apk" >> $GITHUB_OUTPUT
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find_apk.outputs.APK_PATH }}
+          name: ${{ steps.get_tag.outputs.TAG }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename and upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.find_apk.outputs.APK_NAME }}
+          path: ${{ steps.find_apk.outputs.APK_PATH }}
+          retention-days: 30
