@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
@@ -11,6 +12,45 @@ import SimplePicker from './components/SimplePicker';
 // Currency formatting helper
 const formatCurrency = (amount, currency) => {
   return `${parseFloat(amount).toFixed(2)} ${currency}`;
+};
+
+// Custom Legend Component
+const CustomLegend = ({ data, currency, colors }) => {
+  const total = data.reduce((sum, item) => sum + item.amount, 0);
+
+  return (
+    <View style={styles.legendContainer}>
+      {data.map((item, index) => {
+        const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
+        return (
+          <View key={index} style={[styles.legendItem, { borderBottomColor: colors.border }]}>
+            <View style={styles.legendLeft}>
+              <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
+              {item.icon && (
+                <Icon
+                  name={item.icon}
+                  size={18}
+                  color={colors.text}
+                  style={styles.legendIcon}
+                />
+              )}
+              <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+            </View>
+            <View style={styles.legendRight}>
+              <Text style={[styles.legendAmount, { color: colors.text }]}>
+                {formatCurrency(item.amount, currency)}
+              </Text>
+              <Text style={[styles.legendPercentage, { color: colors.mutedText }]}>
+                {percentage}%
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
 };
 
 const GraphsScreen = () => {
@@ -33,6 +73,10 @@ const GraphsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [loadingIncome, setLoadingIncome] = useState(true);
   const [availableMonths, setAvailableMonths] = useState([]);
+
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
 
   // Month names translation keys
   const monthKeys = [
@@ -191,13 +235,17 @@ const GraphsScreen = () => {
       ];
 
       // Transform regular categories for pie chart
-      const data = regularSpending.map((item, index) => ({
-        name: categoryMap.get(item.category_id) || t('unknown_category'),
-        amount: parseFloat(item.total),
-        color: chartColors[index % chartColors.length],
-        legendFontColor: colors.text,
-        legendFontSize: 13
-      }));
+      const data = regularSpending.map((item, index) => {
+        const category = categories.find(cat => cat.id === item.category_id);
+        return {
+          name: categoryMap.get(item.category_id) || t('unknown_category'),
+          amount: parseFloat(item.total),
+          color: chartColors[index % chartColors.length],
+          legendFontColor: colors.text,
+          legendFontSize: 13,
+          icon: category?.icon || null,
+        };
+      });
 
       // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
       if (shadowCategoryTotal > 0) {
@@ -206,7 +254,8 @@ const GraphsScreen = () => {
           amount: shadowCategoryTotal,
           color: chartColors[data.length % chartColors.length],
           legendFontColor: colors.text,
-          legendFontSize: 13
+          legendFontSize: 13,
+          icon: null,
         });
       }
 
@@ -274,13 +323,17 @@ const GraphsScreen = () => {
       ];
 
       // Transform data for pie chart
-      const data = filteredIncome.map((item, index) => ({
-        name: categoryMap.get(item.category_id) || t('unknown_category'),
-        amount: parseFloat(item.total),
-        color: chartColors[index % chartColors.length],
-        legendFontColor: colors.text,
-        legendFontSize: 13
-      }));
+      const data = filteredIncome.map((item, index) => {
+        const category = categories.find(cat => cat.id === item.category_id);
+        return {
+          name: categoryMap.get(item.category_id) || t('unknown_category'),
+          amount: parseFloat(item.total),
+          color: chartColors[index % chartColors.length],
+          legendFontColor: colors.text,
+          legendFontSize: 13,
+          icon: category?.icon || null,
+        };
+      });
 
       setIncomeChartData(data);
     } catch (error) {
@@ -357,154 +410,270 @@ const GraphsScreen = () => {
 
   const screenWidth = Dimensions.get('window').width;
 
+  // Handlers for opening modals
+  const openExpenseModal = () => {
+    setModalType('expense');
+    setModalVisible(true);
+  };
+
+  const openIncomeModal = () => {
+    setModalType('income');
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {t('expenses_by_category')}
-        </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          {/* Filters Row */}
+          <View style={styles.filtersRow}>
+            {/* Currency Picker */}
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <SimplePicker
+                value={selectedCurrency}
+                onValueChange={setSelectedCurrency}
+                items={currencyItems}
+                colors={colors}
+              />
+            </View>
 
-        {/* Filters Row */}
-        <View style={styles.filtersRow}>
-          {/* Category Picker */}
-          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <SimplePicker
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-              items={categoryItems}
-              colors={colors}
-            />
+            {/* Year Picker */}
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <SimplePicker
+                value={selectedYear}
+                onValueChange={setSelectedYear}
+                items={yearItems}
+                colors={colors}
+              />
+            </View>
+
+            {/* Month Picker */}
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <SimplePicker
+                value={selectedMonth}
+                onValueChange={setSelectedMonth}
+                items={monthItems}
+                colors={colors}
+              />
+            </View>
           </View>
 
-          {/* Currency Picker */}
-          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <SimplePicker
-              value={selectedCurrency}
-              onValueChange={setSelectedCurrency}
-              items={currencyItems}
-              colors={colors}
-            />
-          </View>
+          {/* Expenses Summary Card */}
+          <TouchableOpacity
+            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={openExpenseModal}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('expenses_by_category')}
+          >
+            <View style={styles.summaryCardContent}>
+              <View style={styles.summaryInfo}>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+                  {t('total_expenses')}
+                </Text>
+                <Text style={[styles.summaryAmount, { color: colors.text }]}>
+                  {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
+                </Text>
+              </View>
+              <View style={styles.miniChartContainer}>
+                {loading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : chartData.length > 0 ? (
+                  <PieChart
+                    data={chartData}
+                    width={80}
+                    height={80}
+                    chartConfig={{
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    }}
+                    accessor="amount"
+                    backgroundColor="transparent"
+                    paddingLeft="0"
+                    hasLegend={false}
+                    center={[20, 0]}
+                  />
+                ) : (
+                  <View style={styles.noDataPlaceholder}>
+                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
 
-          {/* Year Picker */}
-          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <SimplePicker
-              value={selectedYear}
-              onValueChange={setSelectedYear}
-              items={yearItems}
-              colors={colors}
-            />
-          </View>
+          {/* Income Summary Card */}
+          <TouchableOpacity
+            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={openIncomeModal}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('income_by_category')}
+          >
+            <View style={styles.summaryCardContent}>
+              <View style={styles.summaryInfo}>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+                  {t('total_income')}
+                </Text>
+                <Text style={[styles.summaryAmount, { color: colors.text }]}>
+                  {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+                </Text>
+              </View>
+              <View style={styles.miniChartContainer}>
+                {loadingIncome ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : incomeChartData.length > 0 ? (
+                  <PieChart
+                    data={incomeChartData}
+                    width={80}
+                    height={80}
+                    chartConfig={{
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    }}
+                    accessor="amount"
+                    backgroundColor="transparent"
+                    paddingLeft="0"
+                    hasLegend={false}
+                    center={[20, 0]}
+                  />
+                ) : (
+                  <View style={styles.noDataPlaceholder}>
+                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-          {/* Month Picker */}
-          <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <SimplePicker
-              value={selectedMonth}
-              onValueChange={setSelectedMonth}
-              items={monthItems}
-              colors={colors}
-            />
+      {/* Chart Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
+              </Text>
+              <TouchableOpacity
+                onPress={closeModal}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
+              >
+                <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+                  {t('close')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {modalType === 'expense' && (
+              <>
+                {/* Expense Category Picker */}
+                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <SimplePicker
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                    items={categoryItems}
+                    colors={colors}
+                  />
+                </View>
+
+                <ScrollView style={styles.modalScrollView}>
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                      <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+                        {t('loading_operations')}
+                      </Text>
+                    </View>
+                  ) : chartData.length > 0 ? (
+                    <>
+                      <View style={styles.chartContainer}>
+                        <PieChart
+                          data={chartData}
+                          width={screenWidth - 64}
+                          height={220}
+                          chartConfig={{
+                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                          }}
+                          accessor="amount"
+                          backgroundColor="transparent"
+                          paddingLeft="15"
+                          center={[0, 0]}
+                          hasLegend={false}
+                        />
+                      </View>
+                      <CustomLegend data={chartData} currency={selectedCurrency} colors={colors} />
+                    </>
+                  ) : (
+                    <Text style={[styles.noData, { color: colors.mutedText }]}>
+                      {t('no_expense_data')}
+                    </Text>
+                  )}
+                </ScrollView>
+              </>
+            )}
+
+            {modalType === 'income' && (
+              <>
+                {/* Income Category Picker */}
+                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <SimplePicker
+                    value={selectedIncomeCategory}
+                    onValueChange={setSelectedIncomeCategory}
+                    items={incomeCategoryItems}
+                    colors={colors}
+                  />
+                </View>
+
+                <ScrollView style={styles.modalScrollView}>
+                  {loadingIncome ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                      <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+                        {t('loading_operations')}
+                      </Text>
+                    </View>
+                  ) : incomeChartData.length > 0 ? (
+                    <>
+                      <View style={styles.chartContainer}>
+                        <PieChart
+                          data={incomeChartData}
+                          width={screenWidth - 64}
+                          height={220}
+                          chartConfig={{
+                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                          }}
+                          accessor="amount"
+                          backgroundColor="transparent"
+                          paddingLeft="15"
+                          center={[0, 0]}
+                          hasLegend={false}
+                        />
+                      </View>
+                      <CustomLegend data={incomeChartData} currency={selectedCurrency} colors={colors} />
+                    </>
+                  ) : (
+                    <Text style={[styles.noData, { color: colors.mutedText }]}>
+                      {t('no_income_data')}
+                    </Text>
+                  )}
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
-
-        {/* Total Expenses Display */}
-        {!loading && chartData.length > 0 && (
-          <View style={[styles.totalContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
-              {t('total_expenses')}:
-            </Text>
-            <Text style={[styles.totalAmount, { color: colors.text }]}>
-              {formatCurrency(totalExpenses, selectedCurrency)}
-            </Text>
-          </View>
-        )}
-
-        {/* Pie Chart */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-              {t('loading_operations')}
-            </Text>
-          </View>
-        ) : chartData.length > 0 ? (
-          <View style={styles.chartContainer}>
-            <PieChart
-              data={chartData}
-              width={screenWidth - 32}
-              height={220}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              center={[0, 0]}
-            />
-          </View>
-        ) : (
-          <Text style={[styles.noData, { color: colors.mutedText }]}>
-            {t('no_expense_data')}
-          </Text>
-        )}
-
-        {/* Income Section */}
-        <Text style={[styles.title, { color: colors.text, marginTop: 40 }]}>
-          {t('income_by_category')}
-        </Text>
-
-        {/* Income Category Picker */}
-        <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 16 }]}>
-          <SimplePicker
-            value={selectedIncomeCategory}
-            onValueChange={setSelectedIncomeCategory}
-            items={incomeCategoryItems}
-            colors={colors}
-          />
-        </View>
-
-        {/* Total Income Display */}
-        {!loadingIncome && incomeChartData.length > 0 && (
-          <View style={[styles.totalContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
-              {t('total_income')}:
-            </Text>
-            <Text style={[styles.totalAmount, { color: colors.text }]}>
-              {formatCurrency(totalIncome, selectedCurrency)}
-            </Text>
-          </View>
-        )}
-
-        {/* Income Pie Chart */}
-        {loadingIncome ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-              {t('loading_operations')}
-            </Text>
-          </View>
-        ) : incomeChartData.length > 0 ? (
-          <View style={styles.chartContainer}>
-            <PieChart
-              data={incomeChartData}
-              width={screenWidth - 32}
-              height={220}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              center={[0, 0]}
-            />
-          </View>
-        ) : (
-          <Text style={[styles.noData, { color: colors.mutedText }]}>
-            {t('no_income_data')}
-          </Text>
-        )}
-      </View>
-    </ScrollView>
+      </Modal>
+    </View>
   );
 };
 
@@ -512,19 +681,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
     padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
   },
   filtersRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   pickerWrapper: {
     flex: 1,
@@ -533,23 +699,88 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     height: 40,
   },
-  totalContainer: {
+  summaryCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  summaryCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 16,
   },
-  totalLabel: {
+  summaryInfo: {
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  summaryAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  miniChartContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noDataPlaceholder: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noDataText: {
+    fontSize: 32,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '90%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  modalPickerWrapper: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    height: 40,
+  },
+  modalScrollView: {
+    padding: 20,
   },
   loadingContainer: {
     marginTop: 40,
@@ -567,6 +798,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 40,
+  },
+  legendContainer: {
+    marginTop: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  colorIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  legendName: {
+    fontSize: 15,
+    flex: 1,
+  },
+  legendRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  legendAmount: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  legendPercentage: {
+    fontSize: 14,
+    minWidth: 45,
+    textAlign: 'right',
   },
 });
 
