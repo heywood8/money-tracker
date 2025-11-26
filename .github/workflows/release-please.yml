@@ -17,3 +17,4 @@ jobs:
         with:
           release-type: node
           package-name: penny
+          include-v-in-tag: true
