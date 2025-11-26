@@ -13,6 +13,38 @@ const formatCurrency = (amount, currency) => {
   return `${parseFloat(amount).toFixed(2)} ${currency}`;
 };
 
+// Custom Legend Component
+const CustomLegend = ({ data, currency, colors }) => {
+  const total = data.reduce((sum, item) => sum + item.amount, 0);
+
+  return (
+    <View style={styles.legendContainer}>
+      {data.map((item, index) => {
+        const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
+        return (
+          <View key={index} style={[styles.legendItem, { borderBottomColor: colors.border }]}>
+            <View style={styles.legendLeft}>
+              <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
+              {item.icon && <Text style={styles.legendIcon}>{item.icon}</Text>}
+              <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+            </View>
+            <View style={styles.legendRight}>
+              <Text style={[styles.legendAmount, { color: colors.text }]}>
+                {formatCurrency(item.amount, currency)}
+              </Text>
+              <Text style={[styles.legendPercentage, { color: colors.mutedText }]}>
+                {percentage}%
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
 const GraphsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -195,13 +227,17 @@ const GraphsScreen = () => {
       ];
 
       // Transform regular categories for pie chart
-      const data = regularSpending.map((item, index) => ({
-        name: categoryMap.get(item.category_id) || t('unknown_category'),
-        amount: parseFloat(item.total),
-        color: chartColors[index % chartColors.length],
-        legendFontColor: colors.text,
-        legendFontSize: 13
-      }));
+      const data = regularSpending.map((item, index) => {
+        const category = categories.find(cat => cat.id === item.category_id);
+        return {
+          name: categoryMap.get(item.category_id) || t('unknown_category'),
+          amount: parseFloat(item.total),
+          color: chartColors[index % chartColors.length],
+          legendFontColor: colors.text,
+          legendFontSize: 13,
+          icon: category?.icon || null,
+        };
+      });
 
       // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
       if (shadowCategoryTotal > 0) {
@@ -210,7 +246,8 @@ const GraphsScreen = () => {
           amount: shadowCategoryTotal,
           color: chartColors[data.length % chartColors.length],
           legendFontColor: colors.text,
-          legendFontSize: 13
+          legendFontSize: 13,
+          icon: null,
         });
       }
 
@@ -278,13 +315,17 @@ const GraphsScreen = () => {
       ];
 
       // Transform data for pie chart
-      const data = filteredIncome.map((item, index) => ({
-        name: categoryMap.get(item.category_id) || t('unknown_category'),
-        amount: parseFloat(item.total),
-        color: chartColors[index % chartColors.length],
-        legendFontColor: colors.text,
-        legendFontSize: 13
-      }));
+      const data = filteredIncome.map((item, index) => {
+        const category = categories.find(cat => cat.id === item.category_id);
+        return {
+          name: categoryMap.get(item.category_id) || t('unknown_category'),
+          amount: parseFloat(item.total),
+          color: chartColors[index % chartColors.length],
+          legendFontColor: colors.text,
+          legendFontSize: 13,
+          icon: category?.icon || null,
+        };
+      });
 
       setIncomeChartData(data);
     } catch (error) {
@@ -547,20 +588,24 @@ const GraphsScreen = () => {
                       </Text>
                     </View>
                   ) : chartData.length > 0 ? (
-                    <View style={styles.chartContainer}>
-                      <PieChart
-                        data={chartData}
-                        width={screenWidth - 64}
-                        height={220}
-                        chartConfig={{
-                          color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                        }}
-                        accessor="amount"
-                        backgroundColor="transparent"
-                        paddingLeft="15"
-                        center={[0, 0]}
-                      />
-                    </View>
+                    <>
+                      <View style={styles.chartContainer}>
+                        <PieChart
+                          data={chartData}
+                          width={screenWidth - 64}
+                          height={220}
+                          chartConfig={{
+                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                          }}
+                          accessor="amount"
+                          backgroundColor="transparent"
+                          paddingLeft="15"
+                          center={[0, 0]}
+                          hasLegend={false}
+                        />
+                      </View>
+                      <CustomLegend data={chartData} currency={selectedCurrency} colors={colors} />
+                    </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
                       {t('no_expense_data')}
@@ -591,20 +636,24 @@ const GraphsScreen = () => {
                       </Text>
                     </View>
                   ) : incomeChartData.length > 0 ? (
-                    <View style={styles.chartContainer}>
-                      <PieChart
-                        data={incomeChartData}
-                        width={screenWidth - 64}
-                        height={220}
-                        chartConfig={{
-                          color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                        }}
-                        accessor="amount"
-                        backgroundColor="transparent"
-                        paddingLeft="15"
-                        center={[0, 0]}
-                      />
-                    </View>
+                    <>
+                      <View style={styles.chartContainer}>
+                        <PieChart
+                          data={incomeChartData}
+                          width={screenWidth - 64}
+                          height={220}
+                          chartConfig={{
+                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                          }}
+                          accessor="amount"
+                          backgroundColor="transparent"
+                          paddingLeft="15"
+                          center={[0, 0]}
+                          hasLegend={false}
+                        />
+                      </View>
+                      <CustomLegend data={incomeChartData} currency={selectedCurrency} colors={colors} />
+                    </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
                       {t('no_income_data')}
@@ -741,6 +790,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 40,
+  },
+  legendContainer: {
+    marginTop: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  colorIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  legendName: {
+    fontSize: 15,
+    flex: 1,
+  },
+  legendRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  legendAmount: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  legendPercentage: {
+    fontSize: 14,
+    minWidth: 45,
+    textAlign: 'right',
   },
 });
 
