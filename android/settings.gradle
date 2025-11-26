@@ -37,7 +37,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
 }
 expoAutolinking.useExpoModules()
 
-rootProject.name = 'Money Keeper'
+rootProject.name = 'Penny'
 
 expoAutolinking.useExpoVersionCatalog()
 
