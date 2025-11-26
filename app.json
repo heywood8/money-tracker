@@ -30,10 +30,6 @@
       "edgeToEdgeEnabled": true,
       "package": "com.heywood8.monkeep"
     },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
-    },
     "extra": {
       "eas": {
         "projectId": "89372eb2-93f5-475a-a630-9caa827d8406"
