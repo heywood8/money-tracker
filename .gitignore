@@ -88,3 +88,4 @@ ios/Podfile.lock
 .idea/
 *.iml
 *.hprof
+.env.local
