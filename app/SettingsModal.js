@@ -135,10 +135,10 @@ export default function SettingsModal({ visible, onClose }) {
   }, [visible, theme, language]);
 
   return (
-    <>
-      <Portal>
+    <Portal>
+      {!languageModalVisible ? (
         <Modal
-          visible={visible && !languageModalVisible}
+          visible={visible}
           onDismiss={onClose}
           contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
         >
@@ -265,50 +265,45 @@ export default function SettingsModal({ visible, onClose }) {
           </Button>
         </View>
       </Modal>
-    </Portal>
-
-    {/* Language Selection Modal */}
-    {languageModalVisible && (
-      <Portal>
+      ) : (
         <Modal
-          visible={true}
+          visible={visible}
           onDismiss={closeLanguageModal}
           contentContainerStyle={[styles.languageModalContent, { backgroundColor: colors.card }]}
         >
-        <View style={styles.languageModalHeader}>
-          <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-            {t('language')}
-          </Text>
-          <View style={styles.backButton} />
-        </View>
+          <View style={styles.languageModalHeader}>
+            <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+              {t('language')}
+            </Text>
+            <View style={styles.backButton} />
+          </View>
 
-        <Divider />
+          <Divider />
 
-        <View style={styles.languageList}>
-          {availableLanguages.map(lng => (
-            <TouchableRipple
-              key={lng}
-              onPress={() => handleLanguageSelect(lng)}
-              style={styles.languageItem}
-            >
-              <View style={styles.languageItemContent}>
-                <Text style={[styles.languageItemText, { color: colors.text }]}>
-                  {t(lng === 'en' ? 'english' : 'russian')}
-                </Text>
-                {localLang === lng && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                )}
-              </View>
-            </TouchableRipple>
-          ))}
-        </View>
-      </Modal>
+          <View style={styles.languageList}>
+            {availableLanguages.map(lng => (
+              <TouchableRipple
+                key={lng}
+                onPress={() => handleLanguageSelect(lng)}
+                style={styles.languageItem}
+              >
+                <View style={styles.languageItemContent}>
+                  <Text style={[styles.languageItemText, { color: colors.text }]}>
+                    {t(lng === 'en' ? 'english' : 'russian')}
+                  </Text>
+                  {localLang === lng && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </View>
+              </TouchableRipple>
+            ))}
+          </View>
+        </Modal>
+      )}
     </Portal>
-    )}
-    </>
   );
 }
 
