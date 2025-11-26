@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/heywood8/money-tracker/compare/v0.1.0...v0.1.1) (2025-11-26)
+
+
+### Bug Fixes
+
+* **workflows:** add manual builds on tags ([6f5e8fc](https://github.com/heywood8/money-tracker/commit/6f5e8fc9ae04a35d9b2905dfa6cb6159bbddde65))
+
 ## 0.1.0 (2025-11-26)
 
 
