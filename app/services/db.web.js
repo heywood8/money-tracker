@@ -3,7 +3,7 @@
  * This file is automatically used on web platform instead of db.js
  */
 
-const DB_NAME = 'money_tracker';
+const DB_NAME = 'penny';
 const DB_VERSION = 5;
 
 let dbInstance = null;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Money Tracker (Money Keeper) is a React Native mobile app built with Expo for tracking personal finances. The app supports iOS, Android, and web platforms with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app supports iOS, Android, and web platforms with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
 
 ## Development Commands
 
@@ -81,8 +81,8 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 ### Data Persistence
 
 **Database Layer** (SQLite/IndexedDB):
-- **Native (iOS/Android)**: SQLite database (`money_tracker.db`)
-- **Web**: IndexedDB (`money_tracker` database)
+- **Native (iOS/Android)**: SQLite database (`penny.db`)
+- **Web**: IndexedDB (`penny` database)
 - Platform-specific implementations: `*.js` for native, `*.web.js` for web
 - Database modules: `db.js`, `AccountsDB.js`, `OperationsDB.js`, `CategoriesDB.js`
 - Automatic migration from AsyncStorage on first run
@@ -122,7 +122,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 - Expo managed workflow with EAS
 - Bundle identifier: `com.heywood8.monkeep`
-- App name: "Money Keeper"
+- App name: "Penny"
 - New Architecture enabled (`newArchEnabled: true`)
 - EAS project ID: `89372eb2-93f5-475a-a630-9caa827d8406`
 

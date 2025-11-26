@@ -1,6 +1,6 @@
-# Test Strategy for Money Tracker App
+# Test Strategy for Penny
 
-This document outlines the comprehensive testing strategy for the Money Tracker application, designed to prevent regressions and ensure critical functionality remains stable across changes.
+This document outlines the comprehensive testing strategy for the Penny application, designed to prevent regressions and ensure critical functionality remains stable across changes.
 
 ## Testing Philosophy
 
