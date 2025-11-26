@@ -177,7 +177,13 @@
     "restore_confirm": "Are you sure you want to restore from backup? This will replace all current data.",
     "backup_error": "Failed to create backup",
     "restore_error": "Failed to restore backup",
-    "invalid_backup": "Invalid backup file"
+    "invalid_backup": "Invalid backup file",
+    "spending_prediction": "Spending Prediction",
+    "current_spending": "Current Spending",
+    "predicted_spending": "Predicted by Month End",
+    "days_elapsed": "Days Elapsed",
+    "daily_average": "Daily Average",
+    "no_prediction_data": "Not enough data to predict spending"
   },
   "ru": {
     "accounts": "Счета",
@@ -357,7 +363,13 @@
     "restore_confirm": "Вы уверены, что хотите восстановить базу данных из резервной копии? Это заменит все текущие данные.",
     "backup_error": "Не удалось создать резервную копию",
     "restore_error": "Не удалось восстановить резервную копию",
-    "invalid_backup": "Неверный файл резервной копии"
+    "invalid_backup": "Неверный файл резервной копии",
+    "spending_prediction": "Прогноз расходов",
+    "current_spending": "Текущие расходы",
+    "predicted_spending": "Прогноз на конец месяца",
+    "days_elapsed": "Прошло дней",
+    "daily_average": "Среднее в день",
+    "no_prediction_data": "Недостаточно данных для прогноза"
   }
 }
 
