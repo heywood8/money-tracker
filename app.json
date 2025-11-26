@@ -39,6 +39,16 @@
         "projectId": "89372eb2-93f5-475a-a630-9caa827d8406"
       }
     },
-    "owner": "lopatinikita"
+    "owner": "lopatinikita",
+    "plugins": [
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "penny",
+          "organization": "heywood8"
+        }
+      ]
+    ]
   }
 }
