@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -15,15 +15,32 @@ const formatCurrency = (amount, currency) => {
 };
 
 // Custom Legend Component
-const CustomLegend = ({ data, currency, colors }) => {
+const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
   const total = data.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <View style={styles.legendContainer}>
       {data.map((item, index) => {
         const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
+        const ItemWrapper = isClickable && item.categoryId ? TouchableOpacity : View;
+        const wrapperProps = isClickable && item.categoryId ? {
+          onPress: () => onItemPress(item.categoryId),
+          activeOpacity: 0.7,
+          accessibilityRole: 'button',
+          accessibilityLabel: `View details for ${item.name}`,
+          accessibilityHint: 'Double tap to filter by this category'
+        } : {};
+
         return (
-          <View key={index} style={[styles.legendItem, { borderBottomColor: colors.border }]}>
+          <ItemWrapper
+            key={index}
+            style={[
+              styles.legendItem,
+              { borderBottomColor: colors.border },
+              isClickable && item.categoryId && styles.legendItemClickable
+            ]}
+            {...wrapperProps}
+          >
             <View style={styles.legendLeft}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
               {item.icon && (
@@ -37,6 +54,14 @@ const CustomLegend = ({ data, currency, colors }) => {
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
+              {isClickable && item.categoryId && (
+                <Icon
+                  name="chevron-right"
+                  size={16}
+                  color={colors.mutedText}
+                  style={styles.legendChevron}
+                />
+              )}
             </View>
             <View style={styles.legendRight}>
               <Text style={[styles.legendAmount, { color: colors.text }]}>
@@ -46,7 +71,7 @@ const CustomLegend = ({ data, currency, colors }) => {
                 {percentage}%
               </Text>
             </View>
-          </View>
+          </ItemWrapper>
         );
       })}
     </View>
@@ -77,6 +102,46 @@ const GraphsScreen = () => {
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
+
+  // Pan Responder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes from the left edge when not viewing "All"
+        const isExpenseMode = modalType === 'expense';
+        const currentCategory = isExpenseMode ? selectedCategory : selectedIncomeCategory;
+        return currentCategory !== 'all' && gestureState.dx > 20 && Math.abs(gestureState.dy) < 80;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Swipe right to go back to "All"
+        if (gestureState.dx > 100) {
+          if (modalType === 'expense') {
+            setSelectedCategory('all');
+          } else {
+            setSelectedIncomeCategory('all');
+          }
+        }
+      },
+    })
+  ).current;
+
+  // Handlers for legend item clicks
+  const handleExpenseLegendItemPress = useCallback((categoryId) => {
+    setSelectedCategory(categoryId);
+  }, []);
+
+  const handleIncomeLegendItemPress = useCallback((categoryId) => {
+    setSelectedIncomeCategory(categoryId);
+  }, []);
+
+  const handleBackToAll = useCallback(() => {
+    if (modalType === 'expense') {
+      setSelectedCategory('all');
+    } else {
+      setSelectedIncomeCategory('all');
+    }
+  }, [modalType]);
 
   // Month names translation keys
   const monthKeys = [
@@ -292,6 +357,7 @@ const GraphsScreen = () => {
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: item.category.icon || null,
+          categoryId: item.category.id, // For clickable legend navigation
         };
       });
 
@@ -431,6 +497,7 @@ const GraphsScreen = () => {
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: item.category.icon || null,
+          categoryId: item.category.id, // For clickable legend navigation
         };
       });
 
@@ -660,11 +727,25 @@ const GraphsScreen = () => {
         onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
-              </Text>
+              <View style={styles.modalHeaderLeft}>
+                {((modalType === 'expense' && selectedCategory !== 'all') ||
+                  (modalType === 'income' && selectedIncomeCategory !== 'all')) && (
+                  <TouchableOpacity
+                    onPress={handleBackToAll}
+                    style={styles.backButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back') || 'Back to all categories'}
+                    accessibilityHint="Returns to viewing all categories"
+                  >
+                    <Icon name="arrow-left" size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={closeModal}
                 style={styles.closeButton}
@@ -679,15 +760,17 @@ const GraphsScreen = () => {
 
             {modalType === 'expense' && (
               <>
-                {/* Expense Category Picker */}
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                    items={categoryItems}
-                    colors={colors}
-                  />
-                </View>
+                {/* Expense Category Picker - Only show when not viewing "All" */}
+                {selectedCategory !== 'all' && (
+                  <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                      items={categoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                )}
 
                 <ScrollView style={styles.modalScrollView}>
                   {loading ? (
@@ -714,7 +797,13 @@ const GraphsScreen = () => {
                           hasLegend={false}
                         />
                       </View>
-                      <CustomLegend data={chartData} currency={selectedCurrency} colors={colors} />
+                      <CustomLegend
+                        data={chartData}
+                        currency={selectedCurrency}
+                        colors={colors}
+                        onItemPress={handleExpenseLegendItemPress}
+                        isClickable={selectedCategory === 'all'}
+                      />
                     </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
@@ -727,15 +816,17 @@ const GraphsScreen = () => {
 
             {modalType === 'income' && (
               <>
-                {/* Income Category Picker */}
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedIncomeCategory}
-                    onValueChange={setSelectedIncomeCategory}
-                    items={incomeCategoryItems}
-                    colors={colors}
-                  />
-                </View>
+                {/* Income Category Picker - Only show when not viewing "All" */}
+                {selectedIncomeCategory !== 'all' && (
+                  <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedIncomeCategory}
+                      onValueChange={setSelectedIncomeCategory}
+                      items={incomeCategoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                )}
 
                 <ScrollView style={styles.modalScrollView}>
                   {loadingIncome ? (
@@ -762,7 +853,13 @@ const GraphsScreen = () => {
                           hasLegend={false}
                         />
                       </View>
-                      <CustomLegend data={incomeChartData} currency={selectedCurrency} colors={colors} />
+                      <CustomLegend
+                        data={incomeChartData}
+                        currency={selectedCurrency}
+                        colors={colors}
+                        onItemPress={handleIncomeLegendItemPress}
+                        isClickable={selectedIncomeCategory === 'all'}
+                      />
                     </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
@@ -861,6 +958,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 12,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -912,6 +1019,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderBottomWidth: 1,
   },
+  legendItemClickable: {
+    paddingHorizontal: 8,
+  },
   legendLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -927,6 +1037,9 @@ const styles = StyleSheet.create({
   legendIcon: {
     fontSize: 18,
     marginRight: 8,
+  },
+  legendChevron: {
+    marginLeft: 4,
   },
   legendName: {
     fontSize: 15,
