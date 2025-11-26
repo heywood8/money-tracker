@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Alert, Platform, TouchableOpacity } from 'react-native';
-import { Portal, Modal, Text, Button, Divider, Menu } from 'react-native-paper';
+import { Portal, Modal, Text, Button, Divider, Menu, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
@@ -16,6 +16,14 @@ export default function SettingsModal({ visible, onClose }) {
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
+
+  const openLanguageMenu = useCallback(() => setLanguageMenuVisible(true), []);
+  const closeLanguageMenu = useCallback(() => setLanguageMenuVisible(false), []);
+
+  const handleLanguageSelect = useCallback((lng) => {
+    setLocalLang(lng);
+    setLanguageMenuVisible(false);
+  }, []);
 
   const handleResetDatabase = () => {
     Alert.alert(
@@ -181,35 +189,35 @@ export default function SettingsModal({ visible, onClose }) {
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <View>
-          <Menu
-            visible={languageMenuVisible}
-            onDismiss={() => setLanguageMenuVisible(false)}
-            anchor={
-              <Button
-                mode="outlined"
-                onPress={() => setLanguageMenuVisible(true)}
-                style={styles.dropdown}
-                contentStyle={styles.dropdownContent}
-                icon={() => <Ionicons name="chevron-down" size={20} color={colors.text} />}
-                labelStyle={{ color: colors.text }}
-              >
-                {t(localLang === 'en' ? 'english' : 'russian')}
-              </Button>
-            }
-          >
-            {availableLanguages.map(lng => (
-              <Menu.Item
-                key={lng}
-                onPress={() => {
-                  setLocalLang(lng);
-                  setLanguageMenuVisible(false);
-                }}
-                title={t(lng === 'en' ? 'english' : 'russian')}
-              />
-            ))}
-          </Menu>
-        </View>
+        <Menu
+          visible={languageMenuVisible}
+          onDismiss={closeLanguageMenu}
+          anchor={
+            <TouchableRipple
+              onPress={openLanguageMenu}
+              style={[styles.dropdownTrigger, { borderColor: colors.border }]}
+              borderless={false}
+            >
+              <View style={styles.dropdownContent}>
+                <Text style={[styles.dropdownText, { color: colors.text }]}>
+                  {t(localLang === 'en' ? 'english' : 'russian')}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+          }
+          contentStyle={{ backgroundColor: colors.surface }}
+        >
+          {availableLanguages.map(lng => (
+            <Menu.Item
+              key={lng}
+              onPress={() => handleLanguageSelect(lng)}
+              title={t(lng === 'en' ? 'english' : 'russian')}
+              titleStyle={{ color: colors.text }}
+              style={{ backgroundColor: colors.surface }}
+            />
+          ))}
+        </Menu>
 
         <Divider style={styles.divider} />
 
@@ -311,13 +319,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  dropdown: {
+  dropdownTrigger: {
     marginTop: 8,
     marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   dropdownContent: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownText: {
+    fontSize: 16,
   },
   divider: {
     marginVertical: 12,
