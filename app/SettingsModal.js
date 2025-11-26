@@ -135,13 +135,14 @@ export default function SettingsModal({ visible, onClose }) {
   }, [visible, theme, language]);
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onClose}
-        contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
-      >
-        <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
+    <>
+      <Portal>
+        <Modal
+          visible={visible}
+          onDismiss={onClose}
+          contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
+        >
+          <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
         <View style={styles.themeSwitch}>
@@ -305,6 +306,7 @@ export default function SettingsModal({ visible, onClose }) {
         </View>
       </Modal>
     </Portal>
+    </>
   );
 }
 
