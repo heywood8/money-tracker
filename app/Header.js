@@ -43,13 +43,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
   },
-  title: { fontSize: 11, fontWeight: '700' },
+  title: { fontSize: 14, fontWeight: '700' },
   burger: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  line: { width: 14, height: 2, marginVertical: 1.5 },
+  line: { width: 18, height: 2, marginVertical: 2 },
 });
