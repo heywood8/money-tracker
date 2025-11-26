@@ -138,7 +138,7 @@ export default function SettingsModal({ visible, onClose }) {
     <>
       <Portal>
         <Modal
-          visible={visible}
+          visible={visible && !languageModalVisible}
           onDismiss={onClose}
           contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
         >
@@ -268,12 +268,13 @@ export default function SettingsModal({ visible, onClose }) {
     </Portal>
 
     {/* Language Selection Modal */}
-    <Portal>
-      <Modal
-        visible={languageModalVisible}
-        onDismiss={closeLanguageModal}
-        contentContainerStyle={[styles.languageModalContent, { backgroundColor: colors.card }]}
-      >
+    {languageModalVisible && (
+      <Portal>
+        <Modal
+          visible={true}
+          onDismiss={closeLanguageModal}
+          contentContainerStyle={[styles.languageModalContent, { backgroundColor: colors.card }]}
+        >
         <View style={styles.languageModalHeader}>
           <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -306,6 +307,7 @@ export default function SettingsModal({ visible, onClose }) {
         </View>
       </Modal>
     </Portal>
+    )}
     </>
   );
 }
