@@ -16,7 +16,7 @@ export default function Header({ onOpenSettings }) {
         {
           backgroundColor: colors.surface,
           borderBottomColor: colors.border,
-          paddingTop: insets.top + 8,
+          paddingTop: insets.top + 5,
         }
       ]}
     >
@@ -27,7 +27,7 @@ export default function Header({ onOpenSettings }) {
         accessibilityRole="button"
         accessibilityHint="Opens settings menu"
         style={[styles.burger, { backgroundColor: colors.secondary }]}
-        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <View style={[styles.line, { backgroundColor: colors.text }]} />
         <View style={[styles.line, { backgroundColor: colors.text }]} />
@@ -40,19 +40,19 @@ export default function Header({ onOpenSettings }) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
   },
-  title: { fontSize: 18, fontWeight: '700' },
+  title: { fontSize: 11, fontWeight: '700' },
   burger: {
-    width: 44,  // Increased to minimum touch target
-    height: 44, // Increased to minimum touch target
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  line: { width: 18, height: 2, marginVertical: 2 },
+  line: { width: 14, height: 2, marginVertical: 1.5 },
 });
