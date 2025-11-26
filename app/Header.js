@@ -1,13 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 
 export default function Header({ onOpenSettings }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const insets = useSafeAreaInsets();
 
   return (
     <View
@@ -16,7 +14,6 @@ export default function Header({ onOpenSettings }) {
         {
           backgroundColor: colors.surface,
           borderBottomColor: colors.border,
-          paddingTop: insets.top,
         }
       ]}
     >
@@ -40,7 +37,7 @@ export default function Header({ onOpenSettings }) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
