@@ -15,15 +15,19 @@ export default function SettingsModal({ visible, onClose }) {
   const { resetDatabase } = useAccounts();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
-  const [languageExpanded, setLanguageExpanded] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
-  const toggleLanguageExpanded = useCallback(() => {
-    setLanguageExpanded(prev => !prev);
+  const openLanguageModal = useCallback(() => {
+    setLanguageModalVisible(true);
+  }, []);
+
+  const closeLanguageModal = useCallback(() => {
+    setLanguageModalVisible(false);
   }, []);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLocalLang(lng);
-    setLanguageExpanded(false);
+    setLanguageModalVisible(false);
   }, []);
 
   const handleResetDatabase = () => {
@@ -126,7 +130,7 @@ export default function SettingsModal({ visible, onClose }) {
     if (visible) {
       setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
-      setLanguageExpanded(false);
+      setLanguageModalVisible(false);
     }
   }, [visible, theme, language]);
 
@@ -190,45 +194,18 @@ export default function SettingsModal({ visible, onClose }) {
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <View style={styles.languageContainer}>
-          <TouchableRipple
-            onPress={toggleLanguageExpanded}
-            style={[styles.languageTrigger, { borderColor: colors.border, backgroundColor: colors.surface }]}
-            borderless={false}
-          >
-            <View style={styles.languageHeader}>
-              <Text style={[styles.languageText, { color: colors.text }]}>
-                {t(localLang === 'en' ? 'english' : 'russian')}
-              </Text>
-              <Ionicons
-                name={languageExpanded ? "chevron-up" : "chevron-down"}
-                size={20}
-                color={colors.mutedText}
-              />
-            </View>
-          </TouchableRipple>
-
-          {languageExpanded && (
-            <View style={[styles.languageOptions, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              {availableLanguages.map(lng => (
-                <TouchableRipple
-                  key={lng}
-                  onPress={() => handleLanguageSelect(lng)}
-                  style={styles.languageOption}
-                >
-                  <View style={styles.languageOptionContent}>
-                    <Text style={[styles.languageOptionText, { color: colors.text }]}>
-                      {t(lng === 'en' ? 'english' : 'russian')}
-                    </Text>
-                    {localLang === lng && (
-                      <Ionicons name="checkmark" size={20} color={colors.primary} />
-                    )}
-                  </View>
-                </TouchableRipple>
-              ))}
-            </View>
-          )}
-        </View>
+        <TouchableRipple
+          onPress={openLanguageModal}
+          style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
+          borderless={false}
+        >
+          <View style={styles.languageSelectorContent}>
+            <Text style={[styles.languageText, { color: colors.text }]}>
+              {t(localLang === 'en' ? 'english' : 'russian')}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
 
         <Divider style={styles.divider} />
 
@@ -288,6 +265,46 @@ export default function SettingsModal({ visible, onClose }) {
         </View>
       </Modal>
     </Portal>
+
+    {/* Language Selection Modal */}
+    <Portal>
+      <Modal
+        visible={languageModalVisible}
+        onDismiss={closeLanguageModal}
+        contentContainerStyle={[styles.languageModalContent, { backgroundColor: colors.card }]}
+      >
+        <View style={styles.languageModalHeader}>
+          <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+            {t('language')}
+          </Text>
+          <View style={styles.backButton} />
+        </View>
+
+        <Divider />
+
+        <View style={styles.languageList}>
+          {availableLanguages.map(lng => (
+            <TouchableRipple
+              key={lng}
+              onPress={() => handleLanguageSelect(lng)}
+              style={styles.languageItem}
+            >
+              <View style={styles.languageItemContent}>
+                <Text style={[styles.languageItemText, { color: colors.text }]}>
+                  {t(lng === 'en' ? 'english' : 'russian')}
+                </Text>
+                {localLang === lng && (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                )}
+              </View>
+            </TouchableRipple>
+          ))}
+        </View>
+      </Modal>
+    </Portal>
   );
 }
 
@@ -330,16 +347,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  languageContainer: {
+  languageSelector: {
     marginTop: 8,
     marginBottom: 8,
-  },
-  languageTrigger: {
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  languageHeader: {
+  languageSelectorContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -349,24 +364,41 @@ const styles = StyleSheet.create({
   languageText: {
     fontSize: 16,
   },
-  languageOptions: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
+  languageModalContent: {
+    margin: 20,
+    borderRadius: 12,
+    padding: 0,
+    maxHeight: '80%',
   },
-  languageOption: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  languageOptionContent: {
+  languageModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageModalTitle: {
+    fontWeight: '600',
+  },
+  languageList: {
+    paddingVertical: 8,
+  },
+  languageItem: {
     paddingHorizontal: 16,
   },
-  languageOptionText: {
+  languageItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  languageItemText: {
     fontSize: 16,
   },
   divider: {
