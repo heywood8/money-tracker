@@ -156,6 +156,11 @@ export const restoreBackup = async (backup) => {
       console.log(`Restored ${backup.data.app_metadata.length} metadata entries`);
     }
 
+    // Post-restore upgrades: Ensure shadow categories exist
+    console.log('Performing post-restore database upgrades...');
+    await ensureShadowCategoriesExist(db);
+    console.log('Post-restore upgrades completed');
+
     console.log('Database restored successfully');
   } catch (error) {
     console.error('Failed to restore backup:', error);
@@ -236,9 +241,14 @@ const restoreObjectStore = (db, storeName, data) => {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
 
-    // Add all items
+    // Add all items, ensuring proper field defaults for categories
     for (const item of data) {
-      store.put(item);
+      if (storeName === 'categories' && item.is_shadow === undefined) {
+        // Add is_shadow field to categories from old backups
+        store.put({ ...item, is_shadow: 0 });
+      } else {
+        store.put(item);
+      }
     }
   });
 };
@@ -262,6 +272,78 @@ const restoreAppMetadata = (db, metadata) => {
       if (item.key !== 'db_version') {
         store.put(item);
       }
+    }
+  });
+};
+
+/**
+ * Ensure shadow categories exist in the database
+ * @param {IDBDatabase} db
+ * @returns {Promise<void>}
+ */
+const ensureShadowCategoriesExist = (db) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const transaction = db.transaction(['categories'], 'readwrite');
+      const store = transaction.objectStore('categories');
+
+      // Get all categories
+      const getAllRequest = store.getAll();
+      getAllRequest.onsuccess = () => {
+        const categories = getAllRequest.result;
+
+        // Check if shadow categories exist
+        const hasShadowExpense = categories.some(cat => cat.id === 'shadow-adjustment-expense');
+        const hasShadowIncome = categories.some(cat => cat.id === 'shadow-adjustment-income');
+
+        if (!hasShadowExpense || !hasShadowIncome) {
+          console.log('Adding missing shadow categories...');
+          const now = new Date().toISOString();
+
+          // Add shadow adjustment expense category if missing
+          if (!hasShadowExpense) {
+            store.put({
+              id: 'shadow-adjustment-expense',
+              name: 'Balance Adjustment (Expense)',
+              type: 'entry',
+              category_type: 'expense',
+              parent_id: null,
+              icon: 'cash-minus',
+              color: null,
+              is_shadow: 1,
+              created_at: now,
+              updated_at: now,
+            });
+            console.log('Shadow expense category added');
+          }
+
+          // Add shadow adjustment income category if missing
+          if (!hasShadowIncome) {
+            store.put({
+              id: 'shadow-adjustment-income',
+              name: 'Balance Adjustment (Income)',
+              type: 'entry',
+              category_type: 'income',
+              parent_id: null,
+              icon: 'cash-plus',
+              color: null,
+              is_shadow: 1,
+              created_at: now,
+              updated_at: now,
+            });
+            console.log('Shadow income category added');
+          }
+
+          console.log('Shadow categories added successfully');
+        } else {
+          console.log('Shadow categories already exist in backup');
+        }
+      };
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    } catch (error) {
+      reject(error);
     }
   });
 };
