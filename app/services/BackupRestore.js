@@ -163,7 +163,7 @@ export const restoreBackup = async (backup) => {
       // Restore categories
       for (const category of backup.data.categories) {
         await db.runAsync(
-          'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             category.id,
             category.name,
@@ -172,6 +172,7 @@ export const restoreBackup = async (backup) => {
             category.parent_id || null,
             category.icon || null,
             category.color || null,
+            category.is_shadow || 0,
             category.created_at,
             category.updated_at,
           ]
@@ -210,6 +211,67 @@ export const restoreBackup = async (backup) => {
         }
         console.log(`Restored ${backup.data.app_metadata.length} metadata entries`);
       }
+
+      // Post-restore upgrades: Ensure shadow categories exist
+      console.log('Performing post-restore database upgrades...');
+      const shadowCategories = await db.getAllAsync(
+        'SELECT id FROM categories WHERE id IN (?, ?)',
+        ['shadow-adjustment-expense', 'shadow-adjustment-income']
+      );
+
+      if (shadowCategories.length < 2) {
+        console.log('Adding missing shadow categories...');
+        const now = new Date().toISOString();
+
+        const hasShadowExpense = shadowCategories.some(cat => cat.id === 'shadow-adjustment-expense');
+        const hasShadowIncome = shadowCategories.some(cat => cat.id === 'shadow-adjustment-income');
+
+        // Add shadow adjustment expense category if missing
+        if (!hasShadowExpense) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              'shadow-adjustment-expense',
+              'Balance Adjustment (Expense)',
+              'entry',
+              'expense',
+              null,
+              'cash-minus',
+              null,
+              1,
+              now,
+              now,
+            ]
+          );
+          console.log('Shadow expense category added');
+        }
+
+        // Add shadow adjustment income category if missing
+        if (!hasShadowIncome) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              'shadow-adjustment-income',
+              'Balance Adjustment (Income)',
+              'entry',
+              'income',
+              null,
+              'cash-plus',
+              null,
+              1,
+              now,
+              now,
+            ]
+          );
+          console.log('Shadow income category added');
+        }
+
+        console.log('Shadow categories added successfully');
+      } else {
+        console.log('Shadow categories already exist in backup');
+      }
+
+      console.log('Post-restore upgrades completed');
     });
 
     console.log('Database restored successfully');
