@@ -1,25 +1,48 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
-import { Portal, Modal, Text, Button, RadioButton, Divider } from 'react-native-paper';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, StyleSheet, Alert, Platform, TouchableOpacity, Animated } from 'react-native';
+import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
 import { exportBackup, importBackup } from './services/BackupRestore';
 
-const themeOptions = [
-  { label: 'System', value: 'system' },
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' },
-];
-
 
 export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { resetDatabase } = useAccounts();
-  const [localSelection, setLocalSelection] = useState(theme);
+  const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const openLanguageModal = useCallback(() => {
+    setLanguageModalVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [slideAnim]);
+
+  const closeLanguageModal = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setLanguageModalVisible(false);
+    });
+  }, [slideAnim]);
+
+  const handleLanguageSelect = useCallback((lng) => {
+    setLocalLang(lng);
+    closeLanguageModal();
+  }, [closeLanguageModal]);
 
   const handleResetDatabase = () => {
     Alert.alert(
@@ -119,45 +142,115 @@ export default function SettingsModal({ visible, onClose }) {
 
   useEffect(() => {
     if (visible) {
-      setLocalSelection(theme);
+      setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
+      setLanguageModalVisible(false);
+      slideAnim.setValue(0);
     }
-  }, [visible, theme, language]);
+  }, [visible, theme, language, slideAnim]);
+
+  // Interpolate animation values
+  const settingsTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -50],
+  });
+
+  const settingsOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const languageTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  const languageOpacity = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <Portal>
       <Modal
         visible={visible}
-        onDismiss={onClose}
-        contentContainerStyle={[styles.content, { backgroundColor: colors.card }]}
+        onDismiss={languageModalVisible ? closeLanguageModal : onClose}
+        contentContainerStyle={[styles.modalWrapper, { backgroundColor: 'transparent' }]}
       >
-        <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
+        <Animated.View style={[
+          styles.content,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: settingsTranslateX }],
+            opacity: settingsOpacity,
+          },
+          languageModalVisible && styles.hidden
+        ]}>
+          <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
-        <RadioButton.Group onValueChange={setLocalSelection} value={localSelection}>
-          {themeOptions.map(opt => (
-            <RadioButton.Item
-              key={opt.value}
-              label={opt.label}
-              value={opt.value}
-              style={styles.radioItem}
+        <View style={styles.themeSwitch}>
+          <TouchableOpacity
+            style={[
+              styles.themeOption,
+              localSelection === 'light' && styles.themeOptionActive,
+              { borderColor: colors.border }
+            ]}
+            onPress={() => setLocalSelection('light')}
+            accessibilityRole="button"
+            accessibilityLabel="Light theme"
+          >
+            <Ionicons
+              name="sunny"
+              size={24}
+              color={localSelection === 'light' ? colors.primary : colors.mutedText}
             />
-          ))}
-        </RadioButton.Group>
+            <Text style={[
+              styles.themeLabel,
+              { color: localSelection === 'light' ? colors.text : colors.mutedText }
+            ]}>
+              Light
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.themeOption,
+              localSelection === 'dark' && styles.themeOptionActive,
+              { borderColor: colors.border }
+            ]}
+            onPress={() => setLocalSelection('dark')}
+            accessibilityRole="button"
+            accessibilityLabel="Dark theme"
+          >
+            <Ionicons
+              name="moon"
+              size={24}
+              color={localSelection === 'dark' ? colors.primary : colors.mutedText}
+            />
+            <Text style={[
+              styles.themeLabel,
+              { color: localSelection === 'dark' ? colors.text : colors.mutedText }
+            ]}>
+              Dark
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <Divider style={styles.divider} />
 
         <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <RadioButton.Group onValueChange={setLocalLang} value={localLang}>
-          {availableLanguages.map(lng => (
-            <RadioButton.Item
-              key={lng}
-              label={t(lng === 'en' ? 'english' : 'russian')}
-              value={lng}
-              style={styles.radioItem}
-            />
-          ))}
-        </RadioButton.Group>
+        <TouchableRipple
+          onPress={openLanguageModal}
+          style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
+          borderless={false}
+        >
+          <View style={styles.languageSelectorContent}>
+            <Text style={[styles.languageText, { color: colors.text }]}>
+              {t(localLang === 'en' ? 'english' : 'russian')}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
 
         <Divider style={styles.divider} />
 
@@ -182,18 +275,25 @@ export default function SettingsModal({ visible, onClose }) {
           </Button>
         </View>
 
-        <Button
-          mode="contained"
-          buttonColor="#dc3545"
-          onPress={handleResetDatabase}
-          style={styles.resetButton}
-          icon="delete-forever"
-        >
-          {t('reset_database') || 'Reset Database'}
-        </Button>
+        <View style={styles.resetButtonContainer}>
+          <Button
+            mode="outlined"
+            textColor="#b33"
+            onPress={handleResetDatabase}
+            style={styles.resetButton}
+            icon="delete-forever"
+          >
+            {t('reset_database') || 'Reset Database'}
+          </Button>
+        </View>
 
         <View style={styles.modalButtonRow}>
-          <Button mode="outlined" onPress={onClose} style={styles.modalButton}>
+          <Button
+            mode="outlined"
+            onPress={onClose}
+            style={[styles.modalButton, { borderColor: '#999' }]}
+            textColor="#888"
+          >
             {t('cancel') || 'Cancel'}
           </Button>
           <Button
@@ -208,17 +308,68 @@ export default function SettingsModal({ visible, onClose }) {
             {t('save') || 'Save'}
           </Button>
         </View>
+        </Animated.View>
+
+        <Animated.View style={[
+          styles.languageModalContent,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: languageTranslateX }],
+            opacity: languageOpacity,
+          },
+          !languageModalVisible && styles.hidden
+        ]}>
+          <View style={styles.languageModalHeader}>
+            <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+              {t('language')}
+            </Text>
+            <View style={styles.backButton} />
+          </View>
+
+          <Divider />
+
+          <View style={styles.languageList}>
+            {availableLanguages.map(lng => (
+              <TouchableRipple
+                key={lng}
+                onPress={() => handleLanguageSelect(lng)}
+                style={styles.languageItem}
+              >
+                <View style={styles.languageItemContent}>
+                  <Text style={[styles.languageItemText, { color: colors.text }]}>
+                    {t(lng === 'en' ? 'english' : 'russian')}
+                  </Text>
+                  {localLang === lng && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </View>
+              </TouchableRipple>
+            ))}
+          </View>
+        </Animated.View>
       </Modal>
     </Portal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   content: {
     margin: 20,
     borderRadius: 12,
     padding: 24,
     maxHeight: '90%',
+  },
+  hidden: {
+    position: 'absolute',
+    opacity: 0,
+    pointerEvents: 'none',
   },
   title: {
     marginBottom: 16,
@@ -226,10 +377,85 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  radioItem: {
-    paddingVertical: 4,
+  themeSwitch: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  themeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  themeOptionActive: {
+    borderWidth: 2,
+  },
+  themeLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  languageSelector: {
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  languageSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  languageText: {
+    fontSize: 16,
+  },
+  languageModalContent: {
+    margin: 20,
+    borderRadius: 12,
+    padding: 0,
+    maxHeight: '80%',
+  },
+  languageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageModalTitle: {
+    fontWeight: '600',
+  },
+  languageList: {
+    paddingVertical: 8,
+  },
+  languageItem: {
+    paddingHorizontal: 16,
+  },
+  languageItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  languageItemText: {
+    fontSize: 16,
   },
   divider: {
     marginVertical: 12,
@@ -243,9 +469,13 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-  resetButton: {
+  resetButtonContainer: {
+    alignItems: 'center',
     marginTop: 8,
     marginBottom: 8,
+  },
+  resetButton: {
+    maxWidth: 300,
   },
   modalButtonRow: {
     flexDirection: 'row',
