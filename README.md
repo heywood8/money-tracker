@@ -1,6 +1,6 @@
-# Money Tracker App (React Native + Expo)
+# Penny (React Native + Expo)
 
-This is a minimal Expo (React Native) scaffold for a money tracking mobile app. All core features will be added iteratively.
+This is a minimal Expo (React Native) scaffold for a personal finance tracking mobile app. All core features will be added iteratively.
 
 ## Getting Started
 

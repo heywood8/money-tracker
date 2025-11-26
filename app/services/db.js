@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
-const DB_NAME = 'money_tracker.db';
+const DB_NAME = 'penny.db';
 const DB_VERSION = 6;
 
 let dbInstance = null;
