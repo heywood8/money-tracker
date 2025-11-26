@@ -50,6 +50,7 @@ jobs:
         working-directory: ./android
         env:
           GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError"
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --max-workers=2
