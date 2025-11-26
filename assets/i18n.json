@@ -177,7 +177,12 @@
     "restore_confirm": "Are you sure you want to restore from backup? This will replace all current data.",
     "backup_error": "Failed to create backup",
     "restore_error": "Failed to restore backup",
-    "invalid_backup": "Invalid backup file"
+    "invalid_backup": "Invalid backup file",
+    "export_format": "Export Format",
+    "json_description": "Standard format, compatible with all versions",
+    "csv_description": "Plain text format, easy to edit",
+    "excel_description": "Spreadsheet format with multiple sheets",
+    "sqlite_description": "Raw database file, complete backup"
   },
   "ru": {
     "accounts": "Счета",
@@ -357,7 +362,12 @@
     "restore_confirm": "Вы уверены, что хотите восстановить базу данных из резервной копии? Это заменит все текущие данные.",
     "backup_error": "Не удалось создать резервную копию",
     "restore_error": "Не удалось восстановить резервную копию",
-    "invalid_backup": "Неверный файл резервной копии"
+    "invalid_backup": "Неверный файл резервной копии",
+    "export_format": "Формат экспорта",
+    "json_description": "Стандартный формат, совместим со всеми версиями",
+    "csv_description": "Текстовый формат, легко редактировать",
+    "excel_description": "Формат электронной таблицы с несколькими листами",
+    "sqlite_description": "Исходный файл базы данных, полная резервная копия"
   }
 }
 

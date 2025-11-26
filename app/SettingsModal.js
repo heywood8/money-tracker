@@ -16,9 +16,11 @@ export default function SettingsModal({ visible, onClose }) {
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const exportFormatSlideAnim = useRef(new Animated.Value(0)).current;
 
   const openLanguageModal = useCallback(() => {
     setLanguageModalVisible(true);
@@ -44,6 +46,44 @@ export default function SettingsModal({ visible, onClose }) {
     closeLanguageModal();
   }, [closeLanguageModal]);
 
+  const openExportFormatModal = useCallback(() => {
+    setExportFormatModalVisible(true);
+    Animated.timing(exportFormatSlideAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [exportFormatSlideAnim]);
+
+  const closeExportFormatModal = useCallback(() => {
+    Animated.timing(exportFormatSlideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setExportFormatModalVisible(false);
+    });
+  }, [exportFormatSlideAnim]);
+
+  const handleExportFormatSelect = useCallback(async (format) => {
+    closeExportFormatModal();
+    try {
+      await exportBackup(format);
+      Alert.alert(
+        t('backup_database') || 'Backup Database',
+        t('backup_success') || 'Backup exported successfully'
+      );
+    } catch (error) {
+      console.error('Export backup error:', error);
+      Alert.alert(
+        t('error') || 'Error',
+        error.message === 'Import cancelled'
+          ? t('cancel') || 'Cancelled'
+          : t('backup_error') || 'Failed to create backup'
+      );
+    }
+  }, [closeExportFormatModal, t]);
+
   const handleResetDatabase = () => {
     Alert.alert(
       t('reset_database') || 'Reset Database',
@@ -66,22 +106,8 @@ export default function SettingsModal({ visible, onClose }) {
     );
   };
 
-  const handleExportBackup = async () => {
-    try {
-      await exportBackup();
-      Alert.alert(
-        t('backup_database') || 'Backup Database',
-        t('backup_success') || 'Backup exported successfully'
-      );
-    } catch (error) {
-      console.error('Export backup error:', error);
-      Alert.alert(
-        t('error') || 'Error',
-        error.message === 'Import cancelled'
-          ? t('cancel') || 'Cancelled'
-          : t('backup_error') || 'Failed to create backup'
-      );
-    }
+  const handleExportBackup = () => {
+    openExportFormatModal();
   };
 
   const reloadApp = async () => {
@@ -145,11 +171,13 @@ export default function SettingsModal({ visible, onClose }) {
       setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
       setLanguageModalVisible(false);
+      setExportFormatModalVisible(false);
       slideAnim.setValue(0);
+      exportFormatSlideAnim.setValue(0);
     }
-  }, [visible, theme, language, slideAnim]);
+  }, [visible, theme, language, slideAnim, exportFormatSlideAnim]);
 
-  // Interpolate animation values
+  // Interpolate animation values for language modal
   const settingsTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -50],
@@ -170,11 +198,22 @@ export default function SettingsModal({ visible, onClose }) {
     outputRange: [0, 1],
   });
 
+  // Interpolate animation values for export format modal
+  const exportFormatTranslateX = exportFormatSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  const exportFormatOpacity = exportFormatSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   return (
     <Portal>
       <Modal
         visible={visible}
-        onDismiss={languageModalVisible ? closeLanguageModal : onClose}
+        onDismiss={exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)}
         contentContainerStyle={[styles.modalWrapper, { backgroundColor: 'transparent' }]}
       >
         <Animated.View style={[
@@ -184,7 +223,7 @@ export default function SettingsModal({ visible, onClose }) {
             transform: [{ translateX: settingsTranslateX }],
             opacity: settingsOpacity,
           },
-          languageModalVisible && styles.hidden
+          (languageModalVisible || exportFormatModalVisible) && styles.hidden
         ]}>
           <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
@@ -350,6 +389,110 @@ export default function SettingsModal({ visible, onClose }) {
             ))}
           </View>
         </Animated.View>
+
+        <Animated.View style={[
+          styles.languageModalContent,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: exportFormatTranslateX }],
+            opacity: exportFormatOpacity,
+          },
+          !exportFormatModalVisible && styles.hidden
+        ]}>
+          <View style={styles.languageModalHeader}>
+            <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+              {t('export_format') || 'Export Format'}
+            </Text>
+            <View style={styles.backButton} />
+          </View>
+
+          <Divider />
+
+          <View style={styles.languageList}>
+            <TouchableRipple
+              onPress={() => handleExportFormatSelect('json')}
+              style={styles.languageItem}
+            >
+              <View style={styles.languageItemContent}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="code-outline" size={24} color={colors.text} />
+                  <View>
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+                      JSON
+                    </Text>
+                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                      {t('json_description') || 'Standard format, compatible with all versions'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple
+              onPress={() => handleExportFormatSelect('csv')}
+              style={styles.languageItem}
+            >
+              <View style={styles.languageItemContent}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                  <View>
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+                      CSV
+                    </Text>
+                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                      {t('csv_description') || 'Plain text format, easy to edit'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple
+              onPress={() => handleExportFormatSelect('excel')}
+              style={styles.languageItem}
+            >
+              <View style={styles.languageItemContent}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="grid-outline" size={24} color={colors.text} />
+                  <View>
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+                      Excel (XLSX)
+                    </Text>
+                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                      {t('excel_description') || 'Spreadsheet format with multiple sheets'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple
+              onPress={() => handleExportFormatSelect('sqlite')}
+              style={styles.languageItem}
+            >
+              <View style={styles.languageItemContent}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="server-outline" size={24} color={colors.text} />
+                  <View>
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+                      SQLite Database
+                    </Text>
+                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                      {t('sqlite_description') || 'Raw database file, complete backup'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+          </View>
+        </Animated.View>
       </Modal>
     </Portal>
   );
@@ -456,6 +599,10 @@ const styles = StyleSheet.create({
   },
   languageItemText: {
     fontSize: 16,
+  },
+  formatDescription: {
+    fontSize: 12,
+    marginTop: 4,
   },
   divider: {
     marginVertical: 12,

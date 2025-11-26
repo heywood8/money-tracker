@@ -1,10 +1,12 @@
 /**
  * SQLite backup and restore service (Native platforms: iOS/Android)
+ * Supports multiple export formats: JSON, CSV, Excel, SQLite
  */
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { queryAll, executeQuery, executeTransaction } from './db';
+import * as XLSX from 'xlsx';
+import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 
 const BACKUP_VERSION = 1;
 
@@ -51,30 +53,80 @@ export const createBackup = async () => {
 };
 
 /**
- * Export backup to a JSON file
- * @returns {Promise<void>}
+ * Convert array of objects to CSV string
+ * @param {Array} data - Array of objects
+ * @returns {string} CSV string
  */
-export const exportBackup = async () => {
+const convertToCSV = (data) => {
+  if (!data || data.length === 0) {
+    return '';
+  }
+
+  // Get headers from first object
+  const headers = Object.keys(data[0]);
+  const csvHeaders = headers.join(',');
+
+  // Convert each row
+  const csvRows = data.map(row => {
+    return headers.map(header => {
+      let value = row[header];
+      // Escape values that contain commas or quotes
+      if (value === null || value === undefined) {
+        value = '';
+      } else {
+        value = String(value);
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          value = `"${value.replace(/"/g, '""')}"`;
+        }
+      }
+      return value;
+    }).join(',');
+  });
+
+  return [csvHeaders, ...csvRows].join('\n');
+};
+
+/**
+ * Export backup as CSV files (creates a zip-like folder structure)
+ * @returns {Promise<string>} Filename
+ */
+export const exportBackupCSV = async () => {
   try {
     const backup = await createBackup();
-
-    // Create filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `money_tracker_backup_${timestamp}.json`;
+
+    // Create CSV content for each table
+    const csvFiles = {
+      'accounts.csv': convertToCSV(backup.data.accounts),
+      'categories.csv': convertToCSV(backup.data.categories),
+      'operations.csv': convertToCSV(backup.data.operations),
+      'app_metadata.csv': convertToCSV(backup.data.app_metadata),
+      'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
+    };
+
+    // For simplicity, we'll combine all CSVs into one file with section markers
+    // This makes import easier and doesn't require ZIP support
+    let combinedCSV = `# Money Tracker Backup - ${backup.timestamp}\n`;
+    combinedCSV += `# Version: ${backup.version}\n\n`;
+
+    combinedCSV += `[ACCOUNTS]\n${csvFiles['accounts.csv']}\n\n`;
+    combinedCSV += `[CATEGORIES]\n${csvFiles['categories.csv']}\n\n`;
+    combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
+    combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n`;
+
+    const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
 
-    // Write backup to file
-    await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
-
-    console.log('Backup file created:', fileUri);
+    await FileSystem.writeAsStringAsync(fileUri, combinedCSV);
+    console.log('CSV backup file created:', fileUri);
 
     // Share the file
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
       await Sharing.shareAsync(fileUri, {
-        mimeType: 'application/json',
-        dialogTitle: 'Export Database Backup',
-        UTI: 'public.json',
+        mimeType: 'text/csv',
+        dialogTitle: 'Export CSV Backup',
+        UTI: 'public.comma-separated-values-text',
       });
     } else {
       throw new Error('Sharing is not available on this device');
@@ -82,8 +134,185 @@ export const exportBackup = async () => {
 
     return filename;
   } catch (error) {
-    console.error('Failed to export backup:', error);
+    console.error('Failed to export CSV backup:', error);
     throw error;
+  }
+};
+
+/**
+ * Export backup as Excel file
+ * @returns {Promise<string>} Filename
+ */
+export const exportBackupExcel = async () => {
+  try {
+    const backup = await createBackup();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Add backup info sheet
+    const infoSheet = XLSX.utils.json_to_sheet([
+      {
+        'Backup Version': backup.version,
+        'Timestamp': backup.timestamp,
+        'Platform': backup.platform,
+        'Accounts': backup.data.accounts.length,
+        'Categories': backup.data.categories.length,
+        'Operations': backup.data.operations.length,
+      }
+    ]);
+    XLSX.utils.book_append_sheet(wb, infoSheet, 'Backup Info');
+
+    // Add accounts sheet
+    if (backup.data.accounts.length > 0) {
+      const accountsSheet = XLSX.utils.json_to_sheet(backup.data.accounts);
+      XLSX.utils.book_append_sheet(wb, accountsSheet, 'Accounts');
+    }
+
+    // Add categories sheet
+    if (backup.data.categories.length > 0) {
+      const categoriesSheet = XLSX.utils.json_to_sheet(backup.data.categories);
+      XLSX.utils.book_append_sheet(wb, categoriesSheet, 'Categories');
+    }
+
+    // Add operations sheet
+    if (backup.data.operations.length > 0) {
+      const operationsSheet = XLSX.utils.json_to_sheet(backup.data.operations);
+      XLSX.utils.book_append_sheet(wb, operationsSheet, 'Operations');
+    }
+
+    // Add app metadata sheet
+    if (backup.data.app_metadata && backup.data.app_metadata.length > 0) {
+      const metadataSheet = XLSX.utils.json_to_sheet(backup.data.app_metadata);
+      XLSX.utils.book_append_sheet(wb, metadataSheet, 'App Metadata');
+    }
+
+    // Write workbook to file
+    const filename = `money_tracker_backup_${timestamp}.xlsx`;
+    const fileUri = `${FileSystem.documentDirectory}${filename}`;
+
+    // Convert workbook to binary
+    const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+    // Write to file
+    await FileSystem.writeAsStringAsync(fileUri, wbout, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    console.log('Excel backup file created:', fileUri);
+
+    // Share the file
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        dialogTitle: 'Export Excel Backup',
+        UTI: 'org.openxmlformats.spreadsheetml.sheet',
+      });
+    } else {
+      throw new Error('Sharing is not available on this device');
+    }
+
+    return filename;
+  } catch (error) {
+    console.error('Failed to export Excel backup:', error);
+    throw error;
+  }
+};
+
+/**
+ * Export backup as SQLite database file
+ * @returns {Promise<string>} Filename
+ */
+export const exportBackupSQLite = async () => {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `money_tracker_backup_${timestamp}.db`;
+    const sourceUri = `${FileSystem.documentDirectory}SQLite/penny.db`;
+    const destUri = `${FileSystem.documentDirectory}${filename}`;
+
+    // Check if source database exists
+    const fileInfo = await FileSystem.getInfoAsync(sourceUri);
+    if (!fileInfo.exists) {
+      throw new Error('Database file not found');
+    }
+
+    // Copy database file
+    await FileSystem.copyAsync({
+      from: sourceUri,
+      to: destUri,
+    });
+
+    console.log('SQLite backup file created:', destUri);
+
+    // Share the file
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(destUri, {
+        mimeType: 'application/vnd.sqlite3',
+        dialogTitle: 'Export SQLite Database',
+        UTI: 'public.database',
+      });
+    } else {
+      throw new Error('Sharing is not available on this device');
+    }
+
+    return filename;
+  } catch (error) {
+    console.error('Failed to export SQLite backup:', error);
+    throw error;
+  }
+};
+
+/**
+ * Export backup to a JSON file
+ * @param {string} format - Export format: 'json', 'csv', 'excel', or 'sqlite'
+ * @returns {Promise<string>} Filename
+ */
+export const exportBackup = async (format = 'json') => {
+  switch (format.toLowerCase()) {
+    case 'csv':
+      return await exportBackupCSV();
+    case 'excel':
+    case 'xlsx':
+      return await exportBackupExcel();
+    case 'sqlite':
+    case 'db':
+      return await exportBackupSQLite();
+    case 'json':
+    default:
+      // Original JSON export
+      try {
+        const backup = await createBackup();
+
+        // Create filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `money_tracker_backup_${timestamp}.json`;
+        const fileUri = `${FileSystem.documentDirectory}${filename}`;
+
+        // Write backup to file
+        await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
+
+        console.log('Backup file created:', fileUri);
+
+        // Share the file
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Export Database Backup',
+            UTI: 'public.json',
+          });
+        } else {
+          throw new Error('Sharing is not available on this device');
+        }
+
+        return filename;
+      } catch (error) {
+        console.error('Failed to export backup:', error);
+        throw error;
+      }
   }
 };
 
@@ -282,14 +511,241 @@ export const restoreBackup = async (backup) => {
 };
 
 /**
- * Import backup from a JSON file
- * @returns {Promise<void>}
+ * Parse CSV section to array of objects
+ * @param {string} csvContent - CSV content
+ * @returns {Array} Array of objects
+ */
+const parseCSV = (csvContent) => {
+  const lines = csvContent.trim().split('\n');
+  if (lines.length === 0) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim());
+  const data = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+
+    const values = [];
+    let currentValue = '';
+    let insideQuotes = false;
+
+    // Parse CSV considering quoted values
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      const nextChar = line[j + 1];
+
+      if (char === '"') {
+        if (insideQuotes && nextChar === '"') {
+          currentValue += '"';
+          j++; // Skip next quote
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        values.push(currentValue);
+        currentValue = '';
+      } else {
+        currentValue += char;
+      }
+    }
+    values.push(currentValue); // Add last value
+
+    // Create object from headers and values
+    const obj = {};
+    headers.forEach((header, index) => {
+      const value = values[index]?.trim() || '';
+      obj[header] = value === '' ? null : value;
+    });
+    data.push(obj);
+  }
+
+  return data;
+};
+
+/**
+ * Import backup from CSV file
+ * @param {string} fileUri - File URI
+ * @returns {Promise<Object>} Imported backup object
+ */
+const importBackupCSV = async (fileUri) => {
+  console.log('Importing CSV backup...');
+  const fileContent = await FileSystem.readAsStringAsync(fileUri);
+
+  // Parse sections
+  const sections = {
+    accounts: [],
+    categories: [],
+    operations: [],
+    app_metadata: [],
+  };
+
+  // Split by section markers
+  const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
+  const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
+
+  if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
+  if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
+  if (operationsMatch) sections.operations = parseCSV(operationsMatch[1]);
+  if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
+
+  // Extract version from header
+  const versionMatch = fileContent.match(/# Version: (\d+)/);
+  const version = versionMatch ? parseInt(versionMatch[1]) : BACKUP_VERSION;
+
+  // Create backup object
+  const backup = {
+    version,
+    timestamp: new Date().toISOString(),
+    platform: 'csv',
+    data: sections,
+  };
+
+  await restoreBackup(backup);
+  return backup;
+};
+
+/**
+ * Import backup from Excel file
+ * @param {string} fileUri - File URI
+ * @returns {Promise<Object>} Imported backup object
+ */
+const importBackupExcel = async (fileUri) => {
+  console.log('Importing Excel backup...');
+  const fileContent = await FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  // Parse Excel file
+  const wb = XLSX.read(fileContent, { type: 'base64' });
+
+  // Extract data from sheets
+  const backup = {
+    version: BACKUP_VERSION,
+    timestamp: new Date().toISOString(),
+    platform: 'excel',
+    data: {
+      accounts: [],
+      categories: [],
+      operations: [],
+      app_metadata: [],
+    },
+  };
+
+  // Read Backup Info sheet if exists
+  if (wb.SheetNames.includes('Backup Info')) {
+    const infoSheet = wb.Sheets['Backup Info'];
+    const infoData = XLSX.utils.sheet_to_json(infoSheet);
+    if (infoData.length > 0) {
+      backup.version = infoData[0]['Backup Version'] || BACKUP_VERSION;
+      backup.timestamp = infoData[0]['Timestamp'] || backup.timestamp;
+    }
+  }
+
+  // Read data sheets
+  if (wb.SheetNames.includes('Accounts')) {
+    backup.data.accounts = XLSX.utils.sheet_to_json(wb.Sheets['Accounts']);
+  }
+  if (wb.SheetNames.includes('Categories')) {
+    backup.data.categories = XLSX.utils.sheet_to_json(wb.Sheets['Categories']);
+  }
+  if (wb.SheetNames.includes('Operations')) {
+    backup.data.operations = XLSX.utils.sheet_to_json(wb.Sheets['Operations']);
+  }
+  if (wb.SheetNames.includes('App Metadata')) {
+    backup.data.app_metadata = XLSX.utils.sheet_to_json(wb.Sheets['App Metadata']);
+  }
+
+  await restoreBackup(backup);
+  return backup;
+};
+
+/**
+ * Import backup from SQLite database file
+ * @param {string} fileUri - File URI
+ * @returns {Promise<Object>} Imported backup info
+ */
+const importBackupSQLite = async (fileUri) => {
+  console.log('Importing SQLite backup...');
+
+  const destUri = `${FileSystem.documentDirectory}SQLite/penny.db`;
+  const backupUri = `${FileSystem.documentDirectory}SQLite/penny_backup_temp.db`;
+
+  // Create backup of current database first
+  const currentDbExists = await FileSystem.getInfoAsync(destUri);
+  if (currentDbExists.exists) {
+    await FileSystem.copyAsync({
+      from: destUri,
+      to: backupUri,
+    });
+  }
+
+  try {
+    // Copy imported database to replace current one
+    await FileSystem.copyAsync({
+      from: fileUri,
+      to: destUri,
+    });
+
+    console.log('SQLite database replaced successfully');
+
+    // Delete temp backup
+    if (currentDbExists.exists) {
+      await FileSystem.deleteAsync(backupUri, { idempotent: true });
+    }
+
+    return {
+      version: BACKUP_VERSION,
+      timestamp: new Date().toISOString(),
+      platform: 'sqlite',
+    };
+  } catch (error) {
+    // Restore from backup if copy failed
+    if (currentDbExists.exists) {
+      await FileSystem.copyAsync({
+        from: backupUri,
+        to: destUri,
+      });
+      await FileSystem.deleteAsync(backupUri, { idempotent: true });
+    }
+    throw error;
+  }
+};
+
+/**
+ * Detect file format from extension
+ * @param {string} filename - Filename
+ * @returns {string} Format: 'json', 'csv', 'excel', or 'sqlite'
+ */
+const detectFileFormat = (filename) => {
+  const ext = filename.toLowerCase().split('.').pop();
+  switch (ext) {
+    case 'csv':
+      return 'csv';
+    case 'xlsx':
+    case 'xls':
+      return 'excel';
+    case 'db':
+    case 'sqlite':
+    case 'sqlite3':
+      return 'sqlite';
+    case 'json':
+    default:
+      return 'json';
+  }
+};
+
+/**
+ * Import backup from a file (auto-detects format)
+ * @returns {Promise<Object>} Imported backup info
  */
 export const importBackup = async () => {
   try {
-    // Pick a document
+    // Pick a document (allow all types)
     const result = await DocumentPicker.getDocumentAsync({
-      type: 'application/json',
+      type: '*/*',
       copyToCacheDirectory: true,
     });
 
@@ -298,21 +754,37 @@ export const importBackup = async () => {
     }
 
     const fileUri = result.assets[0].uri;
-    console.log('Reading backup file:', fileUri);
+    const filename = result.assets[0].name || '';
+    console.log('Reading backup file:', fileUri, 'Name:', filename);
 
-    // Read file contents
-    const fileContent = await FileSystem.readAsStringAsync(fileUri);
+    // Detect format from filename
+    const format = detectFileFormat(filename);
+    console.log('Detected format:', format);
 
-    // Parse JSON
+    // Import based on format
     let backup;
-    try {
-      backup = JSON.parse(fileContent);
-    } catch (error) {
-      throw new Error('Invalid backup file: not valid JSON');
+    switch (format) {
+      case 'csv':
+        backup = await importBackupCSV(fileUri);
+        break;
+      case 'excel':
+        backup = await importBackupExcel(fileUri);
+        break;
+      case 'sqlite':
+        backup = await importBackupSQLite(fileUri);
+        break;
+      case 'json':
+      default:
+        // Original JSON import
+        const fileContent = await FileSystem.readAsStringAsync(fileUri);
+        try {
+          backup = JSON.parse(fileContent);
+        } catch (error) {
+          throw new Error('Invalid backup file: not valid JSON');
+        }
+        await restoreBackup(backup);
+        break;
     }
-
-    // Restore from backup
-    await restoreBackup(backup);
 
     return backup;
   } catch (error) {
