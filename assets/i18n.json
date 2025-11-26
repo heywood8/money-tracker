@@ -167,7 +167,17 @@
     "reset_database": "Reset Database",
     "reset_database_confirm": "Are you sure you want to reset the database? This will delete all data, and you will be asked to choose your language again to initialize default categories.",
     "reset": "Reset",
-    "reset_database_success": "Database reset successfully. Please select your language to initialize default categories."
+    "reset_database_success": "Database reset successfully. Please select your language to initialize default categories.",
+    "backup_database": "Backup Database",
+    "restore_database": "Restore Database",
+    "export_backup": "Export Backup",
+    "import_backup": "Import Backup",
+    "backup_success": "Backup exported successfully",
+    "restore_success": "Database restored successfully",
+    "restore_confirm": "Are you sure you want to restore from backup? This will replace all current data.",
+    "backup_error": "Failed to create backup",
+    "restore_error": "Failed to restore backup",
+    "invalid_backup": "Invalid backup file"
   },
   "ru": {
     "accounts": "Счета",
@@ -337,7 +347,17 @@
     "reset_database": "Сбросить базу данных",
     "reset_database_confirm": "Вы уверены, что хотите сбросить базу данных? Это удалит все данные, и вам будет предложено снова выбрать язык для инициализации категорий по умолчанию.",
     "reset": "Сбросить",
-    "reset_database_success": "База данных успешно сброшена. Пожалуйста, выберите язык для инициализации категорий по умолчанию."
+    "reset_database_success": "База данных успешно сброшена. Пожалуйста, выберите язык для инициализации категорий по умолчанию.",
+    "backup_database": "Резервная копия",
+    "restore_database": "Восстановить базу",
+    "export_backup": "Экспорт резервной копии",
+    "import_backup": "Импорт резервной копии",
+    "backup_success": "Резервная копия успешно экспортирована",
+    "restore_success": "База данных успешно восстановлена",
+    "restore_confirm": "Вы уверены, что хотите восстановить базу данных из резервной копии? Это заменит все текущие данные.",
+    "backup_error": "Не удалось создать резервную копию",
+    "restore_error": "Не удалось восстановить резервную копию",
+    "invalid_backup": "Неверный файл резервной копии"
   }
 }
 
