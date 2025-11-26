@@ -20,7 +20,7 @@ export default function Header({ onOpenSettings }) {
         }
       ]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>{t('Money Tracker') || 'Money Tracker'}</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
       <TouchableOpacity
         onPress={onOpenSettings}
         accessibilityLabel={t('settings')}
