@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app supports iOS, Android, and web platforms with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app supports iOS and Android platforms with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
 
 ## Development Commands
 
@@ -13,26 +13,12 @@ Penny is a React Native mobile app built with Expo for tracking personal finance
 npm start              # Start Expo development server
 npm run android        # Run on Android emulator/device
 npm run ios            # Run on iOS simulator/device
-npm run web            # Run in web browser
 ```
 
 ### Testing
 ```bash
 npm test               # Run Jest tests (if configured)
 ```
-
-### Web Development Setup
-
-**Important:** Always run `npm install` after switching branches or cloning the repository to ensure all dependencies are installed.
-
-For detailed web development instructions, see [WEB_SETUP.md](./WEB_SETUP.md).
-
-**Quick Start:**
-1. Install dependencies: `npm install`
-2. Start web server: `npm run web` or `npx expo start --web`
-3. Open http://localhost:8081 in your browser
-
-**Note:** Expo SDK 54 uses Metro bundler for web (not webpack). The server may appear "stuck" on "Waiting on http://localhost:8081" - this is normal. Just open the URL in your browser.
 
 ## Architecture
 
@@ -80,10 +66,8 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Data Persistence
 
-**Database Layer** (SQLite/IndexedDB):
-- **Native (iOS/Android)**: SQLite database (`penny.db`)
-- **Web**: IndexedDB (`penny` database)
-- Platform-specific implementations: `*.js` for native, `*.web.js` for web
+**Database Layer** (SQLite):
+- SQLite database (`penny.db`)
 - Database modules: `db.js`, `AccountsDB.js`, `OperationsDB.js`, `CategoriesDB.js`
 - Automatic migration from AsyncStorage on first run
 
@@ -94,7 +78,6 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 **Database Services**:
 - `app/services/db.js` - SQLite wrapper with transaction support
-- `app/services/db.web.js` - IndexedDB wrapper matching SQLite API
 - `app/services/currency.js` - Precise currency calculations (avoids floating-point errors)
 - `app/services/migration.js` - AsyncStorage to SQLite migration with rollback support
 
