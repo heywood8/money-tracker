@@ -1,6 +1,7 @@
 name: Build APK and Upload to Release
 
 on:
+  workflow-dispatch:
   push:
     tags:
       - 'v*'
