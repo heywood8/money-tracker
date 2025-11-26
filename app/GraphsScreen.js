@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -15,15 +15,32 @@ const formatCurrency = (amount, currency) => {
 };
 
 // Custom Legend Component
-const CustomLegend = ({ data, currency, colors }) => {
+const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
   const total = data.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <View style={styles.legendContainer}>
       {data.map((item, index) => {
         const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
+        const ItemWrapper = isClickable && item.categoryId ? TouchableOpacity : View;
+        const wrapperProps = isClickable && item.categoryId ? {
+          onPress: () => onItemPress(item.categoryId),
+          activeOpacity: 0.7,
+          accessibilityRole: 'button',
+          accessibilityLabel: `View details for ${item.name}`,
+          accessibilityHint: 'Double tap to filter by this category'
+        } : {};
+
         return (
-          <View key={index} style={[styles.legendItem, { borderBottomColor: colors.border }]}>
+          <ItemWrapper
+            key={index}
+            style={[
+              styles.legendItem,
+              { borderBottomColor: colors.border },
+              isClickable && item.categoryId && styles.legendItemClickable
+            ]}
+            {...wrapperProps}
+          >
             <View style={styles.legendLeft}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
               {item.icon && (
@@ -37,6 +54,14 @@ const CustomLegend = ({ data, currency, colors }) => {
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
+              {isClickable && item.categoryId && (
+                <Icon
+                  name="chevron-right"
+                  size={16}
+                  color={colors.mutedText}
+                  style={styles.legendChevron}
+                />
+              )}
             </View>
             <View style={styles.legendRight}>
               <Text style={[styles.legendAmount, { color: colors.text }]}>
@@ -46,7 +71,7 @@ const CustomLegend = ({ data, currency, colors }) => {
                 {percentage}%
               </Text>
             </View>
-          </View>
+          </ItemWrapper>
         );
       })}
     </View>
@@ -77,6 +102,46 @@ const GraphsScreen = () => {
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
+
+  // Pan Responder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes from the left edge when not viewing "All"
+        const isExpenseMode = modalType === 'expense';
+        const currentCategory = isExpenseMode ? selectedCategory : selectedIncomeCategory;
+        return currentCategory !== 'all' && gestureState.dx > 20 && Math.abs(gestureState.dy) < 80;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Swipe right to go back to "All"
+        if (gestureState.dx > 100) {
+          if (modalType === 'expense') {
+            setSelectedCategory('all');
+          } else {
+            setSelectedIncomeCategory('all');
+          }
+        }
+      },
+    })
+  ).current;
+
+  // Handlers for legend item clicks
+  const handleExpenseLegendItemPress = useCallback((categoryId) => {
+    setSelectedCategory(categoryId);
+  }, []);
+
+  const handleIncomeLegendItemPress = useCallback((categoryId) => {
+    setSelectedIncomeCategory(categoryId);
+  }, []);
+
+  const handleBackToAll = useCallback(() => {
+    if (modalType === 'expense') {
+      setSelectedCategory('all');
+    } else {
+      setSelectedIncomeCategory('all');
+    }
+  }, [modalType]);
 
   // Month names translation keys
   const monthKeys = [
@@ -178,10 +243,10 @@ const GraphsScreen = () => {
         endDateStr
       );
 
-      // Create a map of category ID to category name
+      // Create a map of category ID to category object
       const categoryMap = new Map();
       categories.forEach(cat => {
-        categoryMap.set(cat.id, cat.name);
+        categoryMap.set(cat.id, cat);
       });
 
       // Create a Set of shadow category IDs for easy lookup
@@ -192,32 +257,23 @@ const GraphsScreen = () => {
         }
       });
 
-      // Filter data by selected category if not "all"
-      let filteredSpending = spending;
-      if (selectedCategory !== 'all') {
-        // Get all descendant category IDs for the selected category
-        const descendantIds = new Set([selectedCategory]);
-        const findDescendants = (parentId) => {
-          categories.forEach(cat => {
-            if (cat.parentId === parentId) {
-              descendantIds.add(cat.id);
-              findDescendants(cat.id); // Recursive
-            }
-          });
-        };
-        findDescendants(selectedCategory);
+      // Helper function to get the root parent (top-level folder) of a category
+      const getRootParent = (categoryId) => {
+        let current = categoryMap.get(categoryId);
+        if (!current) return null;
 
-        // Filter spending to only include categories in the descendant set
-        filteredSpending = spending.filter(item =>
-          descendantIds.has(item.category_id)
-        );
-      }
+        while (current.parentId) {
+          current = categoryMap.get(current.parentId);
+          if (!current) return null;
+        }
+        return current;
+      };
 
       // Separate shadow categories from regular categories
       const regularSpending = [];
       let shadowCategoryTotal = 0;
 
-      filteredSpending.forEach(item => {
+      spending.forEach(item => {
         if (shadowCategoryIds.has(item.category_id)) {
           // Accumulate shadow category amounts
           shadowCategoryTotal += parseFloat(item.total);
@@ -227,6 +283,64 @@ const GraphsScreen = () => {
         }
       });
 
+      // Aggregate spending based on selected category
+      let aggregatedSpending = {};
+
+      if (selectedCategory === 'all') {
+        // When "All categories" is selected, aggregate by root folders
+        regularSpending.forEach(item => {
+          const rootParent = getRootParent(item.category_id);
+          if (rootParent) {
+            const rootId = rootParent.id;
+            if (!aggregatedSpending[rootId]) {
+              aggregatedSpending[rootId] = {
+                category: rootParent,
+                total: 0,
+              };
+            }
+            aggregatedSpending[rootId].total += parseFloat(item.total);
+          }
+        });
+      } else {
+        // When a specific folder is selected, show only immediate children
+        regularSpending.forEach(item => {
+          const category = categoryMap.get(item.category_id);
+          if (!category) return;
+
+          // Check if this category is a direct child of the selected folder
+          if (category.parentId === selectedCategory) {
+            if (!aggregatedSpending[category.id]) {
+              aggregatedSpending[category.id] = {
+                category: category,
+                total: 0,
+              };
+            }
+            aggregatedSpending[category.id].total += parseFloat(item.total);
+          } else {
+            // Check if this category is a descendant of the selected folder
+            // If so, aggregate it under its direct parent (immediate child of selected folder)
+            let current = category;
+            while (current.parentId) {
+              const parent = categoryMap.get(current.parentId);
+              if (!parent) break;
+
+              if (parent.id === selectedCategory) {
+                // Current is a direct child of the selected folder
+                if (!aggregatedSpending[current.id]) {
+                  aggregatedSpending[current.id] = {
+                    category: current,
+                    total: 0,
+                  };
+                }
+                aggregatedSpending[current.id].total += parseFloat(item.total);
+                break;
+              }
+              current = parent;
+            }
+          }
+        });
+      }
+
       // Chart colors (vibrant palette)
       const chartColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
@@ -234,18 +348,21 @@ const GraphsScreen = () => {
         '#FFCE56', '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0'
       ];
 
-      // Transform regular categories for pie chart
-      const data = regularSpending.map((item, index) => {
-        const category = categories.find(cat => cat.id === item.category_id);
+      // Transform aggregated data for pie chart
+      const data = Object.values(aggregatedSpending).map((item, index) => {
         return {
-          name: categoryMap.get(item.category_id) || t('unknown_category'),
-          amount: parseFloat(item.total),
+          name: item.category.name,
+          amount: item.total,
           color: chartColors[index % chartColors.length],
           legendFontColor: colors.text,
           legendFontSize: 13,
-          icon: category?.icon || null,
+          icon: item.category.icon || null,
+          categoryId: item.category.id, // For clickable legend navigation
         };
       });
+
+      // Sort by amount descending
+      data.sort((a, b) => b.amount - a.amount);
 
       // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
       if (shadowCategoryTotal > 0) {
@@ -288,31 +405,80 @@ const GraphsScreen = () => {
         endDateStr
       );
 
-      // Create a map of category ID to category name
+      // Create a map of category ID to category object
       const categoryMap = new Map();
       categories.forEach(cat => {
-        categoryMap.set(cat.id, cat.name);
+        categoryMap.set(cat.id, cat);
       });
 
-      // Filter data by selected income category if not "all"
-      let filteredIncome = income;
-      if (selectedIncomeCategory !== 'all') {
-        // Get all descendant category IDs for the selected category
-        const descendantIds = new Set([selectedIncomeCategory]);
-        const findDescendants = (parentId) => {
-          categories.forEach(cat => {
-            if (cat.parentId === parentId) {
-              descendantIds.add(cat.id);
-              findDescendants(cat.id); // Recursive
-            }
-          });
-        };
-        findDescendants(selectedIncomeCategory);
+      // Helper function to get the root parent (top-level folder) of a category
+      const getRootParent = (categoryId) => {
+        let current = categoryMap.get(categoryId);
+        if (!current) return null;
 
-        // Filter income to only include categories in the descendant set
-        filteredIncome = income.filter(item =>
-          descendantIds.has(item.category_id)
-        );
+        while (current.parentId) {
+          current = categoryMap.get(current.parentId);
+          if (!current) return null;
+        }
+        return current;
+      };
+
+      // Aggregate income based on selected category
+      let aggregatedIncome = {};
+
+      if (selectedIncomeCategory === 'all') {
+        // When "All categories" is selected, aggregate by root folders
+        income.forEach(item => {
+          const rootParent = getRootParent(item.category_id);
+          if (rootParent) {
+            const rootId = rootParent.id;
+            if (!aggregatedIncome[rootId]) {
+              aggregatedIncome[rootId] = {
+                category: rootParent,
+                total: 0,
+              };
+            }
+            aggregatedIncome[rootId].total += parseFloat(item.total);
+          }
+        });
+      } else {
+        // When a specific folder is selected, show only immediate children
+        income.forEach(item => {
+          const category = categoryMap.get(item.category_id);
+          if (!category) return;
+
+          // Check if this category is a direct child of the selected folder
+          if (category.parentId === selectedIncomeCategory) {
+            if (!aggregatedIncome[category.id]) {
+              aggregatedIncome[category.id] = {
+                category: category,
+                total: 0,
+              };
+            }
+            aggregatedIncome[category.id].total += parseFloat(item.total);
+          } else {
+            // Check if this category is a descendant of the selected folder
+            // If so, aggregate it under its direct parent (immediate child of selected folder)
+            let current = category;
+            while (current.parentId) {
+              const parent = categoryMap.get(current.parentId);
+              if (!parent) break;
+
+              if (parent.id === selectedIncomeCategory) {
+                // Current is a direct child of the selected folder
+                if (!aggregatedIncome[current.id]) {
+                  aggregatedIncome[current.id] = {
+                    category: current,
+                    total: 0,
+                  };
+                }
+                aggregatedIncome[current.id].total += parseFloat(item.total);
+                break;
+              }
+              current = parent;
+            }
+          }
+        });
       }
 
       // Chart colors (vibrant palette - different from expenses)
@@ -322,18 +488,21 @@ const GraphsScreen = () => {
         '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0', '#FF9F40'
       ];
 
-      // Transform data for pie chart
-      const data = filteredIncome.map((item, index) => {
-        const category = categories.find(cat => cat.id === item.category_id);
+      // Transform aggregated data for pie chart
+      const data = Object.values(aggregatedIncome).map((item, index) => {
         return {
-          name: categoryMap.get(item.category_id) || t('unknown_category'),
-          amount: parseFloat(item.total),
+          name: item.category.name,
+          amount: item.total,
           color: chartColors[index % chartColors.length],
           legendFontColor: colors.text,
           legendFontSize: 13,
-          icon: category?.icon || null,
+          icon: item.category.icon || null,
+          categoryId: item.category.id, // For clickable legend navigation
         };
       });
+
+      // Sort by amount descending
+      data.sort((a, b) => b.amount - a.amount);
 
       setIncomeChartData(data);
     } catch (error) {
@@ -558,11 +727,25 @@ const GraphsScreen = () => {
         onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
-              </Text>
+              <View style={styles.modalHeaderLeft}>
+                {((modalType === 'expense' && selectedCategory !== 'all') ||
+                  (modalType === 'income' && selectedIncomeCategory !== 'all')) && (
+                  <TouchableOpacity
+                    onPress={handleBackToAll}
+                    style={styles.backButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back') || 'Back to all categories'}
+                    accessibilityHint="Returns to viewing all categories"
+                  >
+                    <Icon name="arrow-left" size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={closeModal}
                 style={styles.closeButton}
@@ -577,15 +760,17 @@ const GraphsScreen = () => {
 
             {modalType === 'expense' && (
               <>
-                {/* Expense Category Picker */}
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                    items={categoryItems}
-                    colors={colors}
-                  />
-                </View>
+                {/* Expense Category Picker - Only show when not viewing "All" */}
+                {selectedCategory !== 'all' && (
+                  <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                      items={categoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                )}
 
                 <ScrollView style={styles.modalScrollView}>
                   {loading ? (
@@ -612,7 +797,13 @@ const GraphsScreen = () => {
                           hasLegend={false}
                         />
                       </View>
-                      <CustomLegend data={chartData} currency={selectedCurrency} colors={colors} />
+                      <CustomLegend
+                        data={chartData}
+                        currency={selectedCurrency}
+                        colors={colors}
+                        onItemPress={handleExpenseLegendItemPress}
+                        isClickable={selectedCategory === 'all'}
+                      />
                     </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
@@ -625,15 +816,17 @@ const GraphsScreen = () => {
 
             {modalType === 'income' && (
               <>
-                {/* Income Category Picker */}
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedIncomeCategory}
-                    onValueChange={setSelectedIncomeCategory}
-                    items={incomeCategoryItems}
-                    colors={colors}
-                  />
-                </View>
+                {/* Income Category Picker - Only show when not viewing "All" */}
+                {selectedIncomeCategory !== 'all' && (
+                  <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedIncomeCategory}
+                      onValueChange={setSelectedIncomeCategory}
+                      items={incomeCategoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                )}
 
                 <ScrollView style={styles.modalScrollView}>
                   {loadingIncome ? (
@@ -660,7 +853,13 @@ const GraphsScreen = () => {
                           hasLegend={false}
                         />
                       </View>
-                      <CustomLegend data={incomeChartData} currency={selectedCurrency} colors={colors} />
+                      <CustomLegend
+                        data={incomeChartData}
+                        currency={selectedCurrency}
+                        colors={colors}
+                        onItemPress={handleIncomeLegendItemPress}
+                        isClickable={selectedIncomeCategory === 'all'}
+                      />
                     </>
                   ) : (
                     <Text style={[styles.noData, { color: colors.mutedText }]}>
@@ -759,6 +958,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 12,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -810,6 +1019,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderBottomWidth: 1,
   },
+  legendItemClickable: {
+    paddingHorizontal: 8,
+  },
   legendLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -825,6 +1037,9 @@ const styles = StyleSheet.create({
   legendIcon: {
     fontSize: 18,
     marginRight: 8,
+  },
+  legendChevron: {
+    marginLeft: 4,
   },
   legendName: {
     fontSize: 15,
