@@ -11,15 +11,6 @@ on:
         options:
           - preview
           - production
-  push:
-    branches:
-      - main
-    paths:
-      - 'app/**'
-      - 'assets/**'
-      - 'app.json'
-      - 'eas.json'
-      - 'package.json'
 
 jobs:
   build:
