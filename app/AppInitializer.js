@@ -4,6 +4,8 @@ import { useLocalization } from './LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from './SimpleTabs';
 import { useTheme } from './ThemeContext';
+import { initializeWidgets, setupWidgetTaskHandler } from './widgets/registerWidgets';
+import { initializeWidgetEventListeners, cleanupWidgetEventListeners } from './services/widgetEventListener';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -13,6 +15,26 @@ const AppInitializer = () => {
   const { isFirstLaunch, setFirstLaunchComplete, language } = useLocalization();
   const { colors } = useTheme();
   const [isInitializing, setIsInitializing] = useState(false);
+
+  // Initialize widgets on app startup
+  useEffect(() => {
+    try {
+      initializeWidgets();
+      setupWidgetTaskHandler();
+      initializeWidgetEventListeners();
+    } catch (error) {
+      console.log('Widget initialization skipped:', error.message);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      try {
+        cleanupWidgetEventListeners();
+      } catch (error) {
+        console.log('Widget cleanup skipped:', error.message);
+      }
+    };
+  }, []);
 
   const handleLanguageSelected = async (selectedLanguage) => {
     try {

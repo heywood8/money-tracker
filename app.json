@@ -37,6 +37,33 @@
           "project": "penny",
           "organization": "heywood8"
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "BalanceWidget",
+              "label": "Penny Balance",
+              "description": "Shows your account balances",
+              "minWidth": "2x2",
+              "minHeight": "2x2",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical"
+            },
+            {
+              "name": "RecentOperationsWidget",
+              "label": "Penny Transactions",
+              "description": "Shows recent transactions",
+              "minWidth": "3x3",
+              "minHeight": "3x3",
+              "targetCellWidth": 3,
+              "targetCellHeight": 4,
+              "resizeMode": "horizontal|vertical"
+            }
+          ]
+        }
       ]
     ]
   }

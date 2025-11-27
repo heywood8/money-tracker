@@ -45,10 +45,14 @@ This document contains potential features for the Penny app. Use the architect a
 **Command**: Use architect agent to design goals and savings tracking feature
 
 ### 7. Widget Support
-**Status**: Not Started
+**Status**: Completed ✅
 **Description**: Home screen widgets showing balance, recent transactions, or budgets.
 **User Value**: Quick access to financial information without opening app.
-**Command**: Use architect agent to design widget support feature
+**Implementation**:
+- Android widgets fully implemented (BalanceWidget, RecentOperationsWidget)
+- iOS widget setup documentation provided in `ios-widget-setup/README.md`
+- Widget data service with auto-update system
+- Event-driven widget updates (debounced 2 seconds)
 
 ### 8. Tags and Labels
 **Status**: Not Started

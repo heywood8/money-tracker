@@ -108,6 +108,46 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 - New Architecture enabled (`newArchEnabled: true`)
 - EAS project ID: `89372eb2-93f5-475a-a630-9caa827d8406`
 
+### Widget Support
+
+**Android Widgets** (fully implemented):
+- Uses `react-native-android-widget` library
+- Two widgets available:
+  1. **BalanceWidget**: Shows account balances grouped by currency
+  2. **RecentOperationsWidget**: Displays recent transactions
+- Widget data stored in AsyncStorage key: `'penny_widget_data'`
+- Auto-updates via event listeners when data changes
+- Manual updates available via `updateWidgets()` function
+
+**Widget Architecture**:
+- `app/services/WidgetDataService.js` - Prepares and formats data for widgets
+- `app/widgets/BalanceWidget.js` - Balance widget component
+- `app/widgets/RecentOperationsWidget.js` - Recent operations widget component
+- `app/widgets/widgetTaskHandler.js` - Handles widget update requests
+- `app/widgets/registerWidgets.js` - Widget registration and initialization
+- `app/hooks/useWidgetUpdate.js` - Hook for triggering widget updates
+- `app/services/widgetEventListener.js` - Listens to app events and updates widgets
+
+**Widget Data Update Flow**:
+1. App data changes (accounts, operations)
+2. Event emitted via `appEvents`
+3. Widget event listener catches event (debounced 2 seconds)
+4. Widget data service prepares fresh data
+5. Data saved to AsyncStorage
+6. Widget update requested via `requestWidgetUpdate()`
+
+**iOS Widgets** (setup documentation provided):
+- Requires manual Xcode configuration
+- Uses WidgetKit and SwiftUI
+- Needs App Groups for data sharing
+- Setup instructions in `ios-widget-setup/README.md`
+- Currently requires manual native code implementation
+
+**Widget Configuration**:
+- Defined in `app.json` plugins section
+- Uses `react-native-android-widget` config plugin
+- Widget sizes and metadata configured per widget
+
 ## Development Guidelines (from .github/copilot-instructions.md)
 
 ### Code Organization
@@ -147,12 +187,14 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 - ✅ Theme system (light/dark/system)
 - ✅ Internationalization (en/ru)
 - ✅ Account management (full CRUD)
-- ✅ AsyncStorage persistence
+- ✅ SQLite database with migration support
 - ✅ Header with settings modal
+- ✅ Android widget support (Balance & Recent Operations)
+- ✅ Widget data service and auto-update system
 
 **Stub/Placeholder Screens:**
-- Operations (OperationsScreen.js)
-- Categories (CategoriesScreen.js)
-- Graphs (GraphsScreen.js)
+- Operations (OperationsScreen.js) - Basic implementation exists
+- Categories (CategoriesScreen.js) - Basic implementation exists
+- Graphs (GraphsScreen.js) - Basic implementation exists
 
-These screens currently only display the translated screen title and need implementation.
+These screens have basic functionality but may need further enhancements.
