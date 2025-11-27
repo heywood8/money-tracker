@@ -266,7 +266,7 @@ export default function AccountsScreen() {
           contentContainerStyle={[styles.modalContent, { backgroundColor: colors.card }]}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="height"
           >
             <ScrollView
               keyboardShouldPersistTaps="handled"

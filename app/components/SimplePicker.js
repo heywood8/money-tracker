@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 
 /**
- * SimplePicker - A cross-platform picker component
- * Uses native HTML select on web, custom modal picker on mobile
+ * SimplePicker - A picker component for Android
+ * Uses native HTML select on web, custom modal picker on Android
  */
 const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,21 +42,6 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
           </option>
         ))}
       </select>
-    );
-  }
-
-  // iOS: Use native Picker (works well on iOS)
-  if (Platform.OS === 'ios') {
-    return (
-      <Picker
-        selectedValue={value}
-        onValueChange={onValueChange}
-        style={[styles.iosPicker, style]}
-      >
-        {items.map(item => (
-          <Picker.Item key={item.value} label={item.label} value={item.value} />
-        ))}
-      </Picker>
     );
   }
 
@@ -115,12 +99,6 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
 };
 
 const styles = StyleSheet.create({
-  // iOS Picker styles
-  iosPicker: {
-    width: '100%',
-    height: 40,
-  },
-
   // Android custom picker button
   androidButton: {
     width: '100%',
