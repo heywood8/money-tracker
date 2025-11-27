@@ -79,6 +79,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             description: '',
             date: new Date().toISOString().split('T')[0],
             toAccountId: '',
+            exchangeRate: '',
+            destinationAmount: '',
           });
         }
       }
@@ -231,7 +233,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
         if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
           const calculatedRate = (destAmount / sourceAmount).toFixed(6);
-          if (calculatedRate !== values.exchangeRate) {
+          // Only update if the rate has meaningfully changed (avoid precision issues)
+          const currentRate = parseFloat(values.exchangeRate || '0');
+          const newRate = parseFloat(calculatedRate);
+          if (Math.abs(currentRate - newRate) > 0.000001) {
             setValues(v => ({ ...v, exchangeRate: calculatedRate }));
           }
         }
