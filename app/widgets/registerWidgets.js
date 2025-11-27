@@ -27,48 +27,24 @@ if (Platform.OS === 'android') {
 }
 
 /**
- * Initialize and register all widgets
+ * Initialize widgets
+ *
+ * In react-native-android-widget v0.17+, widgets are automatically
+ * registered based on app.json configuration and native code generation.
+ * No manual registration is needed.
  */
 export const initializeWidgets = () => {
   console.log('initializeWidgets called', {
     platform: Platform.OS,
-    hasRegisterWidget: !!registerWidget
   });
 
-  if (Platform.OS !== 'android' || !registerWidget) {
-    console.log('Widgets not supported on this platform or build');
+  if (Platform.OS !== 'android') {
+    console.log('Widgets only supported on Android');
     return;
   }
 
-  try {
-    console.log('Starting widget registration...');
-
-    // Import widgets
-    const { BalanceWidget } = require('./BalanceWidget');
-    const { RecentOperationsWidget } = require('./RecentOperationsWidget');
-
-    console.log('Widgets imported:', {
-      hasBalanceWidget: !!BalanceWidget,
-      hasRecentOpsWidget: !!RecentOperationsWidget
-    });
-
-    // Register widgets
-    console.log('Registering BalanceWidget...');
-    registerWidget({
-      name: 'BalanceWidget',
-      widget: BalanceWidget,
-    });
-
-    console.log('Registering RecentOperationsWidget...');
-    registerWidget({
-      name: 'RecentOperationsWidget',
-      widget: RecentOperationsWidget,
-    });
-
-    console.log('Widgets registered successfully');
-  } catch (error) {
-    console.error('Failed to register widgets:', error);
-  }
+  console.log('Widgets are configured via app.json and loaded automatically');
+  console.log('Widget components exported from: app/widgets/widgets.js');
 };
 
 /**
