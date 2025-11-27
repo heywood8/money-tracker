@@ -4,6 +4,7 @@ import { ThemeProvider } from './app/ThemeContext';
 import { AccountsProvider } from './app/AccountsContext';
 import { CategoriesProvider } from './app/CategoriesContext';
 import { OperationsProvider } from './app/OperationsContext';
+import { BudgetsProvider } from './app/BudgetsContext';
 import { LocalizationProvider } from './app/LocalizationContext';
 import ErrorBoundary from './app/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
@@ -70,7 +71,9 @@ export default Sentry.wrap(function App() {
               <AccountsProvider>
                 <CategoriesProvider>
                   <OperationsProvider>
-                    <AppContent />
+                    <BudgetsProvider>
+                      <AppContent />
+                    </BudgetsProvider>
                   </OperationsProvider>
                 </CategoriesProvider>
               </AccountsProvider>
