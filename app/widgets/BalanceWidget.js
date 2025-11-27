@@ -1,41 +1,14 @@
 import React from 'react';
-import { FlexWidget, TextWidget, ListWidget } from 'react-native-android-widget';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FlexWidget, TextWidget } from 'react-native-android-widget';
 
 /**
  * Balance Widget for Android Home Screen
  *
  * Displays total balance across all accounts grouped by currency
  * and shows the count of accounts.
+ *
+ * Data is provided by the widget task handler.
  */
-
-const WIDGET_DATA_KEY = 'penny_widget_data';
-
-/**
- * Get widget data from AsyncStorage
- * @returns {Promise<Object>}
- */
-const getWidgetData = async () => {
-  try {
-    const dataStr = await AsyncStorage.getItem(WIDGET_DATA_KEY);
-    if (!dataStr) {
-      return {
-        totalsByCurrency: [],
-        accountCount: 0,
-        lastUpdate: null,
-      };
-    }
-
-    return JSON.parse(dataStr);
-  } catch (error) {
-    console.error('Widget: Failed to get data:', error);
-    return {
-      totalsByCurrency: [],
-      accountCount: 0,
-      lastUpdate: null,
-    };
-  }
-};
 
 /**
  * Format last update time
@@ -45,26 +18,33 @@ const getWidgetData = async () => {
 const formatUpdateTime = (timestamp) => {
   if (!timestamp) return '';
 
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
+  try {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
 
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
 
-  return date.toLocaleDateString();
+    return date.toLocaleDateString();
+  } catch (error) {
+    return '';
+  }
 };
 
 /**
  * Balance Widget Component
+ * @param {Object} props - Data from widget task handler
  */
-export async function BalanceWidget(props) {
-  const widgetData = await getWidgetData();
-  const { totalsByCurrency, accountCount, lastUpdate } = widgetData;
+export function BalanceWidget(props) {
+  // Data is passed from the widget task handler
+  const { totalsByCurrency = [], accountCount = 0, lastUpdate } = props || {};
+
+  console.log('BalanceWidget rendering:', { totalsByCurrency: totalsByCurrency.length, accountCount });
 
   return (
     <FlexWidget

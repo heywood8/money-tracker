@@ -1,38 +1,12 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Recent Operations Widget for Android Home Screen
  *
  * Displays the most recent financial operations
+ * Data is provided by the widget task handler.
  */
-
-const WIDGET_DATA_KEY = 'penny_widget_data';
-
-/**
- * Get widget data from AsyncStorage
- * @returns {Promise<Object>}
- */
-const getWidgetData = async () => {
-  try {
-    const dataStr = await AsyncStorage.getItem(WIDGET_DATA_KEY);
-    if (!dataStr) {
-      return {
-        recentOperations: [],
-        lastUpdate: null,
-      };
-    }
-
-    return JSON.parse(dataStr);
-  } catch (error) {
-    console.error('Widget: Failed to get data:', error);
-    return {
-      recentOperations: [],
-      lastUpdate: null,
-    };
-  }
-};
 
 /**
  * Format date for display
@@ -42,19 +16,23 @@ const getWidgetData = async () => {
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
 
-  const date = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  try {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) {
-    return 'Today';
-  }
-  if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday';
-  }
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
 
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch (error) {
+    return '';
+  }
 };
 
 /**
@@ -95,10 +73,13 @@ const getOperationColor = (type) => {
 
 /**
  * Recent Operations Widget Component
+ * @param {Object} props - Data from widget task handler
  */
-export async function RecentOperationsWidget(props) {
-  const widgetData = await getWidgetData();
-  const { recentOperations } = widgetData;
+export function RecentOperationsWidget(props) {
+  // Data is passed from the widget task handler
+  const { recentOperations = [] } = props || {};
+
+  console.log('RecentOperationsWidget rendering:', { operations: recentOperations.length });
 
   return (
     <FlexWidget
