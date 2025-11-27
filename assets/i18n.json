@@ -180,7 +180,7 @@
     "invalid_backup": "Invalid backup file",
     "exchange_rate": "Exchange Rate",
     "destination_amount": "Destination Amount",
-    "offline_rate_info": "Offline rate from"
+    "offline_rate_info": "Offline rate from",
     "spending_prediction": "Spending Prediction",
     "current_spending": "Current Spending",
     "predicted_spending": "Predicted by Month End",
@@ -374,7 +374,7 @@
     "invalid_backup": "Неверный файл резервной копии",
     "exchange_rate": "Курс обмена",
     "destination_amount": "Сумма получателя",
-    "offline_rate_info": "Оффлайн курс от"
+    "offline_rate_info": "Оффлайн курс от",
     "spending_prediction": "Прогноз расходов",
     "current_spending": "Текущие расходы",
     "predicted_spending": "Прогноз на конец месяца",
