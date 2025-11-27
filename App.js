@@ -5,6 +5,7 @@ import { AccountsProvider } from './app/AccountsContext';
 import { CategoriesProvider } from './app/CategoriesContext';
 import { OperationsProvider } from './app/OperationsContext';
 import { LocalizationProvider } from './app/LocalizationContext';
+import { GooglePayProvider } from './app/GooglePayContext';
 import ErrorBoundary from './app/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -70,7 +71,9 @@ export default Sentry.wrap(function App() {
               <AccountsProvider>
                 <CategoriesProvider>
                   <OperationsProvider>
-                    <AppContent />
+                    <GooglePayProvider>
+                      <AppContent />
+                    </GooglePayProvider>
                   </OperationsProvider>
                 </CategoriesProvider>
               </AccountsProvider>

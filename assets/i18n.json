@@ -177,7 +177,18 @@
     "restore_confirm": "Are you sure you want to restore from backup? This will replace all current data.",
     "backup_error": "Failed to create backup",
     "restore_error": "Failed to restore backup",
-    "invalid_backup": "Invalid backup file"
+    "invalid_backup": "Invalid backup file",
+    "google_pay_integration": "Google Pay Integration",
+    "enable_google_pay": "Enable Google Pay",
+    "auto_create_transactions": "Auto-create transactions",
+    "require_confirmation": "Require confirmation",
+    "grant_notification_access": "Grant Notification Access",
+    "notification_access_granted": "Notification access granted",
+    "notification_access_required": "Notification access is required to read Google Pay transactions",
+    "google_pay_transaction": "Google Pay Transaction",
+    "merchant": "Merchant",
+    "confirm": "Confirm",
+    "failed_to_create_operation": "Failed to create operation"
   },
   "ru": {
     "accounts": "Счета",
@@ -357,7 +368,18 @@
     "restore_confirm": "Вы уверены, что хотите восстановить базу данных из резервной копии? Это заменит все текущие данные.",
     "backup_error": "Не удалось создать резервную копию",
     "restore_error": "Не удалось восстановить резервную копию",
-    "invalid_backup": "Неверный файл резервной копии"
+    "invalid_backup": "Неверный файл резервной копии",
+    "google_pay_integration": "Интеграция Google Pay",
+    "enable_google_pay": "Включить Google Pay",
+    "auto_create_transactions": "Автоматически создавать операции",
+    "require_confirmation": "Требовать подтверждение",
+    "grant_notification_access": "Разрешить доступ к уведомлениям",
+    "notification_access_granted": "Доступ к уведомлениям разрешен",
+    "notification_access_required": "Для чтения транзакций Google Pay требуется доступ к уведомлениям",
+    "google_pay_transaction": "Транзакция Google Pay",
+    "merchant": "Продавец",
+    "confirm": "Подтвердить",
+    "failed_to_create_operation": "Не удалось создать операцию"
   }
 }
 

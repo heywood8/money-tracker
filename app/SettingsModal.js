@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Alert, Platform, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, Alert, Platform, TouchableOpacity, Animated, Switch } from 'react-native';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useAccounts } from './AccountsContext';
+import { useGooglePay } from './GooglePayContext';
 import { exportBackup, importBackup } from './services/BackupRestore';
 
 
@@ -13,6 +14,7 @@ export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { resetDatabase } = useAccounts();
+  const googlePay = useGooglePay();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -254,6 +256,81 @@ export default function SettingsModal({ visible, onClose }) {
 
         <Divider style={styles.divider} />
 
+        {/* Google Pay Integration (Android only) */}
+        {googlePay?.isAvailable && (
+          <>
+            <Text variant="titleMedium" style={styles.subtitle}>{t('google_pay_integration')}</Text>
+
+            {/* Notification Access */}
+            {!googlePay.hasNotificationAccess ? (
+              <View style={[styles.notificationAccessBanner, { backgroundColor: colors.warning || '#fff3cd', borderColor: colors.border }]}>
+                <Ionicons name="information-circle" size={20} color="#856404" />
+                <Text style={[styles.notificationAccessText, { color: '#856404', flex: 1, marginLeft: 8 }]}>
+                  {t('notification_access_required')}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.notificationAccessBanner, { backgroundColor: colors.success || '#d4edda', borderColor: colors.border }]}>
+                <Ionicons name="checkmark-circle" size={20} color="#155724" />
+                <Text style={[styles.notificationAccessText, { color: '#155724', flex: 1, marginLeft: 8 }]}>
+                  {t('notification_access_granted')}
+                </Text>
+              </View>
+            )}
+
+            {!googlePay.hasNotificationAccess && (
+              <Button
+                mode="contained"
+                onPress={googlePay.requestNotificationAccess}
+                style={styles.notificationButton}
+                icon="bell"
+              >
+                {t('grant_notification_access')}
+              </Button>
+            )}
+
+            {/* Enable/Disable Toggle */}
+            <View style={[styles.settingRow, { borderColor: colors.border }]}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>{t('enable_google_pay')}</Text>
+              <Switch
+                value={googlePay.settings?.enabled || false}
+                onValueChange={(value) => googlePay.updateSettings({ enabled: value })}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#fff"
+                disabled={!googlePay.hasNotificationAccess}
+              />
+            </View>
+
+            {/* Auto-create transactions */}
+            {googlePay.settings?.enabled && (
+              <View style={[styles.settingRow, { borderColor: colors.border }]}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>{t('auto_create_transactions')}</Text>
+                <Switch
+                  value={googlePay.settings?.autoCreateTransactions || false}
+                  onValueChange={(value) => googlePay.updateSettings({ autoCreateTransactions: value })}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            )}
+
+            {/* Require confirmation */}
+            {googlePay.settings?.enabled && googlePay.settings?.autoCreateTransactions && (
+              <View style={[styles.settingRow, { borderColor: colors.border }]}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>{t('require_confirmation')}</Text>
+                <Switch
+                  value={googlePay.settings?.requireConfirmation || false}
+                  onValueChange={(value) => googlePay.updateSettings({ requireConfirmation: value })}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            )}
+
+            <Divider style={styles.divider} />
+          </>
+        )}
+
         <Text variant="titleMedium" style={styles.subtitle}>{t('database') || 'Database'}</Text>
 
         <View style={styles.buttonRow}>
@@ -484,6 +561,34 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalButton: {
+    flex: 1,
+  },
+  notificationAccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  notificationAccessText: {
+    fontSize: 14,
+  },
+  notificationButton: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+  },
+  settingLabel: {
+    fontSize: 15,
     flex: 1,
   },
 });
