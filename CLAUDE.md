@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app supports iOS and Android platforms with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app now supports only Android, with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
 
 ## Development Commands
 
@@ -12,7 +12,6 @@ Penny is a React Native mobile app built with Expo for tracking personal finance
 ```bash
 npm start              # Start Expo development server
 npm run android        # Run on Android emulator/device
-npm run ios            # Run on iOS simulator/device
 ```
 
 ### Testing
@@ -20,7 +19,7 @@ npm run ios            # Run on iOS simulator/device
 npm test               # Run Jest tests (if configured)
 ```
 
-## Architecture
+### Architecture
 
 ### Context-Based State Management
 
@@ -91,7 +90,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 - Uses `StyleSheet.create` for performance
 - Dynamic colors from ThemeContext (`colors` object)
-- Platform-specific adjustments via `Platform.OS`
+- Platform-specific adjustments via `Platform.OS` (Android only)
 - Alternating row colors using `altRow` from theme
 - Accessibility props included (accessibilityRole, accessibilityLabel, etc.)
 
@@ -124,7 +123,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 ### Styling
 - Use `StyleSheet.create` for consistent and performant styles
 - Ensure responsive design using `Dimensions`, `PixelRatio`
-- Keep platform-specific styles in separate files when needed (e.g., `Component.ios.js`)
+- Android-only focus: no platform-specific files needed
 
 ### Performance
 - Use `useMemo` and `useCallback` to optimize re-renders (already used in AccountsContext)
@@ -133,7 +132,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Accessibility
 - Include accessibility props (accessibilityRole, accessibilityLabel, accessibilityHint)
-- Test with screen readers (VoiceOver for iOS, TalkBack for Android)
+- Test with screen readers (TalkBack for Android)
 
 ### Security
 - Avoid storing sensitive data in plain text

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Penny",
     "slug": "app",
-    "version": "0.1.7",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,13 +14,6 @@
     },
     "packagerOpts": {
       "hostType": "tunnel"
-    },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.heywood8.monkeep",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
     },
     "android": {
       "adaptiveIcon": {

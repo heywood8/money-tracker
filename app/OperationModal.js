@@ -21,6 +21,7 @@ import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
+import * as Currency from './services/currency';
 
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useTheme();
@@ -37,6 +38,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     description: '',
     date: new Date().toISOString().split('T')[0],
     toAccountId: '',
+    exchangeRate: '',
+    destinationAmount: '',
   });
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -45,6 +48,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     type: null,
     data: [],
   });
+  // Track which field was last edited to determine calculation direction
+  const [lastEditedField, setLastEditedField] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +79,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             description: '',
             date: new Date().toISOString().split('T')[0],
             toAccountId: '',
+            exchangeRate: '',
+            destinationAmount: '',
           });
         }
       }
@@ -84,25 +91,26 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   }, [operation, isNew, visible, accounts]);
 
   const handleSave = useCallback(async () => {
-    const error = validateOperation(values);
+    const operationData = prepareOperationData();
+    const error = validateOperation(operationData);
     if (error) {
       setErrors({ general: error });
       return;
     }
 
     if (isNew) {
-      await addOperation(values);
+      await addOperation(operationData);
     } else {
-      await updateOperation(operation.id, values);
+      await updateOperation(operation.id, operationData);
     }
 
     // Save last accessed account
-    if (values.accountId) {
-      setLastAccessedAccount(values.accountId);
+    if (operationData.accountId) {
+      setLastAccessedAccount(operationData.accountId);
     }
 
     onClose();
-  }, [validateOperation, values, isNew, addOperation, updateOperation, operation, onClose]);
+  }, [prepareOperationData, validateOperation, isNew, addOperation, updateOperation, operation, onClose]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
@@ -176,6 +184,93 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     });
   }, []);
 
+  // Get source and destination accounts for currency detection
+  const sourceAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.accountId);
+  }, [accounts, values.accountId]);
+
+  const destinationAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.toAccountId);
+  }, [accounts, values.toAccountId]);
+
+  // Check if this is a multi-currency transfer
+  const isMultiCurrencyTransfer = useMemo(() => {
+    if (values.type !== 'transfer') return false;
+    if (!sourceAccount || !destinationAccount) return false;
+    return sourceAccount.currency !== destinationAccount.currency;
+  }, [values.type, sourceAccount, destinationAccount]);
+
+  // Auto-populate exchange rate when accounts change
+  useEffect(() => {
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !values.exchangeRate) {
+      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+      if (rate) {
+        setValues(v => ({ ...v, exchangeRate: rate }));
+        setLastEditedField('exchangeRate');
+      }
+    }
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, values.exchangeRate]);
+
+  // Auto-calculate based on which field was last edited
+  useEffect(() => {
+    if (!isMultiCurrencyTransfer) {
+      // Clear exchange rate fields for same-currency transfers
+      if (values.exchangeRate || values.destinationAmount) {
+        setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+        setLastEditedField(null);
+      }
+      return;
+    }
+
+    if (!sourceAccount || !destinationAccount) return;
+
+    // If user edited destination amount, calculate the rate
+    if (lastEditedField === 'destinationAmount') {
+      if (values.amount && values.destinationAmount) {
+        // Calculate rate = destinationAmount / sourceAmount (accounting for decimal places)
+        const sourceAmount = parseFloat(values.amount);
+        const destAmount = parseFloat(values.destinationAmount);
+
+        if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
+          const calculatedRate = (destAmount / sourceAmount).toFixed(6);
+          // Only update if the rate has meaningfully changed (avoid precision issues)
+          const currentRate = parseFloat(values.exchangeRate || '0');
+          const newRate = parseFloat(calculatedRate);
+          if (Math.abs(currentRate - newRate) > 0.000001) {
+            setValues(v => ({ ...v, exchangeRate: calculatedRate }));
+          }
+        }
+      }
+    }
+    // If user edited amount or rate, calculate destination amount
+    else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
+      if (values.amount && values.exchangeRate) {
+        const converted = Currency.convertAmount(
+          values.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          values.exchangeRate
+        );
+        if (converted && converted !== values.destinationAmount) {
+          setValues(v => ({ ...v, destinationAmount: converted }));
+        }
+      }
+    }
+  }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, values.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
+
+  // Prepare operation data with currency information for saving
+  const prepareOperationData = useCallback(() => {
+    const data = { ...values };
+
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
+      data.sourceCurrency = sourceAccount.currency;
+      data.destinationCurrency = destinationAccount.currency;
+      // Exchange rate and destination amount are already in values
+    }
+
+    return data;
+  }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
+
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
     { key: 'income', label: t('income'), icon: 'plus-circle' },
@@ -192,7 +287,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       >
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="height"
             style={{ flex: 1 }}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
@@ -237,7 +332,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       isShadowOperation && styles.disabledInput
                     ]}
                     value={values.amount}
-                    onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, amount: text }))}
+                    onChangeText={text => {
+                      if (!isShadowOperation) {
+                        setValues(v => ({ ...v, amount: text }));
+                        setLastEditedField('amount');
+                      }
+                    }}
                     placeholder={t('amount')}
                     placeholderTextColor={colors.mutedText}
                     keyboardType="decimal-pad"
@@ -264,20 +364,97 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
                   {/* To Account Picker (only for transfers) */}
                   {values.type === 'transfer' && (
-                    <Pressable
-                      style={[
-                        styles.pickerButton,
-                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                        isShadowOperation && styles.disabledInput
-                      ]}
-                      onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
-                      disabled={isShadowOperation}
-                    >
-                      <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
-                        {t('to_account')}: {getAccountName(values.toAccountId)}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                    </Pressable>
+                    <>
+                      <Pressable
+                        style={[
+                          styles.pickerButton,
+                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                          isShadowOperation && styles.disabledInput
+                        ]}
+                        onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                        disabled={isShadowOperation}
+                      >
+                        <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
+                          {t('to_account')}: {getAccountName(values.toAccountId)}
+                        </Text>
+                        <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      </Pressable>
+
+                      {/* Multi-currency transfer fields */}
+                      {isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
+                        <>
+                          {/* Currency info display */}
+                          <View style={styles.currencyInfo}>
+                            <Icon name="swap-horizontal-circle" size={16} color={colors.mutedText} />
+                            <Text style={[styles.currencyInfoText, { color: colors.mutedText }]}>
+                              {sourceAccount.currency} → {destinationAccount.currency}
+                            </Text>
+                          </View>
+
+                          {/* Exchange Rate Input */}
+                          <View style={styles.inputRow}>
+                            <Text style={[styles.inputLabel, { color: colors.text }]}>
+                              {t('exchange_rate')}:
+                            </Text>
+                            <TextInput
+                              style={[
+                                styles.smallInput,
+                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                                isShadowOperation && styles.disabledInput
+                              ]}
+                              value={values.exchangeRate}
+                              onChangeText={text => {
+                                if (!isShadowOperation) {
+                                  setValues(v => ({ ...v, exchangeRate: text }));
+                                  setLastEditedField('exchangeRate');
+                                }
+                              }}
+                              placeholder="0.00"
+                              placeholderTextColor={colors.mutedText}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              onSubmitEditing={Keyboard.dismiss}
+                              editable={!isShadowOperation}
+                            />
+                          </View>
+
+                          {/* Destination Amount Input */}
+                          <View style={styles.inputRow}>
+                            <Text style={[styles.inputLabel, { color: colors.text }]}>
+                              {t('destination_amount')}:
+                            </Text>
+                            <TextInput
+                              style={[
+                                styles.smallInput,
+                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                                isShadowOperation && styles.disabledInput
+                              ]}
+                              value={values.destinationAmount}
+                              onChangeText={text => {
+                                if (!isShadowOperation) {
+                                  setValues(v => ({ ...v, destinationAmount: text }));
+                                  setLastEditedField('destinationAmount');
+                                }
+                              }}
+                              placeholder="0.00"
+                              placeholderTextColor={colors.mutedText}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              onSubmitEditing={Keyboard.dismiss}
+                              editable={!isShadowOperation}
+                            />
+                            <Text style={[styles.currencyLabel, { color: colors.mutedText }]}>
+                              {destinationAccount.currency}
+                            </Text>
+                          </View>
+
+                          {/* Exchange rate source info */}
+                          <Text style={[styles.rateInfo, { color: colors.mutedText }]}>
+                            {t('offline_rate_info')} ({Currency.getExchangeRatesLastUpdated()})
+                          </Text>
+                        </>
+                      )}
+                    </>
                   )}
 
                   {/* Category Picker (not for transfers) */}
@@ -401,9 +578,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         <DateTimePicker
           value={new Date(values.date)}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={(event, selectedDate) => {
-            setShowDatePicker(Platform.OS === 'ios');
+            setShowDatePicker(false);
             if (selectedDate) {
               setValues(v => ({
                 ...v,
@@ -665,5 +842,43 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  currencyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  currencyInfoText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  inputLabel: {
+    fontSize: 14,
+    minWidth: 110,
+  },
+  smallInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 12,
+    fontSize: 16,
+  },
+  currencyLabel: {
+    fontSize: 14,
+    minWidth: 40,
+  },
+  rateInfo: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
 });

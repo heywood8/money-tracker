@@ -204,7 +204,7 @@ const migrateToV6 = async (db) => {
 };
 
 /**
- * Migrate from V6 to V7 - Add budgets table
+ * Migrate from V6 to V7 - Add budgets table and multi-currency transfer support
  */
 const migrateToV7 = async (db) => {
   try {
@@ -234,6 +234,49 @@ const migrateToV7 = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_budgets_currency ON budgets(currency);
       CREATE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets(is_recurring);
     `);
+
+    console.log('Starting migration to V7: Add multi-currency transfer support...');
+
+    // Check if columns already exist
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
+    const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
+    const hasDestinationAmount = tableInfo.some(col => col.name === 'destination_amount');
+    const hasSourceCurrency = tableInfo.some(col => col.name === 'source_currency');
+    const hasDestinationCurrency = tableInfo.some(col => col.name === 'destination_currency');
+
+    if (hasExchangeRate && hasDestinationAmount && hasSourceCurrency && hasDestinationCurrency) {
+      console.log('Multi-currency columns already exist, skipping migration...');
+      return;
+    }
+
+    // Add new columns for multi-currency transfers
+    if (!hasExchangeRate) {
+      console.log('Adding exchange_rate column...');
+      await db.execAsync(`
+        ALTER TABLE operations ADD COLUMN exchange_rate TEXT;
+      `);
+    }
+
+    if (!hasDestinationAmount) {
+      console.log('Adding destination_amount column...');
+      await db.execAsync(`
+        ALTER TABLE operations ADD COLUMN destination_amount TEXT;
+      `);
+    }
+
+    if (!hasSourceCurrency) {
+      console.log('Adding source_currency column...');
+      await db.execAsync(`
+        ALTER TABLE operations ADD COLUMN source_currency TEXT;
+      `);
+    }
+
+    if (!hasDestinationCurrency) {
+      console.log('Adding destination_currency column...');
+      await db.execAsync(`
+        ALTER TABLE operations ADD COLUMN destination_currency TEXT;
+      `);
+    }
 
     console.log('Migration to V7 completed successfully');
   } catch (error) {
@@ -576,6 +619,10 @@ const initializeDatabase = async (db) => {
         date TEXT NOT NULL,
         created_at TEXT NOT NULL,
         description TEXT,
+        exchange_rate TEXT,
+        destination_amount TEXT,
+        source_currency TEXT,
+        destination_currency TEXT,
         FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
         FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
