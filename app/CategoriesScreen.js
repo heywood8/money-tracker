@@ -1,20 +1,27 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
 import { useCategories } from './CategoriesContext';
+import { useBudgets } from './BudgetsContext';
 import CategoryModal from './CategoryModal';
+import BudgetModal from './BudgetModal';
 
 const CategoriesScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();
+  const { hasActiveBudget, getBudgetForCategory } = useBudgets();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isNew, setIsNew] = useState(false);
+
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [budgetCategory, setBudgetCategory] = useState(null);
+  const [isBudgetNew, setIsBudgetNew] = useState(false);
 
   const handleAddCategory = () => {
     setEditingCategory(null);
@@ -28,6 +35,38 @@ const CategoriesScreen = () => {
     setModalVisible(true);
   };
 
+  const handleSetBudget = useCallback((category) => {
+    const hasBudget = hasActiveBudget(category.id);
+    const existingBudget = hasBudget ? getBudgetForCategory(category.id) : null;
+
+    setBudgetCategory(category);
+    setIsBudgetNew(!existingBudget);
+    setBudgetModalVisible(true);
+  }, [hasActiveBudget, getBudgetForCategory]);
+
+  const handleCategoryLongPress = useCallback((category) => {
+    const hasBudget = hasActiveBudget(category.id);
+    const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+
+    Alert.alert(
+      categoryName,
+      t('select_action') || 'Select an action',
+      [
+        {
+          text: t('edit_category'),
+          onPress: () => handleEditCategory(category),
+        },
+        {
+          text: hasBudget ? t('edit_budget') : t('set_budget'),
+          onPress: () => handleSetBudget(category),
+        },
+        {
+          text: t('cancel'),
+          style: 'cancel',
+        },
+      ]
+    );
+  }, [t, handleEditCategory, handleSetBudget, hasActiveBudget]);
 
   // Flatten the category tree based on expanded state (excluding shadow categories)
   const flattenedCategories = useMemo(() => {
@@ -64,6 +103,7 @@ const CategoriesScreen = () => {
     const indentWidth = depth * 20;
     const categoryType = category.category_type || category.categoryType || 'expense';
     const rowBackgroundColor = categoryType === 'expense' ? colors.expenseBackground : colors.incomeBackground;
+    const hasBudget = hasActiveBudget(category.id);
 
     return (
       <TouchableOpacity
@@ -81,7 +121,7 @@ const CategoriesScreen = () => {
             handleEditCategory(category);
           }
         }}
-        onLongPress={() => handleEditCategory(category)}
+        onLongPress={() => handleCategoryLongPress(category)}
         accessibilityRole="button"
         accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
         accessibilityHint={hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
@@ -120,10 +160,21 @@ const CategoriesScreen = () => {
           <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
             {category.nameKey ? t(category.nameKey) : category.name}
           </Text>
+
+          {/* Budget Indicator */}
+          {hasBudget && (
+            <Icon
+              name="cash-clock"
+              size={18}
+              color={colors.primary}
+              style={styles.budgetIcon}
+              accessible={false}
+            />
+          )}
         </View>
       </TouchableOpacity>
     );
-  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory]);
+  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleCategoryLongPress, hasActiveBudget]);
 
   if (loading) {
     return (
@@ -171,6 +222,15 @@ const CategoriesScreen = () => {
         category={editingCategory}
         isNew={isNew}
       />
+
+      <BudgetModal
+        visible={budgetModalVisible}
+        onClose={() => setBudgetModalVisible(false)}
+        budget={isBudgetNew ? null : getBudgetForCategory(budgetCategory?.id)}
+        categoryId={budgetCategory?.id}
+        categoryName={budgetCategory?.nameKey ? t(budgetCategory.nameKey) : budgetCategory?.name}
+        isNew={isBudgetNew}
+      />
     </View>
   );
 };
@@ -207,6 +267,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
+  },
+  budgetIcon: {
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
