@@ -6,6 +6,7 @@ import SimpleTabs from './SimpleTabs';
 import { useTheme } from './ThemeContext';
 import { initializeWidgets, setupWidgetTaskHandler } from './widgets/registerWidgets';
 import { initializeWidgetEventListeners, cleanupWidgetEventListeners } from './services/widgetEventListener';
+import { updateWidgets } from './hooks/useWidgetUpdate';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -18,13 +19,22 @@ const AppInitializer = () => {
 
   // Initialize widgets on app startup
   useEffect(() => {
-    try {
-      initializeWidgets();
-      setupWidgetTaskHandler();
-      initializeWidgetEventListeners();
-    } catch (error) {
-      console.log('Widget initialization skipped:', error.message);
-    }
+    const initWidgets = async () => {
+      try {
+        initializeWidgets();
+        setupWidgetTaskHandler();
+        initializeWidgetEventListeners();
+
+        // Initial widget data update
+        console.log('Performing initial widget data update...');
+        await updateWidgets();
+        console.log('Initial widget data update complete');
+      } catch (error) {
+        console.log('Widget initialization skipped:', error.message);
+      }
+    };
+
+    initWidgets();
 
     // Cleanup on unmount
     return () => {
