@@ -183,7 +183,12 @@
     "predicted_spending": "Predicted by Month End",
     "days_elapsed": "Days Elapsed",
     "daily_average": "Daily Average",
-    "no_prediction_data": "Not enough data to predict spending"
+    "no_prediction_data": "Not enough data to predict spending",
+    "export_format": "Export Format",
+    "json_description": "Standard format, compatible with all versions",
+    "csv_description": "Plain text format, easy to edit",
+    "excel_description": "Spreadsheet format with multiple sheets",
+    "sqlite_description": "Raw database file, complete backup"
   },
   "ru": {
     "accounts": "Счета",
@@ -369,7 +374,12 @@
     "predicted_spending": "Прогноз на конец месяца",
     "days_elapsed": "Прошло дней",
     "daily_average": "Среднее в день",
-    "no_prediction_data": "Недостаточно данных для прогноза"
+    "no_prediction_data": "Недостаточно данных для прогноза",
+    "export_format": "Формат экспорта",
+    "json_description": "Стандартный формат, совместим со всеми версиями",
+    "csv_description": "Текстовый формат, легко редактировать",
+    "excel_description": "Формат электронной таблицы с несколькими листами",
+    "sqlite_description": "Исходный файл базы данных, полная резервная копия"
   }
 }
 
