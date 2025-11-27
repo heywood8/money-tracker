@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    paddingBottom: 24,
   },
   continueButton: {
     backgroundColor: '#2196f3',
