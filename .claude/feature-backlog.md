@@ -18,10 +18,10 @@ This document contains potential features for the Penny app. Use the architect a
 **Command**: Use architect agent to design data export/import feature
 
 ### 3. Multi-Currency Support Enhancement
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Add exchange rate tracking, automatic conversion, and multi-currency reporting.
 **User Value**: Better support for users with accounts in different currencies.
-**Command**: Use architect agent to design multi-currency support feature
+**Implementation**: Multi-currency transfers with offline exchange rates, bidirectional rate/amount editing, and precise currency arithmetic for currencies with different decimal places.
 
 
 ## Medium Priority Features
@@ -77,57 +77,68 @@ This document contains potential features for the Penny app. Use the architect a
 **User Value**: More accurate categorization (e.g., grocery shopping with household items).
 **Command**: Use architect agent to design split transactions feature
 
+### 12. Live Exchange Rates
+**Status**: Not Started
+**Priority**: Low
+**Description**: Integrate live exchange rate API (e.g., https://github.com/fawazahmed0/exchange-api) to fetch real-time currency conversion rates and update offline rates periodically.
+**User Value**: More accurate currency conversions for international transactions.
+**Technical Notes**: Should maintain offline rates as fallback when API is unavailable.
+**Command**: Use architect agent to design live exchange rates feature
+
+### 13. Transfer Screen UX Redesign
+**Status**: Not Started
+**Priority**: Low
+**Description**: Redesign the "add new transfer" screen to improve user experience with multi-currency transfers, making exchange rate and destination amount calculations more intuitive and visually clear.
+**User Value**: Easier and more intuitive transfer creation, especially for multi-currency scenarios.
+**Considerations**: Clear visual feedback for bidirectional editing, better layout for currency-specific fields, inline validation.
+**Command**: Use architect agent to design transfer screen UX improvements
+
 ## Future Considerations
 
-### 11. Bill Reminders
+### 14. Bill Reminders
 **Status**: Not Started
 **Description**: Set reminders for upcoming bills and payments.
 **User Value**: Never miss a payment, avoid late fees.
 
-### 12. Shared Accounts/Family Mode
+### 15. Shared Accounts/Family Mode
 **Status**: Not Started
 **Description**: Allow multiple users to share and collaborate on accounts.
 **User Value**: Household budget management, couples' finance tracking.
 
-### 13. Investment Tracking
+### 16. Investment Tracking
 **Status**: Not Started
 **Description**: Track stocks, bonds, and other investments with current values.
 **User Value**: Complete financial picture including investments.
 
-### 14. Loan/Debt Tracking
+### 17. Loan/Debt Tracking
 **Status**: Not Started
 **Description**: Track loans, debts, and payment schedules.
 **User Value**: Monitor progress on debt repayment.
 
-### 15. Custom Reports
+### 18. Custom Reports
 **Status**: Not Started
 **Description**: Allow users to create custom reports with specific criteria.
 **User Value**: Tailored insights for specific needs.
 
-### 16. Notifications and Alerts
+### 19. Notifications and Alerts
 **Status**: Not Started
 **Description**: Push notifications for budget warnings, large transactions, etc.
 **User Value**: Proactive financial awareness.
 
-### 17. Biometric Security
+### 20. Biometric Security
 **Status**: Not Started
 **Description**: Add fingerprint/face recognition for app access.
 **User Value**: Protect sensitive financial data.
 
-### 18. Cloud Sync
+### 21. Cloud Sync
 **Status**: Not Started
 **Description**: Synchronize data across multiple devices via cloud storage.
 **User Value**: Access data from any device.
 
-### 19. Bank Integration
+### 22. Bank Integration
 **Status**: Not Started
 **Description**: Automatically import transactions from bank accounts (via Plaid or similar).
 **User Value**: Reduced manual entry, always up-to-date data.
-
-### 20. Widget Support
-**Status**: Not Started
-**Description**: Home screen widgets showing balance, recent transactions, or budgets.
-**User Value**: Quick access to financial information without opening app.
 
 ---
 
