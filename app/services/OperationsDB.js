@@ -19,6 +19,10 @@ const mapOperationFields = (dbOperation) => {
     date: dbOperation.date,
     description: dbOperation.description,
     createdAt: dbOperation.created_at,
+    exchangeRate: dbOperation.exchange_rate,
+    destinationAmount: dbOperation.destination_amount,
+    sourceCurrency: dbOperation.source_currency,
+    destinationCurrency: dbOperation.destination_currency,
   };
 };
 
@@ -131,6 +135,7 @@ export const getOperationsByType = async (type) => {
 
 /**
  * Calculate balance changes for an operation
+ * Handles multi-currency transfers by using destination_amount when available
  * @param {Object} operation
  * @returns {Map<string, number>}
  */
@@ -143,10 +148,18 @@ const calculateBalanceChanges = (operation) => {
   } else if (operation.type === 'income') {
     balanceChanges.set(operation.account_id, amount);
   } else if (operation.type === 'transfer') {
+    // Deduct from source account
     balanceChanges.set(operation.account_id, -amount);
+
     if (operation.to_account_id) {
+      // For multi-currency transfers, use destination_amount if available
+      // Otherwise fall back to source amount (same currency transfer)
+      const destinationAmount = operation.destination_amount
+        ? parseFloat(operation.destination_amount)
+        : amount;
+
       const toChange = balanceChanges.get(operation.to_account_id) || 0;
-      balanceChanges.set(operation.to_account_id, toChange + amount);
+      balanceChanges.set(operation.to_account_id, toChange + destinationAmount);
     }
   }
 
@@ -171,12 +184,16 @@ export const createOperation = async (operation) => {
       date: operation.date,
       created_at: now,
       description: operation.description || null,
+      exchange_rate: operation.exchangeRate || null,
+      destination_amount: operation.destinationAmount || null,
+      source_currency: operation.sourceCurrency || null,
+      destination_currency: operation.destinationCurrency || null,
     };
 
     await executeTransaction(async (db) => {
       // Insert operation
       await db.runAsync(
-        'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           operationData.id,
           operationData.type,
@@ -187,6 +204,10 @@ export const createOperation = async (operation) => {
           operationData.date,
           operationData.created_at,
           operationData.description,
+          operationData.exchange_rate,
+          operationData.destination_amount,
+          operationData.source_currency,
+          operationData.destination_currency,
         ]
       );
 
@@ -276,6 +297,22 @@ export const updateOperation = async (id, updates) => {
       if (updates.description !== undefined) {
         fields.push('description = ?');
         values.push(updates.description || null);
+      }
+      if (updates.exchangeRate !== undefined) {
+        fields.push('exchange_rate = ?');
+        values.push(updates.exchangeRate || null);
+      }
+      if (updates.destinationAmount !== undefined) {
+        fields.push('destination_amount = ?');
+        values.push(updates.destinationAmount || null);
+      }
+      if (updates.sourceCurrency !== undefined) {
+        fields.push('source_currency = ?');
+        values.push(updates.sourceCurrency || null);
+      }
+      if (updates.destinationCurrency !== undefined) {
+        fields.push('destination_currency = ?');
+        values.push(updates.destinationCurrency || null);
       }
 
       if (fields.length === 0) {
