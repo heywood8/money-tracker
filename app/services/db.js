@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'penny.db';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 let dbInstance = null;
 let initPromise = null;
@@ -199,6 +199,45 @@ const migrateToV6 = async (db) => {
     console.log('Migration to V6 completed successfully');
   } catch (error) {
     console.error('Failed to migrate to V6:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V6 to V7 - Add budgets table
+ */
+const migrateToV7 = async (db) => {
+  try {
+    console.log('Starting migration to V7: Add budgets table...');
+
+    // Create budgets table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS budgets (
+        id TEXT PRIMARY KEY,
+        category_id TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        currency TEXT NOT NULL,
+        period_type TEXT NOT NULL CHECK(period_type IN ('weekly', 'monthly', 'yearly')),
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        is_recurring INTEGER DEFAULT 1,
+        rollover_enabled INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+      );
+
+      -- Create indexes for efficient queries
+      CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
+      CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets(period_type);
+      CREATE INDEX IF NOT EXISTS idx_budgets_dates ON budgets(start_date, end_date);
+      CREATE INDEX IF NOT EXISTS idx_budgets_currency ON budgets(currency);
+      CREATE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets(is_recurring);
+    `);
+
+    console.log('Migration to V7 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V7:', error);
     throw error;
   }
 };
@@ -492,6 +531,11 @@ const initializeDatabase = async (db) => {
       await migrateToV6(db);
       didMigrate = true;
     }
+    if (currentVersion >= 6 && currentVersion < 7) {
+      console.log('Migrating database from version', currentVersion, 'to version 7...');
+      await migrateToV7(db);
+      didMigrate = true;
+    }
 
     // Now create or update tables
     await db.execAsync(`
@@ -659,6 +703,7 @@ export const dropAllTables = async () => {
   const db = await getDatabase();
   await db.execAsync(`
     PRAGMA foreign_keys = OFF;
+    DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS operations;
     DROP TABLE IF EXISTS categories;
     DROP TABLE IF EXISTS accounts;
