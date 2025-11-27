@@ -48,6 +48,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     type: null,
     data: [],
   });
+  // Track which field was last edited to determine calculation direction
+  const [lastEditedField, setLastEditedField] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,29 +204,54 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
       if (rate) {
         setValues(v => ({ ...v, exchangeRate: rate }));
+        setLastEditedField('exchangeRate');
       }
     }
-  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, values.exchangeRate]);
 
-  // Auto-calculate destination amount when amount or rate changes
+  // Auto-calculate based on which field was last edited
   useEffect(() => {
-    if (isMultiCurrencyTransfer && values.amount && values.exchangeRate && sourceAccount && destinationAccount) {
-      const converted = Currency.convertAmount(
-        values.amount,
-        sourceAccount.currency,
-        destinationAccount.currency,
-        values.exchangeRate
-      );
-      if (converted && converted !== values.destinationAmount) {
-        setValues(v => ({ ...v, destinationAmount: converted }));
-      }
-    } else if (!isMultiCurrencyTransfer) {
+    if (!isMultiCurrencyTransfer) {
       // Clear exchange rate fields for same-currency transfers
       if (values.exchangeRate || values.destinationAmount) {
         setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+        setLastEditedField(null);
+      }
+      return;
+    }
+
+    if (!sourceAccount || !destinationAccount) return;
+
+    // If user edited destination amount, calculate the rate
+    if (lastEditedField === 'destinationAmount') {
+      if (values.amount && values.destinationAmount) {
+        // Calculate rate = destinationAmount / sourceAmount (accounting for decimal places)
+        const sourceAmount = parseFloat(values.amount);
+        const destAmount = parseFloat(values.destinationAmount);
+
+        if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
+          const calculatedRate = (destAmount / sourceAmount).toFixed(6);
+          if (calculatedRate !== values.exchangeRate) {
+            setValues(v => ({ ...v, exchangeRate: calculatedRate }));
+          }
+        }
       }
     }
-  }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, sourceAccount, destinationAccount]);
+    // If user edited amount or rate, calculate destination amount
+    else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
+      if (values.amount && values.exchangeRate) {
+        const converted = Currency.convertAmount(
+          values.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          values.exchangeRate
+        );
+        if (converted && converted !== values.destinationAmount) {
+          setValues(v => ({ ...v, destinationAmount: converted }));
+        }
+      }
+    }
+  }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, values.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
 
   // Prepare operation data with currency information for saving
   const prepareOperationData = useCallback(() => {
@@ -300,7 +327,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       isShadowOperation && styles.disabledInput
                     ]}
                     value={values.amount}
-                    onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, amount: text }))}
+                    onChangeText={text => {
+                      if (!isShadowOperation) {
+                        setValues(v => ({ ...v, amount: text }));
+                        setLastEditedField('amount');
+                      }
+                    }}
                     placeholder={t('amount')}
                     placeholderTextColor={colors.mutedText}
                     keyboardType="decimal-pad"
@@ -366,7 +398,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                                 isShadowOperation && styles.disabledInput
                               ]}
                               value={values.exchangeRate}
-                              onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, exchangeRate: text }))}
+                              onChangeText={text => {
+                                if (!isShadowOperation) {
+                                  setValues(v => ({ ...v, exchangeRate: text }));
+                                  setLastEditedField('exchangeRate');
+                                }
+                              }}
                               placeholder="0.00"
                               placeholderTextColor={colors.mutedText}
                               keyboardType="decimal-pad"
@@ -376,7 +413,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                             />
                           </View>
 
-                          {/* Destination Amount Display */}
+                          {/* Destination Amount Input */}
                           <View style={styles.inputRow}>
                             <Text style={[styles.inputLabel, { color: colors.text }]}>
                               {t('destination_amount')}:
@@ -385,12 +422,21 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                               style={[
                                 styles.smallInput,
                                 { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                                styles.disabledInput
+                                isShadowOperation && styles.disabledInput
                               ]}
                               value={values.destinationAmount}
+                              onChangeText={text => {
+                                if (!isShadowOperation) {
+                                  setValues(v => ({ ...v, destinationAmount: text }));
+                                  setLastEditedField('destinationAmount');
+                                }
+                              }}
                               placeholder="0.00"
                               placeholderTextColor={colors.mutedText}
-                              editable={false}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              onSubmitEditing={Keyboard.dismiss}
+                              editable={!isShadowOperation}
                             />
                             <Text style={[styles.currencyLabel, { color: colors.mutedText }]}>
                               {destinationAccount.currency}
