@@ -48,4 +48,6 @@ export const appEvents = new EventEmitter();
 export const EVENTS = {
   DATABASE_RESET: 'database:reset',
   RELOAD_ALL: 'reload:all',
+  OPERATION_CHANGED: 'operation:changed',
+  BUDGETS_NEED_REFRESH: 'budgets:refresh',
 };
