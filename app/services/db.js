@@ -581,6 +581,22 @@ const initializeDatabase = async (db) => {
         FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
       );
 
+      -- Budgets table
+      CREATE TABLE IF NOT EXISTS budgets (
+        id TEXT PRIMARY KEY,
+        category_id TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        currency TEXT NOT NULL,
+        period_type TEXT NOT NULL CHECK(period_type IN ('weekly', 'monthly', 'yearly')),
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        is_recurring INTEGER DEFAULT 1,
+        rollover_enabled INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+      );
+
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_operations_date ON operations(date DESC);
       CREATE INDEX IF NOT EXISTS idx_operations_account ON operations(account_id);
@@ -591,6 +607,11 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
       CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
       CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+      CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
+      CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets(period_type);
+      CREATE INDEX IF NOT EXISTS idx_budgets_dates ON budgets(start_date, end_date);
+      CREATE INDEX IF NOT EXISTS idx_budgets_currency ON budgets(currency);
+      CREATE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets(is_recurring);
     `);
 
     // Update version
