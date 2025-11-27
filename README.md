@@ -17,10 +17,11 @@ npm install
 npm start
 ```
 
+
 3. Run on your device or emulator:
 - For Android: `npm run android`
-- For iOS: `npm run ios`
-- For Web: `npm run web`
+
+**Note:** This project now supports only Android. iOS and Web support have been removed.
 
 ## Project Structure
 - `App.js`: Main entry point

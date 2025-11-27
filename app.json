@@ -15,13 +15,6 @@
     "packagerOpts": {
       "hostType": "tunnel"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.heywood8.monkeep",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
