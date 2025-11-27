@@ -122,7 +122,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="height"
         style={{ flex: 1 }}
       >
         <Pressable style={styles.modalOverlay} onPress={handleClose}>
