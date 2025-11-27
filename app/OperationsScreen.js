@@ -372,6 +372,9 @@ const OperationsScreen = () => {
     const isIncome = operation.type === 'income';
     const isTransfer = operation.type === 'transfer';
 
+    // Check if this is a multi-currency transfer
+    const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
+
     // For transfers, use transfer icon and localized name instead of category
     const categoryInfo = isTransfer
       ? { name: t('transfer'), icon: 'swap-horizontal' }
@@ -386,6 +389,10 @@ const OperationsScreen = () => {
     if (isTransfer && operation.toAccountId) {
       const toAccountName = getAccountName(operation.toAccountId);
       accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}, ${formatDate(operation.date)}`;
+
+      if (isMultiCurrencyTransfer) {
+        accessibilityLabel += `, exchange rate ${operation.exchangeRate}`;
+      }
     }
 
     if (operation.description) {
@@ -431,7 +438,11 @@ const OperationsScreen = () => {
               {accountName}
               {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
             </Text>
-            {operation.description ? (
+            {isMultiCurrencyTransfer ? (
+              <Text style={[styles.exchangeRate, { color: colors.mutedText }]} numberOfLines={1}>
+                {operation.sourceCurrency} → {operation.destinationCurrency}: {parseFloat(operation.exchangeRate).toFixed(4)}
+              </Text>
+            ) : operation.description ? (
               <Text style={[styles.description, { color: colors.mutedText }]} numberOfLines={1}>
                 {operation.description}
               </Text>
@@ -455,6 +466,11 @@ const OperationsScreen = () => {
               {isExpense ? '-' : isIncome ? '+' : ''}
               {formatCurrency(operation.accountId, operation.amount)}
             </Text>
+            {isMultiCurrencyTransfer && operation.toAccountId && (
+              <Text style={[styles.destinationAmount, { color: colors.mutedText }]} numberOfLines={1}>
+                → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
+              </Text>
+            )}
             <Text style={[styles.date, { color: colors.mutedText }]}>
               {formatDate(operation.date)}
             </Text>
@@ -632,6 +648,14 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 12,
+  },
+  exchangeRate: {
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  destinationAmount: {
+    fontSize: 12,
+    marginBottom: 2,
   },
   operationRight: {
     alignItems: 'flex-end',
