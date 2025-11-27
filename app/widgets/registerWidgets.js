@@ -14,10 +14,15 @@ let registerWidgetTaskHandler;
 if (Platform.OS === 'android') {
   try {
     const widgetLib = require('react-native-android-widget');
+    console.log('Widget library loaded:', {
+      hasRegisterWidget: !!widgetLib.registerWidget,
+      hasRegisterTaskHandler: !!widgetLib.registerWidgetTaskHandler,
+      keys: Object.keys(widgetLib)
+    });
     registerWidget = widgetLib.registerWidget;
     registerWidgetTaskHandler = widgetLib.registerWidgetTaskHandler;
   } catch (error) {
-    console.log('Widget library not available:', error.message);
+    console.error('Widget library not available:', error);
   }
 }
 
@@ -25,22 +30,36 @@ if (Platform.OS === 'android') {
  * Initialize and register all widgets
  */
 export const initializeWidgets = () => {
+  console.log('initializeWidgets called', {
+    platform: Platform.OS,
+    hasRegisterWidget: !!registerWidget
+  });
+
   if (Platform.OS !== 'android' || !registerWidget) {
     console.log('Widgets not supported on this platform or build');
     return;
   }
 
   try {
+    console.log('Starting widget registration...');
+
     // Import widgets
     const { BalanceWidget } = require('./BalanceWidget');
     const { RecentOperationsWidget } = require('./RecentOperationsWidget');
 
+    console.log('Widgets imported:', {
+      hasBalanceWidget: !!BalanceWidget,
+      hasRecentOpsWidget: !!RecentOperationsWidget
+    });
+
     // Register widgets
+    console.log('Registering BalanceWidget...');
     registerWidget({
       name: 'BalanceWidget',
       widget: BalanceWidget,
     });
 
+    console.log('Registering RecentOperationsWidget...');
     registerWidget({
       name: 'RecentOperationsWidget',
       widget: RecentOperationsWidget,
