@@ -46,8 +46,8 @@
               "name": "BalanceWidget",
               "label": "Penny Balance",
               "description": "Shows your account balances",
-              "minWidth": "2x2",
-              "minHeight": "2x2",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
               "targetCellWidth": 2,
               "targetCellHeight": 2,
               "resizeMode": "horizontal|vertical"
@@ -56,8 +56,8 @@
               "name": "RecentOperationsWidget",
               "label": "Penny Transactions",
               "description": "Shows recent transactions",
-              "minWidth": "3x3",
-              "minHeight": "3x3",
+              "minWidth": "180dp",
+              "minHeight": "250dp",
               "targetCellWidth": 3,
               "targetCellHeight": 4,
               "resizeMode": "horizontal|vertical"
