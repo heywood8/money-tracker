@@ -577,6 +577,57 @@ const GraphsScreen = () => {
     return incomeChartData.reduce((sum, item) => sum + item.amount, 0);
   }, [incomeChartData]);
 
+  // Calculate spending prediction
+  const spendingPrediction = useMemo(() => {
+    if (totalExpenses === 0) {
+      return null; // No spending data yet
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // If viewing a past month, don't show prediction
+    if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      return null;
+    }
+
+    // If viewing a future month, don't show prediction
+    if (selectedYear > currentYear || (selectedYear === currentYear && selectedMonth > currentMonth)) {
+      return null;
+    }
+
+    // Calculate days in the selected month
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+    // Calculate days elapsed (from 1st to today)
+    const currentDay = now.getDate();
+    const daysElapsed = currentDay;
+
+    // If it's the first day, we can't make a good prediction yet
+    if (daysElapsed < 1) {
+      return null;
+    }
+
+    // Calculate daily average
+    const dailyAverage = totalExpenses / daysElapsed;
+
+    // Predict total spending by month end
+    const predictedTotal = dailyAverage * daysInMonth;
+
+    // Calculate percentage of month elapsed
+    const percentElapsed = (daysElapsed / daysInMonth) * 100;
+
+    return {
+      currentSpending: totalExpenses,
+      predictedTotal,
+      dailyAverage,
+      daysElapsed,
+      daysInMonth,
+      percentElapsed,
+    };
+  }, [totalExpenses, selectedYear, selectedMonth]);
+
   const screenWidth = Dimensions.get('window').width;
 
   // Handlers for opening modals
@@ -630,6 +681,67 @@ const GraphsScreen = () => {
               />
             </View>
           </View>
+
+          {/* Spending Prediction Card */}
+          {spendingPrediction && (
+            <View style={[styles.predictionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.predictionHeader}>
+                <Icon name="chart-line" size={24} color={colors.primary} />
+                <Text style={[styles.predictionTitle, { color: colors.text }]}>
+                  {t('spending_prediction')}
+                </Text>
+              </View>
+
+              {/* Current vs Predicted */}
+              <View style={styles.predictionStats}>
+                <View style={styles.predictionStat}>
+                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
+                    {t('current_spending')}
+                  </Text>
+                  <Text style={[styles.predictionStatValue, { color: colors.expense || '#ff4444' }]}>
+                    {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
+                  </Text>
+                </View>
+                <Icon name="arrow-right" size={20} color={colors.mutedText} style={styles.predictionArrow} />
+                <View style={styles.predictionStat}>
+                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
+                    {t('predicted_spending')}
+                  </Text>
+                  <Text style={[styles.predictionStatValue, { color: colors.text }]}>
+                    {formatCurrency(spendingPrediction.predictedTotal, selectedCurrency)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={styles.predictionProgressContainer}>
+                <View style={[styles.predictionProgressTrack, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.predictionProgressBar,
+                      {
+                        width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
+                        backgroundColor: colors.primary,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
+                  {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()}
+                </Text>
+              </View>
+
+              {/* Daily Average */}
+              <View style={styles.predictionFooter}>
+                <Text style={[styles.predictionFooterLabel, { color: colors.mutedText }]}>
+                  {t('daily_average')}:{' '}
+                  <Text style={[styles.predictionFooterValue, { color: colors.text }]}>
+                    {formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}
+                  </Text>
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Expenses Summary Card */}
           <TouchableOpacity
@@ -1058,6 +1170,70 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minWidth: 45,
     textAlign: 'right',
+  },
+  predictionCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  predictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  predictionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  predictionStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  predictionStat: {
+    flex: 1,
+  },
+  predictionStatLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  predictionStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  predictionArrow: {
+    marginHorizontal: 8,
+  },
+  predictionProgressContainer: {
+    marginBottom: 12,
+  },
+  predictionProgressTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  predictionProgressBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  predictionProgressText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  predictionFooter: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    paddingTop: 12,
+  },
+  predictionFooterLabel: {
+    fontSize: 14,
+  },
+  predictionFooterValue: {
+    fontWeight: '600',
   },
 });
 
