@@ -43,21 +43,28 @@ export const toCents = (amount, currencyCode = null) => {
 /**
  * Convert smallest unit to currency string
  * @param {number} cents - Amount in smallest unit
- * @param {number|string} decimalsOrCurrency - Number of decimal places or currency code
+ * @param {number|string} decimalsOrCurrency - Number of decimal places (for formatting only) or currency code (for currency-aware conversion)
  * @returns {string} Amount as string with decimals
  */
 export const fromCents = (cents, decimalsOrCurrency = 2) => {
-  let decimals = 2;
-
-  if (typeof decimalsOrCurrency === 'string') {
-    decimals = getDecimalPlaces(decimalsOrCurrency);
-  } else if (typeof decimalsOrCurrency === 'number') {
-    decimals = decimalsOrCurrency;
+  // For backward compatibility: when a number is passed, always divide by 100 (default cents behavior)
+  // and use the number only for formatting
+  if (typeof decimalsOrCurrency === 'number') {
+    const amount = cents / 100;
+    return amount.toFixed(decimalsOrCurrency);
   }
 
-  const divisor = Math.pow(10, decimals);
-  const amount = cents / divisor;
-  return amount.toFixed(decimals);
+  // When a currency code string is passed, use currency-specific decimal places
+  if (typeof decimalsOrCurrency === 'string') {
+    const decimals = getDecimalPlaces(decimalsOrCurrency);
+    const divisor = Math.pow(10, decimals);
+    const amount = cents / divisor;
+    return amount.toFixed(decimals);
+  }
+
+  // Default: divide by 100 and format with 2 decimals
+  const amount = cents / 100;
+  return amount.toFixed(2);
 };
 
 /**
@@ -262,8 +269,7 @@ export const convertAmount = (amount, fromCurrency, toCurrency, customRate = nul
 
   // Same currency = no conversion needed
   if (fromCurrency === toCurrency) {
-    const decimals = getDecimalPlaces(toCurrency);
-    return fromCents(toCents(amount, fromCurrency), decimals);
+    return fromCents(toCents(amount, fromCurrency), fromCurrency);
   }
 
   // Get exchange rate
@@ -309,8 +315,7 @@ export const reverseConvert = (destinationAmount, fromCurrency, toCurrency, cust
 
   // Same currency = no conversion needed
   if (fromCurrency === toCurrency) {
-    const decimals = getDecimalPlaces(fromCurrency);
-    return fromCents(toCents(destinationAmount, toCurrency), decimals);
+    return fromCents(toCents(destinationAmount, toCurrency), fromCurrency);
   }
 
   // Get exchange rate
