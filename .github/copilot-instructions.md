@@ -131,8 +131,7 @@ Before starting a new task in the above plan, update progress in the plan.
   - Handle deep linking and navigation state persistence.
 
 - **Platform-Specific Code**:
-  - Use `Platform` API to handle platform-specific logic.
-  - Keep platform-specific styles and components in separate files (e.g., `Component.ios.js`, `Component.android.js`).
+  - This project only supports Android. No iOS or web platform-specific code is needed.
 
 - **Performance Optimization**:
   - Use `useMemo` and `useCallback` to optimize re-renders.
@@ -143,7 +142,7 @@ Before starting a new task in the above plan, update progress in the plan.
 - **Testing**:
   - Write unit tests using Jest.
   - Use `react-native-testing-library` for component testing.
-  - Test on both iOS and Android devices/emulators.
+  - Test on Android devices/emulators.
 
 - **Error Handling**:
   - Use `ErrorBoundary` for catching runtime errors.
@@ -155,7 +154,7 @@ Before starting a new task in the above plan, update progress in the plan.
 
 - **Accessibility**:
   - Use accessibility props like `accessible`, `accessibilityLabel`, and `accessibilityHint`.
-  - Test with screen readers (VoiceOver for iOS, TalkBack for Android).
+  - Test with TalkBack screen reader on Android.
 
 - **Localization and Internationalization**:
   - Use libraries like `react-intl` or `i18next` for multi-language support.
