@@ -592,6 +592,10 @@ const initializeDatabase = async (db) => {
         date TEXT NOT NULL,
         created_at TEXT NOT NULL,
         description TEXT,
+        exchange_rate TEXT,
+        destination_amount TEXT,
+        source_currency TEXT,
+        destination_currency TEXT,
         FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
         FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
