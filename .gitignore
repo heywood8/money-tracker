@@ -22,17 +22,6 @@ android/.settings/
 android/.project
 android/.classpath
 
-# iOS
-ios/Pods/
-ios/build/
-ios/DerivedData/
-ios/*.xcodeproj/project.xcworkspace/
-ios/*.xcworkspace/xcuserdata/
-ios/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
-ios/*.xcodeproj/xcuserdata/
-ios/*.xcodeproj/project.xcworkspace/
-ios/.DS_Store
-
 # Metro
 .expo/
 .expo-shared/
@@ -79,9 +68,6 @@ firebase-debug.log
 
 # React Native Packager
 react-native-debugger.json
-
-# CocoaPods
-ios/Podfile.lock
 
 # Sentry
 .sentryclirc

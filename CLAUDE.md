@@ -123,7 +123,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 ### Styling
 - Use `StyleSheet.create` for consistent and performant styles
 - Ensure responsive design using `Dimensions`, `PixelRatio`
-- Keep platform-specific styles in separate files when needed (e.g., `Component.ios.js`)
+- Android-only focus: no platform-specific files needed
 
 ### Performance
 - Use `useMemo` and `useCallback` to optimize re-renders (already used in AccountsContext)

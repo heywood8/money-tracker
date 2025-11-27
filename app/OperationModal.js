@@ -287,7 +287,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       >
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="height"
             style={{ flex: 1 }}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
@@ -578,9 +578,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         <DateTimePicker
           value={new Date(values.date)}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={(event, selectedDate) => {
-            setShowDatePicker(Platform.OS === 'ios');
+            setShowDatePicker(false);
             if (selectedDate) {
               setValues(v => ({
                 ...v,
