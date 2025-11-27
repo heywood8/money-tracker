@@ -47,6 +47,7 @@ export default function SettingsModal({ visible, onClose }) {
   }, [closeLanguageModal]);
 
   const openExportFormatModal = useCallback(() => {
+    console.log('openExportFormatModal called - showing modal');
     setExportFormatModalVisible(true);
     Animated.timing(exportFormatSlideAnim, {
       toValue: 1,
@@ -107,6 +108,7 @@ export default function SettingsModal({ visible, onClose }) {
   };
 
   const handleExportBackup = () => {
+    console.log('handleExportBackup called - opening export format modal');
     openExportFormatModal();
   };
 
