@@ -68,6 +68,9 @@ export const OperationsProvider = ({ children }) => {
       // Reload accounts to reflect balance changes
       await reloadAccounts();
 
+      // Emit event to refresh budget statuses
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
+
       return newOperation;
     } catch (error) {
       console.error('Failed to add operation:', error);
@@ -98,6 +101,9 @@ export const OperationsProvider = ({ children }) => {
 
       // Reload accounts to reflect balance changes
       await reloadAccounts();
+
+      // Emit event to refresh budget statuses
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
     } catch (error) {
       console.error('Failed to update operation:', error);
       setSaveError(error.message);
@@ -120,6 +126,9 @@ export const OperationsProvider = ({ children }) => {
 
       // Reload accounts to reflect balance changes
       await reloadAccounts();
+
+      // Emit event to refresh budget statuses
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
     } catch (error) {
       console.error('Failed to delete operation:', error);
       setSaveError(error.message);
