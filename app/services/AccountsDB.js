@@ -56,18 +56,20 @@ export const createAccount = async (account) => {
       balance: account.balance || '0',
       currency: account.currency || 'USD',
       display_order: account.display_order ?? newOrder,
+      hidden: account.hidden ?? 0,
       created_at: now,
       updated_at: now,
     };
 
     await executeQuery(
-      'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         accountData.id,
         accountData.name,
         accountData.balance,
         accountData.currency,
         accountData.display_order,
+        accountData.hidden,
         accountData.created_at,
         accountData.updated_at,
       ]
@@ -104,6 +106,10 @@ export const updateAccount = async (id, updates) => {
     if (updates.currency !== undefined) {
       fields.push('currency = ?');
       values.push(updates.currency);
+    }
+    if (updates.hidden !== undefined) {
+      fields.push('hidden = ?');
+      values.push(updates.hidden ? 1 : 0);
     }
 
     if (fields.length === 0) {
