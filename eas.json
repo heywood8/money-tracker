@@ -9,18 +9,10 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "applicationId": "com.heywood8.monkeep",
-        "appName": "Penny"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "android": {
-        "applicationId": "com.heywood8.monkeep",
-        "appName": "Penny"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
