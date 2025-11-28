@@ -22,6 +22,18 @@ import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import * as Currency from './services/currency';
+import currencies from '../assets/currencies.json';
+
+/**
+ * Get currency symbol from currency code
+ * @param {string} currencyCode - Currency code like 'USD', 'EUR', etc.
+ * @returns {string} Currency symbol or code if not found
+ */
+const getCurrencySymbol = (currencyCode) => {
+  if (!currencyCode) return '';
+  const currency = currencies[currencyCode];
+  return currency ? currency.symbol : currencyCode;
+};
 
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useTheme();
@@ -387,7 +399,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                           <View style={styles.currencyInfo}>
                             <Icon name="swap-horizontal-circle" size={16} color={colors.mutedText} />
                             <Text style={[styles.currencyInfoText, { color: colors.mutedText }]}>
-                              {sourceAccount.currency} → {destinationAccount.currency}
+                              {getCurrencySymbol(sourceAccount.currency)} → {getCurrencySymbol(destinationAccount.currency)}
                             </Text>
                           </View>
 
@@ -444,7 +456,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                               editable={!isShadowOperation}
                             />
                             <Text style={[styles.currencyLabel, { color: colors.mutedText }]}>
-                              {destinationAccount.currency}
+                              {getCurrencySymbol(destinationAccount.currency)}
                             </Text>
                           </View>
 
@@ -652,7 +664,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
                         <Text style={{ color: colors.mutedText, fontSize: 14 }}>
-                          {item.balance} {item.currency}
+                          {getCurrencySymbol(item.currency)}{item.balance}
                         </Text>
                       </View>
                     </Pressable>
