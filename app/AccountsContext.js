@@ -108,7 +108,7 @@ export const AccountsProvider = ({ children }) => {
     }
   }, []);
 
-  const updateAccount = useCallback(async (id, updated) => {
+  const updateAccount = useCallback(async (id, updated, createAdjustmentOperation = true) => {
     try {
       const currentAccount = accounts.find(a => a.id === id);
       if (!currentAccount) {
@@ -118,7 +118,7 @@ export const AccountsProvider = ({ children }) => {
       // Check if balance is being changed
       const balanceChanged = updated.balance !== undefined && currentAccount.balance !== String(updated.balance);
 
-      if (balanceChanged) {
+      if (balanceChanged && createAdjustmentOperation) {
         // Use adjustAccountBalance for balance changes to create adjustment operations
         await AccountsDB.adjustAccountBalance(id, String(updated.balance), '');
 
@@ -138,7 +138,7 @@ export const AccountsProvider = ({ children }) => {
         // Emit event to reload operations since we created/updated an adjustment operation
         appEvents.emit(EVENTS.RELOAD_ALL);
       } else {
-        // No balance change, just update normally
+        // No balance change or createAdjustmentOperation is false, just update normally
         // Filter out undefined values and convert balance to string if present
         const updates = {};
         if (updated.name !== undefined) updates.name = updated.name;
@@ -146,6 +146,11 @@ export const AccountsProvider = ({ children }) => {
         if (updated.balance !== undefined) updates.balance = String(updated.balance);
 
         await AccountsDB.updateAccount(id, updates);
+
+        // If balance changed but adjustment operation was disabled, reload operations
+        if (balanceChanged && !createAdjustmentOperation) {
+          appEvents.emit(EVENTS.RELOAD_ALL);
+        }
       }
 
       // Reload accounts to get the updated balance from the database
