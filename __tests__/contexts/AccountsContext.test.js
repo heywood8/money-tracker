@@ -76,8 +76,8 @@ describe('AccountsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(2);
-      expect(result.current.accounts).toHaveLength(2);
+      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(15);
+      expect(result.current.accounts).toHaveLength(15);
     });
 
     it('shows alert on load error', async () => {

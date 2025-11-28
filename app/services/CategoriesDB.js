@@ -1,5 +1,5 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
-import defaultCategories from '../../assets/defaultCategories.json';
+import defaultCategories from '../defaults/defaultCategories.json';
 import i18nData from '../../assets/i18n.json';
 
 /**
