@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
-import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -207,6 +207,7 @@ export default function AccountsScreen() {
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
+  const [createAdjustmentOperation, setCreateAdjustmentOperation] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
@@ -232,6 +233,7 @@ export default function AccountsScreen() {
     const acc = accounts.find(a => a.id === id);
     setEditValues({ ...acc });
     setErrors({});
+    setCreateAdjustmentOperation(true);
   }, [accounts]);
 
   const saveEdit = useCallback(() => {
@@ -243,17 +245,19 @@ export default function AccountsScreen() {
     if (editingId === 'new') {
       addAccount(editValues);
     } else {
-      updateAccount(editingId, editValues);
+      updateAccount(editingId, editValues, createAdjustmentOperation);
     }
     setEditingId(null);
     setEditValues({});
     setErrors({});
-  }, [validateAccount, editValues, editingId, addAccount, updateAccount]);
+    setCreateAdjustmentOperation(true);
+  }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation]);
 
   const addAccountHandler = useCallback(() => {
     setEditingId('new');
     setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0] });
     setErrors({});
+    setCreateAdjustmentOperation(true);
   }, [currencies]);
 
   const deleteAccountHandler = useCallback(async (id) => {
@@ -303,6 +307,7 @@ export default function AccountsScreen() {
     Keyboard.dismiss();
     setEditingId(null);
     setErrors({});
+    setCreateAdjustmentOperation(true);
   }, []);
 
   const handleOpenPicker = useCallback(() => {
@@ -324,6 +329,10 @@ export default function AccountsScreen() {
   const handleCurrencySelect = useCallback((code) => {
     setEditValues(v => ({ ...v, currency: code }));
     setPickerVisible(false);
+  }, []);
+
+  const handleToggleAdjustmentSwitch = useCallback(() => {
+    setCreateAdjustmentOperation(prev => !prev);
   }, []);
 
   const handleCloseTransferModal = useCallback(() => {
@@ -491,6 +500,21 @@ export default function AccountsScreen() {
                 style={styles.textInput}
               />
               {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+              {editingId !== 'new' && (
+                <View style={styles.switchContainer}>
+                  <View style={styles.switchLabelContainer}>
+                    <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
+                    <Text variant="bodySmall" style={{ color: colors.mutedText, marginTop: 4 }}>
+                      {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={createAdjustmentOperation}
+                    onValueChange={handleToggleAdjustmentSwitch}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
               <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
                 <View style={styles.pickerDisplay}>
                   <Text variant="bodyLarge">
@@ -654,6 +678,17 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 8,
     marginLeft: 12,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 16,
+    paddingVertical: 8,
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 16,
   },
   pickerWrapper: {
     marginBottom: 8,
