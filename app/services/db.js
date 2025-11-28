@@ -580,6 +580,17 @@ const initializeDatabase = async (db) => {
       didMigrate = true;
     }
 
+    // Force-check for V7 columns (safety net for migration issues)
+    console.log('Verifying V7 schema...');
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
+    const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
+
+    if (!hasExchangeRate) {
+      console.log('V7 columns missing! Force-running V7 migration...');
+      await migrateToV7(db);
+      didMigrate = true;
+    }
+
     // Now create or update tables
     await db.execAsync(`
       -- Accounts table
