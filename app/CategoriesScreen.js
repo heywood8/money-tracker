@@ -141,7 +141,7 @@ const CategoriesScreen = () => {
               >
                 <Icon
                   name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                  size={20}
+                  size={18}
                   color={colors.mutedText}
                   accessible={false}
                 />
@@ -151,7 +151,7 @@ const CategoriesScreen = () => {
             )}
 
             {/* Category Icon */}
-            <Icon name={category.icon} size={24} color={colors.text} style={styles.categoryIcon} accessible={false} />
+            <Icon name={category.icon} size={22} color={colors.text} style={styles.categoryIcon} accessible={false} />
 
             {/* Category Name */}
             <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
@@ -248,18 +248,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryRow: {
-    minHeight: 56,
+    minHeight: 44,
   },
   categoryContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
     paddingRight: 16,
   },
   expandButton: {
-    width: 44,
-    height: 44,
-    marginRight: 8,
+    width: 32,
+    height: 32,
+    marginRight: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
   budgetIcon: {
