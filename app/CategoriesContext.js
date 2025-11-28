@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
-import defaultCategories from '../assets/defaultCategories.json';
+import defaultCategories from './defaults/defaultCategories.json';
 import * as CategoriesDB from './services/CategoriesDB';
 import { appEvents, EVENTS } from './services/eventEmitter';
 import { useLocalization } from './LocalizationContext';
