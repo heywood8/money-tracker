@@ -237,6 +237,17 @@ const migrateToV7 = async (db) => {
 
     console.log('Starting migration to V7: Add multi-currency transfer support...');
 
+    // Check if operations table exists first
+    const tables = await db.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='operations'"
+    );
+
+    if (tables.length === 0) {
+      console.log('Operations table does not exist yet, skipping column additions...');
+      console.log('Migration to V7 completed successfully');
+      return;
+    }
+
     // Check if columns already exist
     const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
     const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
@@ -582,13 +593,21 @@ const initializeDatabase = async (db) => {
 
     // Force-check for V7 columns (safety net for migration issues)
     console.log('Verifying V7 schema...');
-    const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
-    const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
+    const tables = await db.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='operations'"
+    );
 
-    if (!hasExchangeRate) {
-      console.log('V7 columns missing! Force-running V7 migration...');
-      await migrateToV7(db);
-      didMigrate = true;
+    if (tables.length > 0) {
+      const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
+      const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
+
+      if (!hasExchangeRate) {
+        console.log('V7 columns missing! Force-running V7 migration...');
+        await migrateToV7(db);
+        didMigrate = true;
+      }
+    } else {
+      console.log('Operations table does not exist yet, skipping V7 verification...');
     }
 
     // Now create or update tables

@@ -24,6 +24,18 @@ This document contains potential features for the Penny app. Use the architect a
 **Implementation**: Multi-currency transfers with offline exchange rates, bidirectional rate/amount editing, and precise currency arithmetic for currencies with different decimal places.
 
 
+### 4. Switch To Liquibase For Migrations
+**Status**: Not Started
+**Description**: Replace the current ad-hoc SQLite migration approach with Liquibase (or similar DB migration tool) to manage database schema and data migrations across app versions.
+**User Value**: More reliable, auditable, and reversible migrations; easier collaboration and safer upgrades for users.
+**Implementation Notes**: 
+- Add Liquibase changelog files (XML/YAML/JSON) to repository, include versioned changesets.
+- Integrate Liquibase execution into app startup or build pipeline for Android/iOS (use `liquibase-core` for Java/Kotlin side where native DB is managed, or a JS-based migrator if preferred).
+- Create an initial changelog that mirrors current schema and incremental changes for past migrations.
+- Add migration tests and run migrations in a sandbox before applying to user's DB; provide a safe rollback path and backup step.
+- Document migration process in README and add scripts to generate new changesets.
+**Command**: Use architect agent to design Liquibase migration strategy
+
 ## Medium Priority Features
 
 ### 4. Search and Filters

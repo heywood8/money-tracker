@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Penny",
+    "name": "PennyDev",
     "slug": "app",
     "version": "0.3.0",
     "orientation": "portrait",
@@ -21,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.heywood8.monkeep"
+      "package": "com.heywood8.monkeep.dev"
     },
     "extra": {
       "eas": {
