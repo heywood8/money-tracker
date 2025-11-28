@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import { AccountsProvider, useAccounts } from '../../app/AccountsContext';
 import * as AccountsDB from '../../app/services/AccountsDB';
 import { performMigration, isMigrationComplete } from '../../app/services/migration';
@@ -13,6 +12,16 @@ import { performMigration, isMigrationComplete } from '../../app/services/migrat
 // Mock dependencies
 jest.mock('../../app/services/AccountsDB');
 jest.mock('../../app/services/migration');
+
+// Mock DialogContext
+const mockShowDialog = jest.fn();
+jest.mock('../../app/DialogContext', () => ({
+  DialogProvider: ({ children }) => children,
+  useDialog: () => ({
+    showDialog: mockShowDialog,
+    hideDialog: jest.fn(),
+  }),
+}));
 
 // Mock uuid to return predictable IDs
 let mockUuidCounter = 0;
@@ -23,7 +32,7 @@ jest.mock('react-native-uuid', () => ({
 describe('AccountsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockShowDialog.mockClear();
     mockUuidCounter = 0;
     // Default mock implementations
     isMigrationComplete.mockResolvedValue(true);
@@ -91,7 +100,7 @@ describe('AccountsContext', () => {
       });
 
       expect(result.current.error).toBe('Load failed');
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(mockShowDialog).toHaveBeenCalledWith(
         'Load Error',
         'Failed to load accounts from database.',
         [{ text: 'OK' }]
@@ -169,7 +178,7 @@ describe('AccountsContext', () => {
         await result.current.addAccount(newAccount);
       })).rejects.toThrow('Add failed');
 
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to create account. Please try again.',
         [{ text: 'OK' }]
@@ -254,7 +263,7 @@ describe('AccountsContext', () => {
         await result.current.updateAccount('1', { name: 'New Name' });
       })).rejects.toThrow('Update failed');
 
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to update account. Please try again.',
         [{ text: 'OK' }]
@@ -335,7 +344,7 @@ describe('AccountsContext', () => {
         await result.current.deleteAccount('1');
       })).rejects.toThrow('Delete failed');
 
-      expect(Alert.alert).toHaveBeenCalledWith(
+      expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to delete account. Please try again.',
         [{ text: 'OK' }]
@@ -458,7 +467,7 @@ describe('AccountsContext', () => {
       const invalidAccount = { name: '   ', balance: '100', currency: 'USD' };
       const errors = result.current.validateAccount(invalidAccount);
 
-      expect(errors.name).toBe('Name required');
+      expect(errors.name).toBe('name_required');
     });
 
     it('returns error when balance is not a number', async () => {
@@ -474,7 +483,7 @@ describe('AccountsContext', () => {
       const invalidAccount = { name: 'Test', balance: 'invalid', currency: 'USD' };
       const errors = result.current.validateAccount(invalidAccount);
 
-      expect(errors.balance).toBe('Balance must be a number');
+      expect(errors.balance).toBe('balance_must_be_number');
     });
 
     it('returns error when balance is empty string', async () => {
@@ -490,7 +499,7 @@ describe('AccountsContext', () => {
       const invalidAccount = { name: 'Test', balance: '', currency: 'USD' };
       const errors = result.current.validateAccount(invalidAccount);
 
-      expect(errors.balance).toBe('Balance must be a number');
+      expect(errors.balance).toBe('balance_must_be_number');
     });
 
     it('returns error when currency is missing', async () => {
@@ -506,7 +515,7 @@ describe('AccountsContext', () => {
       const invalidAccount = { name: 'Test', balance: '100', currency: '' };
       const errors = result.current.validateAccount(invalidAccount);
 
-      expect(errors.currency).toBe('Currency required');
+      expect(errors.currency).toBe('currency_required');
     });
 
     it('returns multiple errors when multiple fields are invalid', async () => {

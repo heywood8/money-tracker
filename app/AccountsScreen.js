@@ -237,7 +237,7 @@ export default function AccountsScreen() {
   }, [accounts]);
 
   const saveEdit = useCallback(() => {
-    const validation = validateAccount(editValues);
+    const validation = validateAccount(editValues, t);
     if (Object.keys(validation).length) {
       setErrors(validation);
       return;
@@ -251,7 +251,7 @@ export default function AccountsScreen() {
     setEditValues({});
     setErrors({});
     setCreateAdjustmentOperation(true);
-  }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation]);
+  }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation, t]);
 
   const addAccountHandler = useCallback(() => {
     setEditingId('new');

@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Alert, Platform, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 import { useAccounts } from './AccountsContext';
 import { exportBackup, importBackup } from './services/BackupRestore';
 
@@ -12,6 +13,7 @@ import { exportBackup, importBackup } from './services/BackupRestore';
 export default function SettingsModal({ visible, onClose }) {
   const { theme, setTheme, colorScheme, colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
+  const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
@@ -70,23 +72,25 @@ export default function SettingsModal({ visible, onClose }) {
     closeExportFormatModal();
     try {
       await exportBackup(format);
-      Alert.alert(
+      showDialog(
         t('backup_database') || 'Backup Database',
-        t('backup_success') || 'Backup exported successfully'
+        t('backup_success') || 'Backup exported successfully',
+        [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('Export backup error:', error);
-      Alert.alert(
+      showDialog(
         t('error') || 'Error',
         error.message === 'Import cancelled'
           ? t('cancel') || 'Cancelled'
-          : t('backup_error') || 'Failed to create backup'
+          : t('backup_error') || 'Failed to create backup',
+        [{ text: 'OK' }]
       );
     }
-  }, [closeExportFormatModal, t]);
+  }, [closeExportFormatModal, t, showDialog]);
 
   const handleResetDatabase = () => {
-    Alert.alert(
+    showDialog(
       t('reset_database') || 'Reset Database',
       t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.',
       [
@@ -132,7 +136,7 @@ export default function SettingsModal({ visible, onClose }) {
   };
 
   const handleImportBackup = () => {
-    Alert.alert(
+    showDialog(
       t('restore_database') || 'Restore Database',
       t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.',
       [
@@ -143,7 +147,7 @@ export default function SettingsModal({ visible, onClose }) {
           onPress: async () => {
             try {
               await importBackup();
-              Alert.alert(
+              showDialog(
                 t('restore_database') || 'Restore Database',
                 t('restore_success') || 'Database restored successfully',
                 [
@@ -155,11 +159,12 @@ export default function SettingsModal({ visible, onClose }) {
               );
             } catch (error) {
               console.error('Import backup error:', error);
-              Alert.alert(
+              showDialog(
                 t('error') || 'Error',
                 error.message === 'Import cancelled'
                   ? t('cancel') || 'Cancelled'
-                  : error.message || t('restore_error') || 'Failed to restore backup'
+                  : error.message || t('restore_error') || 'Failed to restore backup',
+                [{ text: 'OK' }]
               );
             }
           },
