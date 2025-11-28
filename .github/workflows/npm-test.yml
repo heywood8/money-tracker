@@ -24,6 +24,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
+        id: test
         run: npm test -- --coverage 2>&1 | tee test-output.txt
         continue-on-error: true
       - name: Post test results
@@ -71,7 +72,6 @@ jobs:
 
       - uses: marocchino/sticky-pull-request-comment@v2.9.4
         id: sticky-comment
-        if: github.event.pull_request.user.login != 'SVC-schops-gha-hdgit_thdgit' && !cancelled() && steps.set-results.outputs.message != ''
         with:
           header: "Test Results"
           message: ${{ steps.set-results.outputs.message }}
@@ -79,5 +79,5 @@ jobs:
           hide_classify: "OUTDATED"
 
       - name: Fail if tests failed
-        if: steps.test.outcome != 'success' && github.event.pull_request.user.login != 'SVC-schops-gha-hdgit_thdgit'
+        if: steps.test.outcome != 'success'
         run: exit 1
