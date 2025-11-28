@@ -281,9 +281,40 @@ describe('AccountsContext', () => {
         await result.current.deleteAccount('1');
       });
 
-      expect(AccountsDB.deleteAccount).toHaveBeenCalledWith('1');
+      expect(AccountsDB.deleteAccount).toHaveBeenCalledWith('1', null);
       expect(result.current.accounts).toHaveLength(1);
       expect(result.current.accounts[0].id).toBe('2');
+    });
+
+    it('deletes an account with operation transfer successfully', async () => {
+      const mockAccounts = [
+        { id: '1', name: 'Account 1', balance: '100', currency: 'USD' },
+        { id: '2', name: 'Account 2', balance: '200', currency: 'USD' },
+      ];
+      const mockAccountsAfterDelete = [
+        { id: '2', name: 'Account 2', balance: '300', currency: 'USD' }, // Balance updated after transfer
+      ];
+      AccountsDB.getAllAccounts
+        .mockResolvedValueOnce(mockAccounts)
+        .mockResolvedValueOnce(mockAccountsAfterDelete);
+      AccountsDB.deleteAccount.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAccounts(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.deleteAccount('1', '2');
+      });
+
+      expect(AccountsDB.deleteAccount).toHaveBeenCalledWith('1', '2');
+      // Should reload accounts after transfer
+      expect(AccountsDB.getAllAccounts).toHaveBeenCalledTimes(2);
+      expect(result.current.accounts).toHaveLength(1);
+      expect(result.current.accounts[0].id).toBe('2');
+      expect(result.current.accounts[0].balance).toBe('300');
     });
 
     it('shows alert and throws error on delete failure', async () => {
@@ -359,6 +390,41 @@ describe('AccountsContext', () => {
 
       // Should not throw, just log error, accounts remain unchanged
       expect(result.current.accounts).toEqual(accountsBeforeReload);
+    });
+  });
+
+  describe('getOperationCount', () => {
+    it('returns operation count for an account', async () => {
+      const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
+      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
+      AccountsDB.getOperationCount.mockResolvedValue(5);
+
+      const { result } = renderHook(() => useAccounts(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const count = await result.current.getOperationCount('1');
+
+      expect(AccountsDB.getOperationCount).toHaveBeenCalledWith('1');
+      expect(count).toBe(5);
+    });
+
+    it('returns 0 on error', async () => {
+      const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
+      AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
+      AccountsDB.getOperationCount.mockRejectedValue(new Error('Failed'));
+
+      const { result } = renderHook(() => useAccounts(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const count = await result.current.getOperationCount('1');
+
+      expect(count).toBe(0);
     });
   });
 
@@ -496,7 +562,7 @@ describe('AccountsContext', () => {
         if (account) account.balance = newBalance;
         return Promise.resolve(undefined);
       });
-      AccountsDB.deleteAccount.mockImplementation((id) => {
+      AccountsDB.deleteAccount.mockImplementation((id, transferToAccountId) => {
         currentMockAccounts = currentMockAccounts.filter(a => a.id !== id);
         return Promise.resolve(undefined);
       });
