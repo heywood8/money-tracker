@@ -6,13 +6,13 @@ This document contains potential features for the Penny app. Use the architect a
 ## High Priority Features
 
 ### 1. Budget Tracking
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Allow users to set monthly budgets per category and track spending against those budgets.
 **User Value**: Helps users control spending and achieve financial goals.
 **Command**: Use architect agent to design budget tracking feature
 
 ### 2. Data Export/Import
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Allow users to export data to CSV/Excel and import from other apps.
 **User Value**: Data portability, backup, and integration with other financial tools.
 **Command**: Use architect agent to design data export/import feature
