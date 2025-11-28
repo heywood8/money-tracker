@@ -22,6 +22,7 @@ export const AccountsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [showHiddenAccounts, setShowHiddenAccounts] = useState(false);
 
   // Initialize default accounts if none exist
   const initializeDefaultAccounts = useCallback(async () => {
@@ -292,8 +293,31 @@ export const AccountsProvider = ({ children }) => {
     }
   }, []);
 
+  const toggleShowHiddenAccounts = useCallback(() => {
+    setShowHiddenAccounts(prev => !prev);
+  }, []);
+
+  // Filter accounts based on hidden status
+  const visibleAccounts = useMemo(() => {
+    return accounts.filter(account => !account.hidden);
+  }, [accounts]);
+
+  const hiddenAccounts = useMemo(() => {
+    return accounts.filter(account => account.hidden);
+  }, [accounts]);
+
+  // Accounts to display based on showHiddenAccounts toggle
+  const displayedAccounts = useMemo(() => {
+    return showHiddenAccounts ? accounts : visibleAccounts;
+  }, [accounts, visibleAccounts, showHiddenAccounts]);
+
   const value = useMemo(() => ({
     accounts,
+    visibleAccounts,
+    hiddenAccounts,
+    displayedAccounts,
+    showHiddenAccounts,
+    toggleShowHiddenAccounts,
     loading,
     error,
     addAccount,
@@ -305,7 +329,7 @@ export const AccountsProvider = ({ children }) => {
     validateAccount,
     getOperationCount,
     currencies,
-  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, reorderAccounts, resetDatabase, getOperationCount]);
+  }), [accounts, visibleAccounts, hiddenAccounts, displayedAccounts, showHiddenAccounts, toggleShowHiddenAccounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, reorderAccounts, resetDatabase, getOperationCount]);
 
   return (
     <AccountsContext.Provider value={value}>

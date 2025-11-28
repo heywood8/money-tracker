@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'penny.db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 let dbInstance = null;
 let initPromise = null;
@@ -199,6 +199,39 @@ const migrateToV6 = async (db) => {
     console.log('Migration to V6 completed successfully');
   } catch (error) {
     console.error('Failed to migrate to V6:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V7 to V8 - Add hidden field to accounts
+ */
+const migrateToV8 = async (db) => {
+  try {
+    console.log('Starting migration to V8: Add hidden field to accounts...');
+
+    // Check if hidden column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
+    const hasHiddenColumn = tableInfo.some(col => col.name === 'hidden');
+
+    if (hasHiddenColumn) {
+      console.log('Hidden column already exists, skipping migration...');
+      return;
+    }
+
+    // Add hidden column to accounts table (defaults to 0/false)
+    await db.execAsync(`
+      ALTER TABLE accounts ADD COLUMN hidden INTEGER DEFAULT 0;
+    `);
+
+    // Create index on hidden for efficient filtering
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
+    `);
+
+    console.log('Migration to V8 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V8:', error);
     throw error;
   }
 };
@@ -590,6 +623,11 @@ const initializeDatabase = async (db) => {
       await migrateToV7(db);
       didMigrate = true;
     }
+    if (currentVersion >= 7 && currentVersion < 8) {
+      console.log('Migrating database from version', currentVersion, 'to version 8...');
+      await migrateToV8(db);
+      didMigrate = true;
+    }
 
     // Force-check for V7 columns (safety net for migration issues)
     console.log('Verifying V7 schema...');
@@ -619,6 +657,7 @@ const initializeDatabase = async (db) => {
         balance TEXT NOT NULL DEFAULT '0',
         currency TEXT NOT NULL DEFAULT 'USD',
         display_order INTEGER,
+        hidden INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -684,6 +723,7 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
       CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
       CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+      CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
       CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
       CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets(period_type);
       CREATE INDEX IF NOT EXISTS idx_budgets_dates ON budgets(start_date, end_date);
