@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
@@ -17,7 +17,14 @@ export default function Header({ onOpenSettings }) {
         }
       ]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+      <View style={styles.titleContainer}>
+        <Image
+          source={require('../assets/icon.png')}
+          style={styles.icon}
+          accessibilityLabel="Penny app icon"
+        />
+        <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+      </View>
       <TouchableOpacity
         onPress={onOpenSettings}
         accessibilityLabel={t('settings')}
@@ -40,6 +47,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  icon: {
+    width: 50,
+    height: 50,
+    marginRight: 4,
   },
   title: { fontSize: 14, fontWeight: '700' },
   settingsButton: {
