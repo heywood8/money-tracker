@@ -223,7 +223,7 @@ export default function AccountsScreen() {
   const [noCurrencyMatchMessage, setNoCurrencyMatchMessage] = useState('');
 
   const { colorScheme, colors } = useTheme();
-  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
+  const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, toggleShowHiddenAccounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);
@@ -255,7 +255,7 @@ export default function AccountsScreen() {
 
   const addAccountHandler = useCallback(() => {
     setEditingId('new');
-    setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0] });
+    setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0], hidden: 0 });
     setErrors({});
     setCreateAdjustmentOperation(true);
   }, [currencies]);
@@ -396,11 +396,11 @@ export default function AccountsScreen() {
 
   // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
-    return accounts.map(acc => ({
+    return displayedAccounts.map(acc => ({
       ...acc,
       currencySymbol: currencies[acc.currency]?.symbol || acc.currency
     }));
-  }, [accounts, currencies]);
+  }, [displayedAccounts, currencies]);
 
   const renderItem = useCallback(({ item, index, drag, isActive }) => (
     <AccountRow
@@ -451,6 +451,27 @@ export default function AccountsScreen() {
         onDragEnd={handleDragEnd}
         activationDistance={20}
         ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
+        ListFooterComponent={
+          hiddenAccounts.length > 0 ? (
+            <TouchableRipple
+              onPress={toggleShowHiddenAccounts}
+              style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <View style={styles.showHiddenContent}>
+                <Icon
+                  name={showHiddenAccounts ? 'eye-off' : 'eye'}
+                  size={24}
+                  color={colors.primary}
+                />
+                <Text style={[styles.showHiddenText, { color: colors.text }]}>
+                  {showHiddenAccounts
+                    ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
+                    : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
+                </Text>
+              </View>
+            </TouchableRipple>
+          ) : null
+        }
       />
       <FAB
         icon="plus"
@@ -515,6 +536,19 @@ export default function AccountsScreen() {
                   />
                 </View>
               )}
+              <View style={styles.switchContainer}>
+                <View style={styles.switchLabelContainer}>
+                  <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
+                  <Text variant="bodySmall" style={{ color: colors.mutedText, marginTop: 4 }}>
+                    {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
+                  </Text>
+                </View>
+                <Switch
+                  value={!!editValues.hidden}
+                  onValueChange={(value) => setEditValues(prev => ({ ...prev, hidden: value ? 1 : 0 }))}
+                  color={colors.primary}
+                />
+              </View>
               <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
                 <View style={styles.pickerDisplay}>
                   <Text variant="bodyLarge">
@@ -761,6 +795,25 @@ const styles = StyleSheet.create({
   },
   confirmationButton: {
     minWidth: 100,
+  },
+  showHiddenButton: {
+    marginHorizontal: 8,
+    marginVertical: 8,
+    marginTop: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  showHiddenContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  showHiddenText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
