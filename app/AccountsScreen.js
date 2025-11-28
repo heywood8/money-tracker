@@ -304,38 +304,75 @@ export default function AccountsScreen() {
   }, []);
 
   const handleTransferAndDelete = useCallback(async (transferToAccountId) => {
-    try {
-      setTransferModalVisible(false);
+    // Close the transfer modal first
+    setTransferModalVisible(false);
 
-      // Delete account and transfer operations
-      await deleteAccount(accountToDelete, transferToAccountId);
+    // Get account names for the confirmation message
+    const accountToDeleteData = accounts.find(a => a.id === accountToDelete);
+    const destinationAccountData = accounts.find(a => a.id === transferToAccountId);
 
-      // Clear edit state if we were editing the deleted account
-      if (editingId === accountToDelete) {
-        setEditingId(null);
-        setEditValues({});
-        setErrors({});
-      }
-
-      // Reset transfer modal state
-      setAccountToDelete(null);
-      setAccountToDeleteCurrency(null);
-      setOperationCount(0);
-
-      Alert.alert(
-        t('success') || 'Success',
-        t('account_deleted_operations_transferred') || 'Account deleted and operations transferred successfully.',
-        [{ text: t('ok') || 'OK' }]
-      );
-    } catch (err) {
-      console.error('Failed to transfer and delete account:', err);
+    if (!accountToDeleteData || !destinationAccountData) {
       Alert.alert(
         t('error') || 'Error',
-        t('failed_to_delete_account') || 'Failed to delete account. Please try again.',
+        t('account_not_found') || 'Account not found. Please try again.',
         [{ text: t('ok') || 'OK' }]
       );
+      return;
     }
-  }, [accountToDelete, deleteAccount, editingId, t]);
+
+    // Show final confirmation
+    Alert.alert(
+      t('confirm_delete_and_transfer') || 'Confirm Deletion',
+      t('confirm_delete_and_transfer_message') || `This will permanently delete "${accountToDeleteData.name}" and irreversibly move ${operationCount} transaction(s) to "${destinationAccountData.name}".\n\nThis action cannot be undone.`,
+      [
+        {
+          text: t('cancel') || 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            // Reset state if user cancels
+            setAccountToDelete(null);
+            setAccountToDeleteCurrency(null);
+            setOperationCount(0);
+          },
+        },
+        {
+          text: t('delete') || 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete account and transfer operations
+              await deleteAccount(accountToDelete, transferToAccountId);
+
+              // Clear edit state if we were editing the deleted account
+              if (editingId === accountToDelete) {
+                setEditingId(null);
+                setEditValues({});
+                setErrors({});
+              }
+
+              // Reset transfer modal state
+              setAccountToDelete(null);
+              setAccountToDeleteCurrency(null);
+              setOperationCount(0);
+
+              Alert.alert(
+                t('success') || 'Success',
+                t('account_deleted_operations_transferred') || 'Account deleted and operations transferred successfully.',
+                [{ text: t('ok') || 'OK' }]
+              );
+            } catch (err) {
+              console.error('Failed to transfer and delete account:', err);
+              Alert.alert(
+                t('error') || 'Error',
+                t('failed_to_delete_account') || 'Failed to delete account. Please try again.',
+                [{ text: t('ok') || 'OK' }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [accountToDelete, operationCount, deleteAccount, editingId, t, accounts]);
 
   // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
