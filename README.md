@@ -26,6 +26,36 @@ npm start
 ## Project Structure
 - `App.js`: Main entry point
 - `assets/`: Images and static assets
+- `docs/`: Documentation including build setup guides
+
+## Building with EAS
+
+This project uses EAS Build for creating production and preview builds.
+
+### First-Time Setup
+
+Before running builds in CI/CD or non-interactive mode, you need to set up Android signing credentials. See the detailed guide:
+
+📖 **[EAS Credentials Setup Guide](docs/EAS_CREDENTIALS_SETUP.md)**
+
+### Build Commands
+
+```sh
+# Preview build (APK for internal testing)
+npx eas-cli build --platform android --profile preview
+
+# Production build (AAB for Google Play)
+npx eas-cli build --platform android --profile production
+
+# Development build
+npx eas-cli build --platform android --profile development
+```
+
+### Build Profiles
+
+- **preview**: Creates APK files for internal distribution and testing
+- **production**: Creates AAB files for Google Play Store
+- **development**: Creates development builds with Expo Dev Client
 
 ## Next Steps
 - Add features iteratively with LLM assistance.
