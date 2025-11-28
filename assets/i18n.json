@@ -229,7 +229,8 @@
     "transfer_operations": "Transfer Operations",
     "transfer_operations_message": "This account has transactions. Select an account to transfer them to:",
     "account_deleted_operations_transferred": "Account deleted and operations transferred successfully.",
-    "failed_to_delete_account": "Failed to delete account. Please try again."
+    "failed_to_delete_account": "Failed to delete account. Please try again.",
+    "no_same_currency_account": "This account has transactions but there are no other accounts with the same currency. Please create another account with the same currency first, or delete the transactions."
   },
   "ru": {
     "accounts": "Счета",
@@ -461,7 +462,8 @@
     "transfer_operations": "Перенос операций",
     "transfer_operations_message": "У этого счета есть транзакции. Выберите счет для переноса:",
     "account_deleted_operations_transferred": "Счет удален и операции успешно перенесены.",
-    "failed_to_delete_account": "Не удалось удалить счет. Попробуйте еще раз."
+    "failed_to_delete_account": "Не удалось удалить счет. Попробуйте еще раз.",
+    "no_same_currency_account": "У этого счета есть транзакции, но нет других счетов с той же валютой. Пожалуйста, создайте другой счет с той же валютой или удалите транзакции."
   }
 }
 

@@ -48,10 +48,10 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
 CurrencyPickerModal.displayName = 'CurrencyPickerModal';
 
 // Memoized transfer account picker modal component
-const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, operationCount, colors, t, onSelect, currencies }) => {
+const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, accountCurrency, operationCount, colors, t, onSelect, currencies }) => {
   const availableAccounts = useMemo(() => {
-    return accounts.filter(a => a.id !== accountToDelete);
-  }, [accounts, accountToDelete]);
+    return accounts.filter(a => a.id !== accountToDelete && a.currency === accountCurrency);
+  }, [accounts, accountToDelete, accountCurrency]);
 
   const renderAccountItem = useCallback(({ item }) => {
     const currencySymbol = currencies[item.currency]?.symbol || item.currency;
@@ -168,6 +168,7 @@ export default function AccountsScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
+  const [accountToDeleteCurrency, setAccountToDeleteCurrency] = useState(null);
   const [operationCount, setOperationCount] = useState(0);
   const { colorScheme, colors } = useTheme();
   const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
@@ -211,13 +212,21 @@ export default function AccountsScreen() {
 
       if (count > 0) {
         // Account has operations, need to transfer them first
-        const otherAccounts = accounts.filter(a => a.id !== id);
+        const accountToDeleteData = accounts.find(a => a.id === id);
+        if (!accountToDeleteData) {
+          throw new Error('Account not found');
+        }
 
-        if (otherAccounts.length === 0) {
-          // No other accounts to transfer to
+        // Filter for accounts with same currency (excluding the account being deleted)
+        const sameCurrencyAccounts = accounts.filter(
+          a => a.id !== id && a.currency === accountToDeleteData.currency
+        );
+
+        if (sameCurrencyAccounts.length === 0) {
+          // No same-currency accounts to transfer to
           Alert.alert(
             t('cannot_delete_account') || 'Cannot Delete Account',
-            t('cannot_delete_last_account_with_operations') || 'This is the only account and it has transactions. Please delete the transactions first, or create another account to transfer them to.',
+            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`,
             [{ text: t('ok') || 'OK' }]
           );
           return;
@@ -225,6 +234,7 @@ export default function AccountsScreen() {
 
         // Show transfer modal
         setAccountToDelete(id);
+        setAccountToDeleteCurrency(accountToDeleteData.currency);
         setOperationCount(count);
         setTransferModalVisible(true);
       } else {
@@ -289,6 +299,7 @@ export default function AccountsScreen() {
   const handleCloseTransferModal = useCallback(() => {
     setTransferModalVisible(false);
     setAccountToDelete(null);
+    setAccountToDeleteCurrency(null);
     setOperationCount(0);
   }, []);
 
@@ -308,6 +319,7 @@ export default function AccountsScreen() {
 
       // Reset transfer modal state
       setAccountToDelete(null);
+      setAccountToDeleteCurrency(null);
       setOperationCount(0);
 
       Alert.alert(
@@ -474,6 +486,7 @@ export default function AccountsScreen() {
         onClose={handleCloseTransferModal}
         accounts={accounts}
         accountToDelete={accountToDelete}
+        accountCurrency={accountToDeleteCurrency}
         operationCount={operationCount}
         currencies={currencies}
         colors={colors}

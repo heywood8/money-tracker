@@ -127,10 +127,33 @@ export const updateAccount = async (id, updates) => {
  * @param {string} fromAccountId - Account to transfer operations from
  * @param {string} toAccountId - Account to transfer operations to
  * @returns {Promise<number>} Number of operations transferred
+ * @throws {Error} If accounts have different currencies
  */
 export const transferOperations = async (fromAccountId, toAccountId) => {
   try {
     return await executeTransaction(async (db) => {
+      // Verify both accounts exist and have the same currency
+      const fromAccount = await db.getFirstAsync(
+        'SELECT id, currency FROM accounts WHERE id = ?',
+        [fromAccountId]
+      );
+      const toAccount = await db.getFirstAsync(
+        'SELECT id, currency FROM accounts WHERE id = ?',
+        [toAccountId]
+      );
+
+      if (!fromAccount) {
+        throw new Error(`Source account ${fromAccountId} not found`);
+      }
+      if (!toAccount) {
+        throw new Error(`Destination account ${toAccountId} not found`);
+      }
+      if (fromAccount.currency !== toAccount.currency) {
+        throw new Error(
+          `Cannot transfer operations: accounts have different currencies (${fromAccount.currency} → ${toAccount.currency})`
+        );
+      }
+
       // Update operations where the account is the source (account_id)
       const sourceResult = await db.runAsync(
         'UPDATE operations SET account_id = ? WHERE account_id = ?',
