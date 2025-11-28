@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
-import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
 import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -104,6 +104,48 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
 
 TransferAccountPickerModal.displayName = 'TransferAccountPickerModal';
 
+// Memoized confirmation dialog component
+const ConfirmationDialog = memo(({ visible, onClose, title, message, cancelText, confirmText, onConfirm, colors, confirmColor }) => {
+  return (
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={[styles.confirmationModalContent, { backgroundColor: colors.card }]}
+      >
+        <Text variant="titleLarge" style={[styles.confirmationTitle, { color: colors.text }]}>
+          {title}
+        </Text>
+        <Text variant="bodyMedium" style={[styles.confirmationMessage, { color: colors.text }]}>
+          {message}
+        </Text>
+        <View style={styles.confirmationButtons}>
+          {cancelText && (
+            <Button
+              mode="outlined"
+              onPress={onClose}
+              style={styles.confirmationButton}
+              textColor={colors.text}
+            >
+              {cancelText}
+            </Button>
+          )}
+          <Button
+            mode="contained"
+            onPress={onConfirm}
+            style={styles.confirmationButton}
+            buttonColor={confirmColor || colors.primary}
+          >
+            {confirmText}
+          </Button>
+        </View>
+      </Modal>
+    </Portal>
+  );
+});
+
+ConfirmationDialog.displayName = 'ConfirmationDialog';
+
 // Memoized account row component
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
@@ -170,6 +212,15 @@ export default function AccountsScreen() {
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [accountToDeleteCurrency, setAccountToDeleteCurrency] = useState(null);
   const [operationCount, setOperationCount] = useState(0);
+
+  // Confirmation dialogs
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteConfirmAccountId, setDeleteConfirmAccountId] = useState(null);
+  const [transferConfirmVisible, setTransferConfirmVisible] = useState(false);
+  const [transferConfirmDestinationId, setTransferConfirmDestinationId] = useState(null);
+  const [noCurrencyMatchVisible, setNoCurrencyMatchVisible] = useState(false);
+  const [noCurrencyMatchMessage, setNoCurrencyMatchMessage] = useState('');
+
   const { colorScheme, colors } = useTheme();
   const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
   const { t } = useLocalization();
@@ -224,11 +275,10 @@ export default function AccountsScreen() {
 
         if (sameCurrencyAccounts.length === 0) {
           // No same-currency accounts to transfer to
-          Alert.alert(
-            t('cannot_delete_account') || 'Cannot Delete Account',
-            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`,
-            [{ text: t('ok') || 'OK' }]
+          setNoCurrencyMatchMessage(
+            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`
           );
+          setNoCurrencyMatchVisible(true);
           return;
         }
 
@@ -239,35 +289,15 @@ export default function AccountsScreen() {
         setTransferModalVisible(true);
       } else {
         // No operations, safe to delete directly
-        Alert.alert(
-          t('delete_account') || 'Delete Account',
-          t('delete_account_confirm') || 'Are you sure you want to delete this account?',
-          [
-            { text: t('cancel') || 'Cancel', style: 'cancel' },
-            {
-              text: t('delete') || 'Delete',
-              style: 'destructive',
-              onPress: () => {
-                deleteAccount(id);
-                if (editingId === id) {
-                  setEditingId(null);
-                  setEditValues({});
-                  setErrors({});
-                }
-              },
-            },
-          ]
-        );
+        setDeleteConfirmAccountId(id);
+        setDeleteConfirmVisible(true);
       }
     } catch (err) {
       console.error('Failed to check operation count:', err);
-      Alert.alert(
-        t('error') || 'Error',
-        t('failed_to_check_operations') || 'Failed to check operations. Please try again.',
-        [{ text: t('ok') || 'OK' }]
-      );
+      setNoCurrencyMatchMessage(t('failed_to_check_operations') || 'Failed to check operations. Please try again.');
+      setNoCurrencyMatchVisible(true);
     }
-  }, [t, deleteAccount, editingId, getOperationCount, accounts]);
+  }, [t, getOperationCount, accounts]);
 
   const handleCloseModal = useCallback(() => {
     Keyboard.dismiss();
@@ -303,76 +333,57 @@ export default function AccountsScreen() {
     setOperationCount(0);
   }, []);
 
-  const handleTransferAndDelete = useCallback(async (transferToAccountId) => {
+  const handleTransferAndDelete = useCallback((transferToAccountId) => {
     // Close the transfer modal first
     setTransferModalVisible(false);
 
-    // Get account names for the confirmation message
-    const accountToDeleteData = accounts.find(a => a.id === accountToDelete);
-    const destinationAccountData = accounts.find(a => a.id === transferToAccountId);
+    // Store the destination ID and show confirmation dialog
+    setTransferConfirmDestinationId(transferToAccountId);
+    setTransferConfirmVisible(true);
+  }, []);
 
-    if (!accountToDeleteData || !destinationAccountData) {
-      Alert.alert(
-        t('error') || 'Error',
-        t('account_not_found') || 'Account not found. Please try again.',
-        [{ text: t('ok') || 'OK' }]
-      );
-      return;
+  // Handle simple delete confirmation
+  const handleConfirmDelete = useCallback(async () => {
+    setDeleteConfirmVisible(false);
+    try {
+      await deleteAccount(deleteConfirmAccountId);
+      if (editingId === deleteConfirmAccountId) {
+        setEditingId(null);
+        setEditValues({});
+        setErrors({});
+      }
+    } catch (err) {
+      console.error('Failed to delete account:', err);
+      setNoCurrencyMatchMessage(t('failed_to_delete_account') || 'Failed to delete account. Please try again.');
+      setNoCurrencyMatchVisible(true);
     }
+    setDeleteConfirmAccountId(null);
+  }, [deleteConfirmAccountId, deleteAccount, editingId, t]);
 
-    // Show final confirmation
-    Alert.alert(
-      t('confirm_delete_and_transfer') || 'Confirm Deletion',
-      t('confirm_delete_and_transfer_message') || `This will permanently delete "${accountToDeleteData.name}" and irreversibly move ${operationCount} transaction(s) to "${destinationAccountData.name}".\n\nThis action cannot be undone.`,
-      [
-        {
-          text: t('cancel') || 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            // Reset state if user cancels
-            setAccountToDelete(null);
-            setAccountToDeleteCurrency(null);
-            setOperationCount(0);
-          },
-        },
-        {
-          text: t('delete') || 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Delete account and transfer operations
-              await deleteAccount(accountToDelete, transferToAccountId);
+  // Handle transfer and delete confirmation
+  const handleConfirmTransferAndDelete = useCallback(async () => {
+    setTransferConfirmVisible(false);
+    try {
+      await deleteAccount(accountToDelete, transferConfirmDestinationId);
 
-              // Clear edit state if we were editing the deleted account
-              if (editingId === accountToDelete) {
-                setEditingId(null);
-                setEditValues({});
-                setErrors({});
-              }
+      // Clear edit state if we were editing the deleted account
+      if (editingId === accountToDelete) {
+        setEditingId(null);
+        setEditValues({});
+        setErrors({});
+      }
 
-              // Reset transfer modal state
-              setAccountToDelete(null);
-              setAccountToDeleteCurrency(null);
-              setOperationCount(0);
-
-              Alert.alert(
-                t('success') || 'Success',
-                t('account_deleted_operations_transferred') || 'Account deleted and operations transferred successfully.',
-                [{ text: t('ok') || 'OK' }]
-              );
-            } catch (err) {
-              console.error('Failed to transfer and delete account:', err);
-              Alert.alert(
-                t('error') || 'Error',
-                t('failed_to_delete_account') || 'Failed to delete account. Please try again.',
-                [{ text: t('ok') || 'OK' }]
-              );
-            }
-          },
-        },
-      ]
-    );
-  }, [accountToDelete, operationCount, deleteAccount, editingId, t, accounts]);
+      // Reset transfer modal state
+      setAccountToDelete(null);
+      setAccountToDeleteCurrency(null);
+      setOperationCount(0);
+      setTransferConfirmDestinationId(null);
+    } catch (err) {
+      console.error('Failed to transfer and delete account:', err);
+      setNoCurrencyMatchMessage(t('failed_to_delete_account') || 'Failed to delete account. Please try again.');
+      setNoCurrencyMatchVisible(true);
+    }
+  }, [accountToDelete, transferConfirmDestinationId, deleteAccount, editingId, t]);
 
   // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
@@ -530,6 +541,57 @@ export default function AccountsScreen() {
         t={t}
         onSelect={handleTransferAndDelete}
       />
+
+      {/* Simple delete confirmation */}
+      <ConfirmationDialog
+        visible={deleteConfirmVisible}
+        onClose={() => setDeleteConfirmVisible(false)}
+        title={t('delete_account') || 'Delete Account'}
+        message={t('delete_account_confirm') || 'Are you sure you want to delete this account?'}
+        cancelText={t('cancel') || 'Cancel'}
+        confirmText={t('delete') || 'Delete'}
+        onConfirm={handleConfirmDelete}
+        colors={colors}
+        confirmColor={colors.delete}
+      />
+
+      {/* Transfer and delete confirmation */}
+      <ConfirmationDialog
+        visible={transferConfirmVisible}
+        onClose={() => {
+          setTransferConfirmVisible(false);
+          setAccountToDelete(null);
+          setAccountToDeleteCurrency(null);
+          setOperationCount(0);
+          setTransferConfirmDestinationId(null);
+        }}
+        title={t('confirm_delete_and_transfer') || 'Confirm Deletion'}
+        message={(() => {
+          if (!accountToDelete || !transferConfirmDestinationId) return '';
+          const sourceAccount = accounts.find(a => a.id === accountToDelete);
+          const destAccount = accounts.find(a => a.id === transferConfirmDestinationId);
+          if (!sourceAccount || !destAccount) return '';
+          return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
+        })()}
+        cancelText={t('cancel') || 'Cancel'}
+        confirmText={t('delete') || 'Delete'}
+        onConfirm={handleConfirmTransferAndDelete}
+        colors={colors}
+        confirmColor={colors.delete}
+      />
+
+      {/* Error/info dialog (no currency match, errors, etc.) */}
+      <ConfirmationDialog
+        visible={noCurrencyMatchVisible}
+        onClose={() => setNoCurrencyMatchVisible(false)}
+        title={t('cannot_delete_account') || 'Cannot Delete Account'}
+        message={noCurrencyMatchMessage}
+        cancelText=""
+        confirmText={t('ok') || 'OK'}
+        onConfirm={() => setNoCurrencyMatchVisible(false)}
+        colors={colors}
+      />
+
       {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
   );
@@ -638,6 +700,32 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  confirmationModalContent: {
+    margin: 20,
+    padding: 24,
+    borderRadius: 16,
+    maxWidth: 500,
+    alignSelf: 'center',
+    width: '90%',
+  },
+  confirmationTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  confirmationMessage: {
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  confirmationButton: {
+    minWidth: 100,
   },
 });
 
