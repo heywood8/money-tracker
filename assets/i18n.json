@@ -220,7 +220,16 @@
     "json_description": "Standard format, compatible with all versions",
     "csv_description": "Plain text format, easy to edit",
     "excel_description": "Spreadsheet format with multiple sheets",
-    "sqlite_description": "Raw database file, complete backup"
+    "sqlite_description": "Raw database file, complete backup",
+    "ok": "OK",
+    "success": "Success",
+    "cannot_delete_account": "Cannot Delete Account",
+    "cannot_delete_last_account_with_operations": "This is the only account and it has transactions. Please delete the transactions first, or create another account to transfer them to.",
+    "failed_to_check_operations": "Failed to check operations. Please try again.",
+    "transfer_operations": "Transfer Operations",
+    "transfer_operations_message": "This account has transactions. Select an account to transfer them to:",
+    "account_deleted_operations_transferred": "Account deleted and operations transferred successfully.",
+    "failed_to_delete_account": "Failed to delete account. Please try again."
   },
   "ru": {
     "accounts": "Счета",
@@ -443,7 +452,16 @@
     "json_description": "Стандартный формат, совместим со всеми версиями",
     "csv_description": "Текстовый формат, легко редактировать",
     "excel_description": "Формат электронной таблицы с несколькими листами",
-    "sqlite_description": "Исходный файл базы данных, полная резервная копия"
+    "sqlite_description": "Исходный файл базы данных, полная резервная копия",
+    "ok": "ОК",
+    "success": "Успешно",
+    "cannot_delete_account": "Невозможно удалить счет",
+    "cannot_delete_last_account_with_operations": "Это единственный счет и у него есть транзакции. Пожалуйста, удалите транзакции сначала, или создайте другой счет для переноса.",
+    "failed_to_check_operations": "Не удалось проверить операции. Попробуйте еще раз.",
+    "transfer_operations": "Перенос операций",
+    "transfer_operations_message": "У этого счета есть транзакции. Выберите счет для переноса:",
+    "account_deleted_operations_transferred": "Счет удален и операции успешно перенесены.",
+    "failed_to_delete_account": "Не удалось удалить счет. Попробуйте еще раз."
   }
 }
 

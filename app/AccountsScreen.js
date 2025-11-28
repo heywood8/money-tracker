@@ -47,6 +47,63 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
 
 CurrencyPickerModal.displayName = 'CurrencyPickerModal';
 
+// Memoized transfer account picker modal component
+const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, operationCount, colors, t, onSelect, currencies }) => {
+  const availableAccounts = useMemo(() => {
+    return accounts.filter(a => a.id !== accountToDelete);
+  }, [accounts, accountToDelete]);
+
+  const renderAccountItem = useCallback(({ item }) => {
+    const currencySymbol = currencies[item.currency]?.symbol || item.currency;
+
+    return (
+      <TouchableRipple
+        onPress={() => onSelect(item.id)}
+        style={styles.pickerOption}
+        rippleColor="rgba(0, 0, 0, .12)"
+      >
+        <View>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.name}</Text>
+          <Text style={{ fontSize: 14, color: colors.mutedText, marginTop: 4 }}>
+            {item.balance} {currencySymbol}
+          </Text>
+        </View>
+      </TouchableRipple>
+    );
+  }, [onSelect, colors, currencies]);
+
+  return (
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={[styles.pickerModalContent, { backgroundColor: colors.card }]}
+      >
+        <Text variant="titleLarge" style={{ marginBottom: 8, textAlign: 'center' }}>
+          {t('transfer_operations') || 'Transfer Operations'}
+        </Text>
+        <Text variant="bodyMedium" style={{ marginBottom: 16, textAlign: 'center', color: colors.mutedText }}>
+          {`${t('transfer_operations_message') || 'This account has transactions. Select an account to transfer them to:'}`}
+        </Text>
+        <Text variant="bodySmall" style={{ marginBottom: 16, textAlign: 'center', color: colors.mutedText, fontWeight: '600' }}>
+          {`${operationCount} ${operationCount === 1 ? 'transaction' : 'transactions'}`}
+        </Text>
+        <FlatList
+          data={availableAccounts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderAccountItem}
+          style={{ maxHeight: 400 }}
+        />
+        <Button mode="text" onPress={onClose} style={{ marginTop: 8 }}>
+          {t('cancel') || 'Cancel'}
+        </Button>
+      </Modal>
+    </Portal>
+  );
+});
+
+TransferAccountPickerModal.displayName = 'TransferAccountPickerModal';
+
 // Memoized account row component
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
@@ -109,8 +166,11 @@ export default function AccountsScreen() {
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null);
+  const [operationCount, setOperationCount] = useState(0);
   const { colorScheme, colors } = useTheme();
-  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, currencies } = useAccounts();
+  const { accounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);
@@ -144,27 +204,60 @@ export default function AccountsScreen() {
     setErrors({});
   }, [currencies]);
 
-  const deleteAccountHandler = useCallback((id) => {
-    Alert.alert(
-      t('delete_account') || 'Delete Account',
-      t('delete_account_confirm') || 'Are you sure you want to delete this account?',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('delete') || 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteAccount(id);
-            if (editingId === id) {
-              setEditingId(null);
-              setEditValues({});
-              setErrors({});
-            }
-          },
-        },
-      ]
-    );
-  }, [t, deleteAccount, editingId]);
+  const deleteAccountHandler = useCallback(async (id) => {
+    try {
+      // Check if account has operations
+      const count = await getOperationCount(id);
+
+      if (count > 0) {
+        // Account has operations, need to transfer them first
+        const otherAccounts = accounts.filter(a => a.id !== id);
+
+        if (otherAccounts.length === 0) {
+          // No other accounts to transfer to
+          Alert.alert(
+            t('cannot_delete_account') || 'Cannot Delete Account',
+            t('cannot_delete_last_account_with_operations') || 'This is the only account and it has transactions. Please delete the transactions first, or create another account to transfer them to.',
+            [{ text: t('ok') || 'OK' }]
+          );
+          return;
+        }
+
+        // Show transfer modal
+        setAccountToDelete(id);
+        setOperationCount(count);
+        setTransferModalVisible(true);
+      } else {
+        // No operations, safe to delete directly
+        Alert.alert(
+          t('delete_account') || 'Delete Account',
+          t('delete_account_confirm') || 'Are you sure you want to delete this account?',
+          [
+            { text: t('cancel') || 'Cancel', style: 'cancel' },
+            {
+              text: t('delete') || 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                deleteAccount(id);
+                if (editingId === id) {
+                  setEditingId(null);
+                  setEditValues({});
+                  setErrors({});
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      console.error('Failed to check operation count:', err);
+      Alert.alert(
+        t('error') || 'Error',
+        t('failed_to_check_operations') || 'Failed to check operations. Please try again.',
+        [{ text: t('ok') || 'OK' }]
+      );
+    }
+  }, [t, deleteAccount, editingId, getOperationCount, accounts]);
 
   const handleCloseModal = useCallback(() => {
     Keyboard.dismiss();
@@ -192,6 +285,45 @@ export default function AccountsScreen() {
     setEditValues(v => ({ ...v, currency: code }));
     setPickerVisible(false);
   }, []);
+
+  const handleCloseTransferModal = useCallback(() => {
+    setTransferModalVisible(false);
+    setAccountToDelete(null);
+    setOperationCount(0);
+  }, []);
+
+  const handleTransferAndDelete = useCallback(async (transferToAccountId) => {
+    try {
+      setTransferModalVisible(false);
+
+      // Delete account and transfer operations
+      await deleteAccount(accountToDelete, transferToAccountId);
+
+      // Clear edit state if we were editing the deleted account
+      if (editingId === accountToDelete) {
+        setEditingId(null);
+        setEditValues({});
+        setErrors({});
+      }
+
+      // Reset transfer modal state
+      setAccountToDelete(null);
+      setOperationCount(0);
+
+      Alert.alert(
+        t('success') || 'Success',
+        t('account_deleted_operations_transferred') || 'Account deleted and operations transferred successfully.',
+        [{ text: t('ok') || 'OK' }]
+      );
+    } catch (err) {
+      console.error('Failed to transfer and delete account:', err);
+      Alert.alert(
+        t('error') || 'Error',
+        t('failed_to_delete_account') || 'Failed to delete account. Please try again.',
+        [{ text: t('ok') || 'OK' }]
+      );
+    }
+  }, [accountToDelete, deleteAccount, editingId, t]);
 
   // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
@@ -336,6 +468,17 @@ export default function AccountsScreen() {
         colors={colors}
         t={t}
         onSelect={handleCurrencySelect}
+      />
+      <TransferAccountPickerModal
+        visible={transferModalVisible}
+        onClose={handleCloseTransferModal}
+        accounts={accounts}
+        accountToDelete={accountToDelete}
+        operationCount={operationCount}
+        currencies={currencies}
+        colors={colors}
+        t={t}
+        onSelect={handleTransferAndDelete}
       />
       {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
