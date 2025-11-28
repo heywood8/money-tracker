@@ -137,6 +137,7 @@ export const AccountsProvider = ({ children }) => {
         if (updated.name !== undefined) updates.name = updated.name;
         if (updated.currency !== undefined) updates.currency = updated.currency;
         if (updated.balance !== undefined) updates.balance = String(updated.balance);
+        if (updated.hidden !== undefined) updates.hidden = updated.hidden;
 
         await AccountsDB.updateAccount(id, updates);
 
