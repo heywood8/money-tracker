@@ -104,7 +104,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   const handleSave = useCallback(async () => {
     const operationData = prepareOperationData();
-    const error = validateOperation(operationData);
+    const error = validateOperation(operationData, t);
     if (error) {
       setErrors({ general: error });
       return;
@@ -122,7 +122,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
 
     onClose();
-  }, [prepareOperationData, validateOperation, isNew, addOperation, updateOperation, operation, onClose]);
+  }, [prepareOperationData, validateOperation, isNew, addOperation, updateOperation, operation, onClose, t]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();

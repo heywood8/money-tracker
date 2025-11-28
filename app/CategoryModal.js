@@ -12,17 +12,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 import { useCategories } from './CategoriesContext';
 import IconPicker from './IconPicker';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { showDialog } = useDialog();
   const { categories, addCategory, updateCategory, deleteCategory, validateCategory } = useCategories();
 
   const [values, setValues] = useState({
@@ -56,7 +57,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
   }, [category, isNew, visible]);
 
   const handleSave = useCallback(() => {
-    const error = validateCategory(values);
+    const error = validateCategory(values, t);
     if (error) {
       setErrors({ general: error });
       return;
@@ -69,7 +70,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     }
 
     onClose();
-  }, [validateCategory, values, isNew, addCategory, updateCategory, category, onClose]);
+  }, [validateCategory, values, isNew, addCategory, updateCategory, category, onClose, t]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
@@ -78,7 +79,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
   }, [onClose]);
 
   const handleDelete = useCallback(() => {
-    Alert.alert(
+    showDialog(
       t('delete_category'),
       t('delete_category_confirm'),
       [
@@ -93,7 +94,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         },
       ]
     );
-  }, [category, deleteCategory, onClose, t]);
+  }, [category, deleteCategory, onClose, t, showDialog]);
 
   // Get potential parents - all folders of the same category_type
   const potentialParents = useMemo(() => {

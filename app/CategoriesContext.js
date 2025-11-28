@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import defaultCategories from './defaults/defaultCategories.json';
 import * as CategoriesDB from './services/CategoriesDB';
 import { appEvents, EVENTS } from './services/eventEmitter';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 
 const CategoriesContext = createContext();
 
@@ -17,6 +17,7 @@ export const useCategories = () => {
 };
 
 export const CategoriesProvider = ({ children }) => {
+  const { showDialog } = useDialog();
   const { isFirstLaunch, language } = useLocalization();
   const [categories, setCategories] = useState([]);
   const [expandedIds, setExpandedIds] = useState(new Set());
@@ -100,14 +101,14 @@ export const CategoriesProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to add category:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to create category. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, []);
+  }, [showDialog]);
 
   const updateCategory = useCallback(async (id, updates) => {
     try {
@@ -119,14 +120,14 @@ export const CategoriesProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to update category:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to update category. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, []);
+  }, [showDialog]);
 
   const deleteCategory = useCallback(async (id) => {
     try {
@@ -155,14 +156,14 @@ export const CategoriesProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to delete category:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to delete category. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, []);
+  }, [showDialog]);
 
   const toggleExpanded = useCallback((id) => {
     setExpandedIds(prev => {
@@ -192,15 +193,15 @@ export const CategoriesProvider = ({ children }) => {
     return path;
   }, [categories]);
 
-  const validateCategory = useCallback((category) => {
+  const validateCategory = useCallback((category, t = (key) => key) => {
     if (!category.name || category.name.trim() === '') {
-      return 'Category name is required';
+      return t('category_name_required') || 'Category name is required';
     }
     if (!category.category_type && !category.categoryType) {
-      return 'Category type (expense/income) is required';
+      return t('category_type_required') || 'Category type (expense/income) is required';
     }
     if (!category.icon) {
-      return 'Icon is required';
+      return t('icon_required') || 'Icon is required';
     }
     return null;
   }, []);

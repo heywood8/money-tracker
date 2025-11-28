@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import * as OperationsDB from './services/OperationsDB';
 import { useAccounts } from './AccountsContext';
 import { appEvents, EVENTS } from './services/eventEmitter';
+import { useDialog } from './DialogContext';
 
 const OperationsContext = createContext();
 
@@ -16,6 +16,7 @@ export const useOperations = () => {
 };
 
 export const OperationsProvider = ({ children }) => {
+  const { showDialog } = useDialog();
   const [operations, setOperations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -75,14 +76,14 @@ export const OperationsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to add operation:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to create operation. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, [reloadAccounts]);
+  }, [reloadAccounts, showDialog]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {
@@ -107,14 +108,14 @@ export const OperationsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to update operation:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to update operation. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, [reloadAccounts]);
+  }, [reloadAccounts, showDialog]);
 
   const deleteOperation = useCallback(async (id) => {
     try {
@@ -132,39 +133,39 @@ export const OperationsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to delete operation:', error);
       setSaveError(error.message);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to delete operation. Please try again.',
         [{ text: 'OK' }]
       );
       throw error;
     }
-  }, [reloadAccounts]);
+  }, [reloadAccounts, showDialog]);
 
-  const validateOperation = useCallback((operation) => {
+  const validateOperation = useCallback((operation, t = (key) => key) => {
     if (!operation.type) {
-      return 'Operation type is required';
+      return t('operation_type_required') || 'Operation type is required';
     }
     if (!operation.amount || isNaN(Number(operation.amount)) || Number(operation.amount) <= 0) {
-      return 'Valid amount is required';
+      return t('valid_amount_required') || 'Valid amount is required';
     }
     if (!operation.accountId) {
-      return 'Account is required';
+      return t('account_required') || 'Account is required';
     }
     if (operation.type === 'transfer') {
       if (!operation.toAccountId) {
-        return 'Destination account is required for transfers';
+        return t('destination_account_required') || 'Destination account is required for transfers';
       }
       if (operation.accountId === operation.toAccountId) {
-        return 'Source and destination accounts must be different';
+        return t('accounts_must_be_different') || 'Source and destination accounts must be different';
       }
     } else {
       if (!operation.categoryId) {
-        return 'Category is required';
+        return t('category_required') || 'Category is required';
       }
     }
     if (!operation.date) {
-      return 'Date is required';
+      return t('date_required') || 'Date is required';
     }
     return null;
   }, []);
