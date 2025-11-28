@@ -235,7 +235,11 @@
     "confirm_delete_and_transfer": "Confirm Deletion",
     "confirm_delete_and_transfer_message": "This will permanently delete the account and irreversibly move all transactions to the selected account.\n\nThis action cannot be undone.",
     "create_adjustment_operation": "Create adjustment operation",
-    "create_adjustment_operation_hint": "Automatically create a shadow operation to track balance adjustments"
+    "create_adjustment_operation_hint": "Automatically create a shadow operation to track balance adjustments",
+    "hidden_account": "Hidden account",
+    "hidden_account_hint": "Hide this account from the main list and operations",
+    "show_hidden_accounts": "Show hidden accounts",
+    "hide_hidden_accounts": "Hide hidden accounts"
   },
   "ru": {
     "accounts": "Счета",
@@ -473,7 +477,11 @@
     "confirm_delete_and_transfer": "Подтвердите удаление",
     "confirm_delete_and_transfer_message": "Это безвозвратно удалит счет и переместит все транзакции на выбранный счет.\n\nЭто действие нельзя отменить.",
     "create_adjustment_operation": "Создать корректировочную операцию",
-    "create_adjustment_operation_hint": "Автоматически создавать теневую операцию для отслеживания корректировок баланса"
+    "create_adjustment_operation_hint": "Автоматически создавать теневую операцию для отслеживания корректировок баланса",
+    "hidden_account": "Скрытый счет",
+    "hidden_account_hint": "Скрыть этот счет из основного списка и операций",
+    "show_hidden_accounts": "Показать скрытые счета",
+    "hide_hidden_accounts": "Скрыть скрытые счета"
   }
 }
 

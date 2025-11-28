@@ -28,7 +28,7 @@ const QuickAddForm = memo(({
   t,
   quickAddValues,
   setQuickAddValues,
-  accounts,
+  accounts: visibleAccounts,
   filteredCategories,
   getAccountName,
   getCategoryName,
@@ -77,7 +77,7 @@ const QuickAddForm = memo(({
       {/* Account Picker */}
       <Pressable
         style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-        onPress={() => openPicker('account', accounts)}
+        onPress={() => openPicker('account', visibleAccounts)}
       >
         <Icon name="wallet" size={18} color={colors.mutedText} />
         <Text style={[styles.formInputText, { color: colors.text }]}>
@@ -90,7 +90,7 @@ const QuickAddForm = memo(({
       {quickAddValues.type === 'transfer' && (
         <Pressable
           style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={() => openPicker('toAccount', accounts.filter(acc => acc.id !== quickAddValues.accountId))}
+          onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
         >
           <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
           <Text style={[styles.formInputText, { color: colors.text }]}>
@@ -159,7 +159,7 @@ const OperationsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { operations, loading: operationsLoading, deleteOperation, addOperation, validateOperation } = useOperations();
-  const { accounts, loading: accountsLoading } = useAccounts();
+  const { visibleAccounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -191,20 +191,20 @@ const OperationsScreen = () => {
   // Set default account on mount
   useEffect(() => {
     async function setDefaultAccount() {
-      if (accounts.length === 1) {
-        setQuickAddValues(v => ({ ...v, accountId: accounts[0].id }));
-      } else if (accounts.length > 1) {
+      if (visibleAccounts.length === 1) {
+        setQuickAddValues(v => ({ ...v, accountId: visibleAccounts[0].id }));
+      } else if (visibleAccounts.length > 1) {
         const lastId = await getLastAccessedAccount();
-        if (lastId && accounts.some(acc => acc.id === lastId)) {
+        if (lastId && visibleAccounts.some(acc => acc.id === lastId)) {
           setQuickAddValues(v => ({ ...v, accountId: lastId }));
         } else {
-          const defaultId = accounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+          const defaultId = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
           setQuickAddValues(v => ({ ...v, accountId: defaultId }));
         }
       }
     }
     setDefaultAccount();
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   const handleEditOperation = (operation) => {
     setEditingOperation(operation);
@@ -327,9 +327,9 @@ const OperationsScreen = () => {
 
   // Get account name
   const getAccountName = useCallback((accountId) => {
-    const account = accounts.find(acc => acc.id === accountId);
+    const account = visibleAccounts.find(acc => acc.id === accountId);
     return account ? account.name : 'Unknown';
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   // Get category info
   const getCategoryInfo = useCallback((categoryId) => {
@@ -412,7 +412,7 @@ const OperationsScreen = () => {
 
   // Format amount with currency (memoized)
   const formatCurrency = useCallback((accountId, amount) => {
-    const account = accounts.find(acc => acc.id === accountId);
+    const account = visibleAccounts.find(acc => acc.id === accountId);
     if (!account) return amount;
 
     const numAmount = parseFloat(amount);
@@ -421,7 +421,7 @@ const OperationsScreen = () => {
     // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
     const symbol = getCurrencySymbol(account.currency || 'USD');
     return `${symbol}${numAmount.toFixed(2)}`;
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -435,7 +435,7 @@ const OperationsScreen = () => {
       t={t}
       quickAddValues={quickAddValues}
       setQuickAddValues={setQuickAddValues}
-      accounts={accounts}
+      accounts={visibleAccounts}
       filteredCategories={filteredCategories}
       getAccountName={getAccountName}
       getCategoryName={getCategoryName}
@@ -443,7 +443,7 @@ const OperationsScreen = () => {
       handleQuickAdd={handleQuickAdd}
       TYPES={TYPES}
     />
-  ), [colors, t, quickAddValues, accounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   const renderItem = useCallback(({ item }) => {
     // Render date separator
@@ -590,7 +590,7 @@ const OperationsScreen = () => {
         data={groupedOperations}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        extraData={[accounts, categories]}
+        extraData={[visibleAccounts, categories]}
         ListHeaderComponent={quickAddFormComponent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

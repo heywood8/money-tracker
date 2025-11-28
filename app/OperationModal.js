@@ -39,7 +39,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { addOperation, updateOperation, validateOperation } = useOperations();
-  const { accounts } = useAccounts();
+  const { visibleAccounts: accounts } = useAccounts();
   const { categories } = useCategories();
 
   const [values, setValues] = useState({

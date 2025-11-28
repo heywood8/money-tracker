@@ -91,13 +91,14 @@ describe('AccountsDB', () => {
       const result = await AccountsDB.createAccount(newAccount);
 
       expect(db.executeQuery).toHaveBeenCalledWith(
-        'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         expect.arrayContaining([
           'test-id',
           'New Account',
           '100.50',
           'USD',
           6, // max_order + 1
+          0, // hidden
           expect.any(String), // created_at
           expect.any(String), // updated_at
         ])
@@ -122,6 +123,7 @@ describe('AccountsDB', () => {
       expect(result.balance).toBe('0');
       expect(result.currency).toBe('USD');
       expect(result.display_order).toBe(0);
+      expect(result.hidden).toBe(0);
     });
 
     it('throws error when database insert fails', async () => {
