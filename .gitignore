@@ -52,6 +52,10 @@ buck-out/
 \.buckd/
 *.keystore
 
+# EAS Credentials (if using local credentials)
+credentials.json
+*.keystore.base64.txt
+
 # Test coverage
 coverage/
 *.lcov
