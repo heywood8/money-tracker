@@ -161,10 +161,17 @@ export const AccountsProvider = ({ children }) => {
     }
   }, [accounts, reloadAccounts]);
 
-  const deleteAccount = useCallback(async (id) => {
+  const deleteAccount = useCallback(async (id, transferToAccountId = null) => {
     try {
-      await AccountsDB.deleteAccount(id);
+      await AccountsDB.deleteAccount(id, transferToAccountId);
       setAccounts(accs => accs.filter(a => a.id !== id));
+
+      // If operations were transferred, reload all accounts to reflect balance changes
+      if (transferToAccountId) {
+        await reloadAccounts();
+        // Emit event to reload operations since they were transferred
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      }
     } catch (err) {
       console.error('Failed to delete account:', err);
       Alert.alert(
@@ -174,7 +181,7 @@ export const AccountsProvider = ({ children }) => {
       );
       throw err;
     }
-  }, []);
+  }, [reloadAccounts]);
 
   const reloadAccounts = useCallback(async () => {
     try {
@@ -279,6 +286,15 @@ export const AccountsProvider = ({ children }) => {
     }
   }, [initializeDefaultAccounts]);
 
+  const getOperationCount = useCallback(async (accountId) => {
+    try {
+      return await AccountsDB.getOperationCount(accountId);
+    } catch (err) {
+      console.error('Failed to get operation count:', err);
+      return 0;
+    }
+  }, []);
+
   const value = useMemo(() => ({
     accounts,
     loading,
@@ -290,8 +306,9 @@ export const AccountsProvider = ({ children }) => {
     reorderAccounts,
     resetDatabase,
     validateAccount,
+    getOperationCount,
     currencies,
-  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, reorderAccounts, resetDatabase]);
+  }), [accounts, loading, error, addAccount, updateAccount, deleteAccount, reloadAccounts, reorderAccounts, resetDatabase, getOperationCount]);
 
   return (
     <AccountsContext.Provider value={value}>
