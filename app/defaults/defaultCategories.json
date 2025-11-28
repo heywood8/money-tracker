@@ -1,0 +1,643 @@
+[ 
+  {
+    "id": "expense-food",
+    "name": "Food",
+    "nameKey": "food",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "food"
+  },
+  {
+    "id": "expense-food-groceries",
+    "name": "Groceries",
+    "nameKey": "groceries",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "cart"
+  },
+  {
+    "id": "expense-food-coffee-cafe",
+    "name": "Coffee/Cafe",
+    "nameKey": "coffee_cafe",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "coffee"
+  },
+  {
+    "id": "expense-food-restaurants",
+    "name": "Restaurants",
+    "nameKey": "restaurants",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "silverware-fork-knife"
+  },
+  {
+    "id": "expense-food-fast-food",
+    "name": "Fast food",
+    "nameKey": "fast_food",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "hamburger"
+  },
+  {
+    "id": "expense-food-lunches",
+    "name": "Lunches",
+    "nameKey": "lunches",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "food-variant"
+  },
+  {
+    "id": "expense-food-breakfasts",
+    "name": "Breakfasts",
+    "nameKey": "breakfasts",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "egg-fried"
+  },
+  {
+    "id": "expense-food-tips",
+    "name": "Tips",
+    "nameKey": "tips",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "cash-plus"
+  },
+  {
+    "id": "expense-food-other",
+    "name": "Other",
+    "nameKey": "food_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-food",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-transportation",
+    "name": "Transportation",
+    "nameKey": "transportation",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "car"
+  },
+  {
+    "id": "expense-transportation-public-transport",
+    "name": "Public transport",
+    "nameKey": "public_transport",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "bus"
+  },
+  {
+    "id": "expense-transportation-taxi",
+    "name": "Taxi",
+    "nameKey": "taxi",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "taxi"
+  },
+  {
+    "id": "expense-transportation-fuel",
+    "name": "Fuel",
+    "nameKey": "fuel",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "gas-station"
+  },
+  {
+    "id": "expense-transportation-repair",
+    "name": "Repair",
+    "nameKey": "transportation_repair",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "wrench"
+  },
+  {
+    "id": "expense-transportation-car-rent",
+    "name": "Car rent",
+    "nameKey": "car_rent",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "car-key"
+  },
+  {
+    "id": "expense-transportation-other",
+    "name": "Other",
+    "nameKey": "transportation_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-transportation",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-entertainment",
+    "name": "Entertainment",
+    "nameKey": "entertainment",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "party-popper"
+  },
+  {
+    "id": "expense-entertainment-movies",
+    "name": "Movies",
+    "nameKey": "movies",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "movie-open"
+  },
+  {
+    "id": "expense-entertainment-cultural",
+    "name": "Cultural",
+    "nameKey": "cultural",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "ticket"
+  },
+  {
+    "id": "expense-entertainment-bars",
+    "name": "Bars",
+    "nameKey": "bars",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "glass-cocktail"
+  },
+  {
+    "id": "expense-entertainment-drinks",
+    "name": "Drinks",
+    "nameKey": "drinks",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "cup"
+  },
+  {
+    "id": "expense-entertainment-celebrations",
+    "name": "Celebrations",
+    "nameKey": "celebrations",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "cake-variant"
+  },
+  {
+    "id": "expense-entertainment-sports",
+    "name": "Sports",
+    "nameKey": "sports",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "basketball"
+  },
+  {
+    "id": "expense-entertainment-hobbies",
+    "name": "Hobbies",
+    "nameKey": "hobbies",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "palette"
+  },
+  {
+    "id": "expense-entertainment-other",
+    "name": "Other",
+    "nameKey": "entertainment_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-entertainment",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-monthly",
+    "name": "Monthly",
+    "nameKey": "monthly",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "calendar-month"
+  },
+  {
+    "id": "expense-monthly-rent",
+    "name": "Rent",
+    "nameKey": "rent",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "home"
+  },
+  {
+    "id": "expense-monthly-electricity",
+    "name": "Electricity",
+    "nameKey": "electricity",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "lightning-bolt"
+  },
+  {
+    "id": "expense-monthly-water",
+    "name": "Water",
+    "nameKey": "water",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "water"
+  },
+  {
+    "id": "expense-monthly-gas",
+    "name": "Gas",
+    "nameKey": "gas",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "fire"
+  },
+  {
+    "id": "expense-monthly-internet",
+    "name": "Internet",
+    "nameKey": "internet",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "wifi"
+  },
+  {
+    "id": "expense-monthly-phone",
+    "name": "Phone",
+    "nameKey": "phone",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "phone"
+  },
+  {
+    "id": "expense-monthly-subscriptions",
+    "name": "Subscriptions",
+    "nameKey": "subscriptions",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "autorenew"
+  },
+  {
+    "id": "expense-monthly-credit-card",
+    "name": "Credit Card",
+    "nameKey": "credit_card",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "credit-card"
+  },
+  {
+    "id": "expense-monthly-other",
+    "name": "Other",
+    "nameKey": "monthly_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-monthly",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-shopping",
+    "name": "Shopping",
+    "nameKey": "shopping",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "shopping"
+  },
+  {
+    "id": "expense-shopping-clothing",
+    "name": "Clothing",
+    "nameKey": "clothing",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-shopping",
+    "icon": "hanger"
+  },
+  {
+    "id": "expense-shopping-electronics",
+    "name": "Electronics",
+    "nameKey": "electronics",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-shopping",
+    "icon": "laptop"
+  },
+  {
+    "id": "expense-shopping-books",
+    "name": "Books",
+    "nameKey": "books",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-shopping",
+    "icon": "book-open-page-variant"
+  },
+  {
+    "id": "expense-shopping-gifts",
+    "name": "Gifts",
+    "nameKey": "shopping_gifts",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-shopping",
+    "icon": "gift"
+  },
+  {
+    "id": "expense-shopping-other",
+    "name": "Other",
+    "nameKey": "shopping_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-shopping",
+    "icon": "cart-outline"
+  },
+  {
+    "id": "expense-family",
+    "name": "Family",
+    "nameKey": "family",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "account-group"
+  },
+  {
+    "id": "expense-family-pocket-money",
+    "name": "Pocket money",
+    "nameKey": "pocket_money",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-family",
+    "icon": "wallet"
+  },
+  {
+    "id": "expense-family-gifts",
+    "name": "Gifts",
+    "nameKey": "family_gifts",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-family",
+    "icon": "gift"
+  },
+  {
+    "id": "expense-family-animals",
+    "name": "Animals",
+    "nameKey": "family_animals",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-family",
+    "icon": "paw"
+  },
+  {
+    "id": "expense-family-other",
+    "name": "Other",
+    "nameKey": "family_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-family",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-travelling",
+    "name": "Travelling",
+    "nameKey": "travelling",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "airplane"
+  },
+  {
+    "id": "expense-travelling-transportation",
+    "name": "Transportation",
+    "nameKey": "travelling_transportation",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "train-car"
+  },
+  {
+    "id": "expense-travelling-accommodation",
+    "name": "Accommodation",
+    "nameKey": "accommodation",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "bed"
+  },
+  {
+    "id": "expense-travelling-food",
+    "name": "Food",
+    "nameKey": "travelling_food",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "food"
+  },
+  {
+    "id": "expense-travelling-cultural",
+    "name": "Cultural",
+    "nameKey": "travelling_cultural",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "camera"
+  },
+  {
+    "id": "expense-travelling-souvenirs",
+    "name": "Souvenirs",
+    "nameKey": "souvenirs",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "shopping-outline"
+  },
+  {
+    "id": "expense-travelling-package-tour",
+    "name": "Package tour",
+    "nameKey": "package_tour",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "briefcase-outline"
+  },
+  {
+    "id": "expense-travelling-other",
+    "name": "Other",
+    "nameKey": "travelling_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-travelling",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-health",
+    "name": "Health",
+    "nameKey": "health",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "heart-pulse"
+  },
+  {
+    "id": "expense-health-hospitals",
+    "name": "Hospitals",
+    "nameKey": "hospitals",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "hospital-box"
+  },
+  {
+    "id": "expense-health-medicine",
+    "name": "Medicine",
+    "nameKey": "medicine",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "pill"
+  },
+  {
+    "id": "expense-health-veterinary",
+    "name": "Veterinary",
+    "nameKey": "veterinary",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "paw"
+  },
+  {
+    "id": "expense-health-other",
+    "name": "Other",
+    "nameKey": "health_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-health",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "expense-house",
+    "name": "House",
+    "nameKey": "house",
+    "type": "folder",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "home-outline"
+  },
+  {
+    "id": "expense-house-renovations",
+    "name": "Renovations",
+    "nameKey": "renovations",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-house",
+    "icon": "hammer-wrench"
+  },
+  {
+    "id": "expense-house-furniture",
+    "name": "Furniture",
+    "nameKey": "furniture",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-house",
+    "icon": "sofa"
+  },
+  {
+    "id": "expense-house-household-goods",
+    "name": "Household goods",
+    "nameKey": "household_goods",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-house",
+    "icon": "broom"
+  },
+  {
+    "id": "expense-house-other",
+    "name": "Other",
+    "nameKey": "house_other",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": "expense-house",
+    "icon": "dots-horizontal"
+  },
+  {
+    "id": "income-salary",
+    "name": "Salary",
+    "nameKey": "salary",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "briefcase"
+  },
+  {
+    "id": "income-business",
+    "name": "Business",
+    "nameKey": "business",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "domain"
+  },
+  {
+    "id": "income-investments",
+    "name": "Investments",
+    "nameKey": "investments",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "chart-line"
+  },
+  {
+    "id": "income-gifts",
+    "name": "Gifts",
+    "nameKey": "income_gifts",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "gift"
+  },
+  {
+    "id": "income-other",
+    "name": "Other Income",
+    "nameKey": "other_income",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "cash"
+  },
+  {
+    "id": "shadow-adjustment-expense",
+    "name": "Balance Adjustment (Expense)",
+    "nameKey": "adjustment_expense",
+    "type": "entry",
+    "category_type": "expense",
+    "parentId": null,
+    "icon": "cash-minus",
+    "isShadow": true
+  },
+  {
+    "id": "shadow-adjustment-income",
+    "name": "Balance Adjustment (Income)",
+    "nameKey": "adjustment_income",
+    "type": "entry",
+    "category_type": "income",
+    "parentId": null,
+    "icon": "cash-plus",
+    "isShadow": true
+  }
+]

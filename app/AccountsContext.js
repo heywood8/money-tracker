@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import currencies from '../assets/currencies.json';
+import defaultAccounts from './defaults/defaultAccounts';
 import * as AccountsDB from './services/AccountsDB';
 import { performMigration, isMigrationComplete } from './services/migration';
 import { appEvents, EVENTS } from './services/eventEmitter';
@@ -25,26 +26,17 @@ export const AccountsProvider = ({ children }) => {
   // Initialize default accounts if none exist
   const initializeDefaultAccounts = useCallback(async () => {
     try {
-      const defaultAccounts = [
-        {
-          id: uuid.v4(),
-          name: 'Наличка драмы',
-          balance: '1000',
-          currency: 'AMD',
-        },
-        {
-          id: uuid.v4(),
-          name: 'Ameria',
-          balance: '5000',
-          currency: 'AMD',
-        },
-      ];
+      const accountsToCreate = defaultAccounts.map(acc => ({
+        ...acc,
+        id: uuid.v4(),
+        balance: String(acc.balance),
+      }));
 
-      for (const account of defaultAccounts) {
+      for (const account of accountsToCreate) {
         await AccountsDB.createAccount(account);
       }
 
-      return defaultAccounts;
+      return accountsToCreate;
     } catch (err) {
       console.error('Failed to create default accounts:', err);
       throw err;
