@@ -9,6 +9,18 @@ import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import OperationModal from './OperationModal';
+import currencies from '../assets/currencies.json';
+
+/**
+ * Get currency symbol from currency code
+ * @param {string} currencyCode - Currency code like 'USD', 'EUR', etc.
+ * @returns {string} Currency symbol or code if not found
+ */
+const getCurrencySymbol = (currencyCode) => {
+  if (!currencyCode) return '';
+  const currency = currencies[currencyCode];
+  return currency ? currency.symbol : currencyCode;
+};
 
 // Separate memoized component for the quick add form
 const QuickAddForm = memo(({
@@ -334,7 +346,8 @@ const OperationsScreen = () => {
       }).format(numAmount);
     } catch (error) {
       // Fallback if currency is invalid
-      return `${numAmount.toFixed(2)} ${account.currency || 'USD'}`;
+      const symbol = getCurrencySymbol(account.currency || 'USD');
+      return `${symbol}${numAmount.toFixed(2)}`;
     }
   }, [accounts]);
 
@@ -440,7 +453,7 @@ const OperationsScreen = () => {
             </Text>
             {isMultiCurrencyTransfer ? (
               <Text style={[styles.exchangeRate, { color: colors.mutedText }]} numberOfLines={1}>
-                {operation.sourceCurrency} → {operation.destinationCurrency}: {parseFloat(operation.exchangeRate).toFixed(4)}
+                {getCurrencySymbol(operation.sourceCurrency)} → {getCurrencySymbol(operation.destinationCurrency)}: {parseFloat(operation.exchangeRate).toFixed(4)}
               </Text>
             ) : operation.description ? (
               <Text style={[styles.description, { color: colors.mutedText }]} numberOfLines={1}>
@@ -550,7 +563,7 @@ const OperationsScreen = () => {
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
                         <Text style={{ color: colors.mutedText, fontSize: 14 }}>
-                          {item.balance} {item.currency}
+                          {getCurrencySymbol(item.currency)}{item.balance}
                         </Text>
                       </View>
                     </Pressable>
