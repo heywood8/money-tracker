@@ -337,18 +337,9 @@ const OperationsScreen = () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) return amount;
 
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: account.currency || 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(numAmount);
-    } catch (error) {
-      // Fallback if currency is invalid
-      const symbol = getCurrencySymbol(account.currency || 'USD');
-      return `${symbol}${numAmount.toFixed(2)}`;
-    }
+    // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
+    const symbol = getCurrencySymbol(account.currency || 'USD');
+    return `${symbol}${numAmount.toFixed(2)}`;
   }, [accounts]);
 
   const getItemLayout = useCallback((data, index) => ({
@@ -476,7 +467,6 @@ const OperationsScreen = () => {
                 },
               ]}
             >
-              {isExpense ? '-' : isIncome ? '+' : ''}
               {formatCurrency(operation.accountId, operation.amount)}
             </Text>
             {isMultiCurrencyTransfer && operation.toAccountId && (
