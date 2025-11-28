@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
@@ -158,6 +159,7 @@ QuickAddForm.displayName = 'QuickAddForm';
 const OperationsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { showDialog } = useDialog();
   const { operations, loading: operationsLoading, deleteOperation, addOperation, validateOperation } = useOperations();
   const { visibleAccounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -213,7 +215,7 @@ const OperationsScreen = () => {
   };
 
   const handleDeleteOperation = (operation) => {
-    Alert.alert(
+    showDialog(
       t('delete_operation'),
       t('delete_operation_confirm'),
       [
@@ -295,9 +297,9 @@ const OperationsScreen = () => {
       date: new Date().toISOString().split('T')[0],
     };
 
-    const error = validateOperation(operationData);
+    const error = validateOperation(operationData, t);
     if (error) {
-      Alert.alert(t('error'), error);
+      showDialog(t('error'), error, [{ text: 'OK' }]);
       return;
     }
 

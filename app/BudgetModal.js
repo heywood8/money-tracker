@@ -11,13 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Alert,
   Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 import { useBudgets } from './BudgetsContext';
 import { useAccounts } from './AccountsContext';
 import currencies from '../assets/currencies.json';
@@ -25,6 +25,7 @@ import currencies from '../assets/currencies.json';
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { showDialog } = useDialog();
   const { addBudget, updateBudget, deleteBudget } = useBudgets();
   const { accounts } = useAccounts();
 
@@ -97,28 +98,28 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     // Amount validation
     const amount = parseFloat(values.amount);
     if (!values.amount || isNaN(amount) || amount <= 0) {
-      newErrors.amount = t('budget_amount') + ' must be greater than zero';
+      newErrors.amount = t('amount_must_be_greater_than_zero') || 'Amount must be greater than zero';
     }
 
     // Currency validation
     if (!values.currency) {
-      newErrors.currency = 'Currency is required';
+      newErrors.currency = t('currency_required') || 'Currency is required';
     }
 
     // Period type validation
     if (!values.periodType) {
-      newErrors.periodType = 'Period type is required';
+      newErrors.periodType = t('period_type_required') || 'Period type is required';
     }
 
     // Start date validation
     if (!values.startDate) {
-      newErrors.startDate = 'Start date is required';
+      newErrors.startDate = t('start_date_required') || 'Start date is required';
     }
 
     // End date validation (if specified)
     if (values.endDate && values.startDate) {
       if (new Date(values.endDate) <= new Date(values.startDate)) {
-        newErrors.endDate = 'End date must be after start date';
+        newErrors.endDate = t('end_date_must_be_after_start') || 'End date must be after start date';
       }
     }
 
@@ -174,7 +175,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
   }, [onClose]);
 
   const handleDelete = useCallback(() => {
-    Alert.alert(
+    showDialog(
       t('delete_budget'),
       t('delete_budget_confirm'),
       [
@@ -193,7 +194,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
         },
       ]
     );
-  }, [budget, deleteBudget, onClose, t]);
+  }, [budget, deleteBudget, onClose, t, showDialog]);
 
   const handleStartDateChange = useCallback((event, selectedDate) => {
     setShowStartDatePicker(Platform.OS === 'ios');
