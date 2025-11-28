@@ -29,6 +29,7 @@
       }
     },
     "owner": "lopatinikita",
+    "platforms": ["android"],
     "plugins": [
       [
         "@sentry/react-native/expo",
