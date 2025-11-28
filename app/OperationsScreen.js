@@ -360,9 +360,30 @@ const OperationsScreen = () => {
     });
   }, [categories, quickAddValues.type]);
 
-  // Sort operations by date (newest first)
-  const sortedOperations = useMemo(() => {
-    return [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Group operations by date and create flat list with separators
+  const groupedOperations = useMemo(() => {
+    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const grouped = [];
+    let currentDate = null;
+
+    sorted.forEach((operation) => {
+      if (operation.date !== currentDate) {
+        // Add date separator
+        grouped.push({
+          type: 'separator',
+          date: operation.date,
+          id: `separator-${operation.date}`,
+        });
+        currentDate = operation.date;
+      }
+      // Add operation
+      grouped.push({
+        type: 'operation',
+        ...operation,
+      });
+    });
+
+    return grouped;
   }, [operations]);
 
   // Format date (memoized)
@@ -402,12 +423,6 @@ const OperationsScreen = () => {
     return `${symbol}${numAmount.toFixed(2)}`;
   }, [accounts]);
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: 72,
-    offset: 72 * index,
-    index,
-  }), []);
-
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
     { key: 'income', label: t('income'), icon: 'plus-circle' },
@@ -430,7 +445,21 @@ const OperationsScreen = () => {
     />
   ), [colors, t, quickAddValues, accounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
-  const renderOperation = useCallback(({ item }) => {
+  const renderItem = useCallback(({ item }) => {
+    // Render date separator
+    if (item.type === 'separator') {
+      return (
+        <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
+          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
+            {formatDate(item.date)}
+          </Text>
+          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
+        </View>
+      );
+    }
+
+    // Render operation
     const operation = item;
     const isExpense = operation.type === 'expense';
     const isIncome = operation.type === 'income';
@@ -558,11 +587,10 @@ const OperationsScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <FlatList
         contentInsetAdjustmentBehavior="automatic"
-        data={sortedOperations}
-        renderItem={renderOperation}
+        data={groupedOperations}
+        renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={[accounts, categories]}
-        getItemLayout={getItemLayout}
         ListHeaderComponent={quickAddFormComponent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -572,7 +600,7 @@ const OperationsScreen = () => {
             </Text>
           </View>
         }
-        contentContainerStyle={sortedOperations.length === 0 ? styles.emptyList : null}
+        contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : null}
         windowSize={10}
         maxToRenderPerBatch={10}
         initialNumToRender={15}
@@ -894,6 +922,23 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+  },
+  dateSeparatorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 
