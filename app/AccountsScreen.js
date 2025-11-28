@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
   confirmationButtons: {
     flexDirection: 'row',
     gap: 12,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
   },
   confirmationButton: {
     minWidth: 100,
