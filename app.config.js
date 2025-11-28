@@ -12,7 +12,7 @@ module.exports = {
   expo: {
     name: APP_NAME,
     slug: 'app',
-    version: '0.4.0',
+    version: '0.4.3',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
