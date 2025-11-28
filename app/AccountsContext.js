@@ -1,23 +1,24 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import currencies from '../assets/currencies.json';
 import defaultAccounts from './defaults/defaultAccounts';
 import * as AccountsDB from './services/AccountsDB';
 import { performMigration, isMigrationComplete } from './services/migration';
 import { appEvents, EVENTS } from './services/eventEmitter';
+import { useDialog } from './DialogContext';
 
 const AccountsContext = createContext();
 
-function validateAccount(account) {
+function validateAccount(account, t = (key) => key) {
   const errors = {};
-  if (!account.name.trim()) errors.name = 'Name required';
-  if (isNaN(Number(account.balance)) || account.balance === '') errors.balance = 'Balance must be a number';
-  if (!account.currency) errors.currency = 'Currency required';
+  if (!account.name.trim()) errors.name = t('name_required') || 'Name required';
+  if (isNaN(Number(account.balance)) || account.balance === '') errors.balance = t('balance_must_be_number') || 'Balance must be a number';
+  if (!account.currency) errors.currency = t('currency_required') || 'Currency required';
   return errors;
 }
 
 export const AccountsProvider = ({ children }) => {
+  const { showDialog } = useDialog();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,7 +68,7 @@ export const AccountsProvider = ({ children }) => {
       } catch (err) {
         console.error('Failed to load accounts:', err);
         setError(err.message);
-        Alert.alert(
+        showDialog(
           'Load Error',
           'Failed to load accounts from database.',
           [{ text: 'OK' }]
@@ -78,7 +79,7 @@ export const AccountsProvider = ({ children }) => {
       }
     };
     loadAccounts();
-  }, [initializeDefaultAccounts]);
+  }, [initializeDefaultAccounts, showDialog]);
 
   const addAccount = useCallback(async (account) => {
     try {
@@ -92,14 +93,14 @@ export const AccountsProvider = ({ children }) => {
       setAccounts(accs => [...accs, newAccount]);
     } catch (err) {
       console.error('Failed to add account:', err);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to create account. Please try again.',
         [{ text: 'OK' }]
       );
       throw err;
     }
-  }, []);
+  }, [showDialog]);
 
   const updateAccount = useCallback(async (id, updated, createAdjustmentOperation = true) => {
     try {
@@ -151,14 +152,14 @@ export const AccountsProvider = ({ children }) => {
       await reloadAccounts();
     } catch (err) {
       console.error('Failed to update account:', err);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to update account. Please try again.',
         [{ text: 'OK' }]
       );
       throw err;
     }
-  }, [accounts, reloadAccounts]);
+  }, [accounts, reloadAccounts, showDialog]);
 
   const deleteAccount = useCallback(async (id, transferToAccountId = null) => {
     try {
@@ -173,14 +174,14 @@ export const AccountsProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Failed to delete account:', err);
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to delete account. Please try again.',
         [{ text: 'OK' }]
       );
       throw err;
     }
-  }, [reloadAccounts]);
+  }, [reloadAccounts, showDialog]);
 
   const reloadAccounts = useCallback(async () => {
     try {
@@ -208,14 +209,14 @@ export const AccountsProvider = ({ children }) => {
       console.error('Failed to reorder accounts:', err);
       // Reload accounts to restore correct order
       await reloadAccounts();
-      Alert.alert(
+      showDialog(
         'Error',
         'Failed to save new account order. Please try again.',
         [{ text: 'OK' }]
       );
       throw err;
     }
-  }, [reloadAccounts]);
+  }, [reloadAccounts, showDialog]);
 
   const resetDatabase = useCallback(async () => {
     try {
@@ -267,14 +268,14 @@ export const AccountsProvider = ({ children }) => {
       // - Operations will be empty anyway after reset
       // The AppInitializer will handle category initialization with the selected language
 
-      Alert.alert(
+      showDialog(
         'Success',
         'Database has been reset successfully.',
         [{ text: 'OK' }]
       );
     } catch (err) {
       console.error('Failed to reset database:', err);
-      Alert.alert(
+      showDialog(
         'Error',
         `Failed to reset database: ${err.message}`,
         [{ text: 'OK' }]
@@ -283,7 +284,7 @@ export const AccountsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [initializeDefaultAccounts]);
+  }, [initializeDefaultAccounts, reloadAccounts, showDialog]);
 
   const getOperationCount = useCallback(async (accountId) => {
     try {

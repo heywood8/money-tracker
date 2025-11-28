@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import * as BudgetsDB from './services/BudgetsDB';
 import { appEvents, EVENTS } from './services/eventEmitter';
+import { useDialog } from './DialogContext';
 
 const BudgetsContext = createContext();
 
@@ -15,6 +15,7 @@ export const useBudgets = () => {
 };
 
 export const BudgetsProvider = ({ children }) => {
+  const { showDialog } = useDialog();
   const [budgets, setBudgets] = useState([]);
   const [budgetStatuses, setBudgetStatuses] = useState(new Map());
   const [loading, setLoading] = useState(true);
@@ -140,10 +141,10 @@ export const BudgetsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to create budget:', error);
       setSaveError(error.message);
-      Alert.alert('Error', error.message, [{ text: 'OK' }]);
+      showDialog('Error', error.message, [{ text: 'OK' }]);
       throw error;
     }
-  }, [refreshBudgetStatuses]);
+  }, [refreshBudgetStatuses, showDialog]);
 
   /**
    * Update existing budget
@@ -188,10 +189,10 @@ export const BudgetsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to update budget:', error);
       setSaveError(error.message);
-      Alert.alert('Error', error.message, [{ text: 'OK' }]);
+      showDialog('Error', error.message, [{ text: 'OK' }]);
       throw error;
     }
-  }, [budgets, refreshBudgetStatuses]);
+  }, [budgets, refreshBudgetStatuses, showDialog]);
 
   /**
    * Delete budget
@@ -212,10 +213,10 @@ export const BudgetsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to delete budget:', error);
       setSaveError(error.message);
-      Alert.alert('Error', 'Failed to delete budget. Please try again.', [{ text: 'OK' }]);
+      showDialog('Error', 'Failed to delete budget. Please try again.', [{ text: 'OK' }]);
       throw error;
     }
-  }, []);
+  }, [showDialog]);
 
   /**
    * Get budget for category

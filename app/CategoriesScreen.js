@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
+import { useDialog } from './DialogContext';
 import { useCategories } from './CategoriesContext';
 import { useBudgets } from './BudgetsContext';
 import CategoryModal from './CategoryModal';
@@ -13,6 +14,7 @@ import BudgetProgressBar from './components/BudgetProgressBar';
 const CategoriesScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { showDialog } = useDialog();
   const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();
   const { hasActiveBudget, getBudgetForCategory } = useBudgets();
 
@@ -49,7 +51,7 @@ const CategoriesScreen = () => {
     const hasBudget = hasActiveBudget(category.id);
     const categoryName = category.nameKey ? t(category.nameKey) : category.name;
 
-    Alert.alert(
+    showDialog(
       categoryName,
       t('select_action') || 'Select an action',
       [
@@ -67,7 +69,7 @@ const CategoriesScreen = () => {
         },
       ]
     );
-  }, [t, handleEditCategory, handleSetBudget, hasActiveBudget]);
+  }, [t, handleEditCategory, handleSetBudget, hasActiveBudget, showDialog]);
 
   // Flatten the category tree based on expanded state (excluding shadow categories)
   const flattenedCategories = useMemo(() => {
