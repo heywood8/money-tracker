@@ -31,7 +31,7 @@ const defaultAccounts = [
   },
   {
     name: 'T-bank credit card',
-    balance: '-292380.35',
+    balance: '0',
     currency: 'RUB',
   },
   {
