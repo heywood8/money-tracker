@@ -420,9 +420,12 @@ const OperationsScreen = () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) return amount;
 
+    // Get the number of decimal places for the currency
+    const decimals = Currency.getDecimalPlaces(account.currency || 'USD');
+
     // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
     const symbol = getCurrencySymbol(account.currency || 'USD');
-    return `${symbol}${numAmount.toFixed(2)}`;
+    return `${symbol}${numAmount.toFixed(decimals)}`;
   }, [visibleAccounts]);
 
   const TYPES = useMemo(() => [

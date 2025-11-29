@@ -141,7 +141,9 @@ export const getOperationsByType = async (type) => {
  */
 const calculateBalanceChanges = (operation) => {
   const balanceChanges = new Map();
-  const amount = parseFloat(operation.amount) || 0;
+
+  // Convert amounts to smallest unit (e.g., cents) based on currency
+  const amount = Currency.toCents(operation.amount, operation.sourceCurrency);
 
   if (operation.type === 'expense') {
     balanceChanges.set(operation.account_id, -amount);
@@ -155,11 +157,10 @@ const calculateBalanceChanges = (operation) => {
       // For multi-currency transfers, use destination_amount if available
       // Otherwise fall back to source amount (same currency transfer)
       const destinationAmount = operation.destination_amount
-        ? parseFloat(operation.destination_amount)
+        ? Currency.toCents(operation.destination_amount, operation.destinationCurrency)
         : amount;
 
-      const toChange = balanceChanges.get(operation.to_account_id) || 0;
-      balanceChanges.set(operation.to_account_id, toChange + destinationAmount);
+      balanceChanges.set(operation.to_account_id, destinationAmount);
     }
   }
 
