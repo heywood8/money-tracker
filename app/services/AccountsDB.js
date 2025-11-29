@@ -390,11 +390,12 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
     const OperationsDB = require('./OperationsDB');
     const CategoriesDB = require('./CategoriesDB');
     const uuid = require('react-native-uuid').default || require('react-native-uuid');
+    const Currency = require('./currency');
 
     await executeTransaction(async (db) => {
       // Get current balance
       const account = await db.getFirstAsync(
-        'SELECT balance FROM accounts WHERE id = ?',
+        'SELECT balance, currency FROM accounts WHERE id = ?',
         [accountId]
       );
 
@@ -402,8 +403,8 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         throw new Error(`Account ${accountId} not found`);
       }
 
-      const currentBalance = parseFloat(account.balance);
-      const targetBalance = parseFloat(newBalance);
+      const currentBalance = Currency.toCents(account.balance, account.currency);
+      const targetBalance = Currency.toCents(newBalance, account.currency);
 
       // Check if there's already an adjustment operation for today
       const today = new Date().toISOString().split('T')[0];
@@ -424,12 +425,12 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       if (existingOperation) {
         // Parse the existing description to extract original balance and history
         const descMatch = existingOperation.description?.match(/from\s+([\d.]+)/);
-        originalBalance = descMatch ? parseFloat(descMatch[1]) : currentBalance;
+        originalBalance = descMatch ? Currency.toCents(descMatch[1], account.currency) : currentBalance;
 
         // Extract adjustment history from description
         const historyMatch = existingOperation.description?.match(/→\s*([\d.\s→]+)$/);
         if (historyMatch) {
-          adjustmentHistory = historyMatch[1].split('→').map(v => v.trim());
+          adjustmentHistory = historyMatch[1].split('→').map(v => Currency.toCents(v.trim(), account.currency));
         }
       } else {
         // First adjustment of the day - current balance is the original
@@ -438,15 +439,15 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
       // Add current balance to history if it's different from the last entry
       const lastHistoryValue = adjustmentHistory.length > 0
-        ? parseFloat(adjustmentHistory[adjustmentHistory.length - 1])
+        ? adjustmentHistory[adjustmentHistory.length - 1]
         : originalBalance;
 
       if (Math.abs(currentBalance - lastHistoryValue) > 0.0001) {
-        adjustmentHistory.push(currentBalance.toFixed(2));
+        adjustmentHistory.push(currentBalance);
       }
 
       // Add target balance to history
-      adjustmentHistory.push(targetBalance.toFixed(2));
+      adjustmentHistory.push(targetBalance);
 
       // Calculate total adjustment from original balance
       const totalDelta = targetBalance - originalBalance;
@@ -476,10 +477,10 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         : shadowIncomeCategory.id;
 
       // Build description with adjustment history
-      const historyString = adjustmentHistory.join(' → ');
+      const historyString = adjustmentHistory.map(v => (v / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2)).join(' → ');
       const fullDescription = description
-        ? `${description}\nBalance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`
-        : `Balance adjusted from ${originalBalance.toFixed(2)} → ${historyString}`;
+        ? `${description}\nBalance adjusted from ${(originalBalance / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2)} → ${historyString}`
+        : `Balance adjusted from ${(originalBalance / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2)} → ${historyString}`;
 
       if (existingOperation) {
         // Check if total delta is 0 - if so, delete the operation
@@ -487,7 +488,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           console.log('Cumulative delta is 0, deleting adjustment operation:', existingOperation.id);
 
           // Calculate balance adjustment needed - reverse the old operation's effect
-          const oldAmount = parseFloat(existingOperation.amount);
+          const oldAmount = Currency.toCents(existingOperation.amount, account.currency);
           const oldType = existingOperation.type;
           let balanceAdjustment = 0;
 
@@ -502,7 +503,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           console.log('Adjustment operation deleted successfully');
 
           // Update account balance
-          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          const newBalanceValue = currentBalance + balanceAdjustment;
           await db.runAsync(
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
             [newBalanceValue, new Date().toISOString(), accountId]
@@ -512,13 +513,13 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           console.log('Updating existing adjustment operation:', existingOperation.id);
           await db.runAsync(
             'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
-            [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
+            [operationType, (absoluteDelta / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2), categoryId, fullDescription, existingOperation.id]
           );
           console.log('Adjustment operation updated successfully');
 
           // Calculate balance adjustment needed
           // First, reverse the old operation's effect on balance
-          const oldAmount = parseFloat(existingOperation.amount);
+          const oldAmount = Currency.toCents(existingOperation.amount, account.currency);
           const oldType = existingOperation.type;
           let balanceAdjustment = 0;
 
@@ -536,7 +537,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           }
 
           // Update account balance
-          const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
+          const newBalanceValue = currentBalance + balanceAdjustment;
           await db.runAsync(
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
             [newBalanceValue, new Date().toISOString(), accountId]
@@ -548,7 +549,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         console.log('Creating new adjustment operation:', {
           id: operationId,
           type: operationType,
-          amount: absoluteDelta.toFixed(2),
+          amount: (absoluteDelta / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2),
           categoryId,
           date: today,
         });
@@ -558,7 +559,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           [
             operationId,
             operationType,
-            absoluteDelta.toFixed(2),
+            (absoluteDelta / Math.pow(10, Currency.getDecimalPlaces(account.currency))).toFixed(2),
             accountId,
             categoryId,
             null,
@@ -571,7 +572,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
         // Update account balance based on operation type
         const delta = operationType === 'expense' ? -absoluteDelta : absoluteDelta;
-        const newBalanceValue = Currency.add(currentBalance, delta);
+        const newBalanceValue = currentBalance + delta;
 
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',

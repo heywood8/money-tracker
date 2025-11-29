@@ -11,6 +11,7 @@ import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import OperationModal from './OperationModal';
 import currencies from '../assets/currencies.json';
+import * as Currency from './services/currency';
 
 /**
  * Get currency symbol from currency code
@@ -415,17 +416,23 @@ const OperationsScreen = () => {
   // Format amount with currency (memoized)
   const formatCurrency = useCallback((accountId, amount) => {
     const account = visibleAccounts.find(acc => acc.id === accountId);
-    if (!account) return amount;
+    if (!account) {
+      return amount;
+    }
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return amount;
+    if (isNaN(numAmount)) {
+      return amount;
+    }
 
     // Get the number of decimal places for the currency
     const decimals = Currency.getDecimalPlaces(account.currency || 'USD');
 
     // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
     const symbol = getCurrencySymbol(account.currency || 'USD');
-    return `${symbol}${numAmount.toFixed(decimals)}`;
+    const formattedAmount = `${symbol}${numAmount.toFixed(decimals)}`;
+
+    return formattedAmount;
   }, [visibleAccounts]);
 
   const TYPES = useMemo(() => [
@@ -658,7 +665,7 @@ const OperationsScreen = () => {
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
                         <Text style={{ color: colors.mutedText, fontSize: 14 }}>
-                          {getCurrencySymbol(item.currency)}{item.balance}
+                          {formatCurrency(item.id, item.balance)}
                         </Text>
                       </View>
                     </Pressable>

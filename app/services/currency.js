@@ -18,9 +18,17 @@ import currenciesData from '../../assets/currencies.json';
  */
 export const getDecimalPlaces = (currencyCode) => {
   if (!currencyCode || !currenciesData[currencyCode]) {
+    console.debug('getDecimalPlaces: Defaulting to 2 decimals for currencyCode:', currencyCode);
     return 2; // Default to 2 decimal places
   }
-  return currenciesData[currencyCode].decimal_digits || 2;
+
+  const decimalDigits = currenciesData[currencyCode].decimal_digits ?? 2; // Use nullish coalescing operator
+  console.debug('getDecimalPlaces:', {
+    currencyCode,
+    decimalDigits,
+  });
+
+  return decimalDigits;
 };
 
 /**
