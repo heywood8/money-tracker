@@ -11,6 +11,9 @@ on:
         options:
           - preview
           - production
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
