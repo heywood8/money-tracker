@@ -3,7 +3,7 @@
   "EUR": {"symbol": "€", "name": "Euro", "symbol_native": "€", "decimal_digits": 2, "rounding": 0, "code": "EUR", "name_plural": "euros"},
   "RUB": {"symbol": "₽", "name": "Russian Ruble", "symbol_native": "₽", "decimal_digits": 0, "rounding": 0, "code": "RUB", "name_plural": "Russian rubles"},
   "AMD": {"symbol": "֏", "name": "Armenian Dram", "symbol_native": "֏", "decimal_digits": 0, "rounding": 0, "code": "AMD", "name_plural": "Armenian drams"},
-  "THB": {"symbol": "฿", "name": "Thai Baht", "symbol_native": "฿", "decimal_digits": 2, "rounding": 0, "code": "THB", "name_plural": "Thai baht"},
-  "TRY": {"symbol": "₺", "name": "Turkish Lira", "symbol_native": "₺", "decimal_digits": 2, "rounding": 0, "code": "TRY", "name_plural": "Turkish lira"},
-  "CNY": {"symbol": "¥", "name": "Chinese Yuan", "symbol_native": "¥", "decimal_digits": 2, "rounding": 0, "code": "CNY", "name_plural": "Chinese yuan"}
+  "THB": {"symbol": "฿", "name": "Thai Baht", "symbol_native": "฿", "decimal_digits": 0, "rounding": 0, "code": "THB", "name_plural": "Thai baht"},
+  "TRY": {"symbol": "₺", "name": "Turkish Lira", "symbol_native": "₺", "decimal_digits": 0, "rounding": 0, "code": "TRY", "name_plural": "Turkish lira"},
+  "CNY": {"symbol": "¥", "name": "Chinese Yuan", "symbol_native": "¥", "decimal_digits": 0, "rounding": 0, "code": "CNY", "name_plural": "Chinese yuan"}
 }
