@@ -67,7 +67,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     let cancelled = false;
     async function setDefaultAccount() {
       if (operation && !isNew) {
-        setValues({ ...operation });
+        // Normalize values when editing an existing operation
+        setValues({
+          type: operation.type || 'expense',
+          amount: String(operation.amount || ''),
+          accountId: operation.accountId || accounts[0]?.id || '',
+          categoryId: operation.categoryId || '',
+          description: operation.description || '',
+          date: operation.date || new Date().toISOString().split('T')[0],
+          toAccountId: operation.toAccountId || '',
+          exchangeRate: String(operation.exchangeRate || ''),
+          destinationAmount: String(operation.destinationAmount || ''),
+        });
       } else if (isNew) {
         let defaultAccountId = '';
         if (accounts.length === 1) {
@@ -102,13 +113,45 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     return () => { cancelled = true; };
   }, [operation, isNew, visible, accounts]);
 
+  const validateFields = useCallback(() => {
+    const newErrors = {};
+
+    if (!values.type) {
+      newErrors.type = t('operation_type_required');
+    }
+
+    if (!values.amount || isNaN(parseFloat(values.amount)) || parseFloat(values.amount) <= 0) {
+      newErrors.amount = t('valid_amount_required');
+    }
+
+    if (!values.accountId) {
+      newErrors.accountId = t('account_required');
+    }
+
+    if (values.type === 'transfer') {
+      if (!values.toAccountId) {
+        newErrors.toAccountId = t('destination_account_required');
+      } else if (values.accountId === values.toAccountId) {
+        newErrors.toAccountId = t('accounts_must_be_different');
+      }
+    } else if (!values.categoryId) {
+      newErrors.categoryId = t('category_required');
+    }
+
+    if (!values.date) {
+      newErrors.date = t('date_required');
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [values, t]);
+
   const handleSave = useCallback(async () => {
-    const operationData = prepareOperationData();
-    const error = validateOperation(operationData, t);
-    if (error) {
-      setErrors({ general: error });
+    if (!validateFields()) {
       return;
     }
+
+    const operationData = prepareOperationData();
 
     if (isNew) {
       await addOperation(operationData);
@@ -122,7 +165,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
 
     onClose();
-  }, [prepareOperationData, validateOperation, isNew, addOperation, updateOperation, operation, onClose, t]);
+  }, [validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
@@ -277,11 +320,15 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
-      // Exchange rate and destination amount are already in values
+    }
+
+    // Ensure amount is preserved when editing
+    if (!isNew && !data.amount && operation?.amount) {
+      data.amount = String(operation.amount);
     }
 
     return data;
-  }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
+  }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount, isNew, operation]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -356,6 +403,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     returnKeyType="done"
                     onSubmitEditing={Keyboard.dismiss}
                     editable={!isShadowOperation}
+                    testID="amount-input" // Added testID for amount input
                   />
 
                   {/* Account Picker */}
@@ -498,6 +546,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     disabled={isShadowOperation}
                     accessibilityRole="button"
                     accessibilityLabel={t('select_date')}
+                    testID="date-input" // Added testID for date input
                   >
                     <View style={styles.pickerButtonContent}>
                       <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
@@ -545,6 +594,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     <Pressable
                       style={[styles.modalButton, { backgroundColor: colors.primary }]}
                       onPress={handleSave}
+                      accessibilityLabel="Save"
+                      testID="save-button" // Added testID for Save button
                     >
                       <Text style={[styles.buttonText, { color: colors.text }]}>
                         {t('save')}
