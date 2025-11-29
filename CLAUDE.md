@@ -139,6 +139,132 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 - Use secure storage libraries like `react-native-keychain` for sensitive data
 - Validate user inputs to prevent injection attacks
 
+### Testing
+
+The app uses Jest with React Native Testing Library for unit, integration, and regression testing.
+
+**Testing Framework:**
+- Jest (`jest`) - Test runner and assertion library
+- React Native Testing Library (`@testing-library/react-native`) - Component testing utilities
+- `jest-expo` - Expo-specific Jest preset
+- `react-test-renderer` - React component rendering for tests
+
+**Test Organization:**
+- Tests located in `__tests__/` directory
+- Directory structure mirrors app structure: `contexts/`, `services/`, `integration/`, `components/`
+- Test files use `.test.js` naming convention
+- Setup file at `jest.setup.js` for global mocks and configuration
+
+**Running Tests:**
+```bash
+npm test                  # Run all tests
+npm test -- --watch      # Run in watch mode
+npm test -- <pattern>    # Run specific test files matching pattern
+```
+
+**Testing Patterns:**
+
+1. **Context Testing** (see `__tests__/contexts/ThemeContext.test.js`):
+   - Use `renderHook` from `@testing-library/react-native` to test custom hooks
+   - Wrap hooks with their Provider component using `wrapper` pattern
+   - Test initialization, state changes, persistence, and cleanup
+   - Group related tests with `describe` blocks (Initialization, Behavior, Edge Cases)
+   - Use `waitFor` for async state updates
+   - Use `act` wrapper for state-changing operations
+   - Mock dependencies (AsyncStorage, Appearance API, etc.)
+   - Clear mocks and AsyncStorage in `beforeEach`
+
+2. **Service/Utility Testing** (see `__tests__/services/currency.test.js`):
+   - Test pure functions with various inputs
+   - Include edge cases: zero, negative, empty, invalid inputs
+   - Test precision and floating-point accuracy (critical for currency)
+   - Add regression tests for known bugs or critical accuracy requirements
+   - Group tests by function with `describe` blocks
+   - Use descriptive test names explaining what is being tested
+
+3. **Integration Testing** (see `__tests__/integration/AccountManagement.test.js`):
+   - Test complete workflows (CRUD cycles, multi-step operations)
+   - Mock database layer and track state changes
+   - Test concurrent operations and race conditions
+   - Verify data integrity across multiple operations
+   - Test error handling and recovery
+   - Include regression tests for bugs and edge cases
+
+4. **Component Testing** (future - when UI components are tested):
+   - Use `render` from `@testing-library/react-native`
+   - Test user interactions with `fireEvent` or `userEvent`
+   - Verify rendered output with queries: `getByText`, `getByTestId`, etc.
+   - Mock contexts using wrapper pattern
+   - Test accessibility props and behavior
+
+**Mocking Patterns:**
+
+- **AsyncStorage**: Mocked globally in `jest.setup.js`
+- **expo-sqlite**: Mocked with spy functions for DB operations
+- **react-native APIs**: Mock Appearance, DateTimePicker, etc. in `jest.setup.js`
+- **Third-party libraries**: Mock chart-kit, SVG, gesture-handler in setup file
+- **Database services**: Mock in integration tests to control DB behavior
+- **UUIDs**: Mock `react-native-uuid` for predictable test IDs
+
+**Best Practices:**
+
+- Clear all mocks in `beforeEach` to ensure test isolation
+- Use `waitFor` for async operations, not arbitrary timeouts
+- Wrap state updates in `act` to avoid warnings
+- Test both happy paths and error cases
+- Add regression tests when fixing bugs
+- Use descriptive test names: "should do X when Y"
+- Group related tests with `describe` blocks
+- Test state persistence (AsyncStorage/SQLite operations)
+- Mock external dependencies, test internal logic
+- Verify cleanup (listeners removed, resources freed)
+- Test data type consistency (strings vs numbers, especially for currency)
+- For financial calculations, verify precision and avoid floating-point errors
+
+**Common Test Structure:**
+```javascript
+describe('ComponentOrService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Additional setup
+  });
+
+  describe('Feature Group', () => {
+    it('does something specific', async () => {
+      // Arrange: Set up test data and mocks
+
+      // Act: Perform the operation
+
+      // Assert: Verify the result
+    });
+  });
+
+  describe('Regression Tests', () => {
+    it('handles edge case that caused bug #123', () => {
+      // Test specific regression
+    });
+  });
+});
+```
+
+**What to Test:**
+
+- Context providers: initialization, state management, persistence
+- Services: business logic, calculations, data transformations
+- Database operations: CRUD, transactions, error handling
+- Integration flows: multi-step user workflows
+- Validation functions: all edge cases and error conditions
+- Error handling: graceful degradation, error messages
+- Concurrent operations: race conditions, state consistency
+- Cleanup: resource disposal, listener removal
+
+**What NOT to Test:**
+
+- Implementation details (internal state, private methods)
+- External library behavior (assume they work correctly)
+- Exact styling or visual appearance (use snapshot tests sparingly)
+- Complex integration with native modules (use E2E tests instead)
+
 ## Current Implementation Status
 
 **Completed:**
