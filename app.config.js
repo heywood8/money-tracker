@@ -1,6 +1,5 @@
 const IS_DEV = process.env.EAS_BUILD_PROFILE === 'development' || !process.env.EAS_BUILD_PROFILE;
-const IS_PREVIEW = process.env.EAS_BUILD_PROFILE === 'preview';
-const IS_PROD = process.env.EAS_BUILD_PROFILE === 'production';
+
 
 // App name: PennyDev for local dev, Penny for preview/production
 const APP_NAME = IS_DEV ? 'PennyDev' : 'Penny';
@@ -12,7 +11,7 @@ module.exports = {
   expo: {
     name: APP_NAME,
     slug: 'app',
-    version: '0.4.3',
+    version: '0.4.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
