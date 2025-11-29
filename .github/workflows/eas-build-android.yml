@@ -11,6 +11,9 @@ on:
         options:
           - preview
           - production
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -38,9 +41,9 @@ jobs:
 
       - name: Build Android app
         run: |
-          PROFILE=${{ github.event.inputs.profile || 'preview' }}
-          echo "Building with profile: $PROFILE"
-          eas build --platform android --profile $PROFILE --non-interactive --no-wait
+          export EAS_BUILD_PROFILE=${{ github.event.inputs.profile || 'preview' }}
+          echo "Building with profile: $EAS_BUILD_PROFILE"
+          eas build --platform android --profile $EAS_BUILD_PROFILE --non-interactive --no-wait
 
       - name: Comment build URL
         if: github.event_name == 'workflow_dispatch'
