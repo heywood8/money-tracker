@@ -23,11 +23,6 @@ export const getDecimalPlaces = (currencyCode) => {
   }
 
   const decimalDigits = currenciesData[currencyCode].decimal_digits ?? 2; // Use nullish coalescing operator
-  console.debug('getDecimalPlaces:', {
-    currencyCode,
-    decimalDigits,
-  });
-
   return decimalDigits;
 };
 
@@ -44,7 +39,19 @@ export const toCents = (amount, currencyCode = null) => {
   if (typeof amount === 'number') {
     return Math.round(amount * multiplier);
   }
-  const num = parseFloat(amount) || 0;
+
+  if (!currencyCode) {
+    // Assume the amount is already in the smallest unit if no currency code is provided
+    console.debug('toCents: No currency code provided, assuming amount is in smallest unit:', amount);
+    return Math.round(parseFloat(amount) || 0);
+  }
+
+  // Ensure amount is parsed correctly
+  const num = parseFloat(amount);
+  if (isNaN(num)) {
+    console.debug('toCents: Invalid amount provided, defaulting to 0:', amount);
+    return 0;
+  }
   return Math.round(num * multiplier);
 };
 
@@ -84,6 +91,13 @@ export const fromCents = (cents, decimalsOrCurrency = 2) => {
 export const add = (a, b) => {
   const centsA = toCents(a);
   const centsB = toCents(b);
+
+  if (typeof a === 'number' && typeof b === 'number') {
+    // Assume inputs are already in the smallest unit
+    console.debug('Currency.add: Inputs are in smallest unit:', { a, b });
+    return a + b; // Return as number, no formatting
+  }
+
   return fromCents(centsA + centsB);
 };
 

@@ -164,6 +164,13 @@ const calculateBalanceChanges = (operation) => {
     }
   }
 
+  console.debug('calculateBalanceChanges:', {
+    operation,
+    amount,
+    destinationAmount: operation.destination_amount,
+    balanceChanges,
+  });
+
   return balanceChanges;
 };
 
@@ -230,14 +237,22 @@ export const createOperation = async (operation) => {
           continue;
         }
 
-        // Use Currency utilities for precise arithmetic
-        const newBalance = Currency.add(account.balance, delta);
+        // Convert currentBalance to a number before performing arithmetic
+        const currentBalance = parseFloat(account.balance); // Convert to number
+        const newBalance = Currency.add(currentBalance, delta); // Ensure arithmetic is performed on numbers
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        console.debug('Updating balance:', {
+          accountId,
+          currentBalance,
+          delta,
+          newBalance,
+        });
       }
     });
 
@@ -363,14 +378,22 @@ export const updateOperation = async (id, updates) => {
           continue;
         }
 
-        // Use Currency utilities for precise arithmetic
-        const newBalance = Currency.add(account.balance, delta);
+        // Convert currentBalance to a number before performing arithmetic
+        const currentBalance = parseFloat(account.balance); // Convert to number
+        const newBalance = Currency.add(currentBalance, delta); // Ensure arithmetic is performed on numbers
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        console.debug('Updating balance:', {
+          accountId,
+          currentBalance,
+          delta,
+          newBalance,
+        });
       }
     });
   } catch (error) {
@@ -423,14 +446,22 @@ export const deleteOperation = async (id) => {
           continue;
         }
 
-        // Use Currency utilities for precise arithmetic
-        const newBalance = Currency.add(account.balance, delta);
+        // Convert currentBalance to a number before performing arithmetic
+        const currentBalance = parseFloat(account.balance); // Convert to number
+        const newBalance = Currency.add(currentBalance, delta); // Ensure arithmetic is performed on numbers
 
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        console.debug('Updating balance:', {
+          accountId,
+          currentBalance,
+          delta,
+          newBalance,
+        });
       }
     });
   } catch (error) {
