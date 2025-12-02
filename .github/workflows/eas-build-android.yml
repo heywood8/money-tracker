@@ -43,10 +43,16 @@ jobs:
         run: |
           export EAS_BUILD_PROFILE=${{ github.event.inputs.profile || 'preview' }}
           echo "Building with profile: $EAS_BUILD_PROFILE"
-          eas build --platform android --profile $EAS_BUILD_PROFILE --non-interactive --no-wait
+          eas build --platform android --profile $EAS_BUILD_PROFILE --non-interactive --no-wait 2>&1 | tee eas-build-output.txt
+          
+          # Extract the build URL from EAS output
+          BUILD_URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' eas-build-output.txt | head -1)
+          echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
 
-      - name: Comment build URL
-        if: github.event_name == 'workflow_dispatch'
+      - name: Post build URL to summary
         run: |
-          echo "Build started! Check your Expo dashboard for build progress:"
-          echo "https://expo.dev/accounts/lopatinikita/projects/app/builds"
+          echo "## 🚀 EAS Build Started" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Profile:** ${{ github.event.inputs.profile || 'preview' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build URL:** [$BUILD_URL]($BUILD_URL)" >> $GITHUB_STEP_SUMMARY
