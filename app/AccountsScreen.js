@@ -7,6 +7,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
 import { useLocalization } from './LocalizationContext';
+import currencies from '../assets/currencies.json';
 
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
@@ -55,6 +56,8 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
 
   const renderAccountItem = useCallback(({ item }) => {
     const currencySymbol = currencies[item.currency]?.symbol || item.currency;
+    const decimals = currencies[item.currency]?.decimal_digits ?? 2;
+    const formattedBalance = parseFloat(item.balance).toFixed(decimals);
 
     return (
       <TouchableRipple
@@ -65,7 +68,7 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
         <View>
           <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.name}</Text>
           <Text style={{ fontSize: 14, color: colors.mutedText, marginTop: 4 }}>
-            {item.balance} {currencySymbol}
+            {formattedBalance} {currencySymbol}
           </Text>
         </View>
       </TouchableRipple>
@@ -150,6 +153,8 @@ ConfirmationDialog.displayName = 'ConfirmationDialog';
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
   const rowBg = isEven ? colors.background : colors.altRow;
+  const decimals = currencies[item.currency]?.decimal_digits ?? 2;
+  const formattedBalance = parseFloat(item.balance).toFixed(decimals);
 
   const handlePress = useCallback(() => {
     onPress(item.id);
@@ -181,7 +186,7 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
             <View style={styles.verticalDivider} />
             <View style={styles.accountValueWrapper}>
               <Text variant="titleMedium" style={{ textAlign: 'right' }} numberOfLines={1} ellipsizeMode="tail">
-                {item.balance} {item.currencySymbol}
+                {formattedBalance} {item.currencySymbol}
               </Text>
             </View>
           </View>

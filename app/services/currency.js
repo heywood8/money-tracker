@@ -1,15 +1,24 @@
 /**
  * Currency utility functions for precise decimal arithmetic
  *
- * Financial calculations require precision. This module handles currency
- * operations using integer arithmetic (cents) to avoid floating-point errors.
+ * Financial calculations require precision. This module uses decimal.js
+ * for arbitrary-precision decimal arithmetic to avoid floating-point errors.
  *
- * All amounts are stored as strings in the database but converted to cents
- * (integers) for calculations, then back to strings.
+ * All amounts are stored as strings in the database and handled as Decimal
+ * objects during calculations.
  */
 
+import Decimal from 'decimal.js';
 import exchangeRatesData from '../../assets/exchange-rates.json';
 import currenciesData from '../../assets/currencies.json';
+
+// Configure Decimal.js for financial calculations
+Decimal.set({
+  precision: 20,           // High precision for financial calculations
+  rounding: Decimal.ROUND_HALF_UP, // Banker's rounding
+  toExpNeg: -9,           // Format numbers with more than 9 decimal places in exponential notation
+  toExpPos: 9,
+});
 
 /**
  * Get decimal places for a currency
@@ -24,46 +33,104 @@ export const getDecimalPlaces = (currencyCode) => {
 };
 
 /**
- * Convert a currency string to smallest unit (e.g., cents for USD, fils for AMD)
+ * Normalize amount to Decimal object
+ * @param {string|number|Decimal} amount - Amount as string, number, or Decimal
+ * @returns {Decimal} Amount as Decimal object
+ */
+const toDecimal = (amount) => {
+  if (amount instanceof Decimal) {
+    return amount;
+  }
+  
+  // Handle various invalid inputs
+  if (amount === null || amount === undefined || amount === '') {
+    return new Decimal(0);
+  }
+  
+  if (typeof amount === 'string' || typeof amount === 'number') {
+    try {
+      const decimal = new Decimal(amount);
+      // Check if the result is a valid finite number
+      if (!decimal.isFinite()) {
+        return new Decimal(0);
+      }
+      return decimal;
+    } catch (error) {
+      return new Decimal(0);
+    }
+  }
+  
+  return new Decimal(0);
+};
+
+/**
+ * Format amount as string with specified decimal places
+ * @param {Decimal|string|number} amount - Amount to format
+ * @param {string|number} currencyOrDecimals - Currency code or number of decimal places
+ * @returns {string} Formatted amount string
+ */
+export const formatAmount = (amount, currencyOrDecimals = 2) => {
+  const decimal = toDecimal(amount);
+  
+  // Determine decimal places
+  let decimals;
+  if (typeof currencyOrDecimals === 'string') {
+    decimals = getDecimalPlaces(currencyOrDecimals);
+  } else {
+    decimals = currencyOrDecimals;
+  }
+  
+  const formatted = decimal.toFixed(decimals);
+  
+  // Strip unnecessary zeros and decimal point if decimals is 0
+  if (decimals === 0) {
+    return formatted.replace(/\.0+$/, '');
+  }
+  
+  return formatted;
+};
+
+/**
+ * Legacy toCents function - kept for backward compatibility
+ * Converts amount to smallest unit (cents) as integer
  * @param {string|number} amount - Amount as string or number
  * @param {string} currencyCode - Currency code (optional, defaults to 2 decimals)
  * @returns {number} Amount in smallest unit (integer)
  */
 export const toCents = (amount, currencyCode = null) => {
   const decimals = currencyCode ? getDecimalPlaces(currencyCode) : 2;
-  const multiplier = Math.pow(10, decimals);
-
-  if (typeof amount === 'number') {
-    return Math.round(amount * multiplier);
-  }
-  const num = parseFloat(amount) || 0;
-  return Math.round(num * multiplier);
+  const decimal = toDecimal(amount);
+  const multiplier = new Decimal(10).pow(decimals);
+  return decimal.times(multiplier).round().toNumber();
 };
 
 /**
+ * Legacy fromCents function - kept for backward compatibility
  * Convert smallest unit to currency string
  * @param {number} cents - Amount in smallest unit
- * @param {number|string} decimalsOrCurrency - Number of decimal places (for formatting only) or currency code (for currency-aware conversion)
+ * @param {number|string} decimalsOrCurrency - Number of decimal places or currency code
  * @returns {string} Amount as string with decimals
  */
 export const fromCents = (cents, decimalsOrCurrency = 2) => {
   // For backward compatibility: when a number is passed, always divide by 100 (default cents behavior)
   // and use the number only for formatting
   if (typeof decimalsOrCurrency === 'number') {
-    const amount = cents / 100;
+    const divisor = new Decimal(100);
+    const amount = new Decimal(cents).dividedBy(divisor);
     return amount.toFixed(decimalsOrCurrency);
   }
-
+  
   // When a currency code string is passed, use currency-specific decimal places
   if (typeof decimalsOrCurrency === 'string') {
     const decimals = getDecimalPlaces(decimalsOrCurrency);
-    const divisor = Math.pow(10, decimals);
-    const amount = cents / divisor;
+    const divisor = new Decimal(10).pow(decimals);
+    const amount = new Decimal(cents).dividedBy(divisor);
     return amount.toFixed(decimals);
   }
-
+  
   // Default: divide by 100 and format with 2 decimals
-  const amount = cents / 100;
+  const divisor = new Decimal(100);
+  const amount = new Decimal(cents).dividedBy(divisor);
   return amount.toFixed(2);
 };
 
@@ -71,49 +138,73 @@ export const fromCents = (cents, decimalsOrCurrency = 2) => {
  * Add two currency amounts
  * @param {string|number} a - First amount
  * @param {string|number} b - Second amount
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string} Result as string
  */
-export const add = (a, b) => {
-  const centsA = toCents(a);
-  const centsB = toCents(b);
-  return fromCents(centsA + centsB);
+export const add = (a, b, currencyCode = null) => {
+  const decimalA = toDecimal(a);
+  const decimalB = toDecimal(b);
+  const result = decimalA.plus(decimalB);
+  
+  if (currencyCode) {
+    return formatAmount(result, currencyCode);
+  }
+  return result.toFixed(2);
 };
 
 /**
  * Subtract two currency amounts
  * @param {string|number} a - First amount
  * @param {string|number} b - Second amount (subtracted from a)
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string} Result as string
  */
-export const subtract = (a, b) => {
-  const centsA = toCents(a);
-  const centsB = toCents(b);
-  return fromCents(centsA - centsB);
+export const subtract = (a, b, currencyCode = null) => {
+  const decimalA = toDecimal(a);
+  const decimalB = toDecimal(b);
+  const result = decimalA.minus(decimalB);
+  
+  if (currencyCode) {
+    return formatAmount(result, currencyCode);
+  }
+  return result.toFixed(2);
 };
 
 /**
  * Multiply a currency amount by a factor
  * @param {string|number} amount - Amount to multiply
  * @param {number} factor - Multiplication factor
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string} Result as string
  */
-export const multiply = (amount, factor) => {
-  const cents = toCents(amount);
-  return fromCents(Math.round(cents * factor));
+export const multiply = (amount, factor, currencyCode = null) => {
+  const decimal = toDecimal(amount);
+  const result = decimal.times(factor);
+  
+  if (currencyCode) {
+    return formatAmount(result, currencyCode);
+  }
+  return result.toFixed(2);
 };
 
 /**
  * Divide a currency amount by a divisor
  * @param {string|number} amount - Amount to divide
  * @param {number} divisor - Division divisor
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string} Result as string
  */
-export const divide = (amount, divisor) => {
+export const divide = (amount, divisor, currencyCode = null) => {
   if (divisor === 0) {
     throw new Error('Division by zero');
   }
-  const cents = toCents(amount);
-  return fromCents(Math.round(cents / divisor));
+  const decimal = toDecimal(amount);
+  const result = decimal.dividedBy(divisor);
+  
+  if (currencyCode) {
+    return formatAmount(result, currencyCode);
+  }
+  return result.toFixed(2);
 };
 
 /**
@@ -123,11 +214,9 @@ export const divide = (amount, divisor) => {
  * @returns {number} -1 if a < b, 0 if a === b, 1 if a > b
  */
 export const compare = (a, b) => {
-  const centsA = toCents(a);
-  const centsB = toCents(b);
-  if (centsA < centsB) return -1;
-  if (centsA > centsB) return 1;
-  return 0;
+  const decimalA = toDecimal(a);
+  const decimalB = toDecimal(b);
+  return decimalA.comparedTo(decimalB);
 };
 
 /**
@@ -136,7 +225,7 @@ export const compare = (a, b) => {
  * @returns {boolean}
  */
 export const isPositive = (amount) => {
-  return toCents(amount) > 0;
+  return toDecimal(amount).greaterThan(0);
 };
 
 /**
@@ -145,7 +234,7 @@ export const isPositive = (amount) => {
  * @returns {boolean}
  */
 export const isNegative = (amount) => {
-  return toCents(amount) < 0;
+  return toDecimal(amount).lessThan(0);
 };
 
 /**
@@ -154,17 +243,22 @@ export const isNegative = (amount) => {
  * @returns {boolean}
  */
 export const isZero = (amount) => {
-  return toCents(amount) === 0;
+  return toDecimal(amount).isZero();
 };
 
 /**
  * Get absolute value of amount
  * @param {string|number} amount
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string}
  */
-export const abs = (amount) => {
-  const cents = toCents(amount);
-  return fromCents(Math.abs(cents));
+export const abs = (amount, currencyCode = null) => {
+  const result = toDecimal(amount).abs();
+  
+  if (currencyCode) {
+    return formatAmount(result, currencyCode);
+  }
+  return result.toFixed(2);
 };
 
 /**
@@ -175,7 +269,9 @@ export const abs = (amount) => {
  * @returns {string} Formatted string
  */
 export const format = (amount, currencyCode = 'USD', locale = 'en-US') => {
-  const num = parseFloat(amount) || 0;
+  const decimal = toDecimal(amount);
+  const num = decimal.toNumber();
+  
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -183,7 +279,8 @@ export const format = (amount, currencyCode = 'USD', locale = 'en-US') => {
     }).format(num);
   } catch (error) {
     // Fallback if Intl is not available or currency code is invalid
-    return `${currencyCode} ${fromCents(toCents(amount))}`;
+    const decimals = getDecimalPlaces(currencyCode);
+    return `${currencyCode} ${decimal.toFixed(decimals)}`;
   }
 };
 
@@ -191,9 +288,10 @@ export const format = (amount, currencyCode = 'USD', locale = 'en-US') => {
  * Parse user input to currency string
  * Handles various input formats and returns normalized string
  * @param {string} input - User input
+ * @param {string} currencyCode - Currency code for formatting (optional)
  * @returns {string|null} Normalized amount or null if invalid
  */
-export const parseInput = (input) => {
+export const parseInput = (input, currencyCode = null) => {
   if (!input || typeof input !== 'string') {
     return null;
   }
@@ -201,14 +299,16 @@ export const parseInput = (input) => {
   // Remove currency symbols, spaces, and other non-numeric characters except . and -
   const cleaned = input.replace(/[^0-9.-]/g, '');
 
-  // Check if valid number
-  const num = parseFloat(cleaned);
-  if (isNaN(num)) {
+  try {
+    const decimal = new Decimal(cleaned);
+    
+    if (currencyCode) {
+      return formatAmount(decimal, currencyCode);
+    }
+    return decimal.toFixed(2);
+  } catch (error) {
     return null;
   }
-
-  // Convert to cents and back to ensure precision
-  return fromCents(toCents(num));
 };
 
 /**
@@ -217,13 +317,32 @@ export const parseInput = (input) => {
  * @returns {boolean}
  */
 export const isValid = (amount) => {
+  // Reject null, undefined, empty string, and non-numeric strings
+  if (amount === null || amount === undefined || amount === '') {
+    return false;
+  }
+  
+  // Handle special number cases
   if (typeof amount === 'number') {
     return !isNaN(amount) && isFinite(amount);
   }
+  
+  // For strings, try to parse and verify it's actually a number
   if (typeof amount === 'string') {
-    const num = parseFloat(amount);
-    return !isNaN(num) && isFinite(num);
+    // Check if string contains only valid number characters
+    const cleaned = amount.trim();
+    if (cleaned === '' || !/^-?\d*\.?\d+$/.test(cleaned)) {
+      return false;
+    }
+    
+    try {
+      const decimal = new Decimal(cleaned);
+      return decimal.isFinite();
+    } catch (error) {
+      return false;
+    }
   }
+  
   return false;
 };
 
@@ -269,7 +388,7 @@ export const convertAmount = (amount, fromCurrency, toCurrency, customRate = nul
 
   // Same currency = no conversion needed
   if (fromCurrency === toCurrency) {
-    return fromCents(toCents(amount, fromCurrency), fromCurrency);
+    return formatAmount(amount, toCurrency);
   }
 
   // Get exchange rate
@@ -278,26 +397,22 @@ export const convertAmount = (amount, fromCurrency, toCurrency, customRate = nul
     return null;
   }
 
-  // Convert amount to source currency's smallest unit
-  const sourceUnits = toCents(amount, fromCurrency);
+  try {
+    const amountDecimal = toDecimal(amount);
+    const rateDecimal = toDecimal(rate);
+    
+    if (rateDecimal.lessThanOrEqualTo(0)) {
+      return null;
+    }
 
-  // Apply exchange rate
-  const rateFloat = parseFloat(rate);
-  if (isNaN(rateFloat) || rateFloat <= 0) {
+    // Convert: amount * rate
+    const result = amountDecimal.times(rateDecimal);
+    
+    // Format with destination currency's decimal places
+    return formatAmount(result, toCurrency);
+  } catch (error) {
     return null;
   }
-
-  // Calculate destination amount in smallest units
-  const destDecimals = getDecimalPlaces(toCurrency);
-  const destMultiplier = Math.pow(10, destDecimals);
-  const sourceDecimals = getDecimalPlaces(fromCurrency);
-  const sourceMultiplier = Math.pow(10, sourceDecimals);
-
-  // Convert: (sourceUnits / sourceMultiplier) * rate * destMultiplier
-  const destUnits = Math.round((sourceUnits / sourceMultiplier) * rateFloat * destMultiplier);
-
-  // Convert back to string with proper decimals
-  return fromCents(destUnits, toCurrency);
 };
 
 /**
@@ -315,7 +430,7 @@ export const reverseConvert = (destinationAmount, fromCurrency, toCurrency, cust
 
   // Same currency = no conversion needed
   if (fromCurrency === toCurrency) {
-    return fromCents(toCents(destinationAmount, toCurrency), fromCurrency);
+    return formatAmount(destinationAmount, fromCurrency);
   }
 
   // Get exchange rate
@@ -324,25 +439,22 @@ export const reverseConvert = (destinationAmount, fromCurrency, toCurrency, cust
     return null;
   }
 
-  const rateFloat = parseFloat(rate);
-  if (isNaN(rateFloat) || rateFloat <= 0) {
+  try {
+    const destDecimal = toDecimal(destinationAmount);
+    const rateDecimal = toDecimal(rate);
+    
+    if (rateDecimal.lessThanOrEqualTo(0)) {
+      return null;
+    }
+
+    // Calculate source amount: destinationAmount / rate
+    const result = destDecimal.dividedBy(rateDecimal);
+    
+    // Format with source currency's decimal places
+    return formatAmount(result, fromCurrency);
+  } catch (error) {
     return null;
   }
-
-  // Convert destination amount to smallest unit
-  const destUnits = toCents(destinationAmount, toCurrency);
-
-  // Calculate source amount: destinationAmount / rate
-  const destDecimals = getDecimalPlaces(toCurrency);
-  const destMultiplier = Math.pow(10, destDecimals);
-  const sourceDecimals = getDecimalPlaces(fromCurrency);
-  const sourceMultiplier = Math.pow(10, sourceDecimals);
-
-  // Convert: (destUnits / destMultiplier) / rate * sourceMultiplier
-  const sourceUnits = Math.round((destUnits / destMultiplier) / rateFloat * sourceMultiplier);
-
-  // Convert back to string with proper decimals
-  return fromCents(sourceUnits, fromCurrency);
 };
 
 /**
@@ -357,29 +469,34 @@ export const isReasonableRate = (rate, fromCurrency, toCurrency) => {
     return false;
   }
 
-  const rateFloat = parseFloat(rate);
+  try {
+    const rateDecimal = toDecimal(rate);
 
-  // Rate must be positive and finite
-  if (isNaN(rateFloat) || rateFloat <= 0 || !isFinite(rateFloat)) {
+    // Rate must be positive and finite
+    if (!rateDecimal.isFinite() || rateDecimal.lessThanOrEqualTo(0)) {
+      return false;
+    }
+
+    // Get the expected rate from offline data
+    const expectedRate = getExchangeRate(fromCurrency, toCurrency);
+    if (!expectedRate) {
+      // If we don't have expected rate, just check if it's within a very broad range
+      // (between 0.0001 and 10000 to catch obvious errors)
+      return rateDecimal.greaterThanOrEqualTo(0.0001) && rateDecimal.lessThanOrEqualTo(10000);
+    }
+
+    const expectedDecimal = toDecimal(expectedRate);
+
+    // Allow up to 50% deviation from expected rate (to account for market fluctuations
+    // or manual rate adjustments, while still catching obvious mistakes)
+    const minAcceptable = expectedDecimal.times(0.5);
+    const maxAcceptable = expectedDecimal.times(1.5);
+
+    return rateDecimal.greaterThanOrEqualTo(minAcceptable) && 
+           rateDecimal.lessThanOrEqualTo(maxAcceptable);
+  } catch (error) {
     return false;
   }
-
-  // Get the expected rate from offline data
-  const expectedRate = getExchangeRate(fromCurrency, toCurrency);
-  if (!expectedRate) {
-    // If we don't have expected rate, just check if it's within a very broad range
-    // (between 0.0001 and 10000 to catch obvious errors)
-    return rateFloat >= 0.0001 && rateFloat <= 10000;
-  }
-
-  const expectedFloat = parseFloat(expectedRate);
-
-  // Allow up to 50% deviation from expected rate (to account for market fluctuations
-  // or manual rate adjustments, while still catching obvious mistakes)
-  const minAcceptable = expectedFloat * 0.5;
-  const maxAcceptable = expectedFloat * 1.5;
-
-  return rateFloat >= minAcceptable && rateFloat <= maxAcceptable;
 };
 
 /**
