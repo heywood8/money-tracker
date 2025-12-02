@@ -59,6 +59,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     visible: false,
     type: null,
     data: [],
+    allCategories: [],
+  });
+  // Category navigation state (for hierarchical folder navigation)
+  const [categoryNavigation, setCategoryNavigation] = useState({
+    currentFolderId: null,
+    breadcrumb: [],
   });
   // Track which field was last edited to determine calculation direction
   const [lastEditedField, setLastEditedField] = useState(null);
@@ -201,11 +207,19 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   const openPicker = useCallback((type, data) => {
     Keyboard.dismiss();
-    setPickerState({ visible: true, type, data });
+    if (type === 'category') {
+      // For categories, show root folders and root entry categories
+      const rootItems = data.filter(cat => !cat.parentId);
+      setPickerState({ visible: true, type, data: rootItems, allCategories: data });
+      setCategoryNavigation({ currentFolderId: null, breadcrumb: [] });
+    } else {
+      setPickerState({ visible: true, type, data, allCategories: [] });
+    }
   }, []);
 
   const closePicker = useCallback(() => {
-    setPickerState({ visible: false, type: null, data: [] });
+    setPickerState({ visible: false, type: null, data: [], allCategories: [] });
+    setCategoryNavigation({ currentFolderId: null, breadcrumb: [] });
   }, []);
 
   const getAccountName = useCallback((accountId) => {
@@ -221,12 +235,52 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     return category.nameKey ? t(category.nameKey) : category.name;
   }, [categories, t]);
 
+  // Navigate into a category folder
+  const navigateIntoFolder = useCallback((folder) => {
+    setPickerState(prev => {
+      const folderName = folder.nameKey ? t(folder.nameKey) : folder.name;
+      const children = prev.allCategories.filter(cat => cat.parentId === folder.id);
+
+      setCategoryNavigation(prevNav => ({
+        currentFolderId: folder.id,
+        breadcrumb: [...prevNav.breadcrumb, { id: folder.id, name: folderName }],
+      }));
+
+      return { ...prev, data: children };
+    });
+  }, [t]);
+
+  // Navigate back to previous folder level
+  const navigateBack = useCallback(() => {
+    setPickerState(prev => {
+      const newBreadcrumb = categoryNavigation.breadcrumb.slice(0, -1);
+      const newFolderId = newBreadcrumb.length > 0
+        ? newBreadcrumb[newBreadcrumb.length - 1].id
+        : null;
+
+      // Get the appropriate categories for this level
+      let newData;
+      if (newFolderId === null) {
+        newData = prev.allCategories.filter(cat => !cat.parentId);
+      } else {
+        newData = prev.allCategories.filter(cat => cat.parentId === newFolderId);
+      }
+
+      setCategoryNavigation({
+        currentFolderId: newFolderId,
+        breadcrumb: newBreadcrumb,
+      });
+
+      return { ...prev, data: newData };
+    });
+  }, [categoryNavigation.breadcrumb]);
+
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => {
       if (values.type === 'transfer') return false;
       // Exclude shadow categories from selection
       if (cat.isShadow) return false;
-      return cat.categoryType === values.type && cat.type === 'entry';
+      return cat.categoryType === values.type;
     });
   }, [categories, values.type]);
 
@@ -663,6 +717,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       >
         <Pressable style={styles.modalOverlay} onPress={closePicker}>
           <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            {/* Breadcrumb navigation for categories */}
+            {pickerState.type === 'category' && categoryNavigation.breadcrumb.length > 0 && (
+              <View style={[styles.breadcrumbContainer, { borderBottomColor: colors.border }]}>
+                <Pressable onPress={navigateBack} style={styles.backButton}>
+                  <Icon name="arrow-left" size={24} color={colors.primary} />
+                </Pressable>
+                <Text style={[styles.breadcrumbText, { color: colors.text }]} numberOfLines={1}>
+                  {categoryNavigation.breadcrumb[categoryNavigation.breadcrumb.length - 1].name}
+                </Text>
+              </View>
+            )}
+
             <FlatList
               data={pickerState.data}
               keyExtractor={(item) => {
@@ -721,11 +787,20 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     </Pressable>
                   );
                 } else if (pickerState.type === 'category') {
+                  // Determine if this is a folder or entry
+                  const isFolder = item.type === 'folder';
+
                   return (
                     <Pressable
                       onPress={() => {
-                        setValues(v => ({ ...v, categoryId: item.id }));
-                        closePicker();
+                        if (isFolder) {
+                          // Navigate into folder
+                          navigateIntoFolder(item);
+                        } else {
+                          // Select entry category
+                          setValues(v => ({ ...v, categoryId: item.id }));
+                          closePicker();
+                        }
                       }}
                       style={({ pressed }) => [
                         styles.pickerOption,
@@ -735,9 +810,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     >
                       <View style={styles.categoryOption}>
                         <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, { color: colors.text, marginLeft: 12 }]}>
+                        <Text style={[styles.pickerOptionText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
                           {item.nameKey ? t(item.nameKey) : item.name}
                         </Text>
+                        {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
                       </View>
                     </Pressable>
                   );
@@ -943,5 +1019,22 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 12,
     paddingHorizontal: 4,
+  },
+  breadcrumbContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    marginBottom: 8,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  breadcrumbText: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
   },
 });
