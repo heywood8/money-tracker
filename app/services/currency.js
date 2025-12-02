@@ -80,7 +80,14 @@ export const formatAmount = (amount, currencyOrDecimals = 2) => {
     decimals = currencyOrDecimals;
   }
   
-  return decimal.toFixed(decimals);
+  const formatted = decimal.toFixed(decimals);
+  
+  // Strip unnecessary zeros and decimal point if decimals is 0
+  if (decimals === 0) {
+    return formatted.replace(/\.0+$/, '');
+  }
+  
+  return formatted;
 };
 
 /**

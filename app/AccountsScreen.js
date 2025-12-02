@@ -7,7 +7,6 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useAccounts } from './AccountsContext';
 import { useLocalization } from './LocalizationContext';
-import { formatAmount } from './services/currency';
 import currencies from '../assets/currencies.json';
 
 // Memoized currency picker modal component
@@ -57,7 +56,8 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
 
   const renderAccountItem = useCallback(({ item }) => {
     const currencySymbol = currencies[item.currency]?.symbol || item.currency;
-    const formattedBalance = formatAmount(item.balance, item.currency);
+    const decimals = currencies[item.currency]?.decimal_digits ?? 2;
+    const formattedBalance = parseFloat(item.balance).toFixed(decimals);
 
     return (
       <TouchableRipple
@@ -153,7 +153,8 @@ ConfirmationDialog.displayName = 'ConfirmationDialog';
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
   const rowBg = isEven ? colors.background : colors.altRow;
-  const formattedBalance = formatAmount(item.balance, item.currency);
+  const decimals = currencies[item.currency]?.decimal_digits ?? 2;
+  const formattedBalance = parseFloat(item.balance).toFixed(decimals);
 
   const handlePress = useCallback(() => {
     onPress(item.id);
