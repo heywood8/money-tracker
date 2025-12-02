@@ -381,6 +381,15 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       data.amount = String(operation.amount);
     }
 
+    // Format amounts based on currency decimal places
+    if (data.amount && sourceAccount) {
+      data.amount = Currency.formatAmount(data.amount, sourceAccount.currency);
+    }
+    
+    if (data.destinationAmount && destinationAccount) {
+      data.destinationAmount = Currency.formatAmount(data.destinationAmount, destinationAccount.currency);
+    }
+
     return data;
   }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount, isNew, operation]);
 

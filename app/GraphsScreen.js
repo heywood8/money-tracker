@@ -10,8 +10,12 @@ import { getAllCategories } from './services/CategoriesDB';
 import SimplePicker from './components/SimplePicker';
 
 // Currency formatting helper
+import currencies from '../assets/currencies.json';
+
 const formatCurrency = (amount, currency) => {
-  return `${parseFloat(amount).toFixed(2)} ${currency}`;
+  const currencyInfo = currencies[currency];
+  const decimals = currencyInfo?.decimal_digits ?? 2;
+  return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
 };
 
 // Custom Legend Component
