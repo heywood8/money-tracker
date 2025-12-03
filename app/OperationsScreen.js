@@ -10,6 +10,7 @@ import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
 import OperationModal from './OperationModal';
+import Calculator from './Calculator';
 import currencies from '../assets/currencies.json';
 
 /**
@@ -40,8 +41,6 @@ const QuickAddForm = memo(({
 }) => {
   return (
     <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.quickAddTitle, { color: colors.text }]}>{t('add_operation')}</Text>
-
       {/* Type Selector */}
       <View style={styles.typeSelector}>
         {TYPES.map(type => (
@@ -138,19 +137,13 @@ const QuickAddForm = memo(({
         </Pressable>
       )}
 
-      {/* Amount Input */}
-      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-        <Icon name="currency-usd" size={18} color={colors.mutedText} />
-        <TextInput
-          style={[styles.formTextInput, { color: colors.text }]}
-          value={quickAddValues.amount}
-          onChangeText={text => setQuickAddValues(v => ({ ...v, amount: text }))}
-          placeholder={t('amount')}
-          placeholderTextColor={colors.mutedText}
-          keyboardType="decimal-pad"
-          returnKeyType="done"
-        />
-      </View>
+      {/* Amount Calculator */}
+      <Calculator
+        value={quickAddValues.amount}
+        onValueChange={text => setQuickAddValues(v => ({ ...v, amount: text }))}
+        colors={colors}
+        placeholder={t('amount')}
+      />
 
       {/* Description Input */}
       <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
@@ -165,28 +158,37 @@ const QuickAddForm = memo(({
         />
       </View>
 
-      {/* Category Picker */}
+      {/* Category Picker and Add Button Row */}
       {quickAddValues.type !== 'transfer' && (
-        <Pressable
-          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={() => openPicker('category', filteredCategories)}
-        >
-          <Icon name="tag" size={18} color={colors.mutedText} />
-          <Text style={[styles.formInputText, { color: colors.text }]}>
-            {getCategoryName(quickAddValues.categoryId)}
-          </Text>
-          <Icon name="chevron-down" size={18} color={colors.mutedText} />
-        </Pressable>
+        <View style={styles.categoryAddRow}>
+          <Pressable
+            style={[styles.formInputCategory, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={() => openPicker('category', filteredCategories)}
+          >
+            <Icon name="tag" size={18} color={colors.mutedText} />
+            <Text style={[styles.formInputText, { color: colors.text }]}>
+              {getCategoryName(quickAddValues.categoryId)}
+            </Text>
+            <Icon name="chevron-down" size={18} color={colors.mutedText} />
+          </Pressable>
+          <TouchableOpacity
+            style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
+            onPress={handleQuickAdd}
+          >
+            <Text style={styles.quickAddButtonText}>{t('add')}</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
-      {/* Add Button */}
-      <TouchableOpacity
-        style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-        onPress={handleQuickAdd}
-      >
-        <Icon name="plus" size={20} color="#fff" />
-        <Text style={styles.quickAddButtonText}>{t('add')}</Text>
-      </TouchableOpacity>
+      {/* Add Button for transfers (full width) */}
+      {quickAddValues.type === 'transfer' && (
+        <TouchableOpacity
+          style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
+          onPress={handleQuickAdd}
+        >
+          <Text style={styles.quickAddButtonText}>{t('add')}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 });
@@ -985,18 +987,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: 0,
   },
+  categoryAddRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  formInputCategory: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
   quickAddButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 8,
-    gap: 6,
   },
   quickAddButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   modalOverlay: {
