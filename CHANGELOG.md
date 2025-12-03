@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/heywood8/money-tracker/compare/penny-v0.5.0...penny-v0.6.0) (2025-12-03)
+
+
+### Miscellaneous Chores
+
+* release 0.6.0 ([934bcc5](https://github.com/heywood8/money-tracker/commit/934bcc522d4b8c30ea058a256c3325a36ee4340f))
+
 ## [0.5.0](https://github.com/heywood8/money-tracker/compare/penny-v0.4.4...penny-v0.5.0) (2025-12-03)
 
 
