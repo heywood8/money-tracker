@@ -32,6 +32,7 @@ const QuickAddForm = memo(({
   accounts: visibleAccounts,
   filteredCategories,
   getAccountName,
+  getAccountBalance,
   getCategoryName,
   openPicker,
   handleQuickAdd,
@@ -81,9 +82,16 @@ const QuickAddForm = memo(({
         onPress={() => openPicker('account', visibleAccounts)}
       >
         <Icon name="wallet" size={18} color={colors.mutedText} />
-        <Text style={[styles.formInputText, { color: colors.text }]}>
-          {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.formInputText, { color: colors.text }]}>
+            {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+          </Text>
+          {quickAddValues.accountId && (
+            <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
+              {getAccountBalance(quickAddValues.accountId)}
+            </Text>
+          )}
+        </View>
         <Icon name="chevron-down" size={18} color={colors.mutedText} />
       </Pressable>
 
@@ -333,6 +341,14 @@ const OperationsScreen = () => {
     return account ? account.name : 'Unknown';
   }, [visibleAccounts]);
 
+  // Get account balance with currency symbol
+  const getAccountBalance = useCallback((accountId) => {
+    const account = visibleAccounts.find(acc => acc.id === accountId);
+    if (!account) return '';
+    const symbol = getCurrencySymbol(account.currency);
+    return `${symbol}${account.balance}`;
+  }, [visibleAccounts]);
+
   // Get category info
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
@@ -444,12 +460,13 @@ const OperationsScreen = () => {
       accounts={visibleAccounts}
       filteredCategories={filteredCategories}
       getAccountName={getAccountName}
+      getAccountBalance={getAccountBalance}
       getCategoryName={getCategoryName}
       openPicker={openPicker}
       handleQuickAdd={handleQuickAdd}
       TYPES={TYPES}
     />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   const renderItem = useCallback(({ item }) => {
     // Render date separator
@@ -847,6 +864,10 @@ const styles = StyleSheet.create({
   formInputText: {
     flex: 1,
     fontSize: 15,
+  },
+  accountBalanceText: {
+    fontSize: 12,
+    marginTop: 2,
   },
   formTextInput: {
     flex: 1,
