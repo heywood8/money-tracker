@@ -1,15 +1,11 @@
 {
   "packages": {
     ".": {
-      "release-type": "expo",
+      "release-type": "node",
       "package-name": "penny",
       "include-v-in-tag": true,
       "extra-files": [
-        {
-          "type": "json",
-          "path": "app.config.js",
-          "jsonpath": "$.expo.version"
-        }
+        "app.config.js"
       ]
     }
   }
