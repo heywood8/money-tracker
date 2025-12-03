@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'penny.db';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 
 let dbInstance = null;
 let initPromise = null;
@@ -232,6 +232,39 @@ const migrateToV8 = async (db) => {
     console.log('Migration to V8 completed successfully');
   } catch (error) {
     console.error('Failed to migrate to V8:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V8 to V9 - Add exclude_from_forecast field to categories
+ */
+const migrateToV9 = async (db) => {
+  try {
+    console.log('Starting migration to V9: Add exclude_from_forecast field to categories...');
+
+    // Check if exclude_from_forecast column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
+    const hasExcludeFromForecastColumn = tableInfo.some(col => col.name === 'exclude_from_forecast');
+
+    if (hasExcludeFromForecastColumn) {
+      console.log('exclude_from_forecast column already exists, skipping migration...');
+      return;
+    }
+
+    // Add exclude_from_forecast column to categories table (defaults to 0/false)
+    await db.execAsync(`
+      ALTER TABLE categories ADD COLUMN exclude_from_forecast INTEGER DEFAULT 0;
+    `);
+
+    // Create index on exclude_from_forecast for efficient filtering
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_categories_exclude_from_forecast ON categories(exclude_from_forecast);
+    `);
+
+    console.log('Migration to V9 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V9:', error);
     throw error;
   }
 };
@@ -628,6 +661,11 @@ const initializeDatabase = async (db) => {
       await migrateToV8(db);
       didMigrate = true;
     }
+    if (currentVersion >= 8 && currentVersion < 9) {
+      console.log('Migrating database from version', currentVersion, 'to version 9...');
+      await migrateToV9(db);
+      didMigrate = true;
+    }
 
     // Force-check for V7 columns (safety net for migration issues)
     console.log('Verifying V7 schema...');
@@ -646,6 +684,25 @@ const initializeDatabase = async (db) => {
       }
     } else {
       console.log('Operations table does not exist yet, skipping V7 verification...');
+    }
+
+    // Force-check for V9 columns (safety net for migration issues)
+    console.log('Verifying V9 schema...');
+    const categoriesTables = await db.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'"
+    );
+
+    if (categoriesTables.length > 0) {
+      const categoriesTableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
+      const hasExcludeFromForecast = categoriesTableInfo.some(col => col.name === 'exclude_from_forecast');
+
+      if (!hasExcludeFromForecast) {
+        console.log('V9 columns missing! Force-running V9 migration...');
+        await migrateToV9(db);
+        didMigrate = true;
+      }
+    } else {
+      console.log('Categories table does not exist yet, skipping V9 verification...');
     }
 
     // Now create or update tables
@@ -672,6 +729,7 @@ const initializeDatabase = async (db) => {
         icon TEXT,
         color TEXT,
         is_shadow INTEGER DEFAULT 0,
+        exclude_from_forecast INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
@@ -722,6 +780,7 @@ const initializeDatabase = async (db) => {
       CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
       CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
       CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
+      CREATE INDEX IF NOT EXISTS idx_categories_exclude_from_forecast ON categories(exclude_from_forecast);
       CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
       CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
       CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
