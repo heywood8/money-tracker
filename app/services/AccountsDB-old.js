@@ -1,19 +1,16 @@
-import { executeQuery, queryAll, queryFirst, executeTransaction, getDrizzle } from './db';
+import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import { eq, sql, desc, asc } from 'drizzle-orm';
-import { accounts } from '../db/schema';
 
 /**
- * Get all accounts using Drizzle
+ * Get all accounts
  * @returns {Promise<Array>}
  */
 export const getAllAccounts = async () => {
   try {
-    const db = await getDrizzle();
-    const results = await db.select()
-      .from(accounts)
-      .orderBy(asc(accounts.displayOrder), desc(accounts.createdAt));
-    return results || [];
+    const accounts = await queryAll(
+      'SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC'
+    );
+    return accounts || [];
   } catch (error) {
     console.error('Failed to get accounts:', error);
     throw error;
@@ -21,18 +18,17 @@ export const getAllAccounts = async () => {
 };
 
 /**
- * Get account by ID using Drizzle
+ * Get account by ID
  * @param {string} id
  * @returns {Promise<Object|null>}
  */
 export const getAccountById = async (id) => {
   try {
-    const db = await getDrizzle();
-    const results = await db.select()
-      .from(accounts)
-      .where(eq(accounts.id, id))
-      .limit(1);
-    return results[0] || null;
+    const account = await queryFirst(
+      'SELECT * FROM accounts WHERE id = ?',
+      [id]
+    );
+    return account;
   } catch (error) {
     console.error('Failed to get account:', error);
     throw error;
@@ -40,34 +36,44 @@ export const getAccountById = async (id) => {
 };
 
 /**
- * Create a new account using Drizzle
+ * Create a new account
  * @param {Object} account - Account data
  * @returns {Promise<Object>}
  */
 export const createAccount = async (account) => {
   try {
-    const db = await getDrizzle();
     const now = new Date().toISOString();
 
     // Get max order value and add 1 for new account
-    const maxOrderResult = await db.select({
-      maxOrder: sql`MAX(${accounts.displayOrder})`
-    }).from(accounts);
-
-    const newOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
+    const maxOrderResult = await queryFirst(
+      'SELECT MAX(display_order) as max_order FROM accounts'
+    );
+    const newOrder = (maxOrderResult?.max_order ?? -1) + 1;
 
     const accountData = {
       id: account.id,
       name: account.name,
       balance: account.balance || '0',
       currency: account.currency || 'USD',
-      displayOrder: account.display_order ?? account.displayOrder ?? newOrder,
+      display_order: account.display_order ?? newOrder,
       hidden: account.hidden ?? 0,
-      createdAt: now,
-      updatedAt: now,
+      created_at: now,
+      updated_at: now,
     };
 
-    await db.insert(accounts).values(accountData);
+    await executeQuery(
+      'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        accountData.id,
+        accountData.name,
+        accountData.balance,
+        accountData.currency,
+        accountData.display_order,
+        accountData.hidden,
+        accountData.created_at,
+        accountData.updated_at,
+      ]
+    );
 
     return accountData;
   } catch (error) {
@@ -77,30 +83,45 @@ export const createAccount = async (account) => {
 };
 
 /**
- * Update an existing account using Drizzle
+ * Update an existing account
  * @param {string} id
  * @param {Object} updates
  * @returns {Promise<void>}
  */
 export const updateAccount = async (id, updates) => {
   try {
-    const db = await getDrizzle();
     const updatedAt = new Date().toISOString();
-    const updateData = { updatedAt };
+    const fields = [];
+    const values = [];
 
-    // Build update object based on provided fields
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.balance !== undefined) updateData.balance = updates.balance;
-    if (updates.currency !== undefined) updateData.currency = updates.currency;
-    if (updates.hidden !== undefined) updateData.hidden = updates.hidden ? 1 : 0;
-
-    if (Object.keys(updateData).length === 1) {
-      return; // Nothing to update besides updatedAt
+    // Build dynamic UPDATE query based on provided fields
+    if (updates.name !== undefined) {
+      fields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.balance !== undefined) {
+      fields.push('balance = ?');
+      values.push(updates.balance);
+    }
+    if (updates.currency !== undefined) {
+      fields.push('currency = ?');
+      values.push(updates.currency);
+    }
+    if (updates.hidden !== undefined) {
+      fields.push('hidden = ?');
+      values.push(updates.hidden ? 1 : 0);
     }
 
-    await db.update(accounts)
-      .set(updateData)
-      .where(eq(accounts.id, id));
+    if (fields.length === 0) {
+      return; // Nothing to update
+    }
+
+    fields.push('updated_at = ?');
+    values.push(updatedAt);
+    values.push(id); // Add ID at the end for WHERE clause
+
+    const sql = `UPDATE accounts SET ${fields.join(', ')} WHERE id = ?`;
+    await executeQuery(sql, values);
   } catch (error) {
     console.error('Failed to update account:', error);
     throw error;
@@ -182,7 +203,7 @@ export const getOperationCount = async (id) => {
 };
 
 /**
- * Delete an account (with optional operation transfer) using Drizzle
+ * Delete an account (with optional operation transfer)
  * @param {string} id - Account ID to delete
  * @param {string|null} transferToAccountId - Optional account ID to transfer operations to
  * @returns {Promise<void>}
@@ -207,8 +228,7 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
     }
 
     // Safe to delete - no operations are linked or they've been transferred
-    const db = await getDrizzle();
-    await db.delete(accounts).where(eq(accounts.id, id));
+    await executeQuery('DELETE FROM accounts WHERE id = ?', [id]);
   } catch (error) {
     console.error('Failed to delete account:', error);
     throw error;
@@ -300,12 +320,11 @@ export const batchUpdateBalances = async (balanceChanges) => {
  */
 export const getAccountBalance = async (id) => {
   try {
-    const db = await getDrizzle();
-    const results = await db.select({ balance: accounts.balance })
-      .from(accounts)
-      .where(eq(accounts.id, id))
-      .limit(1);
-    return results[0]?.balance || '0';
+    const account = await queryFirst(
+      'SELECT balance FROM accounts WHERE id = ?',
+      [id]
+    );
+    return account ? account.balance : '0';
   } catch (error) {
     console.error('Failed to get account balance:', error);
     throw error;
@@ -313,18 +332,17 @@ export const getAccountBalance = async (id) => {
 };
 
 /**
- * Check if account exists using Drizzle
+ * Check if account exists
  * @param {string} id
  * @returns {Promise<boolean>}
  */
 export const accountExists = async (id) => {
   try {
-    const db = await getDrizzle();
-    const results = await db.select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.id, id))
-      .limit(1);
-    return results.length > 0;
+    const result = await queryFirst(
+      'SELECT 1 FROM accounts WHERE id = ? LIMIT 1',
+      [id]
+    );
+    return !!result;
   } catch (error) {
     console.error('Failed to check account existence:', error);
     throw error;
