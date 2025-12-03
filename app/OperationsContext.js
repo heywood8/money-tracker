@@ -23,13 +23,83 @@ export const OperationsProvider = ({ children }) => {
   const [saveError, setSaveError] = useState(null);
   const { reloadAccounts } = useAccounts();
 
-  // Reload operations from database
+  // Lazy-loading state - track the oldest date we've loaded so far
+  const [oldestLoadedDate, setOldestLoadedDate] = useState(null);
+  const [hasMoreOperations, setHasMoreOperations] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Load initial week of operations
+  const loadInitialOperations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const operationsData = await OperationsDB.getOperationsByWeekOffset(0);
+      setOperations(operationsData);
+
+      // Track the oldest date in the initial load
+      if (operationsData.length > 0) {
+        const oldestOp = operationsData[operationsData.length - 1];
+        setOldestLoadedDate(oldestOp.date);
+      }
+
+      // Always assume there might be more operations initially
+      setHasMoreOperations(true);
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Failed to load initial operations:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load more operations (next week with operations)
+  // Triggered only when user scrolls to the bottom
+  // Finds the next operation older than what we've loaded and loads a week from that date
+  const loadMoreOperations = useCallback(async () => {
+    if (loadingMore || !hasMoreOperations || !oldestLoadedDate) return;
+
+    try {
+      setLoadingMore(true);
+
+      // Find the next oldest operation before our current oldest date
+      const nextOp = await OperationsDB.getNextOldestOperation(oldestLoadedDate);
+
+      if (!nextOp) {
+        // No more operations found
+        setHasMoreOperations(false);
+      } else {
+        // Load a week of operations starting from this operation's date
+        const moreOperations = await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
+
+        // Merge and deduplicate operations by ID
+        setOperations(prevOps => {
+          const existingIds = new Set(prevOps.map(op => op.id));
+          const newOps = moreOperations.filter(op => !existingIds.has(op.id));
+          return [...prevOps, ...newOps];
+        });
+
+        // Update the oldest loaded date
+        if (moreOperations.length > 0) {
+          const oldestOp = moreOperations[moreOperations.length - 1];
+          setOldestLoadedDate(oldestOp.date);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load more operations:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [oldestLoadedDate, hasMoreOperations, loadingMore]);
+
+  // Reload operations from database (loads all operations)
   const reloadOperations = useCallback(async () => {
     try {
       setLoading(true);
       const operationsData = await OperationsDB.getAllOperations();
       setOperations(operationsData);
       setDataLoaded(true);
+      // Reset lazy-loading state
+      setCurrentWeekOffset(Math.floor(operationsData.length / 50)); // Rough estimate
+      setHasMoreOperations(false); // All loaded
     } catch (error) {
       console.error('Failed to reload operations:', error);
     } finally {
@@ -39,8 +109,8 @@ export const OperationsProvider = ({ children }) => {
 
   // Load operations from SQLite on mount
   useEffect(() => {
-    reloadOperations();
-  }, [reloadOperations]);
+    loadInitialOperations();
+  }, [loadInitialOperations]);
 
   // Listen for reload events
   useEffect(() => {
@@ -63,7 +133,8 @@ export const OperationsProvider = ({ children }) => {
       // Create operation in DB (handles balance updates automatically)
       await OperationsDB.createOperation(newOperation);
 
-      setOperations(ops => [newOperation, ...ops]);
+      // Reload from the beginning to ensure consistency
+      await loadInitialOperations();
       setSaveError(null);
 
       // Reload accounts to reflect balance changes
@@ -83,7 +154,7 @@ export const OperationsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog]);
+  }, [reloadAccounts, showDialog, loadInitialOperations]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {
@@ -189,6 +260,8 @@ export const OperationsProvider = ({ children }) => {
   const value = useMemo(() => ({
     operations,
     loading,
+    loadingMore,
+    hasMoreOperations,
     addOperation,
     updateOperation,
     deleteOperation,
@@ -197,9 +270,13 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByCategory,
     getOperationsByDateRange,
     reloadOperations,
+    loadMoreOperations,
+    loadInitialOperations,
   }), [
     operations,
     loading,
+    loadingMore,
+    hasMoreOperations,
     addOperation,
     updateOperation,
     deleteOperation,
@@ -208,6 +285,8 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByCategory,
     getOperationsByDateRange,
     reloadOperations,
+    loadMoreOperations,
+    loadInitialOperations,
   ]);
 
   return (

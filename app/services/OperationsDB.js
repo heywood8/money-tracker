@@ -656,3 +656,107 @@ export const getAvailableMonths = async () => {
     throw error;
   }
 };
+
+/**
+ * Format date to local YYYY-MM-DD string
+ * @param {Date} date
+ * @returns {string}
+ */
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Get operations for a specific week offset from today
+ * Week 0 is the current week (last 7 days including today)
+ * Week 1 is days 8-14 ago, week 2 is days 15-21 ago, etc.
+ * @param {number} weekOffset - Number of weeks before current week (0 = current week)
+ * @returns {Promise<Array>}
+ */
+export const getOperationsByWeekOffset = async (weekOffset) => {
+  try {
+    // Calculate date range for the week
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // For week 0: today to 6 days ago
+    // For week 1: 7 days ago to 13 days ago
+    // For week N: (N*7) days ago to (N*7+6) days ago
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() - (weekOffset * 7));
+
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
+
+    const startDateStr = formatLocalDate(startDate);
+    const endDateStr = formatLocalDate(endDate);
+
+    console.log(`Loading week ${weekOffset}: ${startDateStr} to ${endDateStr}`);
+
+    const operations = await queryAll(
+      'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
+      [startDateStr, endDateStr]
+    );
+
+    console.log(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
+
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get operations by week offset:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the next oldest operation before a given date
+ * @param {string} beforeDate - ISO date string (YYYY-MM-DD)
+ * @returns {Promise<Object|null>}
+ */
+export const getNextOldestOperation = async (beforeDate) => {
+  try {
+    const operation = await queryFirst(
+      'SELECT * FROM operations WHERE date < ? ORDER BY date DESC, created_at DESC LIMIT 1',
+      [beforeDate]
+    );
+    return mapOperationFields(operation);
+  } catch (error) {
+    console.error('Failed to get next oldest operation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get operations for a week starting from (and including) a specific date, going back 6 days
+ * @param {string} endDate - ISO date string (YYYY-MM-DD) - the most recent date in the range
+ * @returns {Promise<Array>}
+ */
+export const getOperationsByWeekFromDate = async (endDate) => {
+  try {
+    // Parse the end date
+    const end = new Date(endDate + 'T00:00:00');
+
+    // Calculate start date (6 days before end date)
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+
+    const startDateStr = formatLocalDate(start);
+    const endDateStr = formatLocalDate(end);
+
+    console.log(`Loading week from ${startDateStr} to ${endDateStr}`);
+
+    const operations = await queryAll(
+      'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
+      [startDateStr, endDateStr]
+    );
+
+    console.log(`Week loaded: ${operations?.length || 0} operations`);
+
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get operations by week from date:', error);
+    throw error;
+  }
+};
