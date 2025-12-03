@@ -38,6 +38,7 @@ export const categories = sqliteTable('categories', {
   icon: text('icon'),
   color: text('color'),
   isShadow: integer('is_shadow').default(0),
+  excludeFromForecast: integer('exclude_from_forecast').default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
@@ -45,6 +46,7 @@ export const categories = sqliteTable('categories', {
   typeIdx: index('idx_categories_type').on(table.type),
   categoryTypeIdx: index('idx_categories_category_type').on(table.categoryType),
   shadowIdx: index('idx_categories_is_shadow').on(table.isShadow),
+  excludeFromForecastIdx: index('idx_categories_exclude_from_forecast').on(table.excludeFromForecast),
 }));
 
 /**
