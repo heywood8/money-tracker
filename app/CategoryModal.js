@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Switch,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -32,6 +33,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     parentId: null,
     icon: 'folder',
     category_type: 'expense',
+    excludeFromForecast: false,
   });
   const [errors, setErrors] = useState({});
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
@@ -42,7 +44,8 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     if (category && !isNew) {
       setValues({
         ...category,
-        category_type: category.category_type || category.categoryType || 'expense'
+        category_type: category.category_type || category.categoryType || 'expense',
+        excludeFromForecast: category.excludeFromForecast || false,
       });
     } else if (isNew) {
       setValues({
@@ -51,6 +54,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         parentId: null,
         icon: 'folder',
         category_type: 'expense',
+        excludeFromForecast: false,
       });
     }
     setErrors({});
@@ -194,6 +198,24 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                 {t('select_icon')}
               </Text>
             </Pressable>
+
+            {/* Exclude from Forecast Toggle */}
+            <View style={[styles.toggleRow, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              <View style={styles.toggleLabelContainer}>
+                <Text style={[styles.toggleLabel, { color: colors.text }]}>
+                  {t('exclude_from_forecast')}
+                </Text>
+                <Text style={[styles.toggleHint, { color: colors.mutedText }]}>
+                  {t('exclude_from_forecast_hint')}
+                </Text>
+              </View>
+              <Switch
+                value={values.excludeFromForecast || false}
+                onValueChange={(value) => setValues(v => ({ ...v, excludeFromForecast: value }))}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.card}
+              />
+            </View>
 
             {errors.general && <Text style={styles.error}>{errors.general}</Text>}
 
@@ -375,6 +397,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  toggleRow: {
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleLabelContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  toggleHint: {
+    fontSize: 12,
   },
   error: {
     color: '#ff6b6b',
