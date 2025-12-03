@@ -21,6 +21,7 @@ import { useOperations } from './OperationsContext';
 import { useAccounts } from './AccountsContext';
 import { useCategories } from './CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
+import Calculator from './Calculator';
 import * as Currency from './services/currency';
 import currencies from '../assets/currencies.json';
 
@@ -446,28 +447,20 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
-                  {/* Amount Input */}
-                  <TextInput
-                    style={[
-                      styles.input,
-                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput
-                    ]}
-                    value={values.amount}
-                    onChangeText={text => {
-                      if (!isShadowOperation) {
-                        setValues(v => ({ ...v, amount: text }));
-                        setLastEditedField('amount');
-                      }
-                    }}
-                    placeholder={t('amount')}
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                    editable={!isShadowOperation}
-                    testID="amount-input" // Added testID for amount input
-                  />
+                  {/* Amount Calculator */}
+                  <View style={isShadowOperation && styles.disabledInput}>
+                    <Calculator
+                      value={values.amount}
+                      onValueChange={text => {
+                        if (!isShadowOperation) {
+                          setValues(v => ({ ...v, amount: text }));
+                          setLastEditedField('amount');
+                        }
+                      }}
+                      colors={colors}
+                      placeholder={t('amount')}
+                    />
+                  </View>
 
                   {/* Account Picker */}
                   <Pressable
