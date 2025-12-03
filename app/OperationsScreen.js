@@ -692,15 +692,16 @@ const OperationsScreen = () => {
                           // Navigate into folder
                           navigateIntoFolder(item);
                         } else {
-                          // Select entry category
+                          // Select entry category and keep picker open
                           setQuickAddValues(v => ({ ...v, categoryId: item.id }));
-                          closePicker();
                         }
                       }}
                       style={({ pressed }) => [
                         styles.pickerOption,
                         { borderColor: colors.border },
                         pressed && { backgroundColor: colors.selected },
+                        // Highlight selected category
+                        !isFolder && quickAddValues.categoryId === item.id && { backgroundColor: colors.selected },
                       ]}
                     >
                       <View style={styles.categoryOption}>
@@ -721,9 +722,43 @@ const OperationsScreen = () => {
                 </Text>
               }
             />
-            <Pressable style={styles.closeButton} onPress={closePicker}>
-              <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
-            </Pressable>
+            {/* Action buttons - different for category vs account/toAccount */}
+            {pickerState.type === 'category' ? (
+              <View style={styles.pickerActions}>
+                <TouchableOpacity
+                  style={[styles.pickerActionButton, styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={closePicker}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerActionButton,
+                    styles.addButton,
+                    { backgroundColor: colors.primary },
+                    // Disable if no amount entered
+                    (!quickAddValues.amount || quickAddValues.amount.trim() === '') && styles.disabledButton,
+                  ]}
+                  onPress={() => {
+                    if (quickAddValues.amount && quickAddValues.amount.trim() !== '') {
+                      closePicker();
+                      // Automatically trigger add operation
+                      handleQuickAdd();
+                    }
+                  }}
+                  disabled={!quickAddValues.amount || quickAddValues.amount.trim() === ''}
+                >
+                  <Text style={[
+                    styles.addButtonText,
+                    (!quickAddValues.amount || quickAddValues.amount.trim() === '') && styles.disabledButtonText,
+                  ]}>{t('add')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Pressable style={styles.closeButton} onPress={closePicker}>
+                <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
+              </Pressable>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -949,6 +984,41 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  pickerActions: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 12,
+    paddingHorizontal: 8,
+  },
+  pickerActionButton: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addButton: {
+    // backgroundColor set dynamically from colors.primary
+  },
+  addButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  disabledButton: {
+    opacity: 0.4,
+  },
+  disabledButtonText: {
+    opacity: 0.6,
   },
   dateSeparator: {
     flexDirection: 'row',
