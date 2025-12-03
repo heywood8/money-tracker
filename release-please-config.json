@@ -2,7 +2,6 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "penny",
       "include-v-in-tag": true,
       "extra-files": [
         "app.config.js",
