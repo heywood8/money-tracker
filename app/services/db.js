@@ -1,34 +1,39 @@
+import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
+import * as schema from '../db/schema';
 
 const DB_NAME = 'penny.db';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 
 let dbInstance = null;
+let drizzleInstance = null;
 let initPromise = null;
 
 /**
  * Get or create the database instance
- * @returns {Promise<SQLite.SQLiteDatabase>}
+ * @returns {Promise<Object>} Object with both raw and drizzle instances
  */
 export const getDatabase = async () => {
-  if (dbInstance) {
-    return dbInstance;
+  if (dbInstance && drizzleInstance) {
+    return { raw: dbInstance, drizzle: drizzleInstance };
   }
 
   // If initialization is in progress, wait for it
   if (initPromise) {
     await initPromise;
-    return dbInstance;
+    return { raw: dbInstance, drizzle: drizzleInstance };
   }
 
   // Start initialization
   initPromise = (async () => {
     try {
       dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
+      drizzleInstance = drizzle(dbInstance, { schema });
       await initializeDatabase(dbInstance);
     } catch (error) {
       console.error('Failed to open database:', error);
       dbInstance = null;
+      drizzleInstance = null;
       initPromise = null;
       throw error;
     }
@@ -36,11 +41,256 @@ export const getDatabase = async () => {
 
   await initPromise;
   initPromise = null;
-  return dbInstance;
+  return { raw: dbInstance, drizzle: drizzleInstance };
 };
 
 /**
- * Migrate from V4 to V5 - Add is_shadow field to categories for shadow categories
+ * Get the Drizzle instance
+ * @returns {Promise<drizzle>}
+ */
+export const getDrizzle = async () => {
+  const { drizzle: db } = await getDatabase();
+  return db;
+};
+
+/**
+ * Migrate from V1 to V2 - Refactor category structure
+ */
+const migrateToV2 = async (db) => {
+  try {
+    // Check if categories table exists and has the old structure
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
+    const hasCategoryTypeColumn = tableInfo.some(col => col.name === 'category_type');
+
+    if (hasCategoryTypeColumn) {
+      console.log('Migration already applied, skipping...');
+      return;
+    }
+
+    console.log('Starting category structure migration...');
+
+    // Get all existing categories
+    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
+
+    if (existingCategories.length === 0) {
+      console.log('No categories to migrate');
+      return;
+    }
+
+    // Create new categories table with updated schema
+    await db.execAsync(`
+      -- Create temporary table with new schema
+      CREATE TABLE categories_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
+        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
+        parent_id TEXT,
+        icon TEXT,
+        color TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Build a map to determine category_type for each category
+    const categoryTypeMap = new Map();
+
+    // First pass: determine category_type from old type or ID/name
+    for (const cat of existingCategories) {
+      let categoryType = 'expense'; // default
+
+      // If old type was 'expense' or 'income', use that as category_type
+      if (cat.type === 'expense' || cat.type === 'income') {
+        categoryType = cat.type;
+      }
+      // Check for root folders by ID or name
+      else if (cat.id === 'expense-root' || cat.name === 'Expenses') {
+        categoryType = 'expense';
+      } else if (cat.id === 'income-root' || cat.name === 'Income') {
+        categoryType = 'income';
+      }
+      // Check if ID starts with expense- or income-
+      else if (cat.id && cat.id.startsWith('expense-')) {
+        categoryType = 'expense';
+      } else if (cat.id && cat.id.startsWith('income-')) {
+        categoryType = 'income';
+      }
+
+      categoryTypeMap.set(cat.id, categoryType);
+    }
+
+    // Second pass: inherit category_type from parent if not determined
+    for (const cat of existingCategories) {
+      if (cat.parent_id && !categoryTypeMap.has(cat.id)) {
+        const parent = existingCategories.find(c => c.id === cat.parent_id);
+        if (parent && categoryTypeMap.has(parent.id)) {
+          categoryTypeMap.set(cat.id, categoryTypeMap.get(parent.id));
+        }
+      }
+    }
+
+    // Third pass: insert into new table
+    for (const cat of existingCategories) {
+      const categoryType = categoryTypeMap.get(cat.id) || 'expense';
+
+      await db.runAsync(
+        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          cat.id,
+          cat.name,
+          'folder', // All items are now folders
+          categoryType,
+          cat.parent_id,
+          cat.icon,
+          cat.color,
+          cat.created_at,
+          cat.updated_at
+        ]
+      );
+    }
+
+    // Drop old table and rename new one
+    await db.execAsync(`
+      DROP TABLE categories;
+      ALTER TABLE categories_new RENAME TO categories;
+
+      -- Recreate indexes
+      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+    `);
+
+    console.log('Category structure migration completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate categories:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V2 to V3 - Allow 'entry' type categories
+ */
+const migrateToV3 = async (db) => {
+  try {
+    console.log('Starting migration to V3: Allow entry type categories...');
+
+    // Create new categories table with updated schema
+    await db.execAsync(`
+      -- Create temporary table with updated schema
+      CREATE TABLE categories_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
+        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
+        parent_id TEXT,
+        icon TEXT,
+        color TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Get all existing categories
+    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
+
+    // Determine which categories should be 'entry' (leaf categories without children)
+    const categoryIdsWithChildren = new Set(
+      existingCategories
+        .filter(cat => cat.parent_id !== null)
+        .map(cat => cat.parent_id)
+    );
+
+    // Copy data to new table, updating type for leaf categories
+    for (const cat of existingCategories) {
+      const isLeaf = !categoryIdsWithChildren.has(cat.id);
+      const newType = isLeaf ? 'entry' : 'folder';
+
+      await db.runAsync(
+        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          cat.id,
+          cat.name,
+          newType,
+          cat.category_type,
+          cat.parent_id,
+          cat.icon,
+          cat.color,
+          cat.created_at,
+          cat.updated_at
+        ]
+      );
+    }
+
+    // Drop old table and rename new one
+    await db.execAsync(`
+      DROP TABLE categories;
+      ALTER TABLE categories_new RENAME TO categories;
+
+      -- Recreate indexes
+      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+    `);
+
+    console.log('Migration to V3 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V3:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate from V3 to V4 - Add order field to accounts
+ */
+const migrateToV4 = async (db) => {
+  try {
+    console.log('Starting migration to V4: Add order field to accounts...');
+
+    // Check if order column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
+    const hasOrderColumn = tableInfo.some(col => col.name === 'display_order');
+
+    if (hasOrderColumn) {
+      console.log('Order column already exists, skipping migration...');
+      return;
+    }
+
+    // Add order column to accounts table
+    await db.execAsync(`
+      ALTER TABLE accounts ADD COLUMN display_order INTEGER;
+    `);
+
+    // Set initial order based on created_at (oldest first)
+    const accounts = await db.getAllAsync(
+      'SELECT id FROM accounts ORDER BY created_at ASC'
+    );
+
+    for (let i = 0; i < accounts.length; i++) {
+      await db.runAsync(
+        'UPDATE accounts SET display_order = ? WHERE id = ?',
+        [i, accounts[i].id]
+      );
+    }
+
+    // Create index on display_order for efficient sorting
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+    `);
+
+    console.log('Migration to V4 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V4:', error);
+    throw error;
+  }
+};
+
+/**
+ * Migrate to V5 - Add is_shadow field to categories
  */
 const migrateToV5 = async (db) => {
   try {
@@ -204,39 +454,6 @@ const migrateToV6 = async (db) => {
 };
 
 /**
- * Migrate from V7 to V8 - Add hidden field to accounts
- */
-const migrateToV8 = async (db) => {
-  try {
-    console.log('Starting migration to V8: Add hidden field to accounts...');
-
-    // Check if hidden column already exists
-    const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
-    const hasHiddenColumn = tableInfo.some(col => col.name === 'hidden');
-
-    if (hasHiddenColumn) {
-      console.log('Hidden column already exists, skipping migration...');
-      return;
-    }
-
-    // Add hidden column to accounts table (defaults to 0/false)
-    await db.execAsync(`
-      ALTER TABLE accounts ADD COLUMN hidden INTEGER DEFAULT 0;
-    `);
-
-    // Create index on hidden for efficient filtering
-    await db.execAsync(`
-      CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
-    `);
-
-    console.log('Migration to V8 completed successfully');
-  } catch (error) {
-    console.error('Failed to migrate to V8:', error);
-    throw error;
-  }
-};
-
-/**
  * Migrate from V6 to V7 - Add budgets table and multi-currency transfer support
  */
 const migrateToV7 = async (db) => {
@@ -330,237 +547,67 @@ const migrateToV7 = async (db) => {
 };
 
 /**
- * Migrate from V3 to V4 - Add order field to accounts
+ * Migrate from V7 to V8 - Add hidden field to accounts
  */
-const migrateToV4 = async (db) => {
+const migrateToV8 = async (db) => {
   try {
-    console.log('Starting migration to V4: Add order field to accounts...');
+    console.log('Starting migration to V8: Add hidden field to accounts...');
 
-    // Check if order column already exists
+    // Check if hidden column already exists
     const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
-    const hasOrderColumn = tableInfo.some(col => col.name === 'display_order');
+    const hasHiddenColumn = tableInfo.some(col => col.name === 'hidden');
 
-    if (hasOrderColumn) {
-      console.log('Order column already exists, skipping migration...');
+    if (hasHiddenColumn) {
+      console.log('Hidden column already exists, skipping migration...');
       return;
     }
 
-    // Add order column to accounts table
+    // Add hidden column to accounts table (defaults to 0/false)
     await db.execAsync(`
-      ALTER TABLE accounts ADD COLUMN display_order INTEGER;
+      ALTER TABLE accounts ADD COLUMN hidden INTEGER DEFAULT 0;
     `);
 
-    // Set initial order based on created_at (oldest first)
-    const accounts = await db.getAllAsync(
-      'SELECT id FROM accounts ORDER BY created_at ASC'
-    );
-
-    for (let i = 0; i < accounts.length; i++) {
-      await db.runAsync(
-        'UPDATE accounts SET display_order = ? WHERE id = ?',
-        [i, accounts[i].id]
-      );
-    }
-
-    // Create index on display_order for efficient sorting
+    // Create index on hidden for efficient filtering
     await db.execAsync(`
-      CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+      CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
     `);
 
-    console.log('Migration to V4 completed successfully');
+    console.log('Migration to V8 completed successfully');
   } catch (error) {
-    console.error('Failed to migrate to V4:', error);
+    console.error('Failed to migrate to V8:', error);
     throw error;
   }
 };
 
 /**
- * Migrate from V2 to V3 - Allow 'entry' type categories
+ * Migrate from V8 to V9 - Add exclude_from_forecast field to categories
  */
-const migrateToV3 = async (db) => {
+const migrateToV9 = async (db) => {
   try {
-    console.log('Starting migration to V3: Allow entry type categories...');
+    console.log('Starting migration to V9: Add exclude_from_forecast field to categories...');
 
-    // Create new categories table with updated schema
-    await db.execAsync(`
-      -- Create temporary table with updated schema
-      CREATE TABLE categories_new (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
-        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
-        parent_id TEXT,
-        icon TEXT,
-        color TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
-      );
-    `);
-
-    // Get all existing categories
-    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
-
-    // Determine which categories should be 'entry' (leaf categories without children)
-    const categoryIdsWithChildren = new Set(
-      existingCategories
-        .filter(cat => cat.parent_id !== null)
-        .map(cat => cat.parent_id)
-    );
-
-    // Copy data to new table, updating type for leaf categories
-    for (const cat of existingCategories) {
-      const isLeaf = !categoryIdsWithChildren.has(cat.id);
-      const newType = isLeaf ? 'entry' : 'folder';
-
-      await db.runAsync(
-        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          cat.id,
-          cat.name,
-          newType,
-          cat.category_type,
-          cat.parent_id,
-          cat.icon,
-          cat.color,
-          cat.created_at,
-          cat.updated_at
-        ]
-      );
-    }
-
-    // Drop old table and rename new one
-    await db.execAsync(`
-      DROP TABLE categories;
-      ALTER TABLE categories_new RENAME TO categories;
-
-      -- Recreate indexes
-      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
-      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
-      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
-    `);
-
-    console.log('Migration to V3 completed successfully');
-  } catch (error) {
-    console.error('Failed to migrate to V3:', error);
-    throw error;
-  }
-};
-
-/**
- * Migrate from V1 to V2 - Refactor category structure
- */
-const migrateToV2 = async (db) => {
-  try {
-    // Check if categories table exists and has the old structure
+    // Check if exclude_from_forecast column already exists
     const tableInfo = await db.getAllAsync('PRAGMA table_info(categories)');
-    const hasCategoryTypeColumn = tableInfo.some(col => col.name === 'category_type');
+    const hasExcludeFromForecastColumn = tableInfo.some(col => col.name === 'exclude_from_forecast');
 
-    if (hasCategoryTypeColumn) {
-      console.log('Migration already applied, skipping...');
+    if (hasExcludeFromForecastColumn) {
+      console.log('exclude_from_forecast column already exists, skipping migration...');
       return;
     }
 
-    console.log('Starting category structure migration...');
-
-    // Get all existing categories
-    const existingCategories = await db.getAllAsync('SELECT * FROM categories');
-
-    if (existingCategories.length === 0) {
-      console.log('No categories to migrate');
-      return;
-    }
-
-    // Create new categories table with updated schema
+    // Add exclude_from_forecast column to categories table (defaults to 0/false)
     await db.execAsync(`
-      -- Create temporary table with new schema
-      CREATE TABLE categories_new (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
-        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
-        parent_id TEXT,
-        icon TEXT,
-        color TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (parent_id) REFERENCES categories_new(id) ON DELETE CASCADE
-      );
+      ALTER TABLE categories ADD COLUMN exclude_from_forecast INTEGER DEFAULT 0;
     `);
 
-    // Build a map to determine category_type for each category
-    const categoryTypeMap = new Map();
-
-    // First pass: determine category_type from old type or ID/name
-    for (const cat of existingCategories) {
-      let categoryType = 'expense'; // default
-
-      // If old type was 'expense' or 'income', use that as category_type
-      if (cat.type === 'expense' || cat.type === 'income') {
-        categoryType = cat.type;
-      }
-      // Check for root folders by ID or name
-      else if (cat.id === 'expense-root' || cat.name === 'Expenses') {
-        categoryType = 'expense';
-      } else if (cat.id === 'income-root' || cat.name === 'Income') {
-        categoryType = 'income';
-      }
-      // Check if ID starts with expense- or income-
-      else if (cat.id && cat.id.startsWith('expense-')) {
-        categoryType = 'expense';
-      } else if (cat.id && cat.id.startsWith('income-')) {
-        categoryType = 'income';
-      }
-
-      categoryTypeMap.set(cat.id, categoryType);
-    }
-
-    // Second pass: inherit category_type from parent if not determined
-    for (const cat of existingCategories) {
-      if (cat.parent_id && !categoryTypeMap.has(cat.id)) {
-        const parent = existingCategories.find(c => c.id === cat.parent_id);
-        if (parent && categoryTypeMap.has(parent.id)) {
-          categoryTypeMap.set(cat.id, categoryTypeMap.get(parent.id));
-        }
-      }
-    }
-
-    // Third pass: insert into new table
-    for (const cat of existingCategories) {
-      const categoryType = categoryTypeMap.get(cat.id) || 'expense';
-
-      await db.runAsync(
-        `INSERT INTO categories_new (id, name, type, category_type, parent_id, icon, color, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          cat.id,
-          cat.name,
-          'folder', // All items are now folders
-          categoryType,
-          cat.parent_id,
-          cat.icon,
-          cat.color,
-          cat.created_at,
-          cat.updated_at
-        ]
-      );
-    }
-
-    // Drop old table and rename new one
+    // Create index on exclude_from_forecast for efficient filtering
     await db.execAsync(`
-      DROP TABLE categories;
-      ALTER TABLE categories_new RENAME TO categories;
-
-      -- Recreate indexes
-      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
-      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
-      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+      CREATE INDEX IF NOT EXISTS idx_categories_exclude_from_forecast ON categories(exclude_from_forecast);
     `);
 
-    console.log('Category structure migration completed successfully');
+    console.log('Migration to V9 completed successfully');
   } catch (error) {
-    console.error('Failed to migrate categories:', error);
+    console.error('Failed to migrate to V9:', error);
     throw error;
   }
 };
@@ -568,189 +615,120 @@ const migrateToV2 = async (db) => {
 /**
  * Initialize database schema
  */
-const initializeDatabase = async (db) => {
+const initializeDatabase = async (rawDb) => {
   try {
-    await db.execAsync(`
-      PRAGMA foreign_keys = ON;
-      PRAGMA journal_mode = WAL;
+    // Enable foreign keys and WAL mode
+    await rawDb.execAsync('PRAGMA foreign_keys = ON');
+    await rawDb.execAsync('PRAGMA journal_mode = WAL');
 
-      -- App metadata table (create first to track version)
-      CREATE TABLE IF NOT EXISTS app_metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
-
-    // Check database version before creating other tables
-    const versionResult = await db.getFirstAsync(
-      'SELECT value FROM app_metadata WHERE key = ?',
-      ['db_version']
+    // Check if app_metadata table exists
+    const tableCheck = await rawDb.getFirstAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='app_metadata'"
     );
 
-    const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
-    const isNewDatabase = currentVersion === 0;
-    let didMigrate = false;
+    if (!tableCheck) {
+      // Fresh database - create all tables
+      console.log('Initializing fresh database...');
+      await createTables(rawDb);
 
-    // Run migrations BEFORE creating tables
-    if (currentVersion > 0 && currentVersion < 2) {
-      console.log('Migrating database from version', currentVersion, 'to version 2...');
-      await migrateToV2(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 2 && currentVersion < 3) {
-      console.log('Migrating database from version', currentVersion, 'to version 3...');
-      await migrateToV3(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 3 && currentVersion < 4) {
-      console.log('Migrating database from version', currentVersion, 'to version 4...');
-      await migrateToV4(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 4 && currentVersion < 5) {
-      console.log('Migrating database from version', currentVersion, 'to version 5...');
-      await migrateToV5(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 5 && currentVersion < 6) {
-      console.log('Migrating database from version', currentVersion, 'to version 6...');
-      await migrateToV6(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 6 && currentVersion < 7) {
-      console.log('Migrating database from version', currentVersion, 'to version 7...');
-      await migrateToV7(db);
-      didMigrate = true;
-    }
-    if (currentVersion >= 7 && currentVersion < 8) {
-      console.log('Migrating database from version', currentVersion, 'to version 8...');
-      await migrateToV8(db);
-      didMigrate = true;
-    }
-
-    // Force-check for V7 columns (safety net for migration issues)
-    console.log('Verifying V7 schema...');
-    const tables = await db.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='operations'"
-    );
-
-    if (tables.length > 0) {
-      const tableInfo = await db.getAllAsync('PRAGMA table_info(operations)');
-      const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
-
-      if (!hasExchangeRate) {
-        console.log('V7 columns missing! Force-running V7 migration...');
-        await migrateToV7(db);
-        didMigrate = true;
-      }
-    } else {
-      console.log('Operations table does not exist yet, skipping V7 verification...');
-    }
-
-    // Now create or update tables
-    await db.execAsync(`
-      -- Accounts table
-      CREATE TABLE IF NOT EXISTS accounts (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        balance TEXT NOT NULL DEFAULT '0',
-        currency TEXT NOT NULL DEFAULT 'USD',
-        display_order INTEGER,
-        hidden INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-
-      -- Categories table
-      CREATE TABLE IF NOT EXISTS categories (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
-        category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
-        parent_id TEXT,
-        icon TEXT,
-        color TEXT,
-        is_shadow INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
-      );
-
-      -- Operations table
-      CREATE TABLE IF NOT EXISTS operations (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK(type IN ('expense', 'income', 'transfer')),
-        amount TEXT NOT NULL,
-        account_id TEXT NOT NULL,
-        category_id TEXT,
-        to_account_id TEXT,
-        date TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        description TEXT,
-        exchange_rate TEXT,
-        destination_amount TEXT,
-        source_currency TEXT,
-        destination_currency TEXT,
-        FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
-        FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
-      );
-
-      -- Budgets table
-      CREATE TABLE IF NOT EXISTS budgets (
-        id TEXT PRIMARY KEY,
-        category_id TEXT NOT NULL,
-        amount TEXT NOT NULL,
-        currency TEXT NOT NULL,
-        period_type TEXT NOT NULL CHECK(period_type IN ('weekly', 'monthly', 'yearly')),
-        start_date TEXT NOT NULL,
-        end_date TEXT,
-        is_recurring INTEGER DEFAULT 1,
-        rollover_enabled INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-      );
-
-      -- Create indexes
-      CREATE INDEX IF NOT EXISTS idx_operations_date ON operations(date DESC);
-      CREATE INDEX IF NOT EXISTS idx_operations_account ON operations(account_id);
-      CREATE INDEX IF NOT EXISTS idx_operations_category ON operations(category_id);
-      CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(type);
-      CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
-      CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
-      CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
-      CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
-      CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
-      CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
-      CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
-      CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets(period_type);
-      CREATE INDEX IF NOT EXISTS idx_budgets_dates ON budgets(start_date, end_date);
-      CREATE INDEX IF NOT EXISTS idx_budgets_currency ON budgets(currency);
-      CREATE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets(is_recurring);
-    `);
-
-    // Update version
-    if (!versionResult) {
-      await db.runAsync(
+      // Set initial version
+      await rawDb.runAsync(
         'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
         ['db_version', DB_VERSION.toString(), new Date().toISOString()]
       );
-    } else if (currentVersion < DB_VERSION) {
-      await db.runAsync(
-        'UPDATE app_metadata SET value = ?, updated_at = ? WHERE key = ?',
-        [DB_VERSION.toString(), new Date().toISOString(), 'db_version']
-      );
-    }
 
-    // Log appropriate message based on what happened
-    if (isNewDatabase) {
       console.log(`Database created successfully (v${DB_VERSION})`);
-    } else if (didMigrate) {
-      console.log(`Database migrated successfully (v${currentVersion} → v${DB_VERSION})`);
+    } else {
+      // Existing database - check version and run migrations if needed
+      const versionResult = await rawDb.getFirstAsync(
+        'SELECT value FROM app_metadata WHERE key = ?',
+        ['db_version']
+      );
+
+      const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
+
+      if (currentVersion < DB_VERSION) {
+        console.log(`Database upgrade needed: v${currentVersion} → v${DB_VERSION}`);
+
+        // Run migrations
+        if (currentVersion > 0 && currentVersion < 2) {
+          console.log('Migrating database from version', currentVersion, 'to version 2...');
+          await migrateToV2(rawDb);
+        }
+        if (currentVersion >= 2 && currentVersion < 3) {
+          console.log('Migrating database from version', currentVersion, 'to version 3...');
+          await migrateToV3(rawDb);
+        }
+        if (currentVersion >= 3 && currentVersion < 4) {
+          console.log('Migrating database from version', currentVersion, 'to version 4...');
+          await migrateToV4(rawDb);
+        }
+        if (currentVersion >= 4 && currentVersion < 5) {
+          console.log('Migrating database from version', currentVersion, 'to version 5...');
+          await migrateToV5(rawDb);
+        }
+        if (currentVersion >= 5 && currentVersion < 6) {
+          console.log('Migrating database from version', currentVersion, 'to version 6...');
+          await migrateToV6(rawDb);
+        }
+        if (currentVersion >= 6 && currentVersion < 7) {
+          console.log('Migrating database from version', currentVersion, 'to version 7...');
+          await migrateToV7(rawDb);
+        }
+        if (currentVersion >= 7 && currentVersion < 8) {
+          console.log('Migrating database from version', currentVersion, 'to version 8...');
+          await migrateToV8(rawDb);
+        }
+        if (currentVersion >= 8 && currentVersion < 9) {
+          console.log('Migrating database from version', currentVersion, 'to version 9...');
+          await migrateToV9(rawDb);
+        }
+
+        // Force-check for V7 columns (safety net for migration issues)
+        console.log('Verifying V7 schema...');
+        const tables = await rawDb.getAllAsync(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='operations'"
+        );
+
+        if (tables.length > 0) {
+          const tableInfo = await rawDb.getAllAsync('PRAGMA table_info(operations)');
+          const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
+
+          if (!hasExchangeRate) {
+            console.log('V7 columns missing! Force-running V7 migration...');
+            await migrateToV7(rawDb);
+          }
+        } else {
+          console.log('Operations table does not exist yet, skipping V7 verification...');
+        }
+
+        // Force-check for V9 columns (safety net for migration issues)
+        console.log('Verifying V9 schema...');
+        const categoriesTables = await rawDb.getAllAsync(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'"
+        );
+
+        if (categoriesTables.length > 0) {
+          const categoriesTableInfo = await rawDb.getAllAsync('PRAGMA table_info(categories)');
+          const hasExcludeFromForecast = categoriesTableInfo.some(col => col.name === 'exclude_from_forecast');
+
+          if (!hasExcludeFromForecast) {
+            console.log('V9 columns missing! Force-running V9 migration...');
+            await migrateToV9(rawDb);
+          }
+        } else {
+          console.log('Categories table does not exist yet, skipping V9 verification...');
+        }
+
+        // Update version
+        await rawDb.runAsync(
+          'UPDATE app_metadata SET value = ?, updated_at = ? WHERE key = ?',
+          [DB_VERSION.toString(), new Date().toISOString(), 'db_version']
+        );
+
+        console.log('Database upgraded successfully');
+      }
     }
-    // No log for normal opens - database is ready silently
   } catch (error) {
     console.error('Failed to initialize database:', error);
     throw error;
@@ -758,15 +736,111 @@ const initializeDatabase = async (db) => {
 };
 
 /**
- * Execute a query with parameters
- * @param {string} sql
+ * Create all database tables
+ */
+const createTables = async (rawDb) => {
+  await rawDb.execAsync(`
+    -- App metadata table
+    CREATE TABLE IF NOT EXISTS app_metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Accounts table
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      balance TEXT NOT NULL DEFAULT '0',
+      currency TEXT NOT NULL DEFAULT 'USD',
+      display_order INTEGER,
+      hidden INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Categories table
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('folder', 'entry')),
+      category_type TEXT NOT NULL CHECK(category_type IN ('expense', 'income')),
+      parent_id TEXT,
+      icon TEXT,
+      color TEXT,
+      is_shadow INTEGER DEFAULT 0,
+      exclude_from_forecast INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
+    );
+
+    -- Operations table
+    CREATE TABLE IF NOT EXISTS operations (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL CHECK(type IN ('expense', 'income', 'transfer')),
+      amount TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      category_id TEXT,
+      to_account_id TEXT,
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      description TEXT,
+      exchange_rate TEXT,
+      destination_amount TEXT,
+      source_currency TEXT,
+      destination_currency TEXT,
+      FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE CASCADE
+    );
+
+    -- Budgets table
+    CREATE TABLE IF NOT EXISTS budgets (
+      id TEXT PRIMARY KEY,
+      category_id TEXT NOT NULL,
+      amount TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      period_type TEXT NOT NULL CHECK(period_type IN ('weekly', 'monthly', 'yearly')),
+      start_date TEXT NOT NULL,
+      end_date TEXT,
+      is_recurring INTEGER DEFAULT 1,
+      rollover_enabled INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    );
+
+    -- Create indexes
+    CREATE INDEX IF NOT EXISTS idx_operations_date ON operations(date DESC);
+    CREATE INDEX IF NOT EXISTS idx_operations_account ON operations(account_id);
+    CREATE INDEX IF NOT EXISTS idx_operations_category ON operations(category_id);
+    CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(type);
+    CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+    CREATE INDEX IF NOT EXISTS idx_categories_category_type ON categories(category_type);
+    CREATE INDEX IF NOT EXISTS idx_categories_is_shadow ON categories(is_shadow);
+    CREATE INDEX IF NOT EXISTS idx_categories_exclude_from_forecast ON categories(exclude_from_forecast);
+    CREATE INDEX IF NOT EXISTS idx_accounts_order ON accounts(display_order);
+    CREATE INDEX IF NOT EXISTS idx_accounts_hidden ON accounts(hidden);
+    CREATE INDEX IF NOT EXISTS idx_budgets_category ON budgets(category_id);
+    CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets(period_type);
+    CREATE INDEX IF NOT EXISTS idx_budgets_dates ON budgets(start_date, end_date);
+    CREATE INDEX IF NOT EXISTS idx_budgets_currency ON budgets(currency);
+    CREATE INDEX IF NOT EXISTS idx_budgets_recurring ON budgets(is_recurring);
+  `);
+};
+
+/**
+ * Execute a query with parameters (legacy compatibility)
+ * @param {string} sqlStr
  * @param {Array} params
  * @returns {Promise<any>}
  */
-export const executeQuery = async (sql, params = []) => {
-  const db = await getDatabase();
+export const executeQuery = async (sqlStr, params = []) => {
+  const { raw } = await getDatabase();
   try {
-    return await db.runAsync(sql, params);
+    return await raw.runAsync(sqlStr, params);
   } catch (error) {
     console.error('Query execution failed:', error);
     throw error;
@@ -774,15 +848,15 @@ export const executeQuery = async (sql, params = []) => {
 };
 
 /**
- * Execute a SELECT query and return all results
- * @param {string} sql
+ * Execute a SELECT query and return all results (legacy compatibility)
+ * @param {string} sqlStr
  * @param {Array} params
  * @returns {Promise<Array>}
  */
-export const queryAll = async (sql, params = []) => {
-  const db = await getDatabase();
+export const queryAll = async (sqlStr, params = []) => {
+  const { raw } = await getDatabase();
   try {
-    return await db.getAllAsync(sql, params);
+    return await raw.getAllAsync(sqlStr, params) || [];
   } catch (error) {
     console.error('Query failed:', error);
     throw error;
@@ -790,15 +864,15 @@ export const queryAll = async (sql, params = []) => {
 };
 
 /**
- * Execute a SELECT query and return first result
- * @param {string} sql
+ * Execute a SELECT query and return first result (legacy compatibility)
+ * @param {string} sqlStr
  * @param {Array} params
  * @returns {Promise<any>}
  */
-export const queryFirst = async (sql, params = []) => {
-  const db = await getDatabase();
+export const queryFirst = async (sqlStr, params = []) => {
+  const { raw } = await getDatabase();
   try {
-    return await db.getFirstAsync(sql, params);
+    return await raw.getFirstAsync(sqlStr, params);
   } catch (error) {
     console.error('Query failed:', error);
     throw error;
@@ -806,16 +880,16 @@ export const queryFirst = async (sql, params = []) => {
 };
 
 /**
- * Execute multiple statements in a transaction
+ * Execute multiple statements in a transaction (legacy compatibility)
  * @param {Function} callback - Async function that receives the db instance
  * @returns {Promise<any>}
  */
 export const executeTransaction = async (callback) => {
-  const db = await getDatabase();
+  const { raw } = await getDatabase();
   try {
     let result;
-    await db.withTransactionAsync(async () => {
-      result = await callback(db);
+    await raw.withTransactionAsync(async () => {
+      result = await callback(raw);
     });
     return result;
   } catch (error) {
@@ -831,6 +905,7 @@ export const closeDatabase = async () => {
   if (dbInstance) {
     await dbInstance.closeAsync();
     dbInstance = null;
+    drizzleInstance = null;
   }
 };
 
@@ -838,8 +913,8 @@ export const closeDatabase = async () => {
  * Drop all tables (for testing/development only)
  */
 export const dropAllTables = async () => {
-  const db = await getDatabase();
-  await db.execAsync(`
+  const { raw } = await getDatabase();
+  await raw.execAsync(`
     PRAGMA foreign_keys = OFF;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS operations;
@@ -850,9 +925,10 @@ export const dropAllTables = async () => {
   `);
 
   // Close the database connection properly
-  await db.closeAsync();
+  await raw.closeAsync();
 
   // Reset both instance and initialization promise
   dbInstance = null;
+  drizzleInstance = null;
   initPromise = null;
 };

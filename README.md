@@ -28,6 +28,11 @@ npm start
 - `assets/`: Images and static assets
 - `docs/`: Documentation including build setup guides
 
+## Documentation
+
+- **[Database Architecture](docs/DATABASE.md)** - Complete guide to the SQLite/Drizzle ORM database implementation, schema design, and development workflow
+- **[EAS Credentials Setup](docs/EAS_CREDENTIALS_SETUP.md)** - Guide for setting up Android signing credentials for EAS builds
+
 ## Building with EAS
 
 This project uses EAS Build for creating production and preview builds.

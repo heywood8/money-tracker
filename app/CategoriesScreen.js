@@ -53,7 +53,7 @@ const CategoriesScreen = () => {
 
     showDialog(
       categoryName,
-      t('select_action') || 'Select an action',
+      t('select_action'),
       [
         {
           text: t('edit_category'),
