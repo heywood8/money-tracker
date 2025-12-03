@@ -129,16 +129,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 4,
   },
   button: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
-    minWidth: 64,
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   buttonText: {
     fontSize: 14,
