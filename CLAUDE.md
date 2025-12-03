@@ -9,10 +9,7 @@ Penny is a React Native mobile app built with Expo for tracking personal finance
 ## Development Commands
 
 ### Starting Development
-```bash
-npm start              # Start Expo development server
-npm run android        # Run on Android emulator/device
-```
+**IMPORTANT**: Never run `npm start`, `npm run android`, or similar commands. The developer manages the development server locally.
 
 ### Testing
 ```bash
