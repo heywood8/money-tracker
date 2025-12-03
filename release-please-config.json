@@ -8,5 +8,6 @@
         "app.config.js"
       ]
     }
-  }
+  },
+  "commit-search-depth": 25
 }
