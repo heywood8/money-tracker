@@ -256,7 +256,8 @@
     "hidden_account": "Hidden account",
     "hidden_account_hint": "Hide this account from the main list and operations",
     "show_hidden_accounts": "Show hidden accounts",
-    "hide_hidden_accounts": "Hide hidden accounts"
+    "hide_hidden_accounts": "Hide hidden accounts",
+    "select_action": "Select an action"
   },
   "ru": {
     "accounts": "Счета",
@@ -515,7 +516,8 @@
     "hidden_account": "Скрытый счет",
     "hidden_account_hint": "Скрыть этот счет из основного списка и операций",
     "show_hidden_accounts": "Показать скрытые счета",
-    "hide_hidden_accounts": "Скрыть скрытые счета"
+    "hide_hidden_accounts": "Скрыть скрытые счета",
+    "select_action": "Выберите действие"
   }
 }
 
