@@ -15,7 +15,5 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          release-type: expo
-          package-name: penny
-          include-v-in-tag: true
+          config-file: release-please-config.json
           token: ${{ secrets.RELEASE_TOKEN }}
