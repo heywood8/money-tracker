@@ -90,7 +90,7 @@ const GraphsScreen = () => {
   // Get current month and year
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11, or null for full year
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
@@ -219,8 +219,8 @@ const GraphsScreen = () => {
       .filter(m => m.year === selectedYear)
       .map(m => m.month);
 
-    // If current selected month is not available for this year, select the first available month
-    if (monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
+    // If current selected month is not available for this year and not "Full Year", select the first available month
+    if (selectedMonth !== null && monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
       const sortedMonths = monthsForYear.sort((a, b) => b - a); // Sort descending
       setSelectedMonth(sortedMonths[0]);
     }
@@ -233,9 +233,17 @@ const GraphsScreen = () => {
     try {
       setLoading(true);
 
-      // Calculate start and end dates for the selected month
-      const startDate = new Date(selectedYear, selectedMonth, 1);
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      // Calculate start and end dates for the selected month or full year
+      let startDate, endDate;
+      if (selectedMonth === null) {
+        // Full year view
+        startDate = new Date(selectedYear, 0, 1);
+        endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+      } else {
+        // Single month view
+        startDate = new Date(selectedYear, selectedMonth, 1);
+        endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      }
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -395,9 +403,17 @@ const GraphsScreen = () => {
     try {
       setLoadingIncome(true);
 
-      // Calculate start and end dates for the selected month
-      const startDate = new Date(selectedYear, selectedMonth, 1);
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      // Calculate start and end dates for the selected month or full year
+      let startDate, endDate;
+      if (selectedMonth === null) {
+        // Full year view
+        startDate = new Date(selectedYear, 0, 1);
+        endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+      } else {
+        // Single month view
+        startDate = new Date(selectedYear, selectedMonth, 1);
+        endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      }
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -563,13 +579,18 @@ const GraphsScreen = () => {
     return monthsForYear.sort((a, b) => b - a); // Sort descending
   }, [availableMonths, selectedYear]);
 
-  const monthItems = useMemo(() =>
-    availableMonthsForYear.map(monthIndex => ({
-      label: t(monthKeys[monthIndex]),
-      value: monthIndex
-    })),
-    [availableMonthsForYear, t, monthKeys]
-  );
+  const monthItems = useMemo(() => {
+    const items = [
+      { label: t('full_year'), value: null }
+    ];
+    availableMonthsForYear.forEach(monthIndex => {
+      items.push({
+        label: t(monthKeys[monthIndex]),
+        value: monthIndex
+      });
+    });
+    return items;
+  }, [availableMonthsForYear, t, monthKeys]);
 
   // Calculate total expenses
   const totalExpenses = useMemo(() => {
@@ -585,6 +606,11 @@ const GraphsScreen = () => {
   const spendingPrediction = useMemo(() => {
     if (totalExpenses === 0) {
       return null; // No spending data yet
+    }
+
+    // Don't show prediction for full year view
+    if (selectedMonth === null) {
+      return null;
     }
 
     const now = new Date();
