@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/heywood8/money-tracker/compare/penny-v0.6.0...penny-v0.6.1) (2025-12-03)
+
+
+### Bug Fixes
+
+* app name for preview eas builds ([83e1e1d](https://github.com/heywood8/money-tracker/commit/83e1e1d28c5ebb853364ec4ddb828711a7376ff4))
+* removed package name ([1071616](https://github.com/heywood8/money-tracker/commit/10716164a1e7f19c1181835a1af1b9b28581e17c))
+
 ## [0.6.0](https://github.com/heywood8/money-tracker/compare/penny-v0.5.0...penny-v0.6.0) (2025-12-03)
 
 
