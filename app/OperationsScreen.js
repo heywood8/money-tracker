@@ -76,35 +76,64 @@ const QuickAddForm = memo(({
         ))}
       </View>
 
-      {/* Account Picker */}
-      <Pressable
-        style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-        onPress={() => openPicker('account', visibleAccounts)}
-      >
-        <Icon name="wallet" size={18} color={colors.mutedText} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.formInputText, { color: colors.text }]}>
-            {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-          </Text>
-          {quickAddValues.accountId && (
-            <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
-              {getAccountBalance(quickAddValues.accountId)}
-            </Text>
-          )}
-        </View>
-        <Icon name="chevron-down" size={18} color={colors.mutedText} />
-      </Pressable>
+      {/* Account Pickers - Side by side for transfers */}
+      {quickAddValues.type === 'transfer' ? (
+        <View style={styles.accountPickersRow}>
+          {/* From Account Picker */}
+          <Pressable
+            style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={() => openPicker('account', visibleAccounts)}
+          >
+            <Icon name="wallet" size={18} color={colors.mutedText} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
+                {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+              </Text>
+              {quickAddValues.accountId && (
+                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+                  {getAccountBalance(quickAddValues.accountId)}
+                </Text>
+              )}
+            </View>
+            <Icon name="chevron-down" size={18} color={colors.mutedText} />
+          </Pressable>
 
-      {/* To Account Picker (only for transfers) */}
-      {quickAddValues.type === 'transfer' && (
+          {/* To Account Picker */}
+          <Pressable
+            style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
+          >
+            <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
+                {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+              </Text>
+              {quickAddValues.toAccountId && (
+                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+                  {getAccountBalance(quickAddValues.toAccountId)}
+                </Text>
+              )}
+            </View>
+            <Icon name="chevron-down" size={18} color={colors.mutedText} />
+          </Pressable>
+        </View>
+      ) : (
+        /* Account Picker for non-transfer operations */
         <Pressable
           style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
+          onPress={() => openPicker('account', visibleAccounts)}
         >
-          <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
-          <Text style={[styles.formInputText, { color: colors.text }]}>
-            {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
-          </Text>
+          <Icon name="wallet" size={18} color={colors.mutedText} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.formInputText, { color: colors.text }]}>
+              {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+            </Text>
+            {quickAddValues.accountId && (
+              <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
+                {getAccountBalance(quickAddValues.accountId)}
+              </Text>
+            )}
+          </View>
           <Icon name="chevron-down" size={18} color={colors.mutedText} />
         </Pressable>
       )}
@@ -894,6 +923,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 8,
+    gap: 8,
+  },
+  accountPickersRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  formInputHalf: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 8,
   },
   formInputText: {
