@@ -51,7 +51,7 @@ export const createAccount = async (account) => {
 
     // Get max order value and add 1 for new account
     const maxOrderResult = await db.select({
-      maxOrder: sql<number>`MAX(${accounts.displayOrder})`
+      maxOrder: sql`MAX(${accounts.displayOrder})`
     }).from(accounts);
 
     const newOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;

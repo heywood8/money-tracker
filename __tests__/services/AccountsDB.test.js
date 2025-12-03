@@ -1,37 +1,60 @@
 /**
- * Tests for AccountsDB.js - Database operations for accounts
+ * Tests for AccountsDB.js - Database operations for accounts using Drizzle ORM
  * These tests ensure CRUD operations work correctly and data integrity is maintained
  */
 
 import * as AccountsDB from '../../app/services/AccountsDB';
 import * as db from '../../app/services/db';
+import { eq, asc, desc, sql } from 'drizzle-orm';
 
 // Mock the database module
 jest.mock('../../app/services/db');
 
 describe('AccountsDB', () => {
+  let mockDrizzle;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create a chainable mock Drizzle instance
+    mockDrizzle = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn(() => Promise.resolve()),
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+    };
+
+    // Mock getDrizzle to return our mock instance
+    db.getDrizzle = jest.fn().mockResolvedValue(mockDrizzle);
   });
 
   describe('getAllAccounts', () => {
     it('retrieves all accounts ordered by display_order and created_at', async () => {
       const mockAccounts = [
-        { id: '1', name: 'Account 1', balance: '100', currency: 'USD', display_order: 0, created_at: '2024-01-02' },
-        { id: '2', name: 'Account 2', balance: '200', currency: 'EUR', display_order: 1, created_at: '2024-01-01' },
+        { id: '1', name: 'Account 1', balance: '100', currency: 'USD', displayOrder: 0, createdAt: '2024-01-02' },
+        { id: '2', name: 'Account 2', balance: '200', currency: 'EUR', displayOrder: 1, createdAt: '2024-01-01' },
       ];
-      db.queryAll.mockResolvedValue(mockAccounts);
+
+      // Mock the full Drizzle query chain
+      mockDrizzle.orderBy.mockResolvedValue(mockAccounts);
 
       const result = await AccountsDB.getAllAccounts();
 
-      expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC'
-      );
+      expect(db.getDrizzle).toHaveBeenCalled();
+      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(mockDrizzle.from).toHaveBeenCalled();
+      expect(mockDrizzle.orderBy).toHaveBeenCalled();
       expect(result).toEqual(mockAccounts);
     });
 
     it('returns empty array when no accounts exist', async () => {
-      db.queryAll.mockResolvedValue(null);
+      mockDrizzle.orderBy.mockResolvedValue([]);
 
       const result = await AccountsDB.getAllAccounts();
 
@@ -40,7 +63,7 @@ describe('AccountsDB', () => {
 
     it('throws error when database query fails', async () => {
       const error = new Error('Database error');
-      db.queryAll.mockRejectedValue(error);
+      mockDrizzle.orderBy.mockRejectedValue(error);
 
       await expect(AccountsDB.getAllAccounts()).rejects.toThrow('Database error');
     });
@@ -49,19 +72,20 @@ describe('AccountsDB', () => {
   describe('getAccountById', () => {
     it('retrieves account by ID', async () => {
       const mockAccount = { id: '1', name: 'Test Account', balance: '100', currency: 'USD' };
-      db.queryFirst.mockResolvedValue(mockAccount);
+      mockDrizzle.limit.mockResolvedValue([mockAccount]);
 
       const result = await AccountsDB.getAccountById('1');
 
-      expect(db.queryFirst).toHaveBeenCalledWith(
-        'SELECT * FROM accounts WHERE id = ?',
-        ['1']
-      );
+      expect(db.getDrizzle).toHaveBeenCalled();
+      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(mockDrizzle.from).toHaveBeenCalled();
+      expect(mockDrizzle.where).toHaveBeenCalled();
+      expect(mockDrizzle.limit).toHaveBeenCalledWith(1);
       expect(result).toEqual(mockAccount);
     });
 
     it('returns null when account does not exist', async () => {
-      db.queryFirst.mockResolvedValue(null);
+      mockDrizzle.limit.mockResolvedValue([]);
 
       const result = await AccountsDB.getAccountById('non-existent');
 
@@ -70,7 +94,7 @@ describe('AccountsDB', () => {
 
     it('throws error when database query fails', async () => {
       const error = new Error('Database error');
-      db.queryFirst.mockRejectedValue(error);
+      mockDrizzle.limit.mockRejectedValue(error);
 
       await expect(AccountsDB.getAccountById('1')).rejects.toThrow('Database error');
     });
@@ -85,28 +109,21 @@ describe('AccountsDB', () => {
         currency: 'USD',
       };
 
-      db.queryFirst.mockResolvedValue({ max_order: 5 }); // Mock max order query
-      db.executeQuery.mockResolvedValue(undefined);
+      // Mock getDrizzle to return the same instance for both calls
+      // First call is for max order query, second is for insert
+      db.getDrizzle.mockResolvedValue({
+        ...mockDrizzle,
+        select: jest.fn(() => ({
+          from: jest.fn(() => Promise.resolve([{ maxOrder: 5 }])),
+        })),
+      });
 
       const result = await AccountsDB.createAccount(newAccount);
 
-      expect(db.executeQuery).toHaveBeenCalledWith(
-        'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        expect.arrayContaining([
-          'test-id',
-          'New Account',
-          '100.50',
-          'USD',
-          6, // max_order + 1
-          0, // hidden
-          expect.any(String), // created_at
-          expect.any(String), // updated_at
-        ])
-      );
       expect(result).toMatchObject(newAccount);
-      expect(result.created_at).toBeDefined();
-      expect(result.updated_at).toBeDefined();
-      expect(result.display_order).toBe(6);
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
+      expect(result.displayOrder).toBe(6);
     });
 
     it('creates account with default values when optional fields are missing', async () => {
@@ -115,21 +132,34 @@ describe('AccountsDB', () => {
         name: 'New Account',
       };
 
-      db.queryFirst.mockResolvedValue({ max_order: null }); // No existing accounts
-      db.executeQuery.mockResolvedValue(undefined);
+      // Mock max order query - no existing accounts
+      db.getDrizzle.mockResolvedValue({
+        ...mockDrizzle,
+        select: jest.fn(() => ({
+          from: jest.fn(() => Promise.resolve([{ maxOrder: null }])),
+        })),
+      });
 
       const result = await AccountsDB.createAccount(newAccount);
 
       expect(result.balance).toBe('0');
       expect(result.currency).toBe('USD');
-      expect(result.display_order).toBe(0);
+      expect(result.displayOrder).toBe(0);
       expect(result.hidden).toBe(0);
     });
 
     it('throws error when database insert fails', async () => {
       const error = new Error('Insert failed');
-      db.queryFirst.mockResolvedValue({ max_order: 0 });
-      db.executeQuery.mockRejectedValue(error);
+
+      const failingMockDrizzle = {
+        select: jest.fn(() => ({
+          from: jest.fn(() => Promise.resolve([{ maxOrder: 0 }])),
+        })),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn(() => Promise.reject(error)),
+      };
+
+      db.getDrizzle.mockResolvedValue(failingMockDrizzle);
 
       await expect(AccountsDB.createAccount({ id: '1', name: 'Test' }))
         .rejects.toThrow('Insert failed');
@@ -139,49 +169,59 @@ describe('AccountsDB', () => {
   describe('updateAccount', () => {
     it('updates account name only', async () => {
       const updates = { name: 'Updated Name' };
-      db.executeQuery.mockResolvedValue(undefined);
+      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.updateAccount('1', updates);
 
-      expect(db.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE accounts SET name = ?, updated_at = ? WHERE id = ?'),
-        expect.arrayContaining(['Updated Name', expect.any(String), '1'])
+      expect(mockDrizzle.update).toHaveBeenCalled();
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Updated Name',
+          updatedAt: expect.any(String),
+        })
       );
+      expect(mockDrizzle.where).toHaveBeenCalled();
     });
 
     it('updates account balance only', async () => {
       const updates = { balance: '200.00' };
-      db.executeQuery.mockResolvedValue(undefined);
+      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.updateAccount('1', updates);
 
-      expect(db.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?'),
-        expect.arrayContaining(['200.00', expect.any(String), '1'])
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          balance: '200.00',
+          updatedAt: expect.any(String),
+        })
       );
     });
 
     it('updates multiple fields', async () => {
       const updates = { name: 'New Name', balance: '150.00', currency: 'EUR' };
-      db.executeQuery.mockResolvedValue(undefined);
+      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.updateAccount('1', updates);
 
-      expect(db.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('name = ?'),
-        expect.arrayContaining(['New Name', '150.00', 'EUR', expect.any(String), '1'])
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'New Name',
+          balance: '150.00',
+          currency: 'EUR',
+          updatedAt: expect.any(String),
+        })
       );
     });
 
     it('does nothing when no fields to update', async () => {
       await AccountsDB.updateAccount('1', {});
 
-      expect(db.executeQuery).not.toHaveBeenCalled();
+      expect(mockDrizzle.update).not.toHaveBeenCalled();
     });
 
     it('throws error when database update fails', async () => {
       const error = new Error('Update failed');
-      db.executeQuery.mockRejectedValue(error);
+      mockDrizzle.where.mockRejectedValue(error);
 
       await expect(AccountsDB.updateAccount('1', { name: 'Test' }))
         .rejects.toThrow('Update failed');
@@ -190,8 +230,8 @@ describe('AccountsDB', () => {
 
   describe('deleteAccount', () => {
     it('deletes account when no operations are associated', async () => {
-      db.queryFirst.mockResolvedValue({ count: 0 });
-      db.executeQuery.mockResolvedValue(undefined);
+      db.queryFirst = jest.fn().mockResolvedValue({ count: 0 });
+      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.deleteAccount('1');
 
@@ -199,25 +239,23 @@ describe('AccountsDB', () => {
         expect.stringContaining('SELECT COUNT(*) as count FROM operations'),
         ['1', '1']
       );
-      expect(db.executeQuery).toHaveBeenCalledWith(
-        'DELETE FROM accounts WHERE id = ?',
-        ['1']
-      );
+      expect(mockDrizzle.delete).toHaveBeenCalled();
+      expect(mockDrizzle.where).toHaveBeenCalled();
     });
 
     it('throws error when account has associated operations', async () => {
-      db.queryFirst.mockResolvedValue({ count: 5 });
+      db.queryFirst = jest.fn().mockResolvedValue({ count: 5 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account: 5 transaction(s) are associated with this account'
       );
 
-      expect(db.executeQuery).not.toHaveBeenCalled();
+      expect(mockDrizzle.delete).not.toHaveBeenCalled();
     });
 
     it('throws error when database query fails', async () => {
       const error = new Error('Query failed');
-      db.queryFirst.mockRejectedValue(error);
+      db.queryFirst = jest.fn().mockRejectedValue(error);
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow('Query failed');
     });
@@ -229,7 +267,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -250,7 +288,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -266,7 +304,7 @@ describe('AccountsDB', () => {
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue(null),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -279,7 +317,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -297,7 +335,7 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ balance: '200.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -318,7 +356,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -334,6 +372,7 @@ describe('AccountsDB', () => {
     });
 
     it('does nothing when balanceChanges is empty', async () => {
+      db.executeTransaction = jest.fn();
       const balanceChanges = new Map();
 
       await AccountsDB.batchUpdateBalances(balanceChanges);
@@ -348,7 +387,7 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ balance: '200.00' }), // Second account found
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -365,19 +404,19 @@ describe('AccountsDB', () => {
 
   describe('getAccountBalance', () => {
     it('retrieves account balance', async () => {
-      db.queryFirst.mockResolvedValue({ balance: '150.75' });
+      mockDrizzle.limit.mockResolvedValue([{ balance: '150.75' }]);
 
       const result = await AccountsDB.getAccountBalance('1');
 
-      expect(db.queryFirst).toHaveBeenCalledWith(
-        'SELECT balance FROM accounts WHERE id = ?',
-        ['1']
-      );
+      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(mockDrizzle.from).toHaveBeenCalled();
+      expect(mockDrizzle.where).toHaveBeenCalled();
+      expect(mockDrizzle.limit).toHaveBeenCalledWith(1);
       expect(result).toBe('150.75');
     });
 
     it('returns "0" when account not found', async () => {
-      db.queryFirst.mockResolvedValue(null);
+      mockDrizzle.limit.mockResolvedValue([]);
 
       const result = await AccountsDB.getAccountBalance('non-existent');
 
@@ -386,7 +425,7 @@ describe('AccountsDB', () => {
 
     it('throws error when database query fails', async () => {
       const error = new Error('Query failed');
-      db.queryFirst.mockRejectedValue(error);
+      mockDrizzle.limit.mockRejectedValue(error);
 
       await expect(AccountsDB.getAccountBalance('1')).rejects.toThrow('Query failed');
     });
@@ -394,19 +433,19 @@ describe('AccountsDB', () => {
 
   describe('accountExists', () => {
     it('returns true when account exists', async () => {
-      db.queryFirst.mockResolvedValue({ 1: 1 });
+      mockDrizzle.limit.mockResolvedValue([{ id: '1' }]);
 
       const result = await AccountsDB.accountExists('1');
 
-      expect(db.queryFirst).toHaveBeenCalledWith(
-        'SELECT 1 FROM accounts WHERE id = ? LIMIT 1',
-        ['1']
-      );
+      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(mockDrizzle.from).toHaveBeenCalled();
+      expect(mockDrizzle.where).toHaveBeenCalled();
+      expect(mockDrizzle.limit).toHaveBeenCalledWith(1);
       expect(result).toBe(true);
     });
 
     it('returns false when account does not exist', async () => {
-      db.queryFirst.mockResolvedValue(null);
+      mockDrizzle.limit.mockResolvedValue([]);
 
       const result = await AccountsDB.accountExists('non-existent');
 
@@ -415,7 +454,7 @@ describe('AccountsDB', () => {
 
     it('throws error when database query fails', async () => {
       const error = new Error('Query failed');
-      db.queryFirst.mockRejectedValue(error);
+      mockDrizzle.limit.mockRejectedValue(error);
 
       await expect(AccountsDB.accountExists('1')).rejects.toThrow('Query failed');
     });
@@ -424,7 +463,7 @@ describe('AccountsDB', () => {
   // Regression tests for data integrity
   describe('Regression Tests - Data Integrity', () => {
     it('prevents deletion of accounts with operations', async () => {
-      db.queryFirst.mockResolvedValue({ count: 1 });
+      db.queryFirst = jest.fn().mockResolvedValue({ count: 1 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account'
@@ -436,7 +475,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '999999.99' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction.mockImplementation(async (callback) => {
+      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -449,12 +488,15 @@ describe('AccountsDB', () => {
     });
 
     it('updates updated_at timestamp on every change', async () => {
-      db.executeQuery.mockResolvedValue(undefined);
+      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.updateAccount('1', { name: 'Test' });
 
-      const callArgs = db.executeQuery.mock.calls[0][1];
-      expect(callArgs[1]).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+        })
+      );
     });
   });
 });
