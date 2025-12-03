@@ -257,7 +257,8 @@
     "hidden_account_hint": "Hide this account from the main list and operations",
     "show_hidden_accounts": "Show hidden accounts",
     "hide_hidden_accounts": "Hide hidden accounts",
-    "select_action": "Select an action"
+    "select_action": "Select an action",
+    "full_year": "Full Year"
   },
   "ru": {
     "accounts": "Счета",
@@ -517,7 +518,8 @@
     "hidden_account_hint": "Скрыть этот счет из основного списка и операций",
     "show_hidden_accounts": "Показать скрытые счета",
     "hide_hidden_accounts": "Скрыть скрытые счета",
-    "select_action": "Выберите действие"
+    "select_action": "Выберите действие",
+    "full_year": "Весь год"
   }
 }
 
