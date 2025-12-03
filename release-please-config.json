@@ -1,0 +1,16 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "expo",
+      "package-name": "penny",
+      "include-v-in-tag": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "app.config.js",
+          "jsonpath": "$.expo.version"
+        }
+      ]
+    }
+  }
+}
