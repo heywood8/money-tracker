@@ -22,8 +22,16 @@ jest.mock('@sentry/react-native', () => ({
   feedbackIntegration: jest.fn(() => ({})),
 }));
 
-// Mock expo-sqlite
+// Mock expo-sqlite with async methods
 jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(() => Promise.resolve({
+    execAsync: jest.fn(() => Promise.resolve()),
+    runAsync: jest.fn(() => Promise.resolve({ changes: 0, lastInsertRowId: 0 })),
+    getFirstAsync: jest.fn(() => Promise.resolve(null)),
+    getAllAsync: jest.fn(() => Promise.resolve([])),
+    closeAsync: jest.fn(() => Promise.resolve()),
+    withTransactionAsync: jest.fn((callback) => callback()),
+  })),
   openDatabaseSync: jest.fn(() => ({
     execSync: jest.fn(),
     runSync: jest.fn(),
@@ -32,6 +40,57 @@ jest.mock('expo-sqlite', () => ({
     closeSync: jest.fn(),
   })),
 }));
+
+// Mock drizzle-orm
+jest.mock('drizzle-orm/expo-sqlite', () => ({
+  drizzle: jest.fn((db, config) => {
+    // Return a mock Drizzle instance with query builder methods
+    return {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn(() => Promise.resolve([])),
+            orderBy: jest.fn(() => Promise.resolve([])),
+          })),
+          orderBy: jest.fn(() => Promise.resolve([])),
+          leftJoin: jest.fn(() => ({
+            where: jest.fn(() => Promise.resolve([])),
+          })),
+          limit: jest.fn(() => Promise.resolve([])),
+        })),
+      })),
+      insert: jest.fn(() => ({
+        values: jest.fn(() => Promise.resolve()),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn(() => Promise.resolve()),
+        })),
+      })),
+      delete: jest.fn(() => ({
+        where: jest.fn(() => Promise.resolve()),
+      })),
+    };
+  }),
+}));
+
+// Mock drizzle-orm operators
+jest.mock('drizzle-orm', () => {
+  // Mock sql as a template literal function
+  const sqlMock = jest.fn((strings, ...values) => {
+    // Return a simple object representing the SQL query
+    return { strings, values, sql: true };
+  });
+  sqlMock.raw = jest.fn((str) => str);
+
+  return {
+    eq: jest.fn((field, value) => ({ field, value, op: 'eq' })),
+    and: jest.fn((...conditions) => ({ conditions, op: 'and' })),
+    desc: jest.fn((field) => ({ field, direction: 'desc' })),
+    asc: jest.fn((field) => ({ field, direction: 'asc' })),
+    sql: sqlMock,
+  };
+});
 
 // Mock react-native-uuid
 jest.mock('react-native-uuid', () => ({
