@@ -90,7 +90,7 @@ const GraphsScreen = () => {
   // Get current month and year
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11, or null for full year
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
@@ -219,8 +219,8 @@ const GraphsScreen = () => {
       .filter(m => m.year === selectedYear)
       .map(m => m.month);
 
-    // If current selected month is not available for this year, select the first available month
-    if (monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
+    // If current selected month is not available for this year and not "Full Year", select the first available month
+    if (selectedMonth !== null && monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
       const sortedMonths = monthsForYear.sort((a, b) => b - a); // Sort descending
       setSelectedMonth(sortedMonths[0]);
     }
@@ -233,9 +233,17 @@ const GraphsScreen = () => {
     try {
       setLoading(true);
 
-      // Calculate start and end dates for the selected month
-      const startDate = new Date(selectedYear, selectedMonth, 1);
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      // Calculate start and end dates for the selected month or full year
+      let startDate, endDate;
+      if (selectedMonth === null) {
+        // Full year view
+        startDate = new Date(selectedYear, 0, 1);
+        endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+      } else {
+        // Single month view
+        startDate = new Date(selectedYear, selectedMonth, 1);
+        endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      }
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -287,6 +295,18 @@ const GraphsScreen = () => {
         }
       });
 
+      // Helper function to check if a category is excluded from forecast
+      const isCategoryExcludedFromForecast = (categoryId) => {
+        let current = categoryMap.get(categoryId);
+        while (current) {
+          if (current.excludeFromForecast) {
+            return true;
+          }
+          current = current.parentId ? categoryMap.get(current.parentId) : null;
+        }
+        return false;
+      };
+
       // Aggregate spending based on selected category
       let aggregatedSpending = {};
 
@@ -296,13 +316,22 @@ const GraphsScreen = () => {
           const rootParent = getRootParent(item.category_id);
           if (rootParent) {
             const rootId = rootParent.id;
+            const isExcluded = isCategoryExcludedFromForecast(item.category_id);
+            const amount = parseFloat(item.total);
+
             if (!aggregatedSpending[rootId]) {
               aggregatedSpending[rootId] = {
                 category: rootParent,
                 total: 0,
+                forecastTotal: 0, // Total excluding excluded categories
               };
             }
-            aggregatedSpending[rootId].total += parseFloat(item.total);
+            aggregatedSpending[rootId].total += amount;
+
+            // Only add to forecastTotal if not excluded
+            if (!isExcluded) {
+              aggregatedSpending[rootId].forecastTotal += amount;
+            }
           }
         });
       } else {
@@ -311,15 +340,22 @@ const GraphsScreen = () => {
           const category = categoryMap.get(item.category_id);
           if (!category) return;
 
+          const isExcluded = isCategoryExcludedFromForecast(item.category_id);
+          const amount = parseFloat(item.total);
+
           // Check if this category is a direct child of the selected folder
           if (category.parentId === selectedCategory) {
             if (!aggregatedSpending[category.id]) {
               aggregatedSpending[category.id] = {
                 category: category,
                 total: 0,
+                forecastTotal: 0,
               };
             }
-            aggregatedSpending[category.id].total += parseFloat(item.total);
+            aggregatedSpending[category.id].total += amount;
+            if (!isExcluded) {
+              aggregatedSpending[category.id].forecastTotal += amount;
+            }
           } else {
             // Check if this category is a descendant of the selected folder
             // If so, aggregate it under its direct parent (immediate child of selected folder)
@@ -334,9 +370,13 @@ const GraphsScreen = () => {
                   aggregatedSpending[current.id] = {
                     category: current,
                     total: 0,
+                    forecastTotal: 0,
                   };
                 }
-                aggregatedSpending[current.id].total += parseFloat(item.total);
+                aggregatedSpending[current.id].total += amount;
+                if (!isExcluded) {
+                  aggregatedSpending[current.id].forecastTotal += amount;
+                }
                 break;
               }
               current = parent;
@@ -362,6 +402,7 @@ const GraphsScreen = () => {
           legendFontSize: 13,
           icon: item.category.icon || null,
           categoryId: item.category.id, // For clickable legend navigation
+          forecastAmount: item.forecastTotal !== undefined ? item.forecastTotal : item.total, // Amount to use for forecast (excluding excluded categories)
         };
       });
 
@@ -377,6 +418,7 @@ const GraphsScreen = () => {
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: null,
+          forecastAmount: shadowCategoryTotal, // Balance adjustments are included in forecast
         });
       }
 
@@ -395,9 +437,17 @@ const GraphsScreen = () => {
     try {
       setLoadingIncome(true);
 
-      // Calculate start and end dates for the selected month
-      const startDate = new Date(selectedYear, selectedMonth, 1);
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      // Calculate start and end dates for the selected month or full year
+      let startDate, endDate;
+      if (selectedMonth === null) {
+        // Full year view
+        startDate = new Date(selectedYear, 0, 1);
+        endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+      } else {
+        // Single month view
+        startDate = new Date(selectedYear, selectedMonth, 1);
+        endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+      }
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -563,13 +613,18 @@ const GraphsScreen = () => {
     return monthsForYear.sort((a, b) => b - a); // Sort descending
   }, [availableMonths, selectedYear]);
 
-  const monthItems = useMemo(() =>
-    availableMonthsForYear.map(monthIndex => ({
-      label: t(monthKeys[monthIndex]),
-      value: monthIndex
-    })),
-    [availableMonthsForYear, t, monthKeys]
-  );
+  const monthItems = useMemo(() => {
+    const items = [
+      { label: t('full_year'), value: null }
+    ];
+    availableMonthsForYear.forEach(monthIndex => {
+      items.push({
+        label: t(monthKeys[monthIndex]),
+        value: monthIndex
+      });
+    });
+    return items;
+  }, [availableMonthsForYear, t, monthKeys]);
 
   // Calculate total expenses
   const totalExpenses = useMemo(() => {
@@ -581,10 +636,28 @@ const GraphsScreen = () => {
     return incomeChartData.reduce((sum, item) => sum + item.amount, 0);
   }, [incomeChartData]);
 
-  // Calculate spending prediction
+  // Calculate spending prediction (excluding categories marked as excluded from forecast)
   const spendingPrediction = useMemo(() => {
-    if (totalExpenses === 0) {
+    // Filter out expenses from categories that are excluded from forecast
+    const categoryMap = new Map();
+    categories.forEach(cat => {
+      categoryMap.set(cat.id, cat);
+    });
+
+    // Calculate total expenses for forecast using forecastAmount (which excludes excluded categories)
+    const totalExpensesForForecast = chartData.reduce((sum, item) => {
+      // Use forecastAmount if available (which already has excluded categories removed),
+      // otherwise use amount (for items like balance adjustments that don't have forecastAmount)
+      return sum + (item.forecastAmount !== undefined ? item.forecastAmount : item.amount);
+    }, 0);
+
+    if (totalExpensesForForecast === 0) {
       return null; // No spending data yet
+    }
+
+    // Don't show prediction for full year view
+    if (selectedMonth === null) {
+      return null;
     }
 
     const now = new Date();
@@ -614,7 +687,7 @@ const GraphsScreen = () => {
     }
 
     // Calculate daily average
-    const dailyAverage = totalExpenses / daysElapsed;
+    const dailyAverage = totalExpensesForForecast / daysElapsed;
 
     // Predict total spending by month end
     const predictedTotal = dailyAverage * daysInMonth;
@@ -623,14 +696,14 @@ const GraphsScreen = () => {
     const percentElapsed = (daysElapsed / daysInMonth) * 100;
 
     return {
-      currentSpending: totalExpenses,
+      currentSpending: totalExpensesForForecast,
       predictedTotal,
       dailyAverage,
       daysElapsed,
       daysInMonth,
       percentElapsed,
     };
-  }, [totalExpenses, selectedYear, selectedMonth]);
+  }, [chartData, categories, selectedYear, selectedMonth]);
 
   const screenWidth = Dimensions.get('window').width;
 

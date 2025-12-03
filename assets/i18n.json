@@ -233,6 +233,8 @@
     "days_elapsed": "Days Elapsed",
     "daily_average": "Daily Average",
     "no_prediction_data": "Not enough data to predict spending",
+    "exclude_from_forecast": "Exclude from Forecast",
+    "exclude_from_forecast_hint": "Don't include this category in spending predictions",
     "export_format": "Export Format",
     "json_description": "Standard format, compatible with all versions",
     "csv_description": "Plain text format, easy to edit",
@@ -256,7 +258,9 @@
     "hidden_account": "Hidden account",
     "hidden_account_hint": "Hide this account from the main list and operations",
     "show_hidden_accounts": "Show hidden accounts",
-    "hide_hidden_accounts": "Hide hidden accounts"
+    "hide_hidden_accounts": "Hide hidden accounts",
+    "select_action": "Select an action",
+    "full_year": "Full Year"
   },
   "ru": {
     "accounts": "Счета",
@@ -492,6 +496,8 @@
     "days_elapsed": "Прошло дней",
     "daily_average": "Среднее в день",
     "no_prediction_data": "Недостаточно данных для прогноза",
+    "exclude_from_forecast": "Исключить из прогноза",
+    "exclude_from_forecast_hint": "Не учитывать эту категорию в прогнозе расходов",
     "export_format": "Формат экспорта",
     "json_description": "Стандартный формат, совместим со всеми версиями",
     "csv_description": "Текстовый формат, легко редактировать",
@@ -515,7 +521,9 @@
     "hidden_account": "Скрытый счет",
     "hidden_account_hint": "Скрыть этот счет из основного списка и операций",
     "show_hidden_accounts": "Показать скрытые счета",
-    "hide_hidden_accounts": "Скрыть скрытые счета"
+    "hide_hidden_accounts": "Скрыть скрытые счета",
+    "select_action": "Выберите действие",
+    "full_year": "Весь год"
   }
 }
 
