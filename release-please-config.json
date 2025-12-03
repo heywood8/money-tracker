@@ -5,7 +5,8 @@
       "package-name": "penny",
       "include-v-in-tag": true,
       "extra-files": [
-        "app.config.js"
+        "app.config.js",
+        "android/app/build.gradle"
       ]
     }
   },
