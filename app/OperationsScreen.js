@@ -197,7 +197,16 @@ const OperationsScreen = () => {
   const { colors } = useTheme();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { operations, loading: operationsLoading, deleteOperation, addOperation, validateOperation } = useOperations();
+  const {
+    operations,
+    loading: operationsLoading,
+    loadingMore,
+    hasMoreOperations,
+    deleteOperation,
+    addOperation,
+    validateOperation,
+    loadMoreOperations,
+  } = useOperations();
   const { visibleAccounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
 
@@ -497,6 +506,26 @@ const OperationsScreen = () => {
     />
   ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
+  // Handle end reached for lazy loading
+  const handleEndReached = useCallback(() => {
+    if (!loadingMore && hasMoreOperations) {
+      loadMoreOperations();
+    }
+  }, [loadingMore, hasMoreOperations, loadMoreOperations]);
+
+  // Footer component showing loading indicator
+  const renderFooter = useCallback(() => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadingMoreContainer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={[styles.loadingMoreText, { color: colors.mutedText }]}>
+          {t('loading_more')}
+        </Text>
+      </View>
+    );
+  }, [loadingMore, colors, t]);
+
   const renderItem = useCallback(({ item }) => {
     // Render date separator
     if (item.type === 'separator') {
@@ -644,6 +673,7 @@ const OperationsScreen = () => {
         keyExtractor={item => item.id}
         extraData={[visibleAccounts, categories]}
         ListHeaderComponent={quickAddFormComponent}
+        ListFooterComponent={renderFooter}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
@@ -653,6 +683,8 @@ const OperationsScreen = () => {
           </View>
         }
         contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : null}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
         windowSize={10}
         maxToRenderPerBatch={10}
         initialNumToRender={15}
@@ -1080,6 +1112,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
   },
 });
 
