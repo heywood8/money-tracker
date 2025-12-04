@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 import { useLocalization } from './LocalizationContext';
@@ -726,17 +725,17 @@ const OperationsScreen = () => {
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.mutedText }]}>
           {t('loading_operations')}
         </Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         contentInsetAdjustmentBehavior="automatic"
         data={groupedOperations}
@@ -902,7 +901,7 @@ const OperationsScreen = () => {
         isNew={isNew}
         onDelete={handleDeleteOperation}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
