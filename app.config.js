@@ -1,7 +1,3 @@
-// Log for debugging
-console.log('APP_VARIANT:', process.env.APP_VARIANT);
-console.log('EAS_BUILD_PROFILE:', process.env.EAS_BUILD_PROFILE);
-
 // Determine if this is a development build:
 // - Local dev: no APP_VARIANT set → use 'PennyDev'
 // - EAS development profile: APP_VARIANT === 'development' → use 'PennyDev'
@@ -13,8 +9,6 @@ const APP_NAME = IS_DEV ? 'PennyDev' : 'Penny';
 
 // Package name: .dev suffix for local dev/development, clean for preview/production
 const PACKAGE_NAME = IS_DEV ? 'com.heywood8.monkeep.dev' : 'com.heywood8.monkeep';
-
-console.log('Building with name:', APP_NAME, 'package:', PACKAGE_NAME);
 
 module.exports = {
   expo: {
