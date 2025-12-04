@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.7.0](https://github.com/heywood8/money-tracker/compare/penny-v0.6.1...penny-v0.7.0) (2025-12-04)
+
+
+### Features
+
+* added calculator for "Add new operation" window ([#85](https://github.com/heywood8/money-tracker/issues/85)) ([367bfad](https://github.com/heywood8/money-tracker/commit/367bfad0dc706d5fa708035c6948caabd0c9e608))
+* **graphs:** add an option to show full year stats ([#76](https://github.com/heywood8/money-tracker/issues/76)) ([29525ee](https://github.com/heywood8/money-tracker/commit/29525ee51cf362d9139422da9c62a959201e463f))
+* migrate to drizzle orm ([#79](https://github.com/heywood8/money-tracker/issues/79)) ([f2b7a6f](https://github.com/heywood8/money-tracker/commit/f2b7a6f8628b2160fb9bab9e29d742708a668740))
+* operations lazy loading ([#84](https://github.com/heywood8/money-tracker/issues/84)) ([6a01dd2](https://github.com/heywood8/money-tracker/commit/6a01dd2f6509a1009e4a4de006d851303f1781b0))
+* quick add button when choosing a category for a new operation ([#81](https://github.com/heywood8/money-tracker/issues/81)) ([59ba658](https://github.com/heywood8/money-tracker/commit/59ba6583ba5d2de259766c08b84646ccc1c2a24e))
+* setting for a category to be excluded from forecast ([#77](https://github.com/heywood8/money-tracker/issues/77)) ([f5b084a](https://github.com/heywood8/money-tracker/commit/f5b084ad8c71d528a842c66fc2d5cf0ed454720a))
+* show balance on selected account when adding a new operation ([#80](https://github.com/heywood8/money-tracker/issues/80)) ([4c7929a](https://github.com/heywood8/money-tracker/commit/4c7929aed06c058aa8a27ed71bff2f68e242c704))
+
+
+### Bug Fixes
+
+* add .release-please-manifest.json ([52c97eb](https://github.com/heywood8/money-tracker/commit/52c97eb687426d1f154e5ec9b72cb24f870d69fb))
+* add build.gradle to extra-files for release-please ([e91c2de](https://github.com/heywood8/money-tracker/commit/e91c2dec3bbd161d188381e889be24351809d634))
+* add release-please-config.json to change version properly ([c88f968](https://github.com/heywood8/money-tracker/commit/c88f968eb2ef451f3fdfd2fa32e920c3215033e8))
+* annotate with x-release-please-version ([1ceec90](https://github.com/heywood8/money-tracker/commit/1ceec90d228db1c9f7dd1ac8c5d277439b3e9a81))
+* app name for preview eas builds ([239ae34](https://github.com/heywood8/money-tracker/commit/239ae34c519af399f339eff58717cf820e137de7))
+* bug when editing operation, showing previous amount ([#88](https://github.com/heywood8/money-tracker/issues/88)) ([86ca67e](https://github.com/heywood8/money-tracker/commit/86ca67e430dd0da50bca06733bbe458efb0d691c))
+* edit category modal - to fit the actions; to translate text ([#74](https://github.com/heywood8/money-tracker/issues/74)) ([fc4b91f](https://github.com/heywood8/money-tracker/commit/fc4b91f96df9c63b289dd6ee98f7886e8c5dee46))
+* lower commit-search-depth for release-please ([f3dedb4](https://github.com/heywood8/money-tracker/commit/f3dedb454953e29cc09f1dc6b2f62a4ba94956e5))
+* memory leak in EAS CLI dependencies ([#78](https://github.com/heywood8/money-tracker/issues/78)) ([73f4078](https://github.com/heywood8/money-tracker/commit/73f4078b9e56bf16e240d9d7e91fd20a5b8fb631))
+* removed android folder from history, added to gitignore ([18b85c1](https://github.com/heywood8/money-tracker/commit/18b85c101a8e8f2fc3324847830cf6bf49d91a95))
+* removed package name ([d6eddbc](https://github.com/heywood8/money-tracker/commit/d6eddbcb38884dc53396d14da0c538bcb127d9b6))
+* suppress test exceptions ([#73](https://github.com/heywood8/money-tracker/issues/73)) ([36c09eb](https://github.com/heywood8/money-tracker/commit/36c09ebc89ea3bde6a8a9c3d96b298079327c311))
+* switch release-please to node type ([0e17ecf](https://github.com/heywood8/money-tracker/commit/0e17ecf060de16f6205bc853813d291be623d0be))
+* test for quick add button ([#82](https://github.com/heywood8/money-tracker/issues/82)) ([6145ee1](https://github.com/heywood8/money-tracker/commit/6145ee1f0ea06d0912b382b02b8c3ddf76429671))
+* use APP_VARIANT env var for app naming in builds ([be60628](https://github.com/heywood8/money-tracker/commit/be60628b669b934c7b0932a245924ddab31a9e6f))
+* when transferring money, show accounts in one line ([#83](https://github.com/heywood8/money-tracker/issues/83)) ([5438b0b](https://github.com/heywood8/money-tracker/commit/5438b0b68f69cfb36406a465fc61239d4874fb95))
+
 ## [0.6.1](https://github.com/heywood8/money-tracker/compare/penny-v0.6.0...penny-v0.6.1) (2025-12-03)
 
 
