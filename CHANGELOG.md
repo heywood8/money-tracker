@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/heywood8/money-tracker/compare/penny-v0.8.0...penny-v0.8.1) (2025-12-04)
+
+
+### Bug Fixes
+
+* database initialization and importing ([3552eac](https://github.com/heywood8/money-tracker/commit/3552eac5863683cf17b59bcff09167ad48cd3d82))
+
 ## [0.8.0](https://github.com/heywood8/money-tracker/compare/penny-v0.7.0...penny-v0.8.0) (2025-12-04)
 
 
