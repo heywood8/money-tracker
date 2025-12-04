@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -14,6 +14,11 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
  */
 export default function Calculator({ value, onValueChange, colors, placeholder = '0' }) {
   const [expression, setExpression] = useState(value || '');
+
+  // Sync internal state with prop changes
+  useEffect(() => {
+    setExpression(value || '');
+  }, [value]);
 
   // Check if expression contains a mathematical operation
   const hasOperation = /[+\-×÷]/.test(expression);
