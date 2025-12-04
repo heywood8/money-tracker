@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDatabase } from './db';
 import { createAccount } from './AccountsDB';
 import { createCategory } from './CategoriesDB';
-import { createOperation } from './OperationsDB';
 
 /**
  * Get migration status
@@ -10,7 +9,10 @@ import { createOperation } from './OperationsDB';
  */
 export const getMigrationStatus = async () => {
   try {
-    const { queryFirst } = await import('./db');
+    // Ensure database is initialized before querying
+    const { getDatabase, queryFirst } = await import('./db');
+    await getDatabase(); // Wait for database to be fully initialized
+
     const result = await queryFirst(
       'SELECT value FROM app_metadata WHERE key = ?',
       ['migration_status']
@@ -18,6 +20,8 @@ export const getMigrationStatus = async () => {
     return result ? result.value : null;
   } catch (error) {
     console.error('Failed to get migration status:', error);
+    console.error('Error details:', error.message);
+    // Return null if table doesn't exist yet or other errors
     return null;
   }
 };
@@ -275,6 +279,23 @@ export const performMigration = async () => {
       return {
         success: true,
         alreadyMigrated: true,
+        accounts: 0,
+        categories: 0,
+        operations: 0,
+      };
+    }
+
+    // Check if this is a fresh install (no data in AsyncStorage)
+    const accountsJson = await AsyncStorage.getItem('accounts');
+    const categoriesJson = await AsyncStorage.getItem('categories');
+    const operationsJson = await AsyncStorage.getItem('operations');
+
+    if (!accountsJson && !categoriesJson && !operationsJson) {
+      console.log('Fresh install detected - no data to migrate. Marking migration as complete.');
+      await setMigrationStatus('completed');
+      return {
+        success: true,
+        freshInstall: true,
         accounts: 0,
         categories: 0,
         operations: 0,

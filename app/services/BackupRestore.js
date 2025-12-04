@@ -238,6 +238,17 @@ export const exportBackupSQLite = async () => {
       throw new Error('Database file not found');
     }
 
+    // Force a checkpoint to ensure WAL is merged into main database file
+    console.log('Checkpointing database before export...');
+    try {
+      const { executeQuery } = await import('./db');
+      await executeQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+      console.log('Database checkpoint completed');
+    } catch (checkpointError) {
+      console.warn('Failed to checkpoint database:', checkpointError);
+      // Continue anyway, the copy might still work
+    }
+
     // Copy database file
     await FileSystem.copyAsync({
       from: sourceUri,
@@ -670,12 +681,21 @@ const importBackupExcel = async (fileUri) => {
 const importBackupSQLite = async (fileUri) => {
   console.log('Importing SQLite backup...');
 
-  const destUri = `${FileSystem.documentDirectory}SQLite/penny.db`;
-  const backupUri = `${FileSystem.documentDirectory}SQLite/penny_backup_temp.db`;
+  const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
+  const destUri = `${sqliteDir}/penny.db`;
+  const backupUri = `${sqliteDir}/penny_backup_temp.db`;
+
+  // Ensure SQLite directory exists
+  const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
+  if (!dirInfo.exists) {
+    console.log('Creating SQLite directory...');
+    await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
+  }
 
   // Create backup of current database first
   const currentDbExists = await FileSystem.getInfoAsync(destUri);
   if (currentDbExists.exists) {
+    console.log('Backing up current database...');
     await FileSystem.copyAsync({
       from: destUri,
       to: backupUri,
@@ -689,7 +709,18 @@ const importBackupSQLite = async (fileUri) => {
     await closeDatabase();
     console.log('Database connection closed');
 
+    // Wait a bit to ensure the connection is fully closed
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Delete WAL and SHM files to ensure clean state
+    const walUri = `${destUri}-wal`;
+    const shmUri = `${destUri}-shm`;
+    console.log('Cleaning up WAL files...');
+    await FileSystem.deleteAsync(walUri, { idempotent: true });
+    await FileSystem.deleteAsync(shmUri, { idempotent: true });
+
     // Copy imported database to replace current one
+    console.log('Copying imported database file...');
     await FileSystem.copyAsync({
       from: fileUri,
       to: destUri,
@@ -708,13 +739,19 @@ const importBackupSQLite = async (fileUri) => {
       platform: 'sqlite',
     };
   } catch (error) {
+    console.error('Failed to import SQLite database:', error);
     // Restore from backup if copy failed
     if (currentDbExists.exists) {
-      await FileSystem.copyAsync({
-        from: backupUri,
-        to: destUri,
-      });
-      await FileSystem.deleteAsync(backupUri, { idempotent: true });
+      console.log('Restoring from backup...');
+      try {
+        await FileSystem.copyAsync({
+          from: backupUri,
+          to: destUri,
+        });
+        await FileSystem.deleteAsync(backupUri, { idempotent: true });
+      } catch (restoreError) {
+        console.error('Failed to restore backup:', restoreError);
+      }
     }
     throw error;
   }
