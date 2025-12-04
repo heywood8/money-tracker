@@ -860,7 +860,7 @@ const OperationsScreen = () => {
                   style={[styles.pickerActionButton, styles.cancelButton, { borderColor: colors.border }]}
                   onPress={closePicker}
                 >
-                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('cancel')}</Text>
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('close')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
