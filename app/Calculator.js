@@ -103,7 +103,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   // Calculator button component
   const CalcButton = ({ value, onPress, style, textStyle, icon }) => (
     <TouchableOpacity
-      style={[styles.button, style]}
+      style={[styles.button, { borderColor: colors.border }, style]}
       onPress={() => onPress(value)}
       accessibilityRole="button"
       accessibilityLabel={value}
@@ -299,9 +299,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.15)',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: '#7a7878ff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
