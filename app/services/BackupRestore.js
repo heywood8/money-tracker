@@ -683,6 +683,12 @@ const importBackupSQLite = async (fileUri) => {
   }
 
   try {
+    // Close the current database connection before replacing the file
+    console.log('Closing current database connection...');
+    const { closeDatabase } = await import('./db');
+    await closeDatabase();
+    console.log('Database connection closed');
+
     // Copy imported database to replace current one
     await FileSystem.copyAsync({
       from: fileUri,

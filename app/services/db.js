@@ -906,6 +906,7 @@ export const closeDatabase = async () => {
     await dbInstance.closeAsync();
     dbInstance = null;
     drizzleInstance = null;
+    initPromise = null;
   }
 };
 
