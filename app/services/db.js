@@ -27,11 +27,22 @@ export const getDatabase = async () => {
   // Start initialization
   initPromise = (async () => {
     try {
+      console.log('Opening database:', DB_NAME);
       dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
+      console.log('Database opened successfully, instance:', !!dbInstance);
+
+      if (!dbInstance) {
+        throw new Error('Database instance is null after opening');
+      }
+
       drizzleInstance = drizzle(dbInstance, { schema });
+      console.log('Drizzle instance created');
+
       await initializeDatabase(dbInstance);
+      console.log('Database initialized successfully');
     } catch (error) {
       console.error('Failed to open database:', error);
+      console.error('Error details:', error.message, error.stack);
       dbInstance = null;
       drizzleInstance = null;
       initPromise = null;
@@ -903,7 +914,14 @@ export const executeTransaction = async (callback) => {
  */
 export const closeDatabase = async () => {
   if (dbInstance) {
-    await dbInstance.closeAsync();
+    console.log('Closing database connection...');
+    try {
+      await dbInstance.closeAsync();
+      console.log('Database connection closed successfully');
+    } catch (error) {
+      console.error('Error closing database:', error);
+      // Continue anyway to reset the instances
+    }
     dbInstance = null;
     drizzleInstance = null;
     initPromise = null;
@@ -915,6 +933,11 @@ export const closeDatabase = async () => {
  */
 export const dropAllTables = async () => {
   const { raw } = await getDatabase();
+
+  if (!raw) {
+    throw new Error('Database instance is null');
+  }
+
   await raw.execAsync(`
     PRAGMA foreign_keys = OFF;
     DROP TABLE IF EXISTS budgets;
