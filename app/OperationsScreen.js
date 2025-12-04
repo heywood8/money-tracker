@@ -418,31 +418,84 @@ const OperationsScreen = () => {
     });
   }, [categories, quickAddValues.type]);
 
+  // Calculate spending sums by currency for a group of operations
+  const calculateSpendingSums = useCallback((operations) => {
+    const sumsByCurrency = {};
+
+    operations.forEach((operation) => {
+      if (operation.type === 'expense') {
+        const account = visibleAccounts.find(acc => acc.id === operation.accountId);
+        if (account) {
+          const currency = account.currency || 'USD';
+          const amount = parseFloat(operation.amount);
+          if (!isNaN(amount)) {
+            if (!sumsByCurrency[currency]) {
+              sumsByCurrency[currency] = 0;
+            }
+            sumsByCurrency[currency] += amount;
+          }
+        }
+      }
+    });
+
+    return sumsByCurrency;
+  }, [visibleAccounts]);
+
   // Group operations by date and create flat list with separators
   const groupedOperations = useMemo(() => {
     const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
     const grouped = [];
     let currentDate = null;
+    let currentDateOperations = [];
 
-    sorted.forEach((operation) => {
+    sorted.forEach((operation, index) => {
       if (operation.date !== currentDate) {
-        // Add date separator
+        // If we have accumulated operations for previous date, calculate sums
+        if (currentDate !== null && currentDateOperations.length > 0) {
+          const spendingSums = calculateSpendingSums(currentDateOperations);
+          // Update the separator that was already added with the spending sums
+          const separatorIndex = grouped.findIndex(
+            item => item.type === 'separator' && item.date === currentDate
+          );
+          if (separatorIndex !== -1) {
+            grouped[separatorIndex].spendingSums = spendingSums;
+          }
+        }
+
+        // Start new date group
+        currentDate = operation.date;
+        currentDateOperations = [operation];
+
+        // Add date separator (sums will be added later)
         grouped.push({
           type: 'separator',
           date: operation.date,
           id: `separator-${operation.date}`,
         });
-        currentDate = operation.date;
+      } else {
+        currentDateOperations.push(operation);
       }
+
       // Add operation
       grouped.push({
         type: 'operation',
         ...operation,
       });
+
+      // Handle last date group
+      if (index === sorted.length - 1 && currentDateOperations.length > 0) {
+        const spendingSums = calculateSpendingSums(currentDateOperations);
+        const separatorIndex = grouped.findIndex(
+          item => item.type === 'separator' && item.date === currentDate
+        );
+        if (separatorIndex !== -1) {
+          grouped[separatorIndex].spendingSums = spendingSums;
+        }
+      }
     });
 
     return grouped;
-  }, [operations]);
+  }, [operations, calculateSpendingSums]);
 
   // Format date (memoized)
   const formatDate = useCallback((dateString) => {
@@ -531,12 +584,28 @@ const OperationsScreen = () => {
   const renderItem = useCallback(({ item }) => {
     // Render date separator
     if (item.type === 'separator') {
+      const hasSpending = item.spendingSums && Object.keys(item.spendingSums).length > 0;
+
       return (
         <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
           <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-          <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
-            {formatDate(item.date)}
-          </Text>
+          <View style={styles.dateSeparatorContent}>
+            <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
+              {formatDate(item.date)}
+            </Text>
+            {hasSpending && (
+              <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}>
+                {t('spent_amount')}: {Object.entries(item.spendingSums)
+                  .map(([currency, amount]) => {
+                    const symbol = getCurrencySymbol(currency);
+                    const currencyInfo = currencies[currency];
+                    const decimals = currencyInfo?.decimal_digits ?? 2;
+                    return `${symbol}${amount.toFixed(decimals)}`;
+                  })
+                  .join(', ')}
+              </Text>
+            )}
+          </View>
           <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
         </View>
       );
@@ -1123,11 +1192,19 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
   },
+  dateSeparatorContent: {
+    alignItems: 'center',
+  },
   dateSeparatorText: {
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  dateSeparatorSpent: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
   loadingMoreContainer: {
     paddingVertical: 20,
