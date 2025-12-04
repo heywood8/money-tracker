@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/heywood8/money-tracker/compare/penny-v0.7.0...penny-v0.8.0) (2025-12-04)
+
+
+### Features
+
+* sum of operations on every day delimiter ([a88d07d](https://github.com/heywood8/money-tracker/commit/a88d07d5e36ffcf26c4f7fa2d8b5b3cbe96f08d4))
+
+
+### Bug Fixes
+
+* calc buttons performance ([8daf4be](https://github.com/heywood8/money-tracker/commit/8daf4bee2e99ceab447d32a885df353e38c246ee))
+* database restore ([68b4009](https://github.com/heywood8/money-tracker/commit/68b4009319c4a7b2aa9c82c6aad1a33aed0a9ba1))
+* more visibility to calculator buttons ([84aa96b](https://github.com/heywood8/money-tracker/commit/84aa96b992ddb9075978ef97a6cc2d3f38b2a31a))
+* UI edges for operations page ([e94ad31](https://github.com/heywood8/money-tracker/commit/e94ad3126a88cbe0fe2563c42c0c992290eeb979))
+
 ## [0.7.0](https://github.com/heywood8/money-tracker/compare/penny-v0.6.1...penny-v0.7.0) (2025-12-04)
 
 
