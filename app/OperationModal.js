@@ -71,6 +71,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const [lastEditedField, setLastEditedField] = useState(null);
 
   useEffect(() => {
+    // Only run when modal becomes visible
+    if (!visible) return;
+
     let cancelled = false;
     async function setDefaultAccount() {
       if (operation && !isNew) {
@@ -86,6 +89,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           exchangeRate: String(operation.exchangeRate || ''),
           destinationAmount: String(operation.destinationAmount || ''),
         });
+        // Reset last edited field when opening modal with existing operation
+        setLastEditedField(null);
       } else if (isNew) {
         let defaultAccountId = '';
         if (accounts.length === 1) {
@@ -112,6 +117,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             exchangeRate: '',
             destinationAmount: '',
           });
+          // Reset last edited field when opening modal for new operation
+          setLastEditedField(null);
         }
       }
       if (!cancelled) setErrors({});
