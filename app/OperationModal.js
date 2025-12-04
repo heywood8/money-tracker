@@ -70,6 +70,14 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   // Track which field was last edited to determine calculation direction
   const [lastEditedField, setLastEditedField] = useState(null);
 
+  // Memoize calculator amount change handler for performance
+  const handleAmountChange = useCallback((text) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, amount: text }));
+      setLastEditedField('amount');
+    }
+  }, [isShadowOperation]);
+
   useEffect(() => {
     // Only run when modal becomes visible
     if (!visible) return;
@@ -458,12 +466,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   <View style={isShadowOperation && styles.disabledInput}>
                     <Calculator
                       value={values.amount}
-                      onValueChange={text => {
-                        if (!isShadowOperation) {
-                          setValues(v => ({ ...v, amount: text }));
-                          setLastEditedField('amount');
-                        }
-                      }}
+                      onValueChange={handleAmountChange}
                       colors={colors}
                       placeholder={t('amount')}
                     />

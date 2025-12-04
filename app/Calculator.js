@@ -1,6 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+
+/**
+ * Calculator button component - Memoized for performance
+ */
+const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => {
+  const handlePress = useCallback(() => {
+    onPress(value);
+  }, [onPress, value]);
+
+  const buttonStyle = useMemo(() => [
+    styles.button,
+    { borderColor: colors.border },
+    style
+  ], [colors.border, style]);
+
+  const finalTextStyle = useMemo(() => [
+    styles.buttonText,
+    textStyle
+  ], [textStyle]);
+
+  return (
+    <TouchableOpacity
+      style={buttonStyle}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={value}
+    >
+      {icon ? (
+        <Icon name={icon} size={24} color={textStyle?.color || colors.text} />
+      ) : (
+        <Text style={finalTextStyle}>{value}</Text>
+      )}
+    </TouchableOpacity>
+  );
+});
 
 /**
  * Calculator component for amount input
@@ -20,11 +55,45 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     setExpression(value || '');
   }, [value]);
 
-  // Check if expression contains a mathematical operation
-  const hasOperation = /[+\-×÷]/.test(expression);
+  // Check if expression contains a mathematical operation - Memoized
+  const hasOperation = useMemo(() => /[+\-×÷]/.test(expression), [expression]);
 
-  // Handle button press
-  const handlePress = (key) => {
+  // Get the last number in the expression - Memoized
+  const getLastNumber = useCallback((expr) => {
+    const match = expr.match(/[+\-×÷]?([0-9.]+)$/);
+    return match ? match[1] : expr;
+  }, []);
+
+  // Evaluate mathematical expression - Memoized
+  const evaluateExpression = useCallback((expr) => {
+    if (!expr || expr.trim() === '') return null;
+
+    try {
+      // Replace '×' with '*' for multiplication and '÷' with '/' for division
+      let sanitized = expr.replace(/×/g, '*').replace(/÷/g, '/');
+
+      // Validate expression (only allow numbers, operators, and decimal points)
+      if (!/^[0-9+\-*/.() ]+$/.test(sanitized)) {
+        return null;
+      }
+
+      // Use Function constructor to safely evaluate (no access to external scope)
+      // Note: This is safer than eval() but still requires validation above
+      const result = Function('"use strict"; return (' + sanitized + ')')();
+
+      if (isNaN(result) || !isFinite(result)) {
+        return null;
+      }
+
+      // Round to 2 decimal places to avoid floating point issues
+      return Math.round(result * 100) / 100;
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  // Handle button press - Wrapped with useCallback for performance
+  const handlePress = useCallback((key) => {
     let newExpression = expression;
 
     if (key === 'backspace') {
@@ -64,73 +133,70 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
     setExpression(newExpression);
     onValueChange(newExpression);
-  };
+  }, [expression, onValueChange, getLastNumber, evaluateExpression]);
 
-  // Get the last number in the expression (after the last operation)
-  const getLastNumber = (expr) => {
-    const match = expr.match(/[+\-×÷]?([0-9.]+)$/);
-    return match ? match[1] : expr;
-  };
+  // Handle equals button press - Wrapped with useCallback
+  const handleEqualsPress = useCallback(() => {
+    handlePress('=');
+  }, [handlePress]);
 
-  // Evaluate mathematical expression
-  const evaluateExpression = (expr) => {
-    if (!expr || expr.trim() === '') return null;
+  // Memoize display text style
+  const displayTextStyle = useMemo(() => [
+    styles.displayText,
+    { color: colors.text }
+  ], [colors.text]);
 
-    try {
-      // Replace '×' with '*' for multiplication and '÷' with '/' for division
-      let sanitized = expr.replace(/×/g, '*').replace(/÷/g, '/');
+  // Memoize equals button text style
+  const equalsButtonTextStyle = useMemo(() => [
+    styles.equalsButtonText,
+    { color: colors.text }
+  ], [colors.text]);
 
-      // Validate expression (only allow numbers, operators, and decimal points)
-      if (!/^[0-9+\-*/.() ]+$/.test(sanitized)) {
-        return null;
-      }
+  // Memoize button styles for better performance
+  const operationButtonStyle = useMemo(() => ({
+    backgroundColor: colors.operationBackground || colors.surface
+  }), [colors.operationBackground, colors.surface]);
 
-      // Use Function constructor to safely evaluate (no access to external scope)
-      // Note: This is safer than eval() but still requires validation above
-      const result = Function('"use strict"; return (' + sanitized + ')')();
+  const operationTextStyle = useMemo(() => ({
+    color: colors.primary,
+    fontSize: 24,
+    fontWeight: 'bold'
+  }), [colors.primary]);
 
-      if (isNaN(result) || !isFinite(result)) {
-        return null;
-      }
+  const surfaceButtonStyle = useMemo(() => ({
+    backgroundColor: colors.surface
+  }), [colors.surface]);
 
-      // Round to 2 decimal places to avoid floating point issues
-      return Math.round(result * 100) / 100;
-    } catch (error) {
-      return null;
-    }
-  };
+  const numberTextStyle = useMemo(() => ({
+    color: colors.text,
+    fontSize: 20
+  }), [colors.text]);
 
-  // Calculator button component
-  const CalcButton = ({ value, onPress, style, textStyle, icon }) => (
-    <TouchableOpacity
-      style={[styles.button, { borderColor: colors.border }, style]}
-      onPress={() => onPress(value)}
-      accessibilityRole="button"
-      accessibilityLabel={value}
-    >
-      {icon ? (
-        <Icon name={icon} size={24} color={textStyle?.color || colors.text} />
-      ) : (
-        <Text style={[styles.buttonText, textStyle]}>{value}</Text>
-      )}
-    </TouchableOpacity>
-  );
+  const decimalTextStyle = useMemo(() => ({
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: 'bold'
+  }), [colors.text]);
+
+  const deleteButtonStyle = useMemo(() => ({
+    backgroundColor: colors.deleteBackground || colors.surface
+  }), [colors.deleteBackground, colors.surface]);
 
   return (
     <View style={styles.container}>
       {/* Display */}
       <View style={styles.display}>
-        <Text style={[styles.displayText, { color: colors.text }]} numberOfLines={1}>
+        <Text style={displayTextStyle} numberOfLines={1}>
           {expression}
         </Text>
         {hasOperation && (
           <TouchableOpacity
             style={styles.equalsButton}
-            onPress={() => handlePress('=')}
+            onPress={handleEqualsPress}
             accessibilityRole="button"
             accessibilityLabel="equals"
           >
-            <Text style={[styles.equalsButtonText, { color: colors.text }]}>=</Text>
+            <Text style={equalsButtonTextStyle}>=</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -142,26 +208,30 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="+"
             onPress={handlePress}
-            style={{ backgroundColor: colors.operationBackground || colors.surface }}
-            textStyle={{ color: colors.primary, fontSize: 24, fontWeight: 'bold' }}
+            style={operationButtonStyle}
+            textStyle={operationTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="1"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="2"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="3"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
         </View>
 
@@ -170,26 +240,30 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="-"
             onPress={handlePress}
-            style={{ backgroundColor: colors.operationBackground || colors.surface }}
-            textStyle={{ color: colors.primary, fontSize: 24, fontWeight: 'bold' }}
+            style={operationButtonStyle}
+            textStyle={operationTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="4"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="5"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="6"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
         </View>
 
@@ -198,26 +272,30 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="×"
             onPress={handlePress}
-            style={{ backgroundColor: colors.operationBackground || colors.surface }}
-            textStyle={{ color: colors.primary, fontSize: 24, fontWeight: 'bold' }}
+            style={operationButtonStyle}
+            textStyle={operationTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="7"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="8"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="9"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
         </View>
 
@@ -226,26 +304,30 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="÷"
             onPress={handlePress}
-            style={{ backgroundColor: colors.operationBackground || colors.surface }}
-            textStyle={{ color: colors.primary, fontSize: 24, fontWeight: 'bold' }}
+            style={operationButtonStyle}
+            textStyle={operationTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="."
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 24, fontWeight: 'bold' }}
+            style={surfaceButtonStyle}
+            textStyle={decimalTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="0"
             onPress={handlePress}
-            style={{ backgroundColor: colors.surface }}
-            textStyle={{ color: colors.text, fontSize: 20 }}
+            style={surfaceButtonStyle}
+            textStyle={numberTextStyle}
+            colors={colors}
           />
           <CalcButton
             value="backspace"
             onPress={handlePress}
-            style={{ backgroundColor: colors.deleteBackground || colors.surface }}
+            style={deleteButtonStyle}
             icon="backspace-outline"
+            colors={colors}
           />
         </View>
       </View>
