@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useLocalization } from './LocalizationContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
-import SimpleTabs from './SimpleTabs';
-import { useTheme } from './ThemeContext';
+import SimpleTabs from '../components/SimpleTabs';
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * AppInitializer handles first-time setup and app initialization

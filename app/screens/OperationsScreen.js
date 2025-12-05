@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useDialog } from './DialogContext';
-import { useOperations } from './OperationsContext';
-import { useAccounts } from './AccountsContext';
-import { useCategories } from './CategoriesContext';
-import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
-import OperationModal from './OperationModal';
-import Calculator from './Calculator';
-import currencies from '../assets/currencies.json';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
+import { useOperations } from '../contexts/OperationsContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import { useCategories } from '../contexts/CategoriesContext';
+import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
+import OperationModal from '../modals/OperationModal';
+import Calculator from '../components/Calculator';
+import currencies from '../../assets/currencies.json';
 
 /**
  * Get currency symbol from currency code
