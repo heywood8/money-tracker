@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
-import SimpleTabs from '../components/SimpleTabs';
+import SimpleTabs from '../navigation/SimpleTabs';
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
