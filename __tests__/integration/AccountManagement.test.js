@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AccountsProvider, useAccounts } from '../../app/AccountsContext';
+import { AccountsProvider, useAccounts } from '../../app/contexts/AccountsContext';
 import * as AccountsDB from '../../app/services/AccountsDB';
 import { performMigration, isMigrationComplete } from '../../app/services/migration';
 
@@ -15,7 +15,7 @@ jest.mock('../../app/services/migration');
 
 // Mock DialogContext
 const mockShowDialog = jest.fn();
-jest.mock('../../app/DialogContext', () => ({
+jest.mock('../../app/contexts/DialogContext', () => ({
   DialogProvider: ({ children }) => children,
   useDialog: () => ({
     showDialog: mockShowDialog,

@@ -6,7 +6,7 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LocalizationProvider, useLocalization } from '../../app/LocalizationContext';
+import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
 
 describe('LocalizationContext', () => {
   beforeEach(async () => {
