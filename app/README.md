@@ -9,9 +9,9 @@ app/
 ├── contexts/     # React Context providers for global state
 ├── screens/      # Full-screen components for main navigation
 ├── modals/       # Modal dialog components for data entry
+├── navigation/   # Navigation components and routing
 ├── components/   # Reusable UI components
 ├── hooks/        # Custom React hooks
-├── types/        # Type definitions and data models
 ├── services/     # Business logic and data access layer
 ├── db/           # Database configuration and schema
 ├── defaults/     # Default/seed data
@@ -94,15 +94,39 @@ app/
 
 ---
 
-### components/ (8 files)
+### navigation/ (1 file)
+
+**Purpose:** Navigation components and routing logic
+
+**What goes here:**
+- Tab navigation containers
+- Stack navigators
+- Navigation configuration
+- Route definitions
+
+**Files:**
+- `SimpleTabs.js` - Main tab navigation container
+
+**Guidelines:**
+- Navigation components may import screens (this is expected)
+- Keep navigation logic separate from reusable UI components
+- Follow React Navigation patterns where applicable
+- Document tab/route configurations clearly
+
+**Architectural Note:**
+SimpleTabs was moved here from `components/` to resolve a circular dependency. Navigation components are architecturally special - they need to know about screens, which is a backwards dependency for regular components but expected for navigation.
+
+---
+
+### components/ (7 files)
 
 **Purpose:** Reusable UI components used across the app
 
 **What goes here:**
 - Shared/reusable components used in multiple places
 - Complex UI widgets
-- Navigation components (tabs, headers)
 - Generic form components
+- Presentational components
 
 **Files:**
 - `BudgetProgressBar.js` - Budget progress visualization
@@ -112,11 +136,11 @@ app/
 - `IconPicker.js` - Icon selection component
 - `MaterialDialog.js` - Material Design dialog/alert component
 - `SimplePicker.js` - Custom picker component
-- `SimpleTabs.js` - Main tab navigation container
 
 **Guidelines:**
 - Components should be pure/presentational when possible
 - Accept data via props, not contexts (unless truly needed everywhere)
+- Components should NOT import screens (use navigation/ for that)
 - Use TypeScript-style prop documentation
 - Keep components small and focused
 
@@ -139,26 +163,6 @@ app/
 - Name hooks with `use` prefix
 - Document hook parameters and return values
 - Avoid complex business logic (use services/ instead)
-
----
-
-### types/ (1 file)
-
-**Purpose:** Type definitions and data models
-
-**What goes here:**
-- TypeScript-style type definitions
-- Data model definitions
-- Interface definitions
-- Type utilities
-
-**Files:**
-- `Account.js` - Account object type definition
-
-**Guidelines:**
-- Use JSDoc comments for type documentation
-- Keep types close to their usage domain
-- Prefer simple object shapes over complex types
 
 ---
 
@@ -198,18 +202,16 @@ app/
 
 ---
 
-### db/ (3 files)
+### db/ (2 files)
 
 **Purpose:** Database configuration, schema, and migration
 
 **What goes here:**
-- SQLite client initialization
 - Database schema definitions
 - Migration scripts
 - Database utilities
 
 **Files:**
-- `client.js` - SQLite client initialization
 - `migrate.js` - Database migration utilities
 - `schema.js` - Database table definitions
 
@@ -218,6 +220,8 @@ app/
 - Use migrations for schema changes
 - Document table structures
 - Handle database versioning
+
+**Note:** Database client initialization is handled in `services/db.js`
 
 ---
 
@@ -279,6 +283,7 @@ import Something from './Something';
 ```javascript
 import { useTheme } from '../contexts/ThemeContext';
 import AccountModal from '../modals/AccountModal';
+import SimpleTabs from '../navigation/SimpleTabs';
 import { formatCurrency } from '../services/currency';
 ```
 
