@@ -8,7 +8,7 @@ import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import Header from './Header';
+import Header from '../components/Header';
 import SettingsModal from '../modals/SettingsModal';
 
 // Memoized tab button component to prevent unnecessary re-renders

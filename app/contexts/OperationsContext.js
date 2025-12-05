@@ -5,6 +5,13 @@ import { useAccounts } from './AccountsContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
+/**
+ * OperationsContext manages financial operations/transactions state.
+ *
+ * DEPENDENCY: This context depends on AccountsContext (via useAccounts hook).
+ * Therefore, AccountsProvider MUST wrap OperationsProvider in the component tree.
+ * See App.js for the correct provider nesting order.
+ */
 const OperationsContext = createContext();
 
 export const useOperations = () => {
