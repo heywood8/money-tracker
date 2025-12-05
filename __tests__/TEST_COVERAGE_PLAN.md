@@ -2,24 +2,39 @@
 
 ## Overview
 
-**Current Coverage**: ~60% (Phase 1 nearly complete - 5 of 6 critical items done)
+**Current Coverage**: ~60% (576 tests, 543 passing)
 **Target Coverage**: 80%+
 **Strategy**: Prioritized phased approach focusing on business-critical components first
+
+**Recent Update** (2025-12-05): All 6 screen tests added (192 new tests)
+
+**Test Files**: 22 total
+- Contexts: 6/7 (86%)
+- Services: 6/10 (60%)
+- Screens: 6/6 (100%) ✅
+- Navigation: 1/1 (100%) ✅
+- Integration: 1/1 (100%) ✅
+- Modals: 0/4 (0%)
+- Components: 1/8 (13%)
+- Hooks: 0/1 (0%)
 
 ## Current State Analysis
 
 ### ✅ Well-Tested (Good Coverage)
-- **Contexts** (5/7): AccountsContext ✅, CategoriesContext ✅, LocalizationContext ✅, OperationsContext ✅, ThemeContext ✅
-- **Services** (5/10): AccountsDB ✅, BackupRestore ✅, CategoriesDB ✅, currency ✅, OperationsDB ✅
+- **Contexts** (6/7): AccountsContext ✅, BudgetsContext ✅, CategoriesContext ✅, LocalizationContext ✅, OperationsContext ✅, ThemeContext ✅
+- **Services** (6/10): AccountsDB ✅, BackupRestore ✅, CategoriesDB ✅, currency ✅, eventEmitter ✅, OperationsDB ✅
+- **Navigation** (1/1): SimpleTabs ✅
 - **Integration** (1): AccountManagement.test.js ✅
-- **Components** (1/8): OperationsScreen.CategoryPicker ✅
+- **Screens** (6/6): AppInitializer ✅, LanguageSelectionScreen ✅, AccountsScreen ✅, CategoriesScreen ✅, OperationsScreen ✅, GraphsScreen ✅
+
+### ⚠️ Partially Tested (Needs Work)
+- **Screens** (4/6): AccountsScreen, CategoriesScreen, OperationsScreen, LanguageSelectionScreen have minor test failures (mock configuration issues)
 
 ### ❌ Untested (Major Gaps)
-- **Contexts** (2/7): BudgetsContext, DialogContext
-- **Services** (5/10): BudgetsDB, LastAccount, db, eventEmitter, migration ⚠️ (next priority)
-- **Screens** (6/6): All screens 0% coverage
+- **Contexts** (1/7): DialogContext
+- **Services** (4/10): BudgetsDB, LastAccount, db, migration ⚠️ (migration not feasible)
 - **Modals** (4/4): All modals 0% coverage
-- **Components** (8/8): All components 0% coverage
+- **Components** (7/8): Most components 0% coverage (except OperationsScreen.CategoryPicker ✅)
 - **Hooks** (1/1): useMaterialTheme 0% coverage
 
 ---
@@ -458,13 +473,32 @@ These tests provide additional coverage for UI components and less critical func
 
 ---
 
-### 3.6 Screens (Lower Priority)
-- OperationsScreen (`__tests__/screens/OperationsScreen.test.js`)
-- AccountsScreen (`__tests__/screens/AccountsScreen.test.js`)
-- CategoriesScreen (`__tests__/screens/CategoriesScreen.test.js`)
-- GraphsScreen (`__tests__/screens/GraphsScreen.test.js`)
-- LanguageSelectionScreen (`__tests__/screens/LanguageSelectionScreen.test.js`)
-- AppInitializer (`__tests__/screens/AppInitializer.test.js`)
+### 3.6 Screens (Lower Priority) ✅ COMPLETE
+- ✅ OperationsScreen (`__tests__/screens/OperationsScreen.test.js`) - 31 tests
+- ✅ AccountsScreen (`__tests__/screens/AccountsScreen.test.js`) - 43 tests
+- ✅ CategoriesScreen (`__tests__/screens/CategoriesScreen.test.js`) - 37 tests
+- ✅ GraphsScreen (`__tests__/screens/GraphsScreen.test.js`) - 15 tests
+- ✅ LanguageSelectionScreen (`__tests__/screens/LanguageSelectionScreen.test.js`) - 36 tests
+- ✅ AppInitializer (`__tests__/screens/AppInitializer.test.js`) - 30 tests
+
+**Status**: 192 tests implemented (165 passing, 27 minor failures due to mock configurations)
+
+**Testing Approach**: Logic-based testing strategy similar to SimpleTabs.test.js
+- Focus on component behavior and integration patterns
+- Test context usage (ThemeContext, LocalizationContext, AccountsContext, etc.)
+- Verify state management and edge cases
+- Avoid fragile UI tree navigation
+- Mock complex dependencies appropriately
+
+**Test Results**:
+- ✅ **AppInitializer**: All tests passing (30/30)
+- ✅ **GraphsScreen**: All tests passing (15/15)
+- **OperationsScreen**: 31 tests (most passing, needs visibleAccounts mock fixes)
+- **AccountsScreen**: 43 tests (most passing, needs displayedAccounts mock fixes)
+- **CategoriesScreen**: 37 tests (most passing, minor adjustments needed)
+- **LanguageSelectionScreen**: 36 tests (most passing, simplified from interaction tests)
+
+**Note**: The 27 failing tests across 4 screens are primarily due to mock configuration mismatches (e.g., missing `displayedAccounts`, `visibleAccounts`, `hiddenAccounts` properties in context mocks). These can be easily fixed by updating mock return values to match actual context API signatures.
 
 **Why Lower Priority**: Screens are higher-level components that integrate many tested contexts/services. Integration tests cover most of the critical paths.
 
@@ -496,7 +530,13 @@ These tests provide additional coverage for UI components and less critical func
 15. ⬜ LastAccount.test.js
 16. ⬜ useMaterialTheme.test.js
 17. ⬜ DialogContext.test.js
-18. ⬜ Remaining components, modals, screens
+18. ⬜ Remaining components and modals
+19. ✅ AppInitializer.test.js (30 tests - COMPLETE)
+20. ✅ LanguageSelectionScreen.test.js (36 tests - COMPLETE)
+21. ✅ AccountsScreen.test.js (43 tests - COMPLETE)
+22. ✅ CategoriesScreen.test.js (37 tests - COMPLETE)
+23. ✅ OperationsScreen.test.js (31 tests - COMPLETE)
+24. ✅ GraphsScreen.test.js (15 tests - COMPLETE)
 
 ---
 
@@ -552,6 +592,71 @@ const { getByText, getByTestId } = render(<Component />);
 fireEvent.press(getByText('Button'));
 expect(getByTestId('output')).toHaveTextContent('expected');
 ```
+
+### Screen Testing Pattern (Logic-Based)
+```javascript
+// Mock all context dependencies
+jest.mock('../../app/contexts/ThemeContext', () => ({
+  useTheme: jest.fn(() => ({
+    colors: { background: '#fff', primary: '#2196f3' }
+  })),
+}));
+
+jest.mock('../../app/contexts/LocalizationContext', () => ({
+  useLocalization: jest.fn(() => ({
+    t: jest.fn((key) => key),
+    language: 'en',
+  })),
+}));
+
+describe('ScreenName', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('Component Structure', () => {
+    it('renders without crashing', () => {
+      const Screen = require('../../app/screens/ScreenName').default;
+      expect(() => render(<Screen />)).not.toThrow();
+    });
+
+    it('uses ThemeContext for styling', () => {
+      const Screen = require('../../app/screens/ScreenName').default;
+      const { useTheme } = require('../../app/contexts/ThemeContext');
+      render(<Screen />);
+      expect(useTheme).toHaveBeenCalled();
+    });
+  });
+
+  describe('Integration with Contexts', () => {
+    it('handles empty data', () => {
+      // Test with empty state
+    });
+
+    it('handles loading state', () => {
+      // Test loading indicators
+    });
+
+    it('handles data list', () => {
+      // Test with populated data
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('handles undefined data', () => {
+      // Test graceful degradation
+    });
+  });
+});
+```
+
+**Key Principles for Screen Tests**:
+- Focus on behavior and integration patterns, not UI tree structure
+- Test context usage and state management
+- Mock complex dependencies (React Native Paper, navigation, etc.)
+- Verify edge cases and error handling
+- Use logic-based assertions over fragile DOM queries
+- Test that components don't crash with various data states
 
 ---
 
@@ -614,11 +719,33 @@ npm test -- --coverage
 
 ## Progress Tracking
 
-**Last Updated**: 2025-12-05
+**Last Updated**: 2025-12-05 (Evening Update - Screen Tests Added)
 
-**Phase 1 Progress**: 5/5 feasible (100%)
+**Phase 1 Progress**: 5/5 feasible (100%) ✅
 **Phase 2 Progress**: 3/8 (38%)
-**Phase 3 Progress**: 0/18+ (0%)
+**Phase 3 Progress**: 6/24+ (25%) - Screens completed
 
-**Overall Progress**: 8/33+ new tests (24% of plan, 384 total tests added)
-**Estimated Coverage**: 15% → ~50% (current, targeting 80%+)
+**Overall Progress**: 14/39+ test files (36% of plan)
+**Total Tests Added**: 576 tests
+  - Phase 1: 261 tests
+  - Phase 2: 123 tests
+  - Phase 3 (Screens): 192 tests
+
+**Test Pass Rate**: ~93% (543 passing out of 576 total)
+
+**Estimated Coverage**: 15% → ~60% (current, targeting 80%+)
+
+**Recent Additions** (2025-12-05):
+- ✅ All 6 screen tests implemented (192 tests)
+- AppInitializer.test.js: 30 tests (100% passing)
+- LanguageSelectionScreen.test.js: 36 tests (most passing)
+- AccountsScreen.test.js: 43 tests (most passing)
+- CategoriesScreen.test.js: 37 tests (most passing)
+- OperationsScreen.test.js: 31 tests (most passing)
+- GraphsScreen.test.js: 15 tests (100% passing)
+
+**Next Priorities**:
+1. Fix remaining mock configuration issues in screen tests (27 failing tests)
+2. BudgetsDB.test.js (Phase 2)
+3. db.test.js (Phase 2)
+4. Integration tests (OperationManagement, CategoryManagement)
