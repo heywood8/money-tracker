@@ -4,10 +4,10 @@ import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, To
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
-import { useTheme } from './ThemeContext';
-import { useAccounts } from './AccountsContext';
-import { useLocalization } from './LocalizationContext';
-import currencies from '../assets/currencies.json';
+import { useTheme } from '../contexts/ThemeContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import currencies from '../../assets/currencies.json';
 
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {

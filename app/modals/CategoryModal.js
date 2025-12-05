@@ -15,11 +15,11 @@ import {
   Switch,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useDialog } from './DialogContext';
-import { useCategories } from './CategoriesContext';
-import IconPicker from './IconPicker';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
+import { useCategories } from '../contexts/CategoriesContext';
+import IconPicker from '../components/IconPicker';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
   const { colors } = useTheme();

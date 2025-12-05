@@ -7,7 +7,7 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeProvider, useTheme } from '../../app/ThemeContext';
+import { ThemeProvider, useTheme } from '../../app/contexts/ThemeContext';
 
 describe('ThemeContext', () => {
   beforeEach(async () => {

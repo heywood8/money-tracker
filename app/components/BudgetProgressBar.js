@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useTheme } from '../ThemeContext';
-import { useLocalization } from '../LocalizationContext';
-import { useBudgets } from '../BudgetsContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useBudgets } from '../contexts/BudgetsContext';
 
 const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, style }) => {
   const { colors } = useTheme();

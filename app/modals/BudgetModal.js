@@ -15,12 +15,12 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useDialog } from './DialogContext';
-import { useBudgets } from './BudgetsContext';
-import { useAccounts } from './AccountsContext';
-import currencies from '../assets/currencies.json';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
+import { useBudgets } from '../contexts/BudgetsContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import currencies from '../../assets/currencies.json';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
   const { colors } = useTheme();
