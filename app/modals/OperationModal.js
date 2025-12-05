@@ -15,15 +15,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useOperations } from './OperationsContext';
-import { useAccounts } from './AccountsContext';
-import { useCategories } from './CategoriesContext';
-import { getLastAccessedAccount, setLastAccessedAccount } from './services/LastAccount';
-import Calculator from './Calculator';
-import * as Currency from './services/currency';
-import currencies from '../assets/currencies.json';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useOperations } from '../contexts/OperationsContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import { useCategories } from '../contexts/CategoriesContext';
+import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
+import Calculator from '../components/Calculator';
+import * as Currency from '../services/currency';
+import currencies from '../../assets/currencies.json';
 
 /**
  * Get currency symbol from currency code

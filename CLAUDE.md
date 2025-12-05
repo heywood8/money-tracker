@@ -18,24 +18,62 @@ npm test               # Run Jest tests (if configured)
 
 ### Architecture
 
+### Folder Structure
+
+The app follows a feature-based organization under the `app/` directory:
+
+- **contexts/** (7 files) - React Context providers for global state management
+  - `AccountsContext.js`, `BudgetsContext.js`, `CategoriesContext.js`, `DialogContext.js`
+  - `LocalizationContext.js`, `OperationsContext.js`, `ThemeContext.js`
+
+- **screens/** (6 files) - Full-screen components for main navigation
+  - `AccountsScreen.js`, `AppInitializer.js`, `CategoriesScreen.js`
+  - `GraphsScreen.js`, `LanguageSelectionScreen.js`, `OperationsScreen.js`
+
+- **modals/** (4 files) - Modal dialog components for data entry
+  - `BudgetModal.js`, `CategoryModal.js`, `OperationModal.js`, `SettingsModal.js`
+
+- **components/** (8 files) - Reusable UI components
+  - `BudgetProgressBar.js`, `Calculator.js`, `ErrorBoundary.js`, `Header.js`
+  - `IconPicker.js`, `MaterialDialog.js`, `SimplePicker.js`, `SimpleTabs.js`
+
+- **hooks/** (1 file) - Custom React hooks
+  - `useMaterialTheme.js` - Bridges ThemeContext with React Native Paper
+
+- **types/** (1 file) - Type definitions
+  - `Account.js` - Account object type definition
+
+- **services/** (10 files) - Business logic and data access layer
+  - Database: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`
+  - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`, `migration.js`
+
+- **db/** (3 files) - Database configuration and schema
+  - `client.js`, `migrate.js`, `schema.js`
+
+- **defaults/** (2 files) - Default/seed data
+  - `defaultAccounts.js`, `defaultCategories.json`
+
+- **utils/** (1 file) - Utility functions
+  - `resetDatabase.js`
+
 ### Context-Based State Management
 
-The app uses React Context API for global state, with three primary contexts that wrap the entire application in App.js:
+The app uses React Context API for global state, with primary contexts that wrap the entire application in App.js:
 
-1. **LocalizationContext** (`app/LocalizationContext.js`)
+1. **LocalizationContext** (`app/contexts/LocalizationContext.js`)
    - Manages app language (English/Russian)
    - Loads translations from `assets/i18n.json`
    - Persists language preference to AsyncStorage
    - Provides `t(key)` function for translations
 
-2. **ThemeContext** (`app/ThemeContext.js`)
+2. **ThemeContext** (`app/contexts/ThemeContext.js`)
    - Manages theme selection: 'light', 'dark', or 'system'
    - Listens to OS appearance changes via `Appearance` API
    - Provides color palette through `colors` object
    - Persists theme preference to AsyncStorage
    - Both themes define colors for: background, surface, primary, text, mutedText, border, selected, altRow, etc.
 
-3. **AccountsContext** (`app/AccountsContext.js`)
+3. **AccountsContext** (`app/contexts/AccountsContext.js`)
    - Manages financial accounts (CRUD operations)
    - Persists accounts to AsyncStorage with key 'accounts'
    - Each account has: id (uuid), name, balance (string), currency
@@ -44,21 +82,20 @@ The app uses React Context API for global state, with three primary contexts tha
 
 ### Navigation Structure
 
-Uses custom tab-based navigation (SimpleTabs.js) instead of react-navigation:
-- **Operations**: Financial transactions (stub screen)
+Uses custom tab-based navigation (`app/components/SimpleTabs.js`) instead of react-navigation:
+- **Operations**: Financial transactions screen
 - **Accounts**: Account management with full CRUD
-- **Categories**: Transaction categories (stub screen)
-- **Graphs**: Financial visualizations (stub screen)
+- **Categories**: Transaction categories screen
+- **Graphs**: Financial visualizations screen
 
 Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Key Components
 
-- **SimpleTabs** (`app/SimpleTabs.js`): Main navigation container with custom tab bar
-- **Header** (`app/Header.js`): Top header with settings icon
-- **SettingsModal** (`app/SettingsModal.js`): Modal for theme and language preferences
-- **AccountsScreen** (`app/AccountsScreen.js`): Full-featured account management with add/edit/delete
-- **Account** (`app/Account.js`): Individual account list item component
+- **SimpleTabs** (`app/components/SimpleTabs.js`): Main navigation container with custom tab bar
+- **Header** (`app/components/Header.js`): Top header with settings icon
+- **SettingsModal** (`app/modals/SettingsModal.js`): Modal for theme and language preferences
+- **AccountsScreen** (`app/screens/AccountsScreen.js`): Full-featured account management with add/edit/delete
 
 ### Data Persistence
 

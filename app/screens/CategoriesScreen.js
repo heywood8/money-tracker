@@ -2,14 +2,14 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useDialog } from './DialogContext';
-import { useCategories } from './CategoriesContext';
-import { useBudgets } from './BudgetsContext';
-import CategoryModal from './CategoryModal';
-import BudgetModal from './BudgetModal';
-import BudgetProgressBar from './components/BudgetProgressBar';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
+import { useCategories } from '../contexts/CategoriesContext';
+import { useBudgets } from '../contexts/BudgetsContext';
+import CategoryModal from '../modals/CategoryModal';
+import BudgetModal from '../modals/BudgetModal';
+import BudgetProgressBar from '../components/BudgetProgressBar';
 
 const CategoriesScreen = () => {
   const { colors } = useTheme();

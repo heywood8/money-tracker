@@ -1,8 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import i18nData from '../assets/i18n.json';
+import i18nData from '../../assets/i18n.json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { appEvents, EVENTS } from './services/eventEmitter';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 
 const STORAGE_KEY = 'app_language';

@@ -2,15 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useAccounts } from './AccountsContext';
-import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from './services/OperationsDB';
-import { getAllCategories } from './services/CategoriesDB';
-import SimplePicker from './components/SimplePicker';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
+import { getAllCategories } from '../services/CategoriesDB';
+import SimplePicker from '../components/SimplePicker';
 
 // Currency formatting helper
-import currencies from '../assets/currencies.json';
+import currencies from '../../assets/currencies.json';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];

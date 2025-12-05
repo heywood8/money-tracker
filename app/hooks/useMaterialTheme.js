@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
-import { useTheme } from './ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * Hook to bridge our existing ThemeContext with React Native Paper's theme

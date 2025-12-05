@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 export default function Header({ onOpenSettings }) {
   const { colors } = useTheme();

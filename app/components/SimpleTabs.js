@@ -2,14 +2,14 @@ import React, { useMemo, useCallback, memo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text, Surface } from 'react-native-paper';
-import OperationsScreen from './OperationsScreen';
-import AccountsScreen from './AccountsScreen';
-import CategoriesScreen from './CategoriesScreen';
-import GraphsScreen from './GraphsScreen';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
+import OperationsScreen from '../screens/OperationsScreen';
+import AccountsScreen from '../screens/AccountsScreen';
+import CategoriesScreen from '../screens/CategoriesScreen';
+import GraphsScreen from '../screens/GraphsScreen';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 import Header from './Header';
-import SettingsModal from './SettingsModal';
+import SettingsModal from '../modals/SettingsModal';
 
 // Memoized tab button component to prevent unnecessary re-renders
 const TabButton = memo(({ tab, isActive, colors, onPress }) => {

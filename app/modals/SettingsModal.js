@@ -3,11 +3,11 @@ import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-na
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
-import { useTheme } from './ThemeContext';
-import { useLocalization } from './LocalizationContext';
-import { useDialog } from './DialogContext';
-import { useAccounts } from './AccountsContext';
-import { exportBackup, importBackup } from './services/BackupRestore';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
+import { useAccounts } from '../contexts/AccountsContext';
+import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
 export default function SettingsModal({ visible, onClose }) {

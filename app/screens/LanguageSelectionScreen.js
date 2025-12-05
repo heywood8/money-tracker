@@ -8,7 +8,7 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
-import i18nData from '../assets/i18n.json';
+import i18nData from '../../assets/i18n.json';
 
 const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(null);
