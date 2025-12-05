@@ -1,5 +1,10 @@
 # Penny (React Native + Expo)
 
+![Coverage: Statements](./coverage/badge-statements.svg)
+![Coverage: Branches](./coverage/badge-branches.svg)
+![Coverage: Functions](./coverage/badge-functions.svg)
+![Coverage: Lines](./coverage/badge-lines.svg)
+
 This is a minimal Expo (React Native) scaffold for a personal finance tracking mobile app. All core features will be added iteratively.
 
 ## Getting Started
@@ -22,6 +27,22 @@ npm start
 - For Android: `npm run android`
 
 **Note:** This project now supports only Android. iOS and Web support have been removed.
+
+## Testing
+
+Run tests with coverage:
+
+```sh
+npm run test:coverage
+```
+
+This will run all Jest tests and automatically update the coverage badges displayed at the top of this README. The badges show real-time metrics for:
+- **Statements**: Percentage of statements executed
+- **Branches**: Percentage of conditional branches tested
+- **Functions**: Percentage of functions called
+- **Lines**: Percentage of lines executed
+
+Current test suite: **568 tests** across 16 test suites covering contexts, services, components, and integration scenarios.
 
 ## Project Structure
 - `App.js`: Main entry point
