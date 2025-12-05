@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import uuid from 'react-native-uuid';
-import defaultCategories from './defaults/defaultCategories.json';
-import * as CategoriesDB from './services/CategoriesDB';
-import { appEvents, EVENTS } from './services/eventEmitter';
+import defaultCategories from '../defaults/defaultCategories.json';
+import * as CategoriesDB from '../services/CategoriesDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useLocalization } from './LocalizationContext';
 import { useDialog } from './DialogContext';
 

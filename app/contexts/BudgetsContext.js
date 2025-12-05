@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import uuid from 'react-native-uuid';
-import * as BudgetsDB from './services/BudgetsDB';
-import { appEvents, EVENTS } from './services/eventEmitter';
+import * as BudgetsDB from '../services/BudgetsDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
 const BudgetsContext = createContext();

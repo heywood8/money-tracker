@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import uuid from 'react-native-uuid';
-import currencies from '../assets/currencies.json';
-import defaultAccounts from './defaults/defaultAccounts';
-import * as AccountsDB from './services/AccountsDB';
-import { performMigration, isMigrationComplete } from './services/migration';
-import { appEvents, EVENTS } from './services/eventEmitter';
+import currencies from '../../assets/currencies.json';
+import defaultAccounts from '../defaults/defaultAccounts';
+import * as AccountsDB from '../services/AccountsDB';
+import { performMigration, isMigrationComplete } from '../services/migration';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
 const AccountsContext = createContext();

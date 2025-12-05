@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import MaterialDialog from './MaterialDialog';
+import MaterialDialog from '../components/MaterialDialog';
 
 const DialogContext = createContext();
 

@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import uuid from 'react-native-uuid';
-import * as OperationsDB from './services/OperationsDB';
+import * as OperationsDB from '../services/OperationsDB';
 import { useAccounts } from './AccountsContext';
-import { appEvents, EVENTS } from './services/eventEmitter';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
 const OperationsContext = createContext();
