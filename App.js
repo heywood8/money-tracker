@@ -1,18 +1,18 @@
 import React from 'react';
-import AppInitializer from './app/AppInitializer';
-import { ThemeProvider } from './app/ThemeContext';
-import { AccountsProvider } from './app/AccountsContext';
-import { CategoriesProvider } from './app/CategoriesContext';
-import { OperationsProvider } from './app/OperationsContext';
-import { BudgetsProvider } from './app/BudgetsContext';
-import { LocalizationProvider } from './app/LocalizationContext';
-import { DialogProvider } from './app/DialogContext';
-import ErrorBoundary from './app/ErrorBoundary';
+import AppInitializer from './app/screens/AppInitializer';
+import { ThemeProvider } from './app/contexts/ThemeContext';
+import { AccountsProvider } from './app/contexts/AccountsContext';
+import { CategoriesProvider } from './app/contexts/CategoriesContext';
+import { OperationsProvider } from './app/contexts/OperationsContext';
+import { BudgetsProvider } from './app/contexts/BudgetsContext';
+import { LocalizationProvider } from './app/contexts/LocalizationContext';
+import { DialogProvider } from './app/contexts/DialogContext';
+import ErrorBoundary from './app/components/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
-import { useMaterialTheme } from './app/useMaterialTheme';
+import { useMaterialTheme } from './app/hooks/useMaterialTheme';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -35,7 +35,7 @@ Sentry.init({
 });
 
 function ThemedStatusBar() {
-  const { colorScheme, colors } = require('./app/ThemeContext').useTheme();
+  const { colorScheme, colors } = require('./app/contexts/ThemeContext').useTheme();
   const barStyle = colorScheme === 'dark' ? 'light-content' : 'dark-content';
   React.useEffect(() => {
     try {
