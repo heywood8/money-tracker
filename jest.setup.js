@@ -244,6 +244,9 @@ beforeAll(() => {
       'Warning:',
       'not found',
       'skipping',
+      'Failed to checkpoint database',
+      'dynamic import callback',
+      'experimental-vm-modules',
     ];
     
     const shouldSuppress = suppressedPatterns.some(pattern =>
@@ -256,24 +259,9 @@ beforeAll(() => {
   };
 
   console.log = (...args) => {
-    const message = args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-    ).join(' ');
-    
-    const suppressedPatterns = [
-      // Suppress expected log messages during tests
-      'Performing first-time migration',
-      'No accounts found',
-      'creating defaults',
-    ];
-    
-    const shouldSuppress = suppressedPatterns.some(pattern =>
-      message.includes(pattern)
-    );
-    
-    if (!shouldSuppress) {
-      originalConsoleLog.apply(console, args);
-    }
+    // Suppress all console.log during tests
+    // If you need to see logs for debugging, comment out this line
+    // originalConsoleLog.apply(console, args);
   };
 });
 
