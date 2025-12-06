@@ -56,8 +56,9 @@ buck-out/
 credentials.json
 *.keystore.base64.txt
 
-# Test coverage
-coverage/
+# Test coverage (keep badge SVGs)
+coverage/*
+!coverage/badge*.svg
 *.lcov
 
 # Env files
