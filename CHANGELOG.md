@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/heywood8/money-tracker/compare/penny-v0.8.1...penny-v0.8.2) (2025-12-06)
+
+
+### Bug Fixes
+
+* close button on add-new-operation / categories screen ([a2141fd](https://github.com/heywood8/money-tracker/commit/a2141fddf72b9ae412293c4092e90c1e61cfbcb5))
+
 ## [0.8.1](https://github.com/heywood8/money-tracker/compare/penny-v0.8.0...penny-v0.8.1) (2025-12-04)
 
 
