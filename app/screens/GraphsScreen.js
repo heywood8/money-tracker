@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder } from 'react-native';
-import { PieChart } from 'react-native-chart-kit';
+import { PieChart, LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
+import { getBurndownData } from '../services/BurndownDB';
 import SimplePicker from '../components/SimplePicker';
 
 // Currency formatting helper
@@ -103,6 +104,13 @@ const GraphsScreen = () => {
   const [loadingIncome, setLoadingIncome] = useState(true);
   const [availableMonths, setAvailableMonths] = useState([]);
 
+  // Burndown state
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [burndownData, setBurndownData] = useState(null);
+  const [loadingBurndown, setLoadingBurndown] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
@@ -172,6 +180,15 @@ const GraphsScreen = () => {
       setSelectedCurrency('');
     }
   }, [accounts, selectedCurrency]);
+
+  // Initialize default account for burndown
+  useEffect(() => {
+    if (accounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accounts[0].id);
+    } else if (accounts.length === 0 && selectedAccountId) {
+      setSelectedAccountId('');
+    }
+  }, [accounts, selectedAccountId]);
 
   // Load categories
   useEffect(() => {
@@ -566,6 +583,26 @@ const GraphsScreen = () => {
     }
   }, [selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors.text, t]);
 
+  // Load burndown data
+  const loadBurndownData = useCallback(async () => {
+    if (!selectedAccountId || selectedMonth === null) return;
+
+    try {
+      setLoadingBurndown(true);
+      const data = await getBurndownData(
+        selectedAccountId,
+        selectedYear,
+        selectedMonth
+      );
+      setBurndownData(data);
+    } catch (error) {
+      console.error('Failed to load burndown data:', error);
+      setBurndownData(null);
+    } finally {
+      setLoadingBurndown(false);
+    }
+  }, [selectedAccountId, selectedYear, selectedMonth]);
+
   // Reload data when filters change
   useEffect(() => {
     if (categories.length > 0) {
@@ -573,6 +610,13 @@ const GraphsScreen = () => {
       loadIncomeData();
     }
   }, [loadExpenseData, loadIncomeData, categories.length]);
+
+  // Load burndown data when account or month changes
+  useEffect(() => {
+    if (selectedAccountId && selectedMonth !== null) {
+      loadBurndownData();
+    }
+  }, [loadBurndownData, selectedAccountId, selectedMonth]);
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -625,6 +669,20 @@ const GraphsScreen = () => {
     });
     return items;
   }, [availableMonthsForYear, t, monthKeys]);
+
+  const accountItems = useMemo(() =>
+    accounts.map(acc => ({
+      label: `${acc.name} (${acc.currency})`,
+      value: acc.id
+    })),
+    [accounts]
+  );
+
+  // Get selected account's currency
+  const selectedAccountCurrency = useMemo(() => {
+    const account = accounts.find(acc => acc.id === selectedAccountId);
+    return account?.currency || 'USD';
+  }, [accounts, selectedAccountId]);
 
   // Calculate total expenses
   const totalExpenses = useMemo(() => {
@@ -905,6 +963,211 @@ const GraphsScreen = () => {
               </View>
             </View>
           </TouchableOpacity>
+
+          {/* Burndown Graph Card */}
+          {selectedMonth !== null && (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>
+                {t('burndown_graph')}
+              </Text>
+
+              {/* Account Selector */}
+              <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 16 }]}>
+                <SimplePicker
+                  value={selectedAccountId}
+                  onValueChange={setSelectedAccountId}
+                  items={accountItems}
+                  colors={colors}
+                />
+              </View>
+
+              {/* LineChart */}
+              {loadingBurndown ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+              ) : burndownData &&
+                  Array.isArray(burndownData.current) &&
+                  burndownData.current.length > 0 &&
+                  Array.isArray(burndownData.previous) &&
+                  Array.isArray(burndownData.planned) &&
+                  Array.isArray(burndownData.mean) ? (
+                <>
+                  <LineChart
+                    data={{
+                      labels: Array.from({ length: burndownData.daysInMonth || 30 }, (_, i) =>
+                        (i + 1) % 5 === 0 || i === 0 ? (i + 1).toString() : ''
+                      ),
+                      datasets: [
+                        {
+                          // NOTE: Truncate current month line to current day
+                          // When viewing current month, only show data up to today to avoid
+                          // displaying future days with inaccurate/zero balances.
+                          // For past months, show full month (all days).
+                          data: burndownData.isCurrentMonth && burndownData.currentDay
+                            ? burndownData.current.slice(0, burndownData.currentDay)
+                            : burndownData.current,
+                          color: (opacity = 1) => `rgba(34, 197, 94, 1)`, // Green - solid
+                          strokeWidth: 3,
+                          withDots: false,
+                        },
+                        {
+                          data: burndownData.previous.length > 0 ? burndownData.previous : [0],
+                          color: (opacity = 1) => `rgba(100, 116, 139, 1)`, // Slate gray - solid
+                          strokeWidth: 3,
+                          withDots: false,
+                        },
+                        {
+                          data: burndownData.planned.length > 0 ? burndownData.planned : [0],
+                          color: (opacity = 1) => `rgba(59, 130, 246, 1)`, // Blue - solid
+                          strokeWidth: 3,
+                          withDots: false,
+                        },
+                        {
+                          data: burndownData.mean.length > 0 ? burndownData.mean : [0],
+                          color: (opacity = 1) => `rgba(251, 146, 60, 1)`, // Orange - solid, more vibrant
+                          strokeWidth: 3,
+                          withDots: false,
+                        },
+                      ],
+                    }}
+                    width={Dimensions.get('window').width - 64}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: colors.surface,
+                      backgroundGradientFrom: colors.surface,
+                      backgroundGradientTo: colors.surface,
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => colors.text,
+                      labelColor: (opacity = 1) => colors.mutedText,
+                      propsForDots: {
+                        r: "0",
+                        strokeWidth: "0"
+                      },
+                      fillShadowGradient: 'transparent',
+                      fillShadowGradientOpacity: 0,
+                    }}
+                    // NOTE: Bezier smoothing enabled for visual appeal
+                    // Trade-off: Planned line (mathematically straight) will have slight curve
+                    // This is acceptable for better appearance of actual data lines
+                    bezier
+                    withDots={false}
+                    withInnerLines={false}
+                    withOuterLines={true}
+                    withShadow={false}
+                    segments={4}
+                    fromZero={true}
+                    onDataPointClick={(data) => {
+                      try {
+                        const dayIndex = data?.index;
+                        if (dayIndex !== undefined && dayIndex !== null) {
+                          setSelectedDay(dayIndex);
+                          setTooltipVisible(true);
+                        }
+                      } catch (error) {
+                        console.error('Error handling data point click:', error);
+                      }
+                    }}
+                    style={styles.burndownChart}
+                  />
+
+                  {/* Tooltip */}
+                  {tooltipVisible && selectedDay !== null && burndownData && (
+                    <View style={[styles.tooltip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <View style={styles.tooltipHeader}>
+                        <Text style={[styles.tooltipTitle, { color: colors.text }]}>
+                          Day {selectedDay + 1}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setTooltipVisible(false)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Close tooltip"
+                        >
+                          <Icon name="close" size={20} color={colors.mutedText} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.tooltipContent}>
+                        {burndownData?.current?.[selectedDay] !== undefined && (
+                          <View style={styles.tooltipRow}>
+                            <View style={[styles.tooltipDot, { backgroundColor: 'rgba(34, 197, 94, 1)' }]} />
+                            <Text style={[styles.tooltipLabel, { color: colors.text }]}>
+                              {t('current_month')}:
+                            </Text>
+                            <Text style={[styles.tooltipValue, { color: colors.text }]}>
+                              {formatCurrency(burndownData.current[selectedDay], selectedAccountCurrency)}
+                            </Text>
+                          </View>
+                        )}
+                        {burndownData?.previous?.[selectedDay] !== undefined && (
+                          <View style={styles.tooltipRow}>
+                            <View style={[styles.tooltipDot, { backgroundColor: 'rgba(100, 116, 139, 1)' }]} />
+                            <Text style={[styles.tooltipLabel, { color: colors.text }]}>
+                              {t('previous_month')}:
+                            </Text>
+                            <Text style={[styles.tooltipValue, { color: colors.text }]}>
+                              {formatCurrency(burndownData.previous[selectedDay], selectedAccountCurrency)}
+                            </Text>
+                          </View>
+                        )}
+                        {burndownData?.planned?.[selectedDay] !== undefined && (
+                          <View style={styles.tooltipRow}>
+                            <View style={[styles.tooltipDot, { backgroundColor: 'rgba(59, 130, 246, 1)' }]} />
+                            <Text style={[styles.tooltipLabel, { color: colors.text }]}>
+                              {t('planned')}:
+                            </Text>
+                            <Text style={[styles.tooltipValue, { color: colors.text }]}>
+                              {formatCurrency(burndownData.planned[selectedDay], selectedAccountCurrency)}
+                            </Text>
+                          </View>
+                        )}
+                        {burndownData?.mean?.[selectedDay] !== undefined && (
+                          <View style={styles.tooltipRow}>
+                            <View style={[styles.tooltipDot, { backgroundColor: 'rgba(251, 146, 60, 1)' }]} />
+                            <Text style={[styles.tooltipLabel, { color: colors.text }]}>
+                              {t('12_month_mean')}:
+                            </Text>
+                            <Text style={[styles.tooltipValue, { color: colors.text }]}>
+                              {formatCurrency(burndownData.mean[selectedDay], selectedAccountCurrency)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Legend */}
+                  <View style={styles.burndownLegend}>
+                    <View style={styles.legendRow}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: 'rgba(34, 197, 94, 1)' }]} />
+                        <Text style={[styles.legendLabel, { color: colors.text }]}>{t('current_month')}</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: 'rgba(100, 116, 139, 1)' }]} />
+                        <Text style={[styles.legendLabel, { color: colors.text }]}>{t('previous_month')}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.legendRow}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: 'rgba(59, 130, 246, 1)' }]} />
+                        <Text style={[styles.legendLabel, { color: colors.text }]}>{t('planned')}</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: 'rgba(251, 146, 60, 1)' }]} />
+                        <Text style={[styles.legendLabel, { color: colors.text }]}>{t('12_month_mean')}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={[styles.noDataText, { color: colors.mutedText }]}>
+                    {t('no_burndown_data')}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -1311,6 +1574,99 @@ const styles = StyleSheet.create({
   },
   predictionFooterValue: {
     fontWeight: '600',
+  },
+  burndownChart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  burndownLegend: {
+    marginTop: 16,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  legendLabel: {
+    fontSize: 12,
+  },
+  loadingContainer: {
+    height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noDataContainer: {
+    height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tooltip: {
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tooltipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  tooltipTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tooltipContent: {
+  },
+  tooltipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 3,
+  },
+  tooltipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  tooltipLabel: {
+    fontSize: 13,
+    flex: 1,
+    marginRight: 8,
+  },
+  tooltipValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
   },
 });
 

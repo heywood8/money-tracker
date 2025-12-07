@@ -63,6 +63,7 @@ export const createAccount = async (account) => {
       currency: account.currency || 'USD',
       displayOrder: account.display_order ?? account.displayOrder ?? newOrder,
       hidden: account.hidden ?? 0,
+      monthlyTarget: account.monthly_target ?? account.monthlyTarget ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -93,6 +94,9 @@ export const updateAccount = async (id, updates) => {
     if (updates.balance !== undefined) updateData.balance = updates.balance;
     if (updates.currency !== undefined) updateData.currency = updates.currency;
     if (updates.hidden !== undefined) updateData.hidden = updates.hidden ? 1 : 0;
+    if (updates.monthly_target !== undefined || updates.monthlyTarget !== undefined) {
+      updateData.monthlyTarget = updates.monthly_target ?? updates.monthlyTarget;
+    }
 
     if (Object.keys(updateData).length === 1) {
       return; // Nothing to update besides updatedAt

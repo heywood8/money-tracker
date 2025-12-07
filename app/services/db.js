@@ -3,7 +3,7 @@ import * as SQLite from 'expo-sqlite';
 import * as schema from '../db/schema';
 
 const DB_NAME = 'penny.db';
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 
 let dbInstance = null;
 let drizzleInstance = null;
@@ -624,6 +624,34 @@ const migrateToV9 = async (db) => {
 };
 
 /**
+ * Migrate from V9 to V10 - Add monthly_target field to accounts
+ */
+const migrateToV10 = async (db) => {
+  try {
+    console.log('Starting migration to V10: Add monthly_target field to accounts...');
+
+    // Check if monthly_target column already exists
+    const tableInfo = await db.getAllAsync('PRAGMA table_info(accounts)');
+    const hasMonthlyTargetColumn = tableInfo.some(col => col.name === 'monthly_target');
+
+    if (hasMonthlyTargetColumn) {
+      console.log('monthly_target column already exists, skipping migration...');
+      return;
+    }
+
+    // Add monthly_target column to accounts table (optional field, no default)
+    await db.execAsync(`
+      ALTER TABLE accounts ADD COLUMN monthly_target TEXT;
+    `);
+
+    console.log('Migration to V10 completed successfully');
+  } catch (error) {
+    console.error('Failed to migrate to V10:', error);
+    throw error;
+  }
+};
+
+/**
  * Initialize database schema
  */
 const initializeDatabase = async (rawDb) => {
@@ -693,6 +721,10 @@ const initializeDatabase = async (rawDb) => {
         if (currentVersion >= 8 && currentVersion < 9) {
           console.log('Migrating database from version', currentVersion, 'to version 9...');
           await migrateToV9(rawDb);
+        }
+        if (currentVersion >= 9 && currentVersion < 10) {
+          console.log('Migrating database from version', currentVersion, 'to version 10...');
+          await migrateToV10(rawDb);
         }
 
         // Force-check for V7 columns (safety net for migration issues)
