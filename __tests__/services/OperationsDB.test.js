@@ -858,4 +858,286 @@ describe('OperationsDB Service', () => {
       expect(executeTransaction).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('Filtered Query Operations', () => {
+    describe('getFilteredOperationsByWeekFromDate', () => {
+      it('filters operations by type', async () => {
+        const mockOperations = [
+          {
+            id: 'op1',
+            type: 'expense',
+            amount: '100',
+            account_id: 'acc1',
+            category_id: 'cat1',
+            date: '2025-12-05',
+            created_at: '2025-12-05T10:00:00Z',
+          },
+        ];
+        queryAll.mockResolvedValue(mockOperations);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        expect(queryAll).toHaveBeenCalled();
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.type IN (?)');
+        expect(result).toHaveLength(1);
+        expect(result[0].type).toBe('expense');
+      });
+
+      it('filters by multiple account IDs', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { accountIds: ['acc1', 'acc2'] };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.account_id IN (?,?) OR o.to_account_id IN (?,?)');
+      });
+
+      it('filters by category IDs', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { categoryIds: ['cat1', 'cat2'] };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.category_id IN (?,?)');
+      });
+
+      it('filters by search text across multiple fields', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: 'grocery' };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('o.amount LIKE ?');
+        expect(sqlCall).toContain('a.name LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('c.name LIKE ? COLLATE NOCASE');
+      });
+
+      it('filters by amount range (min and max)', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { amountRange: { min: 10, max: 100 } };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+      });
+
+      it('filters by amount range (min only)', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { amountRange: { min: 10, max: null } };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+        expect(sqlCall).not.toContain('CAST(o.amount AS REAL) <= ?');
+      });
+
+      it('filters by date range', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { dateRange: { startDate: '2025-12-01', endDate: '2025-12-31' } };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.date >= ?');
+        expect(sqlCall).toContain('o.date <= ?');
+      });
+
+      it('combines multiple filters correctly', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = {
+          types: ['expense'],
+          accountIds: ['acc1'],
+          searchText: 'test',
+          amountRange: { min: 10, max: 100 },
+        };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.type IN (?)');
+        expect(sqlCall).toContain('o.account_id IN (?)');
+        expect(sqlCall).toContain('o.description LIKE ?');
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+      });
+
+      it('returns empty array when no operations match', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        expect(result).toEqual([]);
+      });
+
+      it('handles special characters in search text safely', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: "'; DROP TABLE operations; --" };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        // Should use parameterized query, not string interpolation
+        const params = queryAll.mock.calls[0][1];
+        expect(params).toContain("%'; DROP TABLE operations; --%");
+      });
+
+      it('uses DISTINCT to avoid duplicates from JOINs', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: 'test' };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('SELECT DISTINCT o.*');
+      });
+
+      it('orders results by date DESC and created_at DESC', async () => {
+        queryAll.mockResolvedValue([]);
+
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', {});
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('ORDER BY o.date DESC, o.created_at DESC');
+      });
+    });
+
+    describe('getNextOldestFilteredOperation', () => {
+      it('finds next operation before given date matching filters', async () => {
+        const mockOperation = {
+          id: 'op1',
+          type: 'expense',
+          amount: '100',
+          account_id: 'acc1',
+          date: '2025-12-01',
+          created_at: '2025-12-01T10:00:00Z',
+        };
+        queryFirst.mockResolvedValue(mockOperation);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+        expect(queryFirst).toHaveBeenCalled();
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('WHERE o.date < ?');
+        expect(sqlCall).toContain('LIMIT 1');
+        expect(result.id).toBe('op1');
+      });
+
+      it('returns null when no older operations match filters', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+        expect(result).toBeNull();
+      });
+
+      it('applies same filters as getFilteredOperationsByWeekFromDate', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = {
+          types: ['expense'],
+          accountIds: ['acc1'],
+          searchText: 'test',
+        };
+        await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('o.type IN (?)');
+        expect(sqlCall).toContain('o.account_id IN (?)');
+        expect(sqlCall).toContain('o.description LIKE ?');
+      });
+    });
+
+    describe('getFilteredOperationsByWeekOffset', () => {
+      it('calculates date from week offset and calls getFilteredOperationsByWeekFromDate', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { types: ['expense'] };
+        await OperationsDB.getFilteredOperationsByWeekOffset(0, filters);
+
+        expect(queryAll).toHaveBeenCalled();
+      });
+
+      it('handles week offset 0 (current week)', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = {};
+        await OperationsDB.getFilteredOperationsByWeekOffset(0, filters);
+
+        expect(queryAll).toHaveBeenCalled();
+        const params = queryAll.mock.calls[0][1];
+        expect(params).toHaveLength(2); // startDate and endDate
+      });
+
+      it('handles week offset 1 (previous week)', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = {};
+        await OperationsDB.getFilteredOperationsByWeekOffset(1, filters);
+
+        expect(queryAll).toHaveBeenCalled();
+      });
+    });
+
+    describe('Regression Tests', () => {
+      it('handles empty filters object gracefully', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const result = await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', {});
+
+        expect(result).toEqual([]);
+        expect(queryAll).toHaveBeenCalled();
+      });
+
+      it('handles null/undefined filter values', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = {
+          types: null,
+          accountIds: undefined,
+          searchText: null,
+          amountRange: { min: null, max: null },
+        };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        expect(queryAll).toHaveBeenCalled();
+      });
+
+      it('handles empty arrays in filters', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = {
+          types: [],
+          accountIds: [],
+          categoryIds: [],
+        };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        // Empty arrays should not add WHERE clauses
+        expect(sqlCall).not.toContain('o.type IN ()');
+      });
+
+      it('handles whitespace-only search text', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: '   ' };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        // Should trim and skip search
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).not.toContain('o.description LIKE ?');
+      });
+    });
+  });
 });

@@ -19,7 +19,7 @@ export default function Header({ onOpenSettings }) {
     >
       <View style={styles.titleContainer}>
         <Image
-          source={require('../assets/icon.png')}
+          source={require('../../assets/icon.png')}
           style={styles.icon}
           accessibilityLabel="Penny app icon"
         />
