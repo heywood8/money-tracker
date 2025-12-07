@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
+import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -9,6 +10,7 @@ import { useAccounts } from '../contexts/AccountsContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import OperationModal from '../modals/OperationModal';
+import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import currencies from '../../assets/currencies.json';
 
@@ -207,6 +209,11 @@ const OperationsScreen = () => {
     addOperation,
     validateOperation,
     loadMoreOperations,
+    activeFilters,
+    filtersActive,
+    updateFilters,
+    clearFilters,
+    getActiveFilterCount,
   } = useOperations();
   const { visibleAccounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -214,6 +221,7 @@ const OperationsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
 
   // Quick add form state
   const [quickAddValues, setQuickAddValues] = useState({
@@ -894,6 +902,33 @@ const OperationsScreen = () => {
         </Pressable>
       </Modal>
 
+      {/* Filter FAB */}
+      {!operationsLoading && (
+        <FAB
+          icon="filter-variant"
+          style={[
+            styles.filterFab,
+            { backgroundColor: filtersActive ? colors.primary : colors.surface }
+          ]}
+          color={filtersActive ? '#fff' : colors.text}
+          onPress={() => setFilterModalVisible(true)}
+          label={filtersActive ? String(getActiveFilterCount()) : undefined}
+          small={false}
+        />
+      )}
+
+      {/* Filter Modal */}
+      <FilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={activeFilters}
+        onApplyFilters={updateFilters}
+        accounts={visibleAccounts}
+        categories={categories}
+        t={t}
+        colors={colors}
+      />
+
       <OperationModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -1213,6 +1248,12 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     marginTop: 8,
     fontSize: 14,
+  },
+  filterFab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
 

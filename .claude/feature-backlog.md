@@ -27,9 +27,11 @@ This document contains potential features for the Penny app. Use the architect a
 ## Medium Priority Features
 
 ### 4. Search and Filters
-**Status**: Not Started
+**Status**: ✅ Completed (with comprehensive test coverage)
 **Description**: Enable users to search operations by text and filter by date range, category, account, or amount.
 **User Value**: Makes it easy to find specific transactions in large datasets.
+**Implementation**: Floating action button (FAB) opens filter modal with comprehensive search across description, amount, account names, and category names. Filters include type (expense/income/transfer), accounts, categories, date range, and amount range. Week-based lazy loading maintained with filters applied to each batch. Filter state persists across navigation using AsyncStorage.
+**Testing**: 121 tests covering database queries, component behavior, integration workflows, edge cases, and null-safety.
 **Command**: Use architect agent to design search and filters feature
 
 ### 5. Attachments (Receipts/Photos)
