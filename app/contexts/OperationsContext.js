@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccounts } from './AccountsContext';
@@ -35,17 +36,60 @@ export const OperationsProvider = ({ children }) => {
   const [hasMoreOperations, setHasMoreOperations] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // Filter state
+  const [activeFilters, setActiveFilters] = useState({
+    types: [],
+    accountIds: [],
+    categoryIds: [],
+    searchText: '',
+    dateRange: { startDate: null, endDate: null },
+    amountRange: { min: null, max: null },
+  });
+  const [filtersActive, setFiltersActive] = useState(false);
+  const FILTERS_STORAGE_KEY = 'operations_active_filters';
+
+  // Helper to check if any filters are active
+  const hasActiveFilters = useCallback((filters) => {
+    return (
+      filters.types.length > 0 ||
+      filters.accountIds.length > 0 ||
+      filters.categoryIds.length > 0 ||
+      filters.searchText.trim().length > 0 ||
+      filters.dateRange.startDate !== null ||
+      filters.dateRange.endDate !== null ||
+      filters.amountRange.min !== null ||
+      filters.amountRange.max !== null
+    );
+  }, []);
+
+  // Count active filter groups
+  const getActiveFilterCount = useCallback(() => {
+    let count = 0;
+    if (activeFilters.types.length > 0) count++;
+    if (activeFilters.accountIds.length > 0) count++;
+    if (activeFilters.categoryIds.length > 0) count++;
+    if (activeFilters.searchText.trim().length > 0) count++;
+    if (activeFilters.dateRange.startDate || activeFilters.dateRange.endDate) count++;
+    if (activeFilters.amountRange.min !== null || activeFilters.amountRange.max !== null) count++;
+    return count;
+  }, [activeFilters]);
+
   // Load initial week of operations
-  const loadInitialOperations = useCallback(async () => {
+  const loadInitialOperations = useCallback(async (filters = activeFilters) => {
     try {
       setLoading(true);
-      const operationsData = await OperationsDB.getOperationsByWeekOffset(0);
+      const isFiltered = hasActiveFilters(filters);
+      const operationsData = isFiltered
+        ? await OperationsDB.getFilteredOperationsByWeekOffset(0, filters)
+        : await OperationsDB.getOperationsByWeekOffset(0);
       setOperations(operationsData);
 
       // Track the oldest date in the initial load
       if (operationsData.length > 0) {
         const oldestOp = operationsData[operationsData.length - 1];
         setOldestLoadedDate(oldestOp.date);
+      } else {
+        setOldestLoadedDate(null);
       }
 
       // Always assume there might be more operations initially
@@ -56,7 +100,7 @@ export const OperationsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeFilters, hasActiveFilters]);
 
   // Load more operations (next week with operations)
   // Triggered only when user scrolls to the bottom
@@ -67,15 +111,21 @@ export const OperationsProvider = ({ children }) => {
     try {
       setLoadingMore(true);
 
+      const isFiltered = hasActiveFilters(activeFilters);
+
       // Find the next oldest operation before our current oldest date
-      const nextOp = await OperationsDB.getNextOldestOperation(oldestLoadedDate);
+      const nextOp = isFiltered
+        ? await OperationsDB.getNextOldestFilteredOperation(oldestLoadedDate, activeFilters)
+        : await OperationsDB.getNextOldestOperation(oldestLoadedDate);
 
       if (!nextOp) {
         // No more operations found
         setHasMoreOperations(false);
       } else {
         // Load a week of operations starting from this operation's date
-        const moreOperations = await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
+        const moreOperations = isFiltered
+          ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, activeFilters)
+          : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
 
         // Merge and deduplicate operations by ID
         setOperations(prevOps => {
@@ -95,7 +145,7 @@ export const OperationsProvider = ({ children }) => {
     } finally {
       setLoadingMore(false);
     }
-  }, [oldestLoadedDate, hasMoreOperations, loadingMore]);
+  }, [oldestLoadedDate, hasMoreOperations, loadingMore, activeFilters, hasActiveFilters]);
 
   // Reload operations from database (loads all operations)
   const reloadOperations = useCallback(async () => {
@@ -113,6 +163,23 @@ export const OperationsProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  // Load filters from AsyncStorage on mount
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(FILTERS_STORAGE_KEY);
+        if (stored) {
+          const filters = JSON.parse(stored);
+          setActiveFilters(filters);
+          setFiltersActive(hasActiveFilters(filters));
+        }
+      } catch (error) {
+        console.error('Failed to load filters:', error);
+      }
+    };
+    loadFilters();
+  }, [FILTERS_STORAGE_KEY, hasActiveFilters]);
 
   // Load operations from SQLite on mount
   useEffect(() => {
@@ -220,6 +287,36 @@ export const OperationsProvider = ({ children }) => {
     }
   }, [reloadAccounts, showDialog]);
 
+  // Update filters and reload operations
+  const updateFilters = useCallback(async (newFilters) => {
+    try {
+      setActiveFilters(newFilters);
+      const isActive = hasActiveFilters(newFilters);
+      setFiltersActive(isActive);
+
+      // Persist filters to AsyncStorage
+      await AsyncStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(newFilters));
+
+      // Reset to first week when filters change
+      await loadInitialOperations(newFilters);
+    } catch (error) {
+      console.error('Failed to update filters:', error);
+    }
+  }, [hasActiveFilters, loadInitialOperations, FILTERS_STORAGE_KEY]);
+
+  // Clear all filters
+  const clearFilters = useCallback(async () => {
+    const emptyFilters = {
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      searchText: '',
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    };
+    await updateFilters(emptyFilters);
+  }, [updateFilters]);
+
   const validateOperation = useCallback((operation, t = (key) => key) => {
     if (!operation.type) {
       return t('operation_type_required') || 'Operation type is required';
@@ -279,6 +376,11 @@ export const OperationsProvider = ({ children }) => {
     reloadOperations,
     loadMoreOperations,
     loadInitialOperations,
+    activeFilters,
+    filtersActive,
+    updateFilters,
+    clearFilters,
+    getActiveFilterCount,
   }), [
     operations,
     loading,
@@ -294,6 +396,11 @@ export const OperationsProvider = ({ children }) => {
     reloadOperations,
     loadMoreOperations,
     loadInitialOperations,
+    activeFilters,
+    filtersActive,
+    updateFilters,
+    clearFilters,
+    getActiveFilterCount,
   ]);
 
   return (
