@@ -204,7 +204,7 @@ const calculateDailyBalancesInMemory = (accountId, startDate, endDate, allOperat
  * @param {string} currentBalance - Current account balance
  * @returns {Array<{day: number, meanBalance: string}>}
  */
-const calculateMonthMeanInMemory = (accountId, year, month, numMonths, allOperations, currentBalance) => {
+const calculateMonthMeanInMemory = (accountId, year, month, numMonths = 12, allOperations, currentBalance) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const meanBalances = [];
 
