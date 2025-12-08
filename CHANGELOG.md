@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/heywood8/money-tracker/compare/penny-v0.11.1...penny-v0.11.2) (2025-12-08)
+
+
+### Bug Fixes
+
+* **perf:** optimizing build with r8 ([4a38ea0](https://github.com/heywood8/money-tracker/commit/4a38ea0a51db41fb47e5ce095323edbd4a335257))
+
 ## [0.11.1](https://github.com/heywood8/money-tracker/compare/penny-v0.11.0...penny-v0.11.1) (2025-12-08)
 
 
