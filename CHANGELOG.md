@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3](https://github.com/heywood8/money-tracker/compare/penny-v0.11.2...penny-v0.11.3) (2025-12-08)
+
+
+### Bug Fixes
+
+* **build:** production build ([19b7907](https://github.com/heywood8/money-tracker/commit/19b790712b05020265ae998ae82bc7bf7d58934f))
+
 ## [0.11.2](https://github.com/heywood8/money-tracker/compare/penny-v0.11.1...penny-v0.11.2) (2025-12-08)
 
 
