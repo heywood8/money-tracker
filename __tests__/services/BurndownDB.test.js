@@ -1,7 +1,4 @@
 import {
-  getBalanceAtDate,
-  getDailyBalances,
-  get12MonthMean,
   getBurndownData
 } from '../../app/services/BurndownDB';
 import * as db from '../../app/services/db';
@@ -29,65 +26,71 @@ describe('BurndownDB', () => {
     });
   });
 
-  describe('getBalanceAtDate', () => {
-    it('calculates correct balance with expenses and income', async () => {
+  describe('Balance Calculations', () => {
+    it('calculates correct balances with expenses and income', async () => {
       // Mock current balance
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '1000.00' });
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
 
-      // Mock future operations (after target date)
-      db.queryAll.mockResolvedValueOnce([
+      // Mock operations
+      db.queryAll.mockResolvedValue([
         {
           id: 'op1',
           type: 'expense',
           amount: '100.00',
           account_id: 'acc1',
-          date: '2025-12-10',
-          created_at: '2025-12-10T10:00:00Z'
+          date: '2025-01-10',
+          created_at: '2025-01-10T10:00:00Z'
         },
         {
           id: 'op2',
           type: 'income',
           amount: '50.00',
           account_id: 'acc1',
-          date: '2025-12-15',
-          created_at: '2025-12-15T10:00:00Z'
+          date: '2025-01-15',
+          created_at: '2025-01-15T10:00:00Z'
         }
       ]);
 
-      const balance = await getBalanceAtDate('acc1', '2025-12-05');
+      const data = await getBurndownData('acc1', 2025, 0); // January
 
-      // Current: 1000
-      // Reverse op2 (income +50): 1000 - 50 = 950
-      // Reverse op1 (expense -100): 950 + 100 = 1050
-      expect(balance).toBe('1050.00');
+      // Check that operations are applied correctly
+      // Current balance (today): 1000
+      // Reverse from today: -50 (income) +100 (expense) = 1050 at Dec 31
+      // Day 1-9: 1050 (no operations yet)
+      // Day 10: 1050 - 100 (expense) = 950
+      expect(data.currentMonthData[9].balance).toBe('950.00');
+      // Day 15: 950 + 50 (income) = 1000
+      expect(data.currentMonthData[14].balance).toBe('1000.00');
     });
 
     it('handles transfers correctly', async () => {
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '500.00' });
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '500.00' });
 
-      db.queryAll.mockResolvedValueOnce([
+      db.queryAll.mockResolvedValue([
         {
           id: 'transfer1',
           type: 'transfer',
           amount: '200.00',
           account_id: 'acc1',
           to_account_id: 'acc2',
-          date: '2025-12-10',
-          created_at: '2025-12-10T10:00:00Z'
+          date: '2025-01-10',
+          created_at: '2025-01-10T10:00:00Z'
         }
       ]);
 
-      const balance = await getBalanceAtDate('acc1', '2025-12-05');
+      const data = await getBurndownData('acc1', 2025, 0);
 
-      // Current: 500
-      // Reverse transfer out: 500 + 200 = 700
-      expect(balance).toBe('700.00');
+      // Current balance (today): 500
+      // Reverse transfer out from Jan 10: 500 + 200 = 700 at Dec 31
+      // Day 1-9: 700 (no operations yet)
+      // Day 10: 700 - 200 (transfer out) = 500
+      expect(data.currentMonthData[9].balance).toBe('500.00');
     });
 
     it('handles multi-currency transfers with destination_amount', async () => {
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '100.00' });
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '100.00' });
 
-      db.queryAll.mockResolvedValueOnce([
+      db.queryAll.mockResolvedValue([
         {
           id: 'transfer1',
           type: 'transfer',
@@ -95,185 +98,171 @@ describe('BurndownDB', () => {
           destination_amount: '400.00',
           account_id: 'acc2',
           to_account_id: 'acc1',
-          date: '2025-12-10',
-          created_at: '2025-12-10T10:00:00Z'
+          date: '2025-01-10',
+          created_at: '2025-01-10T10:00:00Z'
         }
       ]);
 
-      const balance = await getBalanceAtDate('acc1', '2025-12-05');
+      const data = await getBurndownData('acc1', 2025, 0);
 
-      // Current: 100
-      // Reverse transfer in (destination): 100 - 400 = -300
-      expect(balance).toBe('-300.00');
+      // Current balance (today): 100
+      // Reverse transfer in from Jan 10: 100 - 400 = -300 at Dec 31
+      // Day 1-9: -300 (no operations yet)
+      // Day 10: -300 + 400 (transfer in) = 100
+      expect(data.currentMonthData[9].balance).toBe('100.00');
     });
   });
 
-  describe('getDailyBalances', () => {
+  describe('Daily Balances', () => {
     it('fills in missing days with previous balance', async () => {
       // Mock starting balance
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '1000.00' });
-      db.queryAll
-        .mockResolvedValueOnce([])  // For getBalanceAtDate (day before)
-        .mockResolvedValueOnce([
-          {
-            id: 'op1',
-            type: 'expense',
-            amount: '100.00',
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T10:00:00Z'
-          },
-          {
-            id: 'op2',
-            type: 'expense',
-            amount: '50.00',
-            account_id: 'acc1',
-            date: '2025-12-03',
-            created_at: '2025-12-03T10:00:00Z'
-          }
-        ]);
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
+      db.queryAll.mockResolvedValue([
+        {
+          id: 'op1',
+          type: 'expense',
+          amount: '100.00',
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T10:00:00Z'
+        },
+        {
+          id: 'op2',
+          type: 'expense',
+          amount: '50.00',
+          account_id: 'acc1',
+          date: '2025-01-03',
+          created_at: '2025-01-03T10:00:00Z'
+        }
+      ]);
 
-      const balances = await getDailyBalances('acc1', '2025-12-01', '2025-12-03');
+      const data = await getBurndownData('acc1', 2025, 0);
+      const balances = data.currentMonthData;
 
-      expect(balances).toHaveLength(3);
+      expect(balances).toHaveLength(31);
+      // Current: 1000, reverse ops: +100 +50 = 1150 at Dec 31
       expect(balances[0]).toEqual({
         day: 1,
-        date: '2025-12-01',
-        balance: '900.00'  // 1000 - 100
+        date: '2025-01-01',
+        balance: '1050.00'  // 1150 - 100 (expense on Jan 1)
       });
       expect(balances[1]).toEqual({
         day: 2,
-        date: '2025-12-02',
-        balance: '900.00'  // No operation, same as previous
+        date: '2025-01-02',
+        balance: '1050.00'  // No operation, same as previous
       });
       expect(balances[2]).toEqual({
         day: 3,
-        date: '2025-12-03',
-        balance: '850.00'  // 900 - 50
+        date: '2025-01-03',
+        balance: '1000.00'  // 1050 - 50 (expense on Jan 3)
       });
     });
 
     it('handles month boundaries correctly', async () => {
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '1000.00' });
-      db.queryAll
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'op1',
-            type: 'income',
-            amount: '100.00',
-            account_id: 'acc1',
-            date: '2025-11-30',
-            created_at: '2025-11-30T10:00:00Z'
-          }
-        ]);
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
+      db.queryAll.mockResolvedValue([
+        {
+          id: 'op1',
+          type: 'income',
+          amount: '100.00',
+          account_id: 'acc1',
+          date: '2025-11-30',
+          created_at: '2025-11-30T10:00:00Z'
+        }
+      ]);
 
-      const balances = await getDailyBalances('acc1', '2025-11-30', '2025-11-30');
+      const data = await getBurndownData('acc1', 2025, 10); // November
+      const balances = data.currentMonthData;
 
-      expect(balances).toHaveLength(1);
-      expect(balances[0].balance).toBe('1100.00');
+      expect(balances).toHaveLength(30);
+      // Current: 1000, operation on Nov 30: +100
+      // Working backwards from today to Nov: reverse +100 = 900
+      // Nov 30: 900 + 100 = 1000
+      expect(balances[29].balance).toBe('1000.00');
     });
 
     it('applies multiple operations on the same day in order', async () => {
-      mockDb.getFirstAsync.mockResolvedValueOnce({ balance: '1000.00' });
-      db.queryAll
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'op1',
-            type: 'expense',
-            amount: '100.00',
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T10:00:00Z'
-          },
-          {
-            id: 'op2',
-            type: 'income',
-            amount: '50.00',
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T11:00:00Z'
-          },
-          {
-            id: 'op3',
-            type: 'expense',
-            amount: '25.00',
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T12:00:00Z'
-          }
-        ]);
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
+      db.queryAll.mockResolvedValue([
+        {
+          id: 'op1',
+          type: 'expense',
+          amount: '100.00',
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T10:00:00Z'
+        },
+        {
+          id: 'op2',
+          type: 'income',
+          amount: '50.00',
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T11:00:00Z'
+        },
+        {
+          id: 'op3',
+          type: 'expense',
+          amount: '25.00',
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T12:00:00Z'
+        }
+      ]);
 
-      const balances = await getDailyBalances('acc1', '2025-12-01', '2025-12-01');
+      const data = await getBurndownData('acc1', 2025, 0);
+      const balances = data.currentMonthData;
 
-      expect(balances).toHaveLength(1);
-      // 1000 - 100 + 50 - 25 = 925
-      expect(balances[0].balance).toBe('925.00');
+      expect(balances).toHaveLength(31);
+      // Current: 1000, reverse all Jan 1 ops: +100 -50 +25 = 1075 at Dec 31
+      // Jan 1: 1075 - 100 + 50 - 25 = 1000
+      expect(balances[0].balance).toBe('1000.00');
     });
   });
 
-  describe('get12MonthMean', () => {
-    it('calculates correct mean across 12 months', async () => {
-      // Mock getBalanceAtDate calls for each month
-      mockDb.getFirstAsync.mockResolvedValue({ balance: '0' });
+  describe('Mean Calculation', () => {
+    it('calculates mean across multiple months', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
+      db.queryAll.mockResolvedValue([]);
 
-      let callCount = 0;
-      db.queryAll.mockImplementation(async () => {
-        callCount++;
-        // Return progressively decreasing balances for 12 months
-        return [];
-      });
+      const data = await getBurndownData('acc1', 2025, 0); // January
 
-      // We need to test with actual balance values
-      // Let's manually mock getBalanceAtDate to return specific values
-      const originalGetBalanceAtDate = require('../../app/services/BurndownDB').getBalanceAtDate;
-
-      // This test is complex to mock - skip detailed implementation for now
-      // In real scenario, we'd mock all 12 months of data
+      // Should have mean data for all days in January
+      expect(data.meanData).toHaveLength(31);
+      expect(data.mean).toHaveLength(31);
     });
 
     it('handles months with different day counts', async () => {
       // February has 28/29 days, others have 30/31
-      // This should not cause errors
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
       db.queryAll.mockResolvedValue([]);
 
-      // Test February (28 days)
-      const meanData = await get12MonthMean('acc1', 2025, 1);  // February
+      // Test February (28 days in 2025)
+      const data = await getBurndownData('acc1', 2025, 1); // February
 
-      expect(meanData.length).toBeLessThanOrEqual(29);
-      expect(meanData.length).toBeGreaterThanOrEqual(28);
+      expect(data.meanData.length).toBeLessThanOrEqual(29);
+      expect(data.meanData.length).toBeGreaterThanOrEqual(28);
     });
 
-    it('skips invalid dates (e.g., Feb 30)', async () => {
+    it('handles day positions that dont exist in some months', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
       db.queryAll.mockResolvedValue([]);
 
-      // Request day 30 for a month following February
-      const meanData = await get12MonthMean('acc1', 2025, 2);  // March (31 days)
+      // Test March (31 days) - looking back should skip Feb 30/31
+      const data = await getBurndownData('acc1', 2025, 2); // March
 
       // Should have 31 entries
-      expect(meanData).toHaveLength(31);
+      expect(data.meanData).toHaveLength(31);
 
       // Day 30 should exist and not throw error even though Feb doesn't have day 30
-      expect(meanData[29].day).toBe(30);
+      expect(data.meanData[29].day).toBe(30);
     });
   });
 
   describe('getBurndownData', () => {
     it('returns all 4 lines with correct data structure', async () => {
-      mockDb.getFirstAsync
-        .mockResolvedValueOnce({ balance: '1000.00' })  // current balance for current month
-        .mockResolvedValueOnce({ balance: '1000.00' })  // current balance for previous month
-        .mockResolvedValueOnce({ monthly_target: '2000.00' });  // account with target
-
-      db.queryAll
-        .mockResolvedValueOnce([])  // getBalanceAtDate for current month start
-        .mockResolvedValueOnce([])  // getDailyBalances current month
-        .mockResolvedValueOnce([])  // getBalanceAtDate for previous month start
-        .mockResolvedValueOnce([])  // getDailyBalances previous month
-        .mockResolvedValue([]);  // get12MonthMean calls
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
+      db.queryAll.mockResolvedValue([]);
 
       const data = await getBurndownData('acc1', 2025, 11);  // December
 
@@ -296,29 +285,25 @@ describe('BurndownDB', () => {
       // Mock balance calls
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
 
-      // Mock daily balances with varying values (peak at day 5)
-      db.queryAll
-        .mockResolvedValueOnce([])  // getBalanceAtDate for current month start
-        .mockResolvedValueOnce([    // getDailyBalances current month - simulated operations
-          { id: 'op1', type: 'income', amount: '500.00', account_id: 'acc1', date: '2025-01-05', created_at: '2025-01-05T10:00:00Z' },
-          { id: 'op2', type: 'expense', amount: '200.00', account_id: 'acc1', date: '2025-01-10', created_at: '2025-01-10T10:00:00Z' }
-        ])
-        .mockResolvedValueOnce([])  // getBalanceAtDate for previous month start
-        .mockResolvedValueOnce([])  // getDailyBalances previous month
-        .mockResolvedValue([]);     // get12MonthMean calls
+      // Mock operations with varying balances (peak at day 5)
+      db.queryAll.mockResolvedValue([
+        { id: 'op1', type: 'income', amount: '500.00', account_id: 'acc1', date: '2025-01-05', created_at: '2025-01-05T10:00:00Z' },
+        { id: 'op2', type: 'expense', amount: '200.00', account_id: 'acc1', date: '2025-01-10', created_at: '2025-01-10T10:00:00Z' }
+      ]);
 
       const data = await getBurndownData('acc1', 2025, 0);  // January (31 days)
 
       expect(data.planned).toHaveLength(31);
 
       // The planned line should start from the highest balance in current month
-      // Starting balance: 1000
-      // Day 5: 1000 + 500 = 1500 (peak)
-      // Day 10: 1500 - 200 = 1300
-      // So max should be 1500
-      // Planned line: 1500 / 31 days declining to 0
-      // Day 1 end: 1500 - (1500/31 * 1) ≈ 1451.61
-      expect(data.planned[0]).toBeCloseTo(1452, 0);
+      // Current: 1000, reverse ops: -500 +200 = 700 at Dec 31
+      // Day 5: 700 + 500 = 1200 (peak)
+      // Day 10: 1200 - 200 = 1000
+      // Max balance = 1200
+      // Planned line: 1200 / 31 = 38.71 per day
+      // Day 1: 1200 - (38.71 * 1) ≈ 1161.29
+      expect(data.planned[0]).toBeCloseTo(1161.29, 0);
+      // Day 31: 1200 - (38.71 * 31) ≈ 0
       expect(data.planned[30]).toBeCloseTo(0, 0);
     });
 
@@ -331,9 +316,10 @@ describe('BurndownDB', () => {
 
       // With no operations, all days have same balance (1500)
       // Max balance = 1500
-      // Planned line: 1500 / 31 days declining to 0
-      // Day 1 end: 1500 - (1500/31 * 1) = 1451.61
-      expect(data.planned[0]).toBeCloseTo(1452, 0);
+      // Planned line: 1500 / 31 = 48.39 per day
+      // Day 1: 1500 - (48.39 * 1) ≈ 1451.61
+      expect(data.planned[0]).toBeCloseTo(1451.61, 0);
+      // Day 31: 1500 - (48.39 * 31) ≈ 0
       expect(data.planned[30]).toBeCloseTo(0, 0);
     });
   });
@@ -341,34 +327,34 @@ describe('BurndownDB', () => {
   describe('Regression Tests', () => {
     it('handles retroactive transaction edits by recalculating on next view', async () => {
       // This is implicitly tested by the on-demand calculation approach
-      // Each call to getDailyBalances or getBalanceAtDate uses current operations data
+      // Each call to getBurndownData uses current operations data
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000.00' });
-      db.queryAll
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'op1',
-            type: 'expense',
-            amount: '200.00',  // Edited amount (was 100)
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T10:00:00Z'
-          }
-        ]);
+      db.queryAll.mockResolvedValue([
+        {
+          id: 'op1',
+          type: 'expense',
+          amount: '200.00',  // Edited amount (was 100)
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T10:00:00Z'
+        }
+      ]);
 
-      const balances = await getDailyBalances('acc1', '2025-12-01', '2025-12-01');
+      const data = await getBurndownData('acc1', 2025, 0);
 
-      // Should reflect the edited amount
-      expect(balances[0].balance).toBe('800.00');
+      // Current: 1000, reverse expense 200 = 1200 at Dec 31
+      // Jan 1: 1200 - 200 = 1000
+      expect(data.currentMonthData[0].balance).toBe('1000.00');
     });
 
     it('handles accounts with no operations', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ balance: '500.00' });
       db.queryAll.mockResolvedValue([]);
 
-      const balances = await getDailyBalances('acc1', '2025-12-01', '2025-12-03');
+      const data = await getBurndownData('acc1', 2025, 0);
+      const balances = data.currentMonthData;
 
-      expect(balances).toHaveLength(3);
+      expect(balances).toHaveLength(31);
       // All days should have the same balance (no operations)
       expect(balances[0].balance).toBe('500.00');
       expect(balances[1].balance).toBe('500.00');
@@ -377,22 +363,22 @@ describe('BurndownDB', () => {
 
     it('handles negative balances correctly', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ balance: '-100.00' });
-      db.queryAll
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'op1',
-            type: 'expense',
-            amount: '50.00',
-            account_id: 'acc1',
-            date: '2025-12-01',
-            created_at: '2025-12-01T10:00:00Z'
-          }
-        ]);
+      db.queryAll.mockResolvedValue([
+        {
+          id: 'op1',
+          type: 'expense',
+          amount: '50.00',
+          account_id: 'acc1',
+          date: '2025-01-01',
+          created_at: '2025-01-01T10:00:00Z'
+        }
+      ]);
 
-      const balances = await getDailyBalances('acc1', '2025-12-01', '2025-12-01');
+      const data = await getBurndownData('acc1', 2025, 0);
 
-      expect(balances[0].balance).toBe('-150.00');
+      // Current: -100, reverse expense 50 = -50 at Dec 31
+      // Jan 1: -50 - 50 = -100
+      expect(data.currentMonthData[0].balance).toBe('-100.00');
     });
   });
 });
