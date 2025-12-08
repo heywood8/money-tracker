@@ -215,7 +215,7 @@ const OperationsScreen = () => {
     clearFilters,
     getActiveFilterCount,
   } = useOperations();
-  const { visibleAccounts, loading: accountsLoading } = useAccounts();
+  const { accounts, visibleAccounts, loading: accountsLoading } = useAccounts();
   const { categories, loading: categoriesLoading } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -384,22 +384,22 @@ const OperationsScreen = () => {
 
   // Get account name
   const getAccountName = useCallback((accountId) => {
-    const account = visibleAccounts.find(acc => acc.id === accountId);
+    const account = accounts.find(acc => acc.id === accountId);
     return account ? account.name : 'Unknown';
-  }, [visibleAccounts]);
+  }, [accounts]);
 
   // Get account balance with currency symbol
   const getAccountBalance = useCallback((accountId) => {
-    const account = visibleAccounts.find(acc => acc.id === accountId);
+    const account = accounts.find(acc => acc.id === accountId);
     if (!account) return '';
     const symbol = getCurrencySymbol(account.currency);
     return `${symbol}${account.balance}`;
-  }, [visibleAccounts]);
+  }, [accounts]);
 
   // Get category info
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return { name: 'Unknown', icon: 'help-circle' };
+    if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
     return {
       name: category.nameKey ? t(category.nameKey) : category.name,
       icon: category.icon || 'help-circle',
@@ -431,7 +431,7 @@ const OperationsScreen = () => {
 
     operations.forEach((operation) => {
       if (operation.type === 'expense') {
-        const account = visibleAccounts.find(acc => acc.id === operation.accountId);
+        const account = accounts.find(acc => acc.id === operation.accountId);
         if (account) {
           const currency = account.currency || 'USD';
           const amount = parseFloat(operation.amount);
@@ -446,7 +446,7 @@ const OperationsScreen = () => {
     });
 
     return sumsByCurrency;
-  }, [visibleAccounts]);
+  }, [accounts]);
 
   // Group operations by date and create flat list with separators
   const groupedOperations = useMemo(() => {
@@ -530,7 +530,7 @@ const OperationsScreen = () => {
 
   // Format amount with currency (memoized)
   const formatCurrency = useCallback((accountId, amount) => {
-    const account = visibleAccounts.find(acc => acc.id === accountId);
+    const account = accounts.find(acc => acc.id === accountId);
     if (!account) return amount;
 
     const numAmount = parseFloat(amount);
@@ -543,7 +543,7 @@ const OperationsScreen = () => {
     // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
     const symbol = getCurrencySymbol(account.currency || 'USD');
     return `${symbol}${numAmount.toFixed(decimals)}`;
-  }, [visibleAccounts]);
+  }, [accounts]);
 
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -749,7 +749,7 @@ const OperationsScreen = () => {
         data={groupedOperations}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        extraData={[visibleAccounts, categories]}
+        extraData={[accounts, categories]}
         ListHeaderComponent={quickAddFormComponent}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={
