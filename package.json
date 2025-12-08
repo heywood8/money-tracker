@@ -6,7 +6,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "test": "jest",
-    "test:coverage": "jest --coverage && npx coverage-badge-creator",
+    "test:coverage": "jest --coverage && node scripts/generate-badges.js",
     "ios": "expo run:ios",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"
