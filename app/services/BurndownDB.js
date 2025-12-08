@@ -205,7 +205,9 @@ const calculateDailyBalancesInMemory = (accountId, startDate, endDate, allOperat
  * @returns {Array<{day: number, meanBalance: string}>}
  */
 const calculateMonthMeanInMemory = (accountId, year, month, numMonths = 12, allOperations, currentBalance) => {
+  // Calculate days in the target month
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  
   const meanBalances = [];
 
   // For each day position (1-31)
