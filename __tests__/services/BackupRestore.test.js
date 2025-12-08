@@ -36,23 +36,10 @@ jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
 }));
 
-// Mock xlsx library
-jest.mock('xlsx', () => ({
-  utils: {
-    book_new: jest.fn(() => ({ SheetNames: [], Sheets: {} })),
-    json_to_sheet: jest.fn((data) => ({ data })),
-    book_append_sheet: jest.fn(),
-    sheet_to_json: jest.fn((sheet) => sheet.data || []),
-  },
-  write: jest.fn(() => 'base64content'),
-  read: jest.fn(),
-}));
-
 // Get references to mocked modules
 const mockFileSystem = require('expo-file-system/legacy');
 const mockSharing = require('expo-sharing');
 const mockDocumentPicker = require('expo-document-picker');
-const mockXLSX = require('xlsx');
 
 describe('BackupRestore', () => {
   let mockDb;
@@ -327,48 +314,6 @@ describe('BackupRestore', () => {
       const filename = await BackupRestore.exportBackup('csv');
 
       expect(filename).toBeDefined();
-    });
-  });
-
-  describe('exportBackup - Excel format', () => {
-    it('exports backup as Excel file', async () => {
-      const filename = await BackupRestore.exportBackup('excel');
-
-      expect(filename).toMatch(/^money_tracker_backup_.*\.xlsx$/);
-      expect(mockXLSX.utils.book_new).toHaveBeenCalled();
-      expect(mockXLSX.write).toHaveBeenCalled();
-    });
-
-    it('creates separate sheets for each table', async () => {
-      await BackupRestore.exportBackup('excel');
-
-      expect(mockXLSX.utils.book_append_sheet).toHaveBeenCalledTimes(5); // Info + 4 tables
-    });
-
-    it('includes backup info sheet', async () => {
-      await BackupRestore.exportBackup('excel');
-
-      const calls = mockXLSX.utils.json_to_sheet.mock.calls;
-      const infoCall = calls.find(call => call[0][0]['Backup Version']);
-
-      expect(infoCall).toBeDefined();
-      expect(infoCall[0][0]['Backup Version']).toBe(1);
-    });
-
-    it('writes file with base64 encoding', async () => {
-      await BackupRestore.exportBackup('excel');
-
-      expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        'base64content',
-        expect.objectContaining({ encoding: 'base64' })
-      );
-    });
-
-    it('accepts xlsx as format variant', async () => {
-      const filename = await BackupRestore.exportBackup('xlsx');
-
-      expect(filename).toMatch(/\.xlsx$/);
     });
   });
 
@@ -844,67 +789,6 @@ op-1,"Mom's ""special"" food"`;
 
       expect(backup.data.accounts).toEqual([]);
       expect(backup.data.categories).toEqual([]);
-    });
-  });
-
-  describe('importBackup - Excel format', () => {
-    it('imports Excel backup file', async () => {
-      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
-        canceled: false,
-        assets: [{ uri: 'file:///mock/backup.xlsx', name: 'backup.xlsx' }],
-      });
-
-      mockFileSystem.readAsStringAsync.mockResolvedValue('base64content');
-
-      mockXLSX.read.mockReturnValue({
-        SheetNames: ['Backup Info', 'Accounts', 'Categories', 'Operations'],
-        Sheets: {
-          'Backup Info': {
-            data: [{ 'Backup Version': 1, 'Timestamp': '2024-01-01' }],
-          },
-          'Accounts': { data: [{ id: 'acc-1', name: 'Cash' }] },
-          'Categories': { data: [{ id: 'cat-1', name: 'Food' }] },
-          'Operations': { data: [{ id: 'op-1', type: 'expense' }] },
-        },
-      });
-
-      mockDb.executeTransaction.mockImplementation(async (callback) => {
-        await callback({
-          runAsync: jest.fn().mockResolvedValue(),
-          getAllAsync: jest.fn().mockResolvedValue([]),
-        });
-      });
-
-      const backup = await BackupRestore.importBackup();
-
-      expect(backup.version).toBe(1);
-      expect(backup.data.accounts).toHaveLength(1);
-    });
-
-    it('reads file with base64 encoding', async () => {
-      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
-        canceled: false,
-        assets: [{ uri: 'file:///mock/backup.xlsx', name: 'backup.xlsx' }],
-      });
-
-      mockXLSX.read.mockReturnValue({
-        SheetNames: [],
-        Sheets: {},
-      });
-
-      mockDb.executeTransaction.mockImplementation(async (callback) => {
-        await callback({
-          runAsync: jest.fn().mockResolvedValue(),
-          getAllAsync: jest.fn().mockResolvedValue([]),
-        });
-      });
-
-      await BackupRestore.importBackup();
-
-      expect(mockFileSystem.readAsStringAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ encoding: 'base64' })
-      );
     });
   });
 
