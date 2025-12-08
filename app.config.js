@@ -1,6 +1,9 @@
 // Determine if this is a development build:
 // - Local dev: no APP_VARIANT set → use 'PennyDev'
 // - EAS development profile: APP_VARIANT === 'development' → use 'PennyDev'
+
+const { run } = require("jest");
+
 // - EAS preview/production: APP_VARIANT === 'preview'/'production' → use 'Penny'
 const IS_DEV = !process.env.APP_VARIANT || process.env.APP_VARIANT === 'development';
 
@@ -53,5 +56,11 @@ module.exports = {
         },
       ],
     ],
+    updates: {
+      "url": "https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406"
+    },
+    runtimeVersion: {
+      policy: 'sdkVersion',
+    },
   },
 };
