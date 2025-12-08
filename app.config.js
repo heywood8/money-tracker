@@ -43,6 +43,7 @@ module.exports = {
     owner: 'lopatinikita',
     platforms: ['android'],
     plugins: [
+      'expo-sqlite',
       [
         '@sentry/react-native/expo',
         {
