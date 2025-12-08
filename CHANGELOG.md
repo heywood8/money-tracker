@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/heywood8/money-tracker/compare/penny-v0.10.1...penny-v0.11.0) (2025-12-08)
+
+
+### Features
+
+* more currencies support ([10bdec5](https://github.com/heywood8/money-tracker/commit/10bdec521533828c6f9ce0afd8c319be20d5d0cd))
+* more languages support ([7c3b0b3](https://github.com/heywood8/money-tracker/commit/7c3b0b39bedbfdb7526e3701c6b67cea646439bb))
+
 ## [0.10.1](https://github.com/heywood8/money-tracker/compare/penny-v0.10.0...penny-v0.10.1) (2025-12-08)
 
 
