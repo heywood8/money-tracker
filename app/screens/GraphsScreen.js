@@ -830,67 +830,6 @@ const GraphsScreen = () => {
             </View>
           </View>
 
-          {/* Spending Prediction Card */}
-          {spendingPrediction && (
-            <View style={[styles.predictionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.predictionHeader}>
-                <Icon name="chart-line" size={24} color={colors.primary} />
-                <Text style={[styles.predictionTitle, { color: colors.text }]}>
-                  {t('spending_prediction')}
-                </Text>
-              </View>
-
-              {/* Current vs Predicted */}
-              <View style={styles.predictionStats}>
-                <View style={styles.predictionStat}>
-                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
-                    {t('current_spending')}
-                  </Text>
-                  <Text style={[styles.predictionStatValue, { color: colors.expense || '#ff4444' }]}>
-                    {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
-                  </Text>
-                </View>
-                <Icon name="arrow-right" size={20} color={colors.mutedText} style={styles.predictionArrow} />
-                <View style={styles.predictionStat}>
-                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
-                    {t('predicted_spending')}
-                  </Text>
-                  <Text style={[styles.predictionStatValue, { color: colors.text }]}>
-                    {formatCurrency(spendingPrediction.predictedTotal, selectedCurrency)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress Bar */}
-              <View style={styles.predictionProgressContainer}>
-                <View style={[styles.predictionProgressTrack, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[
-                      styles.predictionProgressBar,
-                      {
-                        width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
-                        backgroundColor: colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
-                  {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()}
-                </Text>
-              </View>
-
-              {/* Daily Average */}
-              <View style={styles.predictionFooter}>
-                <Text style={[styles.predictionFooterLabel, { color: colors.mutedText }]}>
-                  {t('daily_average')}:{' '}
-                  <Text style={[styles.predictionFooterValue, { color: colors.text }]}>
-                    {formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-          )}
-
           {/* Expenses Summary Card */}
           <TouchableOpacity
             style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -1208,6 +1147,67 @@ const GraphsScreen = () => {
                   </Text>
                 </View>
               )}
+            </View>
+          )}
+
+          {/* Spending Prediction Card */}
+          {spendingPrediction && (
+            <View style={[styles.predictionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.predictionHeader}>
+                <Icon name="chart-line" size={24} color={colors.primary} />
+                <Text style={[styles.predictionTitle, { color: colors.text }]}>
+                  {t('spending_prediction')}
+                </Text>
+              </View>
+
+              {/* Current vs Predicted */}
+              <View style={styles.predictionStats}>
+                <View style={styles.predictionStat}>
+                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
+                    {t('current_spending')}
+                  </Text>
+                  <Text style={[styles.predictionStatValue, { color: colors.expense || '#ff4444' }]}>
+                    {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
+                  </Text>
+                </View>
+                <Icon name="arrow-right" size={20} color={colors.mutedText} style={styles.predictionArrow} />
+                <View style={styles.predictionStat}>
+                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
+                    {t('predicted_spending')}
+                  </Text>
+                  <Text style={[styles.predictionStatValue, { color: colors.text }]}>
+                    {formatCurrency(spendingPrediction.predictedTotal, selectedCurrency)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={styles.predictionProgressContainer}>
+                <View style={[styles.predictionProgressTrack, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.predictionProgressBar,
+                      {
+                        width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
+                        backgroundColor: colors.primary,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
+                  {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()}
+                </Text>
+              </View>
+
+              {/* Daily Average */}
+              <View style={styles.predictionFooter}>
+                <Text style={[styles.predictionFooterLabel, { color: colors.mutedText }]}>
+                  {t('daily_average')}:{' '}
+                  <Text style={[styles.predictionFooterValue, { color: colors.text }]}>
+                    {formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}
+                  </Text>
+                </Text>
+              </View>
             </View>
           )}
         </View>
