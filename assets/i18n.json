@@ -293,9 +293,9 @@
     "clear_filters": "Clear Filters",
     "select_all": "Select All",
     "deselect_all": "Deselect All",
-    "show_mean_line": "Show Mean Line",
+    "show_mean": "Show Mean",
     "mean_months": "Number of Months",
-    "n_month_mean": "{{n}}-Month Mean"
+    "n_month_mean": "Mean"
   },
   "ru": {
     "accounts": "Счета",
@@ -591,9 +591,9 @@
     "clear_filters": "Очистить фильтры",
     "select_all": "Выбрать все",
     "deselect_all": "Снять все",
-    "show_mean_line": "Показать среднюю линию",
+    "show_mean": "Среднее",
     "mean_months": "Количество месяцев",
-    "n_month_mean": "Среднее за {{n}} мес."
+    "n_month_mean": "Среднее"
   },
   "es": {
     "accounts": "Cuentas",
@@ -889,8 +889,9 @@
     "clear_filters": "Borrar filtros",
     "select_all": "Seleccionar todo",
     "deselect_all": "Deselect. todo",
-    "show_mean_line": "Показать среднюю линию",
-    "mean_months": "Месяцев для средней"
+    "show_mean": "Promedio",
+    "mean_months": "Meses para promedio",
+    "n_month_mean": "Promedio"
   },
   "fr": {
     "accounts": "Comptes",
@@ -1186,8 +1187,9 @@
     "clear_filters": "Effacer les filtres",
     "select_all": "Tout sélectionner",
     "deselect_all": "Tout désélectionner",
-    "show_mean_line": "Показать среднюю линию",
-    "mean_months": "Месяцев для средней"
+    "show_mean": "Moyenne",
+    "mean_months": "Nombre de mois",
+    "n_month_mean": "Moyenne"
   },
   "zh": {
     "accounts": "账户",
@@ -1483,8 +1485,9 @@
     "clear_filters": "清除筛选器",
     "select_all": "全选",
     "deselect_all": "取消全选",
-    "show_mean_line": "Показать среднюю линию",
-    "mean_months": "Месяцев для средней"
+    "show_mean": "平均值",
+    "mean_months": "月数",
+    "n_month_mean": "平均值"
   },
   "de": {
     "accounts": "Konten",
@@ -1779,7 +1782,8 @@
     "no_operations_matching_filters": "Keine Vorgänge entsprechen Ihren Filtern",
     "clear_filters": "Filter löschen",
     "select_all": "Alle auswählen",
-    "deselect_all": "Alle abwählen"
+    "deselect_all": "Alle abwählen",
+    "n_month_mean": "Durchschnitt"
   }
 }
 

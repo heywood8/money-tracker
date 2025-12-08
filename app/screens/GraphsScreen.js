@@ -998,7 +998,7 @@ const GraphsScreen = () => {
               <View style={[styles.meanControlsContainer, { borderColor: colors.border }]}>
                 <View style={styles.meanControlRow}>
                   <Text style={[styles.meanControlLabel, { color: colors.text }]}>
-                    {t('show_mean_line')}
+                    {t('show_mean')}
                   </Text>
                   <Switch
                     value={showMeanLine}
