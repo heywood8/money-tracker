@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/heywood8/money-tracker/compare/penny-v0.9.0...penny-v0.10.0) (2025-12-08)
+
+
+### Features
+
+* added burndown chart to the graphs page ([#97](https://github.com/heywood8/money-tracker/issues/97)) ([f309846](https://github.com/heywood8/money-tracker/commit/f309846f8be630291803558831377963989a76fd))
+
 ## [0.9.0](https://github.com/heywood8/money-tracker/compare/penny-v0.8.1...penny-v0.9.0) (2025-12-07)
 
 
