@@ -205,7 +205,7 @@ const calculateDailyBalancesInMemory = (accountId, startDate, endDate, allOperat
  * @returns {Array<{day: number, meanBalance: string}>}
  */
 const calculateMonthMeanInMemory = (accountId, year, month, numMonths = 12, allOperations, currentBalance) => {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const meanBalances = [];
 
   // For each day position (1-31)
@@ -214,10 +214,10 @@ const calculateMonthMeanInMemory = (accountId, year, month, numMonths = 12, allO
 
     // Look back N months
     for (let monthOffset = 1; monthOffset <= numMonths; monthOffset++) {
-      const targetDate = new Date(year, month - monthOffset, dayPos);
+      const targetDate = new Date(Date.UTC(year, month - monthOffset, dayPos));
 
       // Skip if this day doesn't exist in that month (e.g., Feb 30)
-      if (targetDate.getDate() !== dayPos) {
+      if (targetDate.getUTCDate() !== dayPos) {
         continue;
       }
 
@@ -263,16 +263,16 @@ const calculateMonthMeanInMemory = (accountId, year, month, numMonths = 12, allO
 export const getBurndownData = async (accountId, year, month, numMonthsForMean = 12) => {
   try {
     // Calculate date ranges
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const currentMonthStart = new Date(year, month, 1).toISOString().split('T')[0];
-    const currentMonthEnd = new Date(year, month, daysInMonth).toISOString().split('T')[0];
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const currentMonthStart = new Date(Date.UTC(year, month, 1)).toISOString().split('T')[0];
+    const currentMonthEnd = new Date(Date.UTC(year, month, daysInMonth)).toISOString().split('T')[0];
 
-    const previousMonthDays = new Date(year, month, 0).getDate();
-    const previousMonthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
-    const previousMonthEnd = new Date(year, month - 1, previousMonthDays).toISOString().split('T')[0];
+    const previousMonthDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const previousMonthStart = new Date(Date.UTC(year, month - 1, 1)).toISOString().split('T')[0];
+    const previousMonthEnd = new Date(Date.UTC(year, month - 1, previousMonthDays)).toISOString().split('T')[0];
 
     // Calculate the oldest date we need (N+1 months back for N-month mean calculation)
-    const oldestDate = new Date(year, month - (numMonthsForMean + 1), 1);
+    const oldestDate = new Date(Date.UTC(year, month - (numMonthsForMean + 1), 1));
     const oldestDateStr = oldestDate.toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
 
