@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text, Surface } from 'react-native-paper';
@@ -8,6 +8,7 @@ import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import Header from '../components/Header';
 import SettingsModal from '../modals/SettingsModal';
 
@@ -46,7 +47,7 @@ TabButton.displayName = 'TabButton';
 export default function SimpleTabs() {
   const { colors } = useTheme();
   const { t } = useLocalization();
-  const [active, setActive] = React.useState('Operations');
+  const { activeTab, setActiveTab } = useNavigation();
   const [settingsVisible, setSettingsVisible] = React.useState(false);
 
   const TABS = useMemo(() => [
@@ -57,8 +58,8 @@ export default function SimpleTabs() {
   ], [t]);
 
   const handleTabPress = useCallback((tabKey) => {
-    setActive(tabKey);
-  }, []);
+    setActiveTab(tabKey);
+  }, [setActiveTab]);
 
   const handleOpenSettings = useCallback(() => {
     setSettingsVisible(true);
@@ -69,7 +70,7 @@ export default function SimpleTabs() {
   }, []);
 
   const renderActive = useCallback(() => {
-    switch (active) {
+    switch (activeTab) {
       case 'Operations':
         return <OperationsScreen />;
       case 'Accounts':
@@ -81,7 +82,7 @@ export default function SimpleTabs() {
       default:
         return <OperationsScreen />;
     }
-  }, [active]);
+  }, [activeTab]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
@@ -94,7 +95,7 @@ export default function SimpleTabs() {
             <TabButton
               key={tab.key}
               tab={tab}
-              isActive={active === tab.key}
+              isActive={activeTab === tab.key}
               colors={colors}
               onPress={handleTabPress}
             />

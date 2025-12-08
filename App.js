@@ -7,6 +7,7 @@ import { OperationsProvider } from './app/contexts/OperationsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
+import { NavigationProvider } from './app/contexts/NavigationContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -70,15 +71,17 @@ export default Sentry.wrap(function App() {
           <LocalizationProvider>
             <ThemeProvider>
               <DialogProvider>
-                <AccountsProvider>
-                  <CategoriesProvider>
-                    <OperationsProvider>
-                      <BudgetsProvider>
-                        <AppContent />
-                      </BudgetsProvider>
-                    </OperationsProvider>
-                  </CategoriesProvider>
-                </AccountsProvider>
+                <NavigationProvider>
+                  <AccountsProvider>
+                    <CategoriesProvider>
+                      <OperationsProvider>
+                        <BudgetsProvider>
+                          <AppContent />
+                        </BudgetsProvider>
+                      </OperationsProvider>
+                    </CategoriesProvider>
+                  </AccountsProvider>
+                </NavigationProvider>
               </DialogProvider>
             </ThemeProvider>
           </LocalizationProvider>

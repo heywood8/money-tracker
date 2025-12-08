@@ -5,6 +5,8 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccounts } from '../contexts/AccountsContext';
+import { useNavigation } from '../contexts/NavigationContext';
+import { useOperations } from '../contexts/OperationsContext';
 import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { getBurndownData } from '../services/BurndownDB';
