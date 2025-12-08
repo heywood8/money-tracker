@@ -55,6 +55,7 @@ module.exports = {
           organization: 'heywood8',
         },
       ],
+      './plugins/withR8Config.js',
     ],
     updates: {
       "url": "https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406"

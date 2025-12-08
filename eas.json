@@ -24,11 +24,16 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease",
+        "config": "release",
+        "withoutCredentials": false
       },
       "env": {
-        "APP_VARIANT": "production"
-      }
+        "APP_VARIANT": "production",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx4096m"
+      },
+      "channel": "production"
     }
   },
   "submit": {
