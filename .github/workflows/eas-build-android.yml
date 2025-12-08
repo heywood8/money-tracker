@@ -53,7 +53,7 @@ jobs:
           echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
 
       - name: 🚀 Build main
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'branch' && github.ref == 'refs/heads/main'
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
           echo "Building with profile: $PROFILE"
