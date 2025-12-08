@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.1](https://github.com/heywood8/money-tracker/compare/penny-v0.11.0...penny-v0.11.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* drop xlsx export/import support to fix vulnerabilities ([20292dc](https://github.com/heywood8/money-tracker/commit/20292dcd5c469ae386c5588bfede2cf95998c27e))
+* eas update for main branch ([0e9916d](https://github.com/heywood8/money-tracker/commit/0e9916dccce722faf8fc570a2896b811201e8ece))
+* switch to another coverage library ([4d31688](https://github.com/heywood8/money-tracker/commit/4d316886fa03bd8a816f9b9ef3ef2727718a1ef5))
+
 ## [0.11.0](https://github.com/heywood8/money-tracker/compare/penny-v0.10.1...penny-v0.11.0) (2025-12-08)
 
 
