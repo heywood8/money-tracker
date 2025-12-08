@@ -873,49 +873,6 @@ const GraphsScreen = () => {
             </View>
           </TouchableOpacity>
 
-          {/* Income Summary Card */}
-          <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={openIncomeModal}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('income_by_category')}
-          >
-            <View style={styles.summaryCardContent}>
-              <View style={styles.summaryInfo}>
-                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-                  {t('total_income')}
-                </Text>
-                <Text style={[styles.summaryAmount, { color: colors.text }]}>
-                  {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
-                </Text>
-              </View>
-              <View style={styles.miniChartContainer}>
-                {loadingIncome ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : incomeChartData.length > 0 ? (
-                  <PieChart
-                    data={incomeChartData}
-                    width={80}
-                    height={80}
-                    chartConfig={{
-                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    }}
-                    accessor="amount"
-                    backgroundColor="transparent"
-                    paddingLeft="0"
-                    hasLegend={false}
-                    center={[20, 0]}
-                  />
-                ) : (
-                  <View style={styles.noDataPlaceholder}>
-                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
-
           {/* Burndown Graph Card */}
           {selectedMonth !== null && (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1210,6 +1167,49 @@ const GraphsScreen = () => {
               </View>
             </View>
           )}
+
+          {/* Income Summary Card */}
+          <TouchableOpacity
+            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={openIncomeModal}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('income_by_category')}
+          >
+            <View style={styles.summaryCardContent}>
+              <View style={styles.summaryInfo}>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+                  {t('total_income')}
+                </Text>
+                <Text style={[styles.summaryAmount, { color: colors.text }]}>
+                  {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+                </Text>
+              </View>
+              <View style={styles.miniChartContainer}>
+                {loadingIncome ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : incomeChartData.length > 0 ? (
+                  <PieChart
+                    data={incomeChartData}
+                    width={80}
+                    height={80}
+                    chartConfig={{
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    }}
+                    accessor="amount"
+                    backgroundColor="transparent"
+                    paddingLeft="0"
+                    hasLegend={false}
+                    center={[20, 0]}
+                  />
+                ) : (
+                  <View style={styles.noDataPlaceholder}>
+                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
