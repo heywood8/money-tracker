@@ -83,3 +83,6 @@ react-native-debugger.json
 *.hprof
 .env.local
 android/
+
+# Local files
+local/
