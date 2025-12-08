@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     borderBottomWidth: 1,
   },
   headerTitle: {
@@ -543,14 +543,15 @@ const styles = StyleSheet.create({
     maxHeight: 500,
   },
   section: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   searchInput: {
     flexDirection: 'row',
@@ -558,7 +559,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     gap: 8,
   },
   searchTextInput: {
@@ -567,7 +568,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 12,
-    marginTop: 6,
+    marginTop: 5,
   },
   chipContainer: {
     flexDirection: 'row',
@@ -578,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     gap: 6,
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
   checkboxLeft: {
@@ -625,14 +626,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     gap: 8,
   },
   dateInputText: {
     fontSize: 14,
   },
   clearDateButton: {
-    marginTop: 8,
+    marginTop: 7,
   },
   clearDateButtonText: {
     fontSize: 14,
@@ -648,7 +649,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     fontSize: 14,
   },
   amountRangeSeparator: {
@@ -656,14 +657,14 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 14,
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 8,
     alignItems: 'center',
   },
