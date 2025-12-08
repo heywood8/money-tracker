@@ -55,9 +55,7 @@ jobs:
       - name: 🚀 Build main
         if: github.ref_type == 'branch' && github.ref == 'refs/heads/main'
         run: |
-          PROFILE="${{ github.event.inputs.profile || 'preview' }}"
-          echo "Building with profile: $PROFILE"
-          eas update --platform android --profile $PROFILE --non-interactive --no-wait --auto 2>&1 | tee eas-build-output.txt
+          eas update --platform android --non-interactive --auto 2>&1 | tee eas-build-output.txt
           
           # Extract the build URL from EAS output
           BUILD_URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' eas-build-output.txt | head -1)
