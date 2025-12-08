@@ -3,6 +3,8 @@
  *
  * Provides functions to calculate daily account balances over time for burndown visualization.
  * Uses on-demand calculation from operations rather than storing daily snapshots.
+ * 
+ * OPTIMIZED: Uses single query to fetch all operations, then calculates balances in memory.
  */
 
 import * as Currency from './currency';
@@ -112,177 +114,153 @@ const reverseOperation = (currentBalance, operation, accountId) => {
 };
 
 /**
- * Calculate account balance at a specific date
- * Uses backward calculation: current balance minus all future operations
+ * Calculate balance at a specific date using pre-fetched operations (in-memory)
  * @param {string} accountId - Account ID
  * @param {string} targetDate - Target date (YYYY-MM-DD)
- * @returns {Promise<string>} Balance at the end of target date
+ * @param {Array} allOperations - Pre-fetched operations (must include all ops from targetDate to today)
+ * @param {string} currentBalance - Current account balance
+ * @returns {string} Balance at the end of target date
  */
-export const getBalanceAtDate = async (accountId, targetDate) => {
-  try {
-    // Get current balance
-    const currentBalance = await getCurrentBalance(accountId);
+const calculateBalanceAtDateInMemory = (accountId, targetDate, allOperations, currentBalance) => {
+  // Filter operations strictly after target date
+  const opsAfterTarget = allOperations.filter(op => op.date > targetDate);
 
-    // Get all operations after target date
-    const today = new Date().toISOString().split('T')[0];
-    const futureOps = await getOperationsForAccount(
-      accountId,
-      targetDate,
-      today
-    );
-
-    // Filter to only operations strictly after target date
-    const opsAfterTarget = futureOps.filter(op => op.date > targetDate);
-
-    // Reverse-apply all future operations
-    let balance = currentBalance;
-    for (const op of opsAfterTarget.reverse()) {
-      balance = reverseOperation(balance, op, accountId);
-    }
-
-    return balance;
-  } catch (error) {
-    console.error('Error calculating balance at date:', error);
-    throw error;
+  // Reverse-apply all future operations (in reverse order)
+  let balance = currentBalance;
+  for (let i = opsAfterTarget.length - 1; i >= 0; i--) {
+    balance = reverseOperation(balance, opsAfterTarget[i], accountId);
   }
+
+  return balance;
 };
 
 /**
- * Calculate daily balances for a date range
+ * Calculate daily balances using pre-fetched operations (in-memory)
  * @param {string} accountId - Account ID
  * @param {string} startDate - Start date (YYYY-MM-DD)
  * @param {string} endDate - End date (YYYY-MM-DD)
- * @returns {Promise<Array<{day: number, date: string, balance: string}>>}
+ * @param {Array} allOperations - Pre-fetched operations covering the entire range needed
+ * @param {string} currentBalance - Current account balance
+ * @returns {Array<{day: number, date: string, balance: string}>}
  */
-export const getDailyBalances = async (accountId, startDate, endDate) => {
-  try {
-    // Get balance at start date (end of day before startDate)
-    const dayBefore = new Date(startDate);
-    dayBefore.setDate(dayBefore.getDate() - 1);
-    const dayBeforeStr = dayBefore.toISOString().split('T')[0];
+const calculateDailyBalancesInMemory = (accountId, startDate, endDate, allOperations, currentBalance) => {
+  // Get balance at day before startDate
+  const dayBefore = new Date(startDate);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const dayBeforeStr = dayBefore.toISOString().split('T')[0];
 
-    let currentBalance = await getBalanceAtDate(accountId, dayBeforeStr);
+  let runningBalance = calculateBalanceAtDateInMemory(accountId, dayBeforeStr, allOperations, currentBalance);
 
-    // Get all operations in the range
-    const operations = await getOperationsForAccount(accountId, startDate, endDate);
+  // Filter operations within the date range
+  const rangeOps = allOperations.filter(op => op.date >= startDate && op.date <= endDate);
 
-    // Group operations by date
-    const opsByDate = {};
-    operations.forEach(op => {
-      if (!opsByDate[op.date]) {
-        opsByDate[op.date] = [];
-      }
-      opsByDate[op.date].push(op);
-    });
+  // Group operations by date
+  const opsByDate = {};
+  rangeOps.forEach(op => {
+    if (!opsByDate[op.date]) {
+      opsByDate[op.date] = [];
+    }
+    opsByDate[op.date].push(op);
+  });
 
-    // Generate daily balances
-    const dailyBalances = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    let dayNum = 1;
+  // Generate daily balances
+  const dailyBalances = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let dayNum = 1;
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split('T')[0];
 
-      // Apply all operations for this date
-      const dayOps = opsByDate[dateStr] || [];
-      for (const op of dayOps) {
-        currentBalance = applyOperation(currentBalance, op, accountId);
-      }
-
-      dailyBalances.push({
-        day: dayNum,
-        date: dateStr,
-        balance: currentBalance
-      });
-
-      dayNum++;
+    // Apply all operations for this date
+    const dayOps = opsByDate[dateStr] || [];
+    for (const op of dayOps) {
+      runningBalance = applyOperation(runningBalance, op, accountId);
     }
 
-    return dailyBalances;
-  } catch (error) {
-    console.error('Error calculating daily balances:', error);
-    throw error;
+    dailyBalances.push({
+      day: dayNum,
+      date: dateStr,
+      balance: runningBalance
+    });
+
+    dayNum++;
   }
+
+  return dailyBalances;
 };
 
 /**
- * Calculate 12-month mean for each day position (1-31)
- * Day 1 shows average of all day-1s from previous 12 months, etc.
- *
- * PERFORMANCE NOTE: This function uses an N+1 query pattern.
- * For a 31-day month, it makes up to 372 database queries (31 days × 12 months).
- * Expected load time: 2-5 seconds on mid-range Android devices.
- *
- * Future optimization: Fetch all operations for 12-month period once,
- * then calculate balances in memory. Estimated 80% performance improvement.
+ * Calculate N-month mean for each day position (1-31) - OPTIMIZED
+ * Fetches all operations once and calculates balances in memory.
+ * 
+ * Performance: Single DB query instead of hundreds of queries
  *
  * @param {string} accountId - Account ID
  * @param {number} year - Target year
  * @param {number} month - Target month (0-11)
- * @returns {Promise<Array<{day: number, meanBalance: string}>>}
+ * @param {number} numMonths - Number of months to look back (default: 12)
+ * @param {Array} allOperations - Pre-fetched operations
+ * @param {string} currentBalance - Current account balance
+ * @returns {Array<{day: number, meanBalance: string}>}
  */
-export const get12MonthMean = async (accountId, year, month) => {
-  try {
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const meanBalances = [];
+const calculateMonthMeanInMemory = (accountId, year, month, numMonths, allOperations, currentBalance) => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const meanBalances = [];
 
-    // For each day position (1-31)
-    for (let dayPos = 1; dayPos <= daysInMonth; dayPos++) {
-      const balances = [];
+  // For each day position (1-31)
+  for (let dayPos = 1; dayPos <= daysInMonth; dayPos++) {
+    const balances = [];
 
-      // Look back 12 months
-      for (let monthOffset = 1; monthOffset <= 12; monthOffset++) {
-        // NOTE: Date constructor with (year, month, day) interprets dates in local timezone
-        // but we immediately convert to ISO date string (YYYY-MM-DD), which is timezone-independent
-        const targetDate = new Date(year, month - monthOffset, dayPos);
+    // Look back N months
+    for (let monthOffset = 1; monthOffset <= numMonths; monthOffset++) {
+      const targetDate = new Date(year, month - monthOffset, dayPos);
 
-        // Skip if this day doesn't exist in that month (e.g., Feb 30)
-        if (targetDate.getDate() !== dayPos) {
-          continue;
-        }
-
-        const dateStr = targetDate.toISOString().split('T')[0];
-
-        try {
-          const balance = await getBalanceAtDate(accountId, dateStr);
-          balances.push(parseFloat(balance));
-        } catch (error) {
-          // If we can't get balance for this date, skip it
-          console.warn(`Could not get balance for ${dateStr}:`, error.message);
-        }
+      // Skip if this day doesn't exist in that month (e.g., Feb 30)
+      if (targetDate.getDate() !== dayPos) {
+        continue;
       }
 
-      // Calculate mean
-      let meanBalance = '0';
-      if (balances.length > 0) {
-        const sum = balances.reduce((acc, val) => acc + val, 0);
-        const mean = sum / balances.length;
-        meanBalance = Currency.formatAmount(mean.toString());
-      }
+      const dateStr = targetDate.toISOString().split('T')[0];
 
-      meanBalances.push({
-        day: dayPos,
-        meanBalance
-      });
+      try {
+        const balance = calculateBalanceAtDateInMemory(accountId, dateStr, allOperations, currentBalance);
+        balances.push(parseFloat(balance));
+      } catch (error) {
+        console.warn(`Could not calculate balance for ${dateStr}:`, error.message);
+      }
     }
 
-    return meanBalances;
-  } catch (error) {
-    console.error('Error calculating 12-month mean:', error);
-    throw error;
+    // Calculate mean
+    let meanBalance = '0';
+    if (balances.length > 0) {
+      const sum = balances.reduce((acc, val) => acc + val, 0);
+      const mean = sum / balances.length;
+      meanBalance = Currency.formatAmount(mean.toString());
+    }
+
+    meanBalances.push({
+      day: dayPos,
+      meanBalance
+    });
   }
+
+  return meanBalances;
 };
 
 /**
- * Get complete burndown data for rendering
- * Returns all 4 lines: current month, previous month, planned, and 12-month mean
+ * Get complete burndown data for rendering - OPTIMIZED
+ * Fetches all operations in a single query, then calculates everything in memory.
+ * 
+ * Performance: 2-3 DB queries instead of 400+ (~95% reduction in DB calls)
+ * 
  * @param {string} accountId - Account ID
  * @param {number} year - Year
  * @param {number} month - Month (0-11)
+ * @param {number} numMonthsForMean - Number of months for mean calculation (default: 12)
  * @returns {Promise<Object>} Burndown data object
  */
-export const getBurndownData = async (accountId, year, month) => {
+export const getBurndownData = async (accountId, year, month, numMonthsForMean = 12) => {
   try {
     // Calculate date ranges
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -293,21 +271,35 @@ export const getBurndownData = async (accountId, year, month) => {
     const previousMonthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
     const previousMonthEnd = new Date(year, month - 1, previousMonthDays).toISOString().split('T')[0];
 
-    // Get current month daily balances
-    const currentMonthData = await getDailyBalances(accountId, currentMonthStart, currentMonthEnd);
+    // Calculate the oldest date we need (N+1 months back for N-month mean calculation)
+    const oldestDate = new Date(year, month - (numMonthsForMean + 1), 1);
+    const oldestDateStr = oldestDate.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
 
-    // Get previous month daily balances
-    const previousMonthData = await getDailyBalances(accountId, previousMonthStart, previousMonthEnd);
+    // OPTIMIZATION: Fetch ALL operations in a single query
+    const [allOperations, currentBalance] = await Promise.all([
+      getOperationsForAccount(accountId, oldestDateStr, today),
+      getCurrentBalance(accountId)
+    ]);
 
-    // Get 12-month mean
-    const meanData = await get12MonthMean(accountId, year, month);
+    // Calculate all data in memory (no more DB queries)
+    const currentMonthData = calculateDailyBalancesInMemory(
+      accountId, currentMonthStart, currentMonthEnd, allOperations, currentBalance
+    );
+
+    const previousMonthData = calculateDailyBalancesInMemory(
+      accountId, previousMonthStart, previousMonthEnd, allOperations, currentBalance
+    );
+
+    const meanData = calculateMonthMeanInMemory(
+      accountId, year, month, numMonthsForMean, allOperations, currentBalance
+    );
 
     // Generate planned line (from highest balance in current month to zero)
     const plannedData = [];
     let startingBalance;
 
     if (currentMonthData.length > 0) {
-      // Find the highest balance in the current month
       const maxBalance = currentMonthData.reduce((max, day) => {
         const dayBalance = parseFloat(day.balance);
         return dayBalance > max ? dayBalance : max;
@@ -315,8 +307,7 @@ export const getBurndownData = async (accountId, year, month) => {
 
       startingBalance = maxBalance.toString();
     } else {
-      // Fallback to current balance if no data yet
-      startingBalance = await getCurrentBalance(accountId);
+      startingBalance = currentBalance;
     }
 
     const dailyDecrease = Currency.divide(startingBalance, daysInMonth);
@@ -329,23 +320,24 @@ export const getBurndownData = async (accountId, year, month) => {
       plannedData.push(parseFloat(remainingBalance));
     }
 
-    // Format data for chart (extract balance values as numbers)
+    // Format data for chart
     const currentBalances = currentMonthData.map(d => parseFloat(d.balance));
 
-    // Pad previous month data to match current month length (for proper chart display)
     const previousBalances = [];
+    const lastPreviousBalance = previousMonthData.length > 0 
+      ? parseFloat(previousMonthData[previousMonthData.length - 1].balance) 
+      : 0;
+
     for (let i = 0; i < daysInMonth; i++) {
       if (i < previousMonthData.length) {
         previousBalances.push(parseFloat(previousMonthData[i].balance));
       } else {
-        // If previous month has fewer days, pad with last value
-        previousBalances.push(previousMonthData.length > 0 ? parseFloat(previousMonthData[previousMonthData.length - 1].balance) : 0);
+        previousBalances.push(lastPreviousBalance);
       }
     }
 
     const meanBalances = meanData.map(d => parseFloat(d.meanBalance));
 
-    // Check if we're viewing the current month
     const now = new Date();
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
     const currentDay = isCurrentMonth ? now.getDate() : daysInMonth;
@@ -356,9 +348,9 @@ export const getBurndownData = async (accountId, year, month) => {
       planned: plannedData,
       mean: meanBalances,
       daysInMonth,
-      currentDay, // Add current day for truncating current month line
+      currentDay,
       isCurrentMonth,
-      currentMonthData,  // Include full data for debugging
+      currentMonthData,
       previousMonthData,
       meanData
     };

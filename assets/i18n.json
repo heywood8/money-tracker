@@ -292,7 +292,9 @@
     "no_operations_matching_filters": "No operations match your filters",
     "clear_filters": "Clear Filters",
     "select_all": "Select All",
-    "deselect_all": "Deselect All"
+    "deselect_all": "Deselect All",
+    "show_mean_line": "Show Mean Line",
+    "mean_months": "Months for Mean"
   },
   "ru": {
     "accounts": "Счета",
@@ -587,7 +589,9 @@
     "no_operations_matching_filters": "Нет операций, соответствующих фильтрам",
     "clear_filters": "Очистить фильтры",
     "select_all": "Выбрать все",
-    "deselect_all": "Снять все"
+    "deselect_all": "Снять все",
+    "show_mean_line": "Показать среднюю линию",
+    "mean_months": "Месяцев для средней"
   },
   "es": {
     "accounts": "Cuentas",
@@ -882,7 +886,9 @@
     "no_operations_matching_filters": "Ninguna operación coincide con tus filtros",
     "clear_filters": "Borrar filtros",
     "select_all": "Seleccionar todo",
-    "deselect_all": "Deselect. todo"
+    "deselect_all": "Deselect. todo",
+    "show_mean_line": "Показать среднюю линию",
+    "mean_months": "Месяцев для средней"
   },
   "fr": {
     "accounts": "Comptes",
@@ -1177,7 +1183,9 @@
     "no_operations_matching_filters": "Aucune opération ne correspond à vos filtres",
     "clear_filters": "Effacer les filtres",
     "select_all": "Tout sélectionner",
-    "deselect_all": "Tout désélectionner"
+    "deselect_all": "Tout désélectionner",
+    "show_mean_line": "Показать среднюю линию",
+    "mean_months": "Месяцев для средней"
   },
   "zh": {
     "accounts": "账户",
@@ -1472,7 +1480,9 @@
     "no_operations_matching_filters": "没有符合筛选条件的操作",
     "clear_filters": "清除筛选器",
     "select_all": "全选",
-    "deselect_all": "取消全选"
+    "deselect_all": "取消全选",
+    "show_mean_line": "Показать среднюю линию",
+    "mean_months": "Месяцев для средней"
   },
   "de": {
     "accounts": "Konten",
