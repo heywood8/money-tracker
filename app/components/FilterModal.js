@@ -32,6 +32,9 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
+  // Track expanded category folders
+  const [expandedIds, setExpandedIds] = useState(new Set());
+
   // Update local filters when prop changes
   useEffect(() => {
     const newFilters = filters || {
@@ -45,6 +48,13 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
     setLocalFilters(newFilters);
     setSearchInput(newFilters.searchText || '');
   }, [filters]);
+
+  // Reset expanded categories when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setExpandedIds(new Set());
+    }
+  }, [visible]);
 
   // Debounced search (300ms delay)
   useEffect(() => {
@@ -75,14 +85,73 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
     }));
   };
 
+  // Get all descendant category IDs (recursively)
+  const getAllDescendantIds = (categoryId) => {
+    const descendants = [];
+    const children = visibleCategories.filter(cat => cat.parentId === categoryId);
+
+    children.forEach(child => {
+      // Only add entry categories (not folders) to the list
+      if (child.type !== 'folder') {
+        descendants.push(child.id);
+      }
+      // Recursively get descendants
+      descendants.push(...getAllDescendantIds(child.id));
+    });
+
+    return descendants;
+  };
+
+  // Check if all descendants are selected
+  const areAllDescendantsSelected = (categoryId) => {
+    const descendantIds = getAllDescendantIds(categoryId);
+    if (descendantIds.length === 0) return false;
+    return descendantIds.every(id => localFilters.categoryIds.includes(id));
+  };
+
+  // Check if some (but not all) descendants are selected
+  const areSomeDescendantsSelected = (categoryId) => {
+    const descendantIds = getAllDescendantIds(categoryId);
+    if (descendantIds.length === 0) return false;
+    const selectedCount = descendantIds.filter(id => localFilters.categoryIds.includes(id)).length;
+    return selectedCount > 0 && selectedCount < descendantIds.length;
+  };
+
   // Toggle category filter
-  const toggleCategory = (categoryId) => {
-    setLocalFilters(f => ({
-      ...f,
-      categoryIds: f.categoryIds.includes(categoryId)
-        ? f.categoryIds.filter(id => id !== categoryId)
-        : [...f.categoryIds, categoryId]
-    }));
+  const toggleCategory = (categoryId, isFolder) => {
+    if (isFolder) {
+      // For folders, toggle all descendants
+      const descendantIds = getAllDescendantIds(categoryId);
+      const allSelected = areAllDescendantsSelected(categoryId);
+
+      setLocalFilters(f => ({
+        ...f,
+        categoryIds: allSelected
+          ? f.categoryIds.filter(id => !descendantIds.includes(id))
+          : [...new Set([...f.categoryIds, ...descendantIds])]
+      }));
+    } else {
+      // For entry categories, toggle individual selection
+      setLocalFilters(f => ({
+        ...f,
+        categoryIds: f.categoryIds.includes(categoryId)
+          ? f.categoryIds.filter(id => id !== categoryId)
+          : [...f.categoryIds, categoryId]
+      }));
+    }
+  };
+
+  // Toggle expanded state for category folders
+  const toggleExpanded = (categoryId) => {
+    setExpandedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
   };
 
   // Clear all filters
@@ -114,6 +183,24 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
 
   // Get visible categories (excluding shadow categories)
   const visibleCategories = categories.filter(c => !c.isShadow);
+
+  // Flatten the category tree based on expanded state (like CategoriesScreen)
+  const flattenedCategories = (() => {
+    const flattened = [];
+    const rootCategories = visibleCategories.filter(cat => !cat.parentId);
+
+    const addWithChildren = (category, depth = 0) => {
+      flattened.push({ ...category, depth });
+
+      if (expandedIds.has(category.id)) {
+        const children = visibleCategories.filter(cat => cat.parentId === category.id);
+        children.forEach(child => addWithChildren(child, depth + 1));
+      }
+    };
+
+    rootCategories.forEach(cat => addWithChildren(cat));
+    return flattened;
+  })();
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -154,99 +241,6 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
               <Text style={[styles.helperText, { color: colors.mutedText }]}>
                 {t('search_helper_text')}
               </Text>
-            </View>
-
-            {/* Type Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('operation_type')}
-              </Text>
-              <View style={styles.chipContainer}>
-                {['expense', 'income', 'transfer'].map(type => {
-                  const isSelected = localFilters.types && localFilters.types.includes(type);
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                          borderColor: colors.border,
-                        }
-                      ]}
-                      onPress={() => toggleType(type)}
-                    >
-                      <Icon
-                        name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
-                        size={18}
-                        color={isSelected ? '#fff' : colors.text}
-                      />
-                      <Text style={[styles.chipText, { color: isSelected ? '#fff' : colors.text }]}>
-                        {t(type)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Accounts Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('accounts')}
-              </Text>
-              {accounts.map(account => {
-                const isSelected = localFilters.accountIds && localFilters.accountIds.includes(account.id);
-                return (
-                  <TouchableOpacity
-                    key={account.id}
-                    style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                    onPress={() => toggleAccount(account.id)}
-                  >
-                    <View style={styles.checkboxLeft}>
-                      <Icon
-                        name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                        size={24}
-                        color={isSelected ? colors.primary : colors.mutedText}
-                      />
-                      <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                        {account.name}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Categories Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('categories')}
-              </Text>
-              {visibleCategories.map(category => {
-                const isSelected = localFilters.categoryIds && localFilters.categoryIds.includes(category.id);
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                    onPress={() => toggleCategory(category.id)}
-                  >
-                    <View style={styles.checkboxLeft}>
-                      <Icon
-                        name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                        size={24}
-                        color={isSelected ? colors.primary : colors.mutedText}
-                      />
-                      <View style={styles.categoryInfo}>
-                        <Icon name={category.icon || 'tag'} size={20} color={colors.text} />
-                        <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                          {category.name}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
 
             {/* Date Range Section */}
@@ -317,6 +311,152 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
                   keyboardType="numeric"
                 />
               </View>
+            </View>
+
+            {/* Type Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('operation_type')}
+              </Text>
+              <View style={styles.chipContainer}>
+                {['expense', 'income', 'transfer'].map(type => {
+                  const isSelected = localFilters.types && localFilters.types.includes(type);
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                          borderColor: colors.border,
+                        }
+                      ]}
+                      onPress={() => toggleType(type)}
+                    >
+                      <Icon
+                        name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
+                        size={18}
+                        color={isSelected ? '#fff' : colors.text}
+                      />
+                      <Text style={[styles.chipText, { color: isSelected ? '#fff' : colors.text }]}>
+                        {t(type)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Accounts Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('accounts')}
+              </Text>
+              {accounts.map(account => {
+                const isSelected = localFilters.accountIds && localFilters.accountIds.includes(account.id);
+                return (
+                  <TouchableOpacity
+                    key={account.id}
+                    style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
+                    onPress={() => toggleAccount(account.id)}
+                  >
+                    <View style={styles.checkboxLeft}>
+                      <Icon
+                        name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                        size={24}
+                        color={isSelected ? colors.primary : colors.mutedText}
+                      />
+                      <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+                        {account.name}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Categories Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('categories')}
+              </Text>
+
+              {flattenedCategories.map(category => {
+                const isFolder = category.type === 'folder';
+                const isSelected = localFilters.categoryIds && localFilters.categoryIds.includes(category.id);
+                const isExpanded = expandedIds.has(category.id);
+                const hasChildren = visibleCategories.some(cat => cat.parentId === category.id);
+                const indentWidth = category.depth * 20;
+
+                // For folders, determine checkbox state
+                const allDescendantsSelected = isFolder ? areAllDescendantsSelected(category.id) : false;
+                const someDescendantsSelected = isFolder ? areSomeDescendantsSelected(category.id) : false;
+
+                // Determine checkbox icon
+                let checkboxIcon, checkboxColor;
+                if (isFolder) {
+                  if (allDescendantsSelected) {
+                    checkboxIcon = 'checkbox-marked';
+                    checkboxColor = colors.primary;
+                  } else if (someDescendantsSelected) {
+                    checkboxIcon = 'minus-box';
+                    checkboxColor = colors.primary;
+                  } else {
+                    checkboxIcon = 'checkbox-blank-outline';
+                    checkboxColor = colors.mutedText;
+                  }
+                } else {
+                  checkboxIcon = isSelected ? 'checkbox-marked' : 'checkbox-blank-outline';
+                  checkboxColor = isSelected ? colors.primary : colors.mutedText;
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[styles.checkboxItem, { borderBottomColor: colors.border, paddingLeft: 12 + indentWidth }]}
+                    onPress={() => {
+                      toggleCategory(category.id, isFolder);
+                    }}
+                  >
+                    <View style={styles.checkboxLeft}>
+                      {/* Expand/Collapse Icon for folders */}
+                      {(isFolder || hasChildren) ? (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            toggleExpanded(category.id);
+                          }}
+                          style={styles.expandButton}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Icon
+                            name={isExpanded ? 'chevron-down' : 'chevron-right'}
+                            size={18}
+                            color={colors.mutedText}
+                          />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.expandButton} />
+                      )}
+
+                      {/* Checkbox for all categories */}
+                      <Icon
+                        name={checkboxIcon}
+                        size={24}
+                        color={checkboxColor}
+                      />
+
+                      {/* Category Icon and Name */}
+                      <View style={styles.categoryInfo}>
+                        <Icon name={category.icon || 'tag'} size={20} color={colors.text} />
+                        <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+                          {category.nameKey ? t(category.nameKey) : category.name}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
 
@@ -461,6 +601,13 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 14,
+  },
+  expandButton: {
+    width: 32,
+    height: 32,
+    marginRight: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryInfo: {
     flexDirection: 'row',
