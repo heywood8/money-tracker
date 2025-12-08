@@ -19,6 +19,7 @@ export const accounts = sqliteTable('accounts', {
   currency: text('currency').notNull().default('USD'),
   displayOrder: integer('display_order'),
   hidden: integer('hidden').default(0),
+  monthlyTarget: text('monthly_target'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({
