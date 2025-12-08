@@ -16,6 +16,10 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   const languages = [
     { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
     { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+    { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
+    { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
+    { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
+    { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
   ];
 
   const handleLanguageSelect = (code) => {
