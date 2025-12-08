@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/heywood8/money-tracker/compare/penny-v0.10.0...penny-v0.10.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* filters - categories parent/child, ordering ([419658b](https://github.com/heywood8/money-tracker/commit/419658b5acc0a6e6704d7842b9c44d9ee4072695))
+* filters - shrink fields 10% ([d83e6da](https://github.com/heywood8/money-tracker/commit/d83e6da171b707ff7ff983ac36e8a185959d1a0d))
+
 ## [0.10.0](https://github.com/heywood8/money-tracker/compare/penny-v0.9.0...penny-v0.10.0) (2025-12-08)
 
 
