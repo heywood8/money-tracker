@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder, Switch, TextInput } from 'react-native';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -110,6 +110,8 @@ const GraphsScreen = () => {
   const [loadingBurndown, setLoadingBurndown] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [showMeanLine, setShowMeanLine] = useState(false);
+  const [meanMonths, setMeanMonths] = useState('12');
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -589,10 +591,12 @@ const GraphsScreen = () => {
 
     try {
       setLoadingBurndown(true);
+      const numMonths = parseInt(meanMonths) || 12;
       const data = await getBurndownData(
         selectedAccountId,
         selectedYear,
-        selectedMonth
+        selectedMonth,
+        numMonths
       );
       setBurndownData(data);
     } catch (error) {
@@ -601,7 +605,7 @@ const GraphsScreen = () => {
     } finally {
       setLoadingBurndown(false);
     }
-  }, [selectedAccountId, selectedYear, selectedMonth]);
+  }, [selectedAccountId, selectedYear, selectedMonth, meanMonths]);
 
   // Reload data when filters change
   useEffect(() => {
@@ -676,6 +680,15 @@ const GraphsScreen = () => {
       value: acc.id
     })),
     [accounts]
+  );
+
+  // Mean months picker items (1-12)
+  const meanMonthsItems = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => ({
+      label: (i + 1).toString(),
+      value: (i + 1).toString()
+    })),
+    []
   );
 
   // Get selected account's currency
@@ -981,6 +994,37 @@ const GraphsScreen = () => {
                 />
               </View>
 
+              {/* Mean Line Controls */}
+              <View style={[styles.meanControlsContainer, { borderColor: colors.border }]}>
+                <View style={styles.meanControlRow}>
+                  <Text style={[styles.meanControlLabel, { color: colors.text }]}>
+                    {t('show_mean_line')}
+                  </Text>
+                  <Switch
+                    value={showMeanLine}
+                    onValueChange={setShowMeanLine}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={showMeanLine ? colors.background : colors.mutedText}
+                  />
+                </View>
+                
+                {showMeanLine && (
+                  <View style={styles.meanControlRow}>
+                    <Text style={[styles.meanControlLabel, { color: colors.text }]}>
+                      {t('mean_months')}
+                    </Text>
+                    <View style={[styles.meanMonthsPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <SimplePicker
+                        value={meanMonths}
+                        onValueChange={setMeanMonths}
+                        items={meanMonthsItems}
+                        colors={colors}
+                      />
+                    </View>
+                  </View>
+                )}
+              </View>
+
               {/* LineChart */}
               {loadingBurndown ? (
                 <View style={styles.loadingContainer}>
@@ -1000,35 +1044,32 @@ const GraphsScreen = () => {
                       ),
                       datasets: [
                         {
-                          // NOTE: Truncate current month line to current day
-                          // When viewing current month, only show data up to today to avoid
-                          // displaying future days with inaccurate/zero balances.
-                          // For past months, show full month (all days).
                           data: burndownData.isCurrentMonth && burndownData.currentDay
                             ? burndownData.current.slice(0, burndownData.currentDay)
                             : burndownData.current,
-                          color: (opacity = 1) => `rgba(34, 197, 94, 1)`, // Green - solid
+                          color: (opacity = 1) => `rgba(34, 197, 94, 1)`,
                           strokeWidth: 3,
                           withDots: false,
                         },
                         {
                           data: burndownData.previous.length > 0 ? burndownData.previous : [0],
-                          color: (opacity = 1) => `rgba(100, 116, 139, 1)`, // Slate gray - solid
+                          color: (opacity = 1) => `rgba(100, 116, 139, 1)`,
                           strokeWidth: 3,
                           withDots: false,
                         },
                         {
                           data: burndownData.planned.length > 0 ? burndownData.planned : [0],
-                          color: (opacity = 1) => `rgba(59, 130, 246, 1)`, // Blue - solid
+                          color: (opacity = 1) => `rgba(59, 130, 246, 1)`,
                           strokeWidth: 3,
                           withDots: false,
                         },
-                        {
+                        // Conditionally add mean line dataset
+                        ...(showMeanLine ? [{
                           data: burndownData.mean.length > 0 ? burndownData.mean : [0],
-                          color: (opacity = 1) => `rgba(251, 146, 60, 1)`, // Orange - solid, more vibrant
+                          color: (opacity = 1) => `rgba(251, 146, 60, 1)`,
                           strokeWidth: 3,
                           withDots: false,
-                        },
+                        }] : []),
                       ],
                     }}
                     width={Dimensions.get('window').width - 64}
@@ -1047,9 +1088,6 @@ const GraphsScreen = () => {
                       fillShadowGradient: 'transparent',
                       fillShadowGradientOpacity: 0,
                     }}
-                    // NOTE: Bezier smoothing enabled for visual appeal
-                    // Trade-off: Planned line (mathematically straight) will have slight curve
-                    // This is acceptable for better appearance of actual data lines
                     bezier
                     withDots={false}
                     withInnerLines={false}
@@ -1120,11 +1158,11 @@ const GraphsScreen = () => {
                             </Text>
                           </View>
                         )}
-                        {burndownData?.mean?.[selectedDay] !== undefined && (
+                        {showMeanLine && burndownData?.mean?.[selectedDay] !== undefined && (
                           <View style={styles.tooltipRow}>
                             <View style={[styles.tooltipDot, { backgroundColor: 'rgba(251, 146, 60, 1)' }]} />
                             <Text style={[styles.tooltipLabel, { color: colors.text }]}>
-                              {t('12_month_mean')}:
+                              {t('n_month_mean', { n: meanMonths })}:
                             </Text>
                             <Text style={[styles.tooltipValue, { color: colors.text }]}>
                               {formatCurrency(burndownData.mean[selectedDay], selectedAccountCurrency)}
@@ -1152,10 +1190,14 @@ const GraphsScreen = () => {
                         <View style={[styles.legendDot, { backgroundColor: 'rgba(59, 130, 246, 1)' }]} />
                         <Text style={[styles.legendLabel, { color: colors.text }]}>{t('planned')}</Text>
                       </View>
-                      <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: 'rgba(251, 146, 60, 1)' }]} />
-                        <Text style={[styles.legendLabel, { color: colors.text }]}>{t('12_month_mean')}</Text>
-                      </View>
+                      {showMeanLine && (
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: 'rgba(251, 146, 60, 1)' }]} />
+                          <Text style={[styles.legendLabel, { color: colors.text }]}>
+                            {t('n_month_mean', { n: meanMonths })}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </>
@@ -1667,6 +1709,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 16,
+  },
+  meanControlsContainer: {
+    marginBottom: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  meanControlRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  meanControlLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  meanMonthsPicker: {
+    width: 80,
+    borderRadius: 6,
+    borderWidth: 1,
+    overflow: 'hidden',
+    height: 36,
   },
 });
 

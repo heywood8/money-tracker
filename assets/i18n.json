@@ -294,7 +294,8 @@
     "select_all": "Select All",
     "deselect_all": "Deselect All",
     "show_mean_line": "Show Mean Line",
-    "mean_months": "Months for Mean"
+    "mean_months": "Number of Months",
+    "n_month_mean": "{{n}}-Month Mean"
   },
   "ru": {
     "accounts": "Счета",
@@ -591,7 +592,8 @@
     "select_all": "Выбрать все",
     "deselect_all": "Снять все",
     "show_mean_line": "Показать среднюю линию",
-    "mean_months": "Месяцев для средней"
+    "mean_months": "Количество месяцев",
+    "n_month_mean": "Среднее за {{n}} мес."
   },
   "es": {
     "accounts": "Cuentas",
