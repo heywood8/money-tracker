@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.0](https://github.com/heywood8/money-tracker/compare/penny-v0.11.3...penny-v0.12.0) (2025-12-08)
+
+
+### Features
+
+* added toggle to show mean line (might be buggy) ([b39400a](https://github.com/heywood8/money-tracker/commit/b39400ac3433761d4caadcba58370df8689d09d5))
+* burndown graph performance increase; added switch to enable a mean line ([7a8eb12](https://github.com/heywood8/money-tracker/commit/7a8eb12c5d98f1cbec0bb4b5a5f09579a613b3e1))
+
+
+### Bug Fixes
+
+* move income card to the bottom ([e39fdf2](https://github.com/heywood8/money-tracker/commit/e39fdf2fe5f697998ecbc32892ca22a31ae79f69))
+* operations from hidden accounts not shown correctly ([dd3c144](https://github.com/heywood8/money-tracker/commit/dd3c1443aa648a27bd013df2f057301efcdde793))
+* reorder graphs ([7eb55d4](https://github.com/heywood8/money-tracker/commit/7eb55d4d4430630e9c112feb0ab50a355262af90))
+* tests ([b3135cf](https://github.com/heywood8/money-tracker/commit/b3135cf49017d30131e0e300365f93cb9ae5d2bd))
+* texts and translations ([4fe5c3f](https://github.com/heywood8/money-tracker/commit/4fe5c3f09945753a2e694eac87332cb060badb94))
+
 ## [0.11.3](https://github.com/heywood8/money-tracker/compare/penny-v0.11.2...penny-v0.11.3) (2025-12-08)
 
 
