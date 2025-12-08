@@ -1,11 +1,10 @@
 /**
  * SQLite backup and restore service (Native platforms: iOS/Android)
- * Supports multiple export formats: JSON, CSV, Excel, SQLite
+ * Supports multiple export formats: JSON, CSV, SQLite
  */
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import * as XLSX from 'xlsx';
 import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
 
 const BACKUP_VERSION = 1;
@@ -140,88 +139,6 @@ export const exportBackupCSV = async () => {
 };
 
 /**
- * Export backup as Excel file
- * @returns {Promise<string>} Filename
- */
-export const exportBackupExcel = async () => {
-  try {
-    const backup = await createBackup();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-
-    // Add backup info sheet
-    const infoSheet = XLSX.utils.json_to_sheet([
-      {
-        'Backup Version': backup.version,
-        'Timestamp': backup.timestamp,
-        'Platform': backup.platform,
-        'Accounts': backup.data.accounts.length,
-        'Categories': backup.data.categories.length,
-        'Operations': backup.data.operations.length,
-      }
-    ]);
-    XLSX.utils.book_append_sheet(wb, infoSheet, 'Backup Info');
-
-    // Add accounts sheet
-    if (backup.data.accounts.length > 0) {
-      const accountsSheet = XLSX.utils.json_to_sheet(backup.data.accounts);
-      XLSX.utils.book_append_sheet(wb, accountsSheet, 'Accounts');
-    }
-
-    // Add categories sheet
-    if (backup.data.categories.length > 0) {
-      const categoriesSheet = XLSX.utils.json_to_sheet(backup.data.categories);
-      XLSX.utils.book_append_sheet(wb, categoriesSheet, 'Categories');
-    }
-
-    // Add operations sheet
-    if (backup.data.operations.length > 0) {
-      const operationsSheet = XLSX.utils.json_to_sheet(backup.data.operations);
-      XLSX.utils.book_append_sheet(wb, operationsSheet, 'Operations');
-    }
-
-    // Add app metadata sheet
-    if (backup.data.app_metadata && backup.data.app_metadata.length > 0) {
-      const metadataSheet = XLSX.utils.json_to_sheet(backup.data.app_metadata);
-      XLSX.utils.book_append_sheet(wb, metadataSheet, 'App Metadata');
-    }
-
-    // Write workbook to file
-    const filename = `money_tracker_backup_${timestamp}.xlsx`;
-    const fileUri = `${FileSystem.documentDirectory}${filename}`;
-
-    // Convert workbook to binary
-    const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-
-    // Write to file
-    await FileSystem.writeAsStringAsync(fileUri, wbout, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    console.log('Excel backup file created:', fileUri);
-
-    // Share the file
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        dialogTitle: 'Export Excel Backup',
-        UTI: 'org.openxmlformats.spreadsheetml.sheet',
-      });
-    } else {
-      throw new Error('Sharing is not available on this device');
-    }
-
-    return filename;
-  } catch (error) {
-    console.error('Failed to export Excel backup:', error);
-    throw error;
-  }
-};
-
-/**
  * Export backup as SQLite database file
  * @returns {Promise<string>} Filename
  */
@@ -278,16 +195,13 @@ export const exportBackupSQLite = async () => {
 
 /**
  * Export backup to a JSON file
- * @param {string} format - Export format: 'json', 'csv', 'excel', or 'sqlite'
+ * @param {string} format - Export format: 'json', 'csv', or 'sqlite'
  * @returns {Promise<string>} Filename
  */
 export const exportBackup = async (format = 'json') => {
   switch (format.toLowerCase()) {
     case 'csv':
       return await exportBackupCSV();
-    case 'excel':
-    case 'xlsx':
-      return await exportBackupExcel();
     case 'sqlite':
     case 'db':
       return await exportBackupSQLite();
@@ -618,60 +532,7 @@ const importBackupCSV = async (fileUri) => {
   return backup;
 };
 
-/**
- * Import backup from Excel file
- * @param {string} fileUri - File URI
- * @returns {Promise<Object>} Imported backup object
- */
-const importBackupExcel = async (fileUri) => {
-  console.log('Importing Excel backup...');
-  const fileContent = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
 
-  // Parse Excel file
-  const wb = XLSX.read(fileContent, { type: 'base64' });
-
-  // Extract data from sheets
-  const backup = {
-    version: BACKUP_VERSION,
-    timestamp: new Date().toISOString(),
-    platform: 'excel',
-    data: {
-      accounts: [],
-      categories: [],
-      operations: [],
-      app_metadata: [],
-    },
-  };
-
-  // Read Backup Info sheet if exists
-  if (wb.SheetNames.includes('Backup Info')) {
-    const infoSheet = wb.Sheets['Backup Info'];
-    const infoData = XLSX.utils.sheet_to_json(infoSheet);
-    if (infoData.length > 0) {
-      backup.version = infoData[0]['Backup Version'] || BACKUP_VERSION;
-      backup.timestamp = infoData[0]['Timestamp'] || backup.timestamp;
-    }
-  }
-
-  // Read data sheets
-  if (wb.SheetNames.includes('Accounts')) {
-    backup.data.accounts = XLSX.utils.sheet_to_json(wb.Sheets['Accounts']);
-  }
-  if (wb.SheetNames.includes('Categories')) {
-    backup.data.categories = XLSX.utils.sheet_to_json(wb.Sheets['Categories']);
-  }
-  if (wb.SheetNames.includes('Operations')) {
-    backup.data.operations = XLSX.utils.sheet_to_json(wb.Sheets['Operations']);
-  }
-  if (wb.SheetNames.includes('App Metadata')) {
-    backup.data.app_metadata = XLSX.utils.sheet_to_json(wb.Sheets['App Metadata']);
-  }
-
-  await restoreBackup(backup);
-  return backup;
-};
 
 /**
  * Import backup from SQLite database file
@@ -760,16 +621,13 @@ const importBackupSQLite = async (fileUri) => {
 /**
  * Detect file format from extension
  * @param {string} filename - Filename
- * @returns {string} Format: 'json', 'csv', 'excel', or 'sqlite'
+ * @returns {string} Format: 'json', 'csv', or 'sqlite'
  */
 const detectFileFormat = (filename) => {
   const ext = filename.toLowerCase().split('.').pop();
   switch (ext) {
     case 'csv':
       return 'csv';
-    case 'xlsx':
-    case 'xls':
-      return 'excel';
     case 'db':
     case 'sqlite':
     case 'sqlite3':
@@ -809,9 +667,6 @@ export const importBackup = async () => {
     switch (format) {
       case 'csv':
         backup = await importBackupCSV(fileUri);
-        break;
-      case 'excel':
-        backup = await importBackupExcel(fileUri);
         break;
       case 'sqlite':
         backup = await importBackupSQLite(fileUri);
