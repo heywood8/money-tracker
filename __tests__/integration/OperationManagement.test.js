@@ -25,16 +25,14 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `uuid-${++mockUuidCounter}`),
-}));
+// Mock auto-increment ID counter
+let mockOperationIdCounter = 0;
 
 describe('Operation Management Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
+    mockOperationIdCounter = 0;
 
     // Default mock implementations
     AccountsDB.getAllAccounts.mockResolvedValue([
@@ -45,7 +43,11 @@ describe('Operation Management Integration Tests', () => {
 
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
-    OperationsDB.createOperation.mockResolvedValue(undefined);
+    OperationsDB.createOperation.mockImplementation(async (operation) => ({
+      ...operation,
+      id: ++mockOperationIdCounter,
+      createdAt: new Date().toISOString(),
+    }));
     OperationsDB.updateOperation.mockResolvedValue(undefined);
     OperationsDB.deleteOperation.mockResolvedValue(undefined);
   });
@@ -64,9 +66,10 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
         Promise.resolve([...currentOperations])
       );
-      OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation, id: operation.id });
-        return Promise.resolve(undefined);
+      OperationsDB.createOperation.mockImplementation(async (operation) => {
+        const newOp = { ...operation, id: ++mockOperationIdCounter, createdAt: new Date().toISOString() };
+        currentOperations.push(newOp);
+        return newOp;
       });
       OperationsDB.updateOperation.mockImplementation((id, updates) => {
         const op = currentOperations.find((o) => o.id === id);

@@ -39,23 +39,24 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-// Mock react-native-uuid
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `op-uuid-${++mockUuidCounter}`),
-}));
+// Mock auto-increment ID counter
+let mockOperationIdCounter = 0;
 
 describe('OperationsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
     mockReloadAccounts.mockClear();
-    mockUuidCounter = 0;
+    mockOperationIdCounter = 0;
 
     // Default mocks
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getAllOperations.mockResolvedValue([]);
-    OperationsDB.createOperation.mockResolvedValue(undefined);
+    OperationsDB.createOperation.mockImplementation(async (operation) => ({
+      ...operation,
+      id: ++mockOperationIdCounter,
+      createdAt: new Date().toISOString(),
+    }));
     OperationsDB.updateOperation.mockResolvedValue(undefined);
     OperationsDB.deleteOperation.mockResolvedValue(undefined);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
@@ -83,8 +84,8 @@ describe('OperationsContext', () => {
 
     it('loads initial week of operations on mount', async () => {
       const mockOperations = [
-        { id: 'op1', type: 'expense', amount: '100', date: '2025-12-05', accountId: 'acc1' },
-        { id: 'op2', type: 'income', amount: '200', date: '2025-12-04', accountId: 'acc2' },
+        { id: 1, type: 'expense', amount: '100', date: '2025-12-05', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', date: '2025-12-04', accountId: 'acc2' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
 
@@ -100,8 +101,8 @@ describe('OperationsContext', () => {
 
     it('tracks oldest loaded date for pagination', async () => {
       const mockOperations = [
-        { id: 'op1', type: 'expense', amount: '100', date: '2025-12-05', accountId: 'acc1' },
-        { id: 'op2', type: 'income', amount: '200', date: '2025-12-01', accountId: 'acc2' },
+        { id: 1, type: 'expense', amount: '100', date: '2025-12-05', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', date: '2025-12-01', accountId: 'acc2' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
 
@@ -159,7 +160,7 @@ describe('OperationsContext', () => {
         description: 'Test expense',
       };
 
-      const mockReloadedOps = [{ ...newOp, id: 'op-uuid-1', createdAt: expect.any(String) }];
+      const mockReloadedOps = [{ ...newOp, id: 1, createdAt: expect.any(String) }];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockReloadedOps);
 
       await act(async () => {
@@ -168,8 +169,6 @@ describe('OperationsContext', () => {
 
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(expect.objectContaining({
         ...newOp,
-        id: 'op-uuid-1',
-        createdAt: expect.any(String),
       }));
 
       // Should reload operations after adding
@@ -184,7 +183,7 @@ describe('OperationsContext', () => {
 
     it('updates an existing operation', async () => {
       const existingOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1', date: '2025-12-05' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
@@ -195,10 +194,10 @@ describe('OperationsContext', () => {
       });
 
       await act(async () => {
-        await result.current.updateOperation('op1', { amount: '200' });
+        await result.current.updateOperation(1, { amount: '200' });
       });
 
-      expect(OperationsDB.updateOperation).toHaveBeenCalledWith('op1', { amount: '200' });
+      expect(OperationsDB.updateOperation).toHaveBeenCalledWith(1, { amount: '200' });
       expect(result.current.operations[0].amount).toBe('200');
       expect(mockReloadAccounts).toHaveBeenCalled();
       expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.OPERATION_CHANGED);
@@ -206,8 +205,8 @@ describe('OperationsContext', () => {
 
     it('deletes an operation', async () => {
       const existingOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
-        { id: 'op2', type: 'income', amount: '200', accountId: 'acc2', categoryId: 'cat2' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
+        { id: 2, type: 'income', amount: '200', accountId: 'acc2', categoryId: 'cat2' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
@@ -220,12 +219,12 @@ describe('OperationsContext', () => {
       expect(result.current.operations).toHaveLength(2);
 
       await act(async () => {
-        await result.current.deleteOperation('op1');
+        await result.current.deleteOperation(1);
       });
 
-      expect(OperationsDB.deleteOperation).toHaveBeenCalledWith('op1');
+      expect(OperationsDB.deleteOperation).toHaveBeenCalledWith(1);
       expect(result.current.operations).toHaveLength(1);
-      expect(result.current.operations[0].id).toBe('op2');
+      expect(result.current.operations[0].id).toBe(2);
       expect(mockReloadAccounts).toHaveBeenCalled();
       expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.OPERATION_CHANGED);
     });
@@ -266,7 +265,7 @@ describe('OperationsContext', () => {
 
     it('handles update operation error and shows dialog', async () => {
       const existingOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
@@ -293,7 +292,7 @@ describe('OperationsContext', () => {
 
     it('handles delete operation error and shows dialog', async () => {
       const existingOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
@@ -532,7 +531,7 @@ describe('OperationsContext', () => {
   describe('Lazy Loading', () => {
     it('loads more operations when available', async () => {
       const initialOps = [
-        { id: 'op1', date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
 
@@ -542,8 +541,8 @@ describe('OperationsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const nextOldestOp = { id: 'op2', date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
-      const moreOps = [nextOldestOp, { id: 'op3', date: '2025-11-27', type: 'expense', amount: '50', accountId: 'acc1' }];
+      const nextOldestOp = { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
+      const moreOps = [nextOldestOp, { id: 3, date: '2025-11-27', type: 'expense', amount: '50', accountId: 'acc1' }];
 
       OperationsDB.getNextOldestOperation.mockResolvedValue(nextOldestOp);
       OperationsDB.getOperationsByWeekFromDate.mockResolvedValue(moreOps);
@@ -558,7 +557,7 @@ describe('OperationsContext', () => {
 
     it('sets hasMoreOperations to false when no more data', async () => {
       const initialOps = [
-        { id: 'op1', date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
 
@@ -579,7 +578,7 @@ describe('OperationsContext', () => {
 
     it('deduplicates operations when loading more', async () => {
       const initialOps = [
-        { id: 'op1', date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
 
@@ -589,9 +588,9 @@ describe('OperationsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const nextOldestOp = { id: 'op2', date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
+      const nextOldestOp = { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
       const moreOps = [
-        { id: 'op1', date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' }, // Duplicate
+        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' }, // Duplicate
         nextOldestOp,
       ];
 
@@ -610,7 +609,7 @@ describe('OperationsContext', () => {
 
     it('does not load more when hasMoreOperations is false', async () => {
       const initialOps = [
-        { id: 'op1', date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
 
@@ -644,9 +643,9 @@ describe('OperationsContext', () => {
   describe('Filter Functions', () => {
     it('filters operations by account', async () => {
       const ops = [
-        { id: 'op1', accountId: 'acc1', type: 'expense', amount: '100' },
-        { id: 'op2', accountId: 'acc2', type: 'income', amount: '200' },
-        { id: 'op3', accountId: 'acc1', type: 'expense', amount: '50' },
+        { id: 1, accountId: 'acc1', type: 'expense', amount: '100' },
+        { id: 2, accountId: 'acc2', type: 'income', amount: '200' },
+        { id: 3, accountId: 'acc1', type: 'expense', amount: '50' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
@@ -663,9 +662,9 @@ describe('OperationsContext', () => {
 
     it('filters operations by category', async () => {
       const ops = [
-        { id: 'op1', categoryId: 'cat1', type: 'expense', amount: '100' },
-        { id: 'op2', categoryId: 'cat2', type: 'income', amount: '200' },
-        { id: 'op3', categoryId: 'cat1', type: 'expense', amount: '50' },
+        { id: 1, categoryId: 'cat1', type: 'expense', amount: '100' },
+        { id: 2, categoryId: 'cat2', type: 'income', amount: '200' },
+        { id: 3, categoryId: 'cat1', type: 'expense', amount: '50' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
@@ -682,9 +681,9 @@ describe('OperationsContext', () => {
 
     it('filters operations by date range', async () => {
       const ops = [
-        { id: 'op1', date: '2025-12-01', type: 'expense', amount: '100' },
-        { id: 'op2', date: '2025-12-05', type: 'income', amount: '200' },
-        { id: 'op3', date: '2025-12-10', type: 'expense', amount: '50' },
+        { id: 1, date: '2025-12-01', type: 'expense', amount: '100' },
+        { id: 2, date: '2025-12-05', type: 'income', amount: '200' },
+        { id: 3, date: '2025-12-10', type: 'expense', amount: '50' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
@@ -699,18 +698,18 @@ describe('OperationsContext', () => {
       const filtered = result.current.getOperationsByDateRange(startDate, endDate);
 
       expect(filtered).toHaveLength(1);
-      expect(filtered[0].id).toBe('op2');
+      expect(filtered[0].id).toBe(2);
     });
   });
 
   describe('Reload Functionality', () => {
     it('reloads all operations', async () => {
       const initialOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       const reloadedOps = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1' },
-        { id: 'op2', type: 'income', amount: '200', accountId: 'acc2' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', accountId: 'acc2' },
       ];
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
@@ -745,7 +744,7 @@ describe('OperationsContext', () => {
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       OperationsDB.getAllOperations.mockResolvedValue([
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
       ]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
@@ -771,9 +770,9 @@ describe('OperationsContext', () => {
   describe('Regression Tests', () => {
     it('maintains operation order after updates', async () => {
       const ops = [
-        { id: 'op1', type: 'expense', amount: '100', accountId: 'acc1' },
-        { id: 'op2', type: 'income', amount: '200', accountId: 'acc2' },
-        { id: 'op3', type: 'expense', amount: '50', accountId: 'acc1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', accountId: 'acc2' },
+        { id: 3, type: 'expense', amount: '50', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
@@ -784,10 +783,10 @@ describe('OperationsContext', () => {
       });
 
       await act(async () => {
-        await result.current.updateOperation('op2', { amount: '250' });
+        await result.current.updateOperation(2, { amount: '250' });
       });
 
-      expect(result.current.operations[1].id).toBe('op2');
+      expect(result.current.operations[1].id).toBe(2);
       expect(result.current.operations[1].amount).toBe('250');
     });
 
@@ -817,7 +816,7 @@ describe('OperationsContext', () => {
 
       // Succeed second time
       OperationsDB.createOperation.mockResolvedValue(undefined);
-      const mockReloadedOps = [{ id: 'op-uuid-2', type: 'expense', amount: '100', accountId: 'acc1' }];
+      const mockReloadedOps = [{ id: 2, type: 'expense', amount: '100', accountId: 'acc1' }];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockReloadedOps);
 
       await act(async () => {
@@ -843,8 +842,8 @@ describe('OperationsContext', () => {
       });
 
       const mockReloadedOps = [
-        { id: 'op-uuid-1', type: 'expense', amount: '100', accountId: 'acc1' },
-        { id: 'op-uuid-2', type: 'income', amount: '200', accountId: 'acc2' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', accountId: 'acc2' },
       ];
 
       let callCount = 0;
@@ -894,7 +893,7 @@ describe('OperationsContext', () => {
 
     it('preserves operation IDs across operations', async () => {
       const ops = [
-        { id: 'op-original', type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1', categoryId: 'cat1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 

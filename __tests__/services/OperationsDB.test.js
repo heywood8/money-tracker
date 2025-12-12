@@ -40,7 +40,7 @@ describe('OperationsDB Service', () => {
     it('gets all operations ordered by date DESC', async () => {
       const mockOperations = [
         {
-          id: 'op1',
+          id: 1,
           type: 'expense',
           amount: '100',
           account_id: 'acc1',
@@ -73,7 +73,7 @@ describe('OperationsDB Service', () => {
 
     it('gets operation by ID', async () => {
       const mockOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -83,11 +83,11 @@ describe('OperationsDB Service', () => {
       };
       queryFirst.mockResolvedValue(mockOperation);
 
-      const result = await OperationsDB.getOperationById('op1');
+      const result = await OperationsDB.getOperationById(1);
 
       expect(queryFirst).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE id = ?',
-        ['op1']
+        [1]
       );
       expect(result.accountId).toBe('acc1');
     });
@@ -102,8 +102,8 @@ describe('OperationsDB Service', () => {
 
     it('gets operations by account', async () => {
       const mockOperations = [
-        { id: 'op1', account_id: 'acc1', to_account_id: null },
-        { id: 'op2', account_id: 'acc2', to_account_id: 'acc1' },
+        { id: 1, account_id: 'acc1', to_account_id: null },
+        { id: 2, account_id: 'acc2', to_account_id: 'acc1' },
       ];
       queryAll.mockResolvedValue(mockOperations);
 
@@ -146,7 +146,6 @@ describe('OperationsDB Service', () => {
   describe('Create Operation', () => {
     it('creates expense operation and updates account balance', async () => {
       const operation = {
-        id: 'op1',
         type: 'expense',
         amount: '100',
         accountId: 'acc1',
@@ -159,11 +158,10 @@ describe('OperationsDB Service', () => {
 
       await OperationsDB.createOperation(operation);
 
-      // Should insert operation
+      // Should insert operation (ID is auto-generated, not passed in)
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO operations'),
         expect.arrayContaining([
-          'op1',
           'expense',
           '100',
           'acc1',
@@ -189,7 +187,6 @@ describe('OperationsDB Service', () => {
 
     it('creates income operation and updates account balance', async () => {
       const operation = {
-        id: 'op2',
         type: 'income',
         amount: '200',
         accountId: 'acc1',
@@ -207,7 +204,7 @@ describe('OperationsDB Service', () => {
 
     it('creates transfer operation and updates both account balances', async () => {
       const operation = {
-        id: 'op3',
+        id: 3,
         type: 'transfer',
         amount: '300',
         accountId: 'acc1',
@@ -234,7 +231,7 @@ describe('OperationsDB Service', () => {
 
     it('handles multi-currency transfers with destination_amount', async () => {
       const operation = {
-        id: 'op4',
+        id: 4,
         type: 'transfer',
         amount: '100',
         accountId: 'acc1',
@@ -260,7 +257,7 @@ describe('OperationsDB Service', () => {
 
     it('skips balance update when account not found', async () => {
       const operation = {
-        id: 'op5',
+        id: 5,
         type: 'expense',
         amount: '100',
         accountId: 'non-existent',
@@ -284,7 +281,7 @@ describe('OperationsDB Service', () => {
 
     it('uses transaction for atomic operation creation', async () => {
       const operation = {
-        id: 'op6',
+        id: 6,
         type: 'expense',
         amount: '50',
         accountId: 'acc1',
@@ -301,7 +298,7 @@ describe('OperationsDB Service', () => {
 
     it('rolls back transaction on error', async () => {
       const operation = {
-        id: 'op7',
+        id: 7,
         type: 'expense',
         amount: '100',
         accountId: 'acc1',
@@ -318,7 +315,7 @@ describe('OperationsDB Service', () => {
   describe('Update Operation', () => {
     it('updates operation and recalculates balance changes', async () => {
       const oldOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -336,12 +333,12 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce(updatedOperation) // Get updated operation
         .mockResolvedValueOnce({ balance: '1000' }); // Get account balance
 
-      await OperationsDB.updateOperation('op1', { amount: '200' });
+      await OperationsDB.updateOperation(1, { amount: '200' });
 
       // Should update the operation
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE operations'),
-        ['200', 'op1']
+        ['200', 1]
       );
 
       // Should recalculate balance: reverse old (-(-100) = +100) + apply new (-200) = -100 net
@@ -350,7 +347,7 @@ describe('OperationsDB Service', () => {
 
     it('handles account change in update', async () => {
       const oldOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -369,7 +366,7 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce({ balance: '1000' }) // acc1
         .mockResolvedValueOnce({ balance: '500' });  // acc2
 
-      await OperationsDB.updateOperation('op1', { accountId: 'acc2' });
+      await OperationsDB.updateOperation(1, { accountId: 'acc2' });
 
       // Should update balances for both old and new accounts
       expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(4);
@@ -377,7 +374,7 @@ describe('OperationsDB Service', () => {
 
     it('does not update when no fields provided', async () => {
       const oldOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -385,7 +382,7 @@ describe('OperationsDB Service', () => {
 
       mockDb.getFirstAsync.mockResolvedValue(oldOperation);
 
-      await OperationsDB.updateOperation('op1', {});
+      await OperationsDB.updateOperation(1, {});
 
       // Should get old operation but not update anything
       expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(1);
@@ -402,7 +399,7 @@ describe('OperationsDB Service', () => {
 
     it('updates all supported fields', async () => {
       const oldOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -428,7 +425,7 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce(oldOperation)
         .mockResolvedValueOnce({ ...oldOperation, ...updates });
 
-      await OperationsDB.updateOperation('op1', updates);
+      await OperationsDB.updateOperation(1, updates);
 
       // Should update with all fields
       const updateCall = mockDb.runAsync.mock.calls.find(call =>
@@ -444,7 +441,7 @@ describe('OperationsDB Service', () => {
   describe('Delete Operation', () => {
     it('deletes operation and reverses balance changes', async () => {
       const operation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -456,12 +453,12 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce(operation)
         .mockResolvedValueOnce({ balance: '900' });
 
-      await OperationsDB.deleteOperation('op1');
+      await OperationsDB.deleteOperation(1);
 
       // Should delete the operation
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'DELETE FROM operations WHERE id = ?',
-        ['op1']
+        [1]
       );
 
       // Should reverse balance change (expense was -100, so reverse is +100)
@@ -470,7 +467,7 @@ describe('OperationsDB Service', () => {
 
     it('reverses transfer balance changes on delete', async () => {
       const operation = {
-        id: 'op1',
+        id: 1,
         type: 'transfer',
         amount: '300',
         account_id: 'acc1',
@@ -483,7 +480,7 @@ describe('OperationsDB Service', () => {
         .mockResolvedValueOnce({ balance: '700' })  // acc1
         .mockResolvedValueOnce({ balance: '800' }); // acc2
 
-      await OperationsDB.deleteOperation('op1');
+      await OperationsDB.deleteOperation(1);
 
       // Should reverse both account changes
       expect(Currency.add).toHaveBeenCalledWith('700', 300);   // Restore source
@@ -576,12 +573,12 @@ describe('OperationsDB Service', () => {
     it('checks if operation exists', async () => {
       queryFirst.mockResolvedValue({ 1: 1 });
 
-      const exists = await OperationsDB.operationExists('op1');
+      const exists = await OperationsDB.operationExists(1);
 
       expect(exists).toBe(true);
       expect(queryFirst).toHaveBeenCalledWith(
         'SELECT 1 FROM operations WHERE id = ? LIMIT 1',
-        ['op1']
+        [1]
       );
     });
 
@@ -595,7 +592,7 @@ describe('OperationsDB Service', () => {
 
     it('gets today adjustment operation', async () => {
       const mockOp = {
-        id: 'op1',
+        id: 1,
         type: 'income',
         amount: '50',
         account_id: 'acc1',
@@ -631,7 +628,7 @@ describe('OperationsDB Service', () => {
   describe('Pagination Queries', () => {
     it('gets operations by week offset', async () => {
       const mockOps = [
-        { id: 'op1', date: '2025-12-05', account_id: 'acc1' },
+        { id: 1, date: '2025-12-05', account_id: 'acc1' },
       ];
       queryAll.mockResolvedValue(mockOps);
 
@@ -647,7 +644,7 @@ describe('OperationsDB Service', () => {
 
     it('gets next oldest operation before date', async () => {
       const mockOp = {
-        id: 'op1',
+        id: 1,
         date: '2025-11-28',
         account_id: 'acc1',
       };
@@ -664,8 +661,8 @@ describe('OperationsDB Service', () => {
 
     it('gets operations by week from date', async () => {
       const mockOps = [
-        { id: 'op1', date: '2025-12-05', account_id: 'acc1' },
-        { id: 'op2', date: '2025-11-30', account_id: 'acc2' },
+        { id: 1, date: '2025-12-05', account_id: 'acc1' },
+        { id: 2, date: '2025-11-30', account_id: 'acc2' },
       ];
       queryAll.mockResolvedValue(mockOps);
 
@@ -682,7 +679,7 @@ describe('OperationsDB Service', () => {
   describe('Field Mapping', () => {
     it('maps database snake_case to camelCase', async () => {
       const dbOperation = {
-        id: 'op1',
+        id: 1,
         type: 'transfer',
         amount: '100',
         account_id: 'acc1',
@@ -699,7 +696,7 @@ describe('OperationsDB Service', () => {
 
       queryFirst.mockResolvedValue(dbOperation);
 
-      const result = await OperationsDB.getOperationById('op1');
+      const result = await OperationsDB.getOperationById(1);
 
       expect(result.accountId).toBe('acc1');
       expect(result.categoryId).toBe('cat1');
@@ -713,7 +710,7 @@ describe('OperationsDB Service', () => {
 
     it('handles null values in mapping', async () => {
       const dbOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -726,7 +723,7 @@ describe('OperationsDB Service', () => {
 
       queryFirst.mockResolvedValue(dbOperation);
 
-      const result = await OperationsDB.getOperationById('op1');
+      const result = await OperationsDB.getOperationById(1);
 
       expect(result.toAccountId).toBeNull();
       expect(result.description).toBeNull();
@@ -743,7 +740,7 @@ describe('OperationsDB Service', () => {
     it('throws error on getOperationById failure', async () => {
       queryFirst.mockRejectedValue(new Error('Query failed'));
 
-      await expect(OperationsDB.getOperationById('op1')).rejects.toThrow();
+      await expect(OperationsDB.getOperationById(1)).rejects.toThrow();
     });
 
     it('throws error on createOperation failure', async () => {
@@ -751,7 +748,7 @@ describe('OperationsDB Service', () => {
 
       await expect(
         OperationsDB.createOperation({
-          id: 'op1',
+          id: 1,
           type: 'expense',
           amount: '100',
           accountId: 'acc1',
@@ -765,21 +762,21 @@ describe('OperationsDB Service', () => {
       mockDb.getFirstAsync.mockRejectedValue(new Error('Query failed'));
 
       await expect(
-        OperationsDB.updateOperation('op1', { amount: '200' })
+        OperationsDB.updateOperation(1, { amount: '200' })
       ).rejects.toThrow();
     });
 
     it('throws error on deleteOperation failure', async () => {
       mockDb.getFirstAsync.mockRejectedValue(new Error('Query failed'));
 
-      await expect(OperationsDB.deleteOperation('op1')).rejects.toThrow();
+      await expect(OperationsDB.deleteOperation(1)).rejects.toThrow();
     });
   });
 
   describe('Regression Tests', () => {
     it('handles zero amount operation', async () => {
       const operation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '0',
         accountId: 'acc1',
@@ -800,7 +797,7 @@ describe('OperationsDB Service', () => {
 
     it('preserves precision in currency calculations', async () => {
       const operation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '0.01',
         accountId: 'acc1',
@@ -818,7 +815,7 @@ describe('OperationsDB Service', () => {
 
     it('handles operations without optional fields', async () => {
       const operation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         accountId: 'acc1',
@@ -838,7 +835,7 @@ describe('OperationsDB Service', () => {
 
     it('maintains data integrity during concurrent updates', async () => {
       const oldOperation = {
-        id: 'op1',
+        id: 1,
         type: 'expense',
         amount: '100',
         account_id: 'acc1',
@@ -850,8 +847,8 @@ describe('OperationsDB Service', () => {
 
       // Simulate concurrent updates
       await Promise.all([
-        OperationsDB.updateOperation('op1', { amount: '150' }),
-        OperationsDB.updateOperation('op1', { description: 'Updated' }),
+        OperationsDB.updateOperation(1, { amount: '150' }),
+        OperationsDB.updateOperation(1, { description: 'Updated' }),
       ]);
 
       // Both should use transactions
@@ -864,7 +861,7 @@ describe('OperationsDB Service', () => {
       it('filters operations by type', async () => {
         const mockOperations = [
           {
-            id: 'op1',
+            id: 1,
             type: 'expense',
             amount: '100',
             account_id: 'acc1',
@@ -1013,7 +1010,7 @@ describe('OperationsDB Service', () => {
     describe('getNextOldestFilteredOperation', () => {
       it('finds next operation before given date matching filters', async () => {
         const mockOperation = {
-          id: 'op1',
+          id: 1,
           type: 'expense',
           amount: '100',
           account_id: 'acc1',
@@ -1029,7 +1026,7 @@ describe('OperationsDB Service', () => {
         const sqlCall = queryFirst.mock.calls[0][0];
         expect(sqlCall).toContain('WHERE o.date < ?');
         expect(sqlCall).toContain('LIMIT 1');
-        expect(result.id).toBe('op1');
+        expect(result.id).toBe(1);
       });
 
       it('returns null when no older operations match filters', async () => {

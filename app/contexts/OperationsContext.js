@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import uuid from 'react-native-uuid';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccounts } from './AccountsContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -198,14 +197,8 @@ export const OperationsProvider = ({ children }) => {
 
   const addOperation = useCallback(async (operation) => {
     try {
-      const newOperation = {
-        ...operation,
-        id: uuid.v4(),
-        createdAt: new Date().toISOString(),
-      };
-
-      // Create operation in DB (handles balance updates automatically)
-      await OperationsDB.createOperation(newOperation);
+      // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
+      const createdOperation = await OperationsDB.createOperation(operation);
 
       // Reload from the beginning to ensure consistency
       await loadInitialOperations();
@@ -217,7 +210,7 @@ export const OperationsProvider = ({ children }) => {
       // Emit event to refresh budget statuses
       appEvents.emit(EVENTS.OPERATION_CHANGED);
 
-      return newOperation;
+      return createdOperation;
     } catch (error) {
       console.error('Failed to add operation:', error);
       setSaveError(error.message);
