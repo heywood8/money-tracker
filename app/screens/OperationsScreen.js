@@ -904,17 +904,32 @@ const OperationsScreen = () => {
 
       {/* Filter FAB */}
       {!operationsLoading && (
-        <FAB
-          icon="filter-variant"
-          style={[
-            styles.filterFab,
-            { backgroundColor: filtersActive ? colors.primary : colors.surface }
-          ]}
-          color={filtersActive ? '#fff' : colors.text}
-          onPress={() => setFilterModalVisible(true)}
-          label={filtersActive ? String(getActiveFilterCount()) : undefined}
-          small={false}
-        />
+        <>
+          <FAB
+            icon="filter-variant"
+            style={[
+              styles.filterFab,
+              { backgroundColor: filtersActive ? colors.primary : colors.surface }
+            ]}
+            color={filtersActive ? '#fff' : colors.text}
+            onPress={() => setFilterModalVisible(true)}
+            label={filtersActive ? String(getActiveFilterCount()) : undefined}
+            small={false}
+          />
+
+          {/* Reset Filters Button - only show when filters are active */}
+          {filtersActive && (
+            <TouchableOpacity
+              style={[styles.resetFilterButton, { backgroundColor: colors.surface }]}
+              onPress={clearFilters}
+              accessibilityRole="button"
+              accessibilityLabel={t('clear_filters')}
+              accessibilityHint={t('clear_filters')}
+            >
+              <Icon name="filter-off" size={20} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* Filter Modal */}
@@ -1254,6 +1269,21 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  resetFilterButton: {
+    position: 'absolute',
+    right: 80,
+    bottom: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });
 
