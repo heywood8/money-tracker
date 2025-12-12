@@ -85,6 +85,22 @@ describe('BackupRestore', () => {
     },
   ];
 
+  const mockBudgets = [
+    {
+      id: 'budget-1',
+      category_id: 'cat-1',
+      amount: '500.00',
+      currency: 'USD',
+      period_type: 'monthly',
+      start_date: '2024-01-01',
+      end_date: null,
+      is_recurring: 1,
+      rollover_enabled: 0,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+    },
+  ];
+
   const mockMetadata = [
     {
       key: 'db_version',
@@ -116,6 +132,7 @@ describe('BackupRestore', () => {
       if (query.includes('accounts')) return Promise.resolve(mockAccounts);
       if (query.includes('categories')) return Promise.resolve(mockCategories);
       if (query.includes('operations')) return Promise.resolve(mockOperations);
+      if (query.includes('budgets')) return Promise.resolve(mockBudgets);
       if (query.includes('app_metadata')) return Promise.resolve(mockMetadata);
       return Promise.resolve([]);
     });
@@ -147,11 +164,12 @@ describe('BackupRestore', () => {
           accounts: mockAccounts,
           categories: mockCategories,
           operations: mockOperations,
+          budgets: mockBudgets,
           app_metadata: mockMetadata,
         },
       });
       expect(backup.timestamp).toBeDefined();
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(4);
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(5);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -162,6 +180,7 @@ describe('BackupRestore', () => {
       expect(backup.data.accounts).toEqual([]);
       expect(backup.data.categories).toEqual([]);
       expect(backup.data.operations).toEqual([]);
+      expect(backup.data.budgets).toEqual([]);
       expect(backup.data.app_metadata).toEqual([]);
     });
 
@@ -173,6 +192,7 @@ describe('BackupRestore', () => {
       expect(backup.data.accounts).toEqual([]);
       expect(backup.data.categories).toEqual([]);
       expect(backup.data.operations).toEqual([]);
+      expect(backup.data.budgets).toEqual([]);
       expect(backup.data.app_metadata).toEqual([]);
     });
 
@@ -260,6 +280,7 @@ describe('BackupRestore', () => {
       expect(csvContent).toContain('[ACCOUNTS]');
       expect(csvContent).toContain('[CATEGORIES]');
       expect(csvContent).toContain('[OPERATIONS]');
+      expect(csvContent).toContain('[BUDGETS]');
       expect(csvContent).toContain('[APP_METADATA]');
     });
 
@@ -503,7 +524,7 @@ describe('BackupRestore', () => {
       expect(deleteCalls.length).toBeGreaterThan(0);
     });
 
-    it('deletes in correct order (operations, categories, accounts)', async () => {
+    it('deletes in correct order (budgets, operations, categories, accounts)', async () => {
       const mockDbInstance = {
         runAsync: jest.fn().mockResolvedValue(),
         getAllAsync: jest.fn().mockResolvedValue([]),
@@ -523,9 +544,10 @@ describe('BackupRestore', () => {
 
       await BackupRestore.restoreBackup(validBackup);
 
-      expect(deleteCalls[0]).toContain('operations');
-      expect(deleteCalls[1]).toContain('categories');
-      expect(deleteCalls[2]).toContain('accounts');
+      expect(deleteCalls[0]).toContain('budgets');
+      expect(deleteCalls[1]).toContain('operations');
+      expect(deleteCalls[2]).toContain('categories');
+      expect(deleteCalls[3]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -685,6 +707,10 @@ cat-1,Food,folder,expense
 id,type,amount,account_id,category_id
 op-1,expense,10,acc-1,cat-1
 
+[BUDGETS]
+id,category_id,amount,currency,period_type
+budget-1,cat-1,500,USD,monthly
+
 [APP_METADATA]
 key,value
 test_key,test_value`;
@@ -770,6 +796,8 @@ op-1,"Mom's ""special"" food"`;
 
 [OPERATIONS]
 
+[BUDGETS]
+
 [APP_METADATA]`;
 
       mockDocumentPicker.getDocumentAsync.mockResolvedValue({
@@ -802,6 +830,7 @@ op-1,"Mom's ""special"" food"`;
           accounts: [1, 2, 3],
           categories: [1, 2],
           operations: [1, 2, 3, 4, 5],
+          budgets: [1],
         },
       };
 
@@ -814,6 +843,7 @@ op-1,"Mom's ""special"" food"`;
         accountsCount: 3,
         categoriesCount: 2,
         operationsCount: 5,
+        budgetsCount: 1,
       });
     });
 
@@ -865,6 +895,7 @@ op-1,"Mom's ""special"" food"`;
       expect(info.accountsCount).toBe(0);
       expect(info.categoriesCount).toBe(0);
       expect(info.operationsCount).toBe(0);
+      expect(info.budgetsCount).toBe(0);
     });
   });
 
