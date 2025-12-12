@@ -6,8 +6,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { queryAll, executeQuery, executeTransaction, getDatabase } from './db';
+import { appEvents } from './eventEmitter';
 
 const BACKUP_VERSION = 1;
+
+// Event for import progress
+export const IMPORT_PROGRESS_EVENT = 'import:progress';
 
 /**
  * Create a backup of the entire database
@@ -289,11 +293,15 @@ const validateBackup = (backup) => {
 export const restoreBackup = async (backup) => {
   try {
     console.log('Restoring database from backup...');
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'in_progress' });
 
     // Validate backup
     validateBackup(backup);
 
     await executeTransaction(async (db) => {
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'completed' });
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'in_progress' });
+
       // Clear existing data (in reverse order due to foreign keys)
       await db.runAsync('DELETE FROM budgets');
       await db.runAsync('DELETE FROM operations');
@@ -302,8 +310,14 @@ export const restoreBackup = async (backup) => {
       await db.runAsync('DELETE FROM app_metadata WHERE key != ?', ['db_version']);
 
       console.log('Existing data cleared');
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
 
       // Restore accounts
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'accounts',
+        status: 'in_progress',
+        data: backup.data.accounts.length
+      });
       for (const account of backup.data.accounts) {
         await db.runAsync(
           'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -319,8 +333,18 @@ export const restoreBackup = async (backup) => {
         );
       }
       console.log(`Restored ${backup.data.accounts.length} accounts`);
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'accounts',
+        status: 'completed',
+        data: backup.data.accounts.length
+      });
 
       // Restore categories
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'categories',
+        status: 'in_progress',
+        data: backup.data.categories.length
+      });
       for (const category of backup.data.categories) {
         await db.runAsync(
           'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -340,8 +364,18 @@ export const restoreBackup = async (backup) => {
         );
       }
       console.log(`Restored ${backup.data.categories.length} categories`);
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'categories',
+        status: 'completed',
+        data: backup.data.categories.length
+      });
 
       // Restore operations
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'operations',
+        status: 'in_progress',
+        data: backup.data.operations.length
+      });
       for (const operation of backup.data.operations) {
         await db.runAsync(
           'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -359,9 +393,19 @@ export const restoreBackup = async (backup) => {
         );
       }
       console.log(`Restored ${backup.data.operations.length} operations`);
+      appEvents.emit(IMPORT_PROGRESS_EVENT, {
+        stepId: 'operations',
+        status: 'completed',
+        data: backup.data.operations.length
+      });
 
       // Restore budgets
       if (backup.data.budgets) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budgets',
+          status: 'in_progress',
+          data: backup.data.budgets.length
+        });
         for (const budget of backup.data.budgets) {
           await db.runAsync(
             'INSERT INTO budgets (id, category_id, amount, currency, period_type, start_date, end_date, is_recurring, rollover_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -381,10 +425,31 @@ export const restoreBackup = async (backup) => {
           );
         }
         console.log(`Restored ${backup.data.budgets.length} budgets`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budgets',
+          status: 'completed',
+          data: backup.data.budgets.length
+        });
+      } else {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budgets',
+          status: 'in_progress',
+          data: 0
+        });
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'budgets',
+          status: 'completed',
+          data: 0
+        });
       }
 
       // Restore app metadata (except db_version)
       if (backup.data.app_metadata) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'metadata',
+          status: 'in_progress',
+          data: backup.data.app_metadata.length
+        });
         for (const meta of backup.data.app_metadata) {
           if (meta.key !== 'db_version') {
             await db.runAsync(
@@ -394,10 +459,27 @@ export const restoreBackup = async (backup) => {
           }
         }
         console.log(`Restored ${backup.data.app_metadata.length} metadata entries`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'metadata',
+          status: 'completed',
+          data: backup.data.app_metadata.length
+        });
+      } else {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'metadata',
+          status: 'in_progress',
+          data: 0
+        });
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'metadata',
+          status: 'completed',
+          data: 0
+        });
       }
 
       // Post-restore upgrades: Ensure shadow categories exist
       console.log('Performing post-restore database upgrades...');
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
       const shadowCategories = await db.getAllAsync(
         'SELECT id FROM categories WHERE id IN (?, ?)',
         ['shadow-adjustment-expense', 'shadow-adjustment-income']
@@ -456,9 +538,11 @@ export const restoreBackup = async (backup) => {
       }
 
       console.log('Post-restore upgrades completed');
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'completed' });
     });
 
     console.log('Database restored successfully');
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'complete', status: 'completed' });
   } catch (error) {
     console.error('Failed to restore backup:', error);
     throw error;
@@ -525,6 +609,7 @@ const parseCSV = (csvContent) => {
  */
 const importBackupCSV = async (fileUri) => {
   console.log('Importing CSV backup...');
+  appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
   const fileContent = await FileSystem.readAsStringAsync(fileUri);
 
   // Parse sections
@@ -561,6 +646,7 @@ const importBackupCSV = async (fileUri) => {
     data: sections,
   };
 
+  appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
   await restoreBackup(backup);
   return backup;
 };
@@ -574,6 +660,7 @@ const importBackupCSV = async (fileUri) => {
  */
 const importBackupSQLite = async (fileUri) => {
   console.log('Importing SQLite backup...');
+  appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
 
   const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
   const destUri = `${sqliteDir}/penny.db`;
@@ -626,6 +713,9 @@ const importBackupSQLite = async (fileUri) => {
     if (currentDbExists.exists) {
       await FileSystem.deleteAsync(backupUri, { idempotent: true });
     }
+
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'complete', status: 'completed' });
 
     return {
       version: BACKUP_VERSION,
@@ -694,6 +784,11 @@ export const importBackup = async () => {
     // Detect format from filename
     const format = detectFileFormat(filename);
     console.log('Detected format:', format);
+    appEvents.emit(IMPORT_PROGRESS_EVENT, {
+      stepId: 'format',
+      status: 'completed',
+      data: format
+    });
 
     // Import based on format
     let backup;
@@ -707,12 +802,14 @@ export const importBackup = async () => {
       case 'json':
       default:
         // Original JSON import
+        appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
         const fileContent = await FileSystem.readAsStringAsync(fileUri);
         try {
           backup = JSON.parse(fileContent);
         } catch (error) {
           throw new Error('Invalid backup file: not valid JSON');
         }
+        appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
         await restoreBackup(backup);
         break;
     }
