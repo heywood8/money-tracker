@@ -12,7 +12,7 @@ import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
 export default function SettingsModal({ visible, onClose }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
