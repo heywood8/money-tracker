@@ -323,7 +323,7 @@ export const restoreBackup = async (backup) => {
       // Restore categories
       for (const category of backup.data.categories) {
         await db.runAsync(
-          'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             category.id,
             category.name,
@@ -333,6 +333,7 @@ export const restoreBackup = async (backup) => {
             category.icon || null,
             category.color || null,
             category.is_shadow || 0,
+            category.exclude_from_forecast || 0,
             category.created_at,
             category.updated_at,
           ]
