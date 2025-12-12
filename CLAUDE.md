@@ -43,9 +43,9 @@ The app follows a feature-based organization under the `app/` directory:
 - **types/** (1 file) - Type definitions
   - `Account.js` - Account object type definition
 
-- **services/** (10 files) - Business logic and data access layer
+- **services/** (9 files) - Business logic and data access layer
   - Database: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`
-  - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`, `migration.js`
+  - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
 
 - **db/** (3 files) - Database configuration and schema
   - `client.js`, `migrate.js`, `schema.js`
@@ -102,23 +102,20 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 **Database Layer** (SQLite):
 - SQLite database (`penny.db`)
 - Database modules: `db.js`, `AccountsDB.js`, `OperationsDB.js`, `CategoriesDB.js`
-- Automatic migration from AsyncStorage on first run
+- Uses Drizzle ORM for schema management and migrations
 
 **Application Preferences** (AsyncStorage):
 - Theme: key `'theme_preference'`
 - Language: key `'app_language'`
-- Migration backup: key `'migration_backup'`
 
 **Database Services**:
 - `app/services/db.js` - SQLite wrapper with transaction support
 - `app/services/currency.js` - Precise currency calculations (avoids floating-point errors)
-- `app/services/migration.js` - AsyncStorage to SQLite migration with rollback support
 
 **Data Integrity**:
 - Atomic transactions for all multi-step operations
 - Foreign key constraints with deletion safeguards
 - Precise currency arithmetic using integer cents internally
-- Automatic migration rollback on failure
 
 ### Styling Patterns
 

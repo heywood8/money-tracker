@@ -191,7 +191,6 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - `currency.js` - Currency formatting and calculations
 - `eventEmitter.js` - Event system for cross-component communication
 - `LastAccount.js` - Tracks last accessed account
-- `migration.js` - AsyncStorage to SQLite migration
 
 **Guidelines:**
 - Keep services focused on a single domain
@@ -204,22 +203,23 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ### db/ (2 files)
 
-**Purpose:** Database configuration, schema, and migration
+**Purpose:** Database configuration, schema, and Drizzle ORM setup
 
 **What goes here:**
-- Database schema definitions
-- Migration scripts
-- Database utilities
+- Database schema definitions using Drizzle ORM
+- Drizzle migration utilities
+- Database configuration
 
 **Files:**
-- `migrate.js` - Database migration utilities
-- `schema.js` - Database table definitions
+- `client.js` - Database client initialization
+- `migrate.js` - Drizzle migration utilities
+- `schema.js` - Drizzle table definitions
 
 **Guidelines:**
 - Keep schema definitions centralized
-- Use migrations for schema changes
+- Use Drizzle migrations for schema changes
 - Document table structures
-- Handle database versioning
+- Follow Drizzle ORM best practices
 
 **Note:** Database client initialization is handled in `services/db.js`
 
