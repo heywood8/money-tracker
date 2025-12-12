@@ -367,15 +367,6 @@ All persistent financial data is stored in the SQLite database (`penny.db`):
 Application preferences are stored separately in AsyncStorage:
 - Theme preference (`theme_preference`)
 - Language preference (`app_language`)
-- Migration backup data (`migration_backup`)
-
-### Migration from AsyncStorage
-
-The app includes automatic migration from the old AsyncStorage-based persistence to SQLite. This migration:
-- Runs once on first launch after upgrade
-- Creates a backup in AsyncStorage before migrating
-- Supports rollback if migration fails
-- Is implemented in `app/services/migration.js`
 
 ## Data Integrity
 
@@ -470,10 +461,6 @@ SQLite handles thousands of transactions efficiently. For very large datasets (>
 - Add composite indexes for complex queries
 
 ## Backup and Recovery
-
-### Automatic Backup
-
-The migration process creates automatic backups in AsyncStorage before migrating data.
 
 ### Manual Backup
 

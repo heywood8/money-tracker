@@ -7,11 +7,9 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AccountsProvider, useAccounts } from '../../app/contexts/AccountsContext';
 import * as AccountsDB from '../../app/services/AccountsDB';
-import { performMigration, isMigrationComplete } from '../../app/services/migration';
 
 // Mock dependencies
 jest.mock('../../app/services/AccountsDB');
-jest.mock('../../app/services/migration');
 
 // Mock DialogContext
 const mockShowDialog = jest.fn();
@@ -33,7 +31,6 @@ describe('Account Management Integration Tests', () => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
     mockUuidCounter = 0;
-    isMigrationComplete.mockResolvedValue(true);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
     AccountsDB.createAccount.mockResolvedValue(undefined);
     AccountsDB.updateAccount.mockResolvedValue(undefined);

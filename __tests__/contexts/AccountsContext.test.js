@@ -7,11 +7,9 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AccountsProvider, useAccounts } from '../../app/contexts/AccountsContext';
 import * as AccountsDB from '../../app/services/AccountsDB';
-import { performMigration, isMigrationComplete } from '../../app/services/migration';
 
 // Mock dependencies
 jest.mock('../../app/services/AccountsDB');
-jest.mock('../../app/services/migration');
 
 // Mock DialogContext
 const mockShowDialog = jest.fn();
@@ -35,7 +33,6 @@ describe('AccountsContext', () => {
     mockShowDialog.mockClear();
     mockUuidCounter = 0;
     // Default mock implementations
-    isMigrationComplete.mockResolvedValue(true);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
     AccountsDB.createAccount.mockResolvedValue(undefined);
     AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
@@ -59,20 +56,6 @@ describe('AccountsContext', () => {
 
       expect(result.current.accounts).toEqual(mockAccounts);
       expect(result.current.error).toBeNull();
-    });
-
-    it('performs migration on first load if needed', async () => {
-      isMigrationComplete.mockResolvedValue(false);
-      performMigration.mockResolvedValue(undefined);
-      AccountsDB.getAllAccounts.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useAccounts(), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      expect(performMigration).toHaveBeenCalled();
     });
 
     it('creates default accounts when none exist', async () => {
