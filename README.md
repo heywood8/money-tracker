@@ -53,7 +53,6 @@ Current test suite: **568 tests** across 16 test suites covering contexts, servi
 
 - **[Database Architecture](docs/DATABASE.md)** - Complete guide to the SQLite/Drizzle ORM database implementation, schema design, and development workflow
 - **[EAS Credentials Setup](docs/EAS_CREDENTIALS_SETUP.md)** - Guide for setting up Android signing credentials for EAS builds
-- **[Burndown Graph Implementation](docs/BURNDOWN_GRAPH.md)** - Comprehensive documentation of the burndown graph feature including architecture, calculations, performance considerations, and future enhancements
 
 ## Building with EAS
 
