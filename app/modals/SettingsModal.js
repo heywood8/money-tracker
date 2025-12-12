@@ -463,26 +463,6 @@ export default function SettingsModal({ visible, onClose }) {
             </TouchableRipple>
 
             <TouchableRipple
-              onPress={() => handleExportFormatSelect('excel')}
-              style={styles.languageItem}
-            >
-              <View style={styles.languageItemContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Ionicons name="grid-outline" size={24} color={colors.text} />
-                  <View>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      Excel (XLSX)
-                    </Text>
-                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                      {t('excel_description') || 'Spreadsheet format with multiple sheets'}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-
-            <TouchableRipple
               onPress={() => handleExportFormatSelect('sqlite')}
               style={styles.languageItem}
             >
