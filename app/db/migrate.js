@@ -1,107 +1,54 @@
-import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
-import { db, rawDb } from './client';
 import { needsUuidMigration, migrateUuidToInteger } from '../services/uuidToIntegerMigration';
 
-/**
- * Run Drizzle migrations
- * This function applies all pending migrations from the drizzle folder
- */
-export const runMigrations = async () => {
-  try {
-    console.log('Running Drizzle migrations...');
-
-    // Enable foreign keys
-    rawDb.execSync('PRAGMA foreign_keys = ON');
-
-    // Run migrations
-    await migrate(db, { migrationsFolder: 'drizzle' });
-
-    console.log('Drizzle migrations completed successfully');
-  } catch (error) {
-    console.error('Failed to run migrations:', error);
-    throw error;
-  }
-};
-
-/**
- * Check if database needs migration from old schema
- * @returns {Promise<boolean>}
- */
-export const needsLegacyMigration = async () => {
-  try {
-    // Check if the old migration system was used
-    const result = rawDb.getFirstSync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='app_metadata'"
-    );
-
-    if (!result) {
-      // No app_metadata table means this is a fresh install
-      return false;
-    }
-
-    // Check for drizzle migration tracking
-    const drizzleCheck = rawDb.getFirstSync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations'"
-    );
-
-    // If app_metadata exists but drizzle migrations don't, we need to migrate
-    return !drizzleCheck;
-  } catch (error) {
-    console.error('Failed to check legacy migration status:', error);
-    return false;
-  }
-};
+// Import the SQL migration directly (can't use Drizzle's file-based migrations in React Native)
+import initialMigrationSQL from './migrations/0000_initial';
 
 /**
  * Initialize database with migrations
+ *
+ * Migration flow:
+ * 1. Check if UUID to integer migration is needed (old text-based IDs)
+ * 2. If needed, run custom UUID migration (creates tables with integer IDs)
+ * 3. Run SQL migration directly (idempotent - uses CREATE TABLE IF NOT EXISTS)
+ *
+ * This approach works for:
+ * - Fresh installs: SQL creates tables
+ * - UUID migrations: Custom migration creates tables, SQL sees they exist
+ * - Normal updates: Add new migration SQL files
+ *
+ * Note: We can't use Drizzle's migrate() in React Native because it requires
+ * filesystem access to read migration files, which isn't available after bundling.
  */
 export const initializeDatabase = async () => {
   try {
+    console.log('Initializing database...');
+
+    // Import db getter functions (lazy import to avoid circular dependency)
+    const { getRawDb } = await import('./client');
+
+    // Get actual database instance
+    const rawDb = getRawDb();
+
+    // Enable foreign keys and WAL mode
+    rawDb.execSync('PRAGMA foreign_keys = ON');
+    rawDb.execSync('PRAGMA journal_mode = WAL');
+
     // Step 1: Check if UUID to integer migration is needed
     const needsUuidMig = await needsUuidMigration();
     if (needsUuidMig) {
-      console.log('UUID to integer migration needed - migrating...');
+      console.log('UUID database detected - migrating to integer IDs...');
       await migrateUuidToInteger();
-      console.log('UUID to integer migration completed');
+      console.log('✅ UUID to integer migration completed');
     }
 
-    // Step 2: Check for legacy Drizzle migration
-    const needsLegacy = await needsLegacyMigration();
+    // Step 2: Run SQL migration directly (idempotent - safe after UUID migration or on fresh install)
+    console.log('Running database schema migration...');
+    rawDb.execSync(initialMigrationSQL);
+    console.log('✅ Database schema migration completed');
 
-    if (needsLegacy) {
-      console.log('Existing database detected - schema will be preserved');
-      // The database already has the schema from the old system
-      // We just need to mark it as migrated in Drizzle's tracking
-      await markAsInitiallyMigrated();
-    } else {
-      // Fresh install or already using Drizzle - run migrations normally
-      await runMigrations();
-    }
-
-    console.log('Database initialized successfully');
+    console.log('Database initialization completed successfully');
   } catch (error) {
     console.error('Failed to initialize database:', error);
-    throw error;
-  }
-};
-
-/**
- * Mark existing database as already migrated (for transition from old system)
- */
-const markAsInitiallyMigrated = async () => {
-  try {
-    // Create the Drizzle migrations table if it doesn't exist
-    rawDb.execSync(`
-      CREATE TABLE IF NOT EXISTS __drizzle_migrations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        hash TEXT NOT NULL,
-        created_at INTEGER
-      )
-    `);
-
-    console.log('Marked existing database as migrated');
-  } catch (error) {
-    console.error('Failed to mark database as migrated:', error);
     throw error;
   }
 };

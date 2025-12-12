@@ -13,10 +13,17 @@
  * 6. Cleanup backup tables
  */
 
-import { rawDb } from '../db/client';
 import { defaultCategoryIdMap } from '../defaults/defaultCategoryIdMap';
 
 const MIGRATION_FLAG_KEY = 'uuid_to_integer_migration_complete';
+
+/**
+ * Get rawDb instance (lazy import to avoid circular dependency)
+ */
+const getRawDbInstance = async () => {
+  const { getRawDb } = await import('../db/client');
+  return getRawDb();
+};
 
 /**
  * Check if UUID to integer migration is needed
@@ -24,6 +31,8 @@ const MIGRATION_FLAG_KEY = 'uuid_to_integer_migration_complete';
  */
 export const needsUuidMigration = async () => {
   try {
+    const rawDb = await getRawDbInstance();
+
     // Check if migration flag exists
     const flagCheck = rawDb.getFirstSync(
       'SELECT value FROM app_metadata WHERE key = ?',
@@ -68,41 +77,43 @@ export const needsUuidMigration = async () => {
 export const migrateUuidToInteger = async () => {
   console.log('Starting UUID to Integer migration...');
 
+  const rawDb = await getRawDbInstance();
+
   try {
     // Begin transaction
     rawDb.execSync('BEGIN TRANSACTION');
 
     // Step 1: Backup existing data
     console.log('Step 1: Backing up existing data...');
-    await backupExistingTables();
+    await backupExistingTables(rawDb);
 
     // Step 2: Drop old tables
     console.log('Step 2: Dropping old tables...');
-    await dropOldTables();
+    await dropOldTables(rawDb);
 
     // Step 3: Create new integer-based tables
     console.log('Step 3: Creating new tables with integer IDs...');
-    await createNewTables();
+    await createNewTables(rawDb);
 
     // Step 4: Migrate accounts
     console.log('Step 4: Migrating accounts...');
-    const accountIdMap = await migrateAccounts();
+    const accountIdMap = await migrateAccounts(rawDb);
 
     // Step 5: Migrate categories
     console.log('Step 5: Migrating categories...');
-    const categoryIdMap = await migrateCategories();
+    const categoryIdMap = await migrateCategories(rawDb);
 
     // Step 6: Migrate operations
     console.log('Step 6: Migrating operations...');
-    await migrateOperations(accountIdMap, categoryIdMap);
+    await migrateOperations(rawDb, accountIdMap, categoryIdMap);
 
     // Step 7: Migrate budgets
     console.log('Step 7: Migrating budgets...');
-    await migrateBudgets(categoryIdMap);
+    await migrateBudgets(rawDb, categoryIdMap);
 
     // Step 8: Verify data integrity
     console.log('Step 8: Verifying data integrity...');
-    await verifyDataIntegrity();
+    await verifyDataIntegrity(rawDb);
 
     // Step 9: Set user category sequence to start at 1000
     console.log('Step 9: Setting category auto-increment...');
@@ -119,7 +130,7 @@ export const migrateUuidToInteger = async () => {
 
     // Step 11: Drop backup tables
     console.log('Step 11: Cleaning up backup tables...');
-    await dropBackupTables();
+    await dropBackupTables(rawDb);
 
     // Commit transaction
     rawDb.execSync('COMMIT');
@@ -132,7 +143,7 @@ export const migrateUuidToInteger = async () => {
 
     console.log('Attempting to restore from backup...');
     try {
-      await restoreFromBackup();
+      await restoreFromBackup(rawDb);
       console.log('✅ Restored from backup successfully');
     } catch (restoreError) {
       console.error('❌ Failed to restore from backup:', restoreError);
@@ -149,7 +160,7 @@ export const migrateUuidToInteger = async () => {
 /**
  * Backup existing tables to _old suffix
  */
-const backupExistingTables = async () => {
+const backupExistingTables = async (rawDb) => {
   const tables = ['accounts', 'categories', 'operations', 'budgets'];
 
   for (const table of tables) {
@@ -164,7 +175,7 @@ const backupExistingTables = async () => {
 /**
  * Drop old tables
  */
-const dropOldTables = async () => {
+const dropOldTables = async (rawDb) => {
   const tables = ['budgets', 'operations', 'categories', 'accounts'];
 
   for (const table of tables) {
@@ -175,7 +186,7 @@ const dropOldTables = async () => {
 /**
  * Create new tables with integer IDs
  */
-const createNewTables = async () => {
+const createNewTables = async (rawDb) => {
   // Enable foreign keys
   rawDb.execSync('PRAGMA foreign_keys = ON');
 
@@ -272,7 +283,7 @@ const createNewTables = async () => {
  * Migrate accounts from old table to new table
  * @returns {Object} Map of old UUID to new integer ID
  */
-const migrateAccounts = async () => {
+const migrateAccounts = async (rawDb) => {
   const oldAccounts = rawDb.getAllSync('SELECT * FROM accounts_old ORDER BY created_at');
 
   const idMap = {};
@@ -308,7 +319,7 @@ const migrateAccounts = async () => {
  * Migrate categories from old table to new table
  * @returns {Object} Map of old UUID to new integer ID
  */
-const migrateCategories = async () => {
+const migrateCategories = async (rawDb) => {
   const oldCategories = rawDb.getAllSync('SELECT * FROM categories_old ORDER BY created_at');
 
   const idMap = {};
@@ -375,7 +386,7 @@ const migrateCategories = async () => {
  * @param {Object} accountIdMap - Map of old account UUIDs to new integer IDs
  * @param {Object} categoryIdMap - Map of old category UUIDs to new integer IDs
  */
-const migrateOperations = async (accountIdMap, categoryIdMap) => {
+const migrateOperations = async (rawDb, accountIdMap, categoryIdMap) => {
   const oldOperations = rawDb.getAllSync('SELECT * FROM operations_old ORDER BY created_at');
 
   for (const operation of oldOperations) {
@@ -417,7 +428,7 @@ const migrateOperations = async (accountIdMap, categoryIdMap) => {
  * Migrate budgets from old table to new table
  * @param {Object} categoryIdMap - Map of old category UUIDs to new integer IDs
  */
-const migrateBudgets = async (categoryIdMap) => {
+const migrateBudgets = async (rawDb, categoryIdMap) => {
   const oldBudgets = rawDb.getAllSync('SELECT * FROM budgets_old ORDER BY created_at');
 
   for (const budget of oldBudgets) {
@@ -454,7 +465,7 @@ const migrateBudgets = async (categoryIdMap) => {
 /**
  * Verify data integrity after migration
  */
-const verifyDataIntegrity = async () => {
+const verifyDataIntegrity = async (rawDb) => {
   const checks = [
     { table: 'accounts', oldTable: 'accounts_old' },
     { table: 'categories', oldTable: 'categories_old' },
@@ -492,7 +503,7 @@ const verifyDataIntegrity = async () => {
 /**
  * Drop backup tables after successful migration
  */
-const dropBackupTables = async () => {
+const dropBackupTables = async (rawDb) => {
   const tables = ['accounts_old', 'categories_old', 'operations_old', 'budgets_old'];
 
   for (const table of tables) {
@@ -503,9 +514,9 @@ const dropBackupTables = async () => {
 /**
  * Restore from backup tables if migration fails
  */
-const restoreFromBackup = async () => {
+const restoreFromBackup = async (rawDb) => {
   // Drop failed new tables
-  await dropOldTables();
+  await dropOldTables(rawDb);
 
   // Rename backup tables back to original names
   const tables = ['accounts', 'categories', 'operations', 'budgets'];
