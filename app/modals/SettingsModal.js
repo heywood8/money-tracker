@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccounts } from '../contexts/AccountsContext';
+import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
@@ -15,6 +16,7 @@ export default function SettingsModal({ visible, onClose }) {
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
+  const { startImport, cancelImport } = useImportProgress();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -146,7 +148,16 @@ export default function SettingsModal({ visible, onClose }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Close settings modal first
+              onClose();
+
+              // Start import progress tracking
+              startImport();
+
+              // Perform the import
               await importBackup();
+
+              // Show success dialog
               showDialog(
                 t('restore_database') || 'Restore Database',
                 t('restore_success') || 'Database restored successfully',
@@ -159,6 +170,8 @@ export default function SettingsModal({ visible, onClose }) {
               );
             } catch (error) {
               console.error('Import backup error:', error);
+              // Cancel import progress on error
+              cancelImport();
               showDialog(
                 t('error') || 'Error',
                 error.message === 'Import cancelled'

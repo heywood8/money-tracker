@@ -7,7 +7,9 @@ import { OperationsProvider } from './app/contexts/OperationsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
+import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
+import ImportProgressModal from './app/modals/ImportProgressModal';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -58,6 +60,7 @@ function AppContent() {
     <PaperProvider theme={paperTheme}>
       <ThemedStatusBar />
       <AppInitializer />
+      <ImportProgressModal />
     </PaperProvider>
   );
 }
@@ -70,15 +73,17 @@ export default Sentry.wrap(function App() {
           <LocalizationProvider>
             <ThemeProvider>
               <DialogProvider>
-                <AccountsProvider>
-                  <CategoriesProvider>
-                    <OperationsProvider>
-                      <BudgetsProvider>
-                        <AppContent />
-                      </BudgetsProvider>
-                    </OperationsProvider>
-                  </CategoriesProvider>
-                </AccountsProvider>
+                <ImportProgressProvider>
+                  <AccountsProvider>
+                    <CategoriesProvider>
+                      <OperationsProvider>
+                        <BudgetsProvider>
+                          <AppContent />
+                        </BudgetsProvider>
+                      </OperationsProvider>
+                    </CategoriesProvider>
+                  </AccountsProvider>
+                </ImportProgressProvider>
               </DialogProvider>
             </ThemeProvider>
           </LocalizationProvider>
