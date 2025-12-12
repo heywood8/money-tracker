@@ -18,10 +18,11 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, appMetadata] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
+      queryAll('SELECT * FROM budgets ORDER BY created_at ASC'),
       queryAll('SELECT * FROM app_metadata'),
     ]);
 
@@ -34,6 +35,7 @@ export const createBackup = async () => {
         accounts: accounts || [],
         categories: categories || [],
         operations: operations || [],
+        budgets: budgets || [],
         app_metadata: appMetadata || [],
       },
     };
@@ -42,6 +44,7 @@ export const createBackup = async () => {
       accounts: backup.data.accounts.length,
       categories: backup.data.categories.length,
       operations: backup.data.operations.length,
+      budgets: backup.data.budgets.length,
     });
 
     return backup;
@@ -99,6 +102,7 @@ export const exportBackupCSV = async () => {
       'accounts.csv': convertToCSV(backup.data.accounts),
       'categories.csv': convertToCSV(backup.data.categories),
       'operations.csv': convertToCSV(backup.data.operations),
+      'budgets.csv': convertToCSV(backup.data.budgets),
       'app_metadata.csv': convertToCSV(backup.data.app_metadata),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
@@ -111,6 +115,7 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[ACCOUNTS]\n${csvFiles['accounts.csv']}\n\n`;
     combinedCSV += `[CATEGORIES]\n${csvFiles['categories.csv']}\n\n`;
     combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
+    combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
     combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
@@ -290,6 +295,7 @@ export const restoreBackup = async (backup) => {
 
     await executeTransaction(async (db) => {
       // Clear existing data (in reverse order due to foreign keys)
+      await db.runAsync('DELETE FROM budgets');
       await db.runAsync('DELETE FROM operations');
       await db.runAsync('DELETE FROM categories');
       await db.runAsync('DELETE FROM accounts');
@@ -352,6 +358,29 @@ export const restoreBackup = async (backup) => {
         );
       }
       console.log(`Restored ${backup.data.operations.length} operations`);
+
+      // Restore budgets
+      if (backup.data.budgets) {
+        for (const budget of backup.data.budgets) {
+          await db.runAsync(
+            'INSERT INTO budgets (id, category_id, amount, currency, period_type, start_date, end_date, is_recurring, rollover_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              budget.id,
+              budget.category_id,
+              budget.amount,
+              budget.currency,
+              budget.period_type,
+              budget.start_date,
+              budget.end_date || null,
+              budget.is_recurring ?? 1,
+              budget.rollover_enabled ?? 0,
+              budget.created_at,
+              budget.updated_at,
+            ]
+          );
+        }
+        console.log(`Restored ${backup.data.budgets.length} budgets`);
+      }
 
       // Restore app metadata (except db_version)
       if (backup.data.app_metadata) {
@@ -502,6 +531,7 @@ const importBackupCSV = async (fileUri) => {
     accounts: [],
     categories: [],
     operations: [],
+    budgets: [],
     app_metadata: [],
   };
 
@@ -509,11 +539,13 @@ const importBackupCSV = async (fileUri) => {
   const accountsMatch = fileContent.match(/\[ACCOUNTS\]\n([\s\S]*?)(?=\n\[|$)/);
   const categoriesMatch = fileContent.match(/\[CATEGORIES\]\n([\s\S]*?)(?=\n\[|$)/);
   const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[|$)/);
   const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
   if (operationsMatch) sections.operations = parseCSV(operationsMatch[1]);
+  if (budgetsMatch) sections.budgets = parseCSV(budgetsMatch[1]);
   if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
 
   // Extract version from header
@@ -707,6 +739,7 @@ export const getBackupInfo = (backup) => {
       accountsCount: backup.data.accounts?.length || 0,
       categoriesCount: backup.data.categories?.length || 0,
       operationsCount: backup.data.operations?.length || 0,
+      budgetsCount: backup.data.budgets?.length || 0,
     };
   } catch (error) {
     return null;
