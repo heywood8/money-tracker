@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.0](https://github.com/heywood8/money-tracker/compare/penny-v0.12.0...penny-v0.13.0) (2025-12-12)
+
+
+### Features
+
+* add reset filters button on operations page ([#106](https://github.com/heywood8/money-tracker/issues/106)) ([4903ef9](https://github.com/heywood8/money-tracker/commit/4903ef9358c1d651f9653e30dd68b1c1b8872d0b))
+
+
+### Bug Fixes
+
+* excluded from forecast categories properly imported ([9758c4d](https://github.com/heywood8/money-tracker/commit/9758c4d3444c8fe136abacebb2d27f6c3e1fd9c6))
+* include budgets in backups ([fd811bf](https://github.com/heywood8/money-tracker/commit/fd811bf9a2c330fed668dd3cdf1f1bb9e21936a7))
+* removed burndown ([24683b1](https://github.com/heywood8/money-tracker/commit/24683b19cfb6487be4b1f551a8514b03b71c6d9d))
+* removed export to xls ([1a71160](https://github.com/heywood8/money-tracker/commit/1a711609f1f54dfa18818306c4d5d834fc367ea4))
+
 ## [0.12.0](https://github.com/heywood8/money-tracker/compare/penny-v0.11.3...penny-v0.12.0) (2025-12-08)
 
 
