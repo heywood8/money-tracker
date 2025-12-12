@@ -42,24 +42,25 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-// Mock react-native-uuid
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `cat-uuid-${++mockUuidCounter}`),
-}));
-
 describe('CategoriesContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
     mockIsFirstLaunch.mockReturnValue(false);
     mockLanguage.mockReturnValue('en');
 
     // Default mocks
     CategoriesDB.getAllCategories.mockResolvedValue([]);
     CategoriesDB.initializeDefaultCategories.mockResolvedValue(undefined);
-    CategoriesDB.createCategory.mockResolvedValue(undefined);
+    // Return realistic created category object for createCategory
+    CategoriesDB.createCategory.mockImplementation(async (category) => {
+      return {
+        ...category,
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
     CategoriesDB.updateCategory.mockResolvedValue(undefined);
     CategoriesDB.deleteCategory.mockResolvedValue(undefined);
   });
@@ -178,7 +179,6 @@ describe('CategoriesContext', () => {
       expect(CategoriesDB.createCategory).toHaveBeenCalledWith(
         expect.objectContaining({
           ...newCategory,
-          id: 'cat-uuid-1',
         })
       );
 

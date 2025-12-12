@@ -1,5 +1,6 @@
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import { db, rawDb } from './client';
+import { needsUuidMigration, migrateUuidToInteger } from '../services/uuidToIntegerMigration';
 
 /**
  * Run Drizzle migrations
@@ -52,10 +53,19 @@ export const needsLegacyMigration = async () => {
 };
 
 /**
- * Initialize database with Drizzle migrations
+ * Initialize database with migrations
  */
 export const initializeDatabase = async () => {
   try {
+    // Step 1: Check if UUID to integer migration is needed
+    const needsUuidMig = await needsUuidMigration();
+    if (needsUuidMig) {
+      console.log('UUID to integer migration needed - migrating...');
+      await migrateUuidToInteger();
+      console.log('UUID to integer migration completed');
+    }
+
+    // Step 2: Check for legacy Drizzle migration
     const needsLegacy = await needsLegacyMigration();
 
     if (needsLegacy) {

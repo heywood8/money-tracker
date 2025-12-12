@@ -146,7 +146,6 @@ describe('OperationsDB Service', () => {
   describe('Create Operation', () => {
     it('creates expense operation and updates account balance', async () => {
       const operation = {
-        id: 'op1',
         type: 'expense',
         amount: '100',
         accountId: 'acc1',
@@ -156,14 +155,14 @@ describe('OperationsDB Service', () => {
       };
 
       mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+      mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1 });
 
       await OperationsDB.createOperation(operation);
 
-      // Should insert operation
+      // Should insert operation (ID is autoincrement, not in parameters)
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO operations'),
         expect.arrayContaining([
-          'op1',
           'expense',
           '100',
           'acc1',

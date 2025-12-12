@@ -41,7 +41,16 @@ describe('LastAccount Service', () => {
       );
     });
 
-    it('handles UUID format account ID', async () => {
+    it('handles integer account ID', async () => {
+      await setLastAccessedAccount(42);
+
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+        'last_accessed_account_id',
+        42
+      );
+    });
+
+    it('handles legacy UUID format account ID (for migration)', async () => {
       const uuid = '123e4567-e89b-12d3-a456-426614174000';
       await setLastAccessedAccount(uuid);
 

@@ -168,9 +168,9 @@ npm test -- --coverage
 ### Mocks (configured in `jest.setup.js`)
 - **AsyncStorage**: Mocked for persistence testing
 - **expo-sqlite**: Mocked for database operations
-- **react-native-uuid**: Predictable IDs for testing
 - **Appearance API**: Controlled theme testing
 - **Alert**: Captured for error testing
+- **Note**: IDs use autoincrement integers (no UUID generation in current codebase)
 
 ### Testing Libraries
 - **Jest**: Test runner and assertion library

@@ -199,7 +199,6 @@ describe('BudgetsDB Service', () => {
     describe('createBudget', () => {
       it('creates a new budget with valid data', async () => {
         const budget = {
-          id: 'budget1',
           categoryId: 'cat1',
           amount: '500.00',
           currency: 'USD',
@@ -208,12 +207,12 @@ describe('BudgetsDB Service', () => {
           isRecurring: true,
         };
 
+        executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
         await BudgetsDB.createBudget(budget);
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('INSERT INTO budgets'),
           expect.arrayContaining([
-            'budget1',
             'cat1',
             '500.00',
             'USD',
@@ -238,7 +237,6 @@ describe('BudgetsDB Service', () => {
 
       it('sets isRecurring to 1 by default', async () => {
         const budget = {
-          id: 'budget1',
           categoryId: 'cat1',
           amount: '500.00',
           currency: 'USD',
@@ -246,6 +244,7 @@ describe('BudgetsDB Service', () => {
           startDate: '2025-01-01',
         };
 
+        executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
         await BudgetsDB.createBudget(budget);
 
         expect(executeQuery).toHaveBeenCalledWith(
@@ -256,7 +255,6 @@ describe('BudgetsDB Service', () => {
 
       it('handles rolloverEnabled flag', async () => {
         const budget = {
-          id: 'budget1',
           categoryId: 'cat1',
           amount: '500.00',
           currency: 'USD',
@@ -265,6 +263,7 @@ describe('BudgetsDB Service', () => {
           rolloverEnabled: true,
         };
 
+        executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
         await BudgetsDB.createBudget(budget);
 
         expect(executeQuery).toHaveBeenCalledWith(

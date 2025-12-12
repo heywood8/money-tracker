@@ -29,16 +29,10 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `uuid-${++mockUuidCounter}`),
-}));
-
 describe('Operation Management Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
 
     // Default mock implementations
     AccountsDB.getAllAccounts.mockResolvedValue([
@@ -49,7 +43,16 @@ describe('Operation Management Integration Tests', () => {
 
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
-    OperationsDB.createOperation.mockResolvedValue(undefined);
+    // Default createOperation returns a realistic created operation object
+    OperationsDB.createOperation.mockImplementation(async (operation) => {
+      const created = {
+        ...operation,
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return created;
+    });
     OperationsDB.updateOperation.mockResolvedValue(undefined);
     OperationsDB.deleteOperation.mockResolvedValue(undefined);
   });
@@ -69,8 +72,14 @@ describe('Operation Management Integration Tests', () => {
         Promise.resolve([...currentOperations])
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation, id: operation.id });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
       OperationsDB.updateOperation.mockImplementation((id, updates) => {
         const op = currentOperations.find((o) => o.id === id);
@@ -155,8 +164,14 @@ describe('Operation Management Integration Tests', () => {
         Promise.resolve([...currentOperations])
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
 
       const { result } = renderHook(() => useOperations(), { wrapper });
@@ -210,8 +225,14 @@ describe('Operation Management Integration Tests', () => {
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
 
       const { result } = renderHook(() => useOperations(), { wrapper });
@@ -245,8 +266,14 @@ describe('Operation Management Integration Tests', () => {
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
 
       const { result } = renderHook(() => useOperations(), { wrapper });
@@ -630,8 +657,14 @@ describe('Operation Management Integration Tests', () => {
         if (currentOperations.some((op) => op.id === operation.id)) {
           return Promise.reject(new Error('Duplicate operation'));
         }
-        currentOperations.push({ ...operation });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
 
       const { result } = renderHook(() => useOperations(), { wrapper });
@@ -676,8 +709,14 @@ describe('Operation Management Integration Tests', () => {
         Promise.resolve([...currentOperations])
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
-        currentOperations.push({ ...operation });
-        return Promise.resolve(undefined);
+        const created = {
+          ...operation,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentOperations.push(created);
+        return Promise.resolve(created);
       });
 
       const { result } = renderHook(() => useOperations(), { wrapper });

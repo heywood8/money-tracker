@@ -39,18 +39,11 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-// Mock react-native-uuid
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `op-uuid-${++mockUuidCounter}`),
-}));
-
 describe('OperationsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
     mockReloadAccounts.mockClear();
-    mockUuidCounter = 0;
 
     // Default mocks
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
@@ -159,7 +152,7 @@ describe('OperationsContext', () => {
         description: 'Test expense',
       };
 
-      const mockReloadedOps = [{ ...newOp, id: 'op-uuid-1', createdAt: expect.any(String) }];
+      const mockReloadedOps = [{ ...newOp, id: 1, createdAt: expect.any(String) }];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockReloadedOps);
 
       await act(async () => {
@@ -168,7 +161,6 @@ describe('OperationsContext', () => {
 
       expect(OperationsDB.createOperation).toHaveBeenCalledWith(expect.objectContaining({
         ...newOp,
-        id: 'op-uuid-1',
         createdAt: expect.any(String),
       }));
 
@@ -817,7 +809,7 @@ describe('OperationsContext', () => {
 
       // Succeed second time
       OperationsDB.createOperation.mockResolvedValue(undefined);
-      const mockReloadedOps = [{ id: 'op-uuid-2', type: 'expense', amount: '100', accountId: 'acc1' }];
+      const mockReloadedOps = [{ id: 2, type: 'expense', amount: '100', accountId: 'acc1' }];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockReloadedOps);
 
       await act(async () => {
@@ -843,8 +835,8 @@ describe('OperationsContext', () => {
       });
 
       const mockReloadedOps = [
-        { id: 'op-uuid-1', type: 'expense', amount: '100', accountId: 'acc1' },
-        { id: 'op-uuid-2', type: 'income', amount: '200', accountId: 'acc2' },
+        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
+        { id: 2, type: 'income', amount: '200', accountId: 'acc2' },
       ];
 
       let callCount = 0;
