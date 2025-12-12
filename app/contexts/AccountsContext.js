@@ -3,7 +3,6 @@ import uuid from 'react-native-uuid';
 import currencies from '../../assets/currencies.json';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
-import { performMigration, isMigrationComplete } from '../services/migration';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
@@ -48,13 +47,6 @@ export const AccountsProvider = ({ children }) => {
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        // Check and perform migration if needed
-        const migrated = await isMigrationComplete();
-        if (!migrated) {
-          console.log('Performing first-time migration...');
-          await performMigration();
-        }
-
         // Load accounts from SQLite
         let accountsData = await AccountsDB.getAllAccounts();
 
@@ -234,22 +226,6 @@ export const AccountsProvider = ({ children }) => {
       // This will create all tables with proper schema
       const db = await getDatabase();
       console.log('Database reinitialized successfully');
-
-      // Clear migration status from database to prevent migration from running
-      await executeQuery(
-        'DELETE FROM app_metadata WHERE key = ?',
-        ['migration_status']
-      );
-
-      // Set migration status to completed so migration doesn't run
-      await executeQuery(
-        'INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
-        ['migration_status', 'completed', new Date().toISOString()]
-      );
-
-      // Clear migration backup from AsyncStorage
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-      await AsyncStorage.removeItem('migration_backup');
 
       // NOTE: Categories will be initialized after language selection
       // The AppInitializer will show the language selection screen

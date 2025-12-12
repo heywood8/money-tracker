@@ -14,10 +14,6 @@ import { appEvents } from '../../app/services/eventEmitter';
 // Mock dependencies
 jest.mock('../../app/services/OperationsDB');
 jest.mock('../../app/services/AccountsDB');
-jest.mock('../../app/services/migration', () => ({
-  performMigration: jest.fn(),
-  isMigrationComplete: jest.fn().mockResolvedValue(true),
-}));
 
 // Mock DialogContext
 const mockShowDialog = jest.fn();
