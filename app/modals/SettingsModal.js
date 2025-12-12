@@ -11,11 +11,10 @@ import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
 export default function SettingsModal({ visible, onClose }) {
-  const { theme, setTheme, colorScheme, colors } = useTheme();
+  const { colors } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
-  const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
@@ -175,14 +174,13 @@ export default function SettingsModal({ visible, onClose }) {
 
   useEffect(() => {
     if (visible) {
-      setLocalSelection(theme === 'system' ? 'light' : theme);
       setLocalLang(language);
       setLanguageModalVisible(false);
       setExportFormatModalVisible(false);
       slideAnim.setValue(0);
       exportFormatSlideAnim.setValue(0);
     }
-  }, [visible, theme, language, slideAnim, exportFormatSlideAnim]);
+  }, [visible, language, slideAnim, exportFormatSlideAnim]);
 
   // Interpolate animation values for language modal
   const settingsTranslateX = slideAnim.interpolate({
@@ -234,57 +232,7 @@ export default function SettingsModal({ visible, onClose }) {
         ]}>
           <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
-        <Text variant="titleMedium" style={styles.subtitle}>{t('theme') || 'Theme'}</Text>
-        <View style={styles.themeSwitch}>
-          <TouchableOpacity
-            style={[
-              styles.themeOption,
-              localSelection === 'light' && styles.themeOptionActive,
-              { borderColor: colors.border }
-            ]}
-            onPress={() => setLocalSelection('light')}
-            accessibilityRole="button"
-            accessibilityLabel="Light theme"
-          >
-            <Ionicons
-              name="sunny"
-              size={24}
-              color={localSelection === 'light' ? colors.primary : colors.mutedText}
-            />
-            <Text style={[
-              styles.themeLabel,
-              { color: localSelection === 'light' ? colors.text : colors.mutedText }
-            ]}>
-              Light
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.themeOption,
-              localSelection === 'dark' && styles.themeOptionActive,
-              { borderColor: colors.border }
-            ]}
-            onPress={() => setLocalSelection('dark')}
-            accessibilityRole="button"
-            accessibilityLabel="Dark theme"
-          >
-            <Ionicons
-              name="moon"
-              size={24}
-              color={localSelection === 'dark' ? colors.primary : colors.mutedText}
-            />
-            <Text style={[
-              styles.themeLabel,
-              { color: localSelection === 'dark' ? colors.text : colors.mutedText }
-            ]}>
-              Dark
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
+          <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
         <TouchableRipple
           onPress={openLanguageModal}
           style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -345,7 +293,6 @@ export default function SettingsModal({ visible, onClose }) {
           <Button
             mode="contained"
             onPress={() => {
-              setTheme(localSelection);
               setLanguage(localLang);
               onClose();
             }}
@@ -511,30 +458,6 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 8,
     marginBottom: 8,
-  },
-  themeSwitch: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  themeOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-  },
-  themeOptionActive: {
-    borderWidth: 2,
-  },
-  themeLabel: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   languageSelector: {
     marginTop: 8,
