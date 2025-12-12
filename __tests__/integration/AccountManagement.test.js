@@ -23,19 +23,25 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `uuid-${++mockUuidCounter}`),
-}));
-
 describe('Account Management Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
     isMigrationComplete.mockResolvedValue(true);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
-    AccountsDB.createAccount.mockResolvedValue(undefined);
+    // Return a realistic created account object when DB auto-creates defaults
+    let _idCounter = 1000;
+    AccountsDB.createAccount.mockImplementation(async (account) => {
+      _idCounter += 1;
+      return {
+        ...account,
+        id: _idCounter,
+        hidden: account.hidden || false,
+        displayOrder: account.displayOrder || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
     AccountsDB.updateAccount.mockResolvedValue(undefined);
     AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
     AccountsDB.deleteAccount.mockResolvedValue(undefined);
@@ -54,8 +60,16 @@ describe('Account Management Integration Tests', () => {
       // Setup dynamic mock that tracks state
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentAccounts.push(account);
-        return Promise.resolve(undefined);
+        const created = {
+          ...account,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          hidden: account.hidden || false,
+          displayOrder: account.displayOrder || currentAccounts.length,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentAccounts.push(created);
+        return Promise.resolve(created);
       });
       AccountsDB.updateAccount.mockImplementation((id, updates) => {
         const account = currentAccounts.find(a => a.id === id);
@@ -156,8 +170,16 @@ describe('Account Management Integration Tests', () => {
       // Setup dynamic mock that tracks state
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentAccounts.push(account);
-        return Promise.resolve(undefined);
+        const created = {
+          ...account,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          hidden: account.hidden || false,
+          displayOrder: account.displayOrder || currentAccounts.length,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentAccounts.push(created);
+        return Promise.resolve(created);
       });
       AccountsDB.updateAccount.mockImplementation((id, updates) => {
         const account = currentAccounts.find(a => a.id === id);
@@ -297,7 +319,17 @@ describe('Account Management Integration Tests', () => {
       expect(result.current.accounts).toHaveLength(1);
 
       // Add a successful account
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+      AccountsDB.createAccount.mockImplementation(async (account) => {
+        const created = {
+          ...account,
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          hidden: account.hidden || false,
+          displayOrder: account.displayOrder || 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return created;
+      });
       await act(async () => {
         await result.current.addAccount({
           name: 'Test Success',

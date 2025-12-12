@@ -75,8 +75,8 @@ The app uses React Context API for global state, with primary contexts that wrap
 
 3. **AccountsContext** (`app/contexts/AccountsContext.js`)
    - Manages financial accounts (CRUD operations)
-   - Persists accounts to AsyncStorage with key 'accounts'
-   - Each account has: id (uuid), name, balance (string), currency
+   - Persists accounts to SQLite database
+   - Each account has: id (autoincrement integer), name, balance (string), currency
    - Provides validation function `validateAccount()`
    - Exposes currencies from `assets/currencies.json`
 
@@ -238,7 +238,7 @@ npm test -- <pattern>    # Run specific test files matching pattern
 - **react-native APIs**: Mock Appearance, DateTimePicker, etc. in `jest.setup.js`
 - **Third-party libraries**: Mock chart-kit, SVG, gesture-handler in setup file
 - **Database services**: Mock in integration tests to control DB behavior
-- **UUIDs**: Mock `react-native-uuid` for predictable test IDs
+- **IDs**: Database uses autoincrement integers (historical UUIDs migrated automatically)
 
 **Best Practices:**
 

@@ -24,7 +24,9 @@ describe('AccountsDB', () => {
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
-      values: jest.fn(() => Promise.resolve()),
+      // Make `values` chainable and add `returning` to match Drizzle's chaining
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
@@ -118,9 +120,28 @@ describe('AccountsDB', () => {
         })),
       });
 
+      // Simulate returning the created row from the DB
+      mockDrizzle.returning.mockResolvedValueOnce([
+        {
+          id: 'test-id',
+          name: newAccount.name,
+          balance: newAccount.balance,
+          currency: newAccount.currency,
+          displayOrder: 6,
+          hidden: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
+
       const result = await AccountsDB.createAccount(newAccount);
 
-      expect(result).toMatchObject(newAccount);
+      expect(result).toMatchObject({
+        id: 'test-id',
+        name: newAccount.name,
+        balance: newAccount.balance,
+        currency: newAccount.currency,
+      });
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();
       expect(result.displayOrder).toBe(6);
@@ -140,6 +161,20 @@ describe('AccountsDB', () => {
         })),
       });
 
+      // Return the created account row with defaulted values
+      mockDrizzle.returning.mockResolvedValueOnce([
+        {
+          id: 'generated-id',
+          name: newAccount.name,
+          balance: '0',
+          currency: 'USD',
+          displayOrder: 0,
+          hidden: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
+
       const result = await AccountsDB.createAccount(newAccount);
 
       expect(result.balance).toBe('0');
@@ -156,12 +191,13 @@ describe('AccountsDB', () => {
           from: jest.fn(() => Promise.resolve([{ maxOrder: 0 }])),
         })),
         insert: jest.fn().mockReturnThis(),
-        values: jest.fn(() => Promise.reject(error)),
+        values: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockRejectedValue(error),
       };
 
       db.getDrizzle.mockResolvedValue(failingMockDrizzle);
 
-      await expect(AccountsDB.createAccount({ id: '1', name: 'Test' }))
+      await expect(AccountsDB.createAccount({ name: 'Test' }))
         .rejects.toThrow('Insert failed');
     });
   });

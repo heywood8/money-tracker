@@ -179,8 +179,11 @@ export const getChildCategories = async (parentId) => {
 export const createCategory = async (category) => {
   try {
     const now = new Date().toISOString();
+
+    // Check if this is a default category (has explicit ID between 1-71)
+    const isDefaultCategory = category.id && category.id >= 1 && category.id <= 71;
+
     const categoryData = {
-      id: category.id,
       name: category.name,
       type: category.type || 'folder',
       category_type: category.category_type || category.categoryType || 'expense',
@@ -193,25 +196,49 @@ export const createCategory = async (category) => {
       updated_at: now,
     };
 
-    await executeQuery(
-      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        categoryData.id,
-        categoryData.name,
-        categoryData.type,
-        categoryData.category_type,
-        categoryData.parent_id,
-        categoryData.icon,
-        categoryData.color,
-        categoryData.is_shadow,
-        categoryData.exclude_from_forecast,
-        categoryData.created_at,
-        categoryData.updated_at,
-      ]
-    );
+    let insertedId;
 
-    // Return mapped fields for consistency
-    return mapCategoryFields(categoryData);
+    if (isDefaultCategory) {
+      // For default categories, use explicit ID
+      await executeQuery(
+        'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          category.id,
+          categoryData.name,
+          categoryData.type,
+          categoryData.category_type,
+          categoryData.parent_id,
+          categoryData.icon,
+          categoryData.color,
+          categoryData.is_shadow,
+          categoryData.exclude_from_forecast,
+          categoryData.created_at,
+          categoryData.updated_at,
+        ]
+      );
+      insertedId = category.id;
+    } else {
+      // For user categories, let database auto-generate ID (starting from 1000)
+      const result = await executeQuery(
+        'INSERT INTO categories (name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          categoryData.name,
+          categoryData.type,
+          categoryData.category_type,
+          categoryData.parent_id,
+          categoryData.icon,
+          categoryData.color,
+          categoryData.is_shadow,
+          categoryData.exclude_from_forecast,
+          categoryData.created_at,
+          categoryData.updated_at,
+        ]
+      );
+      insertedId = result.lastInsertRowId;
+    }
+
+    // Return mapped fields for consistency with generated ID
+    return mapCategoryFields({ ...categoryData, id: insertedId });
   } catch (error) {
     console.error('Failed to create category:', error);
     throw error;

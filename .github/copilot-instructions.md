@@ -40,8 +40,8 @@ The app uses React Context API for global state, with three primary contexts tha
 
 3. **AccountsContext** (`app/AccountsContext.js`)
    - Manages financial accounts (CRUD operations)
-   - Persists accounts to AsyncStorage with key 'accounts'
-   - Each account has: id (uuid), name, balance (string), currency
+   - Persists accounts to SQLite database
+   - Each account has: id (autoincrement integer), name, balance (string), currency
    - Provides validation function `validateAccount()`
    - Exposes currencies from `assets/currencies.json`
 

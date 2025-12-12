@@ -92,11 +92,6 @@ jest.mock('drizzle-orm', () => {
   };
 });
 
-// Mock react-native-uuid
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => 'test-uuid-1234'),
-}));
-
 // Mock Appearance API
 jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   getColorScheme: jest.fn(() => 'light'),

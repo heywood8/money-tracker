@@ -23,21 +23,26 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-// Mock uuid to return predictable IDs
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `test-uuid-${++mockUuidCounter}`),
-}));
-
 describe('AccountsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
     // Default mock implementations
     isMigrationComplete.mockResolvedValue(true);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
-    AccountsDB.createAccount.mockResolvedValue(undefined);
+    // Default createAccount mock returns a realistic created account object
+    let _accountId = 1000;
+    AccountsDB.createAccount.mockImplementation(async (account) => {
+      _accountId += 1;
+      return {
+        ...account,
+        id: _accountId,
+        hidden: account.hidden !== undefined ? account.hidden : 0,
+        displayOrder: _accountId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
     AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
   });
 
@@ -77,7 +82,6 @@ describe('AccountsContext', () => {
 
     it('creates default accounts when none exist', async () => {
       AccountsDB.getAllAccounts.mockResolvedValueOnce([]);
-      AccountsDB.createAccount.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -110,9 +114,12 @@ describe('AccountsContext', () => {
 
   describe('addAccount', () => {
     it('adds a new account successfully', async () => {
-      const mockAccounts = [{ id: 'existing-1', name: 'Existing', balance: '50', currency: 'USD' }];
+      const mockAccounts = [{ id: 1, name: 'Existing', balance: '50', currency: 'USD', hidden: 0 }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+      
+      const newAccount = { name: 'New Account', balance: '100', currency: 'USD' };
+      const createdAccount = { ...newAccount, id: 2, hidden: 0, displayOrder: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      AccountsDB.createAccount.mockResolvedValue(createdAccount);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -121,7 +128,6 @@ describe('AccountsContext', () => {
       });
 
       const initialLength = result.current.accounts.length;
-      const newAccount = { name: 'New Account', balance: '100', currency: 'USD' };
 
       await act(async () => {
         await result.current.addAccount(newAccount);
@@ -132,24 +138,33 @@ describe('AccountsContext', () => {
           name: 'New Account',
           balance: '100',
           currency: 'USD',
-          id: expect.any(String),
         })
       );
       expect(result.current.accounts).toHaveLength(initialLength + 1);
     });
 
     it('converts balance to string when adding account', async () => {
-      const mockAccounts = [{ id: 'existing-1', name: 'Existing', balance: '50', currency: 'USD' }];
+      const mockAccounts = [{ id: 1, name: 'Existing', balance: '50', currency: 'USD', hidden: 0 }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+
+      const newAccount = { name: 'Test', balance: 100, currency: 'USD' };
+      const createdAccount = {
+        id: 2,
+        name: 'Test',
+        balance: '100',
+        currency: 'USD',
+        hidden: 0,
+        displayOrder: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      AccountsDB.createAccount.mockResolvedValue(createdAccount);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-
-      const newAccount = { name: 'Test', balance: 100, currency: 'USD' };
 
       await act(async () => {
         await result.current.addAccount(newAccount);
@@ -562,8 +577,16 @@ describe('AccountsContext', () => {
 
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentMockAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentMockAccounts.push(account);
-        return Promise.resolve(undefined);
+        const created = {
+          ...account,
+          id: `generated-${currentMockAccounts.length + 1}`,
+          hidden: account.hidden !== undefined ? account.hidden : 0,
+          displayOrder: currentMockAccounts.length + 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        currentMockAccounts.push(created);
+        return Promise.resolve(created);
       });
       AccountsDB.updateAccount.mockResolvedValue(undefined);
       AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {

@@ -13,7 +13,7 @@ export const appMetadata = sqliteTable('app_metadata', {
  * Accounts table
  */
 export const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   balance: text('balance').notNull().default('0'),
   currency: text('currency').notNull().default('USD'),
@@ -31,11 +31,11 @@ export const accounts = sqliteTable('accounts', {
  * Categories table
  */
 export const categories = sqliteTable('categories', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   type: text('type', { enum: ['folder', 'entry'] }).notNull(),
   categoryType: text('category_type', { enum: ['expense', 'income'] }).notNull(),
-  parentId: text('parent_id').references(() => categories.id, { onDelete: 'cascade' }),
+  parentId: integer('parent_id').references(() => categories.id, { onDelete: 'cascade' }),
   icon: text('icon'),
   color: text('color'),
   isShadow: integer('is_shadow').default(0),
@@ -54,12 +54,12 @@ export const categories = sqliteTable('categories', {
  * Operations table
  */
 export const operations = sqliteTable('operations', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey({ autoIncrement: true }),
   type: text('type', { enum: ['expense', 'income', 'transfer'] }).notNull(),
   amount: text('amount').notNull(),
-  accountId: text('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
-  categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
-  toAccountId: text('to_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+  accountId: integer('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
   date: text('date').notNull(),
   createdAt: text('created_at').notNull(),
   description: text('description'),
@@ -78,8 +78,8 @@ export const operations = sqliteTable('operations', {
  * Budgets table
  */
 export const budgets = sqliteTable('budgets', {
-  id: text('id').primaryKey(),
-  categoryId: text('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  categoryId: integer('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
   amount: text('amount').notNull(),
   currency: text('currency').notNull(),
   periodType: text('period_type', { enum: ['weekly', 'monthly', 'yearly'] }).notNull(),

@@ -335,7 +335,7 @@ describe('CategoriesDB', () => {
   describe('createCategory', () => {
     it('creates a new category with all fields', async () => {
       const newCategory = {
-        id: 'cat-1',
+        id: 1,
         name: 'Food',
         type: 'folder',
         category_type: 'expense',
@@ -346,14 +346,14 @@ describe('CategoriesDB', () => {
         excludeFromForecast: false,
       };
 
-      mockDb.executeQuery.mockResolvedValue();
+      mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
 
       const result = await CategoriesDB.createCategory(newCategory);
 
       expect(db.executeQuery).toHaveBeenCalled();
       const [query, params] = mockDb.executeQuery.mock.calls[0];
       expect(query).toContain('INSERT INTO categories');
-      expect(params[0]).toBe('cat-1');
+      expect(params[0]).toBe(1);
       expect(params[1]).toBe('Food');
       expect(params[2]).toBe('folder');
       expect(params[3]).toBe('expense');
@@ -367,33 +367,33 @@ describe('CategoriesDB', () => {
 
     it('creates category with default values when optional fields are missing', async () => {
       const newCategory = {
-        id: 'cat-1',
         name: 'Food',
       };
 
-      mockDb.executeQuery.mockResolvedValue();
+      mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
       const result = await CategoriesDB.createCategory(newCategory);
 
       const [query, params] = mockDb.executeQuery.mock.calls[0];
-      expect(params[2]).toBe('folder'); // default type
-      expect(params[3]).toBe('expense'); // default category_type
-      expect(params[4]).toBeNull(); // default parent_id
-      expect(params[5]).toBeNull(); // default icon
-      expect(params[6]).toBeNull(); // default color
-      expect(params[7]).toBe(0); // default is_shadow
+      expect(params[0]).toBe('Food'); // name
+      expect(params[1]).toBe('folder'); // default type
+      expect(params[2]).toBe('expense'); // default category_type
+      expect(params[3]).toBeNull(); // default parent_id
+      expect(params[4]).toBeNull(); // default icon
+      expect(params[5]).toBeNull(); // default color
+      expect(params[6]).toBe(0); // default is_shadow
     });
 
     it('handles both camelCase and snake_case field names', async () => {
       const newCategory = {
-        id: 'cat-1',
+        id: 1,
         name: 'Food',
         categoryType: 'income', // camelCase
         parent_id: 'parent-1', // snake_case
         is_shadow: true, // snake_case
       };
 
-      mockDb.executeQuery.mockResolvedValue();
+      mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
 
       await CategoriesDB.createCategory(newCategory);
 
@@ -405,12 +405,12 @@ describe('CategoriesDB', () => {
 
     it('converts isShadow boolean to integer', async () => {
       const newCategory = {
-        id: 'cat-1',
+        id: 1,
         name: 'Shadow Category',
         isShadow: true,
       };
 
-      mockDb.executeQuery.mockResolvedValue();
+      mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1 });
 
       await CategoriesDB.createCategory(newCategory);
 
@@ -420,17 +420,16 @@ describe('CategoriesDB', () => {
 
     it('sets created_at and updated_at timestamps', async () => {
       const newCategory = {
-        id: 'cat-1',
         name: 'Food',
       };
 
-      mockDb.executeQuery.mockResolvedValue();
+      mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
       const result = await CategoriesDB.createCategory(newCategory);
 
       const [query, params] = mockDb.executeQuery.mock.calls[0];
-      expect(params[9]).toBeDefined(); // created_at
-      expect(params[10]).toBeDefined(); // updated_at
+      expect(params[8]).toBeDefined(); // created_at (index 8 for user categories)
+      expect(params[9]).toBeDefined(); // updated_at (index 9 for user categories)
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();
     });
@@ -895,10 +894,9 @@ describe('CategoriesDB', () => {
   describe('Edge Cases and Regression Tests', () => {
     describe('Null and undefined handling', () => {
       it('handles null parentId correctly in createCategory', async () => {
-        mockDb.executeQuery.mockResolvedValue();
+        mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
         await CategoriesDB.createCategory({
-          id: 'cat-1',
           name: 'Root',
           parentId: null,
         });
@@ -924,10 +922,9 @@ describe('CategoriesDB', () => {
 
     describe('Empty string handling', () => {
       it('converts empty string to null for optional fields', async () => {
-        mockDb.executeQuery.mockResolvedValue();
+        mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
         await CategoriesDB.createCategory({
-          id: 'cat-1',
           name: 'Test',
           icon: '',
           color: '',
@@ -935,8 +932,8 @@ describe('CategoriesDB', () => {
 
         const [query, params] = mockDb.executeQuery.mock.calls[0];
         // Empty strings are converted to null via the || null pattern
-        expect(params[5]).toBeNull();
-        expect(params[6]).toBeNull();
+        expect(params[4]).toBeNull(); // icon (index 4 for user categories)
+        expect(params[5]).toBeNull(); // color (index 5 for user categories)
       });
     });
 
@@ -1011,27 +1008,25 @@ describe('CategoriesDB', () => {
 
     describe('Special characters in names', () => {
       it('handles special characters in category names', async () => {
-        mockDb.executeQuery.mockResolvedValue();
+        mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
         await CategoriesDB.createCategory({
-          id: 'cat-1',
           name: "Food & Drinks (Mom's)",
         });
 
         const [query, params] = mockDb.executeQuery.mock.calls[0];
-        expect(params[1]).toBe("Food & Drinks (Mom's)");
+        expect(params[0]).toBe("Food & Drinks (Mom's)"); // name is first param for user categories
       });
 
       it('handles unicode characters in category names', async () => {
-        mockDb.executeQuery.mockResolvedValue();
+        mockDb.executeQuery.mockResolvedValue({ lastInsertRowId: 1000 });
 
         await CategoriesDB.createCategory({
-          id: 'cat-1',
           name: 'Еда 🍕',
         });
 
         const [query, params] = mockDb.executeQuery.mock.calls[0];
-        expect(params[1]).toBe('Еда 🍕');
+        expect(params[0]).toBe('Еда 🍕'); // name is first param for user categories
       });
     });
   });

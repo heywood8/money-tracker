@@ -33,21 +33,24 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
-// Mock uuid to return predictable IDs
-let mockUuidCounter = 0;
-jest.mock('react-native-uuid', () => ({
-  v4: jest.fn(() => `test-uuid-${++mockUuidCounter}`),
-}));
-
 describe('BudgetsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockUuidCounter = 0;
     // Default mock implementations
     BudgetsDB.getAllBudgets.mockResolvedValue([]);
     BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(new Map());
-    BudgetsDB.createBudget.mockResolvedValue(undefined);
+    // Return realistic created budget object with numeric id
+    let _budgetId = 2000;
+    BudgetsDB.createBudget.mockImplementation(async (budget) => {
+      _budgetId += 1;
+      return {
+        ...budget,
+        id: _budgetId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
     BudgetsDB.updateBudget.mockResolvedValue(undefined);
     BudgetsDB.deleteBudget.mockResolvedValue(undefined);
     BudgetsDB.validateBudget.mockReturnValue(null);
@@ -191,13 +194,12 @@ describe('BudgetsContext', () => {
         addedBudget = await result.current.addBudget(newBudget);
       });
 
-      expect(addedBudget.id).toBe('test-uuid-1');
+      expect(addedBudget.id).toEqual(expect.any(Number));
       expect(result.current.budgets).toHaveLength(1);
       expect(result.current.budgets[0]).toEqual(addedBudget);
       expect(BudgetsDB.createBudget).toHaveBeenCalledWith(
         expect.objectContaining({
           ...newBudget,
-          id: 'test-uuid-1',
         })
       );
       expect(BudgetsDB.calculateAllBudgetStatuses).toHaveBeenCalledTimes(2); // Once on init, once after add
