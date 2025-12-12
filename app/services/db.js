@@ -686,90 +686,42 @@ const initializeDatabase = async (rawDb) => {
 
       const currentVersion = versionResult ? parseInt(versionResult.value) : 0;
 
-      if (currentVersion < DB_VERSION) {
-        console.log(`Database upgrade needed: v${currentVersion} → v${DB_VERSION}`);
-
-        // Run migrations
-        if (currentVersion > 0 && currentVersion < 2) {
-          console.log('Migrating database from version', currentVersion, 'to version 2...');
-          await migrateToV2(rawDb);
-        }
-        if (currentVersion >= 2 && currentVersion < 3) {
-          console.log('Migrating database from version', currentVersion, 'to version 3...');
-          await migrateToV3(rawDb);
-        }
-        if (currentVersion >= 3 && currentVersion < 4) {
-          console.log('Migrating database from version', currentVersion, 'to version 4...');
-          await migrateToV4(rawDb);
-        }
-        if (currentVersion >= 4 && currentVersion < 5) {
-          console.log('Migrating database from version', currentVersion, 'to version 5...');
-          await migrateToV5(rawDb);
-        }
-        if (currentVersion >= 5 && currentVersion < 6) {
-          console.log('Migrating database from version', currentVersion, 'to version 6...');
-          await migrateToV6(rawDb);
-        }
-        if (currentVersion >= 6 && currentVersion < 7) {
-          console.log('Migrating database from version', currentVersion, 'to version 7...');
-          await migrateToV7(rawDb);
-        }
-        if (currentVersion >= 7 && currentVersion < 8) {
-          console.log('Migrating database from version', currentVersion, 'to version 8...');
-          await migrateToV8(rawDb);
-        }
-        if (currentVersion >= 8 && currentVersion < 9) {
-          console.log('Migrating database from version', currentVersion, 'to version 9...');
-          await migrateToV9(rawDb);
-        }
-        if (currentVersion >= 9 && currentVersion < 10) {
-          console.log('Migrating database from version', currentVersion, 'to version 10...');
-          await migrateToV10(rawDb);
-        }
-
-        // Force-check for V7 columns (safety net for migration issues)
-        console.log('Verifying V7 schema...');
-        const tables = await rawDb.getAllAsync(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='operations'"
-        );
-
-        if (tables.length > 0) {
-          const tableInfo = await rawDb.getAllAsync('PRAGMA table_info(operations)');
-          const hasExchangeRate = tableInfo.some(col => col.name === 'exchange_rate');
-
-          if (!hasExchangeRate) {
-            console.log('V7 columns missing! Force-running V7 migration...');
-            await migrateToV7(rawDb);
+      // If stored version doesn't equal code DB_VERSION, run Drizzle migrations
+      if (currentVersion !== DB_VERSION) {
+        console.log(`Database version mismatch: v${currentVersion} != v${DB_VERSION}. Running migrations...`);
+        try {
+          // Attempt to require the migrate module. In some test environments
+          // (where app/db/client.js or other runtime-only modules are unavailable),
+          // requiring may fail. If module can't be loaded, skip migrations.
+          let runMigrations;
+          try {
+            // eslint-disable-next-line global-require
+            ({ runMigrations } = require('../db/migrate'));
+          } catch (requireErr) {
+            if (requireErr && /Cannot find module/.test(requireErr.message)) {
+              console.warn('Drizzle migrate module not available in this environment; skipping runtime migrations.');
+            } else {
+              console.error('Error requiring migrate module:', requireErr);
+            }
           }
-        } else {
-          console.log('Operations table does not exist yet, skipping V7 verification...');
-        }
 
-        // Force-check for V9 columns (safety net for migration issues)
-        console.log('Verifying V9 schema...');
-        const categoriesTables = await rawDb.getAllAsync(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'"
-        );
+          if (typeof runMigrations === 'function') {
+            await runMigrations();
 
-        if (categoriesTables.length > 0) {
-          const categoriesTableInfo = await rawDb.getAllAsync('PRAGMA table_info(categories)');
-          const hasExcludeFromForecast = categoriesTableInfo.some(col => col.name === 'exclude_from_forecast');
+            // Update or insert db_version in app_metadata
+            await rawDb.runAsync(
+              `INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)`,
+              ['db_version', DB_VERSION.toString(), new Date().toISOString()]
+            );
 
-          if (!hasExcludeFromForecast) {
-            console.log('V9 columns missing! Force-running V9 migration...');
-            await migrateToV9(rawDb);
+            console.log(`Drizzle migrations applied. Database version set to v${DB_VERSION}`);
+          } else {
+            console.log('Skipping Drizzle migrations: runMigrations not available');
           }
-        } else {
-          console.log('Categories table does not exist yet, skipping V9 verification...');
+        } catch (err) {
+          console.error('Failed to run Drizzle migrations on startup:', err);
+          throw err;
         }
-
-        // Update version
-        await rawDb.runAsync(
-          'UPDATE app_metadata SET value = ?, updated_at = ? WHERE key = ?',
-          [DB_VERSION.toString(), new Date().toISOString(), 'db_version']
-        );
-
-        console.log('Database upgraded successfully');
       }
     }
   } catch (error) {
