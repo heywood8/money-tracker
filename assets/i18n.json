@@ -240,13 +240,6 @@
     "no_prediction_data": "Not enough data to predict spending",
     "exclude_from_forecast": "Exclude from Forecast",
     "exclude_from_forecast_hint": "Don't include this category in spending predictions",
-    "burndown_graph": "Burndown Graph",
-    "current_month": "Current Month",
-    "previous_month": "Previous Month",
-    "planned": "Planned",
-    "12_month_mean": "12-Month Mean",
-    "select_account": "Select Account",
-    "no_burndown_data": "No data available for burndown graph",
     "monthly_target": "Monthly Target Balance",
     "export_format": "Export Format",
     "json_description": "Standard format, compatible with all versions",
@@ -292,10 +285,7 @@
     "no_operations_matching_filters": "No operations match your filters",
     "clear_filters": "Clear Filters",
     "select_all": "Select All",
-    "deselect_all": "Deselect All",
-    "show_mean": "Show Mean",
-    "mean_months": "Number of Months",
-    "n_month_mean": "Mean"
+    "deselect_all": "Deselect All"
   },
   "ru": {
     "accounts": "Счета",
@@ -538,13 +528,6 @@
     "no_prediction_data": "Недостаточно данных для прогноза",
     "exclude_from_forecast": "Исключить из прогноза",
     "exclude_from_forecast_hint": "Не учитывать эту категорию в прогнозе расходов",
-    "burndown_graph": "График расходования",
-    "current_month": "Текущий месяц",
-    "previous_month": "Предыдущий месяц",
-    "planned": "Планируемое",
-    "12_month_mean": "Среднее за 12 месяцев",
-    "select_account": "Выберите счёт",
-    "no_burndown_data": "Нет данных для графика",
     "monthly_target": "Месячная целевая сумма",
     "export_format": "Формат экспорта",
     "json_description": "Стандартный формат, совместим со всеми версиями",
@@ -590,10 +573,7 @@
     "no_operations_matching_filters": "Нет операций, соответствующих фильтрам",
     "clear_filters": "Очистить фильтры",
     "select_all": "Выбрать все",
-    "deselect_all": "Снять все",
-    "show_mean": "Среднее",
-    "mean_months": "Количество месяцев",
-    "n_month_mean": "Среднее"
+    "deselect_all": "Снять все"
   },
   "es": {
     "accounts": "Cuentas",
@@ -836,13 +816,6 @@
     "no_prediction_data": "No hay suficientes datos para predecir gastos",
     "exclude_from_forecast": "Excluir de la previsión",
     "exclude_from_forecast_hint": "No incluir esta categoría en las predicciones de gastos",
-    "burndown_graph": "Gráfico de quemado",
-    "current_month": "Mes actual",
-    "previous_month": "Mes anterior",
-    "planned": "Planificado",
-    "12_month_mean": "Media de 12 meses",
-    "select_account": "Seleccionar cuenta",
-    "no_burndown_data": "No hay datos disponibles para el gráfico de quemado",
     "monthly_target": "Saldo objetivo mensual",
     "export_format": "Formato de exportación",
     "json_description": "Formato estándar, compatible con todas las versiones",
@@ -888,10 +861,7 @@
     "no_operations_matching_filters": "Ninguna operación coincide con tus filtros",
     "clear_filters": "Borrar filtros",
     "select_all": "Seleccionar todo",
-    "deselect_all": "Deselect. todo",
-    "show_mean": "Promedio",
-    "mean_months": "Meses para promedio",
-    "n_month_mean": "Promedio"
+    "deselect_all": "Deselect. todo"
   },
   "fr": {
     "accounts": "Comptes",
@@ -1134,13 +1104,6 @@
     "no_prediction_data": "Pas assez de données pour prévoir les dépenses",
     "exclude_from_forecast": "Exclure des prévisions",
     "exclude_from_forecast_hint": "Ne pas inclure cette catégorie dans les prévisions de dépenses",
-    "burndown_graph": "Graphique d'avancement",
-    "current_month": "Mois en cours",
-    "previous_month": "Mois précédent",
-    "planned": "Prévu",
-    "12_month_mean": "Moyenne sur 12 mois",
-    "select_account": "Sélectionner un compte",
-    "no_burndown_data": "Pas de données disponibles pour le graphique d'avancement",
     "monthly_target": "Solde cible mensuel",
     "export_format": "Format d'exportation",
     "json_description": "Format standard, compatible avec toutes les versions",
@@ -1186,10 +1149,7 @@
     "no_operations_matching_filters": "Aucune opération ne correspond à vos filtres",
     "clear_filters": "Effacer les filtres",
     "select_all": "Tout sélectionner",
-    "deselect_all": "Tout désélectionner",
-    "show_mean": "Moyenne",
-    "mean_months": "Nombre de mois",
-    "n_month_mean": "Moyenne"
+    "deselect_all": "Tout désélectionner"
   },
   "zh": {
     "accounts": "账户",
@@ -1432,13 +1392,6 @@
     "no_prediction_data": "数据不足，无法预测支出",
     "exclude_from_forecast": "从预测中排除",
     "exclude_from_forecast_hint": "不要在支出预测中包含此类别",
-    "burndown_graph": "燃尽图",
-    "current_month": "本月",
-    "previous_month": "上月",
-    "planned": "计划",
-    "12_month_mean": "12个月平均值",
-    "select_account": "选择账户",
-    "no_burndown_data": "没有可用的燃尽图数据",
     "monthly_target": "每月目标余额",
     "export_format": "导出格式",
     "json_description": "标准格式，与所有版本兼容",
@@ -1484,10 +1437,7 @@
     "no_operations_matching_filters": "没有符合筛选条件的操作",
     "clear_filters": "清除筛选器",
     "select_all": "全选",
-    "deselect_all": "取消全选",
-    "show_mean": "平均值",
-    "mean_months": "月数",
-    "n_month_mean": "平均值"
+    "deselect_all": "取消全选"
   },
   "de": {
     "accounts": "Konten",
@@ -1730,13 +1680,6 @@
     "no_prediction_data": "Nicht genügend Daten zur Vorhersage der Ausgaben",
     "exclude_from_forecast": "Von Prognose ausschließen",
     "exclude_from_forecast_hint": "Diese Kategorie nicht in Ausgabenprognosen einbeziehen",
-    "burndown_graph": "Burndown-Diagramm",
-    "current_month": "Aktueller Monat",
-    "previous_month": "Vorheriger Monat",
-    "planned": "Geplant",
-    "12_month_mean": "12-Monats-Durchschnitt",
-    "select_account": "Konto auswählen",
-    "no_burndown_data": "Keine Daten für Burndown-Diagramm verfügbar",
     "monthly_target": "Monatliches Zielsaldo",
     "export_format": "Exportformat",
     "json_description": "Standardformat, kompatibel mit allen Versionen",
@@ -1782,8 +1725,7 @@
     "no_operations_matching_filters": "Keine Vorgänge entsprechen Ihren Filtern",
     "clear_filters": "Filter löschen",
     "select_all": "Alle auswählen",
-    "deselect_all": "Alle abwählen",
-    "n_month_mean": "Durchschnitt"
+    "deselect_all": "Alle abwählen"
   }
 }
 
