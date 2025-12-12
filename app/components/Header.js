@@ -8,7 +8,7 @@ import { queryFirst } from '../services/db';
 const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings }) {
-  const { colors } = useTheme();
+  const { colors, colorScheme, setTheme } = useTheme();
   const { t } = useLocalization();
   const [dbVersion, setDbVersion] = useState(null);
 
@@ -29,6 +29,11 @@ export default function Header({ onOpenSettings }) {
 
     fetchDbVersion();
   }, []);
+
+  const toggleTheme = () => {
+    const newTheme = colorScheme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+  };
 
   return (
     <View
@@ -53,16 +58,32 @@ export default function Header({ onOpenSettings }) {
           </Text>
         </View>
       </View>
-      <TouchableOpacity
-        onPress={onOpenSettings}
-        accessibilityLabel={t('settings')}
-        accessibilityRole="button"
-        accessibilityHint="Opens settings menu"
-        style={styles.settingsButton}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="settings-outline" size={24} color={colors.text} />
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          onPress={toggleTheme}
+          accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          accessibilityRole="button"
+          accessibilityHint="Toggles between light and dark theme"
+          style={styles.themeButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={colorScheme === 'dark' ? 'moon' : 'sunny'}
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onOpenSettings}
+          accessibilityLabel={t('settings')}
+          accessibilityRole="button"
+          accessibilityHint="Opens settings menu"
+          style={styles.settingsButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="settings-outline" size={24} color={colors.text} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -89,6 +110,14 @@ const styles = StyleSheet.create({
   version: {
     fontSize: 10,
     marginTop: 2,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeButton: {
+    padding: 8,
   },
   settingsButton: {
     padding: 8,
