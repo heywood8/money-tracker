@@ -1,11 +1,34 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { queryFirst } from '../services/db';
+
+const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const [dbVersion, setDbVersion] = useState(null);
+
+  useEffect(() => {
+    const fetchDbVersion = async () => {
+      try {
+        const result = await queryFirst(
+          'SELECT value FROM app_metadata WHERE key = ?',
+          ['db_version']
+        );
+        if (result) {
+          setDbVersion(result.value);
+        }
+      } catch (error) {
+        console.error('Failed to fetch database version:', error);
+      }
+    };
+
+    fetchDbVersion();
+  }, []);
 
   return (
     <View
@@ -23,7 +46,12 @@ export default function Header({ onOpenSettings }) {
           style={styles.icon}
           accessibilityLabel="Penny app icon"
         />
-        <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+        <View>
+          <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+          <Text style={[styles.version, { color: colors.mutedText }]}>
+            v{APP_VERSION} | DB v{dbVersion || '?'}
+          </Text>
+        </View>
       </View>
       <TouchableOpacity
         onPress={onOpenSettings}
@@ -58,6 +86,10 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   title: { fontSize: 14, fontWeight: '700' },
+  version: {
+    fontSize: 10,
+    marginTop: 2,
+  },
   settingsButton: {
     padding: 8,
   },
