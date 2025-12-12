@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "64657728-268c-42e1-a2e9-a3b70c7b7460",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "5af1f2b9-d726-4080-a74a-4900b21b42fa",
+  "prevId": "64657728-268c-42e1-a2e9-a3b70c7b7460",
   "tables": {
     "accounts": {
       "name": "accounts",
@@ -410,10 +410,10 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": true,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": true
         },
         "type": {
           "name": "type",

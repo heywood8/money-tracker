@@ -59,7 +59,7 @@ CREATE INDEX `idx_categories_category_type` ON `categories` (`category_type`);--
 CREATE INDEX `idx_categories_is_shadow` ON `categories` (`is_shadow`);--> statement-breakpoint
 CREATE INDEX `idx_categories_exclude_from_forecast` ON `categories` (`exclude_from_forecast`);--> statement-breakpoint
 CREATE TABLE `operations` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`id` text PRIMARY KEY NOT NULL,
 	`type` text NOT NULL,
 	`amount` text NOT NULL,
 	`account_id` text NOT NULL,
