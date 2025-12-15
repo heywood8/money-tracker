@@ -48,6 +48,10 @@ jobs:
       - name: 🏗 Prebuild Android
         run: npx expo prebuild --platform android --clean
 
+      - name: 🔧 Configure packaging options
+        run: |
+          echo "android.packagingOptions.excludes=META-INF/versions/**" >> android/gradle.properties
+
       - name: 🔐 Decode keystore
         run: |
           echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
