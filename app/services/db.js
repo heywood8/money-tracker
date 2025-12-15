@@ -81,7 +81,7 @@ const initializeDatabase = async (rawDb, db) => {
     const existingTables = await rawDb.getAllAsync(
       'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name'
     );
-    console.log('Existing tables:', existingTables.map(t => t.name).join(', '));
+    console.log('Existing tables:', (existingTables || []).map(t => t.name).join(', '));
 
     // Check current migration state before running
     const drizzleMigrations = await rawDb.getAllAsync(
