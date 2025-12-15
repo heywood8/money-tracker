@@ -108,8 +108,8 @@ const isDatabaseCorrupted = async (rawDb) => {
 const initializeDatabase = async (rawDb, db) => {
   try {
     // Enable foreign keys and WAL mode
-    await rawDb.execAsync('PRAGMA foreign_keys = ON');
-    await rawDb.execAsync('PRAGMA journal_mode = WAL');
+    await rawDb.runAsync('PRAGMA foreign_keys = ON');
+    await rawDb.runAsync('PRAGMA journal_mode = WAL');
 
     console.log('Running Drizzle migrations...');
     console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));

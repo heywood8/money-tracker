@@ -822,8 +822,8 @@ const importBackupSQLite = async (fileUri) => {
     tempDrizzle = drizzle(tempDb, { schema: schema.default || schema });
 
     // Enable foreign keys and WAL mode
-    await tempDb.execAsync('PRAGMA foreign_keys = ON');
-    await tempDb.execAsync('PRAGMA journal_mode = WAL');
+    await tempDb.runAsync('PRAGMA foreign_keys = ON');
+    await tempDb.runAsync('PRAGMA journal_mode = WAL');
 
     // Run migrations on the imported database to bring it up to current schema
     console.log('Running migrations on imported database...');
