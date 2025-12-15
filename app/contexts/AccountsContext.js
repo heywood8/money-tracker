@@ -276,11 +276,11 @@ export const AccountsProvider = ({ children }) => {
 
   // Filter accounts based on hidden status
   const visibleAccounts = useMemo(() => {
-    return accounts.filter(account => !account.hidden);
+    return accounts.filter(account => !account?.hidden);
   }, [accounts]);
 
   const hiddenAccounts = useMemo(() => {
-    return accounts.filter(account => account.hidden);
+    return accounts.filter(account => account?.hidden);
   }, [accounts]);
 
   // Accounts to display based on showHiddenAccounts toggle

@@ -4,12 +4,18 @@ import journal from './meta/_journal.json';
 import m0000 from './0000_ambitious_meltdown.js';
 import m0001 from './0001_modern_lester.js';
 import m0002 from './0002_illegal_apocalypse.js';
+import m0003, { postMigration as m0003PostMigration } from './0003_slow_grandmaster.js';
 
 export default {
   journal,
   migrations: {
     m0000,
     m0001,
-    m0002
+    m0002,
+    m0003
+  },
+  postMigrationHandlers: {
+    m0003: m0003PostMigration
   }
-};
+}
+  
