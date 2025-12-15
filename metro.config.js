@@ -4,10 +4,13 @@ const {
 
 const config = getSentryExpoConfig(__dirname);
 
-// Add support for WASM files
+// Add support for WASM and SQL files
 config.resolver.assetExts = config.resolver.assetExts || [];
 if (!config.resolver.assetExts.includes('wasm')) {
   config.resolver.assetExts.push('wasm');
+}
+if (!config.resolver.assetExts.includes('sql')) {
+  config.resolver.assetExts.push('sql');
 }
 
 // Ensure wasm is not in sourceExts

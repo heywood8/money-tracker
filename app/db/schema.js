@@ -13,7 +13,7 @@ export const appMetadata = sqliteTable('app_metadata', {
  * Accounts table
  */
 export const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   balance: text('balance').notNull().default('0'),
   currency: text('currency').notNull().default('USD'),
