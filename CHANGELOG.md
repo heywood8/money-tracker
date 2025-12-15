@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1](https://github.com/heywood8/money-tracker/compare/penny-v0.15.0...penny-v0.15.1) (2025-12-15)
+
+
+### Bug Fixes
+
+* fasten the build ([40486f1](https://github.com/heywood8/money-tracker/commit/40486f17a6c3d296d01493e2b435d94743d85630))
+* trying to fix a corrupted database after migrations ([ece1814](https://github.com/heywood8/money-tracker/commit/ece1814ffcefabf1fe89121748f5409a8c69611b))
+
 ## [0.15.0](https://github.com/heywood8/money-tracker/compare/penny-v0.14.2...penny-v0.15.0) (2025-12-15)
 
 
