@@ -44,7 +44,7 @@ export const getAllOperations = async () => {
 
 /**
  * Get operation by ID
- * @param {string} id
+ * @param {number} id
  * @returns {Promise<Object|null>}
  */
 export const getOperationById = async (id) => {
@@ -168,14 +168,13 @@ const calculateBalanceChanges = (operation) => {
 
 /**
  * Create a new operation
- * @param {Object} operation - Operation data
+ * @param {Object} operation - Operation data (ID will be auto-generated)
  * @returns {Promise<Object>}
  */
 export const createOperation = async (operation) => {
   try {
     const now = new Date().toISOString();
     const operationData = {
-      id: operation.id,
       type: operation.type,
       amount: operation.amount,
       account_id: operation.accountId,
@@ -190,12 +189,13 @@ export const createOperation = async (operation) => {
       destination_currency: operation.destinationCurrency || null,
     };
 
+    let newOperationId;
+
     await executeTransaction(async (db) => {
-      // Insert operation
-      await db.runAsync(
-        'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      // Insert operation (ID will be auto-generated)
+      const result = await db.runAsync(
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
-          operationData.id,
           operationData.type,
           operationData.amount,
           operationData.account_id,
@@ -210,6 +210,10 @@ export const createOperation = async (operation) => {
           operationData.destination_currency,
         ]
       );
+
+      // Store the auto-generated ID
+      newOperationId = result.lastInsertRowId;
+      operationData.id = newOperationId;
 
       // Update account balances within the same transaction
       const balanceChanges = calculateBalanceChanges(operationData);
@@ -249,7 +253,7 @@ export const createOperation = async (operation) => {
 
 /**
  * Update an existing operation
- * @param {string} id
+ * @param {number} id
  * @param {Object} updates
  * @returns {Promise<void>}
  */
@@ -380,7 +384,7 @@ export const updateOperation = async (id, updates) => {
 
 /**
  * Delete an operation
- * @param {string} id
+ * @param {number} id
  * @returns {Promise<void>}
  */
 export const deleteOperation = async (id) => {
@@ -588,7 +592,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
 
 /**
  * Check if operation exists
- * @param {string} id
+ * @param {number} id
  * @returns {Promise<boolean>}
  */
 export const operationExists = async (id) => {
