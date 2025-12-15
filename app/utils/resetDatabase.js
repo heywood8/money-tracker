@@ -45,8 +45,8 @@ export const resetDatabase = async () => {
  */
 export const checkBudgetsTableExists = async () => {
   try {
-    const db = await getDatabase();
-    const result = await db.getFirstAsync(
+    const { raw } = await getDatabase();
+    const result = await raw.getFirstAsync(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'"
     );
     return result !== null;
@@ -63,8 +63,8 @@ export const checkBudgetsTableExists = async () => {
  */
 export const getDatabaseVersion = async () => {
   try {
-    const db = await getDatabase();
-    const result = await db.getFirstAsync(
+    const { raw } = await getDatabase();
+    const result = await raw.getFirstAsync(
       'SELECT value FROM app_metadata WHERE key = ?',
       ['db_version']
     );

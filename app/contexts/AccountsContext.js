@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import currencies from '../../assets/currencies.json';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
+import { dropAllTables, getDatabase, closeDatabase } from '../services/db';
+import { forceDeleteDatabase } from '../utils/emergencyReset';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
@@ -217,9 +219,29 @@ export const AccountsProvider = ({ children }) => {
       console.log('Emitting DATABASE_RESET event');
       appEvents.emit(EVENTS.DATABASE_RESET);
 
-      // Drop and reinitialize the database
-      const { dropAllTables, getDatabase, executeQuery } = await import('./services/db');
-      await dropAllTables();
+      try {
+        // Try normal reset first - drop all tables
+        console.log('Attempting normal database reset...');
+        await dropAllTables();
+        console.log('Tables dropped successfully');
+      } catch (dropError) {
+        console.warn('Normal reset failed, trying emergency reset...', dropError);
+
+        // If normal reset fails, use emergency nuclear option
+        try {
+          await closeDatabase();
+          const success = await forceDeleteDatabase();
+
+          if (!success) {
+            throw new Error('Emergency database deletion failed');
+          }
+
+          console.log('Emergency database deletion successful');
+        } catch (emergencyError) {
+          console.error('Emergency reset also failed:', emergencyError);
+          throw new Error(`Both normal and emergency reset failed: ${emergencyError.message}`);
+        }
+      }
 
       // Force re-initialization by getting database again
       // This will create all tables with proper schema
