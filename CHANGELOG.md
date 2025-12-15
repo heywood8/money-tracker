@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.2](https://github.com/heywood8/money-tracker/compare/penny-v0.14.1...penny-v0.14.2) (2025-12-15)
+
+
+### Bug Fixes
+
+* configure development and preview channels in eas.json ([9a70e41](https://github.com/heywood8/money-tracker/commit/9a70e416677217aeeb8d9715fefafb29976be8ed))
+* set SENTRY_AUTH_TOKEN ([33bfdc0](https://github.com/heywood8/money-tracker/commit/33bfdc0e3e7f3bb09a0c38129ce971d6bf4c4f27))
+
 ## [0.14.1](https://github.com/heywood8/money-tracker/compare/penny-v0.14.0...penny-v0.14.1) (2025-12-15)
 
 
