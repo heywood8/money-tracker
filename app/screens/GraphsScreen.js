@@ -648,7 +648,9 @@ const GraphsScreen = () => {
       // Map balance history to days
       const balanceByDay = {};
       dataPoints.forEach(point => {
-        const day = new Date(point.date).getDate();
+        // Extract day directly from date string to avoid timezone issues
+        // date format is "YYYY-MM-DD", so split and get the third part
+        const day = parseInt(point.date.split('-')[2], 10);
         balanceByDay[day] = point.balance;
       });
 
@@ -684,8 +686,29 @@ const GraphsScreen = () => {
         }));
       }
 
+      // Create forward-filled data for chart (to connect dots properly)
+      // This ensures the chart line is continuous up to current day only
+      const actualForChart = allDays.map(day => {
+        // Only include data up to current day
+        if (day > currentDay) return undefined;
+
+        // Find if we have data for this day
+        const point = actualData.find(p => p.x === day);
+        if (point) return point.y;
+
+        // Forward fill: use the most recent balance before this day
+        const priorPoints = actualData.filter(p => p.x < day);
+        if (priorPoints.length > 0) {
+          return priorPoints[priorPoints.length - 1].y;
+        }
+
+        // No data yet, return undefined (chart will skip this point)
+        return undefined;
+      });
+
       setBalanceHistoryData({
         actual: actualData,
+        actualForChart: actualForChart,
         trend: trendData,
         burndown: burndownData,
         labels: allDays,
@@ -1035,15 +1058,9 @@ const GraphsScreen = () => {
                       labels: balanceHistoryData.labels.map(d => d.toString()),
                       datasets: [
                         {
-                          data: balanceHistoryData.actual.map(p => p.y),
+                          data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
                           color: () => colors.primary,
                           strokeWidth: 3,
-                        },
-                        {
-                          data: balanceHistoryData.trend.map(p => p.y),
-                          color: () => 'rgba(75, 192, 192, 0.6)',
-                          strokeWidth: 2,
-                          withDots: false,
                         },
                         {
                           data: balanceHistoryData.burndown.map(p => p.y),
@@ -1052,7 +1069,7 @@ const GraphsScreen = () => {
                           withDots: false,
                         },
                       ],
-                      legend: [t('actual') || 'Actual', t('trend') || 'Trend', t('burndown') || 'Burndown'],
+                      legend: [t('actual') || 'Actual', t('burndown') || 'Burndown'],
                     }}
                     width={screenWidth - 64}
                     height={220}

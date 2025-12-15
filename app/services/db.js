@@ -77,6 +77,12 @@ const initializeDatabase = async (rawDb, db) => {
     console.log('Running Drizzle migrations...');
     console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
 
+    // Check existing tables
+    const existingTables = await rawDb.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name'
+    );
+    console.log('Existing tables:', existingTables.map(t => t.name).join(', '));
+
     // Check current migration state before running
     const drizzleMigrations = await rawDb.getAllAsync(
       'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
@@ -84,7 +90,8 @@ const initializeDatabase = async (rawDb, db) => {
 
     if (drizzleMigrations && drizzleMigrations.length > 0) {
       const appliedMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-      console.log('Previously applied migrations:', (appliedMigrations || []).map(m => `${m.hash}`).join(', ') || 'none');
+      const hashList = (appliedMigrations || []).map(m => m.hash || 'null').join(', ');
+      console.log('Previously applied migrations:', hashList || 'none');
     } else {
       console.log('No migrations table found - database will be migrated from scratch');
     }
@@ -98,7 +105,8 @@ const initializeDatabase = async (rawDb, db) => {
 
     // Log which migrations were applied
     const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-    console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
+    const finalHashList = (finalMigrations || []).map(m => m.hash || 'null').join(', ');
+    console.log('Migrations after running migrate:', finalHashList || 'none');
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
     // Run post-migration handlers for newly applied migrations
@@ -123,8 +131,23 @@ const initializeDatabase = async (rawDb, db) => {
 
     console.log('Database migrations completed successfully');
   } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
+    console.error('Failed to initialize database:', error);    console.error('Error details:', {
+      message: error.message,
+      cause: error.cause,
+      stack: error.stack
+    });
+    
+    // Log current database state for debugging
+    try {
+      const tables = await rawDb.getAllAsync('SELECT name FROM sqlite_master WHERE type="table"');
+      console.error('Current tables in database:', tables.map(t => t.name).join(', '));
+      
+      const migrationsCheck = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations').catch(() => []);
+      console.error('Current migration records:', migrationsCheck.length);
+    } catch (debugError) {
+      console.error('Could not retrieve debug info:', debugError.message);
+    }
+        throw error;
   }
 };
 

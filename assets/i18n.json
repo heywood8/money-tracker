@@ -582,7 +582,7 @@
     "balance_history": "История баланса",
     "actual": "Фактический",
     "trend": "Тренд",
-    "burndown": "Снижение",
+    "burndown": "Среднее",
     "no_balance_history": "Нет истории баланса за этот месяц",
     "balance_history_details": "Детали истории баланса",
     "actions": "Действия"

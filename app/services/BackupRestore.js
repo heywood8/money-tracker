@@ -315,17 +315,20 @@ export const restoreBackup = async (backup) => {
       await db.runAsync('DELETE FROM accounts');
       await db.runAsync('DELETE FROM app_metadata WHERE key != ?', ['db_version']);
 
-      console.log('Existing data cleared');
+      // Reset auto-increment counters to allow ID preservation
+      await db.runAsync('DELETE FROM sqlite_sequence WHERE name IN (?, ?)', ['accounts', 'operations']);
+
+      console.log('Existing data cleared and auto-increment counters reset');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
 
-      // Restore accounts - create mapping from old UUID IDs to new integer IDs
+      // Restore accounts - preserve integer IDs, map UUID IDs to new integers
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'accounts',
         status: 'in_progress',
         data: backup.data.accounts.length
       });
 
-      const accountIdMapping = new Map(); // old ID (UUID or integer) -> new integer ID
+      const accountIdMapping = new Map(); // old ID (UUID or integer) -> final integer ID
 
       for (const account of backup.data.accounts) {
         // Validate required fields
@@ -334,26 +337,50 @@ export const restoreBackup = async (backup) => {
           continue;
         }
 
-        // Omit id to let SQLite auto-generate integer ID
-        const result = await db.runAsync(
-          'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            account.name,
-            account.balance || '0',
-            account.currency || 'USD',
-            account.display_order ?? null,
-            account.hidden ?? 0,
-            account.monthly_target ?? null,
-            account.created_at || new Date().toISOString(),
-            account.updated_at || new Date().toISOString(),
-          ]
-        );
+        // Check if ID is a number (integer) or a string (UUID)
+        const isIntegerId = account.id != null && !isNaN(account.id);
 
-        // Map old ID (UUID or integer) to new integer ID
-        // Only create mapping if the original account had an ID
-        if (account.id != null) {
-          accountIdMapping.set(account.id, result.lastInsertRowId);
-          console.log(`Mapped account ID: ${account.id} -> ${result.lastInsertRowId}`);
+        let result;
+        if (isIntegerId) {
+          // Preserve the original integer ID
+          result = await db.runAsync(
+            'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              Number(account.id),
+              account.name,
+              account.balance || '0',
+              account.currency || 'USD',
+              account.display_order ?? null,
+              account.hidden ?? 0,
+              account.monthly_target ?? null,
+              account.created_at || new Date().toISOString(),
+              account.updated_at || new Date().toISOString(),
+            ]
+          );
+          // For integer IDs, no remapping needed - map to itself
+          accountIdMapping.set(account.id, Number(account.id));
+          console.log(`Preserved account ID: ${account.id}`);
+        } else {
+          // UUID or no ID - let SQLite auto-generate integer ID
+          result = await db.runAsync(
+            'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              account.name,
+              account.balance || '0',
+              account.currency || 'USD',
+              account.display_order ?? null,
+              account.hidden ?? 0,
+              account.monthly_target ?? null,
+              account.created_at || new Date().toISOString(),
+              account.updated_at || new Date().toISOString(),
+            ]
+          );
+
+          // Map UUID to new integer ID
+          if (account.id != null) {
+            accountIdMapping.set(account.id, result.lastInsertRowId);
+            console.log(`Mapped account ID: ${account.id} -> ${result.lastInsertRowId}`);
+          }
         }
       }
       console.log(`Restored ${backup.data.accounts.length} accounts with ID mapping`);
