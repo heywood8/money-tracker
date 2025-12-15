@@ -346,9 +346,11 @@ const OperationsScreen = () => {
     });
   }, [categoryNavigation.breadcrumb]);
 
-  const handleQuickAdd = useCallback(async () => {
+  const handleQuickAdd = useCallback(async (overrideCategoryId) => {
     const operationData = {
       ...quickAddValues,
+      // Use override categoryId if provided (for auto-add from category selection)
+      categoryId: overrideCategoryId !== undefined ? overrideCategoryId : quickAddValues.categoryId,
       date: new Date().toISOString().split('T')[0],
     };
 
@@ -826,13 +828,23 @@ const OperationsScreen = () => {
 
                   return (
                     <Pressable
-                      onPress={() => {
+                      onPress={async () => {
                         if (isFolder) {
                           // Navigate into folder
                           navigateIntoFolder(item);
                         } else {
-                          // Select entry category and keep picker open
+                          // Select entry category
                           setQuickAddValues(v => ({ ...v, categoryId: item.id }));
+                          closePicker();
+
+                          // Check if amount is valid and auto-add operation
+                          const hasValidAmount = quickAddValues.amount &&
+                            quickAddValues.amount.trim() !== '';
+
+                          if (hasValidAmount) {
+                            // Pass the selected categoryId directly to avoid race conditions
+                            await handleQuickAdd(item.id);
+                          }
                         }
                       }}
                       style={({ pressed }) => [
@@ -861,39 +873,8 @@ const OperationsScreen = () => {
                 </Text>
               }
             />
-            {/* Action buttons - different for category vs account/toAccount */}
-            {pickerState.type === 'category' ? (
-              <View style={styles.pickerActions}>
-                <TouchableOpacity
-                  style={[styles.pickerActionButton, styles.cancelButton, { borderColor: colors.border }]}
-                  onPress={closePicker}
-                >
-                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t('close')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerActionButton,
-                    styles.addButton,
-                    { backgroundColor: colors.primary },
-                    // Disable if no amount entered
-                    (!quickAddValues.amount || quickAddValues.amount.trim() === '') && styles.disabledButton,
-                  ]}
-                  onPress={() => {
-                    if (quickAddValues.amount && quickAddValues.amount.trim() !== '') {
-                      closePicker();
-                      // Automatically trigger add operation
-                      handleQuickAdd();
-                    }
-                  }}
-                  disabled={!quickAddValues.amount || quickAddValues.amount.trim() === ''}
-                >
-                  <Text style={[
-                    styles.addButtonText,
-                    (!quickAddValues.amount || quickAddValues.amount.trim() === '') && styles.disabledButtonText,
-                  ]}>{t('add')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
+            {/* Action buttons - only show Close button for non-category pickers */}
+            {pickerState.type !== 'category' && (
               <Pressable style={styles.closeButton} onPress={closePicker}>
                 <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
               </Pressable>
