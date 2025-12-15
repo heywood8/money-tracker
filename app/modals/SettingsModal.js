@@ -77,7 +77,7 @@ export default function SettingsModal({ visible, onClose }) {
       showDialog(
         t('backup_database') || 'Backup Database',
         t('backup_success') || 'Backup exported successfully',
-        [{ text: 'OK' }]
+        [{ text: 'OK', onPress: onClose }]
       );
     } catch (error) {
       console.error('Export backup error:', error);
@@ -89,7 +89,7 @@ export default function SettingsModal({ visible, onClose }) {
         [{ text: 'OK' }]
       );
     }
-  }, [closeExportFormatModal, t, showDialog]);
+  }, [closeExportFormatModal, t, showDialog, onClose]);
 
   const handleResetDatabase = () => {
     showDialog(
