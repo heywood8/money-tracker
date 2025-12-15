@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/heywood8/money-tracker/compare/penny-v0.14.2...penny-v0.15.0) (2025-12-15)
+
+
+### Features
+
+* reintroducing balance history ([#118](https://github.com/heywood8/money-tracker/issues/118)) ([beba1ec](https://github.com/heywood8/money-tracker/commit/beba1ecc22a39797fe358fca41d3eb85ca12f64e))
+
+
+### Bug Fixes
+
+* broken migrations ([2f77d78](https://github.com/heywood8/money-tracker/commit/2f77d78626ca5b7a6bd9c30c3e5d80f8b2fe44f8))
+
 ## [0.14.2](https://github.com/heywood8/money-tracker/compare/penny-v0.14.1...penny-v0.14.2) (2025-12-15)
 
 
