@@ -107,10 +107,6 @@ const isDatabaseCorrupted = async (rawDb) => {
  */
 const initializeDatabase = async (rawDb, db) => {
   try {
-    // Enable foreign keys and WAL mode
-    await rawDb.runAsync('PRAGMA foreign_keys = ON');
-    await rawDb.runAsync('PRAGMA journal_mode = WAL');
-
     console.log('Running Drizzle migrations...');
     console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
 
@@ -127,14 +123,14 @@ const initializeDatabase = async (rawDb, db) => {
       console.warn('This will reset all data. To avoid this, please use Settings > Reset Database before updating the app.');
 
       // Drop all tables and start fresh
-      await rawDb.execAsync('PRAGMA foreign_keys = OFF');
+      await rawDb.runAsync('PRAGMA foreign_keys = OFF');
       const tables = await rawDb.getAllAsync(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
       );
       for (const table of tables) {
-        await rawDb.execAsync(`DROP TABLE IF EXISTS "${table.name}"`);
+        await rawDb.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
       }
-      await rawDb.execAsync('PRAGMA foreign_keys = ON');
+      await rawDb.runAsync('PRAGMA foreign_keys = ON');
       console.log('All tables dropped for recovery');
     }
 
@@ -157,6 +153,10 @@ const initializeDatabase = async (rawDb, db) => {
 
     // Run Drizzle migrations
     await migrate(db, migrations);
+
+    // Enable foreign keys and WAL mode after migrations
+    await rawDb.runAsync('PRAGMA foreign_keys = ON');
+    await rawDb.runAsync('PRAGMA journal_mode = WAL');
 
     // Log which migrations were applied
     const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
@@ -343,7 +343,7 @@ export const dropAllTables = async () => {
     }
 
     // Disable foreign keys temporarily
-    await raw.execAsync('PRAGMA foreign_keys = OFF');
+    await raw.runAsync('PRAGMA foreign_keys = OFF');
 
     // Get all table names
     const tables = await raw.getAllAsync(
@@ -354,12 +354,12 @@ export const dropAllTables = async () => {
 
     // Drop each table (including migrations)
     for (const table of tables) {
-      await raw.execAsync(`DROP TABLE IF EXISTS "${table.name}"`);
+      await raw.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
       console.log(`Dropped table: ${table.name}`);
     }
 
     // Re-enable foreign keys
-    await raw.execAsync('PRAGMA foreign_keys = ON');
+    await raw.runAsync('PRAGMA foreign_keys = ON');
 
     console.log('All tables dropped successfully');
 

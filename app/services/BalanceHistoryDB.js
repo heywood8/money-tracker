@@ -103,67 +103,13 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
 
 /**
  * Snapshot previous day's balances for all accounts
- * Called on app opening
- * Only creates snapshots if balance changed since last entry
+ * DISABLED: This functionality has been removed
  *
  * @returns {Promise<void>}
  */
 export const snapshotPreviousDayBalances = async () => {
-  try {
-    // Calculate yesterday's date in YYYY-MM-DD
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = formatDate(yesterday);
-
-    // Get all accounts
-    const accounts = await AccountsDB.getAllAccounts();
-
-    await executeTransaction(async (db) => {
-      for (const account of accounts) {
-        // Get last snapshot for this account
-        const lastSnapshot = await db.getFirstAsync(
-          'SELECT date, balance FROM accounts_balance_history WHERE account_id = ? ORDER BY date DESC LIMIT 1',
-          [account.id]
-        );
-
-        // Calculate yesterday's end-of-day balance (pass db instance)
-        const yesterdayBalance = await calculateBalanceOnDate(account.id, yesterdayStr, db);
-
-        // Skip if:
-        // 1. Last snapshot is already for yesterday or later
-        // 2. Balance hasn't changed since last snapshot
-        if (lastSnapshot) {
-          if (lastSnapshot.date >= yesterdayStr) {
-            continue; // Already have snapshot for this date
-          }
-          if (lastSnapshot.balance === yesterdayBalance) {
-            continue; // Balance unchanged
-          }
-        }
-
-        // Create snapshot
-        await db.runAsync(
-          'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
-          [account.id, yesterdayStr, yesterdayBalance, new Date().toISOString()]
-        );
-      }
-    });
-
-    console.log('Previous day balance snapshots created successfully');
-  } catch (error) {
-    // Gracefully handle transaction errors - can happen if called during an import or migration
-    if (error.message && (
-      error.message.includes('transaction within a transaction') ||
-      error.message.includes('cannot rollback') ||
-      error.message.includes('no transaction is active')
-    )) {
-      console.log('Skipping balance snapshot - transaction conflict detected');
-      return;
-    }
-    console.error('Failed to snapshot previous day balances:', error);
-    // Don't throw - this is a background operation that shouldn't crash the app
-  }
+  // Functionality removed - no-op
+  return;
 };
 
 /**

@@ -196,35 +196,7 @@ export const OperationsProvider = ({ children }) => {
     return unsubscribe;
   }, [reloadOperations]);
 
-  // Track app state changes for balance snapshots
-  useEffect(() => {
-    const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (nextAppState === 'active') {
-        // App came to foreground - snapshot previous day
-        try {
-          const BalanceHistoryDB = await import('../services/BalanceHistoryDB');
-          await BalanceHistoryDB.snapshotPreviousDayBalances();
-        } catch (error) {
-          console.error('Failed to snapshot balances on app open:', error);
-          // Don't crash - non-critical background operation
-        }
-      }
-    });
-
-    // Also run on initial mount
-    (async () => {
-      try {
-        const BalanceHistoryDB = await import('../services/BalanceHistoryDB');
-        await BalanceHistoryDB.snapshotPreviousDayBalances();
-      } catch (error) {
-        console.error('Failed to snapshot balances on initial load:', error);
-      }
-    })();
-
-    return () => {
-      appStateSubscription.remove();
-    };
-  }, []);
+  // Balance snapshots functionality removed - no longer needed
 
   const addOperation = useCallback(async (operation) => {
     try {
