@@ -506,7 +506,7 @@ export default function AccountsScreen() {
                 value={editValues.name}
                 onChangeText={handleNameChange}
                 error={!!errors.name}
-                autoFocus
+                autoFocus={editingId === 'new'}
                 returnKeyType="next"
                 onSubmitEditing={() => balanceInputRef.current?.focus()}
                 blurOnSubmit={false}
