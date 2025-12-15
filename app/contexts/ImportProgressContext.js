@@ -50,12 +50,7 @@ export const ImportProgressProvider = ({ children }) => {
   const completeImport = useCallback(() => {
     setCurrentStep('complete');
     updateStep('complete', 'completed');
-    // Don't close immediately, let the user see the success state
-    setTimeout(() => {
-      setIsImporting(false);
-      setSteps([]);
-      setCurrentStep(null);
-    }, 1000);
+    // Don't auto-close - wait for user to press OK button
   }, [updateStep]);
 
   const cancelImport = useCallback(() => {
@@ -73,6 +68,12 @@ export const ImportProgressProvider = ({ children }) => {
     return unsubscribe;
   }, [updateStep]);
 
+  const finishImport = useCallback(() => {
+    setIsImporting(false);
+    setSteps([]);
+    setCurrentStep(null);
+  }, []);
+
   const value = {
     isImporting,
     steps,
@@ -81,6 +82,7 @@ export const ImportProgressProvider = ({ children }) => {
     updateStep,
     completeImport,
     cancelImport,
+    finishImport,
   };
 
   return (
