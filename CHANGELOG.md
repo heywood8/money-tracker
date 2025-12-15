@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/heywood8/money-tracker/compare/penny-v0.13.0...penny-v0.14.0) (2025-12-15)
+
+
+### Features
+
+* add theme toggle icon to header ([#111](https://github.com/heywood8/money-tracker/issues/111)) ([e2c94eb](https://github.com/heywood8/money-tracker/commit/e2c94eb46f1d0d3f9326ce82f9a2c71789ba0811))
+* backup import progress ([#112](https://github.com/heywood8/money-tracker/issues/112)) ([a659fd7](https://github.com/heywood8/money-tracker/commit/a659fd739651d74750f0705cb38a435c4d7d90dc))
+
+
+### Bug Fixes
+
+* cleanup old database migrations ([#109](https://github.com/heywood8/money-tracker/issues/109)) ([ed71a5a](https://github.com/heywood8/money-tracker/commit/ed71a5a8b4e8044af8fb764ccc691f2293f76ccf))
+* crashes ([bc710bb](https://github.com/heywood8/money-tracker/commit/bc710bb74c0cead1597fa08ac83402fec70a1c8c))
+* docs and proper migration on db import ([b2f6354](https://github.com/heywood8/money-tracker/commit/b2f6354dd794a834605f03ba45a64efc7e57a47a))
+* turn .sql files into .js files ([b0d21f0](https://github.com/heywood8/money-tracker/commit/b0d21f07fd53336dd1ea66d8090530c363903621))
+
 ## [0.13.0](https://github.com/heywood8/money-tracker/compare/penny-v0.12.0...penny-v0.13.0) (2025-12-12)
 
 
