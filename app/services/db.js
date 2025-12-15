@@ -89,6 +89,10 @@ const initializeDatabase = async (rawDb, db) => {
       console.log('No migrations table found - database will be migrated from scratch');
     }
 
+    // Get migrations before applying
+    const migrationsBefore = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
+    const appliedHashesBefore = new Set((migrationsBefore || []).map(m => m.hash));
+
     // Run Drizzle migrations
     await migrate(db, migrations);
 
@@ -97,25 +101,22 @@ const initializeDatabase = async (rawDb, db) => {
     console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
-    // Check if balance history table exists and is empty (first-time migration)
-    const historyExists = await rawDb.getAllAsync(
-      'SELECT name FROM sqlite_master WHERE type="table" AND name="accounts_balance_history"'
-    );
-
-    if (historyExists && historyExists.length > 0) {
-      const historyCount = await rawDb.getFirstAsync(
-        'SELECT COUNT(*) as count FROM accounts_balance_history'
-      );
-
-      if (historyCount && historyCount.count === 0) {
-        console.log('Balance history table is empty - populating current month...');
-        try {
-          const BalanceHistoryDB = require('./BalanceHistoryDB');
-          await BalanceHistoryDB.populateCurrentMonthHistory();
-          console.log('Current month balance history populated successfully');
-        } catch (populateError) {
-          console.error('Failed to populate balance history:', populateError);
-          // Don't throw - allow app to continue
+    // Run post-migration handlers for newly applied migrations
+    if (migrations.postMigrationHandlers) {
+      const appliedHashesAfter = new Set((finalMigrations || []).map(m => m.hash));
+      
+      for (const [key, handler] of Object.entries(migrations.postMigrationHandlers)) {
+        // Find the migration hash for this key (e.g., m0003 -> hash)
+        const migrationEntry = migrations.journal.entries.find(e => e.tag.includes(key.replace('m', '')));
+        
+        if (migrationEntry && appliedHashesAfter.has(migrationEntry.hash) && !appliedHashesBefore.has(migrationEntry.hash)) {
+          console.log(`Running post-migration handler for ${key}...`);
+          try {
+            await handler(rawDb);
+          } catch (handlerError) {
+            console.error(`Post-migration handler ${key} failed:`, handlerError);
+            // Don't throw - allow app to continue
+          }
         }
       }
     }

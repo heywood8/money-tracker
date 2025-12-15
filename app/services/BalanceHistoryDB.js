@@ -29,24 +29,50 @@ const formatDate = (date) => {
  *
  * @param {number} accountId
  * @param {string} targetDate - YYYY-MM-DD format
+ * @param {Object} db - Optional database instance (for use within transactions)
  * @returns {Promise<string>} Balance as string
  */
-const calculateBalanceOnDate = async (accountId, targetDate) => {
+const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
   try {
     // Get current balance
-    const account = await AccountsDB.getAccountById(accountId);
+    let account;
+    if (db) {
+      // Use provided db instance (within transaction)
+      const result = await db.getAllAsync(
+        'SELECT * FROM accounts WHERE id = ? LIMIT 1',
+        [accountId]
+      );
+      account = result && result.length > 0 ? result[0] : null;
+    } else {
+      // Use external function (outside transaction)
+      account = await AccountsDB.getAccountById(accountId);
+    }
+
     if (!account) return '0';
 
     let currentBalance = account.balance;
 
     // Get all operations after target date (these need to be reversed)
-    const operations = await queryAll(
-      `SELECT * FROM operations
-       WHERE (account_id = ? OR to_account_id = ?)
-         AND date > ?
-       ORDER BY date DESC, created_at DESC`,
-      [accountId, accountId, targetDate]
-    );
+    let operations;
+    if (db) {
+      // Use provided db instance (within transaction)
+      operations = await db.getAllAsync(
+        `SELECT * FROM operations
+         WHERE (account_id = ? OR to_account_id = ?)
+           AND date > ?
+         ORDER BY date DESC, created_at DESC`,
+        [accountId, accountId, targetDate]
+      );
+    } else {
+      // Use external function (outside transaction)
+      operations = await queryAll(
+        `SELECT * FROM operations
+         WHERE (account_id = ? OR to_account_id = ?)
+           AND date > ?
+         ORDER BY date DESC, created_at DESC`,
+        [accountId, accountId, targetDate]
+      );
+    }
 
     // Reverse each operation to get balance on target date
     for (const op of operations) {
@@ -101,8 +127,8 @@ export const snapshotPreviousDayBalances = async () => {
           [account.id]
         );
 
-        // Calculate yesterday's end-of-day balance
-        const yesterdayBalance = await calculateBalanceOnDate(account.id, yesterdayStr);
+        // Calculate yesterday's end-of-day balance (pass db instance)
+        const yesterdayBalance = await calculateBalanceOnDate(account.id, yesterdayStr, db);
 
         // Skip if:
         // 1. Last snapshot is already for yesterday or later
@@ -126,18 +152,31 @@ export const snapshotPreviousDayBalances = async () => {
 
     console.log('Previous day balance snapshots created successfully');
   } catch (error) {
+    // Gracefully handle transaction errors - can happen if called during an import or migration
+    if (error.message && (
+      error.message.includes('transaction within a transaction') ||
+      error.message.includes('cannot rollback') ||
+      error.message.includes('no transaction is active')
+    )) {
+      console.log('Skipping balance snapshot - transaction conflict detected');
+      return;
+    }
     console.error('Failed to snapshot previous day balances:', error);
     // Don't throw - this is a background operation that shouldn't crash the app
   }
 };
 
 /**
- * Populate current month's balance history during migration
+ * Populate current month's balance history
  * Works backwards from today to beginning of month
+ * 
+ * NOTE: This is now handled by migration 0003's post-migration handler.
+ * This function remains for manual re-population if needed.
  *
+ * @param {Object} providedDb - Optional database instance (for use within existing transaction)
  * @returns {Promise<void>}
  */
-export const populateCurrentMonthHistory = async () => {
+export const populateCurrentMonthHistory = async (providedDb = null) => {
   try {
     // Get first day of current month
     const now = new Date();
@@ -145,23 +184,15 @@ export const populateCurrentMonthHistory = async () => {
     const firstDayStr = formatDate(firstDayOfMonth);
     const todayStr = formatDate(now);
 
-    // Get all accounts
-    const accounts = await AccountsDB.getAllAccounts();
+    // Define the population logic
+    const populateLogic = async (db) => {
+      // Get all accounts (use db parameter directly)
+      const accounts = await db.getAllAsync('SELECT * FROM accounts ORDER BY display_order ASC, created_at DESC');
 
-    await executeTransaction(async (db) => {
       for (const account of accounts) {
         // Get account creation date
         const accountCreatedDate = account.created_at ? new Date(account.created_at) : firstDayOfMonth;
         const startDate = accountCreatedDate > firstDayOfMonth ? formatDate(accountCreatedDate) : firstDayStr;
-
-        // Get all operations for this account from start to today (DESC)
-        const operations = await queryAll(
-          `SELECT * FROM operations
-           WHERE (account_id = ? OR to_account_id = ?)
-             AND date >= ? AND date <= ?
-           ORDER BY date DESC, created_at DESC`,
-          [account.id, account.id, startDate, todayStr]
-        );
 
         // Build list of dates to snapshot (working backwards from today)
         const datesToSnapshot = [];
@@ -176,12 +207,11 @@ export const populateCurrentMonthHistory = async () => {
         }
 
         // Calculate balance for each date and create snapshots
-        let currentBalance = account.balance;
         let lastSnapshotBalance = null;
 
         for (const targetDate of datesToSnapshot) {
-          // Calculate balance on this date
-          const balanceOnDate = await calculateBalanceOnDate(account.id, targetDate);
+          // Calculate balance on this date (pass db instance)
+          const balanceOnDate = await calculateBalanceOnDate(account.id, targetDate, db);
 
           // Only create snapshot if balance changed
           if (lastSnapshotBalance === null || lastSnapshotBalance !== balanceOnDate) {
@@ -193,11 +223,33 @@ export const populateCurrentMonthHistory = async () => {
           }
         }
       }
-    });
+    };
+
+    // If a database instance is provided, use it directly (already outside a transaction context)
+    if (providedDb) {
+      await populateLogic(providedDb);
+    } else {
+      // Otherwise, create our own transaction
+      await executeTransaction(populateLogic);
+    }
 
     console.log('Current month balance history populated successfully');
   } catch (error) {
+    // Gracefully handle transaction errors - can happen during concurrent operations
+    if (error.message && (
+      error.message.includes('transaction within a transaction') ||
+      error.message.includes('cannot rollback') ||
+      error.message.includes('no transaction is active')
+    )) {
+      console.log('Skipping balance history population - transaction conflict detected');
+      return;
+    }
     console.error('Failed to populate current month history:', error);
+    // Don't throw from migration context - allow app to continue
+    if (providedDb) {
+      console.warn('Population failed during migration, but continuing...');
+      return;
+    }
     throw error;
   }
 };
