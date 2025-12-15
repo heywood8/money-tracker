@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.16.0](https://github.com/heywood8/money-tracker/compare/penny-v0.15.1...penny-v0.16.0) (2025-12-15)
+
+
+### Features
+
+* fast add operation on category select ([2198cce](https://github.com/heywood8/money-tracker/commit/2198cce792d6dd0fa89f72fd26ce74d0aeaa63ec))
+
+
+### Bug Fixes
+
+* close settings window automatically after backup creation ([e92b685](https://github.com/heywood8/money-tracker/commit/e92b685b79996f8fe0b166e85b8aca417054e273))
+* database import errors ([1433246](https://github.com/heywood8/money-tracker/commit/1433246697516fac2f0198a5779088843a3437c8))
+* remove autofocus on account name when editing an account ([b776ab1](https://github.com/heywood8/money-tracker/commit/b776ab1a63addb2a614eb7601aaa90a21a58c2b1))
+* remove extra modal after db import ([f93ca09](https://github.com/heywood8/money-tracker/commit/f93ca099934fc15ede28ccee24163ecba696259f))
+* tests with mockdb ([1b56170](https://github.com/heywood8/money-tracker/commit/1b56170fc7c28e5a624640741a7d854ad09ca8e0))
+
 ## [0.15.1](https://github.com/heywood8/money-tracker/compare/penny-v0.15.0...penny-v0.15.1) (2025-12-15)
 
 
