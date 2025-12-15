@@ -804,7 +804,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
                   return (
                     <Pressable
-                      onPress={() => {
+                      onPress={async () => {
                         if (isFolder) {
                           // Navigate into folder
                           navigateIntoFolder(item);
@@ -812,6 +812,58 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                           // Select entry category
                           setValues(v => ({ ...v, categoryId: item.id }));
                           closePicker();
+
+                          // Only auto-add for new operations, not when editing
+                          if (isNew) {
+                            // Check if amount is valid and auto-save
+                            const hasValidAmount = values.amount &&
+                              !isNaN(parseFloat(values.amount)) &&
+                              parseFloat(values.amount) > 0;
+
+                            if (hasValidAmount) {
+                              // Small delay to ensure state is updated
+                              setTimeout(async () => {
+                                // Validate all fields with the new category
+                                const tempValues = { ...values, categoryId: item.id };
+                                const newErrors = {};
+
+                                if (!tempValues.type) {
+                                  newErrors.type = t('operation_type_required');
+                                }
+
+                                if (!tempValues.amount || isNaN(parseFloat(tempValues.amount)) || parseFloat(tempValues.amount) <= 0) {
+                                  newErrors.amount = t('valid_amount_required');
+                                }
+
+                                if (!tempValues.accountId) {
+                                  newErrors.accountId = t('account_required');
+                                }
+
+                                if (!tempValues.categoryId) {
+                                  newErrors.categoryId = t('category_required');
+                                }
+
+                                if (!tempValues.date) {
+                                  newErrors.date = t('date_required');
+                                }
+
+                                // If all fields are valid, save automatically
+                                if (Object.keys(newErrors).length === 0) {
+                                  const operationData = prepareOperationData();
+                                  operationData.categoryId = item.id; // Ensure the category is set
+
+                                  await addOperation(operationData);
+
+                                  // Save last accessed account
+                                  if (operationData.accountId) {
+                                    setLastAccessedAccount(operationData.accountId);
+                                  }
+
+                                  onClose();
+                                }
+                              }, 100);
+                            }
+                          }
                         }
                       }}
                       style={({ pressed }) => [
@@ -838,9 +890,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                 </Text>
               }
             />
-            <Pressable style={styles.closeButton} onPress={closePicker}>
-              <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
-            </Pressable>
+            {/* Show Close button for non-category pickers OR when editing operations */}
+            {(pickerState.type !== 'category' || !isNew) && (
+              <Pressable style={styles.closeButton} onPress={closePicker}>
+                <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('close')}</Text>
+              </Pressable>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
