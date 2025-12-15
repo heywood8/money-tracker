@@ -57,7 +57,6 @@ export const createAccount = async (account) => {
     const newOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
 
     const accountData = {
-      id: account.id,
       name: account.name,
       balance: account.balance || '0',
       currency: account.currency || 'USD',
@@ -68,9 +67,9 @@ export const createAccount = async (account) => {
       updatedAt: now,
     };
 
-    await db.insert(accounts).values(accountData);
+    const result = await db.insert(accounts).values(accountData).returning();
 
-    return accountData;
+    return result[0];
   } catch (error) {
     console.error('Failed to create account:', error);
     throw error;

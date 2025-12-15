@@ -319,9 +319,15 @@ export const restoreBackup = async (backup) => {
         data: backup.data.accounts.length
       });
 
-      const accountIdMapping = new Map(); // old UUID -> new integer ID
+      const accountIdMapping = new Map(); // old ID (UUID or integer) -> new integer ID
 
       for (const account of backup.data.accounts) {
+        // Validate required fields
+        if (!account.name) {
+          console.error('Skipping account with missing name:', account);
+          continue;
+        }
+
         // Omit id to let SQLite auto-generate integer ID
         const result = await db.runAsync(
           'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -332,13 +338,17 @@ export const restoreBackup = async (backup) => {
             account.display_order ?? null,
             account.hidden ?? 0,
             account.monthly_target ?? null,
-            account.created_at,
-            account.updated_at,
+            account.created_at || new Date().toISOString(),
+            account.updated_at || new Date().toISOString(),
           ]
         );
 
-        // Map old UUID to new integer ID
-        accountIdMapping.set(account.id, result.lastInsertRowId);
+        // Map old ID (UUID or integer) to new integer ID
+        // Only create mapping if the original account had an ID
+        if (account.id != null) {
+          accountIdMapping.set(account.id, result.lastInsertRowId);
+          console.log(`Mapped account ID: ${account.id} -> ${result.lastInsertRowId}`);
+        }
       }
       console.log(`Restored ${backup.data.accounts.length} accounts with ID mapping`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -354,6 +364,12 @@ export const restoreBackup = async (backup) => {
         data: backup.data.categories.length
       });
       for (const category of backup.data.categories) {
+        // Validate required fields
+        if (!category.id || !category.name) {
+          console.error('Skipping category with missing id or name:', category);
+          continue;
+        }
+
         await db.runAsync(
           'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
@@ -366,8 +382,8 @@ export const restoreBackup = async (backup) => {
             category.color || null,
             category.is_shadow || 0,
             category.exclude_from_forecast || 0,
-            category.created_at,
-            category.updated_at,
+            category.created_at || new Date().toISOString(),
+            category.updated_at || new Date().toISOString(),
           ]
         );
       }
@@ -385,23 +401,38 @@ export const restoreBackup = async (backup) => {
         data: backup.data.operations.length
       });
       for (const operation of backup.data.operations) {
-        // Map account IDs from old UUID to new integer
-        const mappedAccountId = accountIdMapping.get(operation.account_id) ?? operation.account_id;
-        const mappedToAccountId = operation.to_account_id
-          ? (accountIdMapping.get(operation.to_account_id) ?? operation.to_account_id)
-          : null;
+        // Map account IDs from old ID to new integer ID
+        // First check if we have a mapping, otherwise use the original value
+        let mappedAccountId = accountIdMapping.get(operation.account_id);
+        if (mappedAccountId === undefined) {
+          mappedAccountId = operation.account_id;
+        }
+        
+        // Validate that account_id is not null/undefined
+        if (mappedAccountId == null) {
+          console.error(`Skipping operation with null account_id:`, operation);
+          continue;
+        }
+
+        let mappedToAccountId = null;
+        if (operation.to_account_id != null) {
+          mappedToAccountId = accountIdMapping.get(operation.to_account_id);
+          if (mappedToAccountId === undefined) {
+            mappedToAccountId = operation.to_account_id;
+          }
+        }
 
         // Note: id is omitted as it's now auto-increment integer
         await db.runAsync(
           'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
-            operation.type,
-            operation.amount,
+            operation.type || 'expense',
+            operation.amount || '0',
             mappedAccountId,
             operation.category_id || null,
             mappedToAccountId,
-            operation.date,
-            operation.created_at,
+            operation.date || new Date().toISOString(),
+            operation.created_at || new Date().toISOString(),
             operation.description || null,
             operation.exchange_rate || null,
             operation.destination_amount || null,
@@ -425,6 +456,12 @@ export const restoreBackup = async (backup) => {
           data: backup.data.budgets.length
         });
         for (const budget of backup.data.budgets) {
+          // Validate required fields
+          if (!budget.id || !budget.category_id || !budget.amount || !budget.currency) {
+            console.error('Skipping budget with missing required fields:', budget);
+            continue;
+          }
+
           await db.runAsync(
             'INSERT INTO budgets (id, category_id, amount, currency, period_type, start_date, end_date, is_recurring, rollover_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
@@ -432,13 +469,13 @@ export const restoreBackup = async (backup) => {
               budget.category_id,
               budget.amount,
               budget.currency,
-              budget.period_type,
-              budget.start_date,
+              budget.period_type || 'monthly',
+              budget.start_date || new Date().toISOString(),
               budget.end_date || null,
               budget.is_recurring ?? 1,
               budget.rollover_enabled ?? 0,
-              budget.created_at,
-              budget.updated_at,
+              budget.created_at || new Date().toISOString(),
+              budget.updated_at || new Date().toISOString(),
             ]
           );
         }
