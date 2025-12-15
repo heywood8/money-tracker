@@ -54,7 +54,7 @@ export const categories = sqliteTable('categories', {
  * Operations table
  */
 export const operations = sqliteTable('operations', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey({ autoIncrement: true }),
   type: text('type', { enum: ['expense', 'income', 'transfer'] }).notNull(),
   amount: text('amount').notNull(),
   accountId: text('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),

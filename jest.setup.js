@@ -41,6 +41,24 @@ jest.mock('expo-sqlite', () => ({
   })),
 }));
 
+// Mock Drizzle migrations
+jest.mock('./drizzle/migrations', () => ({
+  __esModule: true,
+  default: {
+    journal: {
+      version: '7',
+      dialect: 'sqlite',
+      entries: []
+    },
+    migrations: {}
+  }
+}));
+
+// Mock drizzle-orm migrator
+jest.mock('drizzle-orm/expo-sqlite/migrator', () => ({
+  migrate: jest.fn(() => Promise.resolve()),
+}));
+
 // Mock drizzle-orm
 jest.mock('drizzle-orm/expo-sqlite', () => ({
   drizzle: jest.fn((db, config) => {
