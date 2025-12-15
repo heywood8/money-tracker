@@ -211,9 +211,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - Database configuration
 
 **Files:**
-- `client.js` - Database client initialization
-- `migrate.js` - Drizzle migration utilities
-- `schema.js` - Drizzle table definitions
+- `schema.js` - Unified database schema and migration utilities
 
 **Guidelines:**
 - Keep schema definitions centralized

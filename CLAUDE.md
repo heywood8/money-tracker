@@ -48,7 +48,7 @@ The app follows a feature-based organization under the `app/` directory:
   - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
 
 - **db/** (3 files) - Database configuration and schema
-  - `client.js`, `migrate.js`, `schema.js`
+  - `schema.js` (replaces `client.js` and `migrate.js` for database operations)
 
 - **defaults/** (2 files) - Default/seed data
   - `defaultAccounts.js`, `defaultCategories.json`
