@@ -284,7 +284,14 @@
     "no_operations_matching_filters": "No operations match your filters",
     "clear_filters": "Clear Filters",
     "select_all": "Select All",
-    "deselect_all": "Deselect All"
+    "deselect_all": "Deselect All",
+    "balance_history": "Balance History",
+    "actual": "Actual",
+    "trend": "Trend",
+    "burndown": "Burndown",
+    "no_balance_history": "No balance history available for this month",
+    "balance_history_details": "Balance History Details",
+    "actions": "Actions"
   },
   "ru": {
     "accounts": "Счета",
@@ -571,7 +578,14 @@
     "no_operations_matching_filters": "Нет операций, соответствующих фильтрам",
     "clear_filters": "Очистить фильтры",
     "select_all": "Выбрать все",
-    "deselect_all": "Снять все"
+    "deselect_all": "Снять все",
+    "balance_history": "История баланса",
+    "actual": "Фактический",
+    "trend": "Тренд",
+    "burndown": "Снижение",
+    "no_balance_history": "Нет истории баланса за этот месяц",
+    "balance_history_details": "Детали истории баланса",
+    "actions": "Действия"
   },
   "es": {
     "accounts": "Cuentas",
@@ -858,7 +872,14 @@
     "no_operations_matching_filters": "Ninguna operación coincide con tus filtros",
     "clear_filters": "Borrar filtros",
     "select_all": "Seleccionar todo",
-    "deselect_all": "Deselect. todo"
+    "deselect_all": "Deselect. todo",
+    "balance_history": "Historial de saldo",
+    "actual": "Real",
+    "trend": "Tendencia",
+    "burndown": "Reducción",
+    "no_balance_history": "No hay historial de saldo disponible para este mes",
+    "balance_history_details": "Detalles del historial de saldo",
+    "actions": "Acciones"
   },
   "fr": {
     "accounts": "Comptes",
@@ -1145,7 +1166,14 @@
     "no_operations_matching_filters": "Aucune opération ne correspond à vos filtres",
     "clear_filters": "Effacer les filtres",
     "select_all": "Tout sélectionner",
-    "deselect_all": "Tout désélectionner"
+    "deselect_all": "Tout désélectionner",
+    "balance_history": "Historique du solde",
+    "actual": "Réel",
+    "trend": "Tendance",
+    "burndown": "Diminution",
+    "no_balance_history": "Aucun historique de solde disponible pour ce mois",
+    "balance_history_details": "Détails de l'historique du solde",
+    "actions": "Actions"
   },
   "zh": {
     "accounts": "账户",
@@ -1432,7 +1460,14 @@
     "no_operations_matching_filters": "没有符合筛选条件的操作",
     "clear_filters": "清除筛选器",
     "select_all": "全选",
-    "deselect_all": "取消全选"
+    "deselect_all": "取消全选",
+    "balance_history": "余额历史",
+    "actual": "实际",
+    "trend": "趋势",
+    "burndown": "消耗",
+    "no_balance_history": "本月没有可用的余额历史",
+    "balance_history_details": "余额历史详情",
+    "actions": "操作"
   },
   "de": {
     "accounts": "Konten",
@@ -1719,7 +1754,14 @@
     "no_operations_matching_filters": "Keine Vorgänge entsprechen Ihren Filtern",
     "clear_filters": "Filter löschen",
     "select_all": "Alle auswählen",
-    "deselect_all": "Alle abwählen"
+    "deselect_all": "Alle abwählen",
+    "balance_history": "Saldohistorie",
+    "actual": "Tatsächlich",
+    "trend": "Trend",
+    "burndown": "Abbau",
+    "no_balance_history": "Keine Saldohistorie für diesen Monat verfügbar",
+    "balance_history_details": "Saldohistorie Details",
+    "actions": "Aktionen"
   }
 }
 

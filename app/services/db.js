@@ -97,6 +97,29 @@ const initializeDatabase = async (rawDb, db) => {
     console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
+    // Check if balance history table exists and is empty (first-time migration)
+    const historyExists = await rawDb.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="accounts_balance_history"'
+    );
+
+    if (historyExists && historyExists.length > 0) {
+      const historyCount = await rawDb.getFirstAsync(
+        'SELECT COUNT(*) as count FROM accounts_balance_history'
+      );
+
+      if (historyCount && historyCount.count === 0) {
+        console.log('Balance history table is empty - populating current month...');
+        try {
+          const BalanceHistoryDB = require('./BalanceHistoryDB');
+          await BalanceHistoryDB.populateCurrentMonthHistory();
+          console.log('Current month balance history populated successfully');
+        } catch (populateError) {
+          console.error('Failed to populate balance history:', populateError);
+          // Don't throw - allow app to continue
+        }
+      }
+    }
+
     console.log('Database migrations completed successfully');
   } catch (error) {
     console.error('Failed to initialize database:', error);

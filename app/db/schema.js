@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, unique } from 'drizzle-orm/sqlite-core';
 
 /**
  * App metadata table for tracking database version and migration status
@@ -95,4 +95,20 @@ export const budgets = sqliteTable('budgets', {
   datesIdx: index('idx_budgets_dates').on(table.startDate, table.endDate),
   currencyIdx: index('idx_budgets_currency').on(table.currency),
   recurringIdx: index('idx_budgets_recurring').on(table.isRecurring),
+}));
+
+/**
+ * Accounts Balance History table
+ * Tracks daily end-of-day balances for accounts
+ */
+export const accountsBalanceHistory = sqliteTable('accounts_balance_history', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  accountId: integer('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  date: text('date').notNull(),
+  balance: text('balance').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  accountDateIdx: index('idx_balance_history_account_date').on(table.accountId, table.date),
+  dateIdx: index('idx_balance_history_date').on(table.date),
+  uniqueAccountDate: unique().on(table.accountId, table.date),
 }));

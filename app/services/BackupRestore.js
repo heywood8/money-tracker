@@ -22,12 +22,13 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
       queryAll('SELECT * FROM budgets ORDER BY created_at ASC'),
       queryAll('SELECT * FROM app_metadata'),
+      queryAll('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
     ]);
 
     // Create backup object
@@ -41,6 +42,7 @@ export const createBackup = async () => {
         operations: operations || [],
         budgets: budgets || [],
         app_metadata: appMetadata || [],
+        balance_history: balanceHistory || [],
       },
     };
 
@@ -49,6 +51,7 @@ export const createBackup = async () => {
       categories: backup.data.categories.length,
       operations: backup.data.operations.length,
       budgets: backup.data.budgets.length,
+      balance_history: backup.data.balance_history.length,
     });
 
     return backup;
@@ -108,6 +111,7 @@ export const exportBackupCSV = async () => {
       'operations.csv': convertToCSV(backup.data.operations),
       'budgets.csv': convertToCSV(backup.data.budgets),
       'app_metadata.csv': convertToCSV(backup.data.app_metadata),
+      'balance_history.csv': convertToCSV(backup.data.balance_history),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -120,7 +124,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[CATEGORIES]\n${csvFiles['categories.csv']}\n\n`;
     combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
     combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
-    combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n`;
+    combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n\n`;
+    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -304,6 +309,7 @@ export const restoreBackup = async (backup) => {
 
       // Clear existing data (in reverse order due to foreign keys)
       await db.runAsync('DELETE FROM budgets');
+      await db.runAsync('DELETE FROM accounts_balance_history');
       await db.runAsync('DELETE FROM operations');
       await db.runAsync('DELETE FROM categories');
       await db.runAsync('DELETE FROM accounts');
@@ -447,6 +453,42 @@ export const restoreBackup = async (backup) => {
         status: 'completed',
         data: backup.data.operations.length
       });
+
+      // Restore balance history
+      if (backup.data.balance_history) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'balance_history',
+          status: 'in_progress',
+          data: backup.data.balance_history.length
+        });
+
+        for (const history of backup.data.balance_history) {
+          const mappedAccountId = accountIdMapping.get(history.account_id) ?? history.account_id;
+
+          await db.runAsync(
+            'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
+            [mappedAccountId, history.date, history.balance, history.created_at]
+          );
+        }
+
+        console.log(`Restored ${backup.data.balance_history.length} balance history entries`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'balance_history',
+          status: 'completed',
+          data: backup.data.balance_history.length
+        });
+      } else {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'balance_history',
+          status: 'in_progress',
+          data: 0
+        });
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'balance_history',
+          status: 'completed',
+          data: 0
+        });
+      }
 
       // Restore budgets
       if (backup.data.budgets) {
@@ -674,6 +716,7 @@ const importBackupCSV = async (fileUri) => {
     operations: [],
     budgets: [],
     app_metadata: [],
+    balance_history: [],
   };
 
   // Split by section markers
@@ -682,12 +725,14 @@ const importBackupCSV = async (fileUri) => {
   const operationsMatch = fileContent.match(/\[OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
   const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[|$)/);
   const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
+  const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
   if (operationsMatch) sections.operations = parseCSV(operationsMatch[1]);
   if (budgetsMatch) sections.budgets = parseCSV(budgetsMatch[1]);
   if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
+  if (balanceHistoryMatch) sections.balance_history = parseCSV(balanceHistoryMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -779,12 +824,13 @@ const importBackupSQLite = async (fileUri) => {
 
     // Extract all data from the migrated database
     console.log('Extracting data from imported database...');
-    const [accounts, categories, operations, budgets, appMetadata] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory] = await Promise.all([
       tempDb.getAllAsync('SELECT * FROM accounts ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM categories ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM operations ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM budgets ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM app_metadata'),
+      tempDb.getAllAsync('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
     ]);
 
     // Create backup object
@@ -798,6 +844,7 @@ const importBackupSQLite = async (fileUri) => {
         operations: operations || [],
         budgets: budgets || [],
         app_metadata: appMetadata || [],
+        balance_history: balanceHistory || [],
       },
     };
 

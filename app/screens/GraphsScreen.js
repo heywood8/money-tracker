@@ -7,6 +7,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
+import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory } from '../services/BalanceHistoryDB';
 import SimplePicker from '../components/SimplePicker';
 
 // Currency formatting helper
@@ -103,6 +104,15 @@ const GraphsScreen = () => {
   const [loadingIncome, setLoadingIncome] = useState(true);
   const [availableMonths, setAvailableMonths] = useState([]);
 
+  // Balance history state
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [balanceHistoryData, setBalanceHistoryData] = useState([]);
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(true);
+  const [balanceHistoryModalVisible, setBalanceHistoryModalVisible] = useState(false);
+  const [balanceHistoryTableData, setBalanceHistoryTableData] = useState([]);
+  const [editingBalanceRow, setEditingBalanceRow] = useState(null);
+  const [editingBalanceValue, setEditingBalanceValue] = useState('');
+
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
@@ -172,6 +182,16 @@ const GraphsScreen = () => {
       setSelectedCurrency('');
     }
   }, [accounts, selectedCurrency]);
+
+  // Initialize default account (display_order=0)
+  useEffect(() => {
+    if (accounts.length > 0 && !selectedAccount) {
+      const defaultAccount = accounts.find(acc => acc.displayOrder === 0) || accounts[0];
+      setSelectedAccount(defaultAccount.id);
+    } else if (accounts.length === 0 && selectedAccount) {
+      setSelectedAccount(null);
+    }
+  }, [accounts, selectedAccount]);
 
   // Load categories
   useEffect(() => {
@@ -566,6 +586,216 @@ const GraphsScreen = () => {
     }
   }, [selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors.text, t]);
 
+  // Load balance history data
+  const loadBalanceHistory = useCallback(async () => {
+    if (!selectedAccount || selectedMonth === null) {
+      setBalanceHistoryData([]);
+      setLoadingBalanceHistory(false);
+      return;
+    }
+
+    try {
+      setLoadingBalanceHistory(true);
+
+      // Calculate start and end dates for the selected month
+      const startDate = new Date(selectedYear, selectedMonth, 1);
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0);
+
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Get balance history from database
+      const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
+
+      // Helper function to calculate linear regression
+      const calculateTrendLine = (data) => {
+        if (data.length < 2) return null;
+
+        const n = data.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+        data.forEach((point, index) => {
+          sumX += index;
+          sumY += point.y;
+          sumXY += index * point.y;
+          sumX2 += index * index;
+        });
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+
+        return { slope, intercept };
+      };
+
+      // Transform history data for chart
+      const dataPoints = history.map(item => ({
+        date: item.date,
+        balance: parseFloat(item.balance),
+      }));
+
+      // Get current day of month
+      const now = new Date();
+      const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+      const currentDay = isCurrentMonth ? now.getDate() : endDate.getDate();
+
+      // Generate all days in month for x-axis
+      const daysInMonth = endDate.getDate();
+      const allDays = [];
+      for (let day = 1; day <= daysInMonth; day++) {
+        allDays.push(day);
+      }
+
+      // Map balance history to days
+      const balanceByDay = {};
+      dataPoints.forEach(point => {
+        const day = new Date(point.date).getDate();
+        balanceByDay[day] = point.balance;
+      });
+
+      // Create actual data line (only up to current day or last available data)
+      const actualData = allDays.map(day => {
+        if (balanceByDay[day] !== undefined) {
+          return { x: day, y: balanceByDay[day] };
+        }
+        return null;
+      }).filter(p => p && p.x <= currentDay);
+
+      // Calculate trend line
+      let trendData = [];
+      if (actualData.length >= 2) {
+        const trend = calculateTrendLine(actualData);
+        if (trend) {
+          // Extend trend line to end of month
+          trendData = allDays.map(day => ({
+            x: day,
+            y: Math.max(0, trend.intercept + trend.slope * (day - 1)),
+          }));
+        }
+      }
+
+      // Calculate burndown line (from highest balance to 0)
+      let burndownData = [];
+      if (actualData.length > 0) {
+        const maxBalance = Math.max(...actualData.map(p => p.y));
+        const slope = -maxBalance / (daysInMonth - 1);
+        burndownData = allDays.map(day => ({
+          x: day,
+          y: Math.max(0, maxBalance + slope * (day - 1)),
+        }));
+      }
+
+      setBalanceHistoryData({
+        actual: actualData,
+        trend: trendData,
+        burndown: burndownData,
+        labels: allDays,
+      });
+    } catch (error) {
+      console.error('Failed to load balance history:', error);
+      setBalanceHistoryData([]);
+    } finally {
+      setLoadingBalanceHistory(false);
+    }
+  }, [selectedAccount, selectedYear, selectedMonth]);
+
+  // Open balance history modal with table data
+  const handleBalanceHistoryPress = useCallback(async () => {
+    if (!selectedAccount || selectedMonth === null) return;
+
+    try {
+      // Calculate start and end dates for the selected month
+      const startDate = new Date(selectedYear, selectedMonth, 1);
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0);
+      const daysInMonth = endDate.getDate();
+
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Get balance history from database
+      const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
+
+      // Create map of existing balances
+      const balanceByDate = {};
+      history.forEach(item => {
+        balanceByDate[item.date] = item.balance;
+      });
+
+      // Generate table data for all days in month
+      const tableData = [];
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(selectedYear, selectedMonth, day);
+        const dateStr = date.toISOString().split('T')[0];
+        tableData.push({
+          date: dateStr,
+          displayDate: `${day}`,
+          balance: balanceByDate[dateStr] || null,
+        });
+      }
+
+      setBalanceHistoryTableData(tableData);
+      setBalanceHistoryModalVisible(true);
+    } catch (error) {
+      console.error('Failed to load balance history table:', error);
+    }
+  }, [selectedAccount, selectedYear, selectedMonth]);
+
+  // Start editing a balance row
+  const handleEditBalance = useCallback((date, currentBalance) => {
+    setEditingBalanceRow(date);
+    setEditingBalanceValue(currentBalance || '');
+  }, []);
+
+  // Cancel editing
+  const handleCancelEdit = useCallback(() => {
+    setEditingBalanceRow(null);
+    setEditingBalanceValue('');
+  }, []);
+
+  // Save edited balance
+  const handleSaveBalance = useCallback(async (date) => {
+    if (!selectedAccount || !editingBalanceValue) return;
+
+    try {
+      await upsertBalanceHistory(selectedAccount, date, editingBalanceValue);
+
+      // Update table data
+      setBalanceHistoryTableData(prevData =>
+        prevData.map(item =>
+          item.date === date ? { ...item, balance: editingBalanceValue } : item
+        )
+      );
+
+      // Reload the chart
+      await loadBalanceHistory();
+
+      setEditingBalanceRow(null);
+      setEditingBalanceValue('');
+    } catch (error) {
+      console.error('Failed to save balance:', error);
+    }
+  }, [selectedAccount, editingBalanceValue, loadBalanceHistory]);
+
+  // Delete balance entry
+  const handleDeleteBalance = useCallback(async (date) => {
+    if (!selectedAccount) return;
+
+    try {
+      await deleteBalanceHistory(selectedAccount, date);
+
+      // Update table data
+      setBalanceHistoryTableData(prevData =>
+        prevData.map(item =>
+          item.date === date ? { ...item, balance: null } : item
+        )
+      );
+
+      // Reload the chart
+      await loadBalanceHistory();
+    } catch (error) {
+      console.error('Failed to delete balance:', error);
+    }
+  }, [selectedAccount, loadBalanceHistory]);
+
   // Reload data when filters change
   useEffect(() => {
     if (categories.length > 0) {
@@ -573,6 +803,11 @@ const GraphsScreen = () => {
       loadIncomeData();
     }
   }, [loadExpenseData, loadIncomeData, categories.length]);
+
+  // Load balance history when account or month changes
+  useEffect(() => {
+    loadBalanceHistory();
+  }, [loadBalanceHistory]);
 
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
@@ -594,6 +829,11 @@ const GraphsScreen = () => {
   const currencyItems = useMemo(() =>
     currencies.map(cur => ({ label: cur, value: cur })),
     [currencies]
+  );
+
+  const accountItems = useMemo(() =>
+    accounts.map(acc => ({ label: acc.name, value: acc.id })),
+    [accounts]
   );
 
   const yearItems = useMemo(() =>
@@ -758,6 +998,111 @@ const GraphsScreen = () => {
               />
             </View>
           </View>
+
+          {/* Balance History Card */}
+          {selectedMonth !== null && selectedAccount && (
+            <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.balanceHistoryHeader}>
+                <View style={styles.balanceHistoryTitleContainer}>
+                  <Icon name="chart-line" size={24} color={colors.primary} />
+                  <Text style={[styles.balanceHistoryTitle, { color: colors.text }]}>
+                    {t('balance_history') || 'Balance History'}
+                  </Text>
+                </View>
+                {/* Account Picker */}
+                <View style={[styles.accountPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <SimplePicker
+                    value={selectedAccount}
+                    onValueChange={setSelectedAccount}
+                    items={accountItems}
+                    colors={colors}
+                  />
+                </View>
+              </View>
+
+              {loadingBalanceHistory ? (
+                <View style={styles.balanceHistoryLoading}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+              ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
+                <TouchableOpacity
+                  style={styles.balanceHistoryChartContainer}
+                  onPress={handleBalanceHistoryPress}
+                  activeOpacity={0.7}
+                >
+                  <LineChart
+                    data={{
+                      labels: balanceHistoryData.labels.map(d => d.toString()),
+                      datasets: [
+                        {
+                          data: balanceHistoryData.actual.map(p => p.y),
+                          color: () => colors.primary,
+                          strokeWidth: 3,
+                        },
+                        {
+                          data: balanceHistoryData.trend.map(p => p.y),
+                          color: () => 'rgba(75, 192, 192, 0.6)',
+                          strokeWidth: 2,
+                          withDots: false,
+                        },
+                        {
+                          data: balanceHistoryData.burndown.map(p => p.y),
+                          color: () => 'rgba(255, 99, 132, 0.4)',
+                          strokeWidth: 2,
+                          withDots: false,
+                        },
+                      ],
+                      legend: [t('actual') || 'Actual', t('trend') || 'Trend', t('burndown') || 'Burndown'],
+                    }}
+                    width={screenWidth - 64}
+                    height={220}
+                    yAxisLabel=""
+                    yAxisSuffix=""
+                    formatXLabel={(value) => {
+                      // Show every 5th label to avoid crowding
+                      const day = parseInt(value);
+                      return day % 5 === 1 ? value : '';
+                    }}
+                    chartConfig={{
+                      backgroundColor: colors.surface,
+                      backgroundGradientFrom: colors.surface,
+                      backgroundGradientTo: colors.surface,
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => colors.text,
+                      labelColor: (opacity = 1) => colors.mutedText,
+                      style: {
+                        borderRadius: 16,
+                      },
+                      propsForDots: {
+                        r: '2',
+                        strokeWidth: '2',
+                      },
+                      propsForBackgroundLines: {
+                        strokeWidth: 1,
+                        stroke: colors.border,
+                        strokeDasharray: '0',
+                      },
+                    }}
+                    bezier
+                    withInnerLines={true}
+                    withOuterLines={true}
+                    withVerticalLines={false}
+                    withHorizontalLines={true}
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16,
+                    }}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.balanceHistoryNoData}>
+                  <Text style={[styles.balanceHistoryNoDataText, { color: colors.mutedText }]}>
+                    {t('no_balance_history') || 'No balance history available for this month'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Expenses Summary Card */}
           <TouchableOpacity
@@ -1061,6 +1406,118 @@ const GraphsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Balance History Details Modal */}
+      <Modal
+        visible={balanceHistoryModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setBalanceHistoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.modalHeaderLeft}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {t('balance_history_details') || 'Balance History Details'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setBalanceHistoryModalVisible(false)}
+              >
+                <Icon name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Table */}
+            <ScrollView style={styles.modalScrollView}>
+              <View style={styles.balanceTable}>
+                {/* Table Header */}
+                <View style={[styles.balanceTableHeader, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('date') || 'Date'}
+                  </Text>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('balance') || 'Balance'}
+                  </Text>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('actions') || 'Actions'}
+                  </Text>
+                </View>
+
+                {/* Table Rows */}
+                {balanceHistoryTableData.map((row, index) => (
+                  <View
+                    key={row.date}
+                    style={[
+                      styles.balanceTableRow,
+                      index % 2 === 0 && { backgroundColor: colors.altRow },
+                      { borderBottomColor: colors.border }
+                    ]}
+                  >
+                    <Text style={[styles.balanceTableCell, { color: colors.text }]}>
+                      {row.displayDate}
+                    </Text>
+
+                    {editingBalanceRow === row.date ? (
+                      <>
+                        <TextInput
+                          style={[
+                            styles.balanceTableInput,
+                            { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }
+                          ]}
+                          value={editingBalanceValue}
+                          onChangeText={setEditingBalanceValue}
+                          keyboardType="decimal-pad"
+                          autoFocus
+                        />
+                        <View style={styles.balanceTableActions}>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
+                            onPress={() => handleSaveBalance(row.date)}
+                          >
+                            <Icon name="check" size={16} color="#fff" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.mutedText }]}
+                            onPress={handleCancelEdit}
+                          >
+                            <Icon name="close" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.balanceTableCell, { color: row.balance ? colors.text : colors.mutedText }]}>
+                          {row.balance || '-'}
+                        </Text>
+                        <View style={styles.balanceTableActions}>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
+                            onPress={() => handleEditBalance(row.date, row.balance)}
+                          >
+                            <Icon name="pencil" size={16} color="#fff" />
+                          </TouchableOpacity>
+                          {row.balance && (
+                            <TouchableOpacity
+                              style={[styles.balanceActionButton, { backgroundColor: '#f44336' }]}
+                              onPress={() => handleDeleteBalance(row.date)}
+                            >
+                              <Icon name="delete" size={16} color="#fff" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1311,6 +1768,98 @@ const styles = StyleSheet.create({
   },
   predictionFooterValue: {
     fontWeight: '600',
+  },
+  balanceHistoryCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  balanceHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  balanceHistoryTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  balanceHistoryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  accountPickerWrapper: {
+    minWidth: 140,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    height: 40,
+  },
+  balanceHistoryLoading: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  balanceHistoryChartContainer: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  balanceHistoryNoData: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  balanceHistoryNoDataText: {
+    fontSize: 14,
+  },
+  balanceTable: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  balanceTableHeader: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 2,
+  },
+  balanceTableHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  balanceTableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  balanceTableCell: {
+    flex: 1,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  balanceTableInput: {
+    flex: 1,
+    fontSize: 14,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  balanceTableActions: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  balanceActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
