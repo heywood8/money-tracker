@@ -312,27 +312,35 @@ export const restoreBackup = async (backup) => {
       console.log('Existing data cleared');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
 
-      // Restore accounts
+      // Restore accounts - create mapping from old UUID IDs to new integer IDs
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'accounts',
         status: 'in_progress',
         data: backup.data.accounts.length
       });
+
+      const accountIdMapping = new Map(); // old UUID -> new integer ID
+
       for (const account of backup.data.accounts) {
-        await db.runAsync(
-          'INSERT INTO accounts (id, name, balance, currency, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        // Omit id to let SQLite auto-generate integer ID
+        const result = await db.runAsync(
+          'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [
-            account.id,
             account.name,
             account.balance || '0',
             account.currency || 'USD',
             account.display_order ?? null,
+            account.hidden ?? 0,
+            account.monthly_target ?? null,
             account.created_at,
             account.updated_at,
           ]
         );
+
+        // Map old UUID to new integer ID
+        accountIdMapping.set(account.id, result.lastInsertRowId);
       }
-      console.log(`Restored ${backup.data.accounts.length} accounts`);
+      console.log(`Restored ${backup.data.accounts.length} accounts with ID mapping`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'accounts',
         status: 'completed',
@@ -370,22 +378,28 @@ export const restoreBackup = async (backup) => {
         data: backup.data.categories.length
       });
 
-      // Restore operations
+      // Restore operations - map account IDs from UUID to integer
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'operations',
         status: 'in_progress',
         data: backup.data.operations.length
       });
       for (const operation of backup.data.operations) {
+        // Map account IDs from old UUID to new integer
+        const mappedAccountId = accountIdMapping.get(operation.account_id) ?? operation.account_id;
+        const mappedToAccountId = operation.to_account_id
+          ? (accountIdMapping.get(operation.to_account_id) ?? operation.to_account_id)
+          : null;
+
         // Note: id is omitted as it's now auto-increment integer
         await db.runAsync(
           'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             operation.type,
             operation.amount,
-            operation.account_id,
+            mappedAccountId,
             operation.category_id || null,
-            operation.to_account_id || null,
+            mappedToAccountId,
             operation.date,
             operation.created_at,
             operation.description || null,
@@ -396,7 +410,7 @@ export const restoreBackup = async (backup) => {
           ]
         );
       }
-      console.log(`Restored ${backup.data.operations.length} operations`);
+      console.log(`Restored ${backup.data.operations.length} operations with mapped account IDs`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'operations',
         status: 'completed',
@@ -712,9 +726,9 @@ const importBackupSQLite = async (fileUri) => {
       'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
     );
 
-    if (drizzleMigrations.length > 0) {
+    if (drizzleMigrations && drizzleMigrations.length > 0) {
       const appliedMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-      console.log('Previously applied migrations:', appliedMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', ') || 'none');
+      console.log('Previously applied migrations:', (appliedMigrations || []).map(m => `${m.hash}`).join(', ') || 'none');
     } else {
       console.log('No migrations table found - database will be migrated from scratch');
     }
@@ -723,8 +737,8 @@ const importBackupSQLite = async (fileUri) => {
 
     // Log which migrations were applied
     const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-    console.log('Migrations after running migrate:', finalMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', '));
-    console.log(`Total migrations applied: ${finalMigrations.length}/${migrationsData.journal.entries.length}`);
+    console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
+    console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrationsData.journal.entries.length}`);
 
     // Extract all data from the migrated database
     console.log('Extracting data from imported database...');

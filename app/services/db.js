@@ -82,9 +82,9 @@ const initializeDatabase = async (rawDb, db) => {
       'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
     );
 
-    if (drizzleMigrations.length > 0) {
+    if (drizzleMigrations && drizzleMigrations.length > 0) {
       const appliedMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-      console.log('Previously applied migrations:', appliedMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', ') || 'none');
+      console.log('Previously applied migrations:', (appliedMigrations || []).map(m => `${m.hash}`).join(', ') || 'none');
     } else {
       console.log('No migrations table found - database will be migrated from scratch');
     }
@@ -94,8 +94,8 @@ const initializeDatabase = async (rawDb, db) => {
 
     // Log which migrations were applied
     const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-    console.log('Migrations after running migrate:', finalMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', '));
-    console.log(`Total migrations applied: ${finalMigrations.length}/${migrations.journal.entries.length}`);
+    console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
+    console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
     console.log('Database migrations completed successfully');
   } catch (error) {
