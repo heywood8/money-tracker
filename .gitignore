@@ -51,6 +51,7 @@ fastlane/test_output
 buck-out/
 \.buckd/
 *.keystore
+*.jks
 
 # EAS Credentials (if using local credentials)
 credentials.json
