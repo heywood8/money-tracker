@@ -63,6 +63,8 @@ jobs:
 
       - name: 🚀 Build APK
         if: github.ref_type == 'tag'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
           echo "Building with profile: $PROFILE"
