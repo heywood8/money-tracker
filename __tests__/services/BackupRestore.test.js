@@ -394,7 +394,7 @@ describe('BackupRestore', () => {
     it('validates backup with all required fields', async () => {
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         const mockDbInstance = {
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         };
         await callback(mockDbInstance);
@@ -487,8 +487,12 @@ describe('BackupRestore', () => {
     };
 
     it('restores backup to database', async () => {
+      let insertCount = 0;
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => {
+          insertCount++;
+          return Promise.resolve({ lastInsertRowId: insertCount });
+        }),
         getAllAsync: jest.fn().mockResolvedValue([
           { id: 'shadow-adjustment-expense' },
           { id: 'shadow-adjustment-income' },
@@ -506,8 +510,12 @@ describe('BackupRestore', () => {
     });
 
     it('clears existing data before restore', async () => {
+      let insertCount = 0;
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => {
+          insertCount++;
+          return Promise.resolve({ lastInsertRowId: insertCount });
+        }),
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
@@ -526,16 +534,18 @@ describe('BackupRestore', () => {
 
     it('deletes in correct order (budgets, operations, categories, accounts)', async () => {
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
       const deleteCalls = [];
+      let insertCount = 0;
       mockDbInstance.runAsync.mockImplementation((query) => {
         if (query.includes('DELETE')) {
           deleteCalls.push(query);
         }
-        return Promise.resolve();
+        insertCount++;
+        return Promise.resolve({ lastInsertRowId: insertCount });
       });
 
       mockDb.executeTransaction.mockImplementation(async (callback) => {
@@ -552,7 +562,7 @@ describe('BackupRestore', () => {
 
     it('preserves db_version metadata', async () => {
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
@@ -572,7 +582,7 @@ describe('BackupRestore', () => {
 
     it('restores all accounts with default values', async () => {
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
@@ -600,7 +610,7 @@ describe('BackupRestore', () => {
 
     it('adds missing shadow categories', async () => {
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([]), // No shadow categories
       };
 
@@ -623,7 +633,7 @@ describe('BackupRestore', () => {
 
     it('does not add shadow categories if already present', async () => {
       const mockDbInstance = {
-        runAsync: jest.fn().mockResolvedValue(),
+        runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
         getAllAsync: jest.fn().mockResolvedValue([
           { id: 'shadow-adjustment-expense' },
           { id: 'shadow-adjustment-income' },
@@ -667,7 +677,7 @@ describe('BackupRestore', () => {
       mockFileSystem.readAsStringAsync.mockResolvedValue(JSON.stringify(validBackup));
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         await callback({
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         });
       });
@@ -723,7 +733,7 @@ test_key,test_value`;
       mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         await callback({
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         });
       });
@@ -750,7 +760,7 @@ op-1,"Food, drinks, etc"`;
       mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         await callback({
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         });
       });
@@ -776,7 +786,7 @@ op-1,"Mom's ""special"" food"`;
       mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         await callback({
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         });
       });
@@ -808,7 +818,7 @@ op-1,"Mom's ""special"" food"`;
       mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
       mockDb.executeTransaction.mockImplementation(async (callback) => {
         await callback({
-          runAsync: jest.fn().mockResolvedValue(),
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
           getAllAsync: jest.fn().mockResolvedValue([]),
         });
       });
