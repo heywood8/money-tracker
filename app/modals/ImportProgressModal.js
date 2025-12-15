@@ -1,15 +1,34 @@
 import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Portal, Modal, Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Platform } from 'react-native';
+import { Portal, Modal, Text, ActivityIndicator, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 import { useTheme } from '../contexts/ThemeContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 
 export default function ImportProgressModal() {
   const { colors } = useTheme();
-  const { isImporting, steps, currentStep } = useImportProgress();
+  const { isImporting, steps, currentStep, finishImport } = useImportProgress();
   const scrollViewRef = useRef(null);
   const stepPositions = useRef({});
+
+  const isComplete = currentStep === 'complete';
+
+  const handleOkPress = async () => {
+    // Close the modal
+    finishImport();
+
+    // Reload the app
+    if (Platform.OS === 'web') {
+      window.location?.reload?.();
+    } else {
+      try {
+        await Updates.reloadAsync();
+      } catch (error) {
+        console.error('Failed to reload app:', error);
+      }
+    }
+  };
 
   // Auto-scroll to current step when it changes
   useEffect(() => {
@@ -159,6 +178,17 @@ export default function ImportProgressModal() {
             </View>
           ))}
         </ScrollView>
+
+        <View style={styles.footer}>
+          <Button
+            mode="contained"
+            onPress={handleOkPress}
+            disabled={!isComplete}
+            style={styles.okButton}
+          >
+            OK
+          </Button>
+        </View>
       </Modal>
     </Portal>
   );
@@ -216,5 +246,12 @@ const styles = StyleSheet.create({
   },
   stepLabelActive: {
     fontWeight: '600',
+  },
+  footer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  okButton: {
+    minWidth: 120,
   },
 });

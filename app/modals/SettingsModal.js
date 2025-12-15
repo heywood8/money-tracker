@@ -157,17 +157,7 @@ export default function SettingsModal({ visible, onClose }) {
               // Perform the import
               await importBackup();
 
-              // Show success dialog
-              showDialog(
-                t('restore_database') || 'Restore Database',
-                t('restore_success') || 'Database restored successfully',
-                [
-                  {
-                    text: t('close') || 'Close',
-                    onPress: reloadApp,
-                  },
-                ]
-              );
+              // Success - the ImportProgressModal will handle showing the OK button
             } catch (error) {
               console.error('Import backup error:', error);
               // Cancel import progress on error
