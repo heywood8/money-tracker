@@ -56,8 +56,8 @@ describe('Database Service', () => {
     it('initializes database with foreign keys and WAL mode', async () => {
       await getDatabase();
 
-      expect(mockDb.execAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
-      expect(mockDb.execAsync).toHaveBeenCalledWith('PRAGMA journal_mode = WAL');
+      expect(mockDb.runAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
+      expect(mockDb.runAsync).toHaveBeenCalledWith('PRAGMA journal_mode = WAL');
     });
 
     it('runs Drizzle migrations', async () => {
