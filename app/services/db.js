@@ -75,9 +75,27 @@ const initializeDatabase = async (rawDb, db) => {
     await rawDb.execAsync('PRAGMA journal_mode = WAL');
 
     console.log('Running Drizzle migrations...');
+    console.log('Available migrations:', migrations.journal.entries.map(e => e.tag).join(', '));
+
+    // Check current migration state before running
+    const drizzleMigrations = await rawDb.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+    );
+
+    if (drizzleMigrations.length > 0) {
+      const appliedMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
+      console.log('Previously applied migrations:', appliedMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', ') || 'none');
+    } else {
+      console.log('No migrations table found - database will be migrated from scratch');
+    }
 
     // Run Drizzle migrations
     await migrate(db, migrations);
+
+    // Log which migrations were applied
+    const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
+    console.log('Migrations after running migrate:', finalMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', '));
+    console.log(`Total migrations applied: ${finalMigrations.length}/${migrations.journal.entries.length}`);
 
     console.log('Database migrations completed successfully');
   } catch (error) {
@@ -168,6 +186,36 @@ export const closeDatabase = async () => {
       dbInstance = null;
       drizzleInstance = null;
     }
+  }
+};
+
+/**
+ * Get the current database version based on applied migrations
+ * @returns {Promise<string>} Database version (e.g., "2" for 2 migrations applied)
+ */
+export const getDatabaseVersion = async () => {
+  try {
+    const { raw } = await getDatabase();
+
+    // Check if migrations table exists
+    const tableExists = await raw.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+    );
+
+    if (tableExists.length === 0) {
+      return '0';
+    }
+
+    // Get all applied migrations
+    const appliedMigrations = await raw.getAllAsync(
+      'SELECT * FROM __drizzle_migrations ORDER BY created_at ASC'
+    );
+
+    // Return the count of applied migrations (this represents the version)
+    return String(appliedMigrations.length);
+  } catch (error) {
+    console.error('Failed to get database version:', error);
+    return '?';
   }
 };
 

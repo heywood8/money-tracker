@@ -324,7 +324,7 @@ Coverage: Maintained from pre-refactoring
 
 ### Additional Completed Items
 
-- [x] **Cleanup:** Delete unused `app/db/client.js` - **Deleted**
+- [x] **Cleanup:** Delete unused `app/db/client.js` and `migrate.js` - **Deleted**
 - [x] **Document:** Add context dependency documentation in OperationsContext - **Documented**
 - [x] **Document:** Add context dependencies section to ARCHITECTURE-REVIEW.md - **Added**
 

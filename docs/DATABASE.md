@@ -168,9 +168,7 @@ Strategic indexes are created for:
 ```
 app/
 ├── db/
-│   ├── schema.js          # Drizzle schema definitions
-│   ├── client.js          # Drizzle database client
-│   └── migrate.js         # Migration utilities
+│   ├── schema.js          # Unified database schema and migration utilities
 ├── services/
 │   ├── db.js              # Database wrapper (Drizzle + raw SQL)
 │   ├── AccountsDB.js      # Account operations

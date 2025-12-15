@@ -1,9 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { queryFirst } from '../services/db';
+import { getDatabaseVersion } from '../services/db';
+import { appEvents } from '../services/eventEmitter';
+import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -12,23 +14,32 @@ export default function Header({ onOpenSettings }) {
   const { t } = useLocalization();
   const [dbVersion, setDbVersion] = useState(null);
 
+  const fetchDbVersion = useCallback(async () => {
+    try {
+      const version = await getDatabaseVersion();
+      setDbVersion(version);
+    } catch (error) {
+      console.error('Failed to fetch database version:', error);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchDbVersion = async () => {
-      try {
-        const result = await queryFirst(
-          'SELECT value FROM app_metadata WHERE key = ?',
-          ['db_version']
-        );
-        if (result) {
-          setDbVersion(result.value);
-        }
-      } catch (error) {
-        console.error('Failed to fetch database version:', error);
+    fetchDbVersion();
+
+    // Listen for import completion to refresh DB version
+    const handleImportProgress = (event) => {
+      if (event.stepId === 'complete' && event.status === 'completed') {
+        console.log('Import completed, refreshing DB version...');
+        fetchDbVersion();
       }
     };
 
-    fetchDbVersion();
-  }, []);
+    appEvents.on(IMPORT_PROGRESS_EVENT, handleImportProgress);
+
+    return () => {
+      appEvents.off(IMPORT_PROGRESS_EVENT, handleImportProgress);
+    };
+  }, [fetchDbVersion]);
 
   const toggleTheme = () => {
     const newTheme = colorScheme === 'dark' ? 'light' : 'dark';

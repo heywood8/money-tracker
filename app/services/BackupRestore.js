@@ -377,10 +377,10 @@ export const restoreBackup = async (backup) => {
         data: backup.data.operations.length
       });
       for (const operation of backup.data.operations) {
+        // Note: id is omitted as it's now auto-increment integer
         await db.runAsync(
-          'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
-            operation.id,
             operation.type,
             operation.amount,
             operation.account_id,
@@ -389,6 +389,10 @@ export const restoreBackup = async (backup) => {
             operation.date,
             operation.created_at,
             operation.description || null,
+            operation.exchange_rate || null,
+            operation.destination_amount || null,
+            operation.source_currency || null,
+            operation.destination_currency || null,
           ]
         );
       }
@@ -662,9 +666,14 @@ const importBackupSQLite = async (fileUri) => {
   console.log('Importing SQLite backup...');
   appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
 
+  const SQLite = await import('expo-sqlite');
+  const { drizzle } = await import('drizzle-orm/expo-sqlite');
+  const { migrate } = await import('drizzle-orm/expo-sqlite/migrator');
+  const schema = await import('../db/schema');
+  const migrations = await import('../../drizzle/migrations');
+
   const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
-  const destUri = `${sqliteDir}/penny.db`;
-  const backupUri = `${sqliteDir}/penny_backup_temp.db`;
+  const tempDbUri = `${sqliteDir}/penny_import_temp.db`;
 
   // Ensure SQLite directory exists
   const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
@@ -673,70 +682,113 @@ const importBackupSQLite = async (fileUri) => {
     await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
   }
 
-  // Create backup of current database first
-  const currentDbExists = await FileSystem.getInfoAsync(destUri);
-  if (currentDbExists.exists) {
-    console.log('Backing up current database...');
-    await FileSystem.copyAsync({
-      from: destUri,
-      to: backupUri,
-    });
-  }
+  // Copy imported file to temp location
+  console.log('Copying imported file to temp location...');
+  await FileSystem.copyAsync({
+    from: fileUri,
+    to: tempDbUri,
+  });
+
+  let tempDb = null;
+  let tempDrizzle = null;
 
   try {
-    // Close the current database connection before replacing the file
-    console.log('Closing current database connection...');
-    const { closeDatabase } = await import('./db');
-    await closeDatabase();
-    console.log('Database connection closed');
+    // Open the imported database
+    console.log('Opening imported database...');
+    tempDb = await SQLite.openDatabaseAsync('penny_import_temp.db');
+    tempDrizzle = drizzle(tempDb, { schema: schema.default || schema });
 
-    // Wait a bit to ensure the connection is fully closed
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Enable foreign keys and WAL mode
+    await tempDb.execAsync('PRAGMA foreign_keys = ON');
+    await tempDb.execAsync('PRAGMA journal_mode = WAL');
 
-    // Delete WAL and SHM files to ensure clean state
-    const walUri = `${destUri}-wal`;
-    const shmUri = `${destUri}-shm`;
-    console.log('Cleaning up WAL files...');
-    await FileSystem.deleteAsync(walUri, { idempotent: true });
-    await FileSystem.deleteAsync(shmUri, { idempotent: true });
+    // Run migrations on the imported database to bring it up to current schema
+    console.log('Running migrations on imported database...');
+    const migrationsData = migrations.default || migrations;
+    console.log('Available migrations:', migrationsData.journal.entries.map(e => e.tag).join(', '));
 
-    // Copy imported database to replace current one
-    console.log('Copying imported database file...');
-    await FileSystem.copyAsync({
-      from: fileUri,
-      to: destUri,
-    });
+    // Check current migration state before running
+    const drizzleMigrations = await tempDb.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+    );
 
-    console.log('SQLite database replaced successfully');
-
-    // Delete temp backup
-    if (currentDbExists.exists) {
-      await FileSystem.deleteAsync(backupUri, { idempotent: true });
+    if (drizzleMigrations.length > 0) {
+      const appliedMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
+      console.log('Previously applied migrations:', appliedMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', ') || 'none');
+    } else {
+      console.log('No migrations table found - database will be migrated from scratch');
     }
 
-    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
-    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'complete', status: 'completed' });
+    await migrate(tempDrizzle, migrationsData);
 
-    return {
+    // Log which migrations were applied
+    const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
+    console.log('Migrations after running migrate:', finalMigrations.map(m => `${m.hash} (${new Date(m.created_at).toISOString()})`).join(', '));
+    console.log(`Total migrations applied: ${finalMigrations.length}/${migrationsData.journal.entries.length}`);
+
+    // Extract all data from the migrated database
+    console.log('Extracting data from imported database...');
+    const [accounts, categories, operations, budgets, appMetadata] = await Promise.all([
+      tempDb.getAllAsync('SELECT * FROM accounts ORDER BY created_at ASC'),
+      tempDb.getAllAsync('SELECT * FROM categories ORDER BY created_at ASC'),
+      tempDb.getAllAsync('SELECT * FROM operations ORDER BY created_at ASC'),
+      tempDb.getAllAsync('SELECT * FROM budgets ORDER BY created_at ASC'),
+      tempDb.getAllAsync('SELECT * FROM app_metadata'),
+    ]);
+
+    // Create backup object
+    const backup = {
       version: BACKUP_VERSION,
       timestamp: new Date().toISOString(),
       platform: 'sqlite',
+      data: {
+        accounts: accounts || [],
+        categories: categories || [],
+        operations: operations || [],
+        budgets: budgets || [],
+        app_metadata: appMetadata || [],
+      },
     };
+
+    console.log('Data extracted from imported database:', {
+      accounts: backup.data.accounts.length,
+      categories: backup.data.categories.length,
+      operations: backup.data.operations.length,
+      budgets: backup.data.budgets.length,
+    });
+
+    // Close the temp database
+    console.log('Closing temp database...');
+    await tempDb.closeAsync();
+    tempDb = null;
+
+    // Delete temp database file and WAL files
+    await FileSystem.deleteAsync(tempDbUri, { idempotent: true });
+    await FileSystem.deleteAsync(`${tempDbUri}-wal`, { idempotent: true });
+    await FileSystem.deleteAsync(`${tempDbUri}-shm`, { idempotent: true });
+
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
+
+    // Use the standard restore process
+    await restoreBackup(backup);
+
+    return backup;
   } catch (error) {
     console.error('Failed to import SQLite database:', error);
-    // Restore from backup if copy failed
-    if (currentDbExists.exists) {
-      console.log('Restoring from backup...');
+
+    // Clean up temp database
+    if (tempDb) {
       try {
-        await FileSystem.copyAsync({
-          from: backupUri,
-          to: destUri,
-        });
-        await FileSystem.deleteAsync(backupUri, { idempotent: true });
-      } catch (restoreError) {
-        console.error('Failed to restore backup:', restoreError);
+        await tempDb.closeAsync();
+      } catch (closeError) {
+        console.error('Error closing temp database:', closeError);
       }
     }
+
+    await FileSystem.deleteAsync(tempDbUri, { idempotent: true });
+    await FileSystem.deleteAsync(`${tempDbUri}-wal`, { idempotent: true });
+    await FileSystem.deleteAsync(`${tempDbUri}-shm`, { idempotent: true });
+
     throw error;
   }
 };
