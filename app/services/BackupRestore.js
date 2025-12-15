@@ -821,10 +821,6 @@ const importBackupSQLite = async (fileUri) => {
     tempDb = await SQLite.openDatabaseAsync('penny_import_temp.db');
     tempDrizzle = drizzle(tempDb, { schema: schema.default || schema });
 
-    // Enable foreign keys and WAL mode
-    await tempDb.runAsync('PRAGMA foreign_keys = ON');
-    await tempDb.runAsync('PRAGMA journal_mode = WAL');
-
     // Run migrations on the imported database to bring it up to current schema
     console.log('Running migrations on imported database...');
     const migrationsData = migrations.default || migrations;
@@ -848,6 +844,10 @@ const importBackupSQLite = async (fileUri) => {
     const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
     console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrationsData.journal.entries.length}`);
+
+    // Enable foreign keys and WAL mode after migrations
+    await tempDb.runAsync('PRAGMA foreign_keys = ON');
+    await tempDb.runAsync('PRAGMA journal_mode = WAL');
 
     // Extract all data from the migrated database
     console.log('Extracting data from imported database...');
