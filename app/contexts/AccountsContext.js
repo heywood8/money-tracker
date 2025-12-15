@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import uuid from 'react-native-uuid';
 import currencies from '../../assets/currencies.json';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
@@ -29,15 +28,16 @@ export const AccountsProvider = ({ children }) => {
     try {
       const accountsToCreate = defaultAccounts.map(acc => ({
         ...acc,
-        id: uuid.v4(),
         balance: String(acc.balance),
       }));
 
+      const createdAccounts = [];
       for (const account of accountsToCreate) {
-        await AccountsDB.createAccount(account);
+        const created = await AccountsDB.createAccount(account);
+        createdAccounts.push(created);
       }
 
-      return accountsToCreate;
+      return createdAccounts;
     } catch (err) {
       console.error('Failed to create default accounts:', err);
       throw err;
@@ -77,12 +77,11 @@ export const AccountsProvider = ({ children }) => {
     try {
       const newAccount = {
         ...account,
-        id: uuid.v4(),
         balance: String(account.balance),
       };
 
-      await AccountsDB.createAccount(newAccount);
-      setAccounts(accs => [...accs, newAccount]);
+      const createdAccount = await AccountsDB.createAccount(newAccount);
+      setAccounts(accs => [...accs, createdAccount]);
     } catch (err) {
       console.error('Failed to add account:', err);
       showDialog(
