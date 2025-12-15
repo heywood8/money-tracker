@@ -66,6 +66,43 @@ export const getDrizzle = async () => {
 };
 
 /**
+ * Check if database is in a corrupted migration state
+ */
+const isDatabaseCorrupted = async (rawDb) => {
+  try {
+    // Check if accounts table exists
+    const accountsTable = await rawDb.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'"
+    );
+
+    if (accountsTable.length === 0) {
+      return false; // No accounts table, fresh database
+    }
+
+    // Check the actual schema of accounts table
+    const accountsSchema = await rawDb.getAllAsync('PRAGMA table_info(accounts)');
+    const idColumn = accountsSchema.find(col => col.name === 'id');
+
+    if (!idColumn) {
+      console.warn('Accounts table exists but has no id column - corrupted');
+      return true;
+    }
+
+    // Check if we have the right schema (integer id with autoincrement)
+    // If id is 'text' type, we're in the old schema and migration failed
+    if (idColumn.type.toLowerCase() === 'text') {
+      console.warn('Accounts table has text id - migration 0002 was not applied');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking database corruption:', error);
+    return false;
+  }
+};
+
+/**
  * Initialize database with Drizzle migrations
  */
 const initializeDatabase = async (rawDb, db) => {
@@ -82,6 +119,24 @@ const initializeDatabase = async (rawDb, db) => {
       'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name'
     );
     console.log('Existing tables:', (existingTables || []).map(t => t.name).join(', '));
+
+    // Check for corrupted migration state
+    const isCorrupted = await isDatabaseCorrupted(rawDb);
+    if (isCorrupted) {
+      console.warn('Database is in a corrupted state - attempting recovery...');
+      console.warn('This will reset all data. To avoid this, please use Settings > Reset Database before updating the app.');
+
+      // Drop all tables and start fresh
+      await rawDb.execAsync('PRAGMA foreign_keys = OFF');
+      const tables = await rawDb.getAllAsync(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      );
+      for (const table of tables) {
+        await rawDb.execAsync(`DROP TABLE IF EXISTS "${table.name}"`);
+      }
+      await rawDb.execAsync('PRAGMA foreign_keys = ON');
+      console.log('All tables dropped for recovery');
+    }
 
     // Check current migration state before running
     const drizzleMigrations = await rawDb.getAllAsync(
@@ -263,6 +318,58 @@ export const getDatabaseVersion = async () => {
   } catch (error) {
     console.error('Failed to get database version:', error);
     return '?';
+  }
+};
+
+/**
+ * Drop all tables in the database
+ * WARNING: This will delete all data!
+ */
+export const dropAllTables = async () => {
+  try {
+    let raw;
+
+    // Try to get existing database connection, or open a new one
+    try {
+      if (dbInstance) {
+        raw = dbInstance;
+      } else {
+        console.log('Opening database for table drop...');
+        raw = await SQLite.openDatabaseAsync(DB_NAME);
+      }
+    } catch (openError) {
+      console.error('Failed to open database for dropping tables:', openError);
+      throw openError;
+    }
+
+    // Disable foreign keys temporarily
+    await raw.execAsync('PRAGMA foreign_keys = OFF');
+
+    // Get all table names
+    const tables = await raw.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    );
+
+    console.log('Tables to drop:', tables.map(t => t.name).join(', '));
+
+    // Drop each table (including migrations)
+    for (const table of tables) {
+      await raw.execAsync(`DROP TABLE IF EXISTS "${table.name}"`);
+      console.log(`Dropped table: ${table.name}`);
+    }
+
+    // Re-enable foreign keys
+    await raw.execAsync('PRAGMA foreign_keys = ON');
+
+    console.log('All tables dropped successfully');
+
+    // Reset the instances to null so it reinitializes on next getDatabase call
+    dbInstance = null;
+    drizzleInstance = null;
+    initPromise = null;
+  } catch (error) {
+    console.error('Failed to drop tables:', error);
+    throw error;
   }
 };
 
