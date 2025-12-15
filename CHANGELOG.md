@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/heywood8/money-tracker/compare/penny-v0.14.0...penny-v0.14.1) (2025-12-15)
+
+
+### Bug Fixes
+
+* add prebuild stage to ci ([3f5931f](https://github.com/heywood8/money-tracker/commit/3f5931fd235346ac68bc810f0b4dd43d0cefcf99))
+
 ## [0.14.0](https://github.com/heywood8/money-tracker/compare/penny-v0.13.0...penny-v0.14.0) (2025-12-15)
 
 
