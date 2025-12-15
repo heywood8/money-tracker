@@ -68,6 +68,7 @@ jobs:
       - name: 🚀 Build APK
         if: github.ref_type == 'tag'
         env:
+          NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"

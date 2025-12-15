@@ -115,7 +115,6 @@ describe('AccountsContext', () => {
           name: 'New Account',
           balance: '100',
           currency: 'USD',
-          id: expect.any(String),
         })
       );
       expect(result.current.accounts).toHaveLength(initialLength + 1);
@@ -124,7 +123,7 @@ describe('AccountsContext', () => {
     it('converts balance to string when adding account', async () => {
       const mockAccounts = [{ id: 'existing-1', name: 'Existing', balance: '50', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+      AccountsDB.createAccount.mockResolvedValue({ id: 2, name: 'Test', balance: '100', currency: 'USD' });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -545,8 +544,9 @@ describe('AccountsContext', () => {
 
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentMockAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentMockAccounts.push(account);
-        return Promise.resolve(undefined);
+        const accountWithId = { ...account, id: currentMockAccounts.length + 1 };
+        currentMockAccounts.push(accountWithId);
+        return Promise.resolve(accountWithId);
       });
       AccountsDB.updateAccount.mockResolvedValue(undefined);
       AccountsDB.adjustAccountBalance.mockImplementation((id, newBalance) => {

@@ -169,7 +169,7 @@ describe('BackupRestore', () => {
         },
       });
       expect(backup.timestamp).toBeDefined();
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(5);
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(6);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -555,9 +555,10 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(validBackup);
 
       expect(deleteCalls[0]).toContain('budgets');
-      expect(deleteCalls[1]).toContain('operations');
-      expect(deleteCalls[2]).toContain('categories');
-      expect(deleteCalls[3]).toContain('accounts');
+      expect(deleteCalls[1]).toContain('accounts_balance_history');
+      expect(deleteCalls[2]).toContain('operations');
+      expect(deleteCalls[3]).toContain('categories');
+      expect(deleteCalls[4]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {

@@ -24,7 +24,8 @@ describe('AccountsDB', () => {
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
-      values: jest.fn(() => Promise.resolve()),
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn(() => Promise.resolve([])),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
@@ -109,6 +110,15 @@ describe('AccountsDB', () => {
         currency: 'USD',
       };
 
+      const expectedResult = {
+        ...newAccount,
+        displayOrder: 6,
+        hidden: 0,
+        monthlyTarget: null,
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      };
+
       // Mock getDrizzle to return the same instance for both calls
       // First call is for max order query, second is for insert
       db.getDrizzle.mockResolvedValue({
@@ -116,6 +126,7 @@ describe('AccountsDB', () => {
         select: jest.fn(() => ({
           from: jest.fn(() => Promise.resolve([{ maxOrder: 5 }])),
         })),
+        returning: jest.fn(() => Promise.resolve([expectedResult])),
       });
 
       const result = await AccountsDB.createAccount(newAccount);
@@ -132,12 +143,24 @@ describe('AccountsDB', () => {
         name: 'New Account',
       };
 
+      const expectedResult = {
+        ...newAccount,
+        balance: '0',
+        currency: 'USD',
+        displayOrder: 0,
+        hidden: 0,
+        monthlyTarget: null,
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      };
+
       // Mock max order query - no existing accounts
       db.getDrizzle.mockResolvedValue({
         ...mockDrizzle,
         select: jest.fn(() => ({
           from: jest.fn(() => Promise.resolve([{ maxOrder: null }])),
         })),
+        returning: jest.fn(() => Promise.resolve([expectedResult])),
       });
 
       const result = await AccountsDB.createAccount(newAccount);
@@ -156,7 +179,8 @@ describe('AccountsDB', () => {
           from: jest.fn(() => Promise.resolve([{ maxOrder: 0 }])),
         })),
         insert: jest.fn().mockReturnThis(),
-        values: jest.fn(() => Promise.reject(error)),
+        values: jest.fn().mockReturnThis(),
+        returning: jest.fn(() => Promise.reject(error)),
       };
 
       db.getDrizzle.mockResolvedValue(failingMockDrizzle);

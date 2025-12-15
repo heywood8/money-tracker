@@ -51,8 +51,9 @@ describe('Account Management Integration Tests', () => {
       // Setup dynamic mock that tracks state
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentAccounts.push(account);
-        return Promise.resolve(undefined);
+        const accountWithId = { ...account, id: currentAccounts.length + 1 };
+        currentAccounts.push(accountWithId);
+        return Promise.resolve(accountWithId);
       });
       AccountsDB.updateAccount.mockImplementation((id, updates) => {
         const account = currentAccounts.find(a => a.id === id);
@@ -153,8 +154,9 @@ describe('Account Management Integration Tests', () => {
       // Setup dynamic mock that tracks state
       AccountsDB.getAllAccounts.mockImplementation(() => Promise.resolve([...currentAccounts]));
       AccountsDB.createAccount.mockImplementation((account) => {
-        currentAccounts.push(account);
-        return Promise.resolve(undefined);
+        const accountWithId = { ...account, id: currentAccounts.length + 1 };
+        currentAccounts.push(accountWithId);
+        return Promise.resolve(accountWithId);
       });
       AccountsDB.updateAccount.mockImplementation((id, updates) => {
         const account = currentAccounts.find(a => a.id === id);
@@ -294,7 +296,7 @@ describe('Account Management Integration Tests', () => {
       expect(result.current.accounts).toHaveLength(1);
 
       // Add a successful account
-      AccountsDB.createAccount.mockResolvedValue(undefined);
+      AccountsDB.createAccount.mockResolvedValue({ id: 2, name: 'Test Success', balance: '100', currency: 'USD' });
       await act(async () => {
         await result.current.addAccount({
           name: 'Test Success',
@@ -348,6 +350,11 @@ describe('Account Management Integration Tests', () => {
         { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      
+      let idCounter = 1;
+      AccountsDB.createAccount.mockImplementation((account) => {
+        return Promise.resolve({ ...account, id: ++idCounter });
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -444,6 +451,11 @@ describe('Account Management Integration Tests', () => {
         { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' }
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      
+      let idCounter = 1;
+      AccountsDB.createAccount.mockImplementation((account) => {
+        return Promise.resolve({ ...account, id: ++idCounter });
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -504,6 +516,11 @@ describe('Account Management Integration Tests', () => {
         { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' }
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      
+      let idCounter = 1;
+      AccountsDB.createAccount.mockImplementation((account) => {
+        return Promise.resolve({ ...account, id: ++idCounter });
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
@@ -528,6 +545,10 @@ describe('Account Management Integration Tests', () => {
         { id: 'test-1', name: 'Test', balance: '100', currency: 'USD' }
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
+      
+      AccountsDB.createAccount.mockImplementation((account) => {
+        return Promise.resolve({ ...account, id: 2 });
+      });
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
 
