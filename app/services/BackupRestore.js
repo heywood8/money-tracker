@@ -977,7 +977,7 @@ export const importBackup = async () => {
       backup = await importBackupSQLite(fileUri);
       break;
     case 'json':
-    default:
+    default: {
       // Original JSON import
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
       const fileContent = await FileSystem.readAsStringAsync(fileUri);
@@ -989,6 +989,7 @@ export const importBackup = async () => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
       await restoreBackup(backup);
       break;
+    }
     }
 
     return backup;

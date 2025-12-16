@@ -422,7 +422,7 @@ describe('Operation Management Integration Tests', () => {
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValueOnce(week1Ops);
       OperationsDB.getNextOldestOperation.mockResolvedValue({ date: '2025-01-08' });
-      OperationsDB.getOperationsByWeekFromDate = jest.fn().mockResolvedValue(week2Ops);
+      jest.spyOn(OperationsDB, 'getOperationsByWeekFromDate').mockResolvedValue(week2Ops);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -486,7 +486,7 @@ describe('Operation Management Integration Tests', () => {
 
     it('subscribes to RELOAD_ALL events', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      OperationsDB.getAllOperations = jest.fn().mockResolvedValue([]);
+      jest.spyOn(OperationsDB, 'getAllOperations').mockResolvedValue([]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 

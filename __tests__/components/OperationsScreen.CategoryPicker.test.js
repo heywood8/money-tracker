@@ -5,6 +5,10 @@
  */
 
 describe('OperationsScreen - Category Picker Buttons', () => {
+  // Shared helper used across nested describes and regression tests
+  const isAddButtonEnabled = (amount) => {
+    return !!(amount && amount.trim() !== '');
+  };
   describe('Add Button Enable Logic', () => {
     /**
      * Helper function to determine if Add button should be enabled
@@ -225,9 +229,9 @@ describe('OperationsScreen - Category Picker Buttons', () => {
     });
 
     it('properly validates empty vs undefined vs null', () => {
-      expect(!'' || ''.trim() === '').toBe(true);
-      expect(!undefined || undefined?.trim() === '').toBe(true);
-      expect(!null || null?.trim() === '').toBe(true);
+      expect(isAddButtonEnabled('')).toBe(false);
+      expect(isAddButtonEnabled(undefined)).toBe(false);
+      expect(isAddButtonEnabled(null)).toBe(false);
     });
   });
 });

@@ -388,27 +388,30 @@ export const getCurrentPeriodDates = (periodType, referenceDate = new Date()) =>
   const end = new Date(referenceDate);
 
   switch (periodType) {
-  case 'weekly':
+  case 'weekly': {
     // Week starts on Sunday (0) and ends on Saturday (6)
     const dayOfWeek = start.getDay();
     start.setDate(start.getDate() - dayOfWeek);
     end.setDate(start.getDate() + 6);
     break;
+  }
 
-  case 'monthly':
+  case 'monthly': {
     // Month starts on 1st and ends on last day
     start.setDate(1);
     end.setMonth(end.getMonth() + 1);
     end.setDate(0); // Last day of month
     break;
+  }
 
-  case 'yearly':
+  case 'yearly': {
     // Year starts on Jan 1 and ends on Dec 31
     start.setMonth(0);
     start.setDate(1);
     end.setMonth(11);
     end.setDate(31);
     break;
+  }
 
   default:
     throw new Error(`Invalid period type: ${periodType}`);
