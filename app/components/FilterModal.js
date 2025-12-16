@@ -72,7 +72,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
       ...f,
       types: f.types.includes(type)
         ? f.types.filter(t => t !== type)
-        : [...f.types, type]
+        : [...f.types, type],
     }));
   };
 
@@ -82,7 +82,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
       ...f,
       accountIds: f.accountIds.includes(accountId)
         ? f.accountIds.filter(id => id !== accountId)
-        : [...f.accountIds, accountId]
+        : [...f.accountIds, accountId],
     }));
   };
 
@@ -129,7 +129,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
         ...f,
         categoryIds: allSelected
           ? f.categoryIds.filter(id => !descendantIds.includes(id))
-          : [...new Set([...f.categoryIds, ...descendantIds])]
+          : [...new Set([...f.categoryIds, ...descendantIds])],
       }));
     } else {
       // For entry categories, toggle individual selection
@@ -137,7 +137,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
         ...f,
         categoryIds: f.categoryIds.includes(categoryId)
           ? f.categoryIds.filter(id => id !== categoryId)
-          : [...f.categoryIds, categoryId]
+          : [...f.categoryIds, categoryId],
       }));
     }
   };
@@ -330,7 +330,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
                         {
                           backgroundColor: isSelected ? colors.primary : colors.inputBackground,
                           borderColor: colors.border,
-                        }
+                        },
                       ]}
                       onPress={() => toggleType(type)}
                     >
@@ -517,121 +517,80 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  actionButton: {
+    alignItems: 'center',
+    borderRadius: 8,
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 11,
   },
-  modalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  content: {
-    maxHeight: 500,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  sectionTitle: {
+  actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
   },
-  searchInput: {
+  actions: {
+    borderTopColor: '#f0f0f0',
+    borderTopWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    gap: 8,
+    gap: 12,
+    padding: 14,
   },
-  searchTextInput: {
+  amountInput: {
+    borderRadius: 8,
+    borderWidth: 1,
     flex: 1,
     fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
-  helperText: {
-    fontSize: 12,
-    marginTop: 5,
+  amountRangeContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  amountRangeSeparator: {
+    fontSize: 16,
+  },
+  applyButton: {},
+  categoryInfo: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  checkboxItem: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+  },
+  checkboxLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  chip: {
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-  },
   chipText: {
     fontSize: 14,
     fontWeight: '500',
   },
-  checkboxItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-  },
-  checkboxLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-  },
-  expandButton: {
-    width: 32,
-    height: 32,
-    marginRight: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dateRangeContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateInput: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  clearButton: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    gap: 8,
-  },
-  dateInputText: {
-    fontSize: 14,
   },
   clearDateButton: {
     marginTop: 7,
@@ -640,42 +599,83 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  amountRangeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  content: {
+    maxHeight: 500,
   },
-  amountInput: {
-    flex: 1,
-    borderWidth: 1,
+  dateInput: {
+    alignItems: 'center',
     borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 9,
+  },
+  dateInputText: {
     fontSize: 14,
   },
-  amountRangeSeparator: {
-    fontSize: 16,
-  },
-  actions: {
+  dateRangeContainer: {
     flexDirection: 'row',
-    padding: 14,
     gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 8,
+  expandButton: {
     alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+    marginRight: 4,
+    width: 32,
   },
-  clearButton: {
+  header: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 14,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  helperText: {
+    fontSize: 12,
+    marginTop: 5,
+  },
+  modalContent: {
+    borderRadius: 12,
+    maxHeight: '80%',
+    overflow: 'hidden',
+    width: '90%',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  searchInput: {
+    alignItems: 'center',
+    borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  applyButton: {},
-  actionButtonText: {
+  searchTextInput: {
+    flex: 1,
+    fontSize: 14,
+  },
+  section: {
+    borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 10,
   },
 });
 

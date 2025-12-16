@@ -116,97 +116,35 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 48,
-  },
-  languagesContainer: {
-    width: '100%',
-    maxWidth: 400,
-  },
-  languageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#f5f5f5',
-  },
-  languageButtonSelected: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#2196f3',
-  },
-  flag: {
-    fontSize: 40,
-    marginRight: 16,
-  },
-  languageTextContainer: {
-    flex: 1,
-  },
-  languageName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  languageNameSelected: {
-    color: '#1565c0',
-  },
-  languageEnglishName: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  languageEnglishNameSelected: {
-    color: '#1976d2',
-  },
   checkmark: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#2196f3',
     alignItems: 'center',
+    backgroundColor: '#2196f3',
+    borderRadius: 14,
+    height: 28,
     justifyContent: 'center',
+    width: 28,
   },
   checkmarkText: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  footer: {
-    padding: 24,
-    paddingBottom: 24,
+  container: {
+    backgroundColor: '#ffffff',
+    flex: 1,
+  },
+  content: {
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 60,
   },
   continueButton: {
+    alignItems: 'center',
     backgroundColor: '#2196f3',
     borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
     justifyContent: 'center',
+    padding: 16,
   },
   continueButtonDisabled: {
     backgroundColor: '#e0e0e0',
@@ -218,6 +156,68 @@ const styles = StyleSheet.create({
   },
   continueButtonTextDisabled: {
     color: '#9e9e9e',
+  },
+  flag: {
+    fontSize: 40,
+    marginRight: 16,
+  },
+  footer: {
+    padding: 24,
+    paddingBottom: 24,
+  },
+  languageButton: {
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderColor: '#f5f5f5',
+    borderRadius: 12,
+    borderWidth: 2,
+    flexDirection: 'row',
+    marginBottom: 16,
+    padding: 20,
+  },
+  languageButtonSelected: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#2196f3',
+  },
+  languageEnglishName: {
+    color: '#666666',
+    fontSize: 14,
+  },
+  languageEnglishNameSelected: {
+    color: '#1976d2',
+  },
+  languageName: {
+    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  languageNameSelected: {
+    color: '#1565c0',
+  },
+  languageTextContainer: {
+    flex: 1,
+  },
+  languagesContainer: {
+    maxWidth: 400,
+    width: '100%',
+  },
+  safeArea: {
+    backgroundColor: '#ffffff',
+    flex: 1,
+  },
+  subtitle: {
+    color: '#666666',
+    fontSize: 16,
+    marginBottom: 48,
+    textAlign: 'center',
+  },
+  title: {
+    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });
 

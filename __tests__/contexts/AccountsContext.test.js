@@ -86,7 +86,7 @@ describe('AccountsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Load Error',
         'Failed to load accounts from database.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });
@@ -115,7 +115,7 @@ describe('AccountsContext', () => {
           name: 'New Account',
           balance: '100',
           currency: 'USD',
-        })
+        }),
       );
       expect(result.current.accounts).toHaveLength(initialLength + 1);
     });
@@ -138,7 +138,7 @@ describe('AccountsContext', () => {
       });
 
       expect(AccountsDB.createAccount).toHaveBeenCalledWith(
-        expect.objectContaining({ balance: '100' })
+        expect.objectContaining({ balance: '100' }),
       );
     });
 
@@ -163,7 +163,7 @@ describe('AccountsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to create account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });
@@ -248,7 +248,7 @@ describe('AccountsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to update account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });
@@ -329,7 +329,7 @@ describe('AccountsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to delete account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });

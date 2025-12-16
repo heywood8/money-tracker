@@ -193,7 +193,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
             }
           },
         },
-      ]
+      ],
     );
   }, [budget, deleteBudget, onClose, t, showDialog]);
 
@@ -345,7 +345,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                       {
                         flex: 1,
                         backgroundColor: colors.inputBackground,
-                        borderColor: colors.inputBorder
+                        borderColor: colors.inputBorder,
                       },
                     ]}
                     onPress={() => setShowEndDatePicker(true)}
@@ -548,42 +548,55 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxHeight: '85%',
-    minHeight: '60%',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-    flexDirection: 'column',
-  },
-  scrollView: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   categoryLabel: {
     fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',
+  },
+  clearButton: {
+    borderRadius: 4,
+    marginLeft: 8,
+    padding: 12,
+  },
+  closeButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    padding: 10,
+  },
+  currencyOption: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+  },
+  dateRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  deleteButtonContainer: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingVertical: 12,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  error: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  input: {
+    borderRadius: 4,
+    borderWidth: 1,
+    fontSize: 16,
+    padding: 12,
   },
   inputContainer: {
     marginBottom: 16,
@@ -592,69 +605,58 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 6,
   },
-  input: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    fontSize: 16,
-  },
-  pickerButton: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-  },
-  pickerValue: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalButton: {
     alignItems: 'center',
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  clearButton: {
-    marginLeft: 8,
-    borderRadius: 4,
-    padding: 12,
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  switchLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: 6,
     flex: 1,
-    marginRight: 12,
-  },
-  error: {
-    fontSize: 12,
-    marginTop: 4,
+    marginHorizontal: 8,
+    paddingVertical: 12,
   },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
   },
-  modalButton: {
-    flex: 1,
-    marginHorizontal: 8,
-    borderRadius: 6,
-    paddingVertical: 12,
-    alignItems: 'center',
+  modalContent: {
+    borderRadius: 12,
+    elevation: 5,
+    flexDirection: 'column',
+    maxHeight: '85%',
+    minHeight: '60%',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    width: '90%',
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  pickerButton: {
+    borderRadius: 4,
+    borderWidth: 1,
+    padding: 12,
   },
   pickerModalContent: {
-    width: '90%',
-    maxHeight: '60%',
     borderRadius: 12,
+    maxHeight: '60%',
     padding: 12,
+    width: '90%',
+  },
+  pickerOption: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
   },
   pickerTitle: {
     fontSize: 18,
@@ -662,31 +664,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
-  pickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-  },
-  currencyOption: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  closeButton: {
-    marginTop: 8,
-    alignSelf: 'center',
-    padding: 10,
-  },
-  deleteButtonContainer: {
-    flexDirection: 'row',
+  pickerValue: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    marginTop: 20,
-    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  scrollView: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  switchContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingVertical: 12,
+  },
+  switchLabel: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+    marginRight: 12,
   },
 });

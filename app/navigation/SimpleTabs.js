@@ -70,16 +70,16 @@ export default function SimpleTabs() {
 
   const renderActive = useCallback(() => {
     switch (active) {
-      case 'Operations':
-        return <OperationsScreen />;
-      case 'Accounts':
-        return <AccountsScreen />;
-      case 'Categories':
-        return <CategoriesScreen />;
-      case 'Graphs':
-        return <GraphsScreen />;
-      default:
-        return <OperationsScreen />;
+    case 'Operations':
+      return <OperationsScreen />;
+    case 'Accounts':
+      return <AccountsScreen />;
+    case 'Categories':
+      return <CategoriesScreen />;
+    case 'Graphs':
+      return <GraphsScreen />;
+    default:
+      return <OperationsScreen />;
     }
   }, [active]);
 
@@ -108,27 +108,27 @@ export default function SimpleTabs() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
-  tabBarSurface: {
-    elevation: 3,
-  },
-  tabBar: {
-    flexDirection: 'row',
+  indicator: {
+    bottom: 0,
+    height: 3,
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   tab: {
     flex: 1,
     minHeight: 56,
   },
+  tabBar: {
+    flexDirection: 'row',
+  },
+  tabBarSurface: {
+    elevation: 3,
+  },
   tabContent: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     position: 'relative',
-  },
-  indicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
   },
 });

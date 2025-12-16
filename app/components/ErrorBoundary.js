@@ -45,41 +45,41 @@ class ErrorBoundary extends React.Component {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#111',
-  },
-  message: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-    color: '#666',
-  },
   button: {
     backgroundColor: '#007AFF',
+    borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
+  container: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
   error: {
-    marginTop: 20,
-    fontSize: 12,
     color: '#ff0000',
     fontFamily: 'monospace',
+    fontSize: 12,
+    marginTop: 20,
+  },
+  message: {
+    color: '#666',
+    fontSize: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  title: {
+    color: '#111',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
 });
 

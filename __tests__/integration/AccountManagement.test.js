@@ -44,7 +44,7 @@ describe('Account Management Integration Tests', () => {
     it('completes full account lifecycle: create, read, update, delete', async () => {
       // Start with one existing account to prevent default creation
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' },
       ];
       let currentAccounts = [...initialAccounts];
 
@@ -147,7 +147,7 @@ describe('Account Management Integration Tests', () => {
     it('maintains data integrity through multiple operations', async () => {
       // Start with one existing account to prevent default creation
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' },
       ];
       let currentAccounts = [...initialAccounts];
 
@@ -230,7 +230,7 @@ describe('Account Management Integration Tests', () => {
   describe('Validation and Error Handling', () => {
     it('validates account before operations', async () => {
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
@@ -261,7 +261,7 @@ describe('Account Management Integration Tests', () => {
 
     it('handles database errors gracefully during CRUD operations', async () => {
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
@@ -347,7 +347,7 @@ describe('Account Management Integration Tests', () => {
   describe('Concurrent Operations', () => {
     it('handles multiple concurrent account additions', async () => {
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial Account', balance: '100', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
       
@@ -448,7 +448,7 @@ describe('Account Management Integration Tests', () => {
   describe('State Consistency', () => {
     it('maintains correct account order after operations', async () => {
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
       
@@ -486,7 +486,7 @@ describe('Account Management Integration Tests', () => {
 
     it('preserves account IDs across updates', async () => {
       const initialAccounts = [
-        { id: 'test-account', name: 'Test', balance: '100', currency: 'USD' }
+        { id: 'test-account', name: 'Test', balance: '100', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
@@ -513,7 +513,7 @@ describe('Account Management Integration Tests', () => {
   describe('Regression Tests', () => {
     it('prevents duplicate account IDs', async () => {
       const initialAccounts = [
-        { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' }
+        { id: 'initial-1', name: 'Initial', balance: '50', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
       
@@ -542,7 +542,7 @@ describe('Account Management Integration Tests', () => {
 
     it('ensures balance remains as string type', async () => {
       const initialAccounts = [
-        { id: 'test-1', name: 'Test', balance: '100', currency: 'USD' }
+        { id: 'test-1', name: 'Test', balance: '100', currency: 'USD' },
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
       

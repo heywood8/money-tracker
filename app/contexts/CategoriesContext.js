@@ -104,7 +104,7 @@ export const CategoriesProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to create category. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }
@@ -114,7 +114,7 @@ export const CategoriesProvider = ({ children }) => {
     try {
       await CategoriesDB.updateCategory(id, updates);
       setCategories(cats =>
-        cats.map(cat => (cat.id === id ? { ...cat, ...updates } : cat))
+        cats.map(cat => (cat.id === id ? { ...cat, ...updates } : cat)),
       );
       setSaveError(null);
     } catch (error) {
@@ -123,7 +123,7 @@ export const CategoriesProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to update category. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }
@@ -159,7 +159,7 @@ export const CategoriesProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to delete category. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }

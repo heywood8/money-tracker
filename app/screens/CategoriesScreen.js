@@ -67,7 +67,7 @@ const CategoriesScreen = () => {
           text: t('cancel'),
           style: 'cancel',
         },
-      ]
+      ],
     );
   }, [t, handleEditCategory, handleSetBudget, hasActiveBudget, showDialog]);
 
@@ -111,7 +111,7 @@ const CategoriesScreen = () => {
             styles.categoryRow,
             {
               backgroundColor: rowBackgroundColor,
-            }
+            },
           ]}
           onPress={() => {
             if (hasChildren) {
@@ -123,7 +123,7 @@ const CategoriesScreen = () => {
           onLongPress={() => handleCategoryLongPress(category)}
           accessibilityRole="button"
           accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
-          accessibilityHint={hasChildren ? "Double tap to expand or collapse" : "Double tap to edit"}
+          accessibilityHint={hasChildren ? 'Double tap to expand or collapse' : 'Double tap to edit'}
         >
           <View style={[styles.categoryContent, { paddingLeft: 16 + indentWidth }]}>
             {/* Expand/Collapse Icon */}
@@ -242,28 +242,14 @@ const CategoriesScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoryRow: {
-    minHeight: 44,
+  budgetIcon: {
+    marginLeft: 8,
   },
   categoryContent: {
+    alignItems: 'center',
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
     paddingRight: 16,
-  },
-  expandButton: {
-    width: 32,
-    height: 32,
-    marginRight: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 6,
   },
   categoryIcon: {
     marginRight: 12,
@@ -273,28 +259,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  budgetIcon: {
-    marginLeft: 8,
+  categoryRow: {
+    minHeight: 44,
   },
-  progressBarContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    paddingBottom: 12,
+  container: {
+    flex: 1,
   },
   emptyContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     paddingTop: 40,
   },
   emptyList: {
     flex: 1,
   },
+  expandButton: {
+    alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+    marginRight: 4,
+    width: 32,
+  },
   fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
     bottom: 0,
+    margin: 16,
+    position: 'absolute',
+    right: 0,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressBarContainer: {
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
 });
 

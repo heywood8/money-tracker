@@ -17,7 +17,7 @@ async function checkDatabase() {
     console.log('\n=== Database Version ===');
     const versionResult = await db.getAllAsync(
       'SELECT value FROM app_metadata WHERE key = ?',
-      ['db_version']
+      ['db_version'],
     );
 
     if (versionResult && versionResult.length > 0) {
@@ -29,7 +29,7 @@ async function checkDatabase() {
     // List all tables
     console.log('\n=== Tables ===');
     const tables = await db.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
     );
     console.log('Existing tables:', tables.map(t => t.name).join(', '));
 

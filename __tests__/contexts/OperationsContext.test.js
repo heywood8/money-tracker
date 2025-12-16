@@ -259,7 +259,7 @@ describe('OperationsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to create operation. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
 

@@ -114,13 +114,13 @@ export const BudgetsProvider = ({ children }) => {
       const duplicate = await BudgetsDB.findDuplicateBudget(
         budget.categoryId,
         budget.currency,
-        budget.periodType
+        budget.periodType,
       );
 
       if (duplicate) {
         throw new Error(
           'A budget already exists for this category, currency, and period type. ' +
-          'Please edit the existing budget or delete it first.'
+          'Please edit the existing budget or delete it first.',
         );
       }
 
@@ -169,12 +169,12 @@ export const BudgetsProvider = ({ children }) => {
           updatedBudget.categoryId,
           updatedBudget.currency,
           updatedBudget.periodType,
-          id // Exclude this budget from duplicate check
+          id, // Exclude this budget from duplicate check
         );
 
         if (duplicate) {
           throw new Error(
-            'A budget already exists for this category, currency, and period type.'
+            'A budget already exists for this category, currency, and period type.',
           );
         }
       }

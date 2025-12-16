@@ -220,7 +220,7 @@ export const OperationsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to create operation. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }
@@ -252,7 +252,7 @@ export const OperationsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to update operation. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }
@@ -277,7 +277,7 @@ export const OperationsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to delete operation. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw error;
     }

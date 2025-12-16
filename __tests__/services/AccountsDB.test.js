@@ -202,7 +202,7 @@ describe('AccountsDB', () => {
         expect.objectContaining({
           name: 'Updated Name',
           updatedAt: expect.any(String),
-        })
+        }),
       );
       expect(mockDrizzle.where).toHaveBeenCalled();
     });
@@ -217,7 +217,7 @@ describe('AccountsDB', () => {
         expect.objectContaining({
           balance: '200.00',
           updatedAt: expect.any(String),
-        })
+        }),
       );
     });
 
@@ -233,7 +233,7 @@ describe('AccountsDB', () => {
           balance: '150.00',
           currency: 'EUR',
           updatedAt: expect.any(String),
-        })
+        }),
       );
     });
 
@@ -261,7 +261,7 @@ describe('AccountsDB', () => {
 
       expect(db.queryFirst).toHaveBeenCalledWith(
         expect.stringContaining('SELECT COUNT(*) as count FROM operations'),
-        ['1', '1']
+        ['1', '1'],
       );
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockDrizzle.where).toHaveBeenCalled();
@@ -271,7 +271,7 @@ describe('AccountsDB', () => {
       db.queryFirst = jest.fn().mockResolvedValue({ count: 5 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
-        'Cannot delete account: 5 transaction(s) are associated with this account'
+        'Cannot delete account: 5 transaction(s) are associated with this account',
       );
 
       expect(mockDrizzle.delete).not.toHaveBeenCalled();
@@ -299,11 +299,11 @@ describe('AccountsDB', () => {
 
       expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
         'SELECT balance FROM accounts WHERE id = ?',
-        ['1']
+        ['1'],
       );
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-        ['150.00', expect.any(String), '1']
+        ['150.00', expect.any(String), '1'],
       );
     });
 
@@ -320,7 +320,7 @@ describe('AccountsDB', () => {
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-        ['70.00', expect.any(String), '1']
+        ['70.00', expect.any(String), '1'],
       );
     });
 
@@ -490,7 +490,7 @@ describe('AccountsDB', () => {
       db.queryFirst = jest.fn().mockResolvedValue({ count: 1 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
-        'Cannot delete account'
+        'Cannot delete account',
       );
     });
 
@@ -507,7 +507,7 @@ describe('AccountsDB', () => {
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.any(String),
-        ['1000000.00', expect.any(String), '1']
+        ['1000000.00', expect.any(String), '1'],
       );
     });
 
@@ -519,7 +519,7 @@ describe('AccountsDB', () => {
       expect(mockDrizzle.set).toHaveBeenCalledWith(
         expect.objectContaining({
           updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
-        })
+        }),
       );
     });
   });

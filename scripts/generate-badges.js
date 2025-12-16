@@ -15,7 +15,7 @@ const badges = [
   { name: 'statements', value: total.statements.pct },
   { name: 'branches', value: total.branches.pct },
   { name: 'functions', value: total.functions.pct },
-  { name: 'lines', value: total.lines.pct }
+  { name: 'lines', value: total.lines.pct },
 ];
 
 function getColor(percentage) {

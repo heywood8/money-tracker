@@ -96,7 +96,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
             onClose();
           },
         },
-      ]
+      ],
     );
   }, [category, deleteCategory, onClose, t, showDialog]);
 
@@ -137,123 +137,123 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
             >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {isNew ? t('add_category') : t('edit_category')}
-            </Text>
-
-            {/* Name Input */}
-            <TextInput
-              style={[
-                styles.input,
-                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-              ]}
-              value={values.name}
-              onChangeText={text => setValues(v => ({ ...v, name: text }))}
-              placeholder={t('category_name')}
-              placeholderTextColor={colors.mutedText}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
-
-            {/* Category Type Picker (Income/Expense) */}
-            <Pressable
-              style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => setCategoryTypePickerVisible(true)}
-            >
-              <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
-                {t('category_type')}
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {isNew ? t('add_category') : t('edit_category')}
               </Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <Text style={{ color: colors.text, fontSize: 16 }}>
-                  {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
-                </Text>
-                <Icon name="chevron-down" size={20} color={colors.text} />
-              </View>
-            </Pressable>
 
-            {/* Parent Picker */}
-            <Pressable
-              style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => setParentPickerVisible(true)}
-            >
-              <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
-                {t('parent_category')}
-              </Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <Text style={{ color: colors.text, fontSize: 16 }}>
-                  {getParentName(values.parentId)}
-                </Text>
-                <Icon name="chevron-down" size={20} color={colors.text} />
-              </View>
-            </Pressable>
-
-            {/* Icon Picker */}
-            <Pressable
-              style={[styles.iconPickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => setIconPickerVisible(true)}
-            >
-              <Icon name={values.icon || 'folder'} size={32} color={colors.text} />
-              <Text style={{ color: colors.mutedText, marginLeft: 12 }}>
-                {t('select_icon')}
-              </Text>
-            </Pressable>
-
-            {/* Exclude from Forecast Toggle */}
-            <View style={[styles.toggleRow, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-              <View style={styles.toggleLabelContainer}>
-                <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                  {t('exclude_from_forecast')}
-                </Text>
-                <Text style={[styles.toggleHint, { color: colors.mutedText }]}>
-                  {t('exclude_from_forecast_hint')}
-                </Text>
-              </View>
-              <Switch
-                value={values.excludeFromForecast || false}
-                onValueChange={(value) => setValues(v => ({ ...v, excludeFromForecast: value }))}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.card}
+              {/* Name Input */}
+              <TextInput
+                style={[
+                  styles.input,
+                  { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                ]}
+                value={values.name}
+                onChangeText={text => setValues(v => ({ ...v, name: text }))}
+                placeholder={t('category_name')}
+                placeholderTextColor={colors.mutedText}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
               />
-            </View>
 
-            {errors.general && <Text style={styles.error}>{errors.general}</Text>}
-
-            {/* Delete Button (only for existing categories) */}
-            {!isNew && (
+              {/* Category Type Picker (Income/Expense) */}
               <Pressable
-                style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
-                onPress={handleDelete}
+                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                onPress={() => setCategoryTypePickerVisible(true)}
               >
-                <Icon name="delete-outline" size={20} color={colors.delete} />
-                <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
-                  {t('delete_category')}
+                <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                  {t('category_type')}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <Text style={{ color: colors.text, fontSize: 16 }}>
+                    {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
+                  </Text>
+                  <Icon name="chevron-down" size={20} color={colors.text} />
+                </View>
+              </Pressable>
+
+              {/* Parent Picker */}
+              <Pressable
+                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                onPress={() => setParentPickerVisible(true)}
+              >
+                <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                  {t('parent_category')}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <Text style={{ color: colors.text, fontSize: 16 }}>
+                    {getParentName(values.parentId)}
+                  </Text>
+                  <Icon name="chevron-down" size={20} color={colors.text} />
+                </View>
+              </Pressable>
+
+              {/* Icon Picker */}
+              <Pressable
+                style={[styles.iconPickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                onPress={() => setIconPickerVisible(true)}
+              >
+                <Icon name={values.icon || 'folder'} size={32} color={colors.text} />
+                <Text style={{ color: colors.mutedText, marginLeft: 12 }}>
+                  {t('select_icon')}
                 </Text>
               </Pressable>
-            )}
-          </ScrollView>
 
-          {/* Action Buttons */}
-          <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: colors.secondary }]}
-              onPress={handleClose}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>
-                {t('cancel')}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: colors.primary }]}
-              onPress={handleSave}
-            >
-              <Text style={[styles.buttonText, { color: colors.text }]}>
-                {t('save')}
-              </Text>
-            </Pressable>
-          </View>
+              {/* Exclude from Forecast Toggle */}
+              <View style={[styles.toggleRow, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+                <View style={styles.toggleLabelContainer}>
+                  <Text style={[styles.toggleLabel, { color: colors.text }]}>
+                    {t('exclude_from_forecast')}
+                  </Text>
+                  <Text style={[styles.toggleHint, { color: colors.mutedText }]}>
+                    {t('exclude_from_forecast_hint')}
+                  </Text>
+                </View>
+                <Switch
+                  value={values.excludeFromForecast || false}
+                  onValueChange={(value) => setValues(v => ({ ...v, excludeFromForecast: value }))}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.card}
+                />
+              </View>
+
+              {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+
+              {/* Delete Button (only for existing categories) */}
+              {!isNew && (
+                <Pressable
+                  style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
+                  onPress={handleDelete}
+                >
+                  <Icon name="delete-outline" size={20} color={colors.delete} />
+                  <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
+                    {t('delete_category')}
+                  </Text>
+                </Pressable>
+              )}
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                onPress={handleClose}
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>
+                  {t('cancel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={handleSave}
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>
+                  {t('save')}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
       </KeyboardAvoidingView>
 
       {/* Icon Picker Modal */}
@@ -343,31 +343,78 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  closeButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    padding: 10,
+  },
+  deleteButtonContainer: {
     alignItems: 'center',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingVertical: 12,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  error: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  iconPickerButton: {
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 12,
+    padding: 12,
+  },
+  input: {
+    borderRadius: 4,
+    borderWidth: 1,
+    fontSize: 16,
+    marginBottom: 12,
+    padding: 12,
+  },
+  modalButton: {
+    alignItems: 'center',
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 8,
+    paddingVertical: 12,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   modalContent: {
-    width: '90%',
+    borderRadius: 12,
+    elevation: 5,
+    flexDirection: 'column',
     maxHeight: '80%',
     minHeight: '60%',
-    borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 5,
-    flexDirection: 'column',
+    width: '90%',
   },
-  scrollView: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    flex: 1,
+    justifyContent: 'center',
   },
   modalTitle: {
     fontSize: 20,
@@ -375,102 +422,55 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  input: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
+  parentOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   pickerButton: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: 'column',
     alignItems: 'flex-start',
-  },
-  iconPickerButton: {
-    borderWidth: 1,
     borderRadius: 4,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  toggleRow: {
     borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
+    flexDirection: 'column',
     marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: 12,
   },
-  toggleLabelContainer: {
-    flex: 1,
-    marginRight: 12,
+  pickerModalContent: {
+    borderRadius: 12,
+    maxHeight: '70%',
+    padding: 12,
+    width: '90%',
+  },
+  pickerOption: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  scrollView: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  toggleHint: {
+    fontSize: 12,
   },
   toggleLabel: {
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
   },
-  toggleHint: {
-    fontSize: 12,
+  toggleLabelContainer: {
+    flex: 1,
+    marginRight: 12,
   },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  modalButtonRow: {
+  toggleRow: {
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  modalButton: {
-    flex: 1,
-    marginHorizontal: 8,
-    borderRadius: 6,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  pickerModalContent: {
-    width: '90%',
-    maxHeight: '70%',
-    borderRadius: 12,
+    marginBottom: 12,
     padding: 12,
-  },
-  pickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-  },
-  parentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  closeButton: {
-    marginTop: 8,
-    alignSelf: 'center',
-    padding: 10,
-  },
-  deleteButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    marginTop: 20,
-    borderTopWidth: 1,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
   },
 });

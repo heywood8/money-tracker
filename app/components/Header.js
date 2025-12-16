@@ -53,7 +53,7 @@ export default function Header({ onOpenSettings }) {
         {
           backgroundColor: colors.surface,
           borderBottomColor: colors.border,
-        }
+        },
       ]}
     >
       <View style={styles.titleContainer}>
@@ -100,37 +100,37 @@ export default function Header({ onOpenSettings }) {
 }
 
 const styles = StyleSheet.create({
+  buttonContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
   container: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   icon: {
-    width: 50,
     height: 50,
     marginRight: 4,
+    width: 50,
   },
-  title: { fontSize: 14, fontWeight: '700' },
-  version: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  settingsButton: {
+    padding: 8,
   },
   themeButton: {
     padding: 8,
   },
-  settingsButton: {
-    padding: 8,
+  title: { fontSize: 14, fontWeight: '700' },
+  titleContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  version: {
+    fontSize: 10,
+    marginTop: 2,
   },
 });

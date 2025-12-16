@@ -13,12 +13,12 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
   const buttonStyle = useMemo(() => [
     styles.button,
     { borderColor: colors.border },
-    style
+    style,
   ], [colors.border, style]);
 
   const finalTextStyle = useMemo(() => [
     styles.buttonText,
-    textStyle
+    textStyle,
   ], [textStyle]);
 
   return (
@@ -143,43 +143,43 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   // Memoize display text style
   const displayTextStyle = useMemo(() => [
     styles.displayText,
-    { color: colors.text }
+    { color: colors.text },
   ], [colors.text]);
 
   // Memoize equals button text style
   const equalsButtonTextStyle = useMemo(() => [
     styles.equalsButtonText,
-    { color: colors.text }
+    { color: colors.text },
   ], [colors.text]);
 
   // Memoize button styles for better performance
   const operationButtonStyle = useMemo(() => ({
-    backgroundColor: colors.operationBackground || colors.surface
+    backgroundColor: colors.operationBackground || colors.surface,
   }), [colors.operationBackground, colors.surface]);
 
   const operationTextStyle = useMemo(() => ({
     color: colors.primary,
     fontSize: 24,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   }), [colors.primary]);
 
   const surfaceButtonStyle = useMemo(() => ({
-    backgroundColor: colors.surface
+    backgroundColor: colors.surface,
   }), [colors.surface]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
-    fontSize: 20
+    fontSize: 20,
   }), [colors.text]);
 
   const decimalTextStyle = useMemo(() => ({
     color: colors.text,
     fontSize: 24,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   }), [colors.text]);
 
   const deleteButtonStyle = useMemo(() => ({
-    backgroundColor: colors.deleteBackground || colors.surface
+    backgroundColor: colors.deleteBackground || colors.surface,
   }), [colors.deleteBackground, colors.surface]);
 
   return (
@@ -336,52 +336,14 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  display: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    marginBottom: 4,
-    minHeight: 40,
-  },
-  displayText: {
-    fontSize: 20,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  equalsButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 12,
-    paddingHorizontal: 4,
-  },
-  equalsButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  keypad: {
-    width: '100%',
-    gap: 3,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 3,
-  },
   button: {
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 5,
     borderWidth: 1,
     elevation: 2,
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
     shadowColor: '#7a7878ff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -390,5 +352,43 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  container: {
+    alignItems: 'center',
+    marginBottom: 8,
+    width: '100%',
+  },
+  display: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 4,
+    minHeight: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    width: '100%',
+  },
+  displayText: {
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  equalsButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+    paddingHorizontal: 4,
+  },
+  equalsButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  keypad: {
+    gap: 3,
+    width: '100%',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 3,
   },
 });

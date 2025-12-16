@@ -1,6 +1,6 @@
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
 // Mock Sentry to prevent open handle from AsyncExpiringMap timer
@@ -48,10 +48,10 @@ jest.mock('./drizzle/migrations', () => ({
     journal: {
       version: '7',
       dialect: 'sqlite',
-      entries: []
+      entries: [],
     },
-    migrations: {}
-  }
+    migrations: {},
+  },
 }));
 
 // Mock drizzle-orm migrator
@@ -210,7 +210,7 @@ beforeAll(() => {
     // Filter out expected error patterns that are part of normal test behavior
     // Combine all arguments into a single string for pattern matching
     const message = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+      typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
     ).join(' ');
     
     const suppressedPatterns = [
@@ -244,7 +244,7 @@ beforeAll(() => {
     ];
     
     const shouldSuppress = suppressedPatterns.some(pattern => 
-      message.includes(pattern)
+      message.includes(pattern),
     );
     
     if (!shouldSuppress) {
@@ -254,7 +254,7 @@ beforeAll(() => {
 
   console.warn = (...args) => {
     const message = args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+      typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
     ).join(' ');
     
     const suppressedPatterns = [
@@ -268,7 +268,7 @@ beforeAll(() => {
     ];
     
     const shouldSuppress = suppressedPatterns.some(pattern =>
-      message.includes(pattern)
+      message.includes(pattern),
     );
     
     if (!shouldSuppress) {

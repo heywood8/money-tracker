@@ -56,7 +56,7 @@ describe('OperationsDB Service', () => {
       const result = await OperationsDB.getAllOperations();
 
       expect(queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM operations ORDER BY date DESC, created_at DESC'
+        'SELECT * FROM operations ORDER BY date DESC, created_at DESC',
       );
       expect(result).toHaveLength(1);
       expect(result[0].accountId).toBe('acc1'); // Mapped to camelCase
@@ -87,7 +87,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryFirst).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE id = ?',
-        [1]
+        [1],
       );
       expect(result.accountId).toBe('acc1');
     });
@@ -111,7 +111,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE account_id = ? OR to_account_id = ? ORDER BY date DESC, created_at DESC',
-        ['acc1', 'acc1']
+        ['acc1', 'acc1'],
       );
     });
 
@@ -120,7 +120,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE category_id = ? ORDER BY date DESC, created_at DESC',
-        ['cat1']
+        ['cat1'],
       );
     });
 
@@ -129,7 +129,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
-        ['2025-12-01', '2025-12-31']
+        ['2025-12-01', '2025-12-31'],
       );
     });
 
@@ -138,7 +138,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE type = ? ORDER BY date DESC, created_at DESC',
-        ['expense']
+        ['expense'],
       );
     });
   });
@@ -170,18 +170,18 @@ describe('OperationsDB Service', () => {
           '2025-12-05',
           expect.any(String), // created_at
           'Test expense',
-        ])
+        ]),
       );
 
       // Should update account balance (expense reduces balance)
       expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
         'SELECT balance FROM accounts WHERE id = ?',
-        ['acc1']
+        ['acc1'],
       );
       expect(Currency.add).toHaveBeenCalledWith('1000', -100);
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-        expect.any(Array)
+        expect.any(Array),
       );
     });
 
@@ -272,7 +272,7 @@ describe('OperationsDB Service', () => {
       // Should still insert operation
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO operations'),
-        expect.any(Array)
+        expect.any(Array),
       );
 
       // Should not attempt balance update
@@ -338,7 +338,7 @@ describe('OperationsDB Service', () => {
       // Should update the operation
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE operations'),
-        ['200', 1]
+        ['200', 1],
       );
 
       // Should recalculate balance: reverse old (-(-100) = +100) + apply new (-200) = -100 net
@@ -393,7 +393,7 @@ describe('OperationsDB Service', () => {
       mockDb.getFirstAsync.mockResolvedValue(null);
 
       await expect(
-        OperationsDB.updateOperation('non-existent', { amount: '200' })
+        OperationsDB.updateOperation('non-existent', { amount: '200' }),
       ).rejects.toThrow('Operation non-existent not found');
     });
 
@@ -429,7 +429,7 @@ describe('OperationsDB Service', () => {
 
       // Should update with all fields
       const updateCall = mockDb.runAsync.mock.calls.find(call =>
-        call[0].includes('UPDATE operations')
+        call[0].includes('UPDATE operations'),
       );
       expect(updateCall[1]).toContain('income');
       expect(updateCall[1]).toContain('200');
@@ -458,7 +458,7 @@ describe('OperationsDB Service', () => {
       // Should delete the operation
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'DELETE FROM operations WHERE id = ?',
-        [1]
+        [1],
       );
 
       // Should reverse balance change (expense was -100, so reverse is +100)
@@ -491,7 +491,7 @@ describe('OperationsDB Service', () => {
       mockDb.getFirstAsync.mockResolvedValue(null);
 
       await expect(
-        OperationsDB.deleteOperation('non-existent')
+        OperationsDB.deleteOperation('non-existent'),
       ).rejects.toThrow('Operation non-existent not found');
     });
   });
@@ -504,7 +504,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryFirst).toHaveBeenCalledWith(
         expect.stringContaining('SUM'),
-        ['acc1', '2025-12-01', '2025-12-31']
+        ['acc1', '2025-12-01', '2025-12-31'],
       );
       expect(result).toBe(500.50);
     });
@@ -536,7 +536,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining('GROUP BY category_id'),
-        ['2025-12-01', '2025-12-31']
+        ['2025-12-01', '2025-12-31'],
       );
       expect(result).toHaveLength(2);
     });
@@ -546,7 +546,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining("type = 'income'"),
-        ['2025-12-01', '2025-12-31']
+        ['2025-12-01', '2025-12-31'],
       );
     });
 
@@ -555,7 +555,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining('JOIN accounts'),
-        ['USD', '2025-12-01', '2025-12-31']
+        ['USD', '2025-12-01', '2025-12-31'],
       );
     });
 
@@ -564,7 +564,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining("o.type = 'income'"),
-        ['EUR', '2025-12-01', '2025-12-31']
+        ['EUR', '2025-12-01', '2025-12-31'],
       );
     });
   });
@@ -578,7 +578,7 @@ describe('OperationsDB Service', () => {
       expect(exists).toBe(true);
       expect(queryFirst).toHaveBeenCalledWith(
         'SELECT 1 FROM operations WHERE id = ? LIMIT 1',
-        [1]
+        [1],
       );
     });
 
@@ -606,7 +606,7 @@ describe('OperationsDB Service', () => {
       expect(result.accountId).toBe('acc1');
       expect(queryFirst).toHaveBeenCalledWith(
         expect.stringContaining('c.is_shadow = 1'),
-        expect.any(Array)
+        expect.any(Array),
       );
     });
 
@@ -636,7 +636,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining('WHERE date >= ? AND date <= ?'),
-        expect.any(Array)
+        expect.any(Array),
       );
       expect(result).toHaveLength(1);
       expect(result[0].accountId).toBe('acc1');
@@ -654,7 +654,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryFirst).toHaveBeenCalledWith(
         'SELECT * FROM operations WHERE date < ? ORDER BY date DESC, created_at DESC LIMIT 1',
-        ['2025-12-01']
+        ['2025-12-01'],
       );
       expect(result.accountId).toBe('acc1');
     });
@@ -670,7 +670,7 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalledWith(
         expect.stringContaining('WHERE date >= ? AND date <= ?'),
-        expect.any(Array)
+        expect.any(Array),
       );
       expect(result).toHaveLength(2);
     });
@@ -754,7 +754,7 @@ describe('OperationsDB Service', () => {
           accountId: 'acc1',
           categoryId: 'cat1',
           date: '2025-12-05',
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -762,7 +762,7 @@ describe('OperationsDB Service', () => {
       mockDb.getFirstAsync.mockRejectedValue(new Error('Query failed'));
 
       await expect(
-        OperationsDB.updateOperation(1, { amount: '200' })
+        OperationsDB.updateOperation(1, { amount: '200' }),
       ).rejects.toThrow();
     });
 
@@ -790,7 +790,7 @@ describe('OperationsDB Service', () => {
 
       // Should not attempt balance update for zero amount
       const balanceUpdateCalls = mockDb.runAsync.mock.calls.filter(call =>
-        call[0].includes('UPDATE accounts')
+        call[0].includes('UPDATE accounts'),
       );
       expect(balanceUpdateCalls).toHaveLength(0);
     });

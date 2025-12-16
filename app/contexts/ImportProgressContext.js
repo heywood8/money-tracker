@@ -39,8 +39,8 @@ export const ImportProgressProvider = ({ children }) => {
   const updateStep = useCallback((stepId, status, data = null) => {
     setSteps(prevSteps =>
       prevSteps.map(step =>
-        step.id === stepId ? { ...step, status, data } : step
-      )
+        step.id === stepId ? { ...step, status, data } : step,
+      ),
     );
     if (status === 'in_progress') {
       setCurrentStep(stepId);

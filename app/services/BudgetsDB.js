@@ -103,7 +103,7 @@ export const createBudget = async (budget) => {
         budgetData.rollover_enabled,
         budgetData.created_at,
         budgetData.updated_at,
-      ]
+      ],
     );
 
     return mapBudgetFields(budgetData);
@@ -122,7 +122,7 @@ export const getBudgetById = async (id) => {
   try {
     const budget = await queryFirst(
       'SELECT * FROM budgets WHERE id = ?',
-      [id]
+      [id],
     );
     return mapBudgetFields(budget);
   } catch (error) {
@@ -138,7 +138,7 @@ export const getBudgetById = async (id) => {
 export const getAllBudgets = async () => {
   try {
     const budgets = await queryAll(
-      'SELECT * FROM budgets ORDER BY created_at DESC'
+      'SELECT * FROM budgets ORDER BY created_at DESC',
     );
     return (budgets || []).map(mapBudgetFields);
   } catch (error) {
@@ -156,7 +156,7 @@ export const getBudgetsByCategory = async (categoryId) => {
   try {
     const budgets = await queryAll(
       'SELECT * FROM budgets WHERE category_id = ? ORDER BY created_at DESC',
-      [categoryId]
+      [categoryId],
     );
     return (budgets || []).map(mapBudgetFields);
   } catch (error) {
@@ -174,7 +174,7 @@ export const getBudgetsByCurrency = async (currency) => {
   try {
     const budgets = await queryAll(
       'SELECT * FROM budgets WHERE currency = ? ORDER BY created_at DESC',
-      [currency]
+      [currency],
     );
     return (budgets || []).map(mapBudgetFields);
   } catch (error) {
@@ -192,7 +192,7 @@ export const getBudgetsByPeriodType = async (periodType) => {
   try {
     const budgets = await queryAll(
       'SELECT * FROM budgets WHERE period_type = ? ORDER BY created_at DESC',
-      [periodType]
+      [periodType],
     );
     return (budgets || []).map(mapBudgetFields);
   } catch (error) {
@@ -291,7 +291,7 @@ export const getActiveBudgets = async (date = new Date()) => {
        WHERE start_date <= ?
          AND (end_date IS NULL OR end_date >= ?)
        ORDER BY created_at ASC`,
-      [dateStr, dateStr]
+      [dateStr, dateStr],
     );
 
     return (budgets || []).map(mapBudgetFields);
@@ -317,7 +317,7 @@ export const hasActiveBudget = async (categoryId, date = new Date()) => {
          AND start_date <= ?
          AND (end_date IS NULL OR end_date >= ?)
        LIMIT 1`,
-      [categoryId, dateStr, dateStr]
+      [categoryId, dateStr, dateStr],
     );
 
     return !!result;
@@ -334,7 +334,7 @@ export const hasActiveBudget = async (categoryId, date = new Date()) => {
 export const getRecurringBudgets = async () => {
   try {
     const budgets = await queryAll(
-      'SELECT * FROM budgets WHERE is_recurring = 1 ORDER BY created_at ASC'
+      'SELECT * FROM budgets WHERE is_recurring = 1 ORDER BY created_at ASC',
     );
     return (budgets || []).map(mapBudgetFields);
   } catch (error) {
@@ -388,30 +388,30 @@ export const getCurrentPeriodDates = (periodType, referenceDate = new Date()) =>
   const end = new Date(referenceDate);
 
   switch (periodType) {
-    case 'weekly':
-      // Week starts on Sunday (0) and ends on Saturday (6)
-      const dayOfWeek = start.getDay();
-      start.setDate(start.getDate() - dayOfWeek);
-      end.setDate(start.getDate() + 6);
-      break;
+  case 'weekly':
+    // Week starts on Sunday (0) and ends on Saturday (6)
+    const dayOfWeek = start.getDay();
+    start.setDate(start.getDate() - dayOfWeek);
+    end.setDate(start.getDate() + 6);
+    break;
 
-    case 'monthly':
-      // Month starts on 1st and ends on last day
-      start.setDate(1);
-      end.setMonth(end.getMonth() + 1);
-      end.setDate(0); // Last day of month
-      break;
+  case 'monthly':
+    // Month starts on 1st and ends on last day
+    start.setDate(1);
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0); // Last day of month
+    break;
 
-    case 'yearly':
-      // Year starts on Jan 1 and ends on Dec 31
-      start.setMonth(0);
-      start.setDate(1);
-      end.setMonth(11);
-      end.setDate(31);
-      break;
+  case 'yearly':
+    // Year starts on Jan 1 and ends on Dec 31
+    start.setMonth(0);
+    start.setDate(1);
+    end.setMonth(11);
+    end.setDate(31);
+    break;
 
-    default:
-      throw new Error(`Invalid period type: ${periodType}`);
+  default:
+    throw new Error(`Invalid period type: ${periodType}`);
   }
 
   // Set time to start/end of day
@@ -431,15 +431,15 @@ export const getNextPeriodDates = (periodType, currentStart) => {
   const nextStart = new Date(currentStart);
 
   switch (periodType) {
-    case 'weekly':
-      nextStart.setDate(nextStart.getDate() + 7);
-      break;
-    case 'monthly':
-      nextStart.setMonth(nextStart.getMonth() + 1);
-      break;
-    case 'yearly':
-      nextStart.setFullYear(nextStart.getFullYear() + 1);
-      break;
+  case 'weekly':
+    nextStart.setDate(nextStart.getDate() + 7);
+    break;
+  case 'monthly':
+    nextStart.setMonth(nextStart.getMonth() + 1);
+    break;
+  case 'yearly':
+    nextStart.setFullYear(nextStart.getFullYear() + 1);
+    break;
   }
 
   return getCurrentPeriodDates(periodType, nextStart);
@@ -455,15 +455,15 @@ export const getPreviousPeriodDates = (periodType, currentStart) => {
   const prevStart = new Date(currentStart);
 
   switch (periodType) {
-    case 'weekly':
-      prevStart.setDate(prevStart.getDate() - 7);
-      break;
-    case 'monthly':
-      prevStart.setMonth(prevStart.getMonth() - 1);
-      break;
-    case 'yearly':
-      prevStart.setFullYear(prevStart.getFullYear() - 1);
-      break;
+  case 'weekly':
+    prevStart.setDate(prevStart.getDate() - 7);
+    break;
+  case 'monthly':
+    prevStart.setMonth(prevStart.getMonth() - 1);
+    break;
+  case 'yearly':
+    prevStart.setFullYear(prevStart.getFullYear() - 1);
+    break;
   }
 
   return getCurrentPeriodDates(periodType, prevStart);
@@ -483,7 +483,7 @@ export const calculateSpendingForBudget = async (
   currency,
   startDate,
   endDate,
-  includeChildren = true
+  includeChildren = true,
 ) => {
   try {
     let categoryIds = [categoryId];
@@ -541,7 +541,7 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
       budget.currency,
       startDateStr,
       endDateStr,
-      true // Include children
+      true, // Include children
     );
 
     // Calculate metrics
@@ -615,7 +615,7 @@ export const budgetExists = async (id) => {
   try {
     const result = await queryFirst(
       'SELECT 1 FROM budgets WHERE id = ? LIMIT 1',
-      [id]
+      [id],
     );
     return !!result;
   } catch (error) {

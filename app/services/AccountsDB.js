@@ -52,7 +52,7 @@ export const createAccount = async (account) => {
 
     // Get max order value and add 1 for new account
     const maxOrderResult = await db.select({
-      maxOrder: sql`MAX(${accounts.displayOrder})`
+      maxOrder: sql`MAX(${accounts.displayOrder})`,
     }).from(accounts);
 
     const newOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
@@ -129,11 +129,11 @@ export const transferOperations = async (fromAccountId, toAccountId) => {
       // Verify both accounts exist and have the same currency
       const fromAccount = await db.getFirstAsync(
         'SELECT id, currency FROM accounts WHERE id = ?',
-        [fromAccountId]
+        [fromAccountId],
       );
       const toAccount = await db.getFirstAsync(
         'SELECT id, currency FROM accounts WHERE id = ?',
-        [toAccountId]
+        [toAccountId],
       );
 
       if (!fromAccount) {
@@ -144,20 +144,20 @@ export const transferOperations = async (fromAccountId, toAccountId) => {
       }
       if (fromAccount.currency !== toAccount.currency) {
         throw new Error(
-          `Cannot transfer operations: accounts have different currencies (${fromAccount.currency} → ${toAccount.currency})`
+          `Cannot transfer operations: accounts have different currencies (${fromAccount.currency} → ${toAccount.currency})`,
         );
       }
 
       // Update operations where the account is the source (account_id)
       const sourceResult = await db.runAsync(
         'UPDATE operations SET account_id = ? WHERE account_id = ?',
-        [toAccountId, fromAccountId]
+        [toAccountId, fromAccountId],
       );
 
       // Update operations where the account is the destination (to_account_id) for transfers
       const destResult = await db.runAsync(
         'UPDATE operations SET to_account_id = ? WHERE to_account_id = ?',
-        [toAccountId, fromAccountId]
+        [toAccountId, fromAccountId],
       );
 
       const totalTransferred = (sourceResult.changes || 0) + (destResult.changes || 0);
@@ -181,7 +181,7 @@ export const getOperationCount = async (id) => {
     const result = await queryFirst(
       `SELECT COUNT(*) as count FROM operations
        WHERE account_id = ? OR to_account_id = ?`,
-      [id, id]
+      [id, id],
     );
     return result ? result.count : 0;
   } catch (error) {
@@ -206,7 +206,7 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
       if (!transferToAccountId) {
         // No transfer account specified, throw error with count
         throw new Error(
-          `Cannot delete account: ${operationCount} transaction(s) are associated with this account. Please delete or reassign the transactions first.`
+          `Cannot delete account: ${operationCount} transaction(s) are associated with this account. Please delete or reassign the transactions first.`,
         );
       }
 
@@ -236,7 +236,7 @@ export const updateAccountBalance = async (id, delta) => {
       // Get current balance
       const account = await db.getFirstAsync(
         'SELECT balance FROM accounts WHERE id = ?',
-        [id]
+        [id],
       );
 
       if (!account) {
@@ -249,7 +249,7 @@ export const updateAccountBalance = async (id, delta) => {
       // Update balance
       await db.runAsync(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-        [newBalance, new Date().toISOString(), id]
+        [newBalance, new Date().toISOString(), id],
       );
 
       // Update today's balance history
@@ -281,7 +281,7 @@ export const batchUpdateBalances = async (balanceChanges) => {
         // Get current balance
         const account = await db.getFirstAsync(
           'SELECT balance FROM accounts WHERE id = ?',
-          [accountId]
+          [accountId],
         );
 
         if (!account) {
@@ -295,7 +295,7 @@ export const batchUpdateBalances = async (balanceChanges) => {
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance, now, accountId]
+          [newBalance, now, accountId],
         );
 
         // Update today's balance history
@@ -359,7 +359,7 @@ export const reorderAccounts = async (orderedAccounts) => {
       for (const { id, display_order } of orderedAccounts) {
         await db.runAsync(
           'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
-          [display_order, now, id]
+          [display_order, now, id],
         );
       }
     });
@@ -392,7 +392,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       // Get current balance
       const account = await db.getFirstAsync(
         'SELECT balance FROM accounts WHERE id = ?',
-        [accountId]
+        [accountId],
       );
 
       if (!account) {
@@ -412,7 +412,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
            AND c.is_shadow = 1
          ORDER BY o.created_at DESC
          LIMIT 1`,
-        [accountId, today]
+        [accountId, today],
       );
 
       let originalBalance;
@@ -454,14 +454,14 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
       // Get shadow categories
       const shadowCategories = await db.getAllAsync(
-        'SELECT * FROM categories WHERE is_shadow = 1'
+        'SELECT * FROM categories WHERE is_shadow = 1',
       );
 
       const shadowExpenseCategory = shadowCategories.find(
-        c => c.category_type === 'expense' && c.is_shadow === 1
+        c => c.category_type === 'expense' && c.is_shadow === 1,
       );
       const shadowIncomeCategory = shadowCategories.find(
-        c => c.category_type === 'income' && c.is_shadow === 1
+        c => c.category_type === 'income' && c.is_shadow === 1,
       );
 
       if (!shadowExpenseCategory || !shadowIncomeCategory) {
@@ -502,7 +502,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
           await db.runAsync(
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-            [newBalanceValue, new Date().toISOString(), accountId]
+            [newBalanceValue, new Date().toISOString(), accountId],
           );
 
           // Update today's balance history
@@ -512,7 +512,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           console.log('Updating existing adjustment operation:', existingOperation.id);
           await db.runAsync(
             'UPDATE operations SET type = ?, amount = ?, category_id = ?, description = ? WHERE id = ?',
-            [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id]
+            [operationType, absoluteDelta.toFixed(2), categoryId, fullDescription, existingOperation.id],
           );
           console.log('Adjustment operation updated successfully');
 
@@ -539,7 +539,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           const newBalanceValue = Currency.add(currentBalance, balanceAdjustment);
           await db.runAsync(
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-            [newBalanceValue, new Date().toISOString(), accountId]
+            [newBalanceValue, new Date().toISOString(), accountId],
           );
 
           // Update today's balance history
@@ -568,7 +568,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
             today,
             new Date().toISOString(),
             fullDescription,
-          ]
+          ],
         );
         console.log('Adjustment operation created successfully');
 
@@ -578,7 +578,7 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
 
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalanceValue, new Date().toISOString(), accountId]
+          [newBalanceValue, new Date().toISOString(), accountId],
         );
 
         // Update today's balance history

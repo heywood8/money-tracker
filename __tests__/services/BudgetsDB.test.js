@@ -219,7 +219,7 @@ describe('BudgetsDB Service', () => {
             'USD',
             'monthly',
             '2025-01-01',
-          ])
+          ]),
         );
       });
 
@@ -250,7 +250,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.any(String),
-          expect.arrayContaining([1]) // is_recurring defaults to 1
+          expect.arrayContaining([1]), // is_recurring defaults to 1
         );
       });
 
@@ -269,7 +269,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.any(String),
-          expect.arrayContaining([1]) // rollover_enabled set to 1
+          expect.arrayContaining([1]), // rollover_enabled set to 1
         );
       });
     });
@@ -295,7 +295,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryFirst).toHaveBeenCalledWith(
           'SELECT * FROM budgets WHERE id = ?',
-          ['budget1']
+          ['budget1'],
         );
         expect(result.categoryId).toBe('cat1');
         expect(result.isRecurring).toBe(true);
@@ -333,7 +333,7 @@ describe('BudgetsDB Service', () => {
         const result = await BudgetsDB.getAllBudgets();
 
         expect(queryAll).toHaveBeenCalledWith(
-          'SELECT * FROM budgets ORDER BY created_at DESC'
+          'SELECT * FROM budgets ORDER BY created_at DESC',
         );
         expect(result).toHaveLength(1);
         expect(result[0].categoryId).toBe('cat1');
@@ -371,7 +371,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryAll).toHaveBeenCalledWith(
           'SELECT * FROM budgets WHERE category_id = ? ORDER BY created_at DESC',
-          ['cat1']
+          ['cat1'],
         );
         expect(result).toHaveLength(1);
       });
@@ -400,7 +400,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryAll).toHaveBeenCalledWith(
           'SELECT * FROM budgets WHERE currency = ? ORDER BY created_at DESC',
-          ['EUR']
+          ['EUR'],
         );
         expect(result).toHaveLength(1);
       });
@@ -429,7 +429,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryAll).toHaveBeenCalledWith(
           'SELECT * FROM budgets WHERE period_type = ? ORDER BY created_at DESC',
-          ['weekly']
+          ['weekly'],
         );
         expect(result).toHaveLength(1);
       });
@@ -444,7 +444,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('UPDATE budgets SET'),
-          expect.arrayContaining(['750.00', 'EUR', 'budget1'])
+          expect.arrayContaining(['750.00', 'EUR', 'budget1']),
         );
       });
 
@@ -455,7 +455,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringMatching(/UPDATE budgets SET amount = \?, updated_at = \? WHERE id = \?/),
-          expect.arrayContaining(['1000.00', 'budget1'])
+          expect.arrayContaining(['1000.00', 'budget1']),
         );
       });
 
@@ -472,7 +472,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('is_recurring = ?'),
-          expect.arrayContaining([0])
+          expect.arrayContaining([0]),
         );
       });
 
@@ -483,7 +483,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('rollover_enabled = ?'),
-          expect.arrayContaining([1])
+          expect.arrayContaining([1]),
         );
       });
 
@@ -494,7 +494,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('end_date = ?'),
-          expect.arrayContaining([null])
+          expect.arrayContaining([null]),
         );
       });
     });
@@ -505,7 +505,7 @@ describe('BudgetsDB Service', () => {
 
         expect(executeQuery).toHaveBeenCalledWith(
           'DELETE FROM budgets WHERE id = ?',
-          ['budget1']
+          ['budget1'],
         );
       });
     });
@@ -535,7 +535,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryAll).toHaveBeenCalledWith(
           expect.stringContaining('WHERE start_date <= ?'),
-          expect.arrayContaining([expect.any(String), expect.any(String)])
+          expect.arrayContaining([expect.any(String), expect.any(String)]),
         );
         expect(result).toHaveLength(1);
       });
@@ -548,7 +548,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryAll).toHaveBeenCalledWith(
           expect.any(String),
-          ['2025-06-15', '2025-06-15']
+          ['2025-06-15', '2025-06-15'],
         );
       });
     });
@@ -578,7 +578,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryFirst).toHaveBeenCalledWith(
           expect.any(String),
-          ['cat1', '2025-06-15', '2025-06-15']
+          ['cat1', '2025-06-15', '2025-06-15'],
         );
       });
     });
@@ -605,7 +605,7 @@ describe('BudgetsDB Service', () => {
         const result = await BudgetsDB.getRecurringBudgets();
 
         expect(queryAll).toHaveBeenCalledWith(
-          'SELECT * FROM budgets WHERE is_recurring = 1 ORDER BY created_at ASC'
+          'SELECT * FROM budgets WHERE is_recurring = 1 ORDER BY created_at ASC',
         );
         expect(result).toHaveLength(1);
       });
@@ -641,7 +641,7 @@ describe('BudgetsDB Service', () => {
 
         expect(queryFirst).toHaveBeenCalledWith(
           expect.stringContaining('AND id != ?'),
-          ['cat1', 'USD', 'monthly', 'budget1']
+          ['cat1', 'USD', 'monthly', 'budget1'],
         );
       });
 
@@ -767,7 +767,7 @@ describe('BudgetsDB Service', () => {
           'USD',
           '2025-12-01',
           '2025-12-31',
-          false
+          false,
         );
 
         expect(result).toBe(250.50);
@@ -785,13 +785,13 @@ describe('BudgetsDB Service', () => {
           'USD',
           '2025-12-01',
           '2025-12-31',
-          true
+          true,
         );
 
         expect(CategoriesDB.getAllDescendants).toHaveBeenCalledWith('cat1');
         expect(queryFirst).toHaveBeenCalledWith(
           expect.stringContaining('category_id IN (?,?,?)'),
-          expect.arrayContaining(['cat1', 'cat2', 'cat3', 'USD', '2025-12-01', '2025-12-31'])
+          expect.arrayContaining(['cat1', 'cat2', 'cat3', 'USD', '2025-12-01', '2025-12-31']),
         );
       });
 
@@ -804,7 +804,7 @@ describe('BudgetsDB Service', () => {
           'USD',
           '2025-12-01',
           '2025-12-31',
-          false
+          false,
         );
 
         expect(result).toBe(0);

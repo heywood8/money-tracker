@@ -77,7 +77,7 @@ export default function SettingsModal({ visible, onClose }) {
       showDialog(
         t('backup_database') || 'Backup Database',
         t('backup_success') || 'Backup exported successfully',
-        [{ text: 'OK', onPress: onClose }]
+        [{ text: 'OK', onPress: onClose }],
       );
     } catch (error) {
       console.error('Export backup error:', error);
@@ -86,7 +86,7 @@ export default function SettingsModal({ visible, onClose }) {
         error.message === 'Import cancelled'
           ? t('cancel') || 'Cancelled'
           : t('backup_error') || 'Failed to create backup',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     }
   }, [closeExportFormatModal, t, showDialog, onClose]);
@@ -109,7 +109,7 @@ export default function SettingsModal({ visible, onClose }) {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -168,12 +168,12 @@ export default function SettingsModal({ visible, onClose }) {
                 error.message === 'Import cancelled'
                   ? t('cancel') || 'Cancelled'
                   : error.message || t('restore_error') || 'Failed to restore backup',
-                [{ text: 'OK' }]
+                [{ text: 'OK' }],
               );
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -233,79 +233,79 @@ export default function SettingsModal({ visible, onClose }) {
             transform: [{ translateX: settingsTranslateX }],
             opacity: settingsOpacity,
           },
-          (languageModalVisible || exportFormatModalVisible) && styles.hidden
+          (languageModalVisible || exportFormatModalVisible) && styles.hidden,
         ]}>
           <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
 
           <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-        <TouchableRipple
-          onPress={openLanguageModal}
-          style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
-          borderless={false}
-        >
-          <View style={styles.languageSelectorContent}>
-            <Text style={[styles.languageText, { color: colors.text }]}>
-              {t(localLang === 'en' ? 'english' : localLang === 'ru' ? 'russian' : localLang === 'es' ? 'spanish' : localLang === 'fr' ? 'french' : localLang === 'zh' ? 'chinese' : localLang === 'de' ? 'german' : localLang)}
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          <TouchableRipple
+            onPress={openLanguageModal}
+            style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
+            borderless={false}
+          >
+            <View style={styles.languageSelectorContent}>
+              <Text style={[styles.languageText, { color: colors.text }]}>
+                {t(localLang === 'en' ? 'english' : localLang === 'ru' ? 'russian' : localLang === 'es' ? 'spanish' : localLang === 'fr' ? 'french' : localLang === 'zh' ? 'chinese' : localLang === 'de' ? 'german' : localLang)}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <Divider style={styles.divider} />
+
+          <Text variant="titleMedium" style={styles.subtitle}>{t('database') || 'Database'}</Text>
+
+          <View style={styles.buttonRow}>
+            <Button
+              mode="contained"
+              onPress={handleExportBackup}
+              style={styles.actionButton}
+              icon="export"
+            >
+              {t('export_backup') || 'Export Backup'}
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleImportBackup}
+              style={styles.actionButton}
+              icon="import"
+            >
+              {t('import_backup') || 'Import Backup'}
+            </Button>
           </View>
-        </TouchableRipple>
 
-        <Divider style={styles.divider} />
+          <View style={styles.resetButtonContainer}>
+            <Button
+              mode="outlined"
+              textColor="#b33"
+              onPress={handleResetDatabase}
+              style={styles.resetButton}
+              icon="delete-forever"
+            >
+              {t('reset_database') || 'Reset Database'}
+            </Button>
+          </View>
 
-        <Text variant="titleMedium" style={styles.subtitle}>{t('database') || 'Database'}</Text>
-
-        <View style={styles.buttonRow}>
-          <Button
-            mode="contained"
-            onPress={handleExportBackup}
-            style={styles.actionButton}
-            icon="export"
-          >
-            {t('export_backup') || 'Export Backup'}
-          </Button>
-          <Button
-            mode="contained"
-            onPress={handleImportBackup}
-            style={styles.actionButton}
-            icon="import"
-          >
-            {t('import_backup') || 'Import Backup'}
-          </Button>
-        </View>
-
-        <View style={styles.resetButtonContainer}>
-          <Button
-            mode="outlined"
-            textColor="#b33"
-            onPress={handleResetDatabase}
-            style={styles.resetButton}
-            icon="delete-forever"
-          >
-            {t('reset_database') || 'Reset Database'}
-          </Button>
-        </View>
-
-        <View style={styles.modalButtonRow}>
-          <Button
-            mode="outlined"
-            onPress={onClose}
-            style={[styles.modalButton, { borderColor: '#999' }]}
-            textColor="#888"
-          >
-            {t('cancel') || 'Cancel'}
-          </Button>
-          <Button
-            mode="contained"
-            onPress={() => {
-              setLanguage(localLang);
-              onClose();
-            }}
-            style={styles.modalButton}
-          >
-            {t('save') || 'Save'}
-          </Button>
-        </View>
+          <View style={styles.modalButtonRow}>
+            <Button
+              mode="outlined"
+              onPress={onClose}
+              style={[styles.modalButton, { borderColor: '#999' }]}
+              textColor="#888"
+            >
+              {t('cancel') || 'Cancel'}
+            </Button>
+            <Button
+              mode="contained"
+              onPress={() => {
+                setLanguage(localLang);
+                onClose();
+              }}
+              style={styles.modalButton}
+            >
+              {t('save') || 'Save'}
+            </Button>
+          </View>
         </Animated.View>
 
         <Animated.View style={[
@@ -315,7 +315,7 @@ export default function SettingsModal({ visible, onClose }) {
             transform: [{ translateX: languageTranslateX }],
             opacity: languageOpacity,
           },
-          !languageModalVisible && styles.hidden
+          !languageModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
             <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
@@ -359,7 +359,7 @@ export default function SettingsModal({ visible, onClose }) {
             transform: [{ translateX: exportFormatTranslateX }],
             opacity: exportFormatOpacity,
           },
-          !exportFormatModalVisible && styles.hidden
+          !exportFormatModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
             <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton}>
@@ -441,114 +441,114 @@ export default function SettingsModal({ visible, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  modalWrapper: {
+  actionButton: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  content: {
-    margin: 20,
-    borderRadius: 12,
-    padding: 24,
-    maxHeight: '90%',
-  },
-  hidden: {
-    position: 'absolute',
-    opacity: 0,
-    pointerEvents: 'none',
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  languageSelector: {
-    marginTop: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  languageSelectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  languageText: {
-    fontSize: 16,
-  },
-  languageModalContent: {
-    margin: 20,
-    borderRadius: 12,
-    padding: 0,
-    maxHeight: '80%',
-  },
-  languageModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
   },
   backButton: {
-    width: 40,
+    alignItems: 'center',
     height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
+    width: 40,
   },
-  languageModalTitle: {
-    fontWeight: '600',
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    marginTop: 8,
   },
-  languageList: {
-    paddingVertical: 8,
+  content: {
+    borderRadius: 12,
+    margin: 20,
+    maxHeight: '90%',
+    padding: 24,
+  },
+  divider: {
+    marginVertical: 12,
+  },
+  formatDescription: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  hidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+    position: 'absolute',
   },
   languageItem: {
     paddingHorizontal: 16,
   },
   languageItemContent: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 16,
   },
   languageItemText: {
     fontSize: 16,
   },
-  formatDescription: {
-    fontSize: 12,
-    marginTop: 4,
+  languageList: {
+    paddingVertical: 8,
   },
-  divider: {
-    marginVertical: 12,
+  languageModalContent: {
+    borderRadius: 12,
+    margin: 20,
+    maxHeight: '80%',
+    padding: 0,
   },
-  buttonRow: {
+  languageModalHeader: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  actionButton: {
+  languageModalTitle: {
+    fontWeight: '600',
+  },
+  languageSelector: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  languageSelectorContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  languageText: {
+    fontSize: 16,
+  },
+  modalButton: {
     flex: 1,
   },
-  resetButtonContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 8,
+  modalButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  modalWrapper: {
+    flex: 1,
+    justifyContent: 'center',
   },
   resetButton: {
     maxWidth: 300,
   },
-  modalButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    gap: 8,
+  resetButtonContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 8,
   },
-  modalButton: {
-    flex: 1,
+  subtitle: {
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  title: {
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });
