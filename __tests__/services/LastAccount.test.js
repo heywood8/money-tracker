@@ -18,7 +18,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        'account123'
+        'account123',
       );
     });
 
@@ -28,7 +28,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(
         'last_accessed_account_id',
-        'account2'
+        'account2',
       );
     });
 
@@ -37,7 +37,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        ''
+        '',
       );
     });
 
@@ -47,7 +47,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        uuid
+        uuid,
       );
     });
 
@@ -63,7 +63,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        null
+        null,
       );
     });
 
@@ -72,7 +72,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        undefined
+        undefined,
       );
     });
   });
@@ -183,7 +183,7 @@ describe('LastAccount Service', () => {
       expect(AsyncStorage.setItem).toHaveBeenCalledTimes(5);
       expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(
         'last_accessed_account_id',
-        'account5'
+        'account5',
       );
     });
   });
@@ -219,7 +219,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        longId
+        longId,
       );
     });
 
@@ -229,7 +229,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        specialId
+        specialId,
       );
     });
 
@@ -239,7 +239,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        unicodeId
+        unicodeId,
       );
     });
   });
@@ -289,7 +289,7 @@ describe('LastAccount Service', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'last_accessed_account_id',
-        'test'
+        'test',
       );
     });
 

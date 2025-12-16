@@ -47,7 +47,7 @@ export const checkBudgetsTableExists = async () => {
   try {
     const { raw } = await getDatabase();
     const result = await raw.getFirstAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'",
     );
     return result !== null;
   } catch (error) {
@@ -66,7 +66,7 @@ export const getDatabaseVersion = async () => {
     const { raw } = await getDatabase();
     const result = await raw.getFirstAsync(
       'SELECT value FROM app_metadata WHERE key = ?',
-      ['db_version']
+      ['db_version'],
     );
     return result ? parseInt(result.value) : 0;
   } catch (error) {

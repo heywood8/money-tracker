@@ -33,7 +33,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
           activeOpacity: 0.7,
           accessibilityRole: 'button',
           accessibilityLabel: `View details for ${item.name}`,
-          accessibilityHint: 'Double tap to filter by this category'
+          accessibilityHint: 'Double tap to filter by this category',
         } : {};
 
         return (
@@ -42,7 +42,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             style={[
               styles.legendItem,
               { borderBottomColor: colors.border },
-              isClickable && item.categoryId && styles.legendItemClickable
+              isClickable && item.categoryId && styles.legendItemClickable,
             ]}
             {...wrapperProps}
           >
@@ -137,7 +137,7 @@ const GraphsScreen = () => {
           }
         }
       },
-    })
+    }),
   ).current;
 
   // Handlers for legend item clicks
@@ -161,7 +161,7 @@ const GraphsScreen = () => {
   const monthKeys = [
     'month_january', 'month_february', 'month_march', 'month_april',
     'month_may', 'month_june', 'month_july', 'month_august',
-    'month_september', 'month_october', 'month_november', 'month_december'
+    'month_september', 'month_october', 'month_november', 'month_december',
   ];
 
   // Get available years from database (extract unique years from availableMonths)
@@ -202,13 +202,13 @@ const GraphsScreen = () => {
 
         // Filter top-level expense categories (no parent, expense type, not shadow)
         const topLevel = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow
+          cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow,
         );
         setTopLevelCategories(topLevel);
 
         // Filter top-level income categories (no parent, income type)
         const topLevelIncome = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'income'
+          cat.parentId === null && cat.categoryType === 'income',
         );
         setTopLevelIncomeCategories(topLevelIncome);
       } catch (error) {
@@ -272,7 +272,7 @@ const GraphsScreen = () => {
       const spending = await getSpendingByCategoryAndCurrency(
         selectedCurrency,
         startDateStr,
-        endDateStr
+        endDateStr,
       );
 
       // Create a map of category ID to category object
@@ -409,7 +409,7 @@ const GraphsScreen = () => {
       const chartColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
         '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF9F40',
-        '#FFCE56', '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0'
+        '#FFCE56', '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0',
       ];
 
       // Transform aggregated data for pie chart
@@ -477,7 +477,7 @@ const GraphsScreen = () => {
       const income = await getIncomeByCategoryAndCurrency(
         selectedCurrency,
         startDateStr,
-        endDateStr
+        endDateStr,
       );
 
       // Create a map of category ID to category object
@@ -560,7 +560,7 @@ const GraphsScreen = () => {
       const chartColors = [
         '#4BC0C0', '#36A2EB', '#9966FF', '#FF9F40', '#FFCE56',
         '#FF6384', '#C9CBCF', '#4BC0C0', '#FF9F40', '#FFCE56',
-        '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0', '#FF9F40'
+        '#36A2EB', '#9966FF', '#FF6384', '#4BC0C0', '#FF9F40',
       ];
 
       // Transform aggregated data for pie chart
@@ -785,8 +785,8 @@ const GraphsScreen = () => {
       // Update table data
       setBalanceHistoryTableData(prevData =>
         prevData.map(item =>
-          item.date === date ? { ...item, balance: editingBalanceValue } : item
-        )
+          item.date === date ? { ...item, balance: editingBalanceValue } : item,
+        ),
       );
 
       // Reload the chart
@@ -809,8 +809,8 @@ const GraphsScreen = () => {
       // Update table data
       setBalanceHistoryTableData(prevData =>
         prevData.map(item =>
-          item.date === date ? { ...item, balance: null } : item
-        )
+          item.date === date ? { ...item, balance: null } : item,
+        ),
       );
 
       // Reload the chart
@@ -836,33 +836,33 @@ const GraphsScreen = () => {
   // Memoize unique currencies from accounts
   const currencies = useMemo(() =>
     [...new Set(accounts.map(acc => acc.currency))],
-    [accounts]
+  [accounts],
   );
 
   // Prepare picker items
   const categoryItems = useMemo(() => [
     { label: t('all'), value: 'all' },
-    ...topLevelCategories.map(cat => ({ label: cat.name, value: cat.id }))
+    ...topLevelCategories.map(cat => ({ label: cat.name, value: cat.id })),
   ], [topLevelCategories, t]);
 
   const incomeCategoryItems = useMemo(() => [
     { label: t('all'), value: 'all' },
-    ...topLevelIncomeCategories.map(cat => ({ label: cat.name, value: cat.id }))
+    ...topLevelIncomeCategories.map(cat => ({ label: cat.name, value: cat.id })),
   ], [topLevelIncomeCategories, t]);
 
   const currencyItems = useMemo(() =>
     currencies.map(cur => ({ label: cur, value: cur })),
-    [currencies]
+  [currencies],
   );
 
   const accountItems = useMemo(() =>
     accounts.map(acc => ({ label: acc.name, value: acc.id })),
-    [accounts]
+  [accounts],
   );
 
   const yearItems = useMemo(() =>
     availableYears.map(year => ({ label: year.toString(), value: year })),
-    [availableYears]
+  [availableYears],
   );
 
   // Get available months for the selected year
@@ -879,12 +879,12 @@ const GraphsScreen = () => {
 
   const monthItems = useMemo(() => {
     const items = [
-      { label: t('full_year'), value: null }
+      { label: t('full_year'), value: null },
     ];
     availableMonthsForYear.forEach(monthIndex => {
       items.push({
         label: t(monthKeys[monthIndex]),
-        value: monthIndex
+        value: monthIndex,
       });
     });
     return items;
@@ -1472,7 +1472,7 @@ const GraphsScreen = () => {
                     style={[
                       styles.balanceTableRow,
                       index % 2 === 0 && { backgroundColor: colors.altRow },
-                      { borderBottomColor: colors.border }
+                      { borderBottomColor: colors.border },
                     ]}
                   >
                     <Text style={[styles.balanceTableCell, { color: colors.text }]}>
@@ -1484,7 +1484,7 @@ const GraphsScreen = () => {
                         <TextInput
                           style={[
                             styles.balanceTableInput,
-                            { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }
+                            { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
                           ]}
                           value={editingBalanceValue}
                           onChangeText={setEditingBalanceValue}
@@ -1541,10 +1541,120 @@ const GraphsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  accountPickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    minWidth: 140,
+    overflow: 'hidden',
   },
-  scrollView: {
+  backButton: {
+    marginRight: 12,
+    padding: 4,
+  },
+  balanceActionButton: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  balanceHistoryCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  balanceHistoryChartContainer: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  balanceHistoryHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  balanceHistoryLoading: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  balanceHistoryNoData: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  balanceHistoryNoDataText: {
+    fontSize: 14,
+  },
+  balanceHistoryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  balanceHistoryTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  balanceTable: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  balanceTableActions: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  balanceTableCell: {
+    flex: 1,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  balanceTableHeader: {
+    borderBottomWidth: 2,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  balanceTableHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  balanceTableInput: {
+    borderRadius: 4,
+    borderWidth: 1,
+    flex: 1,
+    fontSize: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    textAlign: 'center',
+  },
+  balanceTableRow: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  colorIndicator: {
+    borderRadius: 6,
+    height: 12,
+    marginRight: 8,
+    width: 12,
+  },
+  container: {
     flex: 1,
   },
   content: {
@@ -1555,173 +1665,132 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
   },
-  pickerWrapper: {
-    flex: 1,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: 40,
+  legendAmount: {
+    fontSize: 15,
+    fontWeight: '500',
   },
-  summaryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  summaryCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryInfo: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  summaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  miniChartContainer: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataPlaceholder: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataText: {
-    fontSize: 32,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalContent: {
-    width: '100%',
-    maxHeight: '90%',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
-  },
-  backButton: {
-    padding: 4,
-    marginRight: 12,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalPickerWrapper: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: 40,
-  },
-  modalScrollView: {
-    padding: 20,
-  },
-  loadingContainer: {
-    marginTop: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  chartContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  noData: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 40,
+  legendChevron: {
+    marginLeft: 4,
   },
   legendContainer: {
     marginTop: 20,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-  },
-  legendItemClickable: {
-    paddingHorizontal: 8,
-  },
-  legendLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
-  },
-  colorIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
   },
   legendIcon: {
     fontSize: 18,
     marginRight: 8,
   },
-  legendChevron: {
-    marginLeft: 4,
+  legendItem: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingVertical: 12,
+  },
+  legendItemClickable: {
+    paddingHorizontal: 8,
+  },
+  legendLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+    marginRight: 12,
   },
   legendName: {
-    fontSize: 15,
     flex: 1,
-  },
-  legendRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  legendAmount: {
     fontSize: 15,
-    fontWeight: '500',
   },
   legendPercentage: {
     fontSize: 14,
     minWidth: 45,
     textAlign: 'right',
+  },
+  legendRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    marginTop: 12,
+  },
+  miniChartContainer: {
+    alignItems: 'center',
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
+  },
+  modalContent: {
+    borderRadius: 16,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  modalHeaderLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+    marginRight: 12,
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalPickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    marginBottom: 8,
+    marginHorizontal: 20,
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  modalScrollView: {
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  noData: {
+    fontSize: 16,
+    marginTop: 40,
+    textAlign: 'center',
+  },
+  noDataPlaceholder: {
+    alignItems: 'center',
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
+  },
+  noDataText: {
+    fontSize: 32,
+  },
+  pickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
+  },
+  predictionArrow: {
+    marginHorizontal: 8,
   },
   predictionCard: {
     borderRadius: 12,
@@ -1729,21 +1798,39 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     padding: 16,
   },
-  predictionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
+  predictionFooter: {
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    borderTopWidth: 1,
+    paddingTop: 12,
   },
-  predictionTitle: {
-    fontSize: 18,
+  predictionFooterLabel: {
+    fontSize: 14,
+  },
+  predictionFooterValue: {
     fontWeight: '600',
   },
-  predictionStats: {
-    flexDirection: 'row',
+  predictionHeader: {
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 16,
+  },
+  predictionProgressBar: {
+    borderRadius: 4,
+    height: '100%',
+  },
+  predictionProgressContainer: {
+    marginBottom: 12,
+  },
+  predictionProgressText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  predictionProgressTrack: {
+    borderRadius: 4,
+    height: 8,
+    marginBottom: 4,
+    overflow: 'hidden',
   },
   predictionStat: {
     flex: 1,
@@ -1756,128 +1843,41 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  predictionArrow: {
-    marginHorizontal: 8,
+  predictionStats: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  predictionProgressContainer: {
-    marginBottom: 12,
-  },
-  predictionProgressTrack: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  predictionProgressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  predictionProgressText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  predictionFooter: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    paddingTop: 12,
-  },
-  predictionFooterLabel: {
-    fontSize: 14,
-  },
-  predictionFooterValue: {
+  predictionTitle: {
+    fontSize: 18,
     fontWeight: '600',
   },
-  balanceHistoryCard: {
+  scrollView: {
+    flex: 1,
+  },
+  summaryAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  summaryCard: {
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 16,
     padding: 16,
   },
-  balanceHistoryHeader: {
+  summaryCardContent: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
   },
-  balanceHistoryTitleContainer: {
+  summaryInfo: {
     flex: 1,
-    marginRight: 12,
   },
-  balanceHistoryTitle: {
-    fontSize: 18,
+  summaryLabel: {
+    fontSize: 16,
     fontWeight: '600',
-  },
-  accountPickerWrapper: {
-    minWidth: 140,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: 40,
-  },
-  balanceHistoryLoading: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  balanceHistoryChartContainer: {
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  balanceHistoryNoData: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  balanceHistoryNoDataText: {
-    fontSize: 14,
-  },
-  balanceTable: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  balanceTableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 2,
-  },
-  balanceTableHeaderText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  balanceTableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    alignItems: 'center',
-  },
-  balanceTableCell: {
-    flex: 1,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  balanceTableInput: {
-    flex: 1,
-    fontSize: 14,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  balanceTableActions: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  balanceActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 8,
   },
 });
 

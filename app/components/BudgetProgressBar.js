@@ -17,16 +17,16 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
   // Determine progress bar color based on status
   const getProgressColor = () => {
     switch (status.status) {
-      case 'safe':
-        return '#4CAF50'; // Green
-      case 'warning':
-        return '#FFC107'; // Yellow/Amber
-      case 'danger':
-        return '#FF9800'; // Orange
-      case 'exceeded':
-        return '#F44336'; // Red
-      default:
-        return colors.primary;
+    case 'safe':
+      return '#4CAF50'; // Green
+    case 'warning':
+      return '#FFC107'; // Yellow/Amber
+    case 'danger':
+      return '#FF9800'; // Orange
+    case 'exceeded':
+      return '#F44336'; // Red
+    default:
+      return colors.primary;
     }
   };
 
@@ -48,7 +48,7 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
             {
               width: `${progressWidth}%`,
               backgroundColor: progressColor,
-            }
+            },
           ]}
         />
       </View>
@@ -93,15 +93,6 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
   },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
   details: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -112,6 +103,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: -2,
+  },
+  progressFill: {
+    borderRadius: 3,
+    height: '100%',
+  },
+  progressTrack: {
+    borderRadius: 3,
+    height: 6,
+    overflow: 'hidden',
   },
 });
 

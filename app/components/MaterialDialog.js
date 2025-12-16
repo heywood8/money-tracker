@@ -18,7 +18,7 @@ export default function MaterialDialog({
   title,
   message,
   buttons = [],
-  onDismiss
+  onDismiss,
 }) {
   const { colors } = useTheme();
 
@@ -33,12 +33,12 @@ export default function MaterialDialog({
 
   const getButtonStyle = (style) => {
     switch (style) {
-      case 'destructive':
-        return { color: colors.delete || '#d32f2f' };
-      case 'cancel':
-        return { color: colors.mutedText };
-      default:
-        return { color: colors.primary };
+    case 'destructive':
+      return { color: colors.delete || '#d32f2f' };
+    case 'cancel':
+      return { color: colors.mutedText };
+    default:
+      return { color: colors.primary };
     }
   };
 
@@ -101,50 +101,50 @@ export default function MaterialDialog({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dialog: {
-    width: '80%',
-    maxWidth: 400,
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  message: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  buttonContainer: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 4,
+  boldText: {
+    fontWeight: '700',
   },
   button: {
+    alignItems: 'flex-end',
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'flex-end',
+  },
+  buttonContainer: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    gap: 4,
   },
   buttonText: {
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
-  boldText: {
-    fontWeight: '700',
+  dialog: {
+    borderRadius: 12,
+    elevation: 8,
+    maxWidth: 400,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    width: '80%',
+  },
+  message: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  overlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 16,
   },
 });

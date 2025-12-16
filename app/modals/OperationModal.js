@@ -306,7 +306,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   }, []);
 
@@ -375,7 +375,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           values.amount,
           sourceAccount.currency,
           destinationAccount.currency,
-          values.exchangeRate
+          values.exchangeRate,
         );
         if (converted && converted !== values.destinationAmount) {
           setValues(v => ({ ...v, destinationAmount: converted }));
@@ -445,7 +445,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     style={[
                       styles.pickerButton,
                       { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput
+                      isShadowOperation && styles.disabledInput,
                     ]}
                     onPress={() => !isShadowOperation && openPicker('type', TYPES)}
                     disabled={isShadowOperation}
@@ -478,7 +478,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     style={[
                       styles.pickerButton,
                       { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput
+                      isShadowOperation && styles.disabledInput,
                     ]}
                     onPress={() => !isShadowOperation && openPicker('account', accounts)}
                     disabled={isShadowOperation}
@@ -496,7 +496,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                         style={[
                           styles.pickerButton,
                           { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                          isShadowOperation && styles.disabledInput
+                          isShadowOperation && styles.disabledInput,
                         ]}
                         onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
                         disabled={isShadowOperation}
@@ -527,7 +527,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                               style={[
                                 styles.smallInput,
                                 { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                                isShadowOperation && styles.disabledInput
+                                isShadowOperation && styles.disabledInput,
                               ]}
                               value={values.exchangeRate}
                               onChangeText={text => {
@@ -554,7 +554,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                               style={[
                                 styles.smallInput,
                                 { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                                isShadowOperation && styles.disabledInput
+                                isShadowOperation && styles.disabledInput,
                               ]}
                               value={values.destinationAmount}
                               onChangeText={text => {
@@ -590,7 +590,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       style={[
                         styles.pickerButton,
                         { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                        isShadowOperation && styles.disabledInput
+                        isShadowOperation && styles.disabledInput,
                       ]}
                       onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
                       disabled={isShadowOperation}
@@ -607,7 +607,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     style={[
                       styles.pickerButton,
                       { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput
+                      isShadowOperation && styles.disabledInput,
                     ]}
                     onPress={() => !isShadowOperation && setShowDatePicker(true)}
                     disabled={isShadowOperation}
@@ -630,7 +630,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       styles.input,
                       styles.descriptionInput,
                       { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput
+                      isShadowOperation && styles.disabledInput,
                     ]}
                     value={values.description}
                     onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, description: text }))}
@@ -677,7 +677,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     style={[
                       styles.deleteButtonContainer,
                       { backgroundColor: colors.card },
-                      !canDeleteShadowOperation && styles.disabledButton
+                      !canDeleteShadowOperation && styles.disabledButton,
                     ]}
                     onPress={handleDelete}
                     disabled={!canDeleteShadowOperation}
@@ -690,7 +690,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     <Text
                       style={[
                         styles.deleteButtonText,
-                        { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText }
+                        { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText },
                       ]}
                     >
                       {t('delete_operation')}
@@ -714,7 +714,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             if (selectedDate) {
               setValues(v => ({
                 ...v,
-                date: formatDate(selectedDate)
+                date: formatDate(selectedDate),
               }));
             }
           }}
@@ -905,154 +905,53 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
+  accountOption: {
     alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    minHeight: '60%',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-    flexDirection: 'column',
-  },
-  scrollView: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  descriptionInput: {
-    minHeight: 80,
-  },
-  pickerButton: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: 48,
   },
-  pickerButtonContent: {
+  backButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  breadcrumbContainer: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pickerButtonText: {
-    fontSize: 16,
-  },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 12,
     marginBottom: 8,
-  },
-  modalButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  modalButton: {
-    flex: 1,
-    marginHorizontal: 8,
-    borderRadius: 6,
+    paddingHorizontal: 8,
     paddingVertical: 12,
-    alignItems: 'center',
-    minHeight: 48,
+  },
+  breadcrumbText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
   },
-  pickerModalContent: {
-    width: '90%',
-    maxHeight: '70%',
-    borderRadius: 12,
-    padding: 12,
-  },
-  pickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  pickerOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  pickerOptionText: {
-    fontSize: 18,
-  },
-  accountOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   categoryOption: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
   },
   closeButton: {
-    marginTop: 16,
+    alignItems: 'center',
     alignSelf: 'center',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 16,
     minHeight: 48,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  deleteButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    marginTop: 8,
-    gap: 8,
-    minHeight: 48,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  disabledInput: {
-    opacity: 0.6,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
   currencyInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
     paddingHorizontal: 4,
@@ -1061,26 +960,130 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  inputRow: {
-    flexDirection: 'row',
+  currencyLabel: {
+    fontSize: 14,
+    minWidth: 40,
+  },
+  deleteButtonContainer: {
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 48,
+    paddingVertical: 12,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  descriptionInput: {
+    minHeight: 80,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledInput: {
+    opacity: 0.6,
+  },
+  error: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  input: {
+    borderRadius: 4,
+    borderWidth: 1,
+    fontSize: 16,
     marginBottom: 12,
-    gap: 12,
+    padding: 12,
   },
   inputLabel: {
     fontSize: 14,
     minWidth: 110,
   },
-  smallInput: {
+  inputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  modalButton: {
+    alignItems: 'center',
+    borderRadius: 6,
     flex: 1,
-    borderWidth: 1,
+    marginHorizontal: 8,
+    minHeight: 48,
+    paddingVertical: 12,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  modalContent: {
+    borderRadius: 12,
+    elevation: 5,
+    flexDirection: 'column',
+    maxHeight: '80%',
+    minHeight: '60%',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    width: '90%',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pickerButton: {
+    alignItems: 'center',
     borderRadius: 4,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    minHeight: 48,
     padding: 12,
+  },
+  pickerButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pickerButtonText: {
     fontSize: 16,
   },
-  currencyLabel: {
-    fontSize: 14,
-    minWidth: 40,
+  pickerModalContent: {
+    borderRadius: 12,
+    maxHeight: '70%',
+    padding: 12,
+    width: '90%',
+  },
+  pickerOption: {
+    borderBottomWidth: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  pickerOptionContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pickerOptionText: {
+    fontSize: 18,
   },
   rateInfo: {
     fontSize: 12,
@@ -1088,21 +1091,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 4,
   },
-  breadcrumbContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    marginBottom: 8,
+  scrollContent: {
+    paddingBottom: 20,
   },
-  backButton: {
-    padding: 4,
-    marginRight: 8,
+  scrollView: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
-  breadcrumbText: {
-    fontSize: 18,
-    fontWeight: '600',
+  smallInput: {
+    borderRadius: 4,
+    borderWidth: 1,
     flex: 1,
+    fontSize: 16,
+    padding: 12,
   },
 });

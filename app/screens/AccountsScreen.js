@@ -166,7 +166,7 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
       style={[
         styles.accountCard,
         { backgroundColor: rowBg, borderColor: colors.border },
-        isActive && { backgroundColor: colors.selected, opacity: 0.9 }
+        isActive && { backgroundColor: colors.selected, opacity: 0.9 },
       ]}
     >
       <View style={styles.accountRow}>
@@ -279,13 +279,13 @@ export default function AccountsScreen() {
 
         // Filter for accounts with same currency (excluding the account being deleted)
         const sameCurrencyAccounts = accounts.filter(
-          a => a.id !== id && a.currency === accountToDeleteData.currency
+          a => a.id !== id && a.currency === accountToDeleteData.currency,
         );
 
         if (sameCurrencyAccounts.length === 0) {
           // No same-currency accounts to transfer to
           setNoCurrencyMatchMessage(
-            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`
+            t('no_same_currency_account') || `This account has ${count} transaction(s) but there are no other accounts with the same currency (${accountToDeleteData.currency}). Please create another ${accountToDeleteData.currency} account first, or delete the transactions.`,
           );
           setNoCurrencyMatchVisible(true);
           return;
@@ -403,7 +403,7 @@ export default function AccountsScreen() {
   const enhancedAccounts = useMemo(() => {
     return displayedAccounts.map(acc => ({
       ...acc,
-      currencySymbol: currencies[acc.currency]?.symbol || acc.currency
+      currencySymbol: currencies[acc.currency]?.symbol || acc.currency,
     }));
   }, [displayedAccounts, currencies]);
 
@@ -661,41 +661,14 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
-  verticalDivider: {
-    width: 1,
-    height: '70%',
-    backgroundColor: 'rgba(120,120,120,0.13)',
-    alignSelf: 'center',
-    marginHorizontal: 2,
-  },
-  container: { flex: 1 },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   accountCard: {
+    borderRadius: 8,
     marginHorizontal: 8,
     marginVertical: 4,
-    borderRadius: 8,
-  },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 56,
   },
   accountContentWrapper: {
     flex: 1,
     paddingVertical: 12,
-  },
-  dragHandle: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   accountNameWrapper: {
     flex: 7,
@@ -703,24 +676,132 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 8,
   },
+  accountRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 56,
+  },
   accountValueWrapper: {
+    alignItems: 'flex-end',
     flex: 3,
     justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingRight: 16,
     paddingLeft: 8,
+    paddingRight: 16,
   },
-  textInput: {
-    marginBottom: 8,
+  confirmationButton: {
+    minWidth: 100,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  confirmationMessage: {
+    lineHeight: 22,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  confirmationModalContent: {
+    alignSelf: 'center',
+    borderRadius: 16,
+    margin: 20,
+    maxWidth: 500,
+    padding: 24,
+    width: '90%',
+  },
+  confirmationTitle: {
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  container: { flex: 1 },
+  dragHandle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
   },
   error: {
     color: 'red',
     marginBottom: 8,
     marginLeft: 12,
   },
-  switchContainer: {
-    flexDirection: 'row',
+  errorContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fab: {
+    bottom: 0,
+    margin: 16,
+    position: 'absolute',
+    right: 0,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButton: {
+    flex: 1,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  modalContent: {
+    borderRadius: 12,
+    margin: 20,
+    maxHeight: '90%',
+    padding: 20,
+  },
+  modalTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pickerDisplay: {
+    justifyContent: 'center',
+    padding: 16,
+  },
+  pickerModalContent: {
+    borderRadius: 12,
+    margin: 20,
+    padding: 20,
+  },
+  pickerOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  pickerWrapper: {
+    borderColor: 'rgba(0, 0, 0, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  showHiddenButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginHorizontal: 8,
+    marginTop: 16,
+    marginVertical: 8,
+  },
+  showHiddenContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  showHiddenText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  switchContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 16,
     paddingVertical: 8,
@@ -729,96 +810,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
-  pickerWrapper: {
+  textInput: {
     marginBottom: 8,
-    marginTop: 8,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
-  pickerDisplay: {
-    padding: 16,
-    justifyContent: 'center',
-  },
-  pickerModalContent: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-  },
-  pickerOption: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  modalContent: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  modalButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    gap: 8,
-  },
-  modalButton: {
-    flex: 1,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-  },
-  confirmationModalContent: {
-    margin: 20,
-    padding: 24,
-    borderRadius: 16,
-    maxWidth: 500,
+  verticalDivider: {
     alignSelf: 'center',
-    width: '90%',
-  },
-  confirmationTitle: {
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  confirmationMessage: {
-    marginBottom: 24,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  confirmationButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  confirmationButton: {
-    minWidth: 100,
-  },
-  showHiddenButton: {
-    marginHorizontal: 8,
-    marginVertical: 8,
-    marginTop: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  showHiddenContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  showHiddenText: {
-    fontSize: 16,
-    fontWeight: '500',
+    backgroundColor: 'rgba(120,120,120,0.13)',
+    height: '70%',
+    marginHorizontal: 2,
+    width: 1,
   },
 });
 

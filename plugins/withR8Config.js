@@ -44,7 +44,7 @@ const withR8Config = (config) => {
         projectRoot,
         'android',
         'app',
-        'proguard-rules.pro'
+        'proguard-rules.pro',
       );
 
       // Only copy if source file exists

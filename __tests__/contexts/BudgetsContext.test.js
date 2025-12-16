@@ -198,7 +198,7 @@ describe('BudgetsContext', () => {
         expect.objectContaining({
           ...newBudget,
           id: 'test-uuid-1',
-        })
+        }),
       );
       expect(BudgetsDB.calculateAllBudgetStatuses).toHaveBeenCalledTimes(2); // Once on init, once after add
     });
@@ -223,7 +223,7 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.addBudget(invalidBudget);
-        })
+        }),
       ).rejects.toThrow('Amount must be greater than zero');
 
       expect(result.current.budgets).toHaveLength(0);
@@ -231,7 +231,7 @@ describe('BudgetsContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Amount must be greater than zero',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
 
@@ -262,7 +262,7 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.addBudget(duplicateBudget);
-        })
+        }),
       ).rejects.toThrow('A budget already exists for this category, currency, and period type');
 
       expect(result.current.budgets).toHaveLength(0);
@@ -289,14 +289,14 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.addBudget(budget);
-        })
+        }),
       ).rejects.toThrow('Database insert failed');
 
       await waitFor(() => {
         expect(mockShowDialog).toHaveBeenCalledWith(
           'Error',
           'Database insert failed',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
       });
     });
@@ -343,7 +343,7 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.updateBudget('non-existent', { amount: '1000' });
-        })
+        }),
       ).rejects.toThrow('Budget not found');
 
       expect(BudgetsDB.updateBudget).not.toHaveBeenCalled();
@@ -372,7 +372,7 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.updateBudget('1', { periodType: 'invalid' });
-        })
+        }),
       ).rejects.toThrow('Invalid period type');
 
       expect(BudgetsDB.updateBudget).not.toHaveBeenCalled();
@@ -407,7 +407,7 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.updateBudget('1', { categoryId: 'cat2' });
-        })
+        }),
       ).rejects.toThrow('A budget already exists for this category, currency, and period type');
 
       expect(BudgetsDB.updateBudget).not.toHaveBeenCalled();
@@ -436,13 +436,13 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.updateBudget('1', { amount: '1500' });
-        })
+        }),
       ).rejects.toThrow('Database update failed');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Database update failed',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });
@@ -515,13 +515,13 @@ describe('BudgetsContext', () => {
       await expect(
         act(async () => {
           await result.current.deleteBudget('1');
-        })
+        }),
       ).rejects.toThrow('Foreign key constraint');
 
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to delete budget. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
   });
@@ -840,7 +840,7 @@ describe('BudgetsContext', () => {
 
       expect(appEvents.on).toHaveBeenCalledWith(
         EVENTS.OPERATION_CHANGED,
-        expect.any(Function)
+        expect.any(Function),
       );
 
       // Simulate operation change
@@ -927,7 +927,7 @@ describe('BudgetsContext', () => {
 
       expect(appEvents.on).toHaveBeenCalledWith(
         EVENTS.DATABASE_RESET,
-        expect.any(Function)
+        expect.any(Function),
       );
 
       // Simulate database reset

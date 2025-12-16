@@ -252,7 +252,7 @@ describe('DialogContext', () => {
               style: 'destructive',
               onPress: mockConfirm,
             },
-          ]
+          ],
         );
       });
 
@@ -266,7 +266,7 @@ describe('DialogContext', () => {
         result.current.showDialog(
           'Error',
           'Failed to save data',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
       });
 
@@ -279,7 +279,7 @@ describe('DialogContext', () => {
       act(() => {
         result.current.showDialog(
           'Success',
-          'Account created successfully'
+          'Account created successfully',
         );
       });
 
@@ -297,7 +297,7 @@ describe('DialogContext', () => {
             { text: 'Option 1', onPress: jest.fn() },
             { text: 'Option 2', onPress: jest.fn() },
             { text: 'Cancel', style: 'cancel' },
-          ]
+          ],
         );
       });
 

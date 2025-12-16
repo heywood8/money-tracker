@@ -40,7 +40,7 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
       // Use provided db instance (within transaction)
       const result = await db.getAllAsync(
         'SELECT * FROM accounts WHERE id = ? LIMIT 1',
-        [accountId]
+        [accountId],
       );
       account = result && result.length > 0 ? result[0] : null;
     } else {
@@ -61,7 +61,7 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
          WHERE (account_id = ? OR to_account_id = ?)
            AND date > ?
          ORDER BY date DESC, created_at DESC`,
-        [accountId, accountId, targetDate]
+        [accountId, accountId, targetDate],
       );
     } else {
       // Use external function (outside transaction)
@@ -70,7 +70,7 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
          WHERE (account_id = ? OR to_account_id = ?)
            AND date > ?
          ORDER BY date DESC, created_at DESC`,
-        [accountId, accountId, targetDate]
+        [accountId, accountId, targetDate],
       );
     }
 
@@ -163,7 +163,7 @@ export const populateCurrentMonthHistory = async (providedDb = null) => {
           if (lastSnapshotBalance === null || lastSnapshotBalance !== balanceOnDate) {
             await db.runAsync(
               'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
-              [account.id, targetDate, balanceOnDate, new Date().toISOString()]
+              [account.id, targetDate, balanceOnDate, new Date().toISOString()],
             );
             lastSnapshotBalance = balanceOnDate;
           }
@@ -217,7 +217,7 @@ export const getBalanceHistory = async (accountId, startDate, endDate) => {
          AND date >= ?
          AND date <= ?
        ORDER BY date ASC`,
-      [accountId, startDate, endDate]
+      [accountId, startDate, endDate],
     );
     return results || [];
   } catch (error) {
@@ -240,7 +240,7 @@ export const getAllAccountsBalanceOnDate = async (date) => {
        JOIN accounts a ON abh.account_id = a.id
        WHERE abh.date = ?
        ORDER BY a.display_order ASC`,
-      [date]
+      [date],
     );
     return results || [];
   } catch (error) {
@@ -264,7 +264,7 @@ export const getAccountBalanceOnDate = async (accountId, date) => {
        FROM accounts_balance_history
        WHERE account_id = ? AND date = ?
        LIMIT 1`,
-      [accountId, date]
+      [accountId, date],
     );
     return result && result.length > 0 ? result[0].balance : null;
   } catch (error) {
@@ -287,7 +287,7 @@ export const getLastSnapshotDate = async (accountId) => {
        WHERE account_id = ?
        ORDER BY date DESC
        LIMIT 1`,
-      [accountId]
+      [accountId],
     );
     return result && result.length > 0 ? result[0].date : null;
   } catch (error) {
@@ -313,7 +313,7 @@ export const upsertBalanceHistory = async (accountId, date, balance) => {
       await db.runAsync(
         `INSERT OR REPLACE INTO accounts_balance_history (account_id, date, balance, created_at)
          VALUES (?, ?, ?, ?)`,
-        [accountId, date, balance, now]
+        [accountId, date, balance, now],
       );
     });
   } catch (error) {
@@ -335,7 +335,7 @@ export const deleteBalanceHistory = async (accountId, date) => {
       await db.runAsync(
         `DELETE FROM accounts_balance_history
          WHERE account_id = ? AND date = ?`,
-        [accountId, date]
+        [accountId, date],
       );
     });
   } catch (error) {
@@ -364,7 +364,7 @@ export const updateTodayBalance = async (accountId, balance, db = null) => {
       await dbInstance.runAsync(
         `INSERT OR REPLACE INTO accounts_balance_history (account_id, date, balance, created_at)
          VALUES (?, ?, ?, ?)`,
-        [numericAccountId, today, balance, now]
+        [numericAccountId, today, balance, now],
       );
     };
 

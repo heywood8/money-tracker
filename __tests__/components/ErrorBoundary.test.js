@@ -33,7 +33,7 @@ describe('ErrorBoundary', () => {
       const { getByText, queryByText } = render(
         <ErrorBoundary>
           <Text>Test content</Text>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Test content')).toBeTruthy();
@@ -45,7 +45,7 @@ describe('ErrorBoundary', () => {
         <ErrorBoundary>
           <Text>First child</Text>
           <Text>Second child</Text>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('First child')).toBeTruthy();
@@ -60,7 +60,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <NestedComponent />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Nested component')).toBeTruthy();
@@ -72,7 +72,7 @@ describe('ErrorBoundary', () => {
       const { getByText, queryByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -83,11 +83,11 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(
-        getByText("We're sorry for the inconvenience. Please try restarting the app.")
+        getByText("We're sorry for the inconvenience. Please try restarting the app."),
       ).toBeTruthy();
     });
 
@@ -95,7 +95,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Try Again')).toBeTruthy();
@@ -105,7 +105,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Custom error message" />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -118,7 +118,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <NestedThrowError />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -128,7 +128,7 @@ describe('ErrorBoundary', () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Custom error message" />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Error is caught regardless of message
@@ -141,7 +141,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -155,7 +155,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -171,7 +171,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       const button = getByText('Try Again');
@@ -188,7 +188,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -208,7 +208,7 @@ describe('ErrorBoundary', () => {
       const { queryByText } = render(
         <ErrorBoundary>
           <Text>Content</Text>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(queryByText('Something went wrong')).toBeNull();
@@ -218,7 +218,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Error UI is shown, indicating state was updated
@@ -229,7 +229,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Error state should be maintained
@@ -248,7 +248,7 @@ describe('ErrorBoundary', () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Test error message" />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(consoleErrorSpy).toHaveBeenCalled();
@@ -257,8 +257,8 @@ describe('ErrorBoundary', () => {
       const calls = consoleErrorSpy.mock.calls;
       const hasErrorBoundaryLog = calls.some(call =>
         call.some(arg =>
-          typeof arg === 'string' && arg.includes('Error Boundary caught an error')
-        )
+          typeof arg === 'string' && arg.includes('Error Boundary caught an error'),
+        ),
       );
       expect(hasErrorBoundaryLog).toBe(true);
     });
@@ -267,7 +267,7 @@ describe('ErrorBoundary', () => {
       render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Console.error should be called for componentDidCatch
@@ -284,7 +284,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowNullError />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -298,7 +298,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowUndefinedError />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -308,7 +308,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -318,14 +318,14 @@ describe('ErrorBoundary', () => {
       const { getByText, rerender } = render(
         <ErrorBoundary>
           <Text>Initial content</Text>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Replace with error-throwing component
       rerender(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -335,7 +335,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="First error" />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Should handle the error
@@ -357,7 +357,7 @@ describe('ErrorBoundary', () => {
           <ErrorBoundary>
             <ThrowError shouldThrow={true} />
           </ErrorBoundary>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Inner error boundary should catch the error
@@ -377,7 +377,7 @@ describe('ErrorBoundary', () => {
           <ErrorBoundary>
             <Text>Safe content 2</Text>
           </ErrorBoundary>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Only the second boundary should show error UI
@@ -395,7 +395,7 @@ describe('ErrorBoundary', () => {
           <ErrorBoundary>
             <ThrowError shouldThrow={true} />
           </ErrorBoundary>
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Only inner boundary shows error UI
@@ -415,7 +415,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <DeepNested />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -427,11 +427,11 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       const errorMessage = getByText(
-        "We're sorry for the inconvenience. Please try restarting the app."
+        "We're sorry for the inconvenience. Please try restarting the app.",
       );
       expect(errorMessage).toBeTruthy();
     });
@@ -440,7 +440,7 @@ describe('ErrorBoundary', () => {
       const { getByText } = render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       const button = getByText('Try Again');

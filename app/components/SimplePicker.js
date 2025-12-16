@@ -78,7 +78,7 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
                   style={[
                     styles.modalItem,
                     { borderBottomColor: colors.border },
-                    item.value === value && { backgroundColor: colors.selected }
+                    item.value === value && { backgroundColor: colors.selected },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -101,10 +101,10 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
 const styles = StyleSheet.create({
   // Android custom picker button
   androidButton: {
-    width: '100%',
     height: 40,
     justifyContent: 'center',
     paddingHorizontal: 8,
+    width: '100%',
   },
   androidButtonText: {
     fontSize: 14,
@@ -112,21 +112,21 @@ const styles = StyleSheet.create({
 
   // Modal styles
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'center',
   },
   modalContent: {
-    width: '80%',
-    maxHeight: '60%',
     borderRadius: 8,
+    maxHeight: '60%',
     overflow: 'hidden',
+    width: '80%',
   },
   modalItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   modalItemText: {
     fontSize: 16,

@@ -64,7 +64,7 @@ describe('Operation Management Integration Tests', () => {
 
       // Setup dynamic mocks that track state
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
-        Promise.resolve([...currentOperations])
+        Promise.resolve([...currentOperations]),
       );
       OperationsDB.createOperation.mockImplementation(async (operation) => {
         const newOp = { ...operation, id: ++mockOperationIdCounter, createdAt: new Date().toISOString() };
@@ -151,7 +151,7 @@ describe('Operation Management Integration Tests', () => {
       let currentOperations = [];
 
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
-        Promise.resolve([...currentOperations])
+        Promise.resolve([...currentOperations]),
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
         currentOperations.push({ ...operation });
@@ -235,7 +235,7 @@ describe('Operation Management Integration Tests', () => {
           amount: '100.00',
           accountId: 'account-1',
           categoryId: 'category-1',
-        })
+        }),
       );
     });
 
@@ -268,7 +268,7 @@ describe('Operation Management Integration Tests', () => {
         expect.objectContaining({
           type: 'income',
           amount: '500.00',
-        })
+        }),
       );
     });
 
@@ -301,7 +301,7 @@ describe('Operation Management Integration Tests', () => {
         expect.objectContaining({
           type: 'transfer',
           toAccountId: 'account-2',
-        })
+        }),
       );
     });
   });
@@ -593,7 +593,7 @@ describe('Operation Management Integration Tests', () => {
       ];
 
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
-        Promise.resolve([...currentOperations])
+        Promise.resolve([...currentOperations]),
       );
       OperationsDB.updateOperation.mockImplementation((id, updates) => {
         const op = currentOperations.find((o) => o.id === id);
@@ -622,7 +622,7 @@ describe('Operation Management Integration Tests', () => {
       let currentOperations = [];
 
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
-        Promise.resolve([...currentOperations])
+        Promise.resolve([...currentOperations]),
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
         // Check for duplicate
@@ -672,7 +672,7 @@ describe('Operation Management Integration Tests', () => {
       let currentOperations = [];
 
       OperationsDB.getOperationsByWeekOffset.mockImplementation(() =>
-        Promise.resolve([...currentOperations])
+        Promise.resolve([...currentOperations]),
       );
       OperationsDB.createOperation.mockImplementation((operation) => {
         currentOperations.push({ ...operation });

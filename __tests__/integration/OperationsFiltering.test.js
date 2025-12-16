@@ -248,7 +248,7 @@ describe('Operations Filtering Integration', () => {
       await waitFor(() => {
         expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledWith(
           0,
-          expect.any(Object)
+          expect.any(Object),
         );
       });
     });
@@ -468,7 +468,7 @@ describe('Operations Filtering Integration', () => {
       });
 
       OperationsDB.getFilteredOperationsByWeekOffset.mockRejectedValue(
-        new Error('Database error')
+        new Error('Database error'),
       );
 
       await act(async () => {

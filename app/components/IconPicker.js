@@ -112,38 +112,38 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
   container: {
-    maxHeight: '80%',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+    maxHeight: '80%',
   },
   header: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    padding: 16,
+  },
+  iconButton: {
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  scrollContent: {
-    padding: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
   },
   iconsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  iconButton: {
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  overlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

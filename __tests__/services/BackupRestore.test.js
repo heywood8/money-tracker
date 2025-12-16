@@ -244,7 +244,7 @@ describe('BackupRestore', () => {
         expect.objectContaining({
           mimeType: 'application/json',
           dialogTitle: 'Export Database Backup',
-        })
+        }),
       );
     });
 
@@ -252,7 +252,7 @@ describe('BackupRestore', () => {
       mockSharing.isAvailableAsync.mockResolvedValue(false);
 
       await expect(BackupRestore.exportBackup('json')).rejects.toThrow(
-        'Sharing is not available on this device'
+        'Sharing is not available on this device',
       );
     });
 
@@ -367,7 +367,7 @@ describe('BackupRestore', () => {
       mockFileSystem.getInfoAsync.mockResolvedValue({ exists: false });
 
       await expect(BackupRestore.exportBackup('sqlite')).rejects.toThrow(
-        'Database file not found'
+        'Database file not found',
       );
     });
 
@@ -407,7 +407,7 @@ describe('BackupRestore', () => {
       const invalidBackup = { ...validBackup, version: undefined };
 
       await expect(BackupRestore.restoreBackup(invalidBackup)).rejects.toThrow(
-        'missing version'
+        'missing version',
       );
     });
 
@@ -415,7 +415,7 @@ describe('BackupRestore', () => {
       const futureBackup = { ...validBackup, version: 999 };
 
       await expect(BackupRestore.restoreBackup(futureBackup)).rejects.toThrow(
-        'not supported'
+        'not supported',
       );
     });
 
@@ -423,7 +423,7 @@ describe('BackupRestore', () => {
       const invalidBackup = { ...validBackup, data: undefined };
 
       await expect(BackupRestore.restoreBackup(invalidBackup)).rejects.toThrow(
-        'missing or invalid data'
+        'missing or invalid data',
       );
     });
 
@@ -434,7 +434,7 @@ describe('BackupRestore', () => {
       };
 
       await expect(BackupRestore.restoreBackup(invalidBackup)).rejects.toThrow(
-        'missing or invalid accounts data'
+        'missing or invalid accounts data',
       );
     });
 
@@ -445,7 +445,7 @@ describe('BackupRestore', () => {
       };
 
       await expect(BackupRestore.restoreBackup(invalidBackup)).rejects.toThrow(
-        'missing or invalid categories data'
+        'missing or invalid categories data',
       );
     });
 
@@ -456,19 +456,19 @@ describe('BackupRestore', () => {
       };
 
       await expect(BackupRestore.restoreBackup(invalidBackup)).rejects.toThrow(
-        'missing or invalid operations data'
+        'missing or invalid operations data',
       );
     });
 
     it('rejects null backup', async () => {
       await expect(BackupRestore.restoreBackup(null)).rejects.toThrow(
-        'Invalid backup format: not an object'
+        'Invalid backup format: not an object',
       );
     });
 
     it('rejects non-object backup', async () => {
       await expect(BackupRestore.restoreBackup('string')).rejects.toThrow(
-        'Invalid backup format: not an object'
+        'Invalid backup format: not an object',
       );
     });
   });
@@ -526,7 +526,7 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(validBackup);
 
       const deleteCalls = mockDbInstance.runAsync.mock.calls.filter(call =>
-        call[0].includes('DELETE')
+        call[0].includes('DELETE'),
       );
 
       expect(deleteCalls.length).toBeGreaterThan(0);
@@ -574,10 +574,10 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(validBackup);
 
       const metadataDeleteCall = mockDbInstance.runAsync.mock.calls.find(call =>
-        call[0].includes('DELETE FROM app_metadata')
+        call[0].includes('DELETE FROM app_metadata'),
       );
 
-      expect(metadataDeleteCall[0]).toContain("key != ?");
+      expect(metadataDeleteCall[0]).toContain('key != ?');
       expect(metadataDeleteCall[1]).toEqual(['db_version']);
     });
 
@@ -602,7 +602,7 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(backupWithMinimalAccount);
 
       const accountInsert = mockDbInstance.runAsync.mock.calls.find(call =>
-        call[0].includes('INSERT INTO accounts')
+        call[0].includes('INSERT INTO accounts'),
       );
 
       expect(accountInsert[1]).toContain('0'); // Default balance
@@ -626,7 +626,7 @@ describe('BackupRestore', () => {
         call[0] && call[0].includes('INSERT') && call[1] && (
           call[1].includes('shadow-adjustment-expense') ||
           call[1].includes('shadow-adjustment-income')
-        )
+        ),
       );
 
       expect(shadowInserts.length).toBe(2); // Expense and income
@@ -648,7 +648,7 @@ describe('BackupRestore', () => {
       await BackupRestore.restoreBackup(validBackup);
 
       const shadowInserts = mockDbInstance.runAsync.mock.calls.filter(call =>
-        call[0].includes('shadow-adjustment')
+        call[0].includes('shadow-adjustment'),
       );
 
       expect(shadowInserts.length).toBe(0);
@@ -659,7 +659,7 @@ describe('BackupRestore', () => {
       mockDb.executeTransaction.mockRejectedValue(error);
 
       await expect(BackupRestore.restoreBackup(validBackup)).rejects.toThrow(
-        'Transaction failed'
+        'Transaction failed',
       );
     });
   });

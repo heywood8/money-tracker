@@ -72,7 +72,7 @@ const isDatabaseCorrupted = async (rawDb) => {
   try {
     // Check if accounts table exists
     const accountsTable = await rawDb.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'",
     );
 
     if (accountsTable.length === 0) {
@@ -112,7 +112,7 @@ const initializeDatabase = async (rawDb, db) => {
 
     // Check existing tables
     const existingTables = await rawDb.getAllAsync(
-      'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name'
+      'SELECT name FROM sqlite_master WHERE type="table" ORDER BY name',
     );
     console.log('Existing tables:', (existingTables || []).map(t => t.name).join(', '));
 
@@ -125,7 +125,7 @@ const initializeDatabase = async (rawDb, db) => {
       // Drop all tables and start fresh
       await rawDb.runAsync('PRAGMA foreign_keys = OFF');
       const tables = await rawDb.getAllAsync(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
       );
       for (const table of tables) {
         await rawDb.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
@@ -136,7 +136,7 @@ const initializeDatabase = async (rawDb, db) => {
 
     // Check current migration state before running
     const drizzleMigrations = await rawDb.getAllAsync(
-      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"',
     );
 
     if (drizzleMigrations && drizzleMigrations.length > 0) {
@@ -189,7 +189,7 @@ const initializeDatabase = async (rawDb, db) => {
     console.error('Failed to initialize database:', error);    console.error('Error details:', {
       message: error.message,
       cause: error.cause,
-      stack: error.stack
+      stack: error.stack,
     });
     
     // Log current database state for debugging
@@ -202,7 +202,7 @@ const initializeDatabase = async (rawDb, db) => {
     } catch (debugError) {
       console.error('Could not retrieve debug info:', debugError.message);
     }
-        throw error;
+    throw error;
   }
 };
 
@@ -301,7 +301,7 @@ export const getDatabaseVersion = async () => {
 
     // Check if migrations table exists
     const tableExists = await raw.getAllAsync(
-      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"',
     );
 
     if (tableExists.length === 0) {
@@ -310,7 +310,7 @@ export const getDatabaseVersion = async () => {
 
     // Get all applied migrations
     const appliedMigrations = await raw.getAllAsync(
-      'SELECT * FROM __drizzle_migrations ORDER BY created_at ASC'
+      'SELECT * FROM __drizzle_migrations ORDER BY created_at ASC',
     );
 
     // Return the count of applied migrations (this represents the version)
@@ -347,7 +347,7 @@ export const dropAllTables = async () => {
 
     // Get all table names
     const tables = await raw.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
     );
 
     console.log('Tables to drop:', tables.map(t => t.name).join(', '));

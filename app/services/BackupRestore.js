@@ -214,44 +214,44 @@ export const exportBackupSQLite = async () => {
  */
 export const exportBackup = async (format = 'json') => {
   switch (format.toLowerCase()) {
-    case 'csv':
-      return await exportBackupCSV();
-    case 'sqlite':
-    case 'db':
-      return await exportBackupSQLite();
-    case 'json':
-    default:
-      // Original JSON export
-      try {
-        const backup = await createBackup();
+  case 'csv':
+    return await exportBackupCSV();
+  case 'sqlite':
+  case 'db':
+    return await exportBackupSQLite();
+  case 'json':
+  default:
+    // Original JSON export
+    try {
+      const backup = await createBackup();
 
-        // Create filename with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        const filename = `money_tracker_backup_${timestamp}.json`;
-        const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      // Create filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `money_tracker_backup_${timestamp}.json`;
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
 
-        // Write backup to file
-        await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
+      // Write backup to file
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
 
-        console.log('Backup file created:', fileUri);
+      console.log('Backup file created:', fileUri);
 
-        // Share the file
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/json',
-            dialogTitle: 'Export Database Backup',
-            UTI: 'public.json',
-          });
-        } else {
-          throw new Error('Sharing is not available on this device');
-        }
-
-        return filename;
-      } catch (error) {
-        console.error('Failed to export backup:', error);
-        throw error;
+      // Share the file
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export Database Backup',
+          UTI: 'public.json',
+        });
+      } else {
+        throw new Error('Sharing is not available on this device');
       }
+
+      return filename;
+    } catch (error) {
+      console.error('Failed to export backup:', error);
+      throw error;
+    }
   }
 };
 
@@ -271,7 +271,7 @@ const validateBackup = (backup) => {
 
   if (backup.version > BACKUP_VERSION) {
     throw new Error(
-      `Backup version ${backup.version} is not supported by this app version (max: ${BACKUP_VERSION})`
+      `Backup version ${backup.version} is not supported by this app version (max: ${BACKUP_VERSION})`,
     );
   }
 
@@ -325,7 +325,7 @@ export const restoreBackup = async (backup) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'accounts',
         status: 'in_progress',
-        data: backup.data.accounts.length
+        data: backup.data.accounts.length,
       });
 
       const accountIdMapping = new Map(); // old ID (UUID or integer) -> final integer ID
@@ -355,7 +355,7 @@ export const restoreBackup = async (backup) => {
               account.monthly_target ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
-            ]
+            ],
           );
           // For integer IDs, no remapping needed - map to itself
           accountIdMapping.set(account.id, Number(account.id));
@@ -373,7 +373,7 @@ export const restoreBackup = async (backup) => {
               account.monthly_target ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
-            ]
+            ],
           );
 
           // Map UUID to new integer ID
@@ -387,14 +387,14 @@ export const restoreBackup = async (backup) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'accounts',
         status: 'completed',
-        data: backup.data.accounts.length
+        data: backup.data.accounts.length,
       });
 
       // Restore categories
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'categories',
         status: 'in_progress',
-        data: backup.data.categories.length
+        data: backup.data.categories.length,
       });
       for (const category of backup.data.categories) {
         // Validate required fields
@@ -417,21 +417,21 @@ export const restoreBackup = async (backup) => {
             category.exclude_from_forecast || 0,
             category.created_at || new Date().toISOString(),
             category.updated_at || new Date().toISOString(),
-          ]
+          ],
         );
       }
       console.log(`Restored ${backup.data.categories.length} categories`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'categories',
         status: 'completed',
-        data: backup.data.categories.length
+        data: backup.data.categories.length,
       });
 
       // Restore operations - map account IDs from UUID to integer
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'operations',
         status: 'in_progress',
-        data: backup.data.operations.length
+        data: backup.data.operations.length,
       });
       for (const operation of backup.data.operations) {
         // Map account IDs from old ID to new integer ID
@@ -443,7 +443,7 @@ export const restoreBackup = async (backup) => {
         
         // Validate that account_id is not null/undefined
         if (mappedAccountId == null) {
-          console.error(`Skipping operation with null account_id:`, operation);
+          console.error('Skipping operation with null account_id:', operation);
           continue;
         }
 
@@ -471,14 +471,14 @@ export const restoreBackup = async (backup) => {
             operation.destination_amount || null,
             operation.source_currency || null,
             operation.destination_currency || null,
-          ]
+          ],
         );
       }
       console.log(`Restored ${backup.data.operations.length} operations with mapped account IDs`);
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'operations',
         status: 'completed',
-        data: backup.data.operations.length
+        data: backup.data.operations.length,
       });
 
       // Restore balance history
@@ -486,7 +486,7 @@ export const restoreBackup = async (backup) => {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'balance_history',
           status: 'in_progress',
-          data: backup.data.balance_history.length
+          data: backup.data.balance_history.length,
         });
 
         for (const history of backup.data.balance_history) {
@@ -494,7 +494,7 @@ export const restoreBackup = async (backup) => {
 
           await db.runAsync(
             'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
-            [mappedAccountId, history.date, history.balance, history.created_at]
+            [mappedAccountId, history.date, history.balance, history.created_at],
           );
         }
 
@@ -502,18 +502,18 @@ export const restoreBackup = async (backup) => {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'balance_history',
           status: 'completed',
-          data: backup.data.balance_history.length
+          data: backup.data.balance_history.length,
         });
       } else {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'balance_history',
           status: 'in_progress',
-          data: 0
+          data: 0,
         });
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'balance_history',
           status: 'completed',
-          data: 0
+          data: 0,
         });
       }
 
@@ -522,7 +522,7 @@ export const restoreBackup = async (backup) => {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budgets',
           status: 'in_progress',
-          data: backup.data.budgets.length
+          data: backup.data.budgets.length,
         });
         for (const budget of backup.data.budgets) {
           // Validate required fields
@@ -545,25 +545,25 @@ export const restoreBackup = async (backup) => {
               budget.rollover_enabled ?? 0,
               budget.created_at || new Date().toISOString(),
               budget.updated_at || new Date().toISOString(),
-            ]
+            ],
           );
         }
         console.log(`Restored ${backup.data.budgets.length} budgets`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budgets',
           status: 'completed',
-          data: backup.data.budgets.length
+          data: backup.data.budgets.length,
         });
       } else {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budgets',
           status: 'in_progress',
-          data: 0
+          data: 0,
         });
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'budgets',
           status: 'completed',
-          data: 0
+          data: 0,
         });
       }
 
@@ -572,13 +572,13 @@ export const restoreBackup = async (backup) => {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'metadata',
           status: 'in_progress',
-          data: backup.data.app_metadata.length
+          data: backup.data.app_metadata.length,
         });
         for (const meta of backup.data.app_metadata) {
           if (meta.key !== 'db_version') {
             await db.runAsync(
               'INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)',
-              [meta.key, meta.value, meta.updated_at]
+              [meta.key, meta.value, meta.updated_at],
             );
           }
         }
@@ -586,18 +586,18 @@ export const restoreBackup = async (backup) => {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'metadata',
           status: 'completed',
-          data: backup.data.app_metadata.length
+          data: backup.data.app_metadata.length,
         });
       } else {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'metadata',
           status: 'in_progress',
-          data: 0
+          data: 0,
         });
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'metadata',
           status: 'completed',
-          data: 0
+          data: 0,
         });
       }
 
@@ -606,7 +606,7 @@ export const restoreBackup = async (backup) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
       const shadowCategories = await db.getAllAsync(
         'SELECT id FROM categories WHERE id IN (?, ?)',
-        ['shadow-adjustment-expense', 'shadow-adjustment-income']
+        ['shadow-adjustment-expense', 'shadow-adjustment-income'],
       );
 
       if (shadowCategories.length < 2) {
@@ -631,7 +631,7 @@ export const restoreBackup = async (backup) => {
               1,
               now,
               now,
-            ]
+            ],
           );
           console.log('Shadow expense category added');
         }
@@ -651,7 +651,7 @@ export const restoreBackup = async (backup) => {
               1,
               now,
               now,
-            ]
+            ],
           );
           console.log('Shadow income category added');
         }
@@ -828,7 +828,7 @@ const importBackupSQLite = async (fileUri) => {
 
     // Check current migration state before running
     const drizzleMigrations = await tempDb.getAllAsync(
-      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"'
+      'SELECT name FROM sqlite_master WHERE type="table" AND name="__drizzle_migrations"',
     );
 
     if (drizzleMigrations && drizzleMigrations.length > 0) {
@@ -926,15 +926,15 @@ const importBackupSQLite = async (fileUri) => {
 const detectFileFormat = (filename) => {
   const ext = filename.toLowerCase().split('.').pop();
   switch (ext) {
-    case 'csv':
-      return 'csv';
-    case 'db':
-    case 'sqlite':
-    case 'sqlite3':
-      return 'sqlite';
-    case 'json':
-    default:
-      return 'json';
+  case 'csv':
+    return 'csv';
+  case 'db':
+  case 'sqlite':
+  case 'sqlite3':
+    return 'sqlite';
+  case 'json':
+  default:
+    return 'json';
   }
 };
 
@@ -964,31 +964,31 @@ export const importBackup = async () => {
     appEvents.emit(IMPORT_PROGRESS_EVENT, {
       stepId: 'format',
       status: 'completed',
-      data: format
+      data: format,
     });
 
     // Import based on format
     let backup;
     switch (format) {
-      case 'csv':
-        backup = await importBackupCSV(fileUri);
-        break;
-      case 'sqlite':
-        backup = await importBackupSQLite(fileUri);
-        break;
-      case 'json':
-      default:
-        // Original JSON import
-        appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
-        const fileContent = await FileSystem.readAsStringAsync(fileUri);
-        try {
-          backup = JSON.parse(fileContent);
-        } catch (error) {
-          throw new Error('Invalid backup file: not valid JSON');
-        }
-        appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
-        await restoreBackup(backup);
-        break;
+    case 'csv':
+      backup = await importBackupCSV(fileUri);
+      break;
+    case 'sqlite':
+      backup = await importBackupSQLite(fileUri);
+      break;
+    case 'json':
+    default:
+      // Original JSON import
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
+      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      try {
+        backup = JSON.parse(fileContent);
+      } catch (error) {
+        throw new Error('Invalid backup file: not valid JSON');
+      }
+      appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
+      await restoreBackup(backup);
+      break;
     }
 
     return backup;

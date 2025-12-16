@@ -179,7 +179,7 @@ describe('CategoriesContext', () => {
         expect.objectContaining({
           ...newCategory,
           id: 'cat-uuid-1',
-        })
+        }),
       );
 
       expect(result.current.categories).toHaveLength(1);
@@ -288,7 +288,7 @@ describe('CategoriesContext', () => {
       expect(mockShowDialog).toHaveBeenCalledWith(
         'Error',
         'Failed to create category. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     });
 

@@ -99,7 +99,7 @@ export const getAllCategories = async (includeShadow = false) => {
 export const getShadowCategories = async () => {
   try {
     const categories = await queryAll(
-      'SELECT * FROM categories WHERE is_shadow = 1 ORDER BY created_at ASC'
+      'SELECT * FROM categories WHERE is_shadow = 1 ORDER BY created_at ASC',
     );
     return (categories || []).map(mapCategoryFields);
   } catch (error) {
@@ -117,7 +117,7 @@ export const getCategoryById = async (id) => {
   try {
     const category = await queryFirst(
       'SELECT * FROM categories WHERE id = ?',
-      [id]
+      [id],
     );
     return mapCategoryFields(category);
   } catch (error) {
@@ -156,12 +156,12 @@ export const getChildCategories = async (parentId) => {
     let categories;
     if (parentId === null) {
       categories = await queryAll(
-        'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY created_at ASC'
+        'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY created_at ASC',
       );
     } else {
       categories = await queryAll(
         'SELECT * FROM categories WHERE parent_id = ? ORDER BY created_at ASC',
-        [parentId]
+        [parentId],
       );
     }
     return (categories || []).map(mapCategoryFields);
@@ -207,7 +207,7 @@ export const createCategory = async (category) => {
         categoryData.exclude_from_forecast,
         categoryData.created_at,
         categoryData.updated_at,
-      ]
+      ],
     );
 
     // Return mapped fields for consistency
@@ -287,24 +287,24 @@ export const deleteCategory = async (id) => {
     // Check if category has child categories
     const childCheck = await queryFirst(
       'SELECT COUNT(*) as count FROM categories WHERE parent_id = ?',
-      [id]
+      [id],
     );
 
     if (childCheck && childCheck.count > 0) {
       throw new Error(
-        `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`
+        `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`,
       );
     }
 
     // Check if category is used in any operations
     const operationCheck = await queryFirst(
       'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
-      [id]
+      [id],
     );
 
     if (operationCheck && operationCheck.count > 0) {
       throw new Error(
-        `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`
+        `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`,
       );
     }
 
@@ -325,7 +325,7 @@ export const hasChildCategories = async (id) => {
   try {
     const result = await queryFirst(
       'SELECT 1 FROM categories WHERE parent_id = ? LIMIT 1',
-      [id]
+      [id],
     );
     return !!result;
   } catch (error) {
@@ -418,7 +418,7 @@ export const categoryExists = async (id) => {
   try {
     const result = await queryFirst(
       'SELECT 1 FROM categories WHERE id = ? LIMIT 1',
-      [id]
+      [id],
     );
     return !!result;
   } catch (error) {
@@ -436,7 +436,7 @@ export const countCategoryUsage = async (id) => {
   try {
     const result = await queryFirst(
       'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
-      [id]
+      [id],
     );
     return result ? result.count : 0;
   } catch (error) {

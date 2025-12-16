@@ -39,7 +39,7 @@ const QuickAddForm = memo(({
   getCategoryName,
   openPicker,
   handleQuickAdd,
-  TYPES
+  TYPES,
 }) => {
   return (
     <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -53,7 +53,7 @@ const QuickAddForm = memo(({
               {
                 backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
                 borderColor: colors.border,
-              }
+              },
             ]}
             onPress={() => setQuickAddValues(v => ({
               ...v,
@@ -69,7 +69,7 @@ const QuickAddForm = memo(({
             />
             <Text style={[
               styles.typeButtonText,
-              { color: quickAddValues.type === type.key ? '#fff' : colors.text }
+              { color: quickAddValues.type === type.key ? '#fff' : colors.text },
             ]}>
               {type.label}
             </Text>
@@ -281,7 +281,7 @@ const OperationsScreen = () => {
           style: 'destructive',
           onPress: () => deleteOperation(operation.id),
         },
-      ]
+      ],
     );
   };
 
@@ -465,7 +465,7 @@ const OperationsScreen = () => {
           const spendingSums = calculateSpendingSums(currentDateOperations);
           // Update the separator that was already added with the spending sums
           const separatorIndex = grouped.findIndex(
-            item => item.type === 'separator' && item.date === currentDate
+            item => item.type === 'separator' && item.date === currentDate,
           );
           if (separatorIndex !== -1) {
             grouped[separatorIndex].spendingSums = spendingSums;
@@ -496,7 +496,7 @@ const OperationsScreen = () => {
       if (index === sorted.length - 1 && currentDateOperations.length > 0) {
         const spendingSums = calculateSpendingSums(currentDateOperations);
         const separatorIndex = grouped.findIndex(
-          item => item.type === 'separator' && item.date === currentDate
+          item => item.type === 'separator' && item.date === currentDate,
         );
         if (separatorIndex !== -1) {
           grouped[separatorIndex].spendingSums = spendingSums;
@@ -526,7 +526,7 @@ const OperationsScreen = () => {
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
       });
     }
   }, [t]);
@@ -671,8 +671,8 @@ const OperationsScreen = () => {
                 backgroundColor: isExpense
                   ? colors.expenseBackground || '#ffe5e5'
                   : isIncome
-                  ? colors.incomeBackground || '#e5ffe5'
-                  : colors.transferBackground || '#e5e5ff',
+                    ? colors.incomeBackground || '#e5ffe5'
+                    : colors.transferBackground || '#e5e5ff',
               },
             ]}
           >
@@ -713,8 +713,8 @@ const OperationsScreen = () => {
                   color: isExpense
                     ? colors.expense
                     : isIncome
-                    ? colors.income
-                    : colors.text,
+                      ? colors.income
+                      : colors.text,
                 },
               ]}
             >
@@ -891,7 +891,7 @@ const OperationsScreen = () => {
             icon="filter-variant"
             style={[
               styles.filterFab,
-              { backgroundColor: filtersActive ? colors.primary : colors.surface }
+              { backgroundColor: filtersActive ? colors.primary : colors.surface },
             ]}
             color={filtersActive ? '#fff' : colors.text}
             onPress={() => setFilterModalVisible(true)}
@@ -938,258 +938,53 @@ const OperationsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  operationRow: {
-    borderBottomWidth: 1,
-    minHeight: 72,
-  },
-  operationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  operationInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
+  accountBalanceText: {
+    fontSize: 12,
+    marginTop: 2,
   },
   accountName: {
     fontSize: 13,
     marginBottom: 2,
   },
-  description: {
-    fontSize: 12,
-  },
-  exchangeRate: {
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  destinationAmount: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  operationRight: {
-    alignItems: 'flex-end',
-    marginRight: 8,
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  date: {
-    fontSize: 12,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  accountOption: {
     alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
-  emptyList: {
-    flex: 1,
-  },
-  quickAddForm: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  quickAddTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  typeSelector: {
     flexDirection: 'row',
-    marginBottom: 12,
-    gap: 8,
-  },
-  typeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-  },
-  typeButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  formInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-    gap: 8,
+    justifyContent: 'space-between',
   },
   accountPickersRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
   },
-  formInputHalf: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
+  addButton: {
+    // backgroundColor set dynamically from colors.primary
   },
-  formInputText: {
-    flex: 1,
-    fontSize: 15,
-  },
-  accountBalanceText: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  formTextInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-  categoryAddRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  formInputCategory: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  quickAddButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  quickAddButtonText: {
+  addButtonText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pickerModalContent: {
-    width: '90%',
-    maxHeight: '70%',
-    borderRadius: 12,
-    padding: 12,
-  },
-  pickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  pickerOptionText: {
-    fontSize: 18,
-  },
-  accountOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  categoryOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  breadcrumbContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    marginBottom: 8,
-  },
-  backButton: {
-    padding: 4,
-    marginRight: 8,
-  },
-  breadcrumbText: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-  },
-  closeButton: {
-    marginTop: 16,
-    alignSelf: 'center',
-    minHeight: 48,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  pickerActions: {
-    flexDirection: 'row',
-    marginTop: 16,
-    gap: 12,
-    paddingHorizontal: 8,
+  amount: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 2,
   },
-  pickerActionButton: {
-    flex: 1,
-    minHeight: 48,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
+  backButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  breadcrumbContainer: {
     alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  breadcrumbText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
   },
   cancelButton: {
     borderWidth: 1,
@@ -1198,13 +993,71 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  addButton: {
-    // backgroundColor set dynamically from colors.primary
+  categoryAddRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
   },
-  addButtonText: {
+  categoryName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    marginBottom: 2,
+  },
+  categoryOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  closeButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 16,
+    minHeight: 48,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  container: {
+    flex: 1,
+  },
+  date: {
+    fontSize: 12,
+  },
+  dateSeparator: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dateSeparatorContent: {
+    alignItems: 'center',
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+  },
+  dateSeparatorSpent: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  dateSeparatorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  description: {
+    fontSize: 12,
+  },
+  destinationAmount: {
+    fontSize: 12,
+    marginBottom: 2,
   },
   disabledButton: {
     opacity: 0.4,
@@ -1212,60 +1065,207 @@ const styles = StyleSheet.create({
   disabledButtonText: {
     opacity: 0.6,
   },
-  dateSeparator: {
-    flexDirection: 'row',
+  emptyContainer: {
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  dateSeparatorLine: {
     flex: 1,
-    height: 1,
-  },
-  dateSeparatorContent: {
-    alignItems: 'center',
-  },
-  dateSeparatorText: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  dateSeparatorSpent: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  loadingMoreContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 100,
   },
-  loadingMoreText: {
-    marginTop: 8,
-    fontSize: 14,
+  emptyList: {
+    flex: 1,
+  },
+  emptyText: {
+    fontSize: 16,
+    marginTop: 16,
+  },
+  exchangeRate: {
+    fontSize: 11,
+    fontStyle: 'italic',
   },
   filterFab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
     bottom: 0,
+    margin: 16,
+    position: 'absolute',
+    right: 0,
+  },
+  formInput: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  formInputCategory: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 2,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  formInputHalf: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  formInputText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  formTextInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 48,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    marginTop: 8,
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 12,
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  operationContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  operationInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  operationRight: {
+    alignItems: 'flex-end',
+    marginRight: 8,
+  },
+  operationRow: {
+    borderBottomWidth: 1,
+    minHeight: 72,
+  },
+  pickerActionButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingVertical: 12,
+  },
+  pickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+    paddingHorizontal: 8,
+  },
+  pickerModalContent: {
+    borderRadius: 12,
+    maxHeight: '70%',
+    padding: 12,
+    width: '90%',
+  },
+  pickerOption: {
+    borderBottomWidth: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  pickerOptionText: {
+    fontSize: 18,
+  },
+  quickAddButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  quickAddButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  quickAddForm: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+  },
+  quickAddTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   resetFilterButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    bottom: 16,
+    elevation: 4,
+    height: 40,
+    justifyContent: 'center',
     position: 'absolute',
     right: 80,
-    bottom: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+    width: 40,
+  },
+  typeButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  typeButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
   },
 });
 

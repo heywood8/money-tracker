@@ -182,7 +182,7 @@ describe('EventEmitter', () => {
       expect(listener3).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error in event listener for test-event:'),
-        expect.any(Error)
+        expect.any(Error),
       );
       
       consoleErrorSpy.mockRestore();
@@ -422,7 +422,7 @@ describe('EventEmitter', () => {
             array: [1, 2, 3],
             string: 'test',
             boolean: true,
-          }
+          },
         },
         callback: () => {},
       };

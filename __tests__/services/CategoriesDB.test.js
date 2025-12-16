@@ -106,7 +106,7 @@ describe('CategoriesDB', () => {
       const result = await CategoriesDB.getAllCategories();
 
       expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM categories WHERE is_shadow = 0 ORDER BY created_at ASC'
+        'SELECT * FROM categories WHERE is_shadow = 0 ORDER BY created_at ASC',
       );
       expect(result).toHaveLength(2);
     });
@@ -122,7 +122,7 @@ describe('CategoriesDB', () => {
       const result = await CategoriesDB.getAllCategories(true);
 
       expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM categories ORDER BY created_at ASC'
+        'SELECT * FROM categories ORDER BY created_at ASC',
       );
       expect(result).toHaveLength(2);
     });
@@ -163,7 +163,7 @@ describe('CategoriesDB', () => {
       const result = await CategoriesDB.getShadowCategories();
 
       expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM categories WHERE is_shadow = 1 ORDER BY created_at ASC'
+        'SELECT * FROM categories WHERE is_shadow = 1 ORDER BY created_at ASC',
       );
       expect(result).toHaveLength(2);
       expect(result[0].isShadow).toBe(true);
@@ -200,7 +200,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryFirst).toHaveBeenCalledWith(
         'SELECT * FROM categories WHERE id = ?',
-        ['cat-1']
+        ['cat-1'],
       );
       expect(result.id).toBe('cat-1');
       expect(result.name).toBe('Food');
@@ -235,7 +235,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryAll).toHaveBeenCalledWith(
         'SELECT * FROM categories WHERE category_type = ? AND is_shadow = 0 ORDER BY created_at ASC',
-        ['expense']
+        ['expense'],
       );
       expect(result).toHaveLength(2);
     });
@@ -251,7 +251,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryAll).toHaveBeenCalledWith(
         'SELECT * FROM categories WHERE category_type = ? AND is_shadow = 0 ORDER BY created_at ASC',
-        ['income']
+        ['income'],
       );
       expect(result).toHaveLength(1);
       expect(result[0].categoryType).toBe('income');
@@ -269,7 +269,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryAll).toHaveBeenCalledWith(
         'SELECT * FROM categories WHERE category_type = ? ORDER BY created_at ASC',
-        ['expense']
+        ['expense'],
       );
       expect(result).toHaveLength(2);
     });
@@ -295,7 +295,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryAll).toHaveBeenCalledWith(
         'SELECT * FROM categories WHERE parent_id = ? ORDER BY created_at ASC',
-        ['parent-1']
+        ['parent-1'],
       );
       expect(result).toHaveLength(2);
     });
@@ -311,7 +311,7 @@ describe('CategoriesDB', () => {
       const result = await CategoriesDB.getChildCategories(null);
 
       expect(db.queryAll).toHaveBeenCalledWith(
-        'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY created_at ASC'
+        'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY created_at ASC',
       );
       expect(result).toHaveLength(2);
     });
@@ -541,7 +541,7 @@ describe('CategoriesDB', () => {
       mockDb.executeQuery.mockRejectedValue(error);
 
       await expect(
-        CategoriesDB.updateCategory('cat-1', { name: 'New Name' })
+        CategoriesDB.updateCategory('cat-1', { name: 'New Name' }),
       ).rejects.toThrow('Database error');
     });
   });
@@ -557,7 +557,7 @@ describe('CategoriesDB', () => {
 
       expect(db.executeQuery).toHaveBeenCalledWith(
         'DELETE FROM categories WHERE id = ?',
-        ['cat-1']
+        ['cat-1'],
       );
     });
 
@@ -565,7 +565,7 @@ describe('CategoriesDB', () => {
       mockDb.queryFirst.mockResolvedValueOnce({ count: 3 }); // Has 3 children
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow(
-        'Cannot delete category: 3 subcategory(ies) exist'
+        'Cannot delete category: 3 subcategory(ies) exist',
       );
 
       expect(db.executeQuery).not.toHaveBeenCalled();
@@ -577,7 +577,7 @@ describe('CategoriesDB', () => {
         .mockResolvedValueOnce({ count: 5 }); // Has 5 operations
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow(
-        'Cannot delete category: 5 transaction(s) use this category'
+        'Cannot delete category: 5 transaction(s) use this category',
       );
 
       expect(db.executeQuery).not.toHaveBeenCalled();
@@ -613,7 +613,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryFirst).toHaveBeenCalledWith(
         'SELECT 1 FROM categories WHERE parent_id = ? LIMIT 1',
-        ['cat-1']
+        ['cat-1'],
       );
       expect(result).toBe(true);
     });
@@ -707,7 +707,7 @@ describe('CategoriesDB', () => {
         .mockResolvedValueOnce({ id: 'cat-1', parent_id: null });
 
       await expect(
-        CategoriesDB.moveCategory('cat-1', 'new-parent')
+        CategoriesDB.moveCategory('cat-1', 'new-parent'),
       ).rejects.toThrow('Cannot move category to its own descendant');
 
       expect(db.executeQuery).not.toHaveBeenCalled();
@@ -719,7 +719,7 @@ describe('CategoriesDB', () => {
       mockDb.executeQuery.mockRejectedValue(error);
 
       await expect(
-        CategoriesDB.moveCategory('cat-1', 'new-parent')
+        CategoriesDB.moveCategory('cat-1', 'new-parent'),
       ).rejects.toThrow('Database error');
     });
   });
@@ -736,7 +736,7 @@ describe('CategoriesDB', () => {
           { id: 'grandchild', parent_id: 'child1' },
         ])
         .mockResolvedValueOnce([]); // child2 has no children
-        // .mockResolvedValueOnce([]); // grandchild has no children
+      // .mockResolvedValueOnce([]); // grandchild has no children
 
       const result = await CategoriesDB.getAllDescendants('parent');
 
@@ -770,7 +770,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryFirst).toHaveBeenCalledWith(
         'SELECT 1 FROM categories WHERE id = ? LIMIT 1',
-        ['cat-1']
+        ['cat-1'],
       );
       expect(result).toBe(true);
     });
@@ -799,7 +799,7 @@ describe('CategoriesDB', () => {
 
       expect(db.queryFirst).toHaveBeenCalledWith(
         'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
-        ['cat-1']
+        ['cat-1'],
       );
       expect(result).toBe(42);
     });
@@ -997,7 +997,7 @@ describe('CategoriesDB', () => {
         mockDb.queryAll.mockResolvedValue([{ id: 'cat-1', name: 'Test', is_shadow: 0 }]);
 
         const promises = Array.from({ length: 10 }, () =>
-          CategoriesDB.getAllCategories()
+          CategoriesDB.getAllCategories(),
         );
 
         const results = await Promise.all(promises);

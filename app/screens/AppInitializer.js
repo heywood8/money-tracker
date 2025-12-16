@@ -48,9 +48,9 @@ const AppInitializer = () => {
 
 const styles = StyleSheet.create({
   loadingContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
 });
 

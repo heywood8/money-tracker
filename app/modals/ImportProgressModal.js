@@ -35,7 +35,7 @@ export default function ImportProgressModal() {
     if (currentStep && stepPositions.current[currentStep] !== undefined) {
       scrollViewRef.current?.scrollTo({
         y: stepPositions.current[currentStep],
-        animated: true
+        animated: true,
       });
     }
   }, [currentStep]);
@@ -49,38 +49,38 @@ export default function ImportProgressModal() {
     if (step.status === 'in_progress' && step.data) {
       // Format: "Restoring X operations..."
       switch (step.id) {
-        case 'accounts':
-          return `Restoring ${step.data} accounts...`;
-        case 'categories':
-          return `Restoring ${step.data} categories...`;
-        case 'operations':
-          return `Restoring ${step.data} operations...`;
-        case 'budgets':
-          return `Restoring ${step.data} budgets...`;
-        case 'metadata':
-          return `Restoring ${step.data} metadata entries...`;
-        default:
-          return step.label;
+      case 'accounts':
+        return `Restoring ${step.data} accounts...`;
+      case 'categories':
+        return `Restoring ${step.data} categories...`;
+      case 'operations':
+        return `Restoring ${step.data} operations...`;
+      case 'budgets':
+        return `Restoring ${step.data} budgets...`;
+      case 'metadata':
+        return `Restoring ${step.data} metadata entries...`;
+      default:
+        return step.label;
       }
     }
 
     // For completed steps with data, show the count
     if (step.status === 'completed' && step.data) {
       switch (step.id) {
-        case 'format':
-          return `Detected format: ${step.data}`;
-        case 'accounts':
-          return `Restored ${step.data} accounts`;
-        case 'categories':
-          return `Restored ${step.data} categories`;
-        case 'operations':
-          return `Restored ${step.data} operations`;
-        case 'budgets':
-          return `Restored ${step.data} budgets`;
-        case 'metadata':
-          return `Restored ${step.data} metadata entries`;
-        default:
-          return step.label;
+      case 'format':
+        return `Detected format: ${step.data}`;
+      case 'accounts':
+        return `Restored ${step.data} accounts`;
+      case 'categories':
+        return `Restored ${step.data} categories`;
+      case 'operations':
+        return `Restored ${step.data} operations`;
+      case 'budgets':
+        return `Restored ${step.data} budgets`;
+      case 'metadata':
+        return `Restored ${step.data} metadata entries`;
+      default:
+        return step.label;
       }
     }
 
@@ -113,7 +113,7 @@ export default function ImportProgressModal() {
       <View
         style={[
           styles.stepIconPlaceholder,
-          { borderColor: colors.border }
+          { borderColor: colors.border },
         ]}
       />
     );
@@ -126,7 +126,7 @@ export default function ImportProgressModal() {
         dismissable={false}
         contentContainerStyle={[
           styles.modalContainer,
-          { backgroundColor: colors.card }
+          { backgroundColor: colors.card },
         ]}
       >
         <View style={styles.header}>
@@ -161,7 +161,7 @@ export default function ImportProgressModal() {
               style={[
                 styles.stepRow,
                 { borderBottomColor: colors.border },
-                index === steps.length - 1 && styles.lastStepRow
+                index === steps.length - 1 && styles.lastStepRow,
               ]}
             >
               {renderStepIcon(step)}
@@ -170,7 +170,7 @@ export default function ImportProgressModal() {
                 style={[
                   styles.stepLabel,
                   { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                  step.status === 'in_progress' && styles.stepLabelActive
+                  step.status === 'in_progress' && styles.stepLabelActive,
                 ]}
               >
                 {getStepLabel(step)}
@@ -195,51 +195,37 @@ export default function ImportProgressModal() {
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    margin: 20,
-    borderRadius: 12,
-    padding: 24,
-    maxHeight: '80%',
+  footer: {
+    alignItems: 'center',
+    marginTop: 16,
   },
   header: {
     alignItems: 'center',
     marginBottom: 24,
   },
-  title: {
-    marginTop: 12,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  stepsContainer: {
-    maxHeight: 400,
-  },
-  stepsContent: {
-    paddingBottom: 8,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
   lastStepRow: {
     borderBottomWidth: 0,
   },
+  modalContainer: {
+    borderRadius: 12,
+    margin: 20,
+    maxHeight: '80%',
+    padding: 24,
+  },
+  okButton: {
+    minWidth: 120,
+  },
   stepIcon: {
+    height: 24,
     marginRight: 12,
     width: 24,
-    height: 24,
   },
   stepIconPlaceholder: {
-    width: 24,
-    height: 24,
     borderRadius: 12,
     borderWidth: 2,
+    height: 24,
     marginRight: 12,
+    width: 24,
   },
   stepLabel: {
     flex: 1,
@@ -247,11 +233,25 @@ const styles = StyleSheet.create({
   stepLabelActive: {
     fontWeight: '600',
   },
-  footer: {
-    marginTop: 16,
+  stepRow: {
     alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
   },
-  okButton: {
-    minWidth: 120,
+  stepsContainer: {
+    maxHeight: 400,
+  },
+  stepsContent: {
+    paddingBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  title: {
+    marginBottom: 8,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });

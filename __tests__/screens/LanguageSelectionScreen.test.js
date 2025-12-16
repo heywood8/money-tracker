@@ -32,13 +32,13 @@ describe('LanguageSelectionScreen', () => {
   describe('Initialization', () => {
     it('renders without crashing', () => {
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
 
     it('displays welcome title', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Welcome to Penny')).toBeTruthy();
@@ -46,7 +46,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('displays welcome subtitle', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Choose your language')).toBeTruthy();
@@ -54,7 +54,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('displays language options', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Check for Russian language option (unique text)
@@ -70,13 +70,13 @@ describe('LanguageSelectionScreen', () => {
       const mockCallback = jest.fn();
 
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockCallback} />
+        <LanguageSelectionScreen onLanguageSelected={mockCallback} />,
       )).not.toThrow();
     });
 
     it('handles missing onLanguageSelected callback gracefully', () => {
       expect(() => render(
-        <LanguageSelectionScreen />
+        <LanguageSelectionScreen />,
       )).not.toThrow();
     });
   });
@@ -84,13 +84,13 @@ describe('LanguageSelectionScreen', () => {
   describe('Rendering and UI', () => {
     it('renders SafeAreaView container', () => {
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
 
     it('renders both English and Russian options', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Russian is unique
@@ -102,7 +102,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('renders Continue button', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Continue')).toBeTruthy();
@@ -112,7 +112,7 @@ describe('LanguageSelectionScreen', () => {
   describe('Translation Integration', () => {
     it('uses translations for UI text', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Check translated strings
@@ -124,7 +124,7 @@ describe('LanguageSelectionScreen', () => {
     it('provides translation fallback mechanism', () => {
       // Component has internal t() function for translation
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
   });
@@ -132,19 +132,19 @@ describe('LanguageSelectionScreen', () => {
   describe('Edge Cases', () => {
     it('handles null callback', () => {
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={null} />
+        <LanguageSelectionScreen onLanguageSelected={null} />,
       )).not.toThrow();
     });
 
     it('handles undefined callback', () => {
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={undefined} />
+        <LanguageSelectionScreen onLanguageSelected={undefined} />,
       )).not.toThrow();
     });
 
     it('renders correctly without any props', () => {
       expect(() => render(
-        <LanguageSelectionScreen />
+        <LanguageSelectionScreen />,
       )).not.toThrow();
     });
   });
@@ -153,13 +153,13 @@ describe('LanguageSelectionScreen', () => {
     it('provides accessible structure', () => {
       // Component should render without errors
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
 
     it('includes text content for screen readers', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Important text should be present for screen readers
@@ -171,7 +171,7 @@ describe('LanguageSelectionScreen', () => {
   describe('Component Integration', () => {
     it('integrates with i18n data', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Should load and display translations
@@ -180,7 +180,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('renders language flags', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Flags should be rendered
@@ -193,14 +193,14 @@ describe('LanguageSelectionScreen', () => {
     it('manages language selection state internally', () => {
       // Component uses useState for selected language
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
 
     it('initializes with no language selected', () => {
       // Component should start with null selection
       expect(() => render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
   });
@@ -208,11 +208,11 @@ describe('LanguageSelectionScreen', () => {
   describe('Regression Tests', () => {
     it('handles re-rendering without errors', () => {
       const { rerender } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(() => rerender(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       )).not.toThrow();
     });
 
@@ -221,17 +221,17 @@ describe('LanguageSelectionScreen', () => {
       const callback2 = jest.fn();
 
       const { rerender } = render(
-        <LanguageSelectionScreen onLanguageSelected={callback1} />
+        <LanguageSelectionScreen onLanguageSelected={callback1} />,
       );
 
       expect(() => rerender(
-        <LanguageSelectionScreen onLanguageSelected={callback2} />
+        <LanguageSelectionScreen onLanguageSelected={callback2} />,
       )).not.toThrow();
     });
 
     it('displays correct default language (English)', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Should default to English UI
@@ -243,7 +243,7 @@ describe('LanguageSelectionScreen', () => {
   describe('UI Components', () => {
     it('renders language selection buttons', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Both language options should be present
@@ -253,7 +253,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('renders action button', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Continue')).toBeTruthy();
@@ -261,7 +261,7 @@ describe('LanguageSelectionScreen', () => {
 
     it('includes all required UI elements', () => {
       const { getByText } = render(
-        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Title, subtitle, languages, and button should all be present

@@ -83,16 +83,16 @@ describe('SimpleTabs Navigation', () => {
       // Tests renderActive function logic (lines 69-81)
       const getActiveScreen = (active) => {
         switch (active) {
-          case 'Operations':
-            return 'OperationsScreen';
-          case 'Accounts':
-            return 'AccountsScreen';
-          case 'Categories':
-            return 'CategoriesScreen';
-          case 'Graphs':
-            return 'GraphsScreen';
-          default:
-            return 'OperationsScreen';
+        case 'Operations':
+          return 'OperationsScreen';
+        case 'Accounts':
+          return 'AccountsScreen';
+        case 'Categories':
+          return 'CategoriesScreen';
+        case 'Graphs':
+          return 'GraphsScreen';
+        default:
+          return 'OperationsScreen';
         }
       };
       
@@ -477,11 +477,11 @@ describe('SimpleTabs Navigation', () => {
     it('should handle invalid tab key gracefully', () => {
       const getScreen = (active) => {
         switch (active) {
-          case 'Operations': return 'OperationsScreen';
-          case 'Accounts': return 'AccountsScreen';
-          case 'Categories': return 'CategoriesScreen';
-          case 'Graphs': return 'GraphsScreen';
-          default: return 'OperationsScreen';
+        case 'Operations': return 'OperationsScreen';
+        case 'Accounts': return 'AccountsScreen';
+        case 'Categories': return 'CategoriesScreen';
+        case 'Graphs': return 'GraphsScreen';
+        default: return 'OperationsScreen';
         }
       };
       

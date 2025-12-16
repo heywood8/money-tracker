@@ -34,7 +34,7 @@ const mapOperationFields = (dbOperation) => {
 export const getAllOperations = async () => {
   try {
     const operations = await queryAll(
-      'SELECT * FROM operations ORDER BY date DESC, created_at DESC'
+      'SELECT * FROM operations ORDER BY date DESC, created_at DESC',
     );
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -52,7 +52,7 @@ export const getOperationById = async (id) => {
   try {
     const operation = await queryFirst(
       'SELECT * FROM operations WHERE id = ?',
-      [id]
+      [id],
     );
     return mapOperationFields(operation);
   } catch (error) {
@@ -70,7 +70,7 @@ export const getOperationsByAccount = async (accountId) => {
   try {
     const operations = await queryAll(
       'SELECT * FROM operations WHERE account_id = ? OR to_account_id = ? ORDER BY date DESC, created_at DESC',
-      [accountId, accountId]
+      [accountId, accountId],
     );
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -88,7 +88,7 @@ export const getOperationsByCategory = async (categoryId) => {
   try {
     const operations = await queryAll(
       'SELECT * FROM operations WHERE category_id = ? ORDER BY date DESC, created_at DESC',
-      [categoryId]
+      [categoryId],
     );
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -107,7 +107,7 @@ export const getOperationsByDateRange = async (startDate, endDate) => {
   try {
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
-      [startDate, endDate]
+      [startDate, endDate],
     );
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -125,7 +125,7 @@ export const getOperationsByType = async (type) => {
   try {
     const operations = await queryAll(
       'SELECT * FROM operations WHERE type = ? ORDER BY date DESC, created_at DESC',
-      [type]
+      [type],
     );
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -209,7 +209,7 @@ export const createOperation = async (operation) => {
           operationData.destination_amount,
           operationData.source_currency,
           operationData.destination_currency,
-        ]
+        ],
       );
 
       // Store the auto-generated ID
@@ -226,7 +226,7 @@ export const createOperation = async (operation) => {
         // Get current balance
         const account = await db.getFirstAsync(
           'SELECT balance FROM accounts WHERE id = ?',
-          [accountId]
+          [accountId],
         );
 
         if (!account) {
@@ -240,7 +240,7 @@ export const createOperation = async (operation) => {
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance, updateTime, accountId]
+          [newBalance, updateTime, accountId],
         );
 
         // Update today's balance history
@@ -267,7 +267,7 @@ export const updateOperation = async (id, updates) => {
       // Get old operation
       const oldOperation = await db.getFirstAsync(
         'SELECT * FROM operations WHERE id = ?',
-        [id]
+        [id],
       );
 
       if (!oldOperation) {
@@ -336,7 +336,7 @@ export const updateOperation = async (id, updates) => {
       // Get updated operation
       const newOperation = await db.getFirstAsync(
         'SELECT * FROM operations WHERE id = ?',
-        [id]
+        [id],
       );
 
       // Calculate balance changes (reverse old + apply new)
@@ -362,7 +362,7 @@ export const updateOperation = async (id, updates) => {
         // Get current balance
         const account = await db.getFirstAsync(
           'SELECT balance FROM accounts WHERE id = ?',
-          [accountId]
+          [accountId],
         );
 
         if (!account) {
@@ -376,7 +376,7 @@ export const updateOperation = async (id, updates) => {
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance, updateTime, accountId]
+          [newBalance, updateTime, accountId],
         );
 
         // Update today's balance history
@@ -400,7 +400,7 @@ export const deleteOperation = async (id) => {
       // Get operation before deletion
       const operation = await db.getFirstAsync(
         'SELECT * FROM operations WHERE id = ?',
-        [id]
+        [id],
       );
 
       if (!operation) {
@@ -425,7 +425,7 @@ export const deleteOperation = async (id) => {
         // Get current balance
         const account = await db.getFirstAsync(
           'SELECT balance FROM accounts WHERE id = ?',
-          [accountId]
+          [accountId],
         );
 
         if (!account) {
@@ -439,7 +439,7 @@ export const deleteOperation = async (id) => {
         // Update balance
         await db.runAsync(
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance, updateTime, accountId]
+          [newBalance, updateTime, accountId],
         );
 
         // Update today's balance history
@@ -465,7 +465,7 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
       `SELECT SUM(CAST(amount AS REAL)) as total
        FROM operations
        WHERE account_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
-      [accountId, startDate, endDate]
+      [accountId, startDate, endDate],
     );
     return result && result.total ? parseFloat(result.total) : 0;
   } catch (error) {
@@ -487,7 +487,7 @@ export const getTotalIncome = async (accountId, startDate, endDate) => {
       `SELECT SUM(CAST(amount AS REAL)) as total
        FROM operations
        WHERE account_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
-      [accountId, startDate, endDate]
+      [accountId, startDate, endDate],
     );
     return result && result.total ? parseFloat(result.total) : 0;
   } catch (error) {
@@ -510,7 +510,7 @@ export const getSpendingByCategory = async (startDate, endDate) => {
        WHERE type = 'expense' AND date >= ? AND date <= ? AND category_id IS NOT NULL
        GROUP BY category_id
        ORDER BY total DESC`,
-      [startDate, endDate]
+      [startDate, endDate],
     );
     return results || [];
   } catch (error) {
@@ -533,7 +533,7 @@ export const getIncomeByCategory = async (startDate, endDate) => {
        WHERE type = 'income' AND date >= ? AND date <= ? AND category_id IS NOT NULL
        GROUP BY category_id
        ORDER BY total DESC`,
-      [startDate, endDate]
+      [startDate, endDate],
     );
     return results || [];
   } catch (error) {
@@ -562,7 +562,7 @@ export const getSpendingByCategoryAndCurrency = async (currency, startDate, endD
          AND o.category_id IS NOT NULL
        GROUP BY o.category_id
        ORDER BY total DESC`,
-      [currency, startDate, endDate]
+      [currency, startDate, endDate],
     );
     return results || [];
   } catch (error) {
@@ -591,7 +591,7 @@ export const getIncomeByCategoryAndCurrency = async (currency, startDate, endDat
          AND o.category_id IS NOT NULL
        GROUP BY o.category_id
        ORDER BY total DESC`,
-      [currency, startDate, endDate]
+      [currency, startDate, endDate],
     );
     return results || [];
   } catch (error) {
@@ -609,7 +609,7 @@ export const operationExists = async (id) => {
   try {
     const result = await queryFirst(
       'SELECT 1 FROM operations WHERE id = ? LIMIT 1',
-      [id]
+      [id],
     );
     return !!result;
   } catch (error) {
@@ -637,7 +637,7 @@ export const getTodayAdjustmentOperation = async (accountId) => {
          AND c.is_shadow = 1
        ORDER BY o.created_at DESC
        LIMIT 1`,
-      [accountId, today]
+      [accountId, today],
     );
 
     return mapOperationFields(operation);
@@ -658,12 +658,12 @@ export const getAvailableMonths = async () => {
          CAST(strftime('%Y', date) AS INTEGER) as year,
          CAST(strftime('%m', date) AS INTEGER) as month
        FROM operations
-       ORDER BY year DESC, month DESC`
+       ORDER BY year DESC, month DESC`,
     );
 
     return (results || []).map(row => ({
       year: row.year,
-      month: row.month - 1 // Convert to 0-based month (0-11) for JavaScript Date
+      month: row.month - 1, // Convert to 0-based month (0-11) for JavaScript Date
     }));
   } catch (error) {
     console.error('Failed to get available months:', error);
@@ -712,7 +712,7 @@ export const getOperationsByWeekOffset = async (weekOffset) => {
 
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
-      [startDateStr, endDateStr]
+      [startDateStr, endDateStr],
     );
 
     console.log(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
@@ -733,7 +733,7 @@ export const getNextOldestOperation = async (beforeDate) => {
   try {
     const operation = await queryFirst(
       'SELECT * FROM operations WHERE date < ? ORDER BY date DESC, created_at DESC LIMIT 1',
-      [beforeDate]
+      [beforeDate],
     );
     return mapOperationFields(operation);
   } catch (error) {
@@ -763,7 +763,7 @@ export const getOperationsByWeekFromDate = async (endDate) => {
 
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
-      [startDateStr, endDateStr]
+      [startDateStr, endDateStr],
     );
 
     console.log(`Week loaded: ${operations?.length || 0} operations`);
@@ -834,11 +834,11 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
     // Apply amount range filters
     if (filters.amountRange) {
       if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
-        sql += ` AND CAST(o.amount AS REAL) >= ?`;
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
         params.push(filters.amountRange.min);
       }
       if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
-        sql += ` AND CAST(o.amount AS REAL) <= ?`;
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
         params.push(filters.amountRange.max);
       }
     }
@@ -846,11 +846,11 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
     // Apply additional date range filters (independent of week range)
     if (filters.dateRange) {
       if (filters.dateRange.startDate) {
-        sql += ` AND o.date >= ?`;
+        sql += ' AND o.date >= ?';
         params.push(filters.dateRange.startDate);
       }
       if (filters.dateRange.endDate) {
-        sql += ` AND o.date <= ?`;
+        sql += ' AND o.date <= ?';
         params.push(filters.dateRange.endDate);
       }
     }
@@ -868,7 +868,7 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    sql += ` ORDER BY o.date DESC, o.created_at DESC`;
+    sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
     console.log(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
 
@@ -927,11 +927,11 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
     // Apply amount range filters
     if (filters.amountRange) {
       if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
-        sql += ` AND CAST(o.amount AS REAL) >= ?`;
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
         params.push(filters.amountRange.min);
       }
       if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
-        sql += ` AND CAST(o.amount AS REAL) <= ?`;
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
         params.push(filters.amountRange.max);
       }
     }
@@ -939,11 +939,11 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
     // Apply date range filters
     if (filters.dateRange) {
       if (filters.dateRange.startDate) {
-        sql += ` AND o.date >= ?`;
+        sql += ' AND o.date >= ?';
         params.push(filters.dateRange.startDate);
       }
       if (filters.dateRange.endDate) {
-        sql += ` AND o.date <= ?`;
+        sql += ' AND o.date <= ?';
         params.push(filters.dateRange.endDate);
       }
     }
@@ -961,7 +961,7 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    sql += ` ORDER BY o.date DESC, o.created_at DESC LIMIT 1`;
+    sql += ' ORDER BY o.date DESC, o.created_at DESC LIMIT 1';
 
     const operation = await queryFirst(sql, params);
     return mapOperationFields(operation);

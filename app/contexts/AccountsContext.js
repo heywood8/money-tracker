@@ -65,7 +65,7 @@ export const AccountsProvider = ({ children }) => {
         showDialog(
           'Load Error',
           'Failed to load accounts from database.',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
       } finally {
         setLoading(false);
@@ -89,7 +89,7 @@ export const AccountsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to create account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw err;
     }
@@ -148,7 +148,7 @@ export const AccountsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to update account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw err;
     }
@@ -170,7 +170,7 @@ export const AccountsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to delete account. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw err;
     }
@@ -205,7 +205,7 @@ export const AccountsProvider = ({ children }) => {
       showDialog(
         'Error',
         'Failed to save new account order. Please try again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw err;
     }
@@ -268,14 +268,14 @@ export const AccountsProvider = ({ children }) => {
       showDialog(
         'Success',
         'Database has been reset successfully.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     } catch (err) {
       console.error('Failed to reset database:', err);
       showDialog(
         'Error',
         `Failed to reset database: ${err.message}`,
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       throw err;
     } finally {
