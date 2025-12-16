@@ -430,7 +430,8 @@ const GraphsScreen = () => {
       data.sort((a, b) => b.amount - a.amount);
 
       // Add aggregated balance adjustments if there are any (amounts are already positive for expenses)
-      if (shadowCategoryTotal > 0) {
+      // Only show balance adjustments in the root "All categories" view
+      if (shadowCategoryTotal > 0 && selectedCategory === 'all') {
         data.push({
           name: t('balance_adjustments'),
           amount: shadowCategoryTotal,
