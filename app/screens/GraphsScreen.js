@@ -7,7 +7,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
-import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory } from '../services/BalanceHistoryDB';
+import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
 import SimplePicker from '../components/SimplePicker';
 
 // Currency formatting helper
@@ -106,7 +106,7 @@ const GraphsScreen = () => {
 
   // Balance history state
   const [selectedAccount, setSelectedAccount] = useState(null);
-  const [balanceHistoryData, setBalanceHistoryData] = useState([]);
+  const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
   const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(true);
   const [balanceHistoryModalVisible, setBalanceHistoryModalVisible] = useState(false);
   const [balanceHistoryTableData, setBalanceHistoryTableData] = useState([]);
@@ -265,8 +265,8 @@ const GraphsScreen = () => {
         endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
       }
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
 
       // Get spending data
       const spending = await getSpendingByCategoryAndCurrency(
@@ -470,8 +470,8 @@ const GraphsScreen = () => {
         endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
       }
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
 
       // Get income data
       const income = await getIncomeByCategoryAndCurrency(
@@ -590,7 +590,7 @@ const GraphsScreen = () => {
   // Load balance history data
   const loadBalanceHistory = useCallback(async () => {
     if (!selectedAccount || selectedMonth === null) {
-      setBalanceHistoryData([]);
+      setBalanceHistoryData({ labels: [] });
       setLoadingBalanceHistory(false);
       return;
     }
@@ -602,8 +602,8 @@ const GraphsScreen = () => {
       const startDate = new Date(selectedYear, selectedMonth, 1);
       const endDate = new Date(selectedYear, selectedMonth + 1, 0);
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
 
       // Get balance history from database
       const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
@@ -716,7 +716,7 @@ const GraphsScreen = () => {
       });
     } catch (error) {
       console.error('Failed to load balance history:', error);
-      setBalanceHistoryData([]);
+      setBalanceHistoryData({ labels: [] });
     } finally {
       setLoadingBalanceHistory(false);
     }
@@ -732,8 +732,8 @@ const GraphsScreen = () => {
       const endDate = new Date(selectedYear, selectedMonth + 1, 0);
       const daysInMonth = endDate.getDate();
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
 
       // Get balance history from database
       const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
@@ -748,7 +748,7 @@ const GraphsScreen = () => {
       const tableData = [];
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(selectedYear, selectedMonth, day);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = formatDate(date);
         tableData.push({
           date: dateStr,
           displayDate: `${day}`,

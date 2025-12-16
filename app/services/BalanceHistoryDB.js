@@ -12,11 +12,11 @@ import * as AccountsDB from './AccountsDB';
 import * as Currency from './currency';
 
 /**
- * Format Date object to YYYY-MM-DD string
+ * Format Date object to YYYY-MM-DD string using local timezone
  * @param {Date} date
  * @returns {string}
  */
-const formatDate = (date) => {
+export const formatDate = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -359,10 +359,12 @@ export const updateTodayBalance = async (accountId, balance, db = null) => {
     const now = new Date().toISOString();
 
     const upsertLogic = async (dbInstance) => {
+      // Ensure accountId is a number (schema requires integer)
+      const numericAccountId = Number(accountId);
       await dbInstance.runAsync(
         `INSERT OR REPLACE INTO accounts_balance_history (account_id, date, balance, created_at)
          VALUES (?, ?, ?, ?)`,
-        [accountId, today, balance, now]
+        [numericAccountId, today, balance, now]
       );
     };
 

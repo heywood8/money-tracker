@@ -20,6 +20,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useBudgets } from '../contexts/BudgetsContext';
 import { useAccounts } from '../contexts/AccountsContext';
+import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
@@ -43,7 +44,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     amount: '',
     currency: 'USD',
     periodType: 'monthly',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: toDateString(new Date()),
     endDate: null,
     isRecurring: true,
     rolloverEnabled: false,
@@ -83,7 +84,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
         amount: '',
         currency: defaultCurrency,
         periodType: 'monthly',
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: toDateString(new Date()),
         endDate: null,
         isRecurring: true,
         rolloverEnabled: false,
@@ -199,14 +200,14 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
   const handleStartDateChange = useCallback((event, selectedDate) => {
     setShowStartDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      setValues(v => ({ ...v, startDate: selectedDate.toISOString().split('T')[0] }));
+      setValues(v => ({ ...v, startDate: toDateString(selectedDate) }));
     }
   }, []);
 
   const handleEndDateChange = useCallback((event, selectedDate) => {
     setShowEndDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      setValues(v => ({ ...v, endDate: selectedDate.toISOString().split('T')[0] }));
+      setValues(v => ({ ...v, endDate: toDateString(selectedDate) }));
     }
   }, []);
 

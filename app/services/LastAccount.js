@@ -5,7 +5,7 @@ const LAST_ACCESSED_ACCOUNT_KEY = 'last_accessed_account_id';
 
 export const setLastAccessedAccount = async (accountId) => {
   try {
-    await AsyncStorage.setItem(LAST_ACCESSED_ACCOUNT_KEY, accountId);
+    await AsyncStorage.setItem(LAST_ACCESSED_ACCOUNT_KEY, String(accountId));
   } catch (e) {
     // Ignore errors
   }
@@ -14,7 +14,7 @@ export const setLastAccessedAccount = async (accountId) => {
 export const getLastAccessedAccount = async () => {
   try {
     const id = await AsyncStorage.getItem(LAST_ACCESSED_ACCOUNT_KEY);
-    return id;
+    return id ? Number(id) : null;
   } catch (e) {
     return null;
   }

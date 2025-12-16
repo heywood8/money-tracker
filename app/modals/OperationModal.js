@@ -23,6 +23,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import Calculator from '../components/Calculator';
 import * as Currency from '../services/currency';
+import { formatDate } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -49,7 +50,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     accountId: '',
     categoryId: '',
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: formatDate(new Date()),
     toAccountId: '',
     exchangeRate: '',
     destinationAmount: '',
@@ -92,7 +93,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           accountId: operation.accountId || accounts[0]?.id || '',
           categoryId: operation.categoryId || '',
           description: operation.description || '',
-          date: operation.date || new Date().toISOString().split('T')[0],
+          date: operation.date || formatDate(new Date()),
           toAccountId: operation.toAccountId || '',
           exchangeRate: String(operation.exchangeRate || ''),
           destinationAmount: String(operation.destinationAmount || ''),
@@ -120,7 +121,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             accountId: defaultAccountId,
             categoryId: '',
             description: '',
-            date: new Date().toISOString().split('T')[0],
+            date: formatDate(new Date()),
             toAccountId: '',
             exchangeRate: '',
             destinationAmount: '',
@@ -713,7 +714,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             if (selectedDate) {
               setValues(v => ({
                 ...v,
-                date: selectedDate.toISOString().split('T')[0]
+                date: formatDate(selectedDate)
               }));
             }
           }}

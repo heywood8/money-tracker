@@ -1,6 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
-import * as BalanceHistoryDB from './BalanceHistoryDB';
+import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 
 /**
  * Map database field names to camelCase for application use
@@ -178,9 +178,9 @@ export const createOperation = async (operation) => {
     const operationData = {
       type: operation.type,
       amount: operation.amount,
-      account_id: operation.accountId,
+      account_id: Number(operation.accountId),
       category_id: operation.categoryId || null,
-      to_account_id: operation.toAccountId || null,
+      to_account_id: operation.toAccountId ? Number(operation.toAccountId) : null,
       date: operation.date,
       created_at: now,
       description: operation.description || null,
@@ -244,7 +244,7 @@ export const createOperation = async (operation) => {
         );
 
         // Update today's balance history
-        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
+        await updateTodayBalance(accountId, newBalance, db);
       }
     });
 
@@ -288,7 +288,7 @@ export const updateOperation = async (id, updates) => {
       }
       if (updates.accountId !== undefined) {
         fields.push('account_id = ?');
-        values.push(updates.accountId);
+        values.push(Number(updates.accountId));
       }
       if (updates.categoryId !== undefined) {
         fields.push('category_id = ?');
@@ -296,7 +296,7 @@ export const updateOperation = async (id, updates) => {
       }
       if (updates.toAccountId !== undefined) {
         fields.push('to_account_id = ?');
-        values.push(updates.toAccountId || null);
+        values.push(updates.toAccountId ? Number(updates.toAccountId) : null);
       }
       if (updates.date !== undefined) {
         fields.push('date = ?');
@@ -380,7 +380,7 @@ export const updateOperation = async (id, updates) => {
         );
 
         // Update today's balance history
-        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
+        await updateTodayBalance(accountId, newBalance, db);
       }
     });
   } catch (error) {
@@ -443,7 +443,7 @@ export const deleteOperation = async (id) => {
         );
 
         // Update today's balance history
-        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
+        await updateTodayBalance(accountId, newBalance, db);
       }
     });
   } catch (error) {
@@ -625,8 +625,8 @@ export const operationExists = async (id) => {
  */
 export const getTodayAdjustmentOperation = async (accountId) => {
   try {
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in YYYY-MM-DD format (local timezone)
+    const today = formatDate(new Date());
 
     // Look for adjustment operations (using shadow categories)
     const operation = await queryFirst(
