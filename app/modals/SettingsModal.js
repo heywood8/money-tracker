@@ -16,7 +16,7 @@ export default function SettingsModal({ visible, onClose }) {
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
-  const { startImport, cancelImport } = useImportProgress();
+  const { startImport, cancelImport, completeImport } = useImportProgress();
   const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -157,7 +157,8 @@ export default function SettingsModal({ visible, onClose }) {
               // Perform the import
               await importBackup();
 
-              // Success - the ImportProgressModal will handle showing the OK button
+              // Mark import as complete to enable OK button
+              completeImport();
             } catch (error) {
               console.error('Import backup error:', error);
               // Cancel import progress on error
