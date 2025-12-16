@@ -371,7 +371,7 @@ describe('AccountsDB', () => {
       await AccountsDB.batchUpdateBalances(balanceChanges);
 
       expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(2);
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(4); // 2 balance updates + 2 balance history inserts
       expect(db.executeTransaction).toHaveBeenCalledWith(expect.any(Function));
     });
 
@@ -392,7 +392,7 @@ describe('AccountsDB', () => {
       await AccountsDB.batchUpdateBalances(balanceChanges);
 
       expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(1);
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(2); // 1 balance update + 1 balance history insert
     });
 
     it('does nothing when balanceChanges is empty', async () => {
@@ -422,7 +422,7 @@ describe('AccountsDB', () => {
 
       await AccountsDB.batchUpdateBalances(balanceChanges);
 
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(1); // Only one update
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(2); // 1 balance update + 1 balance history insert
     });
   });
 

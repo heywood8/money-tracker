@@ -343,3 +343,39 @@ export const deleteBalanceHistory = async (accountId, date) => {
     throw error;
   }
 };
+
+/**
+ * Update or insert today's balance for an account
+ * Called automatically on any balance change
+ *
+ * @param {number} accountId - Account ID
+ * @param {string} balance - Current balance as string
+ * @param {Object} db - Optional database instance (for use within transactions)
+ * @returns {Promise<void>}
+ */
+export const updateTodayBalance = async (accountId, balance, db = null) => {
+  try {
+    const today = formatDate(new Date());
+    const now = new Date().toISOString();
+
+    const upsertLogic = async (dbInstance) => {
+      await dbInstance.runAsync(
+        `INSERT OR REPLACE INTO accounts_balance_history (account_id, date, balance, created_at)
+         VALUES (?, ?, ?, ?)`,
+        [accountId, today, balance, now]
+      );
+    };
+
+    if (db) {
+      // Use provided db instance (within transaction)
+      await upsertLogic(db);
+    } else {
+      // Create our own transaction
+      await executeTransaction(upsertLogic);
+    }
+  } catch (error) {
+    console.error('Failed to update today balance:', error);
+    // Don't throw - balance history is supplementary data
+    // We don't want to fail the main operation if history update fails
+  }
+};

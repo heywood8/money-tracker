@@ -2,6 +2,7 @@ import { executeQuery, queryAll, queryFirst, executeTransaction, getDrizzle } fr
 import * as Currency from './currency';
 import { eq, sql, desc, asc } from 'drizzle-orm';
 import { accounts } from '../db/schema';
+import * as BalanceHistoryDB from './BalanceHistoryDB';
 
 /**
  * Get all accounts using Drizzle
@@ -104,6 +105,11 @@ export const updateAccount = async (id, updates) => {
     await db.update(accounts)
       .set(updateData)
       .where(eq(accounts.id, id));
+
+    // Update today's balance history if balance changed
+    if (updates.balance !== undefined) {
+      await BalanceHistoryDB.updateTodayBalance(id, updates.balance);
+    }
   } catch (error) {
     console.error('Failed to update account:', error);
     throw error;
@@ -245,6 +251,9 @@ export const updateAccountBalance = async (id, delta) => {
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
         [newBalance, new Date().toISOString(), id]
       );
+
+      // Update today's balance history
+      await BalanceHistoryDB.updateTodayBalance(id, newBalance, db);
     });
   } catch (error) {
     console.error('Failed to update account balance:', error);
@@ -288,6 +297,9 @@ export const batchUpdateBalances = async (balanceChanges) => {
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, now, accountId]
         );
+
+        // Update today's balance history
+        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
       }
     });
   } catch (error) {
@@ -492,6 +504,9 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
             [newBalanceValue, new Date().toISOString(), accountId]
           );
+
+          // Update today's balance history
+          await BalanceHistoryDB.updateTodayBalance(accountId, newBalanceValue, db);
         } else {
           // Update existing operation
           console.log('Updating existing adjustment operation:', existingOperation.id);
@@ -526,6 +541,9 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
             'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
             [newBalanceValue, new Date().toISOString(), accountId]
           );
+
+          // Update today's balance history
+          await BalanceHistoryDB.updateTodayBalance(accountId, newBalanceValue, db);
         }
       } else {
         // Create new adjustment operation
@@ -562,6 +580,9 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalanceValue, new Date().toISOString(), accountId]
         );
+
+        // Update today's balance history
+        await BalanceHistoryDB.updateTodayBalance(accountId, newBalanceValue, db);
       }
     });
 
