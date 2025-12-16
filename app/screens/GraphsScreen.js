@@ -1030,7 +1030,7 @@ const GraphsScreen = () => {
                 <View style={styles.balanceHistoryTitleContainer}>
                   <Icon name="chart-line" size={24} color={colors.primary} />
                   <Text style={[styles.balanceHistoryTitle, { color: colors.text }]}>
-                    {t('balance_history') || 'Balance History'}
+                    {t('balance') || 'Balance'}
                   </Text>
                 </View>
                 {/* Account Picker */}
@@ -1049,69 +1049,128 @@ const GraphsScreen = () => {
                   <ActivityIndicator size="large" color={colors.primary} />
                 </View>
               ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
-                <TouchableOpacity
-                  style={styles.balanceHistoryChartContainer}
-                  onPress={handleBalanceHistoryPress}
-                  activeOpacity={0.7}
-                >
-                  <LineChart
-                    data={{
-                      labels: balanceHistoryData.labels.map(d => d.toString()),
-                      datasets: [
-                        {
-                          data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
-                          color: () => colors.primary,
-                          strokeWidth: 3,
+                <>
+                  <TouchableOpacity
+                    style={styles.balanceHistoryChartContainer}
+                    onPress={handleBalanceHistoryPress}
+                    activeOpacity={0.7}
+                  >
+                    <LineChart
+                      data={{
+                        labels: balanceHistoryData.labels.map(d => d.toString()),
+                        datasets: [
+                          {
+                            data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
+                            color: () => colors.primary,
+                            strokeWidth: 3,
+                          },
+                          {
+                            data: balanceHistoryData.burndown.map(p => p.y),
+                            color: () => 'rgba(255, 99, 132, 0.4)',
+                            strokeWidth: 2,
+                            withDots: false,
+                          },
+                        ],
+                      }}
+                      width={screenWidth - 64}
+                      height={220}
+                      yAxisLabel=""
+                      yAxisSuffix=""
+                      formatXLabel={(value) => {
+                        // Show every 5th label to avoid crowding
+                        const day = parseInt(value);
+                        return day % 5 === 1 ? value : '';
+                      }}
+                      chartConfig={{
+                        backgroundColor: colors.surface,
+                        backgroundGradientFrom: colors.surface,
+                        backgroundGradientTo: colors.surface,
+                        decimalPlaces: 0,
+                        color: (opacity = 1) => colors.text,
+                        labelColor: (opacity = 1) => colors.mutedText,
+                        style: {
+                          borderRadius: 16,
                         },
-                        {
-                          data: balanceHistoryData.burndown.map(p => p.y),
-                          color: () => 'rgba(255, 99, 132, 0.4)',
-                          strokeWidth: 2,
-                          withDots: false,
+                        propsForDots: {
+                          r: '2',
+                          strokeWidth: '2',
                         },
-                      ],
-                      legend: [t('actual') || 'Actual', t('burndown') || 'Burndown'],
-                    }}
-                    width={screenWidth - 64}
-                    height={220}
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    formatXLabel={(value) => {
-                      // Show every 5th label to avoid crowding
-                      const day = parseInt(value);
-                      return day % 5 === 1 ? value : '';
-                    }}
-                    chartConfig={{
-                      backgroundColor: colors.surface,
-                      backgroundGradientFrom: colors.surface,
-                      backgroundGradientTo: colors.surface,
-                      decimalPlaces: 0,
-                      color: (opacity = 1) => colors.text,
-                      labelColor: (opacity = 1) => colors.mutedText,
-                      style: {
+                        propsForBackgroundLines: {
+                          strokeWidth: 1,
+                          stroke: colors.border,
+                          strokeDasharray: '0',
+                        },
+                      }}
+                      bezier
+                      withInnerLines={true}
+                      withOuterLines={true}
+                      withVerticalLines={false}
+                      withHorizontalLines={true}
+                      withLegend={false}
+                      style={{
+                        marginVertical: 8,
                         borderRadius: 16,
-                      },
-                      propsForDots: {
-                        r: '2',
-                        strokeWidth: '2',
-                      },
-                      propsForBackgroundLines: {
-                        strokeWidth: 1,
-                        stroke: colors.border,
-                        strokeDasharray: '0',
-                      },
-                    }}
-                    bezier
-                    withInnerLines={true}
-                    withOuterLines={true}
-                    withVerticalLines={false}
-                    withHorizontalLines={true}
-                    style={{
-                      marginVertical: 8,
-                      borderRadius: 16,
-                    }}
-                  />
-                </TouchableOpacity>
+                      }}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Legend at bottom with values on the right */}
+                  {(() => {
+                    const now = new Date();
+                    const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+                    const currentDay = isCurrentMonth ? now.getDate() : null;
+
+                    let actualValue = null;
+                    let burndownValue = null;
+
+                    if (currentDay) {
+                      const actualPoint = balanceHistoryData.actual.find(p => p.x === currentDay);
+                      const burndownPoint = balanceHistoryData.burndown.find(p => p.x === currentDay);
+                      const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
+
+                      if (actualPoint) {
+                        actualValue = formatCurrency(actualPoint.y, selectedAccountData?.currency || 'USD');
+                      }
+                      if (burndownPoint) {
+                        burndownValue = formatCurrency(burndownPoint.y, selectedAccountData?.currency || 'USD');
+                      }
+                    }
+
+                    return (
+                      <View style={styles.burndownLegendContainer}>
+                        <View style={styles.burndownLegend}>
+                          <View style={styles.burndownLegendItem}>
+                            <View style={[styles.burndownLegendDot, { backgroundColor: colors.primary }]} />
+                            <Text style={[styles.burndownLegendText, { color: colors.text }]}>
+                              {t('actual') || 'Actual'}
+                            </Text>
+                          </View>
+                          <View style={styles.burndownLegendItem}>
+                            <View style={[styles.burndownLegendDot, { backgroundColor: 'rgba(255, 99, 132, 0.4)' }]} />
+                            <Text style={[styles.burndownLegendText, { color: colors.text }]}>
+                              {t('burndown') || 'Burndown'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {(actualValue || burndownValue) && (
+                          <View style={styles.todayValuesContainer}>
+                            <View style={styles.todayValueItem}>
+                              <Text style={[styles.todayValueText, { color: colors.text }]}>
+                                {actualValue || '-'}
+                              </Text>
+                            </View>
+                            <View style={styles.todayValueItem}>
+                              <Text style={[styles.todayValueText, { color: colors.text }]}>
+                                {burndownValue || '-'}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
+                </>
               ) : (
                 <View style={styles.balanceHistoryNoData}>
                   <Text style={[styles.balanceHistoryNoDataText, { color: colors.mutedText }]}>
@@ -1121,49 +1180,6 @@ const GraphsScreen = () => {
               )}
             </View>
           )}
-
-          {/* Expenses Summary Card */}
-          <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={openExpenseModal}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('expenses_by_category')}
-          >
-            <View style={styles.summaryCardContent}>
-              <View style={styles.summaryInfo}>
-                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-                  {t('total_expenses')}
-                </Text>
-                <Text style={[styles.summaryAmount, { color: colors.text }]}>
-                  {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
-                </Text>
-              </View>
-              <View style={styles.miniChartContainer}>
-                {loading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : chartData.length > 0 ? (
-                  <PieChart
-                    data={chartData}
-                    width={80}
-                    height={80}
-                    chartConfig={{
-                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    }}
-                    accessor="amount"
-                    backgroundColor="transparent"
-                    paddingLeft="0"
-                    hasLegend={false}
-                    center={[20, 0]}
-                  />
-                ) : (
-                  <View style={styles.noDataPlaceholder}>
-                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
 
           {/* Spending Prediction Card */}
           {spendingPrediction && (
@@ -1225,6 +1241,49 @@ const GraphsScreen = () => {
               </View>
             </View>
           )}
+
+          {/* Expenses Summary Card */}
+          <TouchableOpacity
+            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={openExpenseModal}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('expenses_by_category')}
+          >
+            <View style={styles.summaryCardContent}>
+              <View style={styles.summaryInfo}>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+                  {t('total_expenses')}
+                </Text>
+                <Text style={[styles.summaryAmount, { color: colors.text }]}>
+                  {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
+                </Text>
+              </View>
+              <View style={styles.miniChartContainer}>
+                {loading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : chartData.length > 0 ? (
+                  <PieChart
+                    data={chartData}
+                    width={80}
+                    height={80}
+                    chartConfig={{
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    }}
+                    accessor="amount"
+                    backgroundColor="transparent"
+                    paddingLeft="0"
+                    hasLegend={false}
+                    center={[20, 0]}
+                  />
+                ) : (
+                  <View style={styles.noDataPlaceholder}>
+                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
 
           {/* Income Summary Card */}
           <TouchableOpacity
@@ -1591,7 +1650,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   balanceHistoryTitleContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginRight: 12,
   },
   balanceTable: {
@@ -1636,6 +1697,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  burndownLegend: {
+    flexDirection: 'column',
+    gap: 6,
+  },
+  burndownLegendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    marginTop: 0,
+    paddingHorizontal: 50,
+    gap: 20,
+  },
+  burndownLegendDot: {
+    width: 3,
+    height: 10,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  burndownLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  burndownLegendText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   chartContainer: {
     alignItems: 'center',
@@ -1878,6 +1965,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  todayValueItem: {
+    alignItems: 'flex-end',
+  },
+  todayValueText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  todayValuesContainer: {
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'flex-end',
   },
 });
 
