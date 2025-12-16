@@ -44,6 +44,26 @@ This will run all Jest tests and automatically update the coverage badges displa
 
 Current test suite: **568 tests** across 16 test suites covering contexts, services, components, and integration scenarios.
 
+## Git Hooks
+
+This project uses a pre-commit hook to validate commit messages. All commits must follow the [conventional commits](https://www.conventionalcommits.org/) format, which is used by [release-please](https://github.com/googleapis/release-please) for automated versioning and changelog generation.
+
+### Commit Message Format
+
+```
+<type>(<scope>): <subject>
+```
+
+**Valid types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`, `revert`
+
+**Examples:**
+- `feat: add dark mode support`
+- `fix(auth): resolve login timeout issue`
+- `docs: update README`
+- `feat!: breaking change in API`
+
+For detailed guidelines, see [Commit Message Guidelines](docs/COMMIT_MESSAGE_GUIDELINES.md).
+
 ## Project Structure
 - `App.js`: Main entry point
 - `assets/`: Images and static assets
@@ -53,6 +73,7 @@ Current test suite: **568 tests** across 16 test suites covering contexts, servi
 
 - **[Database Architecture](docs/DATABASE.md)** - Complete guide to the SQLite/Drizzle ORM database implementation, schema design, and development workflow
 - **[EAS Credentials Setup](docs/EAS_CREDENTIALS_SETUP.md)** - Guide for setting up Android signing credentials for EAS builds
+- **[Commit Message Guidelines](docs/COMMIT_MESSAGE_GUIDELINES.md)** - Guide for writing conventional commits that work with release-please
 
 ## Building with EAS
 
