@@ -1,5 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
+import * as BalanceHistoryDB from './BalanceHistoryDB';
 
 /**
  * Map database field names to camelCase for application use
@@ -241,6 +242,9 @@ export const createOperation = async (operation) => {
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        // Update today's balance history
+        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
       }
     });
 
@@ -374,6 +378,9 @@ export const updateOperation = async (id, updates) => {
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        // Update today's balance history
+        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
       }
     });
   } catch (error) {
@@ -434,6 +441,9 @@ export const deleteOperation = async (id) => {
           'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
           [newBalance, updateTime, accountId]
         );
+
+        // Update today's balance history
+        await BalanceHistoryDB.updateTodayBalance(accountId, newBalance, db);
       }
     });
   } catch (error) {

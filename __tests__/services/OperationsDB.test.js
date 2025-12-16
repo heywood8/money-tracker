@@ -226,7 +226,7 @@ describe('OperationsDB Service', () => {
       // Destination account should be increased
       expect(Currency.add).toHaveBeenCalledWith('500', 300);
 
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(3); // INSERT + 2 UPDATEs
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(5); // INSERT + 2 UPDATEs + 2 balance history inserts
     });
 
     it('handles multi-currency transfers with destination_amount', async () => {
