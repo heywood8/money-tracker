@@ -59,7 +59,7 @@ const QuickAddForm = memo(({
               ...v,
               type: type.key,
               categoryId: type.key === 'transfer' ? '' : v.categoryId,
-              toAccountId: type.key !== 'transfer' ? '' : v.toAccountId,
+              toAccountId: '',
             }))}
           >
             <Icon
@@ -250,6 +250,22 @@ const OperationsScreen = () => {
     }
     setDefaultAccount();
   }, [visibleAccounts]);
+
+  // Auto-prefill "To Account" for transfers with same currency
+  useEffect(() => {
+    if (quickAddValues.type === 'transfer' && quickAddValues.accountId) {
+      const fromAccount = accounts.find(acc => acc.id === quickAddValues.accountId);
+      if (fromAccount) {
+        // Find first account with same currency that is not the from account
+        const toAccount = visibleAccounts.find(
+          acc => acc.currency === fromAccount.currency && acc.id !== quickAddValues.accountId,
+        );
+        if (toAccount) {
+          setQuickAddValues(v => ({ ...v, toAccountId: toAccount.id }));
+        }
+      }
+    }
+  }, [quickAddValues.type, quickAddValues.accountId, accounts, visibleAccounts]);
 
   const handleEditOperation = (operation) => {
     setEditingOperation(operation);
