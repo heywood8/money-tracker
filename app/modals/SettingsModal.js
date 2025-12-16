@@ -50,6 +50,32 @@ export default function SettingsModal({ visible, onClose }) {
     closeLanguageModal();
   }, [closeLanguageModal]);
 
+  // Map of language codes to their native display names
+  const nativeLanguageNames = {
+    en: 'English',
+    ru: 'Русский',
+    zh: '中文',
+    es: 'Español',
+    fr: 'Français',
+    de: 'Deutsch',
+    ja: '日本語',
+    ko: '한국어',
+    pt: 'Português',
+  };
+
+  // Simple map of language code to flag emoji (useful default)
+  const languageFlags = {
+    en: '🇬🇧',
+    ru: '🇷🇺',
+    zh: '🇨🇳',
+    es: '🇪🇸',
+    fr: '🇫🇷',
+    de: '🇩🇪',
+    ja: '🇯🇵',
+    ko: '🇰🇷',
+    pt: '🇵🇹',
+  };
+
   const openExportFormatModal = useCallback(() => {
     console.log('openExportFormatModal called - showing modal');
     setExportFormatModalVisible(true);
@@ -244,8 +270,8 @@ export default function SettingsModal({ visible, onClose }) {
             borderless={false}
           >
             <View style={styles.languageSelectorContent}>
-              <Text style={[styles.languageText, { color: colors.text }]}>
-                {t(localLang === 'en' ? 'english' : localLang === 'ru' ? 'russian' : localLang === 'es' ? 'spanish' : localLang === 'fr' ? 'french' : localLang === 'zh' ? 'chinese' : localLang === 'de' ? 'german' : localLang)}
+              <Text style={[styles.languageText, { color: colors.text }]}> 
+                {languageFlags[localLang] ? `${languageFlags[localLang]}  ${nativeLanguageNames[localLang] || localLang}` : (nativeLanguageNames[localLang] || localLang)}
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
@@ -331,7 +357,6 @@ export default function SettingsModal({ visible, onClose }) {
 
           <View style={styles.languageList}>
             {availableLanguages.map(lng => {
-              const languageNameKey = lng === 'en' ? 'english' : lng === 'ru' ? 'russian' : lng === 'es' ? 'spanish' : lng === 'fr' ? 'french' : lng === 'zh' ? 'chinese' : lng === 'de' ? 'german' : lng;
               return (
                 <TouchableRipple
                   key={lng}
@@ -339,8 +364,8 @@ export default function SettingsModal({ visible, onClose }) {
                   style={styles.languageItem}
                 >
                   <View style={styles.languageItemContent}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      {t(languageNameKey)}
+                    <Text style={[styles.languageItemText, { color: colors.text }]}> 
+                      {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
                     </Text>
                     {localLang === lng && (
                       <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
