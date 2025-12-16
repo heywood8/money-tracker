@@ -32,7 +32,7 @@ describe('AccountsDB', () => {
     };
 
     // Mock getDrizzle to return our mock instance
-    db.getDrizzle = jest.fn().mockResolvedValue(mockDrizzle);
+    jest.spyOn(db, 'getDrizzle').mockResolvedValue(mockDrizzle);
   });
 
   describe('getAllAccounts', () => {
@@ -254,7 +254,7 @@ describe('AccountsDB', () => {
 
   describe('deleteAccount', () => {
     it('deletes account when no operations are associated', async () => {
-      db.queryFirst = jest.fn().mockResolvedValue({ count: 0 });
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 0 });
       mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.deleteAccount('1');
@@ -268,7 +268,7 @@ describe('AccountsDB', () => {
     });
 
     it('throws error when account has associated operations', async () => {
-      db.queryFirst = jest.fn().mockResolvedValue({ count: 5 });
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 5 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account: 5 transaction(s) are associated with this account',
@@ -279,7 +279,7 @@ describe('AccountsDB', () => {
 
     it('throws error when database query fails', async () => {
       const error = new Error('Query failed');
-      db.queryFirst = jest.fn().mockRejectedValue(error);
+      jest.spyOn(db, 'queryFirst').mockRejectedValue(error);
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow('Query failed');
     });
@@ -291,7 +291,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -312,7 +312,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -328,7 +328,7 @@ describe('AccountsDB', () => {
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue(null),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -341,7 +341,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -359,7 +359,7 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ balance: '200.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -380,7 +380,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '100.00' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -396,7 +396,7 @@ describe('AccountsDB', () => {
     });
 
     it('does nothing when balanceChanges is empty', async () => {
-      db.executeTransaction = jest.fn();
+      jest.spyOn(db, 'executeTransaction').mockImplementation(() => {});
       const balanceChanges = new Map();
 
       await AccountsDB.batchUpdateBalances(balanceChanges);
@@ -411,7 +411,7 @@ describe('AccountsDB', () => {
           .mockResolvedValueOnce({ balance: '200.00' }), // Second account found
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 
@@ -487,7 +487,7 @@ describe('AccountsDB', () => {
   // Regression tests for data integrity
   describe('Regression Tests - Data Integrity', () => {
     it('prevents deletion of accounts with operations', async () => {
-      db.queryFirst = jest.fn().mockResolvedValue({ count: 1 });
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 1 });
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account',
@@ -499,7 +499,7 @@ describe('AccountsDB', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ balance: '999999.99' }),
         runAsync: jest.fn().mockResolvedValue(undefined),
       };
-      db.executeTransaction = jest.fn().mockImplementation(async (callback) => {
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockDb);
       });
 

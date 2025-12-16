@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component {
           <TouchableOpacity style={styles.button} onPress={this.handleReset}>
             <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
-          {__DEV__ && this.state.error && (
+          {typeof __DEV__ !== 'undefined' && __DEV__ && this.state.error && (
             <Text style={styles.error}>
               {this.state.error.toString()}
             </Text>

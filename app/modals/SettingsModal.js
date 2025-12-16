@@ -17,7 +17,6 @@ export default function SettingsModal({ visible, onClose }) {
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
   const { startImport, cancelImport, completeImport } = useImportProgress();
-  const [localSelection, setLocalSelection] = useState(theme === 'system' ? 'light' : theme);
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
@@ -146,24 +145,7 @@ export default function SettingsModal({ visible, onClose }) {
     openExportFormatModal();
   };
 
-  const reloadApp = async () => {
-    // Close modal first
-    onClose();
-
-    // Platform-specific reload
-    if (Platform.OS === 'web') {
-      // Web: reload the page
-      window.location?.reload?.();
-    } else {
-      // Native (iOS/Android): use expo-updates to reload
-      try {
-        await Updates.reloadAsync();
-      } catch (error) {
-        console.error('Failed to reload app:', error);
-        // Fallback: just close the modal and let the app refresh naturally
-      }
-    }
-  };
+  // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
   const handleImportBackup = () => {
     showDialog(

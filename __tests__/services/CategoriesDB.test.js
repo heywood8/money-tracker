@@ -24,10 +24,10 @@ describe('CategoriesDB', () => {
       executeTransaction: jest.fn(),
     };
 
-    db.queryAll = mockDb.queryAll;
-    db.queryFirst = mockDb.queryFirst;
-    db.executeQuery = mockDb.executeQuery;
-    db.executeTransaction = mockDb.executeTransaction;
+    jest.spyOn(db, 'queryAll').mockImplementation(mockDb.queryAll);
+    jest.spyOn(db, 'queryFirst').mockImplementation(mockDb.queryFirst);
+    jest.spyOn(db, 'executeQuery').mockImplementation(mockDb.executeQuery);
+    jest.spyOn(db, 'executeTransaction').mockImplementation(mockDb.executeTransaction);
   });
 
   describe('Field Mapping', () => {

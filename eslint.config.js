@@ -53,7 +53,7 @@ module.exports = [
       'react-native/no-color-literals': 'off',
       'react-native/no-inline-styles': 'warn',
       'no-console': [
-        'warn',
+        'off',
         {
           allow: ['warn', 'error'],
         },

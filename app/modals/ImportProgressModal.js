@@ -186,7 +186,7 @@ export default function ImportProgressModal() {
             disabled={!isComplete}
             style={styles.okButton}
           >
-            OK
+            <Text>OK</Text>
           </Button>
         </View>
       </Modal>

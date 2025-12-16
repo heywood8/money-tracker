@@ -121,11 +121,11 @@ describe('BackupRestore', () => {
       closeDatabase: jest.fn(),
     };
 
-    db.queryAll = mockDb.queryAll;
-    db.executeQuery = mockDb.executeQuery;
-    db.executeTransaction = mockDb.executeTransaction;
-    db.getDatabase = mockDb.getDatabase;
-    db.closeDatabase = mockDb.closeDatabase;
+    jest.spyOn(db, 'queryAll').mockImplementation(mockDb.queryAll);
+    jest.spyOn(db, 'executeQuery').mockImplementation(mockDb.executeQuery);
+    jest.spyOn(db, 'executeTransaction').mockImplementation(mockDb.executeTransaction);
+    jest.spyOn(db, 'getDatabase').mockImplementation(mockDb.getDatabase);
+    jest.spyOn(db, 'closeDatabase').mockImplementation(mockDb.closeDatabase);
 
     // Default mock implementations
     mockDb.queryAll.mockImplementation((query) => {

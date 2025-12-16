@@ -20,7 +20,7 @@ export const getPreference = async (key, defaultValue = null) => {
     // Try SQLite first
     const result = await queryFirst(
       'SELECT value FROM app_metadata WHERE key = ?',
-      [key]
+      [key],
     );
 
     if (result && result.value !== null) {
@@ -60,7 +60,7 @@ export const setPreference = async (key, value) => {
     await executeQuery(
       `INSERT OR REPLACE INTO app_metadata (key, value, updated_at)
        VALUES (?, ?, ?)`,
-      [key, value, now]
+      [key, value, now],
     );
   } catch (error) {
     console.error('[PreferencesDB] Error setting preference:', key, error);
