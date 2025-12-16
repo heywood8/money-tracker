@@ -1650,8 +1650,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   balanceHistoryTitleContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
     marginRight: 12,
   },
@@ -1703,22 +1703,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   burndownLegendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 20,
+    justifyContent: 'center',
     marginTop: 0,
     paddingHorizontal: 50,
-    gap: 20,
   },
   burndownLegendDot: {
-    width: 3,
-    height: 10,
     borderRadius: 6,
+    height: 10,
     marginRight: 8,
+    width: 3,
   },
   burndownLegendItem: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
   },
   burndownLegendText: {
     fontSize: 12,
@@ -1974,9 +1974,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   todayValuesContainer: {
+    alignItems: 'flex-end',
     flexDirection: 'column',
     gap: 6,
-    alignItems: 'flex-end',
   },
 });
 
