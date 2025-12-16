@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.1](https://github.com/heywood8/money-tracker/compare/penny-v0.16.0...penny-v0.16.1) (2025-12-16)
+
+
+### Bug Fixes
+
+* Android lint analysis failure in dev menu ([#122](https://github.com/heywood8/money-tracker/issues/122)) ([03adc0e](https://github.com/heywood8/money-tracker/commit/03adc0e25de5ee63e1f77b0c964247a991592055))
+* balance_adjustments appearing on parent category graph ([7356693](https://github.com/heywood8/money-tracker/commit/73566932a6a68c4bdea5d1cd00d5dc7c045b13be))
+* dates in the balance_history ([ab84a9f](https://github.com/heywood8/money-tracker/commit/ab84a9f4526abc72823b112a24bb2daa7e9679d1))
+* OK button was disabled after import ([ef0cb45](https://github.com/heywood8/money-tracker/commit/ef0cb45f57799362d659cc405607d2d24597f08e))
+* tests ([c9c5967](https://github.com/heywood8/money-tracker/commit/c9c5967fa0cc535b5789b3a9d6947962d3c37cf8))
+* updating balance_history todays entry on any balance/operation update ([a2a02ba](https://github.com/heywood8/money-tracker/commit/a2a02baa870f6f4055d9843f820c758e5c4f5f2a))
+
 ## [0.16.0](https://github.com/heywood8/money-tracker/compare/penny-v0.15.1...penny-v0.16.0) (2025-12-15)
 
 
