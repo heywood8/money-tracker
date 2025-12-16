@@ -49,7 +49,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     amount: '',
     accountId: '',
     categoryId: '',
-    description: '',
     date: formatDate(new Date()),
     toAccountId: '',
     exchangeRate: '',
@@ -624,25 +623,27 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
-                  {/* Description Input */}
-                  <TextInput
-                    style={[
-                      styles.input,
-                      styles.descriptionInput,
-                      { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput,
-                    ]}
-                    value={values.description}
-                    onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, description: text }))}
-                    placeholder={t('description')}
-                    placeholderTextColor={colors.mutedText}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                    editable={!isShadowOperation}
-                  />
+                  {/* Description Input - Only show when editing existing operations */}
+                  {!isNew && (
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.descriptionInput,
+                        { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                        isShadowOperation && styles.disabledInput,
+                      ]}
+                      value={values.description}
+                      onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, description: text }))}
+                      placeholder={t('description')}
+                      placeholderTextColor={colors.mutedText}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                      editable={!isShadowOperation}
+                    />
+                  )}
 
                   {errors.general && <Text style={styles.error}>{errors.general}</Text>}
                 </ScrollView>

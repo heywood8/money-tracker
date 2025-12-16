@@ -147,19 +147,6 @@ const QuickAddForm = memo(({
         placeholder={t('amount')}
       />
 
-      {/* Description Input */}
-      <View style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-        <Icon name="text" size={18} color={colors.mutedText} />
-        <TextInput
-          style={[styles.formTextInput, { color: colors.text }]}
-          value={quickAddValues.description}
-          onChangeText={text => setQuickAddValues(v => ({ ...v, description: text }))}
-          placeholder={t('description')}
-          placeholderTextColor={colors.mutedText}
-          returnKeyType="done"
-        />
-      </View>
-
       {/* Category Picker and Add Button Row */}
       {quickAddValues.type !== 'transfer' && (
         <View style={styles.categoryAddRow}>
