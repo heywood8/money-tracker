@@ -9,6 +9,7 @@ import { useOperations } from '../contexts/OperationsContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
+import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import OperationModal from '../modals/OperationModal';
 import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
@@ -351,7 +352,7 @@ const OperationsScreen = () => {
       ...quickAddValues,
       // Use override categoryId if provided (for auto-add from category selection)
       categoryId: overrideCategoryId !== undefined ? overrideCategoryId : quickAddValues.categoryId,
-      date: new Date().toISOString().split('T')[0],
+      date: toDateString(new Date()),
     };
 
     const error = validateOperation(operationData, t);

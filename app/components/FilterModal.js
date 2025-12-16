@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { formatDate } from '../services/BalanceHistoryDB';
 
 /**
  * FilterModal Component
@@ -489,7 +490,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
               onChange={(event, selectedDate) => {
                 setShowStartDatePicker(false);
                 if (selectedDate) {
-                  const dateStr = selectedDate.toISOString().split('T')[0];
+                  const dateStr = formatDate(selectedDate);
                   setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, startDate: dateStr } }));
                 }
               }}
@@ -503,7 +504,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
               onChange={(event, selectedDate) => {
                 setShowEndDatePicker(false);
                 if (selectedDate) {
-                  const dateStr = selectedDate.toISOString().split('T')[0];
+                  const dateStr = formatDate(selectedDate);
                   setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, endDate: dateStr } }));
                 }
               }}
