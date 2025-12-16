@@ -1,21 +1,28 @@
 // Utility for tracking and retrieving the latest accessed account
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getNumberPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 
-const LAST_ACCESSED_ACCOUNT_KEY = 'last_accessed_account_id';
-
+/**
+ * Set the last accessed account ID
+ * @param {number} accountId - The account ID (integer)
+ */
 export const setLastAccessedAccount = async (accountId) => {
   try {
-    await AsyncStorage.setItem(LAST_ACCESSED_ACCOUNT_KEY, accountId);
+    // Store as string representation of number
+    await setPreference(PREF_KEYS.LAST_ACCOUNT, String(accountId));
   } catch (e) {
-    // Ignore errors
+    console.error('Failed to set last accessed account:', e);
   }
 };
 
+/**
+ * Get the last accessed account ID
+ * @returns {Promise<number|null>} The account ID as a number, or null if not set
+ */
 export const getLastAccessedAccount = async () => {
   try {
-    const id = await AsyncStorage.getItem(LAST_ACCESSED_ACCOUNT_KEY);
-    return id !== null ? id : null;
+    return await getNumberPreference(PREF_KEYS.LAST_ACCOUNT, null);
   } catch (e) {
+    console.error('Failed to get last accessed account:', e);
     return null;
   }
 };

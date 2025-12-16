@@ -6,13 +6,18 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Appearance } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 import { ThemeProvider, useTheme } from '../../app/contexts/ThemeContext';
 
+// Mock PreferencesDB
+jest.mock('../../app/services/PreferencesDB');
+
 describe('ThemeContext', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     jest.clearAllMocks();
+    // Default: no stored preference
+    PreferencesDB.getPreference.mockResolvedValue(null);
+    PreferencesDB.setPreference.mockResolvedValue(undefined);
   });
 
   const wrapper = ({ children }) => <ThemeProvider>{children}</ThemeProvider>;
@@ -35,8 +40,8 @@ describe('ThemeContext', () => {
       expect(result.current.colorScheme).toBe('dark');
     });
 
-    it('loads saved theme preference from AsyncStorage', async () => {
-      await AsyncStorage.setItem('theme_preference', 'dark');
+    it('loads saved theme preference from PreferencesDB', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('dark');
 
       const { result } = renderHook(() => useTheme(), { wrapper });
 
@@ -46,6 +51,8 @@ describe('ThemeContext', () => {
     });
 
     it('falls back to system when no preference is saved', async () => {
+      PreferencesDB.getPreference.mockResolvedValue(null);
+
       const { result } = renderHook(() => useTheme(), { wrapper });
 
       expect(result.current.theme).toBe('system');
@@ -90,15 +97,17 @@ describe('ThemeContext', () => {
       expect(result.current.colorScheme).toBe('dark'); // Follows OS
     });
 
-    it('persists theme preference to AsyncStorage', async () => {
+    it('persists theme preference to PreferencesDB', async () => {
       const { result } = renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('dark');
       });
 
-      const stored = await AsyncStorage.getItem('theme_preference');
-      expect(stored).toBe('dark');
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.THEME,
+        'dark',
+      );
     });
   });
 
@@ -258,8 +267,10 @@ describe('ThemeContext', () => {
       });
       expect(result.current.theme).toBe('system');
 
-      const stored = await AsyncStorage.getItem('theme_preference');
-      expect(stored).toBe('system');
+      expect(PreferencesDB.setPreference).toHaveBeenLastCalledWith(
+        PreferencesDB.PREF_KEYS.THEME,
+        'system',
+      );
     });
 
     it('colors object remains immutable between renders', async () => {

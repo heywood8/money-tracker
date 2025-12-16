@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccounts } from './AccountsContext';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
+import { getJsonPreference, setJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 
 /**
  * OperationsContext manages financial operations/transactions state.
@@ -46,7 +46,6 @@ export const OperationsProvider = ({ children }) => {
     amountRange: { min: null, max: null },
   });
   const [filtersActive, setFiltersActive] = useState(false);
-  const FILTERS_STORAGE_KEY = 'operations_active_filters';
 
   // Helper to check if any filters are active
   const hasActiveFilters = useCallback((filters) => {
@@ -155,7 +154,6 @@ export const OperationsProvider = ({ children }) => {
       setOperations(operationsData);
       setDataLoaded(true);
       // Reset lazy-loading state
-      setCurrentWeekOffset(Math.floor(operationsData.length / 50)); // Rough estimate
       setHasMoreOperations(false); // All loaded
     } catch (error) {
       console.error('Failed to reload operations:', error);
@@ -164,13 +162,12 @@ export const OperationsProvider = ({ children }) => {
     }
   }, []);
 
-  // Load filters from AsyncStorage on mount
+  // Load filters from PreferencesDB on mount
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        const stored = await AsyncStorage.getItem(FILTERS_STORAGE_KEY);
-        if (stored) {
-          const filters = JSON.parse(stored);
+        const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
+        if (filters) {
           setActiveFilters(filters);
           setFiltersActive(hasActiveFilters(filters));
         }
@@ -179,7 +176,7 @@ export const OperationsProvider = ({ children }) => {
       }
     };
     loadFilters();
-  }, [FILTERS_STORAGE_KEY, hasActiveFilters]);
+  }, [hasActiveFilters]);
 
   // Load operations from SQLite on mount
   useEffect(() => {
@@ -290,15 +287,15 @@ export const OperationsProvider = ({ children }) => {
       const isActive = hasActiveFilters(newFilters);
       setFiltersActive(isActive);
 
-      // Persist filters to AsyncStorage
-      await AsyncStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(newFilters));
+      // Persist filters to PreferencesDB
+      await setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, newFilters);
 
       // Reset to first week when filters change
       await loadInitialOperations(newFilters);
     } catch (error) {
       console.error('Failed to update filters:', error);
     }
-  }, [hasActiveFilters, loadInitialOperations, FILTERS_STORAGE_KEY]);
+  }, [hasActiveFilters, loadInitialOperations]);
 
   // Clear all filters
   const clearFilters = useCallback(async () => {

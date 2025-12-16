@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const THEME_KEY = 'theme_preference';
+import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 const ThemeContext = createContext();
 
 const lightTheme = {
@@ -65,7 +63,7 @@ export const ThemeProvider = ({ children }) => {
   const [colorScheme, setColorScheme] = useState('light');
 
   useEffect(() => {
-    AsyncStorage.getItem(THEME_KEY).then(stored => {
+    getPreference(PREF_KEYS.THEME, 'system').then(stored => {
       if (stored) setTheme(stored);
     });
   }, []);
@@ -87,7 +85,7 @@ export const ThemeProvider = ({ children }) => {
 
   const updateTheme = async (newTheme) => {
     setTheme(newTheme);
-    await AsyncStorage.setItem(THEME_KEY, newTheme);
+    await setPreference(PREF_KEYS.THEME, newTheme);
   };
 
   const colors = colorScheme === 'dark' ? darkTheme.colors : lightTheme.colors;

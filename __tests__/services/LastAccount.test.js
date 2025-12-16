@@ -1,94 +1,111 @@
 /**
  * Tests for LastAccount Service - Utility for tracking last accessed account
- * Tests AsyncStorage read/write operations for last accessed account ID
+ * Tests PreferencesDB read/write operations for last accessed account ID
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 import { setLastAccessedAccount, getLastAccessedAccount } from '../../app/services/LastAccount';
 
+// Mock PreferencesDB
+jest.mock('../../app/services/PreferencesDB');
+
 describe('LastAccount Service', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('setLastAccessedAccount', () => {
-    it('saves account ID to AsyncStorage', async () => {
-      await setLastAccessedAccount('account123');
+    it('saves account ID to PreferencesDB as string', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        'account123',
+      await setLastAccessedAccount(123);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '123',
       );
     });
 
     it('updates account ID when called multiple times', async () => {
-      await setLastAccessedAccount('account1');
-      await setLastAccessedAccount('account2');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(
-        'last_accessed_account_id',
-        'account2',
+      await setLastAccessedAccount(1);
+      await setLastAccessedAccount(2);
+
+      expect(PreferencesDB.setPreference).toHaveBeenLastCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '2',
       );
     });
 
-    it('handles empty string account ID', async () => {
-      await setLastAccessedAccount('');
+    it('handles zero account ID', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        '',
+      await setLastAccessedAccount(0);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '0',
       );
     });
 
-    it('handles UUID format account ID', async () => {
-      const uuid = '123e4567-e89b-12d3-a456-426614174000';
-      await setLastAccessedAccount(uuid);
+    it('handles large account ID numbers', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      const largeId = 999999999;
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        uuid,
+      await setLastAccessedAccount(largeId);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '999999999',
       );
     });
 
-    it('silently handles AsyncStorage errors', async () => {
-      AsyncStorage.setItem.mockRejectedValue(new Error('Storage error'));
+    it('silently handles PreferencesDB errors', async () => {
+      PreferencesDB.setPreference.mockRejectedValue(new Error('Storage error'));
 
       // Should not throw
-      await expect(setLastAccessedAccount('account123')).resolves.toBeUndefined();
+      await expect(setLastAccessedAccount(123)).resolves.toBeUndefined();
     });
 
-    it('handles null account ID gracefully', async () => {
+    it('handles null account ID by converting to string', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+
       await setLastAccessedAccount(null);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        null,
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        'null',
       );
     });
 
-    it('handles undefined account ID gracefully', async () => {
+    it('handles undefined account ID by converting to string', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+
       await setLastAccessedAccount(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        undefined,
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        'undefined',
       );
     });
   });
 
   describe('getLastAccessedAccount', () => {
-    it('retrieves account ID from AsyncStorage', async () => {
-      AsyncStorage.getItem.mockResolvedValue('account123');
+    it('retrieves account ID from PreferencesDB as number', async () => {
+      PreferencesDB.getNumberPreference.mockResolvedValue(123);
 
       const result = await getLastAccessedAccount();
 
-      expect(AsyncStorage.getItem).toHaveBeenCalledWith('last_accessed_account_id');
-      expect(result).toBe('account123');
+      expect(PreferencesDB.getNumberPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        null,
+      );
+      expect(result).toBe(123);
     });
 
     it('returns null when no account has been accessed', async () => {
-      AsyncStorage.getItem.mockResolvedValue(null);
+      PreferencesDB.getNumberPreference.mockResolvedValue(null);
 
       const result = await getLastAccessedAccount();
 
@@ -96,112 +113,125 @@ describe('LastAccount Service', () => {
     });
 
     it('returns correct ID after setLastAccessedAccount', async () => {
-      await setLastAccessedAccount('account456');
-      AsyncStorage.getItem.mockResolvedValue('account456');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      PreferencesDB.getNumberPreference.mockResolvedValue(456);
 
+      await setLastAccessedAccount(456);
       const result = await getLastAccessedAccount();
 
-      expect(result).toBe('account456');
+      expect(result).toBe(456);
     });
 
     it('returns latest ID when set multiple times', async () => {
-      await setLastAccessedAccount('account1');
-      await setLastAccessedAccount('account2');
-      await setLastAccessedAccount('account3');
-      AsyncStorage.getItem.mockResolvedValue('account3');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      PreferencesDB.getNumberPreference.mockResolvedValue(3);
+
+      await setLastAccessedAccount(1);
+      await setLastAccessedAccount(2);
+      await setLastAccessedAccount(3);
 
       const result = await getLastAccessedAccount();
 
-      expect(result).toBe('account3');
+      expect(result).toBe(3);
     });
 
-    it('returns null on AsyncStorage error', async () => {
-      AsyncStorage.getItem.mockRejectedValue(new Error('Storage error'));
+    it('returns null on PreferencesDB error', async () => {
+      PreferencesDB.getNumberPreference.mockRejectedValue(new Error('Storage error'));
 
       const result = await getLastAccessedAccount();
 
       expect(result).toBeNull();
     });
 
-    it('handles empty string value', async () => {
-      AsyncStorage.getItem.mockResolvedValue('');
+    it('handles zero value', async () => {
+      PreferencesDB.getNumberPreference.mockResolvedValue(0);
 
       const result = await getLastAccessedAccount();
 
-      expect(result).toBe('');
+      expect(result).toBe(0);
     });
   });
 
   describe('Integration Workflow', () => {
     it('stores and retrieves account ID correctly', async () => {
-      const accountId = 'test-account-123';
+      const accountId = 123;
+
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      PreferencesDB.getNumberPreference.mockResolvedValue(accountId);
 
       // Store
       await setLastAccessedAccount(accountId);
 
-      // Simulate retrieval
-      AsyncStorage.getItem.mockResolvedValue(accountId);
+      // Retrieve
       const retrieved = await getLastAccessedAccount();
 
       expect(retrieved).toBe(accountId);
     });
 
     it('handles set-get-set-get sequence', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+
       // First set
-      await setLastAccessedAccount('account1');
-      AsyncStorage.getItem.mockResolvedValue('account1');
+      await setLastAccessedAccount(1);
+      PreferencesDB.getNumberPreference.mockResolvedValue(1);
       let result = await getLastAccessedAccount();
-      expect(result).toBe('account1');
+      expect(result).toBe(1);
 
       // Second set
-      await setLastAccessedAccount('account2');
-      AsyncStorage.getItem.mockResolvedValue('account2');
+      await setLastAccessedAccount(2);
+      PreferencesDB.getNumberPreference.mockResolvedValue(2);
       result = await getLastAccessedAccount();
-      expect(result).toBe('account2');
+      expect(result).toBe(2);
     });
 
     it('persists across multiple get calls', async () => {
-      await setLastAccessedAccount('persistent-account');
-      AsyncStorage.getItem.mockResolvedValue('persistent-account');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      PreferencesDB.getNumberPreference.mockResolvedValue(999);
+
+      await setLastAccessedAccount(999);
 
       const result1 = await getLastAccessedAccount();
       const result2 = await getLastAccessedAccount();
       const result3 = await getLastAccessedAccount();
 
-      expect(result1).toBe('persistent-account');
-      expect(result2).toBe('persistent-account');
-      expect(result3).toBe('persistent-account');
+      expect(result1).toBe(999);
+      expect(result2).toBe(999);
+      expect(result3).toBe(999);
     });
 
     it('handles rapid successive sets', async () => {
-      await setLastAccessedAccount('account1');
-      await setLastAccessedAccount('account2');
-      await setLastAccessedAccount('account3');
-      await setLastAccessedAccount('account4');
-      await setLastAccessedAccount('account5');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledTimes(5);
-      expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(
-        'last_accessed_account_id',
-        'account5',
+      await setLastAccessedAccount(1);
+      await setLastAccessedAccount(2);
+      await setLastAccessedAccount(3);
+      await setLastAccessedAccount(4);
+      await setLastAccessedAccount(5);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledTimes(5);
+      expect(PreferencesDB.setPreference).toHaveBeenLastCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '5',
       );
     });
   });
 
   describe('Edge Cases', () => {
     it('handles concurrent set operations', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+
       // Simulate concurrent calls
       await Promise.all([
-        setLastAccessedAccount('account1'),
-        setLastAccessedAccount('account2'),
-        setLastAccessedAccount('account3'),
+        setLastAccessedAccount(1),
+        setLastAccessedAccount(2),
+        setLastAccessedAccount(3),
       ]);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledTimes(3);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledTimes(3);
     });
 
     it('handles concurrent get operations', async () => {
-      AsyncStorage.getItem.mockResolvedValue('account123');
+      PreferencesDB.getNumberPreference.mockResolvedValue(123);
 
       // Simulate concurrent calls
       const results = await Promise.all([
@@ -210,36 +240,29 @@ describe('LastAccount Service', () => {
         getLastAccessedAccount(),
       ]);
 
-      expect(results).toEqual(['account123', 'account123', 'account123']);
+      expect(results).toEqual([123, 123, 123]);
     });
 
-    it('handles very long account ID string', async () => {
-      const longId = 'a'.repeat(10000);
-      await setLastAccessedAccount(longId);
+    it('handles very large account ID numbers', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      const largeId = 2147483647; // Max 32-bit integer
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        longId,
+      await setLastAccessedAccount(largeId);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '2147483647',
       );
     });
 
-    it('handles special characters in account ID', async () => {
-      const specialId = 'acc@#$%^&*()_+-={}[]|:";\'<>?,./';
-      await setLastAccessedAccount(specialId);
+    it('handles negative account ID numbers', async () => {
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        specialId,
-      );
-    });
+      await setLastAccessedAccount(-1);
 
-    it('handles unicode characters in account ID', async () => {
-      const unicodeId = '账户123\u4E2D\u6587';
-      await setLastAccessedAccount(unicodeId);
-
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        unicodeId,
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '-1',
       );
     });
   });
@@ -247,58 +270,69 @@ describe('LastAccount Service', () => {
   describe('Error Recovery', () => {
     it('continues working after storage error on set', async () => {
       // First call fails
-      AsyncStorage.setItem.mockRejectedValueOnce(new Error('Storage full'));
-      await setLastAccessedAccount('account1');
+      PreferencesDB.setPreference.mockRejectedValueOnce(new Error('Storage full'));
+      await setLastAccessedAccount(1);
 
       // Second call succeeds
-      AsyncStorage.setItem.mockResolvedValueOnce(undefined);
-      await setLastAccessedAccount('account2');
+      PreferencesDB.setPreference.mockResolvedValueOnce(undefined);
+      await setLastAccessedAccount(2);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledTimes(2);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledTimes(2);
     });
 
     it('continues working after storage error on get', async () => {
       // First call fails
-      AsyncStorage.getItem.mockRejectedValueOnce(new Error('Read error'));
+      PreferencesDB.getNumberPreference.mockRejectedValueOnce(new Error('Read error'));
       let result = await getLastAccessedAccount();
       expect(result).toBeNull();
 
       // Second call succeeds
-      AsyncStorage.getItem.mockResolvedValueOnce('account123');
+      PreferencesDB.getNumberPreference.mockResolvedValueOnce(123);
       result = await getLastAccessedAccount();
-      expect(result).toBe('account123');
+      expect(result).toBe(123);
     });
 
     it('handles intermittent storage failures', async () => {
-      AsyncStorage.setItem
+      PreferencesDB.setPreference
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('Error'))
         .mockResolvedValueOnce(undefined);
 
-      await setLastAccessedAccount('account1');
-      await setLastAccessedAccount('account2'); // Fails silently
-      await setLastAccessedAccount('account3');
+      await setLastAccessedAccount(1);
+      await setLastAccessedAccount(2); // Fails silently
+      await setLastAccessedAccount(3);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledTimes(3);
+      expect(PreferencesDB.setPreference).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('Storage Key', () => {
     it('uses correct storage key constant', async () => {
-      await setLastAccessedAccount('test');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        'last_accessed_account_id',
-        'test',
+      await setLastAccessedAccount(1);
+
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '1',
       );
     });
 
     it('uses same key for get and set', async () => {
-      await setLastAccessedAccount('account123');
+      PreferencesDB.setPreference.mockResolvedValue(undefined);
+      PreferencesDB.getNumberPreference.mockResolvedValue(123);
+
+      await setLastAccessedAccount(123);
       await getLastAccessedAccount();
 
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith('last_accessed_account_id', 'account123');
-      expect(AsyncStorage.getItem).toHaveBeenCalledWith('last_accessed_account_id');
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        '123',
+      );
+      expect(PreferencesDB.getNumberPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LAST_ACCOUNT,
+        null,
+      );
     });
   });
 });
