@@ -5,13 +5,19 @@
 
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
 
+// Mock PreferencesDB
+jest.mock('../../app/services/PreferencesDB');
+
 describe('LocalizationContext', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     jest.clearAllMocks();
+    // Default: no stored preference
+    PreferencesDB.getPreference.mockResolvedValue(null);
+    PreferencesDB.setPreference.mockResolvedValue(undefined);
+    PreferencesDB.deletePreference.mockResolvedValue(undefined);
   });
 
   const wrapper = ({ children }) => <LocalizationProvider>{children}</LocalizationProvider>;
@@ -30,8 +36,8 @@ describe('LocalizationContext', () => {
       expect(result.current.availableLanguages).toBeDefined();
     });
 
-    it('loads saved language from AsyncStorage', async () => {
-      await AsyncStorage.setItem('app_language', 'ru');
+    it('loads saved language from PreferencesDB', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('ru');
 
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
@@ -41,6 +47,8 @@ describe('LocalizationContext', () => {
     });
 
     it('uses default language when no preference is saved', async () => {
+      PreferencesDB.getPreference.mockResolvedValue(null);
+
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
@@ -49,8 +57,8 @@ describe('LocalizationContext', () => {
       });
     });
 
-    it('ignores invalid language from AsyncStorage', async () => {
-      await AsyncStorage.setItem('app_language', 'invalid-lang');
+    it('ignores invalid language from PreferencesDB', async () => {
+      PreferencesDB.getPreference.mockResolvedValue('invalid-lang');
 
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
@@ -76,7 +84,7 @@ describe('LocalizationContext', () => {
     });
 
     it('switches to English', async () => {
-      await AsyncStorage.setItem('app_language', 'ru');
+      PreferencesDB.getPreference.mockResolvedValue('ru');
 
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
@@ -91,7 +99,7 @@ describe('LocalizationContext', () => {
       expect(result.current.language).toBe('en');
     });
 
-    it('persists language preference to AsyncStorage', async () => {
+    it('persists language preference to PreferencesDB', async () => {
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
@@ -102,8 +110,10 @@ describe('LocalizationContext', () => {
         await result.current.setLanguage('ru');
       });
 
-      const stored = await AsyncStorage.getItem('app_language');
-      expect(stored).toBe('ru');
+      expect(PreferencesDB.setPreference).toHaveBeenCalledWith(
+        PreferencesDB.PREF_KEYS.LANGUAGE,
+        'ru',
+      );
     });
   });
 
@@ -262,8 +272,10 @@ describe('LocalizationContext', () => {
       });
       expect(result.current.language).toBe('en');
 
-      const stored = await AsyncStorage.getItem('app_language');
-      expect(stored).toBe('en');
+      expect(PreferencesDB.setPreference).toHaveBeenLastCalledWith(
+        PreferencesDB.PREF_KEYS.LANGUAGE,
+        'en',
+      );
     });
 
     it('translations update immediately after language change', async () => {
@@ -300,15 +312,15 @@ describe('LocalizationContext', () => {
       expect(result.current.language).toBe('ru');
     });
 
-    it('gracefully handles AsyncStorage errors', async () => {
+    it('gracefully handles PreferencesDB errors', async () => {
       const { result } = renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
       });
 
-      // Mock AsyncStorage to throw error after component is mounted
-      jest.spyOn(AsyncStorage, 'setItem').mockRejectedValue(new Error('Storage error'));
+      // Mock PreferencesDB to throw error after component is mounted
+      PreferencesDB.setPreference.mockRejectedValue(new Error('Storage error'));
 
       // Should not throw error
       await act(async () => {

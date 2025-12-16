@@ -5,12 +5,13 @@
 
 import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 import { OperationsProvider, useOperations } from '../../app/contexts/OperationsContext';
 import { AccountsProvider } from '../../app/contexts/AccountsContext';
 import * as OperationsDB from '../../app/services/OperationsDB';
 
 // Mock dependencies
+jest.mock('../../app/services/PreferencesDB');
 jest.mock('../../app/services/OperationsDB');
 jest.mock('../../app/contexts/AccountsContext', () => ({
   AccountsProvider: ({ children }) => children,
@@ -60,7 +61,10 @@ describe('Operations Filtering Integration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    AsyncStorage.clear();
+
+    // Default PreferencesDB mocks
+    PreferencesDB.getJsonPreference.mockResolvedValue(null);
+    PreferencesDB.setJsonPreference.mockResolvedValue(undefined);
 
     // Default mock implementations
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
@@ -88,7 +92,7 @@ describe('Operations Filtering Integration', () => {
       });
     });
 
-    it('loads filters from AsyncStorage on mount', async () => {
+    it('loads filters from PreferencesDB on mount', async () => {
       const storedFilters = {
         types: ['expense'],
         accountIds: ['acc1'],
@@ -98,7 +102,7 @@ describe('Operations Filtering Integration', () => {
         amountRange: { min: null, max: null },
       };
 
-      await AsyncStorage.setItem('operations_active_filters', JSON.stringify(storedFilters));
+      PreferencesDB.getJsonPreference.mockResolvedValue(storedFilters);
 
       const { result } = renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
@@ -110,7 +114,7 @@ describe('Operations Filtering Integration', () => {
       });
     });
 
-    it('persists filters to AsyncStorage when updated', async () => {
+    it('persists filters to PreferencesDB when updated', async () => {
       const { result } = renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
@@ -128,9 +132,11 @@ describe('Operations Filtering Integration', () => {
         await result.current.updateFilters(newFilters);
       });
 
-      await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('operations_active_filters');
-        expect(JSON.parse(stored)).toEqual(newFilters);
+      await waitFor(() => {
+        expect(PreferencesDB.setJsonPreference).toHaveBeenCalledWith(
+          PreferencesDB.PREF_KEYS.OPERATIONS_FILTERS,
+          newFilters,
+        );
       });
     });
 
@@ -424,6 +430,9 @@ describe('Operations Filtering Integration', () => {
 
       // Unmount
       unmount();
+
+      // Mock PreferencesDB to return the filters on next render
+      PreferencesDB.getJsonPreference.mockResolvedValue(filters);
 
       // Remount
       const { result: result2 } = renderHook(() => useOperations(), {

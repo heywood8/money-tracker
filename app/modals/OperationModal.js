@@ -105,7 +105,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         if (accounts.length === 1) {
           defaultAccountId = accounts[0].id;
         } else if (accounts.length > 1) {
-          // Try to get last accessed from AsyncStorage
+          // Try to get last accessed account
           const lastId = await getLastAccessedAccount();
           if (lastId && accounts.some(acc => acc.id === lastId)) {
             defaultAccountId = lastId;

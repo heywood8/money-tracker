@@ -1,11 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import i18nData from '../../assets/i18n.json';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getPreference, setPreference, deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-
-
-const STORAGE_KEY = 'app_language';
 const defaultLang = 'en';
 
 const LocalizationContext = createContext({
@@ -23,11 +20,11 @@ export function LocalizationProvider({ children }) {
   const [isFirstLaunch, setIsFirstLaunch] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load language from AsyncStorage on mount
+  // Load language from PreferencesDB on mount
   useEffect(() => {
     (async () => {
       try {
-        const storedLang = await AsyncStorage.getItem(STORAGE_KEY);
+        const storedLang = await getPreference(PREF_KEYS.LANGUAGE);
         if (storedLang && i18nData[storedLang]) {
           setLanguageState(storedLang);
           setIsFirstLaunch(false);
@@ -48,8 +45,8 @@ export function LocalizationProvider({ children }) {
     const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, async () => {
       console.log('LocalizationContext: Database reset detected, clearing language preference');
       try {
-        // Clear language preference from AsyncStorage
-        await AsyncStorage.removeItem(STORAGE_KEY);
+        // Clear language preference from PreferencesDB
+        await deletePreference(PREF_KEYS.LANGUAGE);
 
         // Reset to first launch state
         setIsFirstLaunch(true);
@@ -62,11 +59,11 @@ export function LocalizationProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  // Save language to AsyncStorage when it changes
+  // Save language to PreferencesDB when it changes
   const setLanguage = useCallback(async (lng) => {
     setLanguageState(lng);
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, lng);
+      await setPreference(PREF_KEYS.LANGUAGE, lng);
     } catch (e) {
       // ignore
     }
@@ -77,7 +74,7 @@ export function LocalizationProvider({ children }) {
     setLanguageState(lng);
     setIsFirstLaunch(false);
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, lng);
+      await setPreference(PREF_KEYS.LANGUAGE, lng);
     } catch (e) {
       // ignore
     }
