@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.2](https://github.com/heywood8/money-tracker/compare/penny-v0.16.1...penny-v0.16.2) (2025-12-16)
+
+
+### Bug Fixes
+
+* adjust forecasted amount logic ([6ce3b02](https://github.com/heywood8/money-tracker/commit/6ce3b0296a3ed21a15f5c8b3b8532f2c5238d084))
+* burndown graph adjustments ([ed19aea](https://github.com/heywood8/money-tracker/commit/ed19aeadfe772beadbc7a9edf2f5b5f4ce527303))
+* graphscreen.js lint ([35a3564](https://github.com/heywood8/money-tracker/commit/35a3564ca6d3ea0035435f25146fb31c6297bb53))
+* lint ([a60f9e9](https://github.com/heywood8/money-tracker/commit/a60f9e9228d8d13a465f81349f86faf636ed87f2))
+* prefill quickadd transfer destination with account ([2776f74](https://github.com/heywood8/money-tracker/commit/2776f74f6078fc56db9771a54a49b5d7085dc26d))
+* remove description from quick add screen ([8095cf2](https://github.com/heywood8/money-tracker/commit/8095cf2d84d6e5f47134d4c28a6ad225f9ea1afa))
+
 ## [0.16.1](https://github.com/heywood8/money-tracker/compare/penny-v0.16.0...penny-v0.16.1) (2025-12-16)
 
 
