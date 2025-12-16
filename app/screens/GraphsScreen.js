@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, ActivityIndicator, TouchableOpacity, Modal, PanResponder, Switch, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, Modal, PanResponder, TextInput } from 'react-native';
+import PropTypes from 'prop-types';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -81,6 +82,26 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
       })}
     </View>
   );
+};
+
+CustomLegend.propTypes = {
+  data: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      amount: PropTypes.number,
+      color: PropTypes.string,
+      icon: PropTypes.string,
+      categoryId: PropTypes.string,
+    }),
+  ).isRequired,
+  currency: PropTypes.string.isRequired,
+  colors: PropTypes.shape({
+    border: PropTypes.string,
+    text: PropTypes.string,
+    mutedText: PropTypes.string,
+  }).isRequired,
+  onItemPress: PropTypes.func.isRequired,
+  isClickable: PropTypes.bool.isRequired,
 };
 
 const GraphsScreen = () => {
@@ -1086,8 +1107,8 @@ const GraphsScreen = () => {
                         backgroundGradientFrom: colors.surface,
                         backgroundGradientTo: colors.surface,
                         decimalPlaces: 0,
-                        color: (opacity = 1) => colors.text,
-                        labelColor: (opacity = 1) => colors.mutedText,
+                        color: (_opacity = 1) => colors.text,
+                        labelColor: (_opacity = 1) => colors.mutedText,
                         style: {
                           borderRadius: 16,
                         },
@@ -1107,10 +1128,7 @@ const GraphsScreen = () => {
                       withVerticalLines={false}
                       withHorizontalLines={true}
                       withLegend={false}
-                      style={{
-                        marginVertical: 8,
-                        borderRadius: 16,
-                      }}
+                      style={styles.lineChartStyle}
                     />
                   </TouchableOpacity>
 
@@ -1146,7 +1164,7 @@ const GraphsScreen = () => {
                             </Text>
                           </View>
                           <View style={styles.burndownLegendItem}>
-                            <View style={[styles.burndownLegendDot, { backgroundColor: 'rgba(255, 99, 132, 0.4)' }]} />
+                            <View style={[styles.burndownLegendDot, styles.burndownDatasetColor]} />
                             <Text style={[styles.burndownLegendText, { color: colors.text }]}>
                               {t('burndown') || 'Burndown'}
                             </Text>
@@ -1579,7 +1597,7 @@ const GraphsScreen = () => {
                           </TouchableOpacity>
                           {row.balance && (
                             <TouchableOpacity
-                              style={[styles.balanceActionButton, { backgroundColor: '#f44336' }]}
+                              style={[styles.balanceActionButton, styles.deleteActionButtonBackground]}
                               onPress={() => handleDeleteBalance(row.date)}
                             >
                               <Icon name="delete" size={16} color="#fff" />
@@ -1698,6 +1716,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  burndownDatasetColor: {
+    backgroundColor: 'rgba(255, 99, 132, 0.4)',
+  },
   burndownLegend: {
     flexDirection: 'column',
     gap: 6,
@@ -1746,6 +1767,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+  },
+  deleteActionButtonBackground: {
+    backgroundColor: '#f44336',
   },
   filtersRow: {
     flexDirection: 'row',
@@ -1796,6 +1820,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
+  },
+  lineChartStyle: {
+    borderRadius: 16,
+    marginVertical: 8,
   },
   loadingContainer: {
     alignItems: 'center',
