@@ -983,6 +983,7 @@ const GraphsScreen = () => {
     return {
       currentSpending: totalExpensesForForecast,
       predictedTotal,
+      predictedRemaining: predictedTotal - totalExpensesForForecast,
       dailyAverage,
       daysElapsed,
       daysInMonth,
@@ -1225,7 +1226,7 @@ const GraphsScreen = () => {
                     {t('predicted_spending')}
                   </Text>
                   <Text style={[styles.predictionStatValue, { color: colors.text }]}>
-                    {formatCurrency(spendingPrediction.predictedTotal, selectedCurrency)}
+                    {formatCurrency(spendingPrediction.predictedRemaining, selectedCurrency)}
                   </Text>
                 </View>
               </View>
