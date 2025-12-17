@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -210,6 +210,10 @@ const OperationsScreen = () => {
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+
+  // Ref for FlatList to enable scrolling to top
+  const flatListRef = useRef(null);
 
   // Quick add form state
   const [quickAddValues, setQuickAddValues] = useState({
@@ -581,6 +585,18 @@ const OperationsScreen = () => {
     }
   }, [loadingMore, hasMoreOperations, loadMoreOperations]);
 
+  // Handle scroll event to show/hide scroll-to-top button
+  const handleScroll = useCallback((event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    // Show button when scrolled down past the calculator (roughly 250px)
+    setShowScrollToTop(offsetY > 250);
+  }, []);
+
+  // Scroll to top handler
+  const scrollToTop = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
   // Footer component showing loading indicator
   const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
@@ -751,6 +767,7 @@ const OperationsScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
+        ref={flatListRef}
         contentInsetAdjustmentBehavior="automatic"
         data={groupedOperations}
         renderItem={renderItem}
@@ -767,6 +784,8 @@ const OperationsScreen = () => {
           </View>
         }
         contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : null}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         windowSize={10}
@@ -886,6 +905,19 @@ const OperationsScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Scroll to Top Button - only show when scrolled down */}
+      {showScrollToTop && !operationsLoading && (
+        <TouchableOpacity
+          style={[styles.scrollToTopButton, { backgroundColor: colors.surface }]}
+          onPress={scrollToTop}
+          accessibilityRole="button"
+          accessibilityLabel="Scroll to top"
+          accessibilityHint="Scroll to the top of the list"
+        >
+          <Icon name="chevron-up" size={24} color={colors.text} />
+        </TouchableOpacity>
+      )}
 
       {/* Filter FAB */}
       {!operationsLoading && (
@@ -1248,6 +1280,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+    width: 40,
+  },
+  scrollToTopButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    elevation: 4,
+    height: 40,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    top: 16,
     width: 40,
   },
   typeButton: {
