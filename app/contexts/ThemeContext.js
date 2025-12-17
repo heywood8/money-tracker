@@ -61,6 +61,9 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState('system');
   const [osColorScheme, setOsColorScheme] = useState(Appearance.getColorScheme() || 'light');
   const [colorScheme, setColorScheme] = useState('light');
+  const [isWaveAnimating, setIsWaveAnimating] = useState(false);
+  const [waveOrigin, setWaveOrigin] = useState(null);
+  const [nextColorScheme, setNextColorScheme] = useState(null);
 
   useEffect(() => {
     getPreference(PREF_KEYS.THEME, 'system').then(stored => {
@@ -83,15 +86,56 @@ export const ThemeProvider = ({ children }) => {
     }
   }, [theme, osColorScheme]);
 
-  const updateTheme = async (newTheme) => {
-    setTheme(newTheme);
-    await setPreference(PREF_KEYS.THEME, newTheme);
+  const updateTheme = async (newTheme, origin = null) => {
+    // Calculate what the next color scheme will be
+    let futureColorScheme;
+    if (newTheme === 'system') {
+      futureColorScheme = osColorScheme;
+    } else {
+      futureColorScheme = newTheme;
+    }
+
+    // Only animate if the color scheme is actually changing
+    if (futureColorScheme !== colorScheme && origin) {
+      // Start wave animation with the future theme colors
+      setNextColorScheme(futureColorScheme);
+      setWaveOrigin(origin);
+      setIsWaveAnimating(true);
+
+      // Wait for animation to cover screen before switching theme
+      setTimeout(() => {
+        setTheme(newTheme);
+        setPreference(PREF_KEYS.THEME, newTheme);
+      }, 300); // Switch theme halfway through the animation
+    } else {
+      // No animation needed, just switch theme
+      setTheme(newTheme);
+      await setPreference(PREF_KEYS.THEME, newTheme);
+    }
+  };
+
+  const onWaveComplete = () => {
+    setIsWaveAnimating(false);
+    setWaveOrigin(null);
+    setNextColorScheme(null);
   };
 
   const colors = colorScheme === 'dark' ? darkTheme.colors : lightTheme.colors;
+  const waveColor = nextColorScheme === 'dark' ? darkTheme.colors.background : lightTheme.colors.background;
 
   return (
-    <ThemeContext.Provider value={{ theme, colorScheme, colors, setTheme: updateTheme }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        colorScheme,
+        colors,
+        setTheme: updateTheme,
+        isWaveAnimating,
+        waveOrigin,
+        waveColor,
+        onWaveComplete,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

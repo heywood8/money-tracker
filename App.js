@@ -10,6 +10,7 @@ import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
+import ThemeWaveTransition from './app/components/ThemeWaveTransition';
 import { StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -55,12 +56,19 @@ function ThemedStatusBar() {
 
 function AppContent() {
   const paperTheme = useMaterialTheme();
+  const { isWaveAnimating, waveOrigin, waveColor, onWaveComplete } = require('./app/contexts/ThemeContext').useTheme();
 
   return (
     <PaperProvider theme={paperTheme}>
       <ThemedStatusBar />
       <AppInitializer />
       <ImportProgressModal />
+      <ThemeWaveTransition
+        isAnimating={isWaveAnimating}
+        origin={waveOrigin}
+        color={waveColor}
+        onComplete={onWaveComplete}
+      />
     </PaperProvider>
   );
 }
