@@ -56,7 +56,7 @@ function ThemedStatusBar() {
 
 function AppContent() {
   const paperTheme = useMaterialTheme();
-  const { isWaveAnimating, waveOrigin, waveColor, onWaveComplete } = require('./app/contexts/ThemeContext').useTheme();
+  const { isWaveAnimating, waveColor, onWaveComplete } = require('./app/contexts/ThemeContext').useTheme();
 
   return (
     <PaperProvider theme={paperTheme}>
@@ -65,7 +65,6 @@ function AppContent() {
       <ImportProgressModal />
       <ThemeWaveTransition
         isAnimating={isWaveAnimating}
-        origin={waveOrigin}
         color={waveColor}
         onComplete={onWaveComplete}
       />

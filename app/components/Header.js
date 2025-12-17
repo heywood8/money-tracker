@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -13,7 +13,6 @@ export default function Header({ onOpenSettings }) {
   const { colors, colorScheme, setTheme } = useTheme();
   const { t } = useLocalization();
   const [dbVersion, setDbVersion] = useState(null);
-  const themeButtonRef = useRef(null);
 
   const fetchDbVersion = useCallback(async () => {
     try {
@@ -44,19 +43,7 @@ export default function Header({ onOpenSettings }) {
 
   const toggleTheme = () => {
     const newTheme = colorScheme === 'dark' ? 'light' : 'dark';
-
-    // Measure the theme button position to use as wave origin
-    if (themeButtonRef.current) {
-      themeButtonRef.current.measure((x, y, width, height, pageX, pageY) => {
-        const origin = {
-          x: pageX + width / 2,
-          y: pageY + height / 2,
-        };
-        setTheme(newTheme, origin);
-      });
-    } else {
-      setTheme(newTheme);
-    }
+    setTheme(newTheme);
   };
 
   return (
@@ -84,7 +71,6 @@ export default function Header({ onOpenSettings }) {
       </View>
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          ref={themeButtonRef}
           onPress={toggleTheme}
           accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           accessibilityRole="button"

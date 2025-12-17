@@ -62,7 +62,6 @@ export const ThemeProvider = ({ children }) => {
   const [osColorScheme, setOsColorScheme] = useState(Appearance.getColorScheme() || 'light');
   const [colorScheme, setColorScheme] = useState('light');
   const [isWaveAnimating, setIsWaveAnimating] = useState(false);
-  const [waveOrigin, setWaveOrigin] = useState(null);
   const [nextColorScheme, setNextColorScheme] = useState(null);
 
   useEffect(() => {
@@ -86,7 +85,7 @@ export const ThemeProvider = ({ children }) => {
     }
   }, [theme, osColorScheme]);
 
-  const updateTheme = async (newTheme, origin = null) => {
+  const updateTheme = async (newTheme) => {
     // Don't start a new animation if one is already in progress
     if (isWaveAnimating) {
       return;
@@ -101,17 +100,16 @@ export const ThemeProvider = ({ children }) => {
     }
 
     // Only animate if the color scheme is actually changing
-    if (futureColorScheme !== colorScheme && origin) {
-      // Start wave animation with the future theme colors
+    if (futureColorScheme !== colorScheme) {
+      // Start fade animation with the future theme colors
       setNextColorScheme(futureColorScheme);
-      setWaveOrigin(origin);
       setIsWaveAnimating(true);
 
-      // Wait for animation to cover screen before switching theme
+      // Switch theme at peak of fade (halfway through the animation)
       setTimeout(() => {
         setTheme(newTheme);
         setPreference(PREF_KEYS.THEME, newTheme);
-      }, 300); // Switch theme halfway through the animation
+      }, 250); // Switch theme at peak opacity
     } else {
       // No animation needed, just switch theme
       setTheme(newTheme);
@@ -121,7 +119,6 @@ export const ThemeProvider = ({ children }) => {
 
   const onWaveComplete = () => {
     setIsWaveAnimating(false);
-    setWaveOrigin(null);
     setNextColorScheme(null);
   };
 
@@ -136,7 +133,6 @@ export const ThemeProvider = ({ children }) => {
         colors,
         setTheme: updateTheme,
         isWaveAnimating,
-        waveOrigin,
         waveColor,
         onWaveComplete,
       }}
