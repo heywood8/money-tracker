@@ -40,12 +40,6 @@ export default function ThemeWaveTransition({ isAnimating, color, origin, onComp
     return null;
   }
 
-  // Calculate the animated scale based on MAX_RADIUS
-  const scale = scaleAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, MAX_RADIUS * 2], // Scale from 0 to full coverage
-  });
-
   // Default origin to center if not provided
   const animOrigin = origin || { x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT / 2 };
 
@@ -57,17 +51,15 @@ export default function ThemeWaveTransition({ isAnimating, color, origin, onComp
           {
             backgroundColor: color,
             opacity: opacityAnim,
+            width: MAX_RADIUS * 2,
+            height: MAX_RADIUS * 2,
+            borderRadius: MAX_RADIUS,
             left: animOrigin.x,
             top: animOrigin.y,
-            width: scale,
-            height: scale,
-            borderRadius: scaleAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, MAX_RADIUS],
-            }),
             transform: [
               { translateX: -MAX_RADIUS },
               { translateY: -MAX_RADIUS },
+              { scale: scaleAnim },
             ],
           },
         ]}
