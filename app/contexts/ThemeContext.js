@@ -87,6 +87,11 @@ export const ThemeProvider = ({ children }) => {
   }, [theme, osColorScheme]);
 
   const updateTheme = async (newTheme, origin = null) => {
+    // Don't start a new animation if one is already in progress
+    if (isWaveAnimating) {
+      return;
+    }
+
     // Calculate what the next color scheme will be
     let futureColorScheme;
     if (newTheme === 'system') {
