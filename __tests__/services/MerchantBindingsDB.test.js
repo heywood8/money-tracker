@@ -5,7 +5,6 @@
 
 import * as MerchantBindingsDB from '../../app/services/MerchantBindingsDB';
 import * as db from '../../app/services/db';
-import { eq, desc } from 'drizzle-orm';
 
 // Mock the database module
 jest.mock('../../app/services/db');

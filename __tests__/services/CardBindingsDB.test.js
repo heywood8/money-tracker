@@ -5,7 +5,6 @@
 
 import * as CardBindingsDB from '../../app/services/CardBindingsDB';
 import * as db from '../../app/services/db';
-import { eq, desc } from 'drizzle-orm';
 
 // Mock the database module
 jest.mock('../../app/services/db');
