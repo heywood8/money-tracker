@@ -112,3 +112,34 @@ export const accountsBalanceHistory = sqliteTable('accounts_balance_history', {
   dateIdx: index('idx_balance_history_date').on(table.date),
   uniqueAccountDate: unique().on(table.accountId, table.date),
 }));
+
+/**
+ * Card Bindings table
+ * Maps masked card numbers to accounts for notification processing
+ */
+export const cardBindings = sqliteTable('card_bindings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  cardMask: text('card_mask').notNull().unique(),
+  accountId: integer('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  bankName: text('bank_name'),
+  lastUsed: text('last_used').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  cardMaskIdx: index('idx_card_bindings_card_mask').on(table.cardMask),
+  accountIdx: index('idx_card_bindings_account').on(table.accountId),
+}));
+
+/**
+ * Merchant Bindings table
+ * Maps merchant/purchase source names to categories for notification processing
+ */
+export const merchantBindings = sqliteTable('merchant_bindings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  merchantName: text('merchant_name').notNull().unique(),
+  categoryId: text('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
+  lastUsed: text('last_used').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  merchantNameIdx: index('idx_merchant_bindings_merchant_name').on(table.merchantName),
+  categoryIdx: index('idx_merchant_bindings_category').on(table.categoryId),
+}));
