@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.0](https://github.com/heywood8/money-tracker/compare/penny-v0.16.2...penny-v0.17.0) (2025-12-17)
+
+
+### Features
+
+* add scroll-to-top button on operations page ([#125](https://github.com/heywood8/money-tracker/issues/125)) ([aa298c8](https://github.com/heywood8/money-tracker/commit/aa298c842d954087ecc47aa7317353c8d2332322))
+
+
+### Bug Fixes
+
+* add italian language ([3b772a3](https://github.com/heywood8/money-tracker/commit/3b772a338e2f62e6c55df4554587bb90ab44ddda))
+* languages in their native notations + flags ([441009a](https://github.com/heywood8/money-tracker/commit/441009a31b557a47317f98023e08df40fd6e6f21))
+* some lints ([edde32e](https://github.com/heywood8/money-tracker/commit/edde32ebbd643489b1b9b18c8341d99cb70bf557))
+
 ## [0.16.2](https://github.com/heywood8/money-tracker/compare/penny-v0.16.1...penny-v0.16.2) (2025-12-16)
 
 
