@@ -351,7 +351,12 @@
     "folder": "Folder",
     "subfolder": "Subfolder",
     "entry": "Entry",
-    "expense": "Expense"
+    "expense": "Expense",
+    "select_account_for_card": "Select Account for Card",
+    "select_category_for_merchant": "Select Category for Merchant",
+    "no_accounts_available": "No accounts available",
+    "no_categories_available": "No categories available",
+    "no_categories_in_folder": "No categories in this folder"
   },
   "ru": {
     "accounts": "Счета",
@@ -645,7 +650,12 @@
     "burndown": "Среднее",
     "no_balance_history": "Нет истории баланса за этот месяц",
     "balance_history_details": "Детали истории баланса",
-    "actions": "Действия"
+    "actions": "Действия",
+    "select_account_for_card": "Выбрать счет для карты",
+    "select_category_for_merchant": "Выбрать категорию для продавца",
+    "no_accounts_available": "Нет доступных счетов",
+    "no_categories_available": "Нет доступных категорий",
+    "no_categories_in_folder": "Нет категорий в этой папке"
   },
   "es": {
     "accounts": "Cuentas",
