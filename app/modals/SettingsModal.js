@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   languageItem: {
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
   },
   languageItemContent: {
     alignItems: 'center',
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 16,
   },
   languageModalTitle: {
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   languageText: {

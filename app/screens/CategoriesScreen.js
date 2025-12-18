@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 8,
   },
   sectionMarginTop: {
