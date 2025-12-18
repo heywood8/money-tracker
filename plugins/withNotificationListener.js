@@ -10,7 +10,7 @@
  * 3. Registers the module in the app
  */
 
-const { withAndroidManifest, withMainApplication } = require('@expo/config-plugins');
+const { withAndroidManifest, withMainApplication, withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -92,9 +92,10 @@ function withNotificationListenerPackage(config) {
  * Copy Java source files to android/app/src/main/java
  */
 function withNotificationListenerJavaFiles(config) {
-  return withAndroidManifest(config, async (config) => {
-    const projectRoot = config.modRequest?.projectRoot;
-    if (!projectRoot) return config;
+  return withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const projectRoot = config.modRequest.projectRoot;
 
     const androidDir = path.join(projectRoot, 'android', 'app', 'src', 'main', 'java', 'com', 'heywood8', 'monkeep');
 
@@ -260,7 +261,8 @@ public class NotificationListenerPackage implements ReactPackage {
     console.log('✅ Created Java source files for NotificationListener');
 
     return config;
-  });
+    },
+  ]);
 }
 
 module.exports = (config) => {
