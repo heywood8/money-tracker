@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Text } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import ErrorBoundary from '../../app/components/ErrorBoundary';
@@ -14,6 +15,11 @@ const ThrowError = ({ shouldThrow, message = 'Test error' }) => {
     throw new Error(message);
   }
   return <Text>Normal content</Text>;
+};
+
+ThrowError.propTypes = {
+  shouldThrow: PropTypes.bool,
+  message: PropTypes.string,
 };
 
 describe('ErrorBoundary', () => {
