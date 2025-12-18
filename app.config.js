@@ -56,6 +56,9 @@ module.exports = {
         },
       ],
       './plugins/withR8Config.js',
+      // Custom notification listener plugin (React 19 compatible)
+      // This replaces react-native-notification-listener which requires React 18
+      './plugins/withNotificationListener.js',
     ],
     updates: {
       "url": "https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406"

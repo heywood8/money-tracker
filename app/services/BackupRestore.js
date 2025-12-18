@@ -22,13 +22,15 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, cardBindings, merchantBindings] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
       queryAll('SELECT * FROM budgets ORDER BY created_at ASC'),
       queryAll('SELECT * FROM app_metadata'),
       queryAll('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
+      queryAll('SELECT * FROM card_bindings ORDER BY created_at ASC'),
+      queryAll('SELECT * FROM merchant_bindings ORDER BY created_at ASC'),
     ]);
 
     // Create backup object
@@ -43,6 +45,8 @@ export const createBackup = async () => {
         budgets: budgets || [],
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
+        card_bindings: cardBindings || [],
+        merchant_bindings: merchantBindings || [],
       },
     };
 
@@ -52,6 +56,8 @@ export const createBackup = async () => {
       operations: backup.data.operations.length,
       budgets: backup.data.budgets.length,
       balance_history: backup.data.balance_history.length,
+      card_bindings: backup.data.card_bindings.length,
+      merchant_bindings: backup.data.merchant_bindings.length,
     });
 
     return backup;
@@ -112,6 +118,8 @@ export const exportBackupCSV = async () => {
       'budgets.csv': convertToCSV(backup.data.budgets),
       'app_metadata.csv': convertToCSV(backup.data.app_metadata),
       'balance_history.csv': convertToCSV(backup.data.balance_history),
+      'card_bindings.csv': convertToCSV(backup.data.card_bindings),
+      'merchant_bindings.csv': convertToCSV(backup.data.merchant_bindings),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -125,7 +133,9 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
     combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
     combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n\n`;
-    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n`;
+    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n\n`;
+    combinedCSV += `[CARD_BINDINGS]\n${csvFiles['card_bindings.csv']}\n\n`;
+    combinedCSV += `[MERCHANT_BINDINGS]\n${csvFiles['merchant_bindings.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -310,13 +320,15 @@ export const restoreBackup = async (backup) => {
       // Clear existing data (in reverse order due to foreign keys)
       await db.runAsync('DELETE FROM budgets');
       await db.runAsync('DELETE FROM accounts_balance_history');
+      await db.runAsync('DELETE FROM merchant_bindings');
+      await db.runAsync('DELETE FROM card_bindings');
       await db.runAsync('DELETE FROM operations');
       await db.runAsync('DELETE FROM categories');
       await db.runAsync('DELETE FROM accounts');
       await db.runAsync('DELETE FROM app_metadata WHERE key != ?', ['db_version']);
 
       // Reset auto-increment counters to allow ID preservation
-      await db.runAsync('DELETE FROM sqlite_sequence WHERE name IN (?, ?)', ['accounts', 'operations']);
+      await db.runAsync('DELETE FROM sqlite_sequence WHERE name IN (?, ?, ?, ?)', ['accounts', 'operations', 'card_bindings', 'merchant_bindings']);
 
       console.log('Existing data cleared and auto-increment counters reset');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
@@ -567,6 +579,76 @@ export const restoreBackup = async (backup) => {
         });
       }
 
+      // Restore card bindings
+      if (backup.data.card_bindings) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'card_bindings',
+          status: 'in_progress',
+          data: backup.data.card_bindings.length,
+        });
+
+        for (const binding of backup.data.card_bindings) {
+          const mappedAccountId = accountIdMapping.get(binding.account_id) ?? binding.account_id;
+
+          await db.runAsync(
+            'INSERT INTO card_bindings (card_mask, account_id, bank_name, last_used, created_at) VALUES (?, ?, ?, ?, ?)',
+            [binding.card_mask, mappedAccountId, binding.bank_name || null, binding.last_used, binding.created_at],
+          );
+        }
+
+        console.log(`Restored ${backup.data.card_bindings.length} card bindings`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'card_bindings',
+          status: 'completed',
+          data: backup.data.card_bindings.length,
+        });
+      } else {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'card_bindings',
+          status: 'in_progress',
+          data: 0,
+        });
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'card_bindings',
+          status: 'completed',
+          data: 0,
+        });
+      }
+
+      // Restore merchant bindings
+      if (backup.data.merchant_bindings) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'merchant_bindings',
+          status: 'in_progress',
+          data: backup.data.merchant_bindings.length,
+        });
+
+        for (const binding of backup.data.merchant_bindings) {
+          await db.runAsync(
+            'INSERT INTO merchant_bindings (merchant_name, category_id, last_used, created_at) VALUES (?, ?, ?, ?)',
+            [binding.merchant_name, binding.category_id, binding.last_used, binding.created_at],
+          );
+        }
+
+        console.log(`Restored ${backup.data.merchant_bindings.length} merchant bindings`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'merchant_bindings',
+          status: 'completed',
+          data: backup.data.merchant_bindings.length,
+        });
+      } else {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'merchant_bindings',
+          status: 'in_progress',
+          data: 0,
+        });
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'merchant_bindings',
+          status: 'completed',
+          data: 0,
+        });
+      }
+
       // Restore app metadata (except db_version)
       if (backup.data.app_metadata) {
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -744,6 +826,8 @@ const importBackupCSV = async (fileUri) => {
     budgets: [],
     app_metadata: [],
     balance_history: [],
+    card_bindings: [],
+    merchant_bindings: [],
   };
 
   // Split by section markers
@@ -753,6 +837,8 @@ const importBackupCSV = async (fileUri) => {
   const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[|$)/);
   const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
   const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[|$)/);
+  const cardBindingsMatch = fileContent.match(/\[CARD_BINDINGS\]\n([\s\S]*?)(?=\n\[|$)/);
+  const merchantBindingsMatch = fileContent.match(/\[MERCHANT_BINDINGS\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -760,6 +846,8 @@ const importBackupCSV = async (fileUri) => {
   if (budgetsMatch) sections.budgets = parseCSV(budgetsMatch[1]);
   if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
   if (balanceHistoryMatch) sections.balance_history = parseCSV(balanceHistoryMatch[1]);
+  if (cardBindingsMatch) sections.card_bindings = parseCSV(cardBindingsMatch[1]);
+  if (merchantBindingsMatch) sections.merchant_bindings = parseCSV(merchantBindingsMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -851,13 +939,23 @@ const importBackupSQLite = async (fileUri) => {
 
     // Extract all data from the migrated database
     console.log('Extracting data from imported database...');
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory] = await Promise.all([
+
+    // Check if new tables exist before querying them
+    const tableNames = await tempDb.getAllAsync(
+      'SELECT name FROM sqlite_master WHERE type="table" AND name IN ("card_bindings", "merchant_bindings")'
+    );
+    const hasCardBindings = tableNames.some(t => t.name === 'card_bindings');
+    const hasMerchantBindings = tableNames.some(t => t.name === 'merchant_bindings');
+
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, cardBindings, merchantBindings] = await Promise.all([
       tempDb.getAllAsync('SELECT * FROM accounts ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM categories ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM operations ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM budgets ORDER BY created_at ASC'),
       tempDb.getAllAsync('SELECT * FROM app_metadata'),
       tempDb.getAllAsync('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
+      hasCardBindings ? tempDb.getAllAsync('SELECT * FROM card_bindings ORDER BY created_at ASC') : Promise.resolve([]),
+      hasMerchantBindings ? tempDb.getAllAsync('SELECT * FROM merchant_bindings ORDER BY created_at ASC') : Promise.resolve([]),
     ]);
 
     // Create backup object
@@ -872,6 +970,8 @@ const importBackupSQLite = async (fileUri) => {
         budgets: budgets || [],
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
+        card_bindings: cardBindings || [],
+        merchant_bindings: merchantBindings || [],
       },
     };
 
@@ -880,6 +980,8 @@ const importBackupSQLite = async (fileUri) => {
       categories: backup.data.categories.length,
       operations: backup.data.operations.length,
       budgets: backup.data.budgets.length,
+      card_bindings: backup.data.card_bindings.length,
+      merchant_bindings: backup.data.merchant_bindings.length,
     });
 
     // Close the temp database

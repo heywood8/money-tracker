@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
-import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
+import { Portal, Modal, Text, Button, Divider, TouchableRipple, Switch } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useTheme } from '../contexts/ThemeContext';
@@ -9,6 +9,8 @@ import { useDialog } from '../contexts/DialogContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup } from '../services/BackupRestore';
+import { useNotificationPermission } from '../hooks/useNotificationPermission';
+import BindingsScreen from '../screens/BindingsScreen';
 
 
 export default function SettingsModal({ visible, onClose }) {
@@ -17,9 +19,11 @@ export default function SettingsModal({ visible, onClose }) {
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccounts();
   const { startImport, cancelImport, completeImport } = useImportProgress();
+  const { hasPermission, requestPermission, openSystemSettings } = useNotificationPermission();
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
+  const [bindingsScreenVisible, setBindingsScreenVisible] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -296,6 +300,51 @@ export default function SettingsModal({ visible, onClose }) {
             </Button>
           </View>
 
+          <Divider style={styles.divider} />
+
+          <Text variant="titleMedium" style={styles.subtitle}>{t('notification_listener') || 'Notification Listener'}</Text>
+
+          <TouchableRipple
+            onPress={() => setBindingsScreenVisible(true)}
+            style={[styles.settingItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <View style={styles.settingContent}>
+              <Ionicons name="link-outline" size={20} color={colors.text} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>
+                {t('manage_bindings') || 'Manage Bindings'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple
+            onPress={() => {
+              if (hasPermission) {
+                openSystemSettings();
+              } else {
+                requestPermission();
+              }
+            }}
+            style={[styles.settingItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <View style={styles.settingContent}>
+              <Ionicons
+                name={hasPermission ? "notifications" : "notifications-off"}
+                size={20}
+                color={hasPermission ? colors.primary : colors.mutedText}
+              />
+              <View style={styles.settingLabelContainer}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  {t('notification_permission') || 'Notification Permission'}
+                </Text>
+                <Text style={[styles.settingSubtext, { color: colors.mutedText }]}>
+                  {hasPermission ? (t('permission_granted') || 'Granted') : (t('permission_required') || 'Required for auto-import')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
           <View style={styles.modalButtonRow}>
             <Button
               mode="outlined"
@@ -445,6 +494,17 @@ export default function SettingsModal({ visible, onClose }) {
           </View>
         </Animated.View>
       </Modal>
+
+      {/* Bindings Screen as full-screen modal */}
+      {bindingsScreenVisible && (
+        <Modal
+          visible={bindingsScreenVisible}
+          onDismiss={() => setBindingsScreenVisible(false)}
+          contentContainerStyle={{ flex: 1 }}
+        >
+          <BindingsScreen onClose={() => setBindingsScreenVisible(false)} />
+        </Modal>
+      )}
     </Portal>
   );
 }
@@ -551,6 +611,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     marginTop: 8,
+  },
+  settingContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  settingItem: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  settingLabelContainer: {
+    flex: 1,
+  },
+  settingSubtext: {
+    fontSize: 12,
+    marginTop: 2,
   },
   subtitle: {
     marginBottom: 8,
