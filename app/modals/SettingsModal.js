@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -234,7 +235,7 @@ export default function SettingsModal({ visible, onClose }) {
       <Modal
         visible={visible}
         onDismiss={exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)}
-        contentContainerStyle={[styles.modalWrapper, { backgroundColor: 'transparent' }]}
+        contentContainerStyle={[styles.modalWrapper, styles.modalWrapperTransparent]}
       >
         <Animated.View style={[
           styles.content,
@@ -300,7 +301,7 @@ export default function SettingsModal({ visible, onClose }) {
             <Button
               mode="outlined"
               onPress={onClose}
-              style={[styles.modalButton, { borderColor: '#999' }]}
+              style={[styles.modalButton, styles.modalButtonCancel]}
               textColor="#888"
             >
               {t('cancel') || 'Cancel'}
@@ -388,7 +389,7 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.languageItem}
             >
               <View style={styles.languageItemContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.formatItemRow}>
                   <Ionicons name="code-outline" size={24} color={colors.text} />
                   <View>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
@@ -408,7 +409,7 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.languageItem}
             >
               <View style={styles.languageItemContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.formatItemRow}>
                   <Ionicons name="document-text-outline" size={24} color={colors.text} />
                   <View>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
@@ -428,7 +429,7 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.languageItem}
             >
               <View style={styles.languageItemContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.formatItemRow}>
                   <Ionicons name="server-outline" size={24} color={colors.text} />
                   <View>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
@@ -477,6 +478,11 @@ const styles = StyleSheet.create({
   formatDescription: {
     fontSize: 12,
     marginTop: 4,
+  },
+  formatItemRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
   },
   hidden: {
     opacity: 0,
@@ -534,6 +540,9 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
   },
+  modalButtonCancel: {
+    borderColor: '#999',
+  },
   modalButtonRow: {
     flexDirection: 'row',
     gap: 8,
@@ -543,6 +552,9 @@ const styles = StyleSheet.create({
   modalWrapper: {
     flex: 1,
     justifyContent: 'center',
+  },
+  modalWrapperTransparent: {
+    backgroundColor: 'transparent',
   },
   resetButton: {
     maxWidth: 300,
@@ -561,3 +573,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+SettingsModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
