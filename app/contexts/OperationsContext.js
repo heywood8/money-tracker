@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { AppState } from 'react-native';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccounts } from './AccountsContext';
@@ -401,4 +402,8 @@ export const OperationsProvider = ({ children }) => {
       {children}
     </OperationsContext.Provider>
   );
+};
+
+OperationsProvider.propTypes = {
+  children: PropTypes.node,
 };

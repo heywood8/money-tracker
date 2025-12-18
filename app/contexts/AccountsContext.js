@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import currencies from '../../assets/currencies.json';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
@@ -335,6 +336,10 @@ export const AccountsProvider = ({ children }) => {
       {children}
     </AccountsContext.Provider>
   );
+};
+
+AccountsProvider.propTypes = {
+  children: PropTypes.node,
 };
 
 export const useAccounts = () => useContext(AccountsContext);
