@@ -244,6 +244,15 @@ class NotificationListenerService {
   isActive() {
     return this.isListening;
   }
+
+  /**
+   * Open Android system settings for notification listener access
+   * Convenience method that does the same as requestPermission
+   * @returns {Promise<boolean>}
+   */
+  async openSystemSettings() {
+    return await this.requestPermission();
+  }
 }
 
 // Export singleton instance
