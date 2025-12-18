@@ -6,6 +6,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccounts } from '../contexts/AccountsContext';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
@@ -1692,7 +1693,7 @@ const styles = StyleSheet.create({
   balanceTableHeader: {
     borderBottomWidth: 2,
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   balanceTableHeaderText: {
@@ -1714,7 +1715,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   burndownDatasetColor: {
@@ -1730,7 +1731,7 @@ const styles = StyleSheet.create({
     gap: 20,
     justifyContent: 'center',
     marginTop: 0,
-    paddingHorizontal: 50,
+    paddingHorizontal: HORIZONTAL_PADDING * 3,
   },
   burndownLegendDot: {
     borderRadius: 6,
@@ -1767,7 +1768,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    padding: HORIZONTAL_PADDING,
+    paddingTop: TOP_CONTENT_SPACING,
   },
   deleteActionButtonBackground: {
     backgroundColor: '#f44336',
@@ -1873,12 +1875,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 40,
     marginBottom: 8,
-    marginHorizontal: 20,
+    marginHorizontal: HORIZONTAL_PADDING + 4,
     marginTop: 16,
     overflow: 'hidden',
   },
   modalScrollView: {
-    padding: 20,
+    padding: HORIZONTAL_PADDING,
   },
   modalTitle: {
     fontSize: 20,

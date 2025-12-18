@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
+import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
@@ -130,7 +131,7 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'flex-end',
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   buttonContainer: {
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 8,
     maxWidth: 400,
-    padding: 24,
+    padding: HORIZONTAL_PADDING + 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

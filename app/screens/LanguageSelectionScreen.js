@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import i18nData from '../../assets/i18n.json';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 
 const LanguageSelectionScreen = ({ onLanguageSelected }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(null);
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: TOP_CONTENT_SPACING,
   },
   continueButton: {
     alignItems: 'center',

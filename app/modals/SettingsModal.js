@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
+import { HORIZONTAL_PADDING } from '../styles/layout';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -478,6 +479,7 @@ const styles = StyleSheet.create({
   formatDescription: {
     fontSize: 12,
     marginTop: 4,
+    padding: HORIZONTAL_PADDING + 8,
   },
   formatItemRow: {
     alignItems: 'center',
@@ -490,7 +492,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   languageItem: {
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
   },
   languageItemContent: {
     alignItems: 'center',
@@ -514,7 +516,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 16,
   },
   languageModalTitle: {
@@ -531,7 +533,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   languageText: {

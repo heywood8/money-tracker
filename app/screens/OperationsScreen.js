@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useOperations } from '../contexts/OperationsContext';
@@ -1023,7 +1024,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     marginBottom: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: HORIZONTAL_PADDING / 2,
     paddingVertical: 12,
   },
   breadcrumbText: {
@@ -1075,7 +1076,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   dateSeparatorContent: {
@@ -1109,7 +1110,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    paddingTop: 100,
+    paddingTop: TOP_CONTENT_SPACING,
   },
   emptyList: {
     flex: 1,
@@ -1201,7 +1202,7 @@ const styles = StyleSheet.create({
   operationContent: {
     alignItems: 'center',
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   operationInfo: {
@@ -1220,7 +1221,7 @@ const styles = StyleSheet.create({
   pickerModalContent: {
     borderRadius: 12,
     maxHeight: '70%',
-    padding: 12,
+    padding: HORIZONTAL_PADDING,
     width: '90%',
   },
   pickerOption: {
@@ -1257,9 +1258,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 8,
-    marginHorizontal: 16,
+    marginHorizontal: HORIZONTAL_PADDING,
     marginTop: 12,
-    padding: 16,
+    padding: HORIZONTAL_PADDING,
   },
   
   resetFilterButton: {
