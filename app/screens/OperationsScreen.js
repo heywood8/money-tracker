@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
+import PropTypes from 'prop-types';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard, ScrollView } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,6 +27,8 @@ const getCurrencySymbol = (currencyCode) => {
   return currency ? currency.symbol : currencyCode;
 };
 
+// Note: dynamic createStyles removed to keep linting stable.
+
 // Separate memoized component for the quick add form
 const QuickAddForm = memo(({
   colors,
@@ -41,6 +44,8 @@ const QuickAddForm = memo(({
   handleQuickAdd,
   TYPES,
 }) => {
+  
+
   return (
     <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Type Selector */}
@@ -67,10 +72,7 @@ const QuickAddForm = memo(({
               size={18}
               color={quickAddValues.type === type.key ? '#fff' : colors.text}
             />
-            <Text style={[
-              styles.typeButtonText,
-              { color: quickAddValues.type === type.key ? '#fff' : colors.text },
-            ]}>
+            <Text style={quickAddValues.type === type.key ? [styles.typeButtonText, { color: '#fff' }] : [styles.typeButtonText, { color: colors.text }]}>
               {type.label}
             </Text>
           </TouchableOpacity>
@@ -86,7 +88,7 @@ const QuickAddForm = memo(({
             onPress={() => openPicker('account', visibleAccounts)}
           >
             <Icon name="wallet" size={18} color={colors.mutedText} />
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
                 {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
               </Text>
@@ -105,7 +107,7 @@ const QuickAddForm = memo(({
             onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
           >
             <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
                 {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
               </Text>
@@ -125,12 +127,12 @@ const QuickAddForm = memo(({
           onPress={() => openPicker('account', visibleAccounts)}
         >
           <Icon name="wallet" size={18} color={colors.mutedText} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.formInputText, { color: colors.text }]}>
+          <View style={styles.flex1}>
+            <Text style={[styles.formInputText, { color: colors.text }]}> 
               {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
             </Text>
             {quickAddValues.accountId && (
-              <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
+              <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}> 
                 {getAccountBalance(quickAddValues.accountId)}
               </Text>
             )}
@@ -155,7 +157,7 @@ const QuickAddForm = memo(({
             onPress={() => openPicker('category', filteredCategories)}
           >
             <Icon name="tag" size={18} color={colors.mutedText} />
-            <Text style={[styles.formInputText, { color: colors.text }]}>
+            <Text style={[styles.formInputText, { color: colors.text }]}> 
               {getCategoryName(quickAddValues.categoryId)}
             </Text>
             <Icon name="chevron-down" size={18} color={colors.mutedText} />
@@ -184,8 +186,24 @@ const QuickAddForm = memo(({
 
 QuickAddForm.displayName = 'QuickAddForm';
 
+QuickAddForm.propTypes = {
+  colors: PropTypes.object.isRequired,
+  t: PropTypes.func.isRequired,
+  quickAddValues: PropTypes.object.isRequired,
+  setQuickAddValues: PropTypes.func.isRequired,
+  accounts: PropTypes.array,
+  filteredCategories: PropTypes.array,
+  getAccountName: PropTypes.func.isRequired,
+  getAccountBalance: PropTypes.func.isRequired,
+  getCategoryName: PropTypes.func.isRequired,
+  openPicker: PropTypes.func.isRequired,
+  handleQuickAdd: PropTypes.func.isRequired,
+  TYPES: PropTypes.array.isRequired,
+};
+
 const OperationsScreen = () => {
   const { colors } = useTheme();
+  
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const {
@@ -603,7 +621,7 @@ const OperationsScreen = () => {
     return (
       <View style={styles.loadingMoreContainer}>
         <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={[styles.loadingMoreText, { color: colors.mutedText }]}>
+        <Text style={[styles.loadingMoreText, { color: colors.mutedText }]}> 
           {t('loading_more')}
         </Text>
       </View>
@@ -619,11 +637,11 @@ const OperationsScreen = () => {
         <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
           <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
           <View style={styles.dateSeparatorContent}>
-            <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
+            <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}> 
               {formatDate(item.date)}
             </Text>
             {hasSpending && (
-              <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}>
+              <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}> 
                 {t('spent_amount')}: {Object.entries(item.spendingSums)
                   .map(([currency, amount]) => {
                     const symbol = getCurrencySymbol(currency);
@@ -744,7 +762,7 @@ const OperationsScreen = () => {
                 → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
               </Text>
             )}
-            <Text style={[styles.date, { color: colors.mutedText }]}>
+            <Text style={[styles.date, { color: colors.mutedText }]}> 
               {formatDate(operation.date)}
             </Text>
           </View>
@@ -757,7 +775,7 @@ const OperationsScreen = () => {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+        <Text style={[styles.loadingText, { color: colors.mutedText }]}> 
           {t('loading_operations')}
         </Text>
       </View>
@@ -778,7 +796,7 @@ const OperationsScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            <Text style={[styles.emptyText, { color: colors.mutedText }]}> 
               {t('no_operations')}
             </Text>
           </View>
@@ -838,8 +856,8 @@ const OperationsScreen = () => {
                       ]}
                     >
                       <View style={styles.accountOption}>
-                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>
+                        <Text style={styles.pickerOptionText}>{item.name}</Text>
+                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}>
                           {getCurrencySymbol(item.currency)}{item.balance}
                         </Text>
                       </View>
@@ -880,7 +898,7 @@ const OperationsScreen = () => {
                     >
                       <View style={styles.categoryOption}>
                         <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
+                        <Text style={[styles.pickerOptionText, styles.pickerOptionTextExpanded, { color: colors.text }]}> 
                           {item.nameKey ? t(item.nameKey) : item.name}
                         </Text>
                         {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
@@ -891,7 +909,7 @@ const OperationsScreen = () => {
                 return null;
               }}
               ListEmptyComponent={
-                <Text style={{ color: colors.mutedText, textAlign: 'center', padding: 20 }}>
+                <Text style={[styles.centeredPaddedText, { color: colors.mutedText }]}>                  
                   {pickerState.type === 'category' ? t('no_categories') : t('no_accounts')}
                 </Text>
               }
@@ -991,14 +1009,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  addButton: {
-    // backgroundColor set dynamically from colors.primary
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   amount: {
     fontSize: 18,
     fontWeight: '700',
@@ -1021,18 +1031,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  cancelButton: {
-    borderWidth: 1,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   categoryAddRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
   },
+  
+
   categoryName: {
     fontSize: 16,
     fontWeight: '600',
@@ -1041,6 +1046,10 @@ const styles = StyleSheet.create({
   categoryOption: {
     alignItems: 'center',
     flexDirection: 'row',
+  },
+  centeredPaddedText: {
+    padding: 20,
+    textAlign: 'center',
   },
   closeButton: {
     alignItems: 'center',
@@ -1094,12 +1103,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 2,
   },
-  disabledButton: {
-    opacity: 0.4,
-  },
-  disabledButtonText: {
-    opacity: 0.6,
-  },
+  
+  
   emptyContainer: {
     alignItems: 'center',
     flex: 1,
@@ -1122,6 +1127,9 @@ const styles = StyleSheet.create({
     margin: 16,
     position: 'absolute',
     right: 0,
+  },
+  flex1: {
+    flex: 1,
   },
   formInput: {
     alignItems: 'center',
@@ -1153,15 +1161,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+
   formInputText: {
     flex: 1,
     fontSize: 15,
   },
-  formTextInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 0,
-  },
+  
   iconContainer: {
     alignItems: 'center',
     borderRadius: 24,
@@ -1211,20 +1216,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     minHeight: 72,
   },
-  pickerActionButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingVertical: 12,
-  },
-  pickerActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    paddingHorizontal: 8,
-  },
+  
   pickerModalContent: {
     borderRadius: 12,
     maxHeight: '70%',
@@ -1240,6 +1232,13 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: {
     fontSize: 18,
+  },
+  pickerOptionTextExpanded: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  pickerSmallText: {
+    fontSize: 14,
   },
   quickAddButton: {
     alignItems: 'center',
@@ -1262,11 +1261,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 16,
   },
-  quickAddTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
+  
   resetFilterButton: {
     alignItems: 'center',
     borderRadius: 20,

@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -90,7 +91,7 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
                       width: iconSize,
                       height: iconSize,
                     },
-                    selectedIcon === iconName && { backgroundColor: colors.primary, opacity: 0.3 },
+                    selectedIcon === iconName && styles.selectedIconOverlay,
                   ]}
                   onPress={() => handleSelect(iconName)}
                   accessibilityLabel={iconName}
@@ -142,8 +143,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  selectedIconOverlay: {
+    opacity: 0.3,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
   },
 });
+
+IconPicker.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  selectedIcon: PropTypes.string,
+};

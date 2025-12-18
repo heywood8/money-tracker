@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -423,10 +424,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         transparent={true}
         onRequestClose={handleClose}
       >
-        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <SafeAreaView style={styles.fullFlex} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
             behavior="height"
-            style={{ flex: 1 }}
+            style={styles.fullFlex}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
               <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
@@ -794,7 +795,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     >
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>
+                        <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}> 
                           {getCurrencySymbol(item.currency)}{item.balance}
                         </Text>
                       </View>
@@ -876,7 +877,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     >
                       <View style={styles.categoryOption}>
                         <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, { color: colors.text, marginLeft: 12, flex: 1 }]}>
+                        <Text style={[styles.pickerOptionText, styles.categoryLabel, { color: colors.text }]}> 
                           {item.nameKey ? t(item.nameKey) : item.name}
                         </Text>
                         {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
@@ -887,7 +888,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                 return null;
               }}
               ListEmptyComponent={
-                <Text style={{ color: colors.mutedText, textAlign: 'center', padding: 20 }}>
+                <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}> 
                   {pickerState.type === 'category' ? t('no_categories') : t('no_accounts')}
                 </Text>
               }
@@ -931,6 +932,10 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  categoryLabel: {
+    flex: 1,
+    marginLeft: 12,
   },
   categoryOption: {
     alignItems: 'center',
@@ -991,6 +996,9 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 12,
     marginBottom: 8,
+  },
+  fullFlex: {
+    flex: 1,
   },
   input: {
     borderRadius: 4,
@@ -1065,6 +1073,10 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: 16,
   },
+  pickerEmptyText: {
+    padding: 20,
+    textAlign: 'center',
+  },
   pickerModalContent: {
     borderRadius: 12,
     maxHeight: '70%',
@@ -1082,6 +1094,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
+  },
+  pickerOptionCurrency: {
+    fontSize: 14,
   },
   pickerOptionText: {
     fontSize: 18,
@@ -1107,3 +1122,30 @@ const styles = StyleSheet.create({
     padding: 12,
   },
 });
+
+OperationModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  operation: PropTypes.shape({
+    id: PropTypes.string,
+    type: PropTypes.string,
+    amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    accountId: PropTypes.string,
+    categoryId: PropTypes.string,
+    description: PropTypes.string,
+    date: PropTypes.string,
+    toAccountId: PropTypes.string,
+    exchangeRate: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    destinationAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }),
+  isNew: PropTypes.bool,
+  onDelete: PropTypes.func,
+};
+
+OperationModal.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  operation: null,
+  isNew: false,
+  onDelete: null,
+};

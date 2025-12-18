@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -222,3 +223,7 @@ const styles = StyleSheet.create({
 });
 
 export default LanguageSelectionScreen;
+
+LanguageSelectionScreen.propTypes = {
+  onLanguageSelected: PropTypes.func.isRequired,
+};

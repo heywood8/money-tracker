@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import * as BudgetsDB from '../services/BudgetsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -324,4 +325,8 @@ export const BudgetsProvider = ({ children }) => {
       {children}
     </BudgetsContext.Provider>
   );
+};
+
+BudgetsProvider.propTypes = {
+  children: PropTypes.node,
 };

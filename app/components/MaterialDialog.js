@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -99,6 +100,28 @@ export default function MaterialDialog({
     </Modal>
   );
 }
+
+MaterialDialog.propTypes = {
+  visible: PropTypes.bool,
+  title: PropTypes.string,
+  message: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  buttons: PropTypes.arrayOf(
+    PropTypes.shape({
+      text: PropTypes.oneOfType([PropTypes.string, PropTypes.node]).isRequired,
+      onPress: PropTypes.func,
+      style: PropTypes.oneOf(['default', 'cancel', 'destructive']),
+    }),
+  ),
+  onDismiss: PropTypes.func,
+};
+
+MaterialDialog.defaultProps = {
+  visible: false,
+  title: undefined,
+  message: undefined,
+  buttons: [],
+  onDismiss: undefined,
+};
 
 const styles = StyleSheet.create({
   boldText: {

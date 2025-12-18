@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import defaultCategories from '../defaults/defaultCategories.json';
 import * as CategoriesDB from '../services/CategoriesDB';
@@ -239,4 +240,8 @@ export const CategoriesProvider = ({ children }) => {
       {children}
     </CategoriesContext.Provider>
   );
+};
+
+CategoriesProvider.propTypes = {
+  children: PropTypes.node,
 };

@@ -105,7 +105,7 @@ const CategoriesScreen = () => {
     const budget = hasBudget ? getBudgetForCategory(category.id) : null;
 
     return (
-      <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      <View style={[styles.itemBorder, { borderBottomColor: colors.border }]}> 
         <TouchableOpacity
           style={[
             styles.categoryRow,
@@ -187,7 +187,7 @@ const CategoriesScreen = () => {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" />
-        <Text variant="bodyLarge" style={{ marginTop: 12, color: colors.mutedText }}>
+        <Text variant="bodyLarge" style={[styles.sectionMarginTop, { color: colors.mutedText }]}> 
           {t('loading_categories') || 'Loading categories...'}
         </Text>
       </View>
@@ -287,6 +287,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
+  itemBorder: {
+    borderBottomWidth: 1,
+  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -295,6 +298,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  sectionMarginTop: {
+    marginTop: 12,
   },
 });
 

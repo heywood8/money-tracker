@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   Text,
@@ -12,6 +13,8 @@ import {
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatDate } from '../services/BalanceHistoryDB';
+
+const ICON_SELECTED_COLOR = '#fff';
 
 /**
  * FilterModal Component
@@ -337,9 +340,9 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
                       <Icon
                         name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
                         size={18}
-                        color={isSelected ? '#fff' : colors.text}
+                        color={isSelected ? ICON_SELECTED_COLOR : colors.text}
                       />
-                      <Text style={[styles.chipText, { color: isSelected ? '#fff' : colors.text }]}>
+                      <Text style={[styles.chipText, isSelected ? styles.chipTextSelected : { color: colors.text }]}> 
                         {t(type)}
                       </Text>
                     </TouchableOpacity>
@@ -475,7 +478,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
               style={[styles.actionButton, styles.applyButton, { backgroundColor: colors.primary }]}
               onPress={handleApply}
             >
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
+              <Text style={[styles.actionButtonText, styles.applyButtonText]}> 
                 {t('apply_filters')}
               </Text>
             </TouchableOpacity>
@@ -678,5 +681,53 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 });
+
+FilterModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  filters: PropTypes.shape({
+    types: PropTypes.array,
+    accountIds: PropTypes.array,
+    categoryIds: PropTypes.array,
+    searchText: PropTypes.string,
+    dateRange: PropTypes.object,
+    amountRange: PropTypes.object,
+  }),
+  onApplyFilters: PropTypes.func,
+  accounts: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.string, name: PropTypes.string })),
+  categories: PropTypes.arrayOf(PropTypes.object),
+  t: PropTypes.func,
+  colors: PropTypes.shape({
+    background: PropTypes.string,
+    surface: PropTypes.string,
+    card: PropTypes.string,
+    text: PropTypes.string,
+    mutedText: PropTypes.string,
+    border: PropTypes.string,
+    primary: PropTypes.string,
+    inputBackground: PropTypes.string,
+    inputBorder: PropTypes.string,
+  }),
+};
+
+FilterModal.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  filters: null,
+  onApplyFilters: () => {},
+  accounts: [],
+  categories: [],
+  t: (k) => k,
+  colors: {},
+};
+
+// Additional styles for inline color values
+styles.chipTextSelected = {
+  color: '#fff',
+};
+
+styles.applyButtonText = {
+  color: '#fff',
+};
 
 export default FilterModal;

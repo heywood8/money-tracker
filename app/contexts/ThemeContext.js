@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Appearance } from 'react-native';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 const ThemeContext = createContext();
@@ -95,6 +96,10 @@ export const ThemeProvider = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
+};
+
+ThemeProvider.propTypes = {
+  children: PropTypes.node,
 };
 
 export const useTheme = () => useContext(ThemeContext);
