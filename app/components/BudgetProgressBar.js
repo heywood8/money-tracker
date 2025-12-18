@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,7 +42,7 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
   return (
     <View style={[styles.container, style]}>
       {/* Progress Bar */}
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}> 
         <View
           style={[
             styles.progressFill,
@@ -56,12 +57,15 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
       {/* Details */}
       {showDetails && (
         <View style={styles.details}>
-          <Text variant={compact ? 'bodySmall' : 'bodyMedium'} style={{ color: colors.text }}>
+          <Text variant={compact ? 'bodySmall' : 'bodyMedium'} style={[styles.detailsText, { color: colors.text }]}> 
             {formatAmount(status.spent)} / {status.amount}
           </Text>
           <Text
             variant={compact ? 'bodySmall' : 'bodyMedium'}
-            style={{ color: status.isExceeded ? '#F44336' : colors.mutedText }}
+            style={[
+              styles.detailsAmount,
+              status.isExceeded ? styles.exceededText : { color: colors.mutedText },
+            ]}
           >
             {status.isExceeded
               ? `${t('over_budget_by')} ${formatAmount(Math.abs(status.remaining))}`
@@ -76,10 +80,10 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
         <View style={styles.percentageContainer}>
           <Text
             variant="bodySmall"
-            style={{
-              color: status.isExceeded ? '#F44336' : colors.mutedText,
-              fontWeight: '500',
-            }}
+            style={[
+              styles.percentageText,
+              status.isExceeded ? styles.exceededText : { color: colors.mutedText },
+            ]}
           >
             {Math.round(status.percentage)}%
           </Text>
@@ -99,10 +103,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 2,
   },
+  detailsAmount: {
+    // color set dynamically
+  },
+  detailsText: {
+    // color set dynamically
+  },
+  exceededText: {
+    color: '#F44336',
+  },
   percentageContainer: {
     position: 'absolute',
     right: 0,
     top: -2,
+  },
+  percentageText: {
+    fontWeight: '500',
+    // color set dynamically
   },
   progressFill: {
     borderRadius: 3,
@@ -114,5 +131,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 });
+
+BudgetProgressBar.propTypes = {
+  budgetId: PropTypes.string.isRequired,
+  compact: PropTypes.bool,
+  showDetails: PropTypes.bool,
+  style: PropTypes.any,
+};
 
 export default BudgetProgressBar;
