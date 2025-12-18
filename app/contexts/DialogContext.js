@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import MaterialDialog from '../components/MaterialDialog';
 
 const DialogContext = createContext();
@@ -42,4 +43,8 @@ export const DialogProvider = ({ children }) => {
       )}
     </DialogContext.Provider>
   );
+};
+
+DialogProvider.propTypes = {
+  children: PropTypes.node,
 };

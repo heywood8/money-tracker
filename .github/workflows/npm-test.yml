@@ -30,7 +30,7 @@ jobs:
 
       - name: Post lint results
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: set-lint-results
         with:
           github-token: ${{ secrets.RELEASE_TOKEN }}

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 
@@ -90,4 +91,8 @@ export const ImportProgressProvider = ({ children }) => {
       {children}
     </ImportProgressContext.Provider>
   );
+};
+
+ImportProgressProvider.propTypes = {
+  children: PropTypes.node,
 };

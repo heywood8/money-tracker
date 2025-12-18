@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
 import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
@@ -20,7 +21,7 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
         style={styles.pickerOption}
         rippleColor="rgba(0, 0, 0, .12)"
       >
-        <Text style={{ fontSize: 16 }}>{cur.name} ({cur.symbol})</Text>
+        <Text style={styles.pickerOptionText}>{cur.name} ({cur.symbol})</Text>
       </TouchableRipple>
     );
   }, [onSelect]);
@@ -36,9 +37,9 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
           data={Object.entries(currencies)}
           keyExtractor={([code]) => code}
           renderItem={renderCurrencyItem}
-          style={{ maxHeight: 400 }}
+          style={styles.pickerList}
         />
-        <Button mode="text" onPress={onClose} style={{ marginTop: 8 }}>
+        <Button mode="text" onPress={onClose} style={styles.pickerCloseButton}>
           {t('close') || 'Close'}
         </Button>
       </Modal>
@@ -47,6 +48,24 @@ const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onS
 });
 
 CurrencyPickerModal.displayName = 'CurrencyPickerModal';
+
+CurrencyPickerModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  currencies: PropTypes.object,
+  colors: PropTypes.object,
+  t: PropTypes.func,
+  onSelect: PropTypes.func,
+};
+
+CurrencyPickerModal.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  currencies,
+  colors: {},
+  t: (k) => k,
+  onSelect: () => {},
+};
 
 // Memoized transfer account picker modal component
 const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, accountCurrency, operationCount, colors, t, onSelect, currencies }) => {
@@ -66,8 +85,8 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
         rippleColor="rgba(0, 0, 0, .12)"
       >
         <View>
-          <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.name}</Text>
-          <Text style={{ fontSize: 14, color: colors.mutedText, marginTop: 4 }}>
+          <Text style={styles.pickerAccountName}>{item.name}</Text>
+          <Text style={[styles.pickerAccountBalance, { color: colors.mutedText }]}>
             {formattedBalance} {currencySymbol}
           </Text>
         </View>
@@ -82,22 +101,22 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
         onDismiss={onClose}
         contentContainerStyle={[styles.pickerModalContent, { backgroundColor: colors.card }]}
       >
-        <Text variant="titleLarge" style={{ marginBottom: 8, textAlign: 'center' }}>
+        <Text variant="titleLarge" style={styles.centeredTitleLarge}>
           {t('transfer_operations') || 'Transfer Operations'}
         </Text>
-        <Text variant="bodyMedium" style={{ marginBottom: 16, textAlign: 'center', color: colors.mutedText }}>
+        <Text variant="bodyMedium" style={[styles.centeredBodyMedium, { color: colors.mutedText }]}>
           {`${t('transfer_operations_message') || 'This account has transactions. Select an account to transfer them to:'}`}
         </Text>
-        <Text variant="bodySmall" style={{ marginBottom: 16, textAlign: 'center', color: colors.mutedText, fontWeight: '600' }}>
+        <Text variant="bodySmall" style={[styles.centeredBodySmall, { color: colors.mutedText }]}>
           {`${operationCount} ${operationCount === 1 ? 'transaction' : 'transactions'}`}
         </Text>
         <FlatList
           data={availableAccounts}
           keyExtractor={(item) => item.id}
           renderItem={renderAccountItem}
-          style={{ maxHeight: 400 }}
+          style={styles.pickerList}
         />
-        <Button mode="text" onPress={onClose} style={{ marginTop: 8 }}>
+        <Button mode="text" onPress={onClose} style={styles.pickerCloseButton}>
           {t('cancel') || 'Cancel'}
         </Button>
       </Modal>
@@ -106,6 +125,32 @@ const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountTo
 });
 
 TransferAccountPickerModal.displayName = 'TransferAccountPickerModal';
+
+TransferAccountPickerModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  accounts: PropTypes.array,
+  accountToDelete: PropTypes.string,
+  accountCurrency: PropTypes.string,
+  operationCount: PropTypes.number,
+  colors: PropTypes.object,
+  t: PropTypes.func,
+  onSelect: PropTypes.func,
+  currencies: PropTypes.object,
+};
+
+TransferAccountPickerModal.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  accounts: [],
+  accountToDelete: null,
+  accountCurrency: null,
+  operationCount: 0,
+  colors: {},
+  t: (k) => k,
+  onSelect: () => {},
+  currencies,
+};
 
 // Memoized confirmation dialog component
 const ConfirmationDialog = memo(({ visible, onClose, title, message, cancelText, confirmText, onConfirm, colors, confirmColor }) => {
@@ -149,6 +194,30 @@ const ConfirmationDialog = memo(({ visible, onClose, title, message, cancelText,
 
 ConfirmationDialog.displayName = 'ConfirmationDialog';
 
+ConfirmationDialog.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  title: PropTypes.string,
+  message: PropTypes.string,
+  cancelText: PropTypes.string,
+  confirmText: PropTypes.string,
+  onConfirm: PropTypes.func,
+  colors: PropTypes.object,
+  confirmColor: PropTypes.string,
+};
+
+ConfirmationDialog.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  title: '',
+  message: '',
+  cancelText: null,
+  confirmText: 'OK',
+  onConfirm: () => {},
+  colors: {},
+  confirmColor: null,
+};
+
 // Memoized account row component
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
@@ -166,7 +235,8 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
       style={[
         styles.accountCard,
         { backgroundColor: rowBg, borderColor: colors.border },
-        isActive && { backgroundColor: colors.selected, opacity: 0.9 },
+        isActive && { backgroundColor: colors.selected },
+        isActive && styles.activeAccountOpacity,
       ]}
     >
       <View style={styles.accountRow}>
@@ -177,7 +247,7 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
           accessibilityLabel={t('edit_account') || 'Edit Account'}
           accessibilityRole="button"
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={styles.rowAlignCenter}>
             <View style={styles.accountNameWrapper}>
               <Text variant="titleMedium" numberOfLines={1} ellipsizeMode="tail">
                 {item.name}
@@ -185,7 +255,7 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
             </View>
             <View style={styles.verticalDivider} />
             <View style={styles.accountValueWrapper}>
-              <Text variant="titleMedium" style={{ textAlign: 'right' }} numberOfLines={1} ellipsizeMode="tail">
+              <Text variant="titleMedium" style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
                 {formattedBalance} {item.currencySymbol}
               </Text>
             </View>
@@ -206,6 +276,25 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
 });
 
 AccountRow.displayName = 'AccountRow';
+
+AccountRow.propTypes = {
+  item: PropTypes.object.isRequired,
+  index: PropTypes.number,
+  colors: PropTypes.object,
+  onPress: PropTypes.func,
+  t: PropTypes.func,
+  drag: PropTypes.func,
+  isActive: PropTypes.bool,
+};
+
+AccountRow.defaultProps = {
+  index: 0,
+  colors: {},
+  onPress: () => {},
+  t: (k) => k,
+  drag: () => {},
+  isActive: false,
+};
 
 export default function AccountsScreen() {
 
@@ -429,7 +518,7 @@ export default function AccountsScreen() {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" />
-        <Text variant="bodyLarge" style={{ marginTop: 12, color: colors.mutedText }}>
+        <Text variant="bodyLarge" style={[styles.loadingText, { color: colors.mutedText }]}>
           {t('loading_accounts') || 'Loading accounts...'}
         </Text>
       </View>
@@ -439,7 +528,7 @@ export default function AccountsScreen() {
   if (error) {
     return (
       <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Text variant="bodyLarge" style={{ color: colors.delete, textAlign: 'center' }}>
+        <Text variant="bodyLarge" style={[styles.centeredErrorText, { color: colors.delete }]}>
           {t('error_loading_accounts') || 'Failed to load accounts'}
         </Text>
       </View>
@@ -455,7 +544,7 @@ export default function AccountsScreen() {
         keyExtractor={keyExtractor}
         onDragEnd={handleDragEnd}
         activationDistance={20}
-        ListEmptyComponent={<Text style={{ color: colors.mutedText }}>{t('no_accounts') || 'No accounts yet.'}</Text>}
+        ListEmptyComponent={<Text style={[styles.listEmptyText, { color: colors.mutedText }]}>{t('no_accounts') || 'No accounts yet.'}</Text>}
         ListFooterComponent={
           hiddenAccounts.length > 0 ? (
             <TouchableRipple
@@ -497,7 +586,7 @@ export default function AccountsScreen() {
           >
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 20 }}
+              contentContainerStyle={styles.listContentContainer}
             >
               <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
               <PaperTextInput
@@ -530,7 +619,7 @@ export default function AccountsScreen() {
                 <View style={styles.switchContainer}>
                   <View style={styles.switchLabelContainer}>
                     <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
-                    <Text variant="bodySmall" style={{ color: colors.mutedText, marginTop: 4 }}>
+                    <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
                       {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
                     </Text>
                   </View>
@@ -544,7 +633,7 @@ export default function AccountsScreen() {
               <View style={styles.switchContainer}>
                 <View style={styles.switchLabelContainer}>
                   <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
-                  <Text variant="bodySmall" style={{ color: colors.mutedText, marginTop: 4 }}>
+                  <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
                     {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
                   </Text>
                 </View>
@@ -681,12 +770,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     minHeight: 56,
   },
+  accountValueText: {
+    textAlign: 'right',
+  },
   accountValueWrapper: {
     alignItems: 'flex-end',
     flex: 3,
     justifyContent: 'center',
     paddingLeft: 8,
     paddingRight: 16,
+  },
+  activeAccountOpacity: {
+    opacity: 0.9,
+  },
+  bodySmallMutedMarginTop: {
+    marginTop: 4,
+  },
+  centeredBodyMedium: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  centeredBodySmall: {
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  centeredErrorText: {
+    textAlign: 'center',
+  },
+  centeredTitleLarge: {
+    marginBottom: 8,
+    textAlign: 'center',
   },
   confirmationButton: {
     minWidth: 100,
@@ -736,9 +850,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
+  listContentContainer: {
+    paddingBottom: 20,
+  },
+  listEmptyText: {
+    // color set dynamically
+  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
   },
   modalButton: {
     flex: 1,
@@ -759,9 +882,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  pickerAccountBalance: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  pickerAccountName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pickerCloseButton: {
+    marginTop: 8,
+  },
   pickerDisplay: {
     justifyContent: 'center',
     padding: 16,
+  },
+  pickerList: {
+    maxHeight: 400,
   },
   pickerModalContent: {
     borderRadius: 12,
@@ -772,6 +909,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
+  pickerOptionText: {
+    fontSize: 16,
+  },
   pickerWrapper: {
     borderColor: 'rgba(0, 0, 0, 0.12)',
     borderRadius: 8,
@@ -779,6 +919,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 8,
     overflow: 'hidden',
+  },
+  rowAlignCenter: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
   },
   showHiddenButton: {
     borderRadius: 8,

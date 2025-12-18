@@ -1,4 +1,5 @@
 import React, { useMemo, useCallback, memo } from 'react';
+import PropTypes from 'prop-types';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text, Surface } from 'react-native-paper';
@@ -42,6 +43,27 @@ const TabButton = memo(({ tab, isActive, colors, onPress }) => {
 });
 
 TabButton.displayName = 'TabButton';
+
+TabButton.propTypes = {
+  tab: PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    icon: PropTypes.string,
+  }).isRequired,
+  isActive: PropTypes.bool,
+  colors: PropTypes.shape({
+    primary: PropTypes.string,
+    mutedText: PropTypes.string,
+  }).isRequired,
+  onPress: PropTypes.func,
+}
+;
+TabButton.defaultProps = {
+  isActive: false,
+  onPress: () => {},
+}
+
+;
 
 export default function SimpleTabs() {
   const { colors } = useTheme();

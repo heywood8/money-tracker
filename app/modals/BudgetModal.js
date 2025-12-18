@@ -13,6 +13,7 @@ import {
   Keyboard,
   Switch,
 } from 'react-native';
+import PropTypes from 'prop-types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -226,7 +227,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        style={styles.flex1}
       >
         <Pressable style={styles.modalOverlay} onPress={handleClose}>
           <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
@@ -283,7 +284,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                   onPress={() => setCurrencyPickerVisible(true)}
                 >
                   <View style={styles.pickerValue}>
-                    <Text style={{ color: colors.text, fontSize: 16 }}>
+                    <Text style={[styles.text16, { color: colors.text }]}> 
                       {values.currency} {currencies[values.currency]?.symbol || ''}
                     </Text>
                     <Icon name="chevron-down" size={20} color={colors.text} />
@@ -304,7 +305,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                   onPress={() => setPeriodPickerVisible(true)}
                 >
                   <View style={styles.pickerValue}>
-                    <Text style={{ color: colors.text, fontSize: 16 }}>
+                    <Text style={[styles.text16, { color: colors.text }]}> 
                       {PERIOD_TYPES.find(p => p.key === values.periodType)?.label}
                     </Text>
                     <Icon name="chevron-down" size={20} color={colors.text} />
@@ -325,7 +326,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                   onPress={() => setShowStartDatePicker(true)}
                 >
                   <View style={styles.pickerValue}>
-                    <Text style={{ color: colors.text, fontSize: 16 }}>
+                    <Text style={[styles.text16, { color: colors.text }]}> 
                       {formatDate(values.startDate)}
                     </Text>
                     <Icon name="calendar" size={20} color={colors.text} />
@@ -342,8 +343,8 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                   <Pressable
                     style={[
                       styles.pickerButton,
+                      styles.flex1,
                       {
-                        flex: 1,
                         backgroundColor: colors.inputBackground,
                         borderColor: colors.inputBorder,
                       },
@@ -351,7 +352,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                     onPress={() => setShowEndDatePicker(true)}
                   >
                     <View style={styles.pickerValue}>
-                      <Text style={{ color: colors.text, fontSize: 16 }}>
+                      <Text style={[styles.text16, { color: colors.text }]}> 
                         {formatDate(values.endDate)}
                       </Text>
                       <Icon name="calendar" size={20} color={colors.text} />
@@ -371,8 +372,8 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
               {/* Recurring Switch */}
               <View style={styles.switchContainer}>
                 <View style={styles.switchLabel}>
-                  <Icon name="sync" size={20} color={colors.text} style={{ marginRight: 8 }} />
-                  <Text style={{ color: colors.text, fontSize: 16 }}>{t('recurring')}</Text>
+                  <Icon name="sync" size={20} color={colors.text} style={styles.iconMarginRight} />
+                  <Text style={[styles.text16, { color: colors.text }]}>{t('recurring')}</Text>
                 </View>
                 <Switch
                   value={values.isRecurring}
@@ -385,10 +386,10 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
               {/* Rollover Switch */}
               <View style={styles.switchContainer}>
                 <View style={styles.switchLabel}>
-                  <Icon name="arrow-right-thick" size={20} color={colors.text} style={{ marginRight: 8 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontSize: 16 }}>{t('rollover')}</Text>
-                    <Text style={{ color: colors.mutedText, fontSize: 12, marginTop: 2 }}>
+                  <Icon name="arrow-right-thick" size={20} color={colors.text} style={styles.iconMarginRight} />
+                  <View style={styles.flex1}>
+                    <Text style={[styles.text16, { color: colors.text }]}>{t('rollover')}</Text>
+                    <Text style={[styles.text12, styles.smallTop, { color: colors.mutedText }]}> 
                       Carry unused amount to next period
                     </Text>
                   </View>
@@ -490,10 +491,10 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                   ]}
                 >
                   <View style={styles.currencyOption}>
-                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '500' }}>
+                    <Text style={[styles.text18bold, { color: colors.text }]}> 
                       {item.code}
                     </Text>
-                    <Text style={{ color: colors.mutedText, fontSize: 14, marginLeft: 8 }}>
+                    <Text style={[styles.text14muted, { color: colors.mutedText }]}> 
                       {item.symbol} - {item.name}
                     </Text>
                   </View>
@@ -501,7 +502,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
               )}
             />
             <Pressable style={styles.closeButton} onPress={() => setCurrencyPickerVisible(false)}>
-              <Text style={{ color: colors.primary }}>{t('close')}</Text>
+              <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -533,12 +534,12 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                     values.periodType === item.key && { backgroundColor: colors.selected },
                   ]}
                 >
-                  <Text style={{ color: colors.text, fontSize: 18 }}>{item.label}</Text>
+                  <Text style={[styles.text18, { color: colors.text }]}>{item.label}</Text>
                 </Pressable>
               )}
             />
             <Pressable style={styles.closeButton} onPress={() => setPeriodPickerVisible(false)}>
-              <Text style={{ color: colors.primary }}>{t('close')}</Text>
+              <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -546,6 +547,33 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     </Modal>
   );
 }
+
+BudgetModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  budget: PropTypes.shape({
+    id: PropTypes.string,
+    amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    currency: PropTypes.string,
+    periodType: PropTypes.string,
+    startDate: PropTypes.string,
+    endDate: PropTypes.string,
+    isRecurring: PropTypes.bool,
+    rolloverEnabled: PropTypes.bool,
+  }),
+  categoryId: PropTypes.string,
+  categoryName: PropTypes.string,
+  isNew: PropTypes.bool,
+};
+
+BudgetModal.defaultProps = {
+  visible: false,
+  onClose: () => {},
+  budget: null,
+  categoryId: '',
+  categoryName: '',
+  isNew: true,
+};
 
 const styles = StyleSheet.create({
   buttonText: {
@@ -591,6 +619,12 @@ const styles = StyleSheet.create({
   error: {
     fontSize: 12,
     marginTop: 4,
+  },
+  flex1: {
+    flex: 1,
+  },
+  iconMarginRight: {
+    marginRight: 8,
   },
   input: {
     borderRadius: 4,
@@ -676,6 +710,9 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 1,
   },
+  smallTop: {
+    marginTop: 2,
+  },
   switchContainer: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -688,5 +725,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flex: 1,
     marginRight: 12,
+  },
+  text12: {
+    fontSize: 12,
+  },
+  text14muted: {
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  text16: {
+    fontSize: 16,
+  },
+  text18: {
+    fontSize: 18,
+  },
+  text18bold: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  textPrimary: {
+    fontSize: 16,
   },
 });

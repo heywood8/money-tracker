@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import PropTypes from 'prop-types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDatabaseVersion } from '../services/db';
@@ -98,6 +99,14 @@ export default function Header({ onOpenSettings }) {
     </View>
   );
 }
+
+Header.propTypes = {
+  onOpenSettings: PropTypes.func,
+};
+
+Header.defaultProps = {
+  onOpenSettings: () => {},
+};
 
 const styles = StyleSheet.create({
   buttonContainer: {

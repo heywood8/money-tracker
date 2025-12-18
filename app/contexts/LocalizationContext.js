@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import i18nData from '../../assets/i18n.json';
 import { getPreference, setPreference, deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -100,6 +101,10 @@ export function LocalizationProvider({ children }) {
     </LocalizationContext.Provider>
   );
 }
+
+LocalizationProvider.propTypes = {
+  children: PropTypes.node,
+};
 
 export function useLocalization() {
   return useContext(LocalizationContext);
