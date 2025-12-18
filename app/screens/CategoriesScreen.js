@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -125,7 +126,7 @@ const CategoriesScreen = () => {
           accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
           accessibilityHint={hasChildren ? 'Double tap to expand or collapse' : 'Double tap to edit'}
         >
-          <View style={[styles.categoryContent, { paddingLeft: 16 + indentWidth }]}>
+          <View style={[styles.categoryContent, { paddingLeft: HORIZONTAL_PADDING + indentWidth }]}>
             {/* Expand/Collapse Icon */}
             {hasChildren ? (
               <TouchableOpacity
@@ -175,7 +176,7 @@ const CategoriesScreen = () => {
 
         {/* Budget Progress Bar */}
         {budget && (
-          <View style={[styles.progressBarContainer, { paddingLeft: 16 + indentWidth, backgroundColor: rowBackgroundColor }]}>
+          <View style={[styles.progressBarContainer, { paddingLeft: HORIZONTAL_PADDING + indentWidth, backgroundColor: rowBackgroundColor }]}>
             <BudgetProgressBar budgetId={budget.id} compact={false} showDetails={true} />
           </View>
         )}
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    paddingTop: 40,
+    paddingTop: TOP_CONTENT_SPACING,
   },
   emptyList: {
     flex: 1,

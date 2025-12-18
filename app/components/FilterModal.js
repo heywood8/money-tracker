@@ -10,6 +10,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { HORIZONTAL_PADDING } from '../styles/layout';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatDate } from '../services/BalanceHistoryDB';
@@ -660,8 +661,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    flexDirection: 'row',
     gap: 8,
+    padding: HORIZONTAL_PADDING,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -672,7 +673,7 @@ const styles = StyleSheet.create({
   section: {
     borderBottomColor: '#f0f0f0',
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 14,
   },
   sectionTitle: {
