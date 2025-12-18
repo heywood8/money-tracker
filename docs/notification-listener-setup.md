@@ -2,11 +2,45 @@
 
 This guide explains how to set up the Android notification listener for automatic transaction reading from bank notifications.
 
+## ⚠️ Current Status: Pending Package Compatibility
+
+**IMPORTANT**: The `react-native-notification-listener` package currently has a peer dependency on React 18, but this project uses React 19.1.0. This causes an installation conflict:
+
+```
+npm error peer react@"^18.0.0" from react-native-notification-listener@5.0.2
+npm error Found: react@19.1.0
+```
+
+### Available Options:
+
+1. **Wait for Package Update** (Recommended)
+   - Wait for `react-native-notification-listener` to support React 19
+   - Track issue: https://github.com/giocapardi/react-native-notification-listener/issues
+   - All infrastructure code is ready and tested
+
+2. **Force Install** (Not Recommended)
+   ```bash
+   npm install react-native-notification-listener --legacy-peer-deps
+   ```
+   - May cause runtime issues
+   - Not guaranteed to work with React 19
+
+3. **Downgrade React** (Not Recommended)
+   - Would require downgrading entire project to React 18
+   - May break other dependencies
+
+4. **Custom Native Module** (Advanced)
+   - Implement NotificationListenerService directly in native Android code
+   - Requires Android development expertise
+   - See "Custom Implementation" section below
+
+**Current Implementation**: All JavaScript/TypeScript code is complete and tested. Only the native bridge package is pending.
+
 ## Overview
 
 The notification listener feature allows the Penny app to read notifications from bank apps and automatically create expense operations. This requires:
 
-1. Installing a native notification listener package
+1. Installing a native notification listener package (currently blocked by React 19 compatibility)
 2. Configuring Android permissions
 3. User granting notification access in system settings
 
@@ -15,18 +49,21 @@ The notification listener feature allows the Penny app to read notifications fro
 - React Native / Expo development environment
 - Android device or emulator (API level 18+)
 - Custom development client (Expo Go does NOT support this feature)
+- **React 18.x** (current project uses React 19.1.0 - compatibility issue)
 
-## Installation Steps
+## Installation Steps (When Package is Compatible)
 
 ### 1. Install Required Package
 
-Install the notification listener package:
+When the package supports React 19, install with:
 
 ```bash
 npm install react-native-notification-listener
 ```
 
 **Package**: [react-native-notification-listener](https://github.com/giocapardi/react-native-notification-listener)
+
+**Current Version**: 5.0.2 (requires React 18)
 
 ### 2. Configure Expo Config
 
@@ -351,6 +388,164 @@ This feature is **Android-only** because:
 - Service may be killed by Android's battery optimization
 - May not work reliably with "Doze mode" on some devices
 - Consider using foreground service for critical scenarios
+
+## Custom Native Implementation (Advanced)
+
+If you need notification listening functionality now and can't wait for package compatibility, you can implement a custom native module. This requires Android development expertise.
+
+### Architecture Overview
+
+The notification listener requires three components:
+
+1. **Native Android Service** - NotificationListenerService implementation
+2. **React Native Bridge** - Native module to communicate with JavaScript
+3. **JavaScript Interface** - Already implemented in `NotificationListener.js`
+
+### Implementation Steps
+
+#### 1. Create Android NotificationListenerService
+
+Create `android/app/src/main/java/com/yourapp/NotificationListener.java`:
+
+```java
+package com.yourapp;
+
+import android.service.notification.NotificationListenerService;
+import android.service.notification.StatusBarNotification;
+import android.content.Intent;
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+
+public class NotificationListener extends NotificationListenerService {
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        String packageName = sbn.getPackageName();
+        String title = sbn.getNotification().extras.getString("android.title");
+        String text = sbn.getNotification().extras.getString("android.text");
+
+        // Send to React Native
+        WritableMap params = Arguments.createMap();
+        params.putString("packageName", packageName);
+        params.putString("title", title);
+        params.putString("text", text);
+        params.putString("app", getApplicationLabel(packageName));
+
+        sendEvent("onNotificationReceived", params);
+    }
+
+    private void sendEvent(String eventName, WritableMap params) {
+        getReactApplicationContext()
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+            .emit(eventName, params);
+    }
+}
+```
+
+#### 2. Create React Native Module
+
+Create `android/app/src/main/java/com/yourapp/NotificationListenerModule.java`:
+
+```java
+package com.yourapp;
+
+import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.bridge.ReactContextBaseJavaModule;
+import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.Promise;
+import android.content.Intent;
+import android.provider.Settings;
+
+public class NotificationListenerModule extends ReactContextBaseJavaModule {
+    public NotificationListenerModule(ReactApplicationContext context) {
+        super(context);
+    }
+
+    @Override
+    public String getName() {
+        return "NotificationListener";
+    }
+
+    @ReactMethod
+    public void checkPermission(Promise promise) {
+        // Check if notification access is granted
+        String enabledListeners = Settings.Secure.getString(
+            getReactApplicationContext().getContentResolver(),
+            "enabled_notification_listeners"
+        );
+
+        boolean hasPermission = enabledListeners != null &&
+            enabledListeners.contains(getReactApplicationContext().getPackageName());
+
+        promise.resolve(hasPermission);
+    }
+
+    @ReactMethod
+    public void requestPermission() {
+        // Open notification listener settings
+        Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getReactApplicationContext().startActivity(intent);
+    }
+}
+```
+
+#### 3. Update AndroidManifest.xml
+
+Add to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<service
+    android:name=".NotificationListener"
+    android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+    </intent-filter>
+</service>
+```
+
+#### 4. Register Native Module
+
+Update `android/app/src/main/java/com/yourapp/MainApplication.java`:
+
+```java
+@Override
+protected List<ReactPackage> getPackages() {
+  return Arrays.asList(
+      new MainReactPackage(),
+      new NotificationListenerPackage() // Add this
+  );
+}
+```
+
+#### 5. Update JavaScript Code
+
+The existing `NotificationListener.js` service is designed to work with any native bridge. Simply update the require statements to use your custom module instead:
+
+```javascript
+// In NotificationListener.js, replace:
+// const RNNotificationListener = require('react-native-notification-listener');
+
+// With your custom module:
+import { NativeModules, NativeEventEmitter } from 'react-native';
+const { NotificationListener: RNNotificationListener } = NativeModules;
+const notificationEmitter = new NativeEventEmitter(RNNotificationListener);
+```
+
+### Testing Custom Implementation
+
+1. Build the app: `npx expo run:android`
+2. Grant notification access in Android Settings
+3. Send a test notification from a bank app
+4. Check logs for notification events
+
+### Maintenance Considerations
+
+- **Updates**: You'll need to maintain the native code yourself
+- **Compatibility**: Test across Android versions (API 18+)
+- **Battery**: Consider foreground service for reliability
+- **Security**: Validate all notification data before processing
 
 ## Future Enhancements
 

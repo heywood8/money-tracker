@@ -2,6 +2,25 @@
 
 This directory contains services for reading and processing bank transaction notifications.
 
+## ⚠️ Status: Infrastructure Complete, Package Pending
+
+**All JavaScript/TypeScript code is implemented and tested** (1,177 tests passing). However, the native notification listener package (`react-native-notification-listener`) currently requires React 18, while this project uses React 19.1.0.
+
+**What's Ready:**
+- ✅ NotificationListener service (220 lines)
+- ✅ useNotificationListener hook (230 lines)
+- ✅ Full test coverage (50+ tests)
+- ✅ Comprehensive documentation
+- ✅ Parser integration ready
+
+**What's Pending:**
+- ⏳ Native package compatibility with React 19
+- ⏳ Or custom native module implementation (see setup guide)
+
+**Next Steps:** See `/docs/notification-listener-setup.md` for installation options and custom implementation guide.
+
+---
+
 ## Overview
 
 The notification reader feature enables automatic transaction creation from bank notifications. When a bank sends a transaction notification, the app:
