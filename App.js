@@ -10,7 +10,7 @@ import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
-import { StatusBar, Platform } from 'react-native';
+import { StatusBar, Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
@@ -68,7 +68,7 @@ function AppContent() {
 export default Sentry.wrap(function App() {
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={styles.container}>
         <SafeAreaProvider>
           <LocalizationProvider>
             <ThemeProvider>
@@ -91,4 +91,10 @@ export default Sentry.wrap(function App() {
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
 });

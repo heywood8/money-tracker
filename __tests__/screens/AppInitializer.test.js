@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { render, waitFor } from '@testing-library/react-native';
 import AppInitializer from '../../app/screens/AppInitializer';
 import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
@@ -12,26 +13,37 @@ import { ThemeProvider } from '../../app/contexts/ThemeContext';
 // Mock the navigation components
 jest.mock('../../app/screens/LanguageSelectionScreen', () => {
   const React = require('react');
+  const PropTypes = require('prop-types');
   const { View, Text } = require('react-native');
-  return function MockLanguageSelectionScreen({ onLanguageSelected }) {
+  function MockLanguageSelectionScreen({ onLanguageSelected }) {
     return (
       <View testID="language-selection-screen">
         <Text>Language Selection</Text>
       </View>
     );
+  }
+  MockLanguageSelectionScreen.propTypes = {
+    onLanguageSelected: PropTypes.func,
   };
+  return MockLanguageSelectionScreen;
 });
 
 jest.mock('../../app/navigation/SimpleTabs', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
-  return function MockSimpleTabs() {
+  function MockSimpleTabs({ children }) {
     return (
       <View testID="simple-tabs">
         <Text>Main App</Text>
+        {children}
       </View>
     );
+  }
+  const PropTypes = require('prop-types');
+  MockSimpleTabs.propTypes = {
+    children: PropTypes.node,
   };
+  return MockSimpleTabs;
 });
 
 // Create a mock LocalizationContext for controlled testing
@@ -43,16 +55,32 @@ const mockLocalizationContext = {
 
 jest.mock('../../app/contexts/LocalizationContext', () => {
   const React = require('react');
+  const PropTypes = require('prop-types');
+  function LocalizationProvider({ children }) {
+    return React.createElement(React.Fragment, null, children);
+  }
+  LocalizationProvider.propTypes = {
+    children: PropTypes.node,
+  };
+
   return {
-    LocalizationProvider: ({ children }) => React.createElement(React.Fragment, null, children),
+    LocalizationProvider,
     useLocalization: jest.fn(() => mockLocalizationContext),
   };
 });
 
 jest.mock('../../app/contexts/ThemeContext', () => {
   const React = require('react');
+  const PropTypes = require('prop-types');
+  function ThemeProvider({ children }) {
+    return React.createElement(React.Fragment, null, children);
+  }
+  ThemeProvider.propTypes = {
+    children: PropTypes.node,
+  };
+
   return {
-    ThemeProvider: ({ children }) => React.createElement(React.Fragment, null, children),
+    ThemeProvider,
     useTheme: jest.fn(() => ({
       colors: {
         background: '#ffffff',
@@ -136,8 +164,9 @@ describe('AppInitializer', () => {
       // Mock LanguageSelectionScreen to capture the callback
       jest.mock('../../app/screens/LanguageSelectionScreen', () => {
         const React = require('react');
+        const PropTypes = require('prop-types');
         const { View, Text, TouchableOpacity } = require('react-native');
-        return function MockLanguageSelectionScreen({ onLanguageSelected: callback }) {
+        function MockLanguageSelectionScreen({ onLanguageSelected: callback }) {
           onLanguageSelected = callback;
           return (
             <View testID="language-selection-screen">
@@ -147,7 +176,11 @@ describe('AppInitializer', () => {
               </TouchableOpacity>
             </View>
           );
+        }
+        MockLanguageSelectionScreen.propTypes = {
+          onLanguageSelected: PropTypes.func,
         };
+        return MockLanguageSelectionScreen;
       });
 
       const { getByTestId } = render(<AppInitializer />);

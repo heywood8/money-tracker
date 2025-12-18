@@ -7,6 +7,81 @@ on:
     branches: ['**']
 
 jobs:
+  lint:
+    name: Code Quality - Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        id: lint
+        run: npm run lint 2>&1 | tee lint-output.txt
+        continue-on-error: true
+
+      - name: Post lint results
+        if: always()
+        uses: actions/github-script@v7
+        id: set-lint-results
+        with:
+          github-token: ${{ secrets.RELEASE_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let output = fs.readFileSync('lint-output.txt', 'utf8');
+
+            // strip ANSI escape codes
+            output = output.replace(/\u001b\[[0-9;]*m/g, '');
+
+            // check if there are any errors or warnings
+            const errorCount = (output.match(/\d+\s+error/g) || []).reduce((acc, match) => {
+              return acc + parseInt(match.match(/\d+/)[0]);
+            }, 0);
+            const warningCount = (output.match(/\d+\s+warning/g) || []).reduce((acc, match) => {
+              return acc + parseInt(match.match(/\d+/)[0]);
+            }, 0);
+
+            // extract problem details
+            const problems = output.match(/[\s\S]*?(?=\n✖|$)/);
+            const problemDetails = problems ? problems[0].trim() : '';
+
+            // build comment
+            let comment = '## Lint Results\n\n';
+
+            if (errorCount === 0 && warningCount === 0) {
+              comment += '✅ **No linting issues found!**\n\n';
+              comment += 'All code passed ESLint checks.\n';
+            } else {
+              comment += `⚠️ **Found ${errorCount} error(s) and ${warningCount} warning(s)**\n\n`;
+
+              if (problemDetails) {
+                comment += '<details>\n<summary>Details</summary>\n\n```\n' + problemDetails + '\n```\n</details>\n';
+              }
+            }
+
+            core.setOutput('message', comment);
+            core.setOutput('has_errors', errorCount > 0 ? 'true' : 'false');
+
+      - uses: marocchino/sticky-pull-request-comment@v2.9.4
+        if: always()
+        with:
+          header: "Lint Results"
+          message: ${{ steps.set-lint-results.outputs.message }}
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
+
+      - name: Fail if linting errors found
+        if: steps.set-lint-results.outputs.has_errors == 'true'
+        run: exit 1
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
