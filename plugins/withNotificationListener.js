@@ -24,18 +24,18 @@ function withNotificationListener(config) {
 
     // Check if service already exists
     const serviceExists = application.service?.some(
-      (service) => service.$?.['android:name'] === '.NotificationListenerService'
+      (service) => service.$?.['android:name'] === '.PennyNotificationListenerService'
     );
 
     if (!serviceExists) {
-      // Add the NotificationListenerService
+      // Add the PennyNotificationListenerService
       if (!application.service) {
         application.service = [];
       }
 
       application.service.push({
         $: {
-          'android:name': '.NotificationListenerService',
+          'android:name': '.PennyNotificationListenerService',
           'android:permission': 'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE',
           'android:exported': 'true',
         },
@@ -52,7 +52,7 @@ function withNotificationListener(config) {
         ],
       });
 
-      console.log('✅ Added NotificationListenerService to AndroidManifest.xml');
+      console.log('✅ Added PennyNotificationListenerService to AndroidManifest.xml');
     }
 
     return config;
@@ -103,7 +103,7 @@ function withNotificationListenerJavaFiles(config) {
       fs.mkdirSync(androidDir, { recursive: true });
     }
 
-    // Create NotificationListenerService.java
+    // Create PennyNotificationListenerService.java
     const serviceCode = `package com.heywood8.monkeep;
 
 import android.service.notification.NotificationListenerService;
@@ -117,7 +117,7 @@ import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.ReactContext;
 
-public class NotificationListenerService extends NotificationListenerService {
+public class PennyNotificationListenerService extends NotificationListenerService {
     private static final String TAG = "NotificationListener";
 
     @Override
@@ -253,7 +253,7 @@ public class NotificationListenerPackage implements ReactPackage {
 `;
 
     // Write files
-    fs.writeFileSync(path.join(androidDir, 'NotificationListenerService.java'), serviceCode);
+    fs.writeFileSync(path.join(androidDir, 'PennyNotificationListenerService.java'), serviceCode);
     fs.writeFileSync(path.join(androidDir, 'NotificationListenerModule.java'), moduleCode);
     fs.writeFileSync(path.join(androidDir, 'NotificationListenerPackage.java'), packageCode);
 
