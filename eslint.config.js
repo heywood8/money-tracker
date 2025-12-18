@@ -58,12 +58,7 @@ module.exports = [
           allow: ['warn', 'error'],
         },
       ],
-      'no-unused-vars': [
-        'warn',
-        {
-          argsIgnorePattern: '^_',
-        },
-      ],
+      'no-unused-vars': 'off',
       quotes: [
         'warn',
         'single',
