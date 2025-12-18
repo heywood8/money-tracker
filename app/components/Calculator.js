@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import PropTypes from 'prop-types';
 
 /**
  * Calculator button component - Memoized for performance
@@ -36,6 +37,25 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
     </TouchableOpacity>
   );
 });
+CalcButton.displayName = 'CalcButton';
+
+CalcButton.propTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onPress: PropTypes.func,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  textStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  icon: PropTypes.string,
+  colors: PropTypes.object,
+};
+
+CalcButton.defaultProps = {
+  value: '',
+  onPress: () => {},
+  style: null,
+  textStyle: null,
+  icon: null,
+  colors: {},
+};
 
 /**
  * Calculator component for amount input
@@ -334,6 +354,21 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     </View>
   );
 }
+
+Calculator.displayName = 'Calculator';
+
+Calculator.propTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onValueChange: PropTypes.func,
+  colors: PropTypes.object.isRequired,
+  placeholder: PropTypes.string,
+};
+
+Calculator.defaultProps = {
+  value: '',
+  onValueChange: () => {},
+  placeholder: '0',
+};
 
 const styles = StyleSheet.create({
   button: {
