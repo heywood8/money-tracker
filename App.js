@@ -10,6 +10,7 @@ import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { CardBindingsProvider } from './app/contexts/CardBindingsContext';
 import { MerchantBindingsProvider } from './app/contexts/MerchantBindingsContext';
+import { PendingNotificationsProvider } from './app/contexts/PendingNotificationsContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
 import { StatusBar, Platform } from 'react-native';
@@ -81,9 +82,11 @@ export default Sentry.wrap(function App() {
                       <AccountsProvider>
                         <CategoriesProvider>
                           <OperationsProvider>
-                            <BudgetsProvider>
-                              <AppContent />
-                            </BudgetsProvider>
+                            <PendingNotificationsProvider>
+                              <BudgetsProvider>
+                                <AppContent />
+                              </BudgetsProvider>
+                            </PendingNotificationsProvider>
                           </OperationsProvider>
                         </CategoriesProvider>
                       </AccountsProvider>
