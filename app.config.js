@@ -56,15 +56,9 @@ module.exports = {
         },
       ],
       './plugins/withR8Config.js',
-      // TODO: Add notification listener plugin when react-native-notification-listener is installed
-      // This is required for Phase 5 of the notification reader feature
-      // Uncomment after running: npm install react-native-notification-listener
-      // [
-      //   'react-native-notification-listener',
-      //   {
-      //     // Configuration for notification listener
-      //   }
-      // ],
+      // Custom notification listener plugin (React 19 compatible)
+      // This replaces react-native-notification-listener which requires React 18
+      './plugins/withNotificationListener.js',
     ],
     updates: {
       "url": "https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406"

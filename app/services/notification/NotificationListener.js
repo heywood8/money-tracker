@@ -3,22 +3,27 @@
  *
  * Listens to notifications from bank apps and filters relevant transaction notifications.
  *
- * IMPORTANT: This service requires react-native-notification-listener package
- * and special Android permissions to read notifications from other apps.
+ * IMPLEMENTATION: Custom native Android module
+ * This service uses a custom native Android module instead of react-native-notification-listener
+ * because that package doesn't support React 19.
  *
- * Installation:
- * 1. npm install react-native-notification-listener
- * 2. Add permissions to app.config.js (see below)
- * 3. User must grant notification access in Android Settings
+ * The native module is implemented via Expo config plugin: plugins/withNotificationListener.js
+ *
+ * Build: npx expo run:android (or npx expo prebuild then rebuild)
+ * User must grant notification access in Android Settings
  *
  * Required Android Permissions:
- * - android.permission.BIND_NOTIFICATION_LISTENER_SERVICE
- *
- * Package: https://github.com/giocapardi/react-native-notification-listener
+ * - android.permission.BIND_NOTIFICATION_LISTENER_SERVICE (added by plugin)
  */
 
-import { Platform } from 'react-native';
+import { Platform, NativeModules, NativeEventEmitter } from 'react-native';
 import { appEvents } from '../eventEmitter';
+
+// Get native module
+const { NotificationListenerModule } = NativeModules;
+const notificationEmitter = NotificationListenerModule
+  ? new NativeEventEmitter(NotificationListenerModule)
+  : null;
 
 // Event types
 export const NOTIFICATION_EVENTS = {
@@ -53,14 +58,15 @@ class NotificationListenerService {
       return false;
     }
 
-    try {
-      // TODO: Implement actual permission check when package is installed
-      // const RNNotificationListener = require('react-native-notification-listener');
-      // const status = await RNNotificationListener.getPermissionStatus();
-      // return status === 'granted';
-
-      console.log('[NotificationListener] Permission check not implemented yet');
+    if (!NotificationListenerModule) {
+      console.warn('[NotificationListener] Native module not found. Did you rebuild the app?');
       return false;
+    }
+
+    try {
+      const hasPermission = await NotificationListenerModule.checkPermission();
+      console.log('[NotificationListener] Permission status:', hasPermission);
+      return hasPermission;
     } catch (error) {
       console.error('[NotificationListener] Failed to check permission:', error);
       return false;
@@ -77,11 +83,13 @@ class NotificationListenerService {
       return false;
     }
 
-    try {
-      // TODO: Implement actual permission request when package is installed
-      // const RNNotificationListener = require('react-native-notification-listener');
-      // await RNNotificationListener.requestPermission();
+    if (!NotificationListenerModule) {
+      console.warn('[NotificationListener] Native module not found. Did you rebuild the app?');
+      return false;
+    }
 
+    try {
+      await NotificationListenerModule.requestPermission();
       console.log('[NotificationListener] Opening system settings for notification access');
       console.log('[NotificationListener] User must manually grant notification access');
       return true;
@@ -106,6 +114,12 @@ class NotificationListenerService {
       return;
     }
 
+    if (!notificationEmitter) {
+      console.warn('[NotificationListener] Native module not available. Did you rebuild the app?');
+      appEvents.emit(NOTIFICATION_EVENTS.LISTENER_ERROR, new Error('Native module not available'));
+      return;
+    }
+
     const hasPermission = await this.checkPermission();
     if (!hasPermission) {
       console.warn('[NotificationListener] Permission not granted');
@@ -116,12 +130,13 @@ class NotificationListenerService {
     try {
       console.log('[NotificationListener] Starting notification listener...');
 
-      // TODO: Implement actual listener when package is installed
-      // const RNNotificationListener = require('react-native-notification-listener');
-      //
-      // this.listener = RNNotificationListener.addListener((notification) => {
-      //   this.handleNotification(notification);
-      // });
+      // Set up event listener for notifications from native module
+      this.listener = notificationEmitter.addListener(
+        'onNotificationReceived',
+        (notification) => {
+          this.handleNotification(notification);
+        }
+      );
 
       this.isListening = true;
       console.log('[NotificationListener] Listening for notifications from:', this.monitoredPackages);
@@ -143,11 +158,11 @@ class NotificationListenerService {
     try {
       console.log('[NotificationListener] Stopping notification listener...');
 
-      // TODO: Implement actual listener cleanup when package is installed
-      // if (this.listener) {
-      //   this.listener.remove();
-      //   this.listener = null;
-      // }
+      // Remove event listener
+      if (this.listener) {
+        this.listener.remove();
+        this.listener = null;
+      }
 
       this.isListening = false;
       console.log('[NotificationListener] Stopped listening');
