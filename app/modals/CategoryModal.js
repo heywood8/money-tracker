@@ -20,9 +20,15 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import IconPicker from '../components/IconPicker';
+import PropTypes from 'prop-types';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
   const { colors } = useTheme();
+  const themed = useMemo(() => ({
+    closeText: { color: colors.primary },
+    parentText: { color: colors.text, fontSize: 18, marginLeft: 12 },
+    pickerItemText: { color: colors.text, fontSize: 18 },
+  }), [colors]);
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const { categories, addCategory, updateCategory, deleteCategory, validateCategory } = useCategories();
@@ -128,7 +134,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     >
       <KeyboardAvoidingView
         behavior="height"
-        style={{ flex: 1 }}
+        style={styles.keyboardAvoid}
       >
         <Pressable style={styles.modalOverlay} onPress={handleClose}>
           <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
@@ -145,6 +151,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               <TextInput
                 style={[
                   styles.input,
+                  styles.inputThemed,
                   { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                 ]}
                 value={values.name}
@@ -158,14 +165,14 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
 
               {/* Category Type Picker (Income/Expense) */}
               <Pressable
-                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                 onPress={() => setCategoryTypePickerVisible(true)}
               >
-                <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
                   {t('category_type')}
                 </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Text style={{ color: colors.text, fontSize: 16 }}>
+                <View style={styles.pickerRow}>
+                  <Text style={[styles.pickerValue, { color: colors.text }]}>
                     {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
                   </Text>
                   <Icon name="chevron-down" size={20} color={colors.text} />
@@ -174,14 +181,14 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
 
               {/* Parent Picker */}
               <Pressable
-                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                 onPress={() => setParentPickerVisible(true)}
               >
-                <Text style={{ color: colors.mutedText, fontSize: 12, marginBottom: 4 }}>
+                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
                   {t('parent_category')}
                 </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Text style={{ color: colors.text, fontSize: 16 }}>
+                <View style={styles.pickerRow}>
+                  <Text style={[styles.pickerValue, { color: colors.text }]}>
                     {getParentName(values.parentId)}
                   </Text>
                   <Icon name="chevron-down" size={20} color={colors.text} />
@@ -190,17 +197,17 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
 
               {/* Icon Picker */}
               <Pressable
-                style={[styles.iconPickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                style={[styles.iconPickerButton, styles.iconPickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                 onPress={() => setIconPickerVisible(true)}
               >
                 <Icon name={values.icon || 'folder'} size={32} color={colors.text} />
-                <Text style={{ color: colors.mutedText, marginLeft: 12 }}>
+                <Text style={[styles.iconPickerText, { color: colors.mutedText }]}> 
                   {t('select_icon')}
                 </Text>
               </Pressable>
 
               {/* Exclude from Forecast Toggle */}
-              <View style={[styles.toggleRow, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              <View style={[styles.toggleRow, styles.toggleRowThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
                 <View style={styles.toggleLabelContainer}>
                   <Text style={[styles.toggleLabel, { color: colors.text }]}>
                     {t('exclude_from_forecast')}
@@ -288,12 +295,12 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                     pressed && { backgroundColor: colors.selected },
                   ]}
                 >
-                  <Text style={{ color: colors.text, fontSize: 18 }}>{item.label}</Text>
+                  <Text style={themed.pickerItemText}>{item.label}</Text>
                 </Pressable>
               )}
             />
             <Pressable style={styles.closeButton} onPress={() => setCategoryTypePickerVisible(false)}>
-              <Text style={{ color: colors.primary }}>{t('close')}</Text>
+              <Text style={themed.closeText}>{t('close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -325,7 +332,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                 >
                   <View style={styles.parentOption}>
                     <Icon name={item.icon} size={24} color={colors.text} />
-                    <Text style={{ color: colors.text, fontSize: 18, marginLeft: 12 }}>
+                    <Text style={themed.parentText}>
                       {item.nameKey ? t(item.nameKey) : item.name}
                     </Text>
                   </View>
@@ -333,7 +340,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
               )}
             />
             <Pressable style={styles.closeButton} onPress={() => setParentPickerVisible(false)}>
-              <Text style={{ color: colors.primary }}>{t('close')}</Text>
+              <Text style={themed.closeText}>{t('close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -378,12 +385,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 12,
   },
+  // Previously added themed/static helpers (placed near related styles)
+  iconPickerButtonThemed: {
+    padding: 12,
+  },
+  iconPickerText: {
+    marginLeft: 12,
+  },
   input: {
     borderRadius: 4,
     borderWidth: 1,
     fontSize: 16,
     marginBottom: 12,
     padding: 12,
+  },
+  inputThemed: {},
+  keyboardAvoid: {
+    flex: 1,
   },
   modalButton: {
     alignItems: 'center',
@@ -434,6 +452,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 12,
   },
+  pickerButtonThemed: {},
+  pickerLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
   pickerModalContent: {
     borderRadius: 12,
     maxHeight: '70%',
@@ -444,6 +467,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 12,
+  },
+  pickerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  pickerValue: {
+    fontSize: 16,
   },
   scrollContent: {
     paddingBottom: 20,
@@ -473,4 +505,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 12,
   },
+  toggleRowThemed: {},
 });
+
+CategoryModal.propTypes = {
+  visible: PropTypes.bool,
+  onClose: PropTypes.func,
+  category: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    name: PropTypes.string,
+    type: PropTypes.string,
+    parentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    icon: PropTypes.string,
+    category_type: PropTypes.string,
+    categoryType: PropTypes.string,
+    excludeFromForecast: PropTypes.bool,
+  }),
+  isNew: PropTypes.bool,
+};
