@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
 
 /**
@@ -7,6 +8,12 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } f
  */
 const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors }) => {
   const [modalVisible, setModalVisible] = useState(false);
+
+  const webSelectStyle = ({
+    ...baseWebSelectStyle,
+    color: colors && colors.text,
+    ...(style || {}),
+  });
 
   // Get label for current value
   const selectedItem = items.find(item => item.value === value);
@@ -18,23 +25,7 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
       <select
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          outline: 'none',
-          backgroundColor: 'transparent',
-          color: colors.text,
-          fontSize: 14,
-          fontFamily: 'inherit',
-          paddingLeft: 8,
-          paddingRight: 8,
-          cursor: 'pointer',
-          appearance: 'none',
-          WebkitAppearance: 'none',
-          MozAppearance: 'none',
-          ...style,
-        }}
+        style={webSelectStyle}
       >
         {items.map(item => (
           <option key={item.value} value={item.value}>
@@ -109,14 +100,7 @@ const styles = StyleSheet.create({
   androidButtonText: {
     fontSize: 14,
   },
-
   // Modal styles
-  modalOverlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    flex: 1,
-    justifyContent: 'center',
-  },
   modalContent: {
     borderRadius: 8,
     maxHeight: '60%',
@@ -131,6 +115,55 @@ const styles = StyleSheet.create({
   modalItemText: {
     fontSize: 16,
   },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
 });
+
+const baseWebSelectStyle = {
+  width: '100%',
+  height: '100%',
+  border: 'none',
+  outline: 'none',
+  backgroundColor: 'transparent',
+  fontSize: 14,
+  fontFamily: 'inherit',
+  paddingLeft: 8,
+  paddingRight: 8,
+  cursor: 'pointer',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+};
+
+SimplePicker.propTypes = {
+  value: PropTypes.any,
+  onValueChange: PropTypes.func,
+  items: PropTypes.arrayOf(PropTypes.shape({
+    label: PropTypes.string,
+    value: PropTypes.any,
+  })),
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array, PropTypes.number]),
+  textStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array, PropTypes.number]),
+  colors: PropTypes.shape({
+    text: PropTypes.string,
+    surface: PropTypes.string,
+    border: PropTypes.string,
+    selected: PropTypes.string,
+  }),
+};
+
+SimplePicker.defaultProps = {
+  items: [],
+  colors: {
+    text: '#000',
+    surface: '#fff',
+    border: '#e0e0e0',
+    selected: '#f5f5f5',
+  },
+};
 
 export default SimplePicker;
