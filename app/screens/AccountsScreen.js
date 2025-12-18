@@ -6,6 +6,7 @@ import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { useTheme } from '../contexts/ThemeContext';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { useAccounts } from '../contexts/AccountsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import currencies from '../../assets/currencies.json';
@@ -539,6 +540,7 @@ export default function AccountsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header is rendered globally by app/Header; per-screen header removed */}
       <DraggableFlatList
+        contentInsetAdjustmentBehavior="automatic"
         data={enhancedAccounts}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
@@ -757,12 +759,11 @@ const styles = StyleSheet.create({
   },
   accountContentWrapper: {
     flex: 1,
-    paddingVertical: 12,
   },
   accountNameWrapper: {
     flex: 7,
     justifyContent: 'center',
-    paddingLeft: 16,
+    paddingLeft: HORIZONTAL_PADDING,
     paddingRight: 8,
   },
   accountRow: {
@@ -778,7 +779,7 @@ const styles = StyleSheet.create({
     flex: 3,
     justifyContent: 'center',
     paddingLeft: 8,
-    paddingRight: 16,
+    paddingRight: HORIZONTAL_PADDING,
   },
   activeAccountOpacity: {
     opacity: 0.9,
@@ -828,7 +829,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  container: { flex: 1 },
+  container: { 
+    flex: 1,
+    paddingTop: TOP_CONTENT_SPACING,
+  },
   dragHandle: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -895,7 +899,7 @@ const styles = StyleSheet.create({
   },
   pickerDisplay: {
     justifyContent: 'center',
-    padding: 16,
+    padding: HORIZONTAL_PADDING,
   },
   pickerList: {
     maxHeight: 400,
@@ -903,11 +907,10 @@ const styles = StyleSheet.create({
   pickerModalContent: {
     borderRadius: 12,
     margin: 20,
-    padding: 20,
+    padding: HORIZONTAL_PADDING,
   },
   pickerOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
   },
   pickerOptionText: {
     fontSize: 16,
@@ -937,7 +940,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
   showHiddenText: {

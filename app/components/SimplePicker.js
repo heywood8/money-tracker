@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
+import { HORIZONTAL_PADDING } from '../styles/layout';
 
 /**
  * SimplePicker - A picker component for Android
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   },
   modalItem: {
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 16,
   },
   modalItemText: {
