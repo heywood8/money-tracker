@@ -1,4 +1,6 @@
+/* global __DEV__ */
 import React from 'react';
+import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 class ErrorBoundary extends React.Component {
@@ -26,7 +28,7 @@ class ErrorBoundary extends React.Component {
         <View style={styles.container}>
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>
-            We're sorry for the inconvenience. Please try restarting the app.
+            {"We're sorry for the inconvenience. Please try restarting the app."}
           </Text>
           <TouchableOpacity style={styles.button} onPress={this.handleReset}>
             <Text style={styles.buttonText}>Try Again</Text>
@@ -84,3 +86,7 @@ const styles = StyleSheet.create({
 });
 
 export default ErrorBoundary;
+
+ErrorBoundary.propTypes = {
+  children: PropTypes.node,
+};
