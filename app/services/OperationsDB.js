@@ -230,7 +230,7 @@ export const createOperation = async (operation) => {
       ];
       
       console.log('[OperationsDB] INSERT params:', insertParams.map((p, i) => 
-        `[${i}]: ${JSON.stringify(p)} (${typeof p})`
+        `[${i}]: ${JSON.stringify(p)} (${typeof p})`,
       ).join(', '));
       
       const result = await db.runAsync(
