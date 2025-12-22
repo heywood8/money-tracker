@@ -122,36 +122,36 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.sm,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    paddingHorizontal: SPACING.md,
-    minHeight: HEIGHTS.input,
-  },
-  multilineContainer: {
-    minHeight: HEIGHTS.input * 2,
-    alignItems: 'flex-start',
-    paddingVertical: SPACING.md,
-  },
-  input: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
-  },
-  multilineInput: {
-    textAlignVertical: 'top',
-  },
-  leftIcon: {
-    marginRight: SPACING.sm,
-  },
   disabled: {
     opacity: OPACITY.disabled,
   },
   errorText: {
     fontSize: FONT_SIZE.sm,
-    marginTop: SPACING.xs,
     marginLeft: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  input: {
+    flex: 1,
+    fontSize: FONT_SIZE.base,
+  },
+  inputContainer: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: HEIGHTS.input,
+    paddingHorizontal: SPACING.md,
+  },
+  leftIcon: {
+    marginRight: SPACING.sm,
+  },
+  multilineContainer: {
+    alignItems: 'flex-start',
+    minHeight: HEIGHTS.input * 2,
+    paddingVertical: SPACING.md,
+  },
+  multilineInput: {
+    textAlignVertical: 'top',
   },
 });
 

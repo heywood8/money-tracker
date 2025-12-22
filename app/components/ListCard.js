@@ -79,14 +79,14 @@ export default function ListCard({
     }
 
     switch (variant) {
-      case 'expense':
-        return colors.expenseBackground || colors.background;
-      case 'income':
-        return colors.incomeBackground || colors.background;
-      case 'transfer':
-        return colors.transferBackground || colors.background;
-      default:
-        return colors.background;
+    case 'expense':
+      return colors.expenseBackground || colors.background;
+    case 'income':
+      return colors.incomeBackground || colors.background;
+    case 'transfer':
+      return colors.transferBackground || colors.background;
+    default:
+      return colors.background;
     }
   };
 
@@ -97,30 +97,36 @@ export default function ListCard({
     if (leftIconColor) return leftIconColor;
 
     switch (variant) {
-      case 'expense':
-        return colors.expense || colors.text;
-      case 'income':
-        return colors.income || colors.text;
-      case 'transfer':
-        return colors.transfer || colors.text;
-      default:
-        return colors.text;
+    case 'expense':
+      return colors.expense || colors.text;
+    case 'income':
+      return colors.income || colors.text;
+    case 'transfer':
+      return colors.transfer || colors.text;
+    default:
+      return colors.text;
     }
   };
+
+  // Memoized themed style object to avoid inline style objects in JSX
+  const cardThemed = React.useMemo(() => ({
+    backgroundColor: getBackgroundColor(),
+    borderColor: showBorder ? colors.border : 'transparent',
+  }), [colors, showBorder, variant, alternateBackground]);
 
   /**
    * Determine icon background color when leftIconBackground is true
    */
   const getIconBackgroundColor = () => {
     switch (variant) {
-      case 'expense':
-        return colors.expenseBackground || colors.surface;
-      case 'income':
-        return colors.incomeBackground || colors.surface;
-      case 'transfer':
-        return colors.transferBackground || colors.surface;
-      default:
-        return colors.surface;
+    case 'expense':
+      return colors.expenseBackground || colors.surface;
+    case 'income':
+      return colors.incomeBackground || colors.surface;
+    case 'transfer':
+      return colors.transferBackground || colors.surface;
+    default:
+      return colors.surface;
     }
   };
 
@@ -129,10 +135,7 @@ export default function ListCard({
       mode="outlined"
       style={[
         styles.card,
-        {
-          backgroundColor: getBackgroundColor(),
-          borderColor: showBorder ? colors.border : 'transparent',
-        },
+        cardThemed,
         style,
       ]}
     >
@@ -188,31 +191,31 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.sm,
     marginVertical: SPACING.xs,
   },
-  touchable: {
-    minHeight: HEIGHTS.listItem,
+  childrenContainer: {
+    flex: 1,
   },
   content: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     minHeight: HEIGHTS.listItem,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
   },
-  leftIconContainer: {
-    marginRight: SPACING.md,
-  },
   iconBackground: {
     borderRadius: ICON_SIZE.xl / 2, // Circular background
-    width: ICON_SIZE.xl,
     height: ICON_SIZE.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    width: ICON_SIZE.xl,
   },
-  childrenContainer: {
-    flex: 1,
+  leftIconContainer: {
+    marginRight: SPACING.md,
   },
   rightActionContainer: {
     marginLeft: SPACING.md,
+  },
+  touchable: {
+    minHeight: HEIGHTS.listItem,
   },
 });
 
