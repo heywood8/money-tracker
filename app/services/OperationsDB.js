@@ -174,13 +174,31 @@ const calculateBalanceChanges = (operation) => {
  */
 export const createOperation = async (operation) => {
   try {
+    console.log('[OperationsDB] createOperation - type:', operation.type, 'amount:', operation.amount, typeof operation.amount, 'accountId:', operation.accountId, typeof operation.accountId, 'toAccountId:', operation.toAccountId, typeof operation.toAccountId, 'categoryId:', operation.categoryId, typeof operation.categoryId, 'date:', operation.date);
+    
     const now = new Date().toISOString();
+    
+    // Safely extract primitive IDs (handle case where objects might be passed)
+    const extractId = (value, fieldName) => {
+      if (value === null || value === undefined || value === '') {
+        console.log(`[OperationsDB] ${fieldName}: null/undefined/empty`);
+        return null;
+      }
+      if (typeof value === 'object' && value !== null) {
+        console.log(`[OperationsDB] ${fieldName}: object with id=${value.id} (${typeof value.id})`);
+        if (value.id !== undefined) {
+          return value.id;
+        }
+      }
+      return value;
+    };
+    
     const operationData = {
       type: operation.type,
       amount: operation.amount,
-      account_id: operation.accountId,
-      category_id: operation.categoryId || null,
-      to_account_id: operation.toAccountId || null,
+      account_id: extractId(operation.accountId, 'accountId'),
+      category_id: extractId(operation.categoryId, 'categoryId'),
+      to_account_id: extractId(operation.toAccountId, 'toAccountId'),
       date: operation.date,
       created_at: now,
       description: operation.description || null,
@@ -189,27 +207,35 @@ export const createOperation = async (operation) => {
       source_currency: operation.sourceCurrency || null,
       destination_currency: operation.destinationCurrency || null,
     };
+    
+    console.log('[OperationsDB] operationData - account_id:', operationData.account_id, typeof operationData.account_id, 'to_account_id:', operationData.to_account_id, typeof operationData.to_account_id, 'category_id:', operationData.category_id, typeof operationData.category_id);
 
     let newOperationId;
 
     await executeTransaction(async (db) => {
       // Insert operation (ID will be auto-generated)
+      const insertParams = [
+        operationData.type,
+        operationData.amount,
+        operationData.account_id,
+        operationData.category_id,
+        operationData.to_account_id,
+        operationData.date,
+        operationData.created_at,
+        operationData.description,
+        operationData.exchange_rate,
+        operationData.destination_amount,
+        operationData.source_currency,
+        operationData.destination_currency,
+      ];
+      
+      console.log('[OperationsDB] INSERT params:', insertParams.map((p, i) => 
+        `[${i}]: ${JSON.stringify(p)} (${typeof p})`
+      ).join(', '));
+      
       const result = await db.runAsync(
         'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          operationData.type,
-          operationData.amount,
-          operationData.account_id,
-          operationData.category_id,
-          operationData.to_account_id,
-          operationData.date,
-          operationData.created_at,
-          operationData.description,
-          operationData.exchange_rate,
-          operationData.destination_amount,
-          operationData.source_currency,
-          operationData.destination_currency,
-        ],
+        insertParams,
       );
 
       // Store the auto-generated ID
@@ -263,6 +289,13 @@ export const createOperation = async (operation) => {
  */
 export const updateOperation = async (id, updates) => {
   try {
+    // Safely extract primitive IDs (handle case where objects might be passed)
+    const extractId = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      if (typeof value === 'object' && value.id !== undefined) return value.id;
+      return value;
+    };
+    
     await executeTransaction(async (db) => {
       // Get old operation
       const oldOperation = await db.getFirstAsync(
@@ -288,15 +321,15 @@ export const updateOperation = async (id, updates) => {
       }
       if (updates.accountId !== undefined) {
         fields.push('account_id = ?');
-        values.push(updates.accountId);
+        values.push(extractId(updates.accountId));
       }
       if (updates.categoryId !== undefined) {
         fields.push('category_id = ?');
-        values.push(updates.categoryId || null);
+        values.push(extractId(updates.categoryId));
       }
       if (updates.toAccountId !== undefined) {
         fields.push('to_account_id = ?');
-        values.push(updates.toAccountId || null);
+        values.push(extractId(updates.toAccountId));
       }
       if (updates.date !== undefined) {
         fields.push('date = ?');

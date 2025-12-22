@@ -279,6 +279,37 @@ describe('OperationsDB Service', () => {
       expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     });
 
+    it('handles object IDs by extracting the id property', async () => {
+      // Simulate case where account/category objects are passed instead of just IDs
+      const operation = {
+        type: 'transfer',
+        amount: '100',
+        accountId: { id: 1 }, // Object instead of primitive
+        toAccountId: { id: 2 }, // Object instead of primitive
+        categoryId: { id: 'cat1' }, // Object instead of primitive
+        date: '2025-12-05',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce({ balance: '1000' })
+        .mockResolvedValueOnce({ balance: '500' });
+
+      await OperationsDB.createOperation(operation);
+
+      // Should extract IDs from objects
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO operations'),
+        expect.arrayContaining([
+          'transfer',
+          '100',
+          1, // Extracted from { id: 1 }
+          'cat1', // Extracted from { id: 'cat1' }
+          2, // Extracted from { id: 2 }
+          '2025-12-05',
+        ]),
+      );
+    });
+
     it('uses transaction for atomic operation creation', async () => {
       const operation = {
         id: 6,

@@ -198,9 +198,21 @@ export const OperationsProvider = ({ children }) => {
 
   const addOperation = useCallback(async (operation) => {
     try {
+      console.log('[OperationsContext] addOperation called with:', {
+        type: operation.type,
+        amount: operation.amount,
+        accountId: operation.accountId,
+        toAccountId: operation.toAccountId,
+        categoryId: operation.categoryId,
+        date: operation.date,
+        description: operation.description,
+      });
+      
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
 
+      console.log('[OperationsContext] Operation created successfully:', createdOperation?.id);
+      
       // Reload from the beginning to ensure consistency
       await loadInitialOperations();
       setSaveError(null);
