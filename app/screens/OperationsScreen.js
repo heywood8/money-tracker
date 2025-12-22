@@ -166,7 +166,7 @@ const QuickAddForm = memo(({
           </Pressable>
           <TouchableOpacity
             style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-            onPress={handleQuickAdd}
+            onPress={() => handleQuickAdd()}
           >
             <Text style={styles.quickAddButtonText}>{t('add')}</Text>
           </TouchableOpacity>
@@ -177,7 +177,7 @@ const QuickAddForm = memo(({
       {quickAddValues.type === 'transfer' && (
         <TouchableOpacity
           style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-          onPress={handleQuickAdd}
+          onPress={() => handleQuickAdd()}
         >
           <Text style={styles.quickAddButtonText}>{t('add')}</Text>
         </TouchableOpacity>
