@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
+import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
 
 /**
  * Calculator button component - Memoized for performance
@@ -373,11 +374,11 @@ Calculator.defaultProps = {
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: 5,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
     elevation: 2,
     flex: 1,
-    height: 44,
+    height: HEIGHTS.calculator,
     justifyContent: 'center',
     shadowColor: '#7a7878ff',
     shadowOffset: { width: 0, height: 1 },
@@ -390,17 +391,17 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
     width: '100%',
   },
   display: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
     minHeight: 40,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
     width: '100%',
   },
   displayText: {
@@ -411,19 +412,19 @@ const styles = StyleSheet.create({
   equalsButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
-    paddingHorizontal: 4,
+    marginLeft: SPACING.md,
+    paddingHorizontal: SPACING.xs,
   },
   equalsButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
   },
   keypad: {
-    gap: 3,
+    gap: SPACING.xs,
     width: '100%',
   },
   row: {
     flexDirection: 'row',
-    gap: 3,
+    gap: SPACING.xs,
   },
 });

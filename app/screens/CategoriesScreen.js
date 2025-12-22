@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -11,6 +11,7 @@ import { useBudgets } from '../contexts/BudgetsContext';
 import CategoryModal from '../modals/CategoryModal';
 import BudgetModal from '../modals/BudgetModal';
 import BudgetProgressBar from '../components/BudgetProgressBar';
+import ListCard from '../components/ListCard';
 
 const CategoriesScreen = () => {
   const { colors } = useTheme();
@@ -101,19 +102,13 @@ const CategoriesScreen = () => {
     const isExpanded = expandedIds.has(category.id);
     const indentWidth = depth * 20;
     const categoryType = category.category_type || category.categoryType || 'expense';
-    const rowBackgroundColor = categoryType === 'expense' ? colors.expenseBackground : colors.incomeBackground;
     const hasBudget = hasActiveBudget(category.id);
     const budget = hasBudget ? getBudgetForCategory(category.id) : null;
 
     return (
-      <View style={[styles.itemBorder, { borderBottomColor: colors.border }]}> 
-        <TouchableOpacity
-          style={[
-            styles.categoryRow,
-            {
-              backgroundColor: rowBackgroundColor,
-            },
-          ]}
+      <View>
+        <ListCard
+          variant={categoryType}
           onPress={() => {
             if (hasChildren) {
               toggleExpanded(category.id);
@@ -122,11 +117,12 @@ const CategoriesScreen = () => {
             }
           }}
           onLongPress={() => handleCategoryLongPress(category)}
-          accessibilityRole="button"
+          leftIcon={category.icon}
+          style={{ paddingLeft: indentWidth }}
           accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
           accessibilityHint={hasChildren ? 'Double tap to expand or collapse' : 'Double tap to edit'}
         >
-          <View style={[styles.categoryContent, { paddingLeft: HORIZONTAL_PADDING + indentWidth }]}>
+          <View style={styles.categoryContent}>
             {/* Expand/Collapse Icon */}
             {hasChildren ? (
               <TouchableOpacity
@@ -153,9 +149,6 @@ const CategoriesScreen = () => {
               <View style={styles.expandButton} />
             )}
 
-            {/* Category Icon */}
-            <Icon name={category.icon} size={22} color={colors.text} style={styles.categoryIcon} accessible={false} />
-
             {/* Category Name */}
             <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
               {category.nameKey ? t(category.nameKey) : category.name}
@@ -172,11 +165,11 @@ const CategoriesScreen = () => {
               />
             )}
           </View>
-        </TouchableOpacity>
+        </ListCard>
 
         {/* Budget Progress Bar */}
         {budget && (
-          <View style={[styles.progressBarContainer, { paddingLeft: HORIZONTAL_PADDING + indentWidth, backgroundColor: rowBackgroundColor }]}>
+          <View style={[styles.progressBarContainer, { paddingLeft: HORIZONTAL_PADDING + indentWidth }]}>
             <BudgetProgressBar budgetId={budget.id} compact={false} showDetails={true} />
           </View>
         )}
@@ -244,24 +237,17 @@ const CategoriesScreen = () => {
 
 const styles = StyleSheet.create({
   budgetIcon: {
-    marginLeft: 8,
+    marginLeft: SPACING.sm,
   },
   categoryContent: {
     alignItems: 'center',
     flexDirection: 'row',
-    paddingRight: 16,
-    paddingVertical: 6,
-  },
-  categoryIcon: {
-    marginRight: 12,
+    flex: 1,
   },
   categoryName: {
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
-  },
-  categoryRow: {
-    minHeight: 44,
   },
   container: {
     flex: 1,
@@ -279,29 +265,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 32,
     justifyContent: 'center',
-    marginRight: 4,
+    marginRight: SPACING.xs,
     width: 32,
   },
   fab: {
     bottom: 0,
-    margin: 16,
+    margin: SPACING.lg,
     position: 'absolute',
     right: 0,
-  },
-  itemBorder: {
-    borderBottomWidth: 1,
   },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   progressBarContainer: {
-    paddingBottom: 12,
+    paddingBottom: SPACING.md,
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 8,
+    paddingVertical: SPACING.sm,
   },
   sectionMarginTop: {
-    marginTop: 12,
+    marginTop: SPACING.md,
   },
 });
 
