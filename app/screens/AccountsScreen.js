@@ -6,10 +6,11 @@ import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { useTheme } from '../contexts/ThemeContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useAccounts } from '../contexts/AccountsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import currencies from '../../assets/currencies.json';
+import ListCard from '../components/ListCard';
 
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
@@ -222,7 +223,6 @@ ConfirmationDialog.defaultProps = {
 // Memoized account row component
 const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
   const isEven = index % 2 === 0;
-  const rowBg = isEven ? colors.background : colors.altRow;
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
   const formattedBalance = parseFloat(item.balance).toFixed(decimals);
 
@@ -231,37 +231,13 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
   }, [onPress, item.id]);
 
   return (
-    <Card
-      mode="outlined"
-      style={[
-        styles.accountCard,
-        { backgroundColor: rowBg, borderColor: colors.border },
-        isActive && { backgroundColor: colors.selected },
-        isActive && styles.activeAccountOpacity,
-      ]}
-    >
-      <View style={styles.accountRow}>
-        <TouchableRipple
-          style={styles.accountContentWrapper}
-          onPress={handlePress}
-          rippleColor="rgba(0, 0, 0, .12)"
-          accessibilityLabel={t('edit_account') || 'Edit Account'}
-          accessibilityRole="button"
-        >
-          <View style={styles.rowAlignCenter}>
-            <View style={styles.accountNameWrapper}>
-              <Text variant="titleMedium" numberOfLines={1} ellipsizeMode="tail">
-                {item.name}
-              </Text>
-            </View>
-            <View style={styles.verticalDivider} />
-            <View style={styles.accountValueWrapper}>
-              <Text variant="titleMedium" style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
-                {formattedBalance} {item.currencySymbol}
-              </Text>
-            </View>
-          </View>
-        </TouchableRipple>
+    <ListCard
+      variant="default"
+      alternateBackground={!isEven}
+      onPress={handlePress}
+      style={isActive && [{ backgroundColor: colors.selected }, styles.activeAccountOpacity]}
+      accessibilityLabel={t('edit_account') || 'Edit Account'}
+      rightAction={
         <TouchableRipple
           onLongPress={drag}
           style={styles.dragHandle}
@@ -271,8 +247,22 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
         >
           <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
         </TouchableRipple>
+      }
+    >
+      <View style={styles.rowAlignCenter}>
+        <View style={styles.accountNameWrapper}>
+          <Text variant="titleMedium" numberOfLines={1} ellipsizeMode="tail">
+            {item.name}
+          </Text>
+        </View>
+        <View style={styles.verticalDivider} />
+        <View style={styles.accountValueWrapper}>
+          <Text variant="titleMedium" style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
+            {formattedBalance} {item.currencySymbol}
+          </Text>
+        </View>
       </View>
-    </Card>
+    </ListCard>
   );
 });
 
@@ -752,24 +742,10 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
-  accountCard: {
-    borderRadius: 8,
-    marginHorizontal: 8,
-    marginVertical: 4,
-  },
-  accountContentWrapper: {
-    flex: 1,
-  },
   accountNameWrapper: {
     flex: 7,
     justifyContent: 'center',
-    paddingLeft: HORIZONTAL_PADDING,
-    paddingRight: 8,
-  },
-  accountRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    minHeight: 56,
+    paddingRight: SPACING.sm,
   },
   accountValueText: {
     textAlign: 'right',
@@ -778,29 +754,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flex: 3,
     justifyContent: 'center',
-    paddingLeft: 8,
-    paddingRight: HORIZONTAL_PADDING,
+    paddingLeft: SPACING.sm,
   },
   activeAccountOpacity: {
     opacity: 0.9,
   },
   bodySmallMutedMarginTop: {
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   centeredBodyMedium: {
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
   },
   centeredBodySmall: {
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
   },
   centeredErrorText: {
     textAlign: 'center',
   },
   centeredTitleLarge: {
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
     textAlign: 'center',
   },
   confirmationButton: {
@@ -808,41 +783,41 @@ const styles = StyleSheet.create({
   },
   confirmationButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
     justifyContent: 'space-between',
   },
   confirmationMessage: {
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: SPACING.xxl,
     textAlign: 'center',
   },
   confirmationModalContent: {
     alignSelf: 'center',
-    borderRadius: 16,
-    margin: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
     maxWidth: 500,
-    padding: 24,
+    padding: SPACING.xxl,
     width: '90%',
   },
   confirmationTitle: {
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
   },
-  container: { 
+  container: {
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
   dragHandle: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 16,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.lg,
   },
   error: {
     color: 'red',
-    marginBottom: 8,
-    marginLeft: 12,
+    marginBottom: SPACING.sm,
+    marginLeft: SPACING.md,
   },
   errorContainer: {
     alignItems: 'center',
@@ -850,12 +825,12 @@ const styles = StyleSheet.create({
   },
   fab: {
     bottom: 0,
-    margin: 16,
+    margin: SPACING.lg,
     position: 'absolute',
     right: 0,
   },
   listContentContainer: {
-    paddingBottom: 20,
+    paddingBottom: SPACING.xl,
   },
   listEmptyText: {
     // color set dynamically
@@ -865,37 +840,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: SPACING.md,
   },
   modalButton: {
     flex: 1,
   },
   modalButtonRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: SPACING.lg,
   },
   modalContent: {
-    borderRadius: 12,
-    margin: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
     maxHeight: '90%',
-    padding: 20,
+    padding: SPACING.xl,
   },
   modalTitle: {
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
   },
   pickerAccountBalance: {
     fontSize: 14,
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   pickerAccountName: {
     fontSize: 16,
     fontWeight: '600',
   },
   pickerCloseButton: {
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   pickerDisplay: {
     justifyContent: 'center',
@@ -905,8 +880,8 @@ const styles = StyleSheet.create({
     maxHeight: 400,
   },
   pickerModalContent: {
-    borderRadius: 12,
-    margin: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
     padding: HORIZONTAL_PADDING,
   },
   pickerOption: {
@@ -917,10 +892,10 @@ const styles = StyleSheet.create({
   },
   pickerWrapper: {
     borderColor: 'rgba(0, 0, 0, 0.12)',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    marginBottom: 8,
-    marginTop: 8,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
     overflow: 'hidden',
   },
   rowAlignCenter: {
@@ -929,19 +904,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   showHiddenButton: {
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    marginHorizontal: 8,
-    marginTop: 16,
-    marginVertical: 8,
+    marginHorizontal: SPACING.sm,
+    marginTop: SPACING.lg,
+    marginVertical: SPACING.sm,
   },
   showHiddenContent: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     justifyContent: 'center',
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   showHiddenText: {
     fontSize: 16,
@@ -951,15 +926,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 16,
-    paddingVertical: 8,
+    marginVertical: SPACING.lg,
+    paddingVertical: SPACING.sm,
   },
   switchLabelContainer: {
     flex: 1,
-    marginRight: 16,
+    marginRight: SPACING.lg,
   },
   textInput: {
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   verticalDivider: {
     alignSelf: 'center',
