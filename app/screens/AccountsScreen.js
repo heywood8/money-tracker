@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
   },
   accountValueWrapper: {
     alignItems: 'flex-end',
-    flex: 3,
+    flex: 4,
     justifyContent: 'center',
     paddingLeft: SPACING.sm,
   },

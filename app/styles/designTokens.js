@@ -44,7 +44,7 @@ export const BORDER_RADIUS = {
  */
 export const HEIGHTS = {
   input: 48,           // All text inputs, pickers, buttons (min touch target)
-  listItem: 56,        // ALL list item rows (accounts, operations, categories)
+  listItem: 48,        // ALL list item rows (accounts, operations, categories)
   calculator: 44,      // Calculator buttons (compact, intentional)
   fab: 56,             // Floating action button
   tabBar: 80,          // Bottom tab bar (includes 24px bottom padding)
@@ -82,7 +82,7 @@ export const FONT_WEIGHT = {
  * These were previously defined in layout.js
  */
 export const HORIZONTAL_PADDING = SPACING.lg; // 16px - screen horizontal gutters
-export const TOP_CONTENT_SPACING = SPACING.md; // 12px - top margin for content
+export const TOP_CONTENT_SPACING = SPACING.sm; // 12px - top margin for content
 
 // ============ ICON SIZES ============
 /**
