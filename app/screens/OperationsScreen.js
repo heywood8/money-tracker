@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useOperations } from '../contexts/OperationsContext';
@@ -15,6 +15,7 @@ import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import OperationModal from '../modals/OperationModal';
 import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
+import ListCard from '../components/ListCard';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -693,35 +694,15 @@ const OperationsScreen = () => {
     }
 
     return (
-      <TouchableOpacity
-        style={[styles.operationRow, { borderBottomColor: colors.border }]}
+      <ListCard
+        variant={operation.type}
         onPress={() => handleEditOperation(operation)}
-        accessibilityRole="button"
+        leftIcon={categoryInfo.icon}
+        leftIconBackground={true}
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={t('edit_operation_hint')}
       >
         <View style={styles.operationContent}>
-          {/* Category Icon */}
-          <View
-            style={[
-              styles.iconContainer,
-              {
-                backgroundColor: isExpense
-                  ? colors.expenseBackground || '#ffe5e5'
-                  : isIncome
-                    ? colors.incomeBackground || '#e5ffe5'
-                    : colors.transferBackground || '#e5e5ff',
-              },
-            ]}
-          >
-            <Icon
-              name={categoryInfo.icon}
-              size={24}
-              color={isExpense ? colors.expense || '#ff4444' : isIncome ? colors.income || '#44ff44' : colors.transfer || '#4444ff'}
-              accessible={false}
-            />
-          </View>
-
           {/* Operation Info */}
           <View style={styles.operationInfo}>
             <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
@@ -731,15 +712,8 @@ const OperationsScreen = () => {
               {accountName}
               {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
             </Text>
-            {isMultiCurrencyTransfer ? (
-              <Text style={[styles.exchangeRate, { color: colors.mutedText }]} numberOfLines={1}>
-                {getCurrencySymbol(operation.sourceCurrency)} → {getCurrencySymbol(operation.destinationCurrency)}: {parseFloat(operation.exchangeRate).toFixed(4)}
-              </Text>
-            ) : operation.description ? (
-              <Text style={[styles.description, { color: colors.mutedText }]} numberOfLines={1}>
-                {operation.description}
-              </Text>
-            ) : null}
+            {/* Note: Description/exchange rate hidden in list view to fit 56px height */}
+            {/* They are still visible in the edit modal */}
           </View>
 
           {/* Date and Amount */}
@@ -755,6 +729,7 @@ const OperationsScreen = () => {
                       : colors.text,
                 },
               ]}
+              numberOfLines={1}
             >
               {formatCurrency(operation.accountId, operation.amount)}
             </Text>
@@ -763,12 +738,12 @@ const OperationsScreen = () => {
                 → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
               </Text>
             )}
-            <Text style={[styles.date, { color: colors.mutedText }]}> 
+            <Text style={[styles.date, { color: colors.mutedText }]} numberOfLines={1}>
               {formatDate(operation.date)}
             </Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </ListCard>
     );
   }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, formatDate, formatCurrency]);
 
@@ -1007,8 +982,8 @@ const styles = StyleSheet.create({
   },
   accountPickersRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   amount: {
     fontSize: 18,
@@ -1016,16 +991,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   backButton: {
-    marginRight: 8,
-    padding: 4,
+    marginRight: SPACING.sm,
+    padding: SPACING.xs,
   },
   breadcrumbContainer: {
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
     paddingHorizontal: HORIZONTAL_PADDING / 2,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   breadcrumbText: {
     flex: 1,
@@ -1034,11 +1009,9 @@ const styles = StyleSheet.create({
   },
   categoryAddRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
-  
-
   categoryName: {
     fontSize: 16,
     fontWeight: '600',
@@ -1049,18 +1022,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   centeredPaddedText: {
-    padding: 20,
+    padding: SPACING.xl,
     textAlign: 'center',
   },
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: SPACING.lg,
     minHeight: 48,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.xxl,
+    paddingVertical: SPACING.md,
   },
   closeButtonText: {
     fontSize: 16,
@@ -1075,9 +1048,9 @@ const styles = StyleSheet.create({
   dateSeparator: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   dateSeparatorContent: {
     alignItems: 'center',
@@ -1117,7 +1090,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    marginTop: 16,
+    marginTop: SPACING.lg,
   },
   exchangeRate: {
     fontSize: 11,
@@ -1125,7 +1098,7 @@ const styles = StyleSheet.create({
   },
   filterFab: {
     bottom: 0,
-    margin: 16,
+    margin: SPACING.lg,
     position: 'absolute',
     right: 0,
   },
@@ -1134,47 +1107,38 @@ const styles = StyleSheet.create({
   },
   formInput: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 12,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 10,
   },
   formInputCategory: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 2,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 10,
   },
   formInputHalf: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 10,
   },
 
   formInputText: {
     flex: 1,
     fontSize: 15,
-  },
-  
-  iconContainer: {
-    alignItems: 'center',
-    borderRadius: 24,
-    height: 48,
-    justifyContent: 'center',
-    marginRight: 12,
-    width: 48,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1183,15 +1147,15 @@ const styles = StyleSheet.create({
   loadingMoreContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: SPACING.xl,
   },
   loadingMoreText: {
     fontSize: 14,
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   loadingText: {
     fontSize: 16,
-    marginTop: 12,
+    marginTop: SPACING.md,
   },
   modalOverlay: {
     alignItems: 'center',
@@ -1202,24 +1166,18 @@ const styles = StyleSheet.create({
   operationContent: {
     alignItems: 'center',
     flexDirection: 'row',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 12,
+    flex: 1,
   },
   operationInfo: {
     flex: 1,
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   operationRight: {
     alignItems: 'flex-end',
-    marginRight: 8,
-  },
-  operationRow: {
-    borderBottomWidth: 1,
-    minHeight: 72,
   },
   
   pickerModalContent: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     maxHeight: '70%',
     padding: HORIZONTAL_PADDING,
     width: '90%',
@@ -1228,26 +1186,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     justifyContent: 'center',
     minHeight: 48,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.md,
   },
   pickerOptionText: {
     fontSize: 18,
   },
   pickerOptionTextExpanded: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: SPACING.md,
   },
   pickerSmallText: {
     fontSize: 14,
   },
   quickAddButton: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   quickAddButtonText: {
     color: '#fff',
@@ -1255,18 +1213,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickAddForm: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
     marginHorizontal: HORIZONTAL_PADDING,
-    marginTop: 12,
+    marginTop: SPACING.md,
     padding: HORIZONTAL_PADDING,
   },
   
   resetFilterButton: {
     alignItems: 'center',
-    borderRadius: 20,
-    bottom: 16,
+    borderRadius: BORDER_RADIUS.lg + 8,
+    bottom: SPACING.lg,
     elevation: 4,
     height: 40,
     justifyContent: 'center',
@@ -1280,12 +1238,12 @@ const styles = StyleSheet.create({
   },
   scrollToTopButton: {
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.lg + 8,
     elevation: 4,
     height: 40,
     justifyContent: 'center',
     position: 'absolute',
-    right: 16,
+    right: SPACING.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

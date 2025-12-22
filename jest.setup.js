@@ -189,6 +189,45 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
+// Mock react-native-paper components used in ListCard
+jest.mock('react-native-paper', () => {
+  const React = require('react');
+  const { View, Text, TouchableOpacity } = require('react-native');
+
+  return {
+    Card: ({ children, style, mode, ...props }) => React.createElement(View, { style, ...props }, children),
+    TouchableRipple: ({ children, onPress, onLongPress, style, ...props }) =>
+      React.createElement(TouchableOpacity, { onPress, onLongPress, style, ...props }, children),
+    Portal: ({ children }) => children,
+    Modal: ({ children, visible, ...props }) => visible ? React.createElement(View, props, children) : null,
+    Text: Text,
+    TextInput: ({ ...props }) => React.createElement(View, props),
+    Button: ({ children, onPress, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }, children),
+    FAB: ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }),
+    ActivityIndicator: View,
+    Divider: View,
+    Switch: ({ value, onValueChange, ...props }) => React.createElement(View, props),
+    Provider: ({ children }) => children,
+  };
+});
+
+// Mock @expo/vector-icons
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+
+  const MockIcon = ({ name, size, color, ...props }) =>
+    React.createElement(Text, { ...props, testID: `icon-${name}` }, name);
+
+  return {
+    MaterialCommunityIcons: MockIcon,
+    Ionicons: MockIcon,
+    FontAwesome: MockIcon,
+    Feather: MockIcon,
+    MaterialIcons: MockIcon,
+  };
+});
+
 // Mock react-native-draggable-flatlist
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');

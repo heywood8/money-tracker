@@ -25,6 +25,7 @@ import { getLastAccessedAccount, setLastAccessedAccount } from '../services/Last
 import Calculator from '../components/Calculator';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
+import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -913,16 +914,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    marginRight: 8,
-    padding: 4,
+    marginRight: SPACING.sm,
+    padding: SPACING.xs,
   },
   breadcrumbContainer: {
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    marginBottom: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.md,
   },
   breadcrumbText: {
     flex: 1,
@@ -935,7 +936,7 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: SPACING.md,
   },
   categoryOption: {
     alignItems: 'center',
@@ -944,12 +945,12 @@ const styles = StyleSheet.create({
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: SPACING.lg,
     minHeight: 48,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.xxl,
+    paddingVertical: SPACING.md,
   },
   closeButtonText: {
     fontSize: 16,
@@ -958,9 +959,9 @@ const styles = StyleSheet.create({
   currencyInfo: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
   },
   currencyInfoText: {
     fontSize: 14,
@@ -973,11 +974,11 @@ const styles = StyleSheet.create({
   deleteButtonContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: SPACING.sm,
     minHeight: 48,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   deleteButtonText: {
     fontSize: 16,

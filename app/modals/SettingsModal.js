@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
-import { HORIZONTAL_PADDING } from '../styles/layout';
+import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -463,28 +463,28 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-    marginTop: 8,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
   },
   content: {
-    borderRadius: 12,
-    margin: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
     maxHeight: '90%',
-    padding: 24,
+    padding: SPACING.xxl,
   },
   divider: {
-    marginVertical: 12,
+    marginVertical: SPACING.md,
   },
   formatDescription: {
     fontSize: 12,
-    marginTop: 4,
-    padding: HORIZONTAL_PADDING + 8,
+    marginTop: SPACING.xs,
+    padding: HORIZONTAL_PADDING + SPACING.sm,
   },
   formatItemRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   hidden: {
     opacity: 0,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: SPACING.lg,
   },
   languageItemText: {
     fontSize: 16,
