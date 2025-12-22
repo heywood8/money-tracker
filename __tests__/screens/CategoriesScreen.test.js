@@ -5,19 +5,42 @@
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
+import PropTypes from 'prop-types';
 
 // Mock all dependencies
 jest.mock('react-native-paper', () => {
   const React = require('react');
   const { View, Text, TouchableOpacity, ActivityIndicator } = require('react-native');
+  const PropTypes = require('prop-types');
   
+  const FAB = ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, testID: 'fab', ...props });
+  FAB.propTypes = {
+    onPress: PropTypes.func,
+    icon: PropTypes.string,
+    label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  };
+
+  const Card = ({ children, style, ...props }) => React.createElement(View, { style, testID: 'card', ...props }, children);
+  Card.propTypes = {
+    children: PropTypes.node,
+    style: PropTypes.any,
+  };
+
+  const TouchableRipple = ({ children, onPress, onLongPress, style, ...props }) => 
+    React.createElement(TouchableOpacity, { onPress, onLongPress, style, testID: 'touchable-ripple', ...props }, children);
+  TouchableRipple.propTypes = {
+    children: PropTypes.node,
+    onPress: PropTypes.func,
+    onLongPress: PropTypes.func,
+    style: PropTypes.any,
+  };
+
   return {
     Text: Text,
-    FAB: ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, testID: 'fab', ...props }),
+    FAB,
     ActivityIndicator: ActivityIndicator,
-    Card: ({ children, style, ...props }) => React.createElement(View, { style, testID: 'card', ...props }, children),
-    TouchableRipple: ({ children, onPress, onLongPress, style, ...props }) => 
-      React.createElement(TouchableOpacity, { onPress, onLongPress, style, testID: 'touchable-ripple', ...props }, children),
+    Card,
+    TouchableRipple,
   };
 });
 
