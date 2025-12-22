@@ -232,12 +232,15 @@ jest.mock('react-native-paper', () => {
   const Provider = ({ children }) => children;
   Provider.propTypes = { children: PropTypes.node };
 
+  const PaperText = ({ children, style, ...props }) => React.createElement(Text, { style, ...props }, children);
+  PaperText.propTypes = { children: PropTypes.node, style: PropTypes.any };
+
   return {
     Card,
     TouchableRipple,
     Portal,
     Modal,
-    Text: Text,
+    Text: PaperText,
     TextInput,
     Button,
     FAB,
