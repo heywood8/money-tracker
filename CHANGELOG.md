@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.18.0](https://github.com/heywood8/money-tracker/compare/penny-v0.17.0...penny-v0.18.0) (2025-12-22)
+
+
+### Features
+
+* design reusability ([#132](https://github.com/heywood8/money-tracker/issues/132)) ([f952b51](https://github.com/heywood8/money-tracker/commit/f952b51da933eacae1361badba968860dcc9f0aa))
+
+
+### Bug Fixes
+
+* adjust some UI numbers ([63c364a](https://github.com/heywood8/money-tracker/commit/63c364aadff9f685301eed30cb8c4353d671f45e))
+* all the lint warnings and errors ([#129](https://github.com/heywood8/money-tracker/issues/129)) ([2a22240](https://github.com/heywood8/money-tracker/commit/2a2224049fe2fa67810fee7c777f9be4034ef5a5))
+* creating transfer operations ([1d5441e](https://github.com/heywood8/money-tracker/commit/1d5441e151ef64adb2d4699a44c98297720aff09))
+* lint ([4b3f036](https://github.com/heywood8/money-tracker/commit/4b3f03658689967e081d231c607c737f1151e0c6))
+* lint ([77caa32](https://github.com/heywood8/money-tracker/commit/77caa324933b84efb2e558bcea55eb6a07cc7577))
+* styles layout ([#131](https://github.com/heywood8/money-tracker/issues/131)) ([8ee23e2](https://github.com/heywood8/money-tracker/commit/8ee23e224d09ced409dc2fe4846fad9fe1aa75d8))
+* tests ([884275b](https://github.com/heywood8/money-tracker/commit/884275b92166abeef1b45cda02061fdf62aaacdf))
+
 ## [0.17.0](https://github.com/heywood8/money-tracker/compare/penny-v0.16.2...penny-v0.17.0) (2025-12-17)
 
 
