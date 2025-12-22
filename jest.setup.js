@@ -193,21 +193,58 @@ jest.mock('react-native-gesture-handler', () => {
 jest.mock('react-native-paper', () => {
   const React = require('react');
   const { View, Text, TouchableOpacity } = require('react-native');
+  const PropTypes = require('prop-types');
+
+  const Card = ({ children, style, mode, ...props }) => React.createElement(View, { style, ...props }, children);
+  Card.propTypes = {
+    children: PropTypes.node,
+    style: PropTypes.any,
+    mode: PropTypes.string,
+  };
+
+  const TouchableRipple = ({ children, onPress, onLongPress, style, ...props }) =>
+    React.createElement(TouchableOpacity, { onPress, onLongPress, style, ...props }, children);
+  TouchableRipple.propTypes = {
+    children: PropTypes.node,
+    onPress: PropTypes.func,
+    onLongPress: PropTypes.func,
+    style: PropTypes.any,
+  };
+
+  const Portal = ({ children }) => children;
+  Portal.propTypes = { children: PropTypes.node };
+
+  const Modal = ({ children, visible, ...props }) => visible ? React.createElement(View, props, children) : null;
+  Modal.propTypes = { children: PropTypes.node, visible: PropTypes.bool };
+
+  const TextInput = ({ ...props }) => React.createElement(View, props);
+  TextInput.propTypes = { children: PropTypes.node };
+
+  const Button = ({ children, onPress, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }, children);
+  Button.propTypes = { children: PropTypes.node, onPress: PropTypes.func };
+
+  const FAB = ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props });
+  FAB.propTypes = { onPress: PropTypes.func, icon: PropTypes.string, label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]) };
+
+  const Switch = ({ value, onValueChange, ...props }) => React.createElement(View, props);
+  Switch.propTypes = { value: PropTypes.bool, onValueChange: PropTypes.func };
+
+  const Provider = ({ children }) => children;
+  Provider.propTypes = { children: PropTypes.node };
 
   return {
-    Card: ({ children, style, mode, ...props }) => React.createElement(View, { style, ...props }, children),
-    TouchableRipple: ({ children, onPress, onLongPress, style, ...props }) =>
-      React.createElement(TouchableOpacity, { onPress, onLongPress, style, ...props }, children),
-    Portal: ({ children }) => children,
-    Modal: ({ children, visible, ...props }) => visible ? React.createElement(View, props, children) : null,
+    Card,
+    TouchableRipple,
+    Portal,
+    Modal,
     Text: Text,
-    TextInput: ({ ...props }) => React.createElement(View, props),
-    Button: ({ children, onPress, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }, children),
-    FAB: ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }),
+    TextInput,
+    Button,
+    FAB,
     ActivityIndicator: View,
     Divider: View,
-    Switch: ({ value, onValueChange, ...props }) => React.createElement(View, props),
-    Provider: ({ children }) => children,
+    Switch,
+    Provider,
   };
 });
 
@@ -215,9 +252,15 @@ jest.mock('react-native-paper', () => {
 jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const { Text } = require('react-native');
+  const PropTypes = require('prop-types');
 
   const MockIcon = ({ name, size, color, ...props }) =>
     React.createElement(Text, { ...props, testID: `icon-${name}` }, name);
+  MockIcon.propTypes = {
+    name: PropTypes.string,
+    size: PropTypes.number,
+    color: PropTypes.string,
+  };
 
   return {
     MaterialCommunityIcons: MockIcon,

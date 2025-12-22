@@ -202,11 +202,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   iconBackground: {
-    borderRadius: ICON_SIZE.xl / 2, // Circular background
-    height: ICON_SIZE.xl,
     alignItems: 'center',
+    borderRadius: ICON_SIZE.xl / 2,
+    height: ICON_SIZE.xl,
     justifyContent: 'center',
-    width: ICON_SIZE.xl,
+    width: ICON_SIZE.xl, // Circular background
   },
   leftIconContainer: {
     marginRight: SPACING.md,

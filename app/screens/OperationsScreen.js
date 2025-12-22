@@ -1070,9 +1070,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  description: {
-    fontSize: 12,
-  },
   destinationAmount: {
     fontSize: 12,
     marginBottom: 2,
@@ -1092,10 +1089,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: SPACING.lg,
   },
-  exchangeRate: {
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
+  /* removed unused styles: description, exchangeRate */
   filterFab: {
     bottom: 0,
     margin: SPACING.lg,
