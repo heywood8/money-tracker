@@ -7,11 +7,19 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 
 // Mock all dependencies
-jest.mock('react-native-paper', () => ({
-  Text: require('react-native').Text,
-  FAB: 'FAB',
-  ActivityIndicator: require('react-native').ActivityIndicator,
-}));
+jest.mock('react-native-paper', () => {
+  const React = require('react');
+  const { View, Text, TouchableOpacity, ActivityIndicator } = require('react-native');
+  
+  return {
+    Text: Text,
+    FAB: ({ onPress, icon, label, ...props }) => React.createElement(TouchableOpacity, { onPress, testID: 'fab', ...props }),
+    ActivityIndicator: ActivityIndicator,
+    Card: ({ children, style, ...props }) => React.createElement(View, { style, testID: 'card', ...props }, children),
+    TouchableRipple: ({ children, onPress, onLongPress, style, ...props }) => 
+      React.createElement(TouchableOpacity, { onPress, onLongPress, style, testID: 'touchable-ripple', ...props }, children),
+  };
+});
 
 jest.mock('../../app/contexts/ThemeContext', () => ({
   useTheme: jest.fn(() => ({
