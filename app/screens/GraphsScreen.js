@@ -1016,7 +1016,7 @@ const GraphsScreen = () => {
           {/* Filters Row */}
           <View style={styles.filtersRow}>
             {/* Currency Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <SimplePicker
                 value={selectedCurrency}
                 onValueChange={setSelectedCurrency}
@@ -1026,7 +1026,7 @@ const GraphsScreen = () => {
             </View>
 
             {/* Year Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <SimplePicker
                 value={selectedYear}
                 onValueChange={setSelectedYear}
@@ -1036,7 +1036,7 @@ const GraphsScreen = () => {
             </View>
 
             {/* Month Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <SimplePicker
                 value={selectedMonth}
                 onValueChange={setSelectedMonth}
@@ -1048,7 +1048,7 @@ const GraphsScreen = () => {
 
           {/* Balance History Card */}
           {selectedMonth !== null && selectedAccount && (
-            <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.balanceHistoryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <View style={styles.balanceHistoryHeader}>
                 <View style={styles.balanceHistoryTitleContainer}>
                   <Icon name="chart-line" size={24} color={colors.primary} />
@@ -1057,7 +1057,7 @@ const GraphsScreen = () => {
                   </Text>
                 </View>
                 {/* Account Picker */}
-                <View style={[styles.accountPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <View style={[styles.accountPickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
                   <SimplePicker
                     value={selectedAccount}
                     onValueChange={setSelectedAccount}
@@ -1105,9 +1105,9 @@ const GraphsScreen = () => {
                         return day % 5 === 1 ? value : '';
                       }}
                       chartConfig={{
-                        backgroundColor: colors.surface,
-                        backgroundGradientFrom: colors.surface,
-                        backgroundGradientTo: colors.surface,
+                        backgroundColor: colors.altRow,
+                        backgroundGradientFrom: colors.altRow,
+                        backgroundGradientTo: colors.altRow,
                         decimalPlaces: 0,
                         color: (_opacity = 1) => colors.text,
                         labelColor: (_opacity = 1) => colors.mutedText,
@@ -1203,7 +1203,7 @@ const GraphsScreen = () => {
 
           {/* Spending Prediction Card */}
           {spendingPrediction && (
-            <View style={[styles.predictionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.predictionCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <View style={styles.predictionHeader}>
                 <Icon name="chart-line" size={24} color={colors.primary} />
                 <Text style={[styles.predictionTitle, { color: colors.text }]}>
@@ -1264,7 +1264,7 @@ const GraphsScreen = () => {
 
           {/* Expenses Summary Card */}
           <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
             onPress={openExpenseModal}
             activeOpacity={0.7}
             accessibilityRole="button"
@@ -1307,7 +1307,7 @@ const GraphsScreen = () => {
 
           {/* Income Summary Card */}
           <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
             onPress={openIncomeModal}
             activeOpacity={0.7}
             accessibilityRole="button"

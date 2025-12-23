@@ -99,7 +99,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   androidButtonText: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   // Modal styles
   modalContent: {
