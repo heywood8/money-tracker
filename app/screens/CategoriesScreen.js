@@ -251,6 +251,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    paddingTop: TOP_CONTENT_SPACING,
   },
   emptyContainer: {
     alignItems: 'center',
