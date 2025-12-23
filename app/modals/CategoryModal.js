@@ -45,6 +45,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [parentPickerVisible, setParentPickerVisible] = useState(false);
   const [categoryTypePickerVisible, setCategoryTypePickerVisible] = useState(false);
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
 
   useEffect(() => {
     if (category && !isNew) {
@@ -125,6 +126,17 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
     { key: 'income', label: t('income') },
   ];
 
+  const TYPE_OPTIONS = [
+    { key: 'folder', label: t('folder') },
+    { key: 'entry', label: t('entry') },
+  ];
+
+  // Check if category has children
+  const hasChildren = useMemo(() => {
+    if (!category?.id) return false;
+    return categories.some(cat => cat.parentId === category.id);
+  }, [category, categories]);
+
   return (
     <Modal
       visible={visible}
@@ -162,6 +174,22 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                 returnKeyType="done"
                 onSubmitEditing={Keyboard.dismiss}
               />
+
+              {/* Type Picker (Folder/Entry) */}
+              <Pressable
+                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                onPress={() => setTypePickerVisible(true)}
+              >
+                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
+                  {t('select_type')}
+                </Text>
+                <View style={styles.pickerRow}>
+                  <Text style={[styles.pickerValue, { color: colors.text }]}>
+                    {TYPE_OPTIONS.find(to => to.key === values.type)?.label}
+                  </Text>
+                  <Icon name="chevron-down" size={20} color={colors.text} />
+                </View>
+              </Pressable>
 
               {/* Category Type Picker (Income/Expense) */}
               <Pressable
@@ -270,6 +298,59 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         onSelect={(icon) => setValues(v => ({ ...v, icon }))}
         selectedIcon={values.icon}
       />
+
+      {/* Type Picker Modal (Folder/Entry) */}
+      <Modal
+        visible={typePickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setTypePickerVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setTypePickerVisible(false)}>
+          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <FlatList
+              data={TYPE_OPTIONS}
+              keyExtractor={item => item.key}
+              renderItem={({ item }) => {
+                // Disable changing to 'entry' if category has children
+                const isDisabled = !isNew && hasChildren && item.key === 'entry';
+
+                return (
+                  <Pressable
+                    onPress={() => {
+                      if (isDisabled) {
+                        showDialog(
+                          t('error'),
+                          t('cannot_change_to_entry_with_children') || 'Cannot change to entry type while category has subcategories',
+                          [{ text: t('ok') }]
+                        );
+                        return;
+                      }
+                      setValues(v => ({ ...v, type: item.key }));
+                      setTypePickerVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && !isDisabled && { backgroundColor: colors.selected },
+                      isDisabled && { opacity: 0.5 },
+                    ]}
+                    disabled={isDisabled}
+                  >
+                    <Text style={[themed.pickerItemText, isDisabled && { color: colors.mutedText }]}>
+                      {item.label}
+                      {isDisabled && ' ⚠️'}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+            />
+            <Pressable style={styles.closeButton} onPress={() => setTypePickerVisible(false)}>
+              <Text style={themed.closeText}>{t('close')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Category Type Picker Modal */}
       <Modal
