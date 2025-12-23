@@ -505,6 +505,30 @@ export default function AccountsScreen() {
 
   const keyExtractor = useCallback((item) => item.id, []);
 
+  const renderFooter = useCallback(() => {
+    if (hiddenAccounts.length === 0) return null;
+
+    return (
+      <TouchableRipple
+        onPress={toggleShowHiddenAccounts}
+        style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={styles.showHiddenContent}>
+          <Icon
+            name={showHiddenAccounts ? 'eye-off' : 'eye'}
+            size={24}
+            color={colors.primary}
+          />
+          <Text style={[styles.showHiddenText, { color: colors.text }]}>
+            {showHiddenAccounts
+              ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
+              : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
+          </Text>
+        </View>
+      </TouchableRipple>
+    );
+  }, [hiddenAccounts.length, showHiddenAccounts, toggleShowHiddenAccounts, colors, t]);
+
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -537,27 +561,7 @@ export default function AccountsScreen() {
         onDragEnd={handleDragEnd}
         activationDistance={20}
         ListEmptyComponent={<Text style={[styles.listEmptyText, { color: colors.mutedText }]}>{t('no_accounts') || 'No accounts yet.'}</Text>}
-        ListFooterComponent={
-          hiddenAccounts.length > 0 ? (
-            <TouchableRipple
-              onPress={toggleShowHiddenAccounts}
-              style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            >
-              <View style={styles.showHiddenContent}>
-                <Icon
-                  name={showHiddenAccounts ? 'eye-off' : 'eye'}
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={[styles.showHiddenText, { color: colors.text }]}>
-                  {showHiddenAccounts
-                    ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
-                    : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
-                </Text>
-              </View>
-            </TouchableRipple>
-          ) : null
-        }
+        ListFooterComponent={renderFooter}
       />
       <FAB
         icon="plus"
