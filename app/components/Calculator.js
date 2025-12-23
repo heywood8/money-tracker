@@ -390,8 +390,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   container: {
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     width: '100%',
   },
   display: {
@@ -400,7 +399,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.xs,
     minHeight: 40,
-    paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
     width: '100%',
   },
@@ -426,5 +424,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: SPACING.xs,
+    width: '100%',
   },
 });

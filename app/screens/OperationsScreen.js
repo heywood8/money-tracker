@@ -1210,7 +1210,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
     marginBottom: SPACING.sm,
-    marginHorizontal: HORIZONTAL_PADDING,
+    marginHorizontal: SPACING.sm,
     marginTop: SPACING.md,
     padding: HORIZONTAL_PADDING,
   },
