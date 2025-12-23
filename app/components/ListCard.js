@@ -80,11 +80,11 @@ export default function ListCard({
 
     switch (variant) {
     case 'expense':
-      return colors.expenseBackground || colors.background;
+      return colors.altRow;
     case 'income':
-      return colors.incomeBackground || colors.background;
+      return colors.altRow;
     case 'transfer':
-      return colors.transferBackground || colors.background;
+      return colors.altRow;
     default:
       return colors.background;
     }
@@ -120,11 +120,11 @@ export default function ListCard({
   const getIconBackgroundColor = () => {
     switch (variant) {
     case 'expense':
-      return colors.expenseBackground || colors.surface;
+      return colors.altRow;
     case 'income':
-      return colors.incomeBackground || colors.surface;
+      return colors.altRow;
     case 'transfer':
-      return colors.transferBackground || colors.surface;
+      return colors.altRow;
     default:
       return colors.surface;
     }
