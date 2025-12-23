@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity } from 'react-native';
 import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -238,26 +238,26 @@ const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) =>
       style={isActive && [{ backgroundColor: colors.selected }, styles.activeAccountOpacity]}
       accessibilityLabel={t('edit_account') || 'Edit Account'}
       rightAction={
-        <TouchableRipple
+        <TouchableOpacity
           onLongPress={drag}
           style={styles.dragHandle}
-          rippleColor="rgba(0, 0, 0, .12)"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel={t('drag_to_reorder') || 'Long press to reorder'}
           accessibilityRole="button"
         >
           <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
-        </TouchableRipple>
+        </TouchableOpacity>
       }
     >
       <View style={styles.rowAlignCenter}>
         <View style={styles.accountNameWrapper}>
-          <Text variant="titleMedium" numberOfLines={1} ellipsizeMode="tail">
+          <Text style={styles.accountNameText} numberOfLines={1} ellipsizeMode="tail">
             {item.name}
           </Text>
         </View>
         <View style={styles.verticalDivider} />
         <View style={styles.accountValueWrapper}>
-          <Text variant="titleMedium" style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
+          <Text style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
             {formattedBalance} {item.currencySymbol}
           </Text>
         </View>
@@ -742,12 +742,18 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
+  accountNameText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
   accountNameWrapper: {
     flex: 7,
     justifyContent: 'center',
     paddingRight: SPACING.sm,
   },
   accountValueText: {
+    fontSize: 15,
+    fontWeight: '500',
     textAlign: 'right',
   },
   accountValueWrapper: {
@@ -810,9 +816,10 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     alignItems: 'center',
+    height: 32,
     justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.lg,
+    marginRight: SPACING.xs,
+    width: 32,
   },
   error: {
     color: 'red',
