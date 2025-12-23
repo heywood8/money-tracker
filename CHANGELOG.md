@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.19.0](https://github.com/heywood8/money-tracker/compare/penny-v0.18.1...penny-v0.19.0) (2025-12-23)
+
+
+### Features
+
+* edit category type (entry/parent) ([b5ed22d](https://github.com/heywood8/money-tracker/commit/b5ed22d48f2f2c485b9901c8105694051dcaa669))
+
+
+### Bug Fixes
+
+* adjust settings/database buttons style ([3ea451e](https://github.com/heywood8/money-tracker/commit/3ea451ebce9050ab8d94e19155d768e108c53bec))
+* altRow color ([5ac41f4](https://github.com/heywood8/money-tracker/commit/5ac41f45da87dcfe2d963c035cc53656c8f76803))
+
 ## [0.18.1](https://github.com/heywood8/money-tracker/compare/penny-v0.18.0...penny-v0.18.1) (2025-12-23)
 
 
