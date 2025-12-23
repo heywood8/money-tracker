@@ -21,7 +21,7 @@ const lightTheme = {
     danger: 'red',
     delete: '#d9534f',
     selected: '#c0e0ff',
-    altRow: '#f6f8fa', // Added for alternating rows
+    altRow: '#f8f8f8', // Added for alternating rows
     expense: '#5a3030',
     income: '#44aa44',
     transfer: '#4444ff',
@@ -48,7 +48,7 @@ const darkTheme = {
     danger: 'red',
     delete: '#ff6b6b',
     selected: '#005fa3',
-    altRow: '#181c20', // Added for alternating rows
+    altRow: '#1a1a1a', // Added for alternating rows
     expense: '#e6cccc',
     income: '#66dd66',
     transfer: '#6b6bff',
