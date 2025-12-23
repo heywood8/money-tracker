@@ -49,7 +49,7 @@ const QuickAddForm = memo(({
   
 
   return (
-    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.quickAddForm, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       {/* Type Selector */}
       <View style={styles.typeSelector}>
         {TYPES.map(type => (
