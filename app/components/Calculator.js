@@ -175,8 +175,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
   // Memoize button styles for better performance
   const operationButtonStyle = useMemo(() => ({
-    backgroundColor: colors.operationBackground || colors.surface,
-  }), [colors.operationBackground, colors.surface]);
+    backgroundColor: colors.operationBackground || colors.background,
+  }), [colors.operationBackground, colors.background]);
 
   const operationTextStyle = useMemo(() => ({
     color: colors.primary,
@@ -185,8 +185,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.primary]);
 
   const surfaceButtonStyle = useMemo(() => ({
-    backgroundColor: colors.surface,
-  }), [colors.surface]);
+    backgroundColor: colors.background,
+  }), [colors.background]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
@@ -200,11 +200,11 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.text]);
 
   const deleteButtonStyle = useMemo(() => ({
-    backgroundColor: colors.deleteBackground || colors.surface,
-  }), [colors.deleteBackground, colors.surface]);
+    backgroundColor: colors.deleteBackground || colors.background,
+  }), [colors.deleteBackground, colors.background]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.altRow }]}>
       {/* Display */}
       <View style={styles.display}>
         <Text style={displayTextStyle} numberOfLines={1}>
