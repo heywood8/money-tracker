@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.1](https://github.com/heywood8/money-tracker/compare/penny-v0.18.0...penny-v0.18.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* accounts items height ([60eace3](https://github.com/heywood8/money-tracker/commit/60eace32fe96c8996e3f5ffef6db3c0b39feae49))
+* calc to match width with other elements ([b4f4e40](https://github.com/heywood8/money-tracker/commit/b4f4e403db8de3b1537e1c515d75b85b81175389))
+* calculator color to be altrow ([7dd76ed](https://github.com/heywood8/money-tracker/commit/7dd76edd465c8653b49435146fdc5bc8238bc905))
+* categories to match padding with operations and accounts ([4dae3ec](https://github.com/heywood8/money-tracker/commit/4dae3ecbe79e3e8e2b6c512a1b223fb76c38903d))
+* edit graph screen colors ([bb79b1d](https://github.com/heywood8/money-tracker/commit/bb79b1d563fa6b50b3ae861cfad54fe91771af16))
+* expence/income colors ([1d4161a](https://github.com/heywood8/money-tracker/commit/1d4161ad2b97eea4e8ec5bd2e6d81ab73ae10fb6))
+* graphs screen elements height and width ([4139832](https://github.com/heywood8/money-tracker/commit/4139832bce9bab5720dc173c2989d6e536740f0d))
+* show hidden accounts not switching theme ([7d69e68](https://github.com/heywood8/money-tracker/commit/7d69e68eb79ca993d1f78f1ef9c6720b4df6d612))
+
 ## [0.18.0](https://github.com/heywood8/money-tracker/compare/penny-v0.17.0...penny-v0.18.0) (2025-12-22)
 
 
