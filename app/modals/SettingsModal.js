@@ -274,7 +274,7 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.actionButton}
               icon="export"
             >
-              {t('export_backup') || 'Export Backup'}
+              {t('export') || 'Export'}
             </Button>
             <Button
               mode="contained"
@@ -282,11 +282,8 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.actionButton}
               icon="import"
             >
-              {t('import_backup') || 'Import Backup'}
+              {t('import') || 'Import'}
             </Button>
-          </View>
-
-          <View style={styles.resetButtonContainer}>
             <Button
               mode="outlined"
               textColor="#b33"
@@ -294,7 +291,7 @@ export default function SettingsModal({ visible, onClose }) {
               style={styles.resetButton}
               icon="delete-forever"
             >
-              {t('reset_database') || 'Reset Database'}
+              {t('reset') || 'Reset'}
             </Button>
           </View>
 
@@ -557,14 +554,6 @@ const styles = StyleSheet.create({
   },
   modalWrapperTransparent: {
     backgroundColor: 'transparent',
-  },
-  resetButton: {
-    maxWidth: 300,
-  },
-  resetButtonContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 8,
   },
   subtitle: {
     marginBottom: 8,

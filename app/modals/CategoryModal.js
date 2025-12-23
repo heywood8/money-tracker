@@ -322,7 +322,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                         showDialog(
                           t('error'),
                           t('cannot_change_to_entry_with_children') || 'Cannot change to entry type while category has subcategories',
-                          [{ text: t('ok') }]
+                          [{ text: t('ok') }],
                         );
                         return;
                       }
