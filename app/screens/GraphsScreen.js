@@ -1768,8 +1768,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: HORIZONTAL_PADDING,
-    paddingTop: TOP_CONTENT_SPACING,
+    padding: TOP_CONTENT_SPACING,
+    paddingTop: TOP_CONTENT_SPACING + 4,
   },
   deleteActionButtonBackground: {
     backgroundColor: '#f44336',
