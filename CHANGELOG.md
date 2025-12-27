@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.19.1](https://github.com/heywood8/money-tracker/compare/penny-v0.19.0...penny-v0.19.1) (2025-12-27)
+
+
+### Bug Fixes
+
+* accounts color when choosing in calculator screen ([c640bf7](https://github.com/heywood8/money-tracker/commit/c640bf73956cc727f3182420f74595a03e6f33e4))
+* budget decimal digits ([a32219d](https://github.com/heywood8/money-tracker/commit/a32219d9bcd7d647cfdbd5d5f89dae5075e3253a))
+* calculating expression automatically when pressing add ([cb1d60a](https://github.com/heywood8/money-tracker/commit/cb1d60a6e3e99f14cf5b316497ef5e80ed891d99))
+* decimal digits in account list ([5b763dc](https://github.com/heywood8/money-tracker/commit/5b763dc9efd0c09e8d10a2bdc863eb848cbe7b63))
+
 ## [0.19.0](https://github.com/heywood8/money-tracker/compare/penny-v0.18.1...penny-v0.19.0) (2025-12-23)
 
 
