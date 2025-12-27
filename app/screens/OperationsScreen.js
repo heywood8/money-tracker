@@ -18,6 +18,7 @@ import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
+import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 
 /**
  * Get currency symbol from currency code
@@ -376,8 +377,19 @@ const OperationsScreen = () => {
   }, [categoryNavigation.breadcrumb]);
 
   const handleQuickAdd = useCallback(async (overrideCategoryId) => {
+    // Automatically evaluate any pending math operation before saving
+    let finalAmount = quickAddValues.amount;
+
+    if (hasOperation(finalAmount)) {
+      const evaluated = evaluateExpression(finalAmount);
+      if (evaluated !== null) {
+        finalAmount = evaluated;
+      }
+    }
+
     const operationData = {
       ...quickAddValues,
+      amount: finalAmount, // Use the evaluated amount
       // Use override categoryId if provided (for auto-add from category selection)
       categoryId: overrideCategoryId !== undefined ? overrideCategoryId : quickAddValues.categoryId,
       date: toDateString(new Date()),
@@ -411,7 +423,7 @@ const OperationsScreen = () => {
     } catch (error) {
       // Error already shown in addOperation
     }
-  }, [quickAddValues, validateOperation, addOperation, t]);
+  }, [quickAddValues, validateOperation, addOperation, t, showDialog]);
 
   // Get account name
   const getAccountName = useCallback((accountId) => {
