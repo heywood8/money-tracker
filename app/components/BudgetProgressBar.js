@@ -5,6 +5,7 @@ import { Text } from 'react-native-paper';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgets } from '../contexts/BudgetsContext';
+import * as Currency from '../services/currency';
 
 const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, style }) => {
   const { colors } = useTheme();
@@ -34,9 +35,9 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
   const progressColor = getProgressColor();
   const progressWidth = Math.min(status.percentage, 100);
 
-  // Format currency amounts
+  // Format currency amounts with proper decimal places
   const formatAmount = (amount) => {
-    return typeof amount === 'number' ? amount.toFixed(2) : '0.00';
+    return Currency.formatAmount(amount, status.currency || 'USD');
   };
 
   return (
