@@ -796,8 +796,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     >
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}> 
-                          {getCurrencySymbol(item.currency)}{item.balance}
+                        <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}>
+                          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
                         </Text>
                       </View>
                     </Pressable>

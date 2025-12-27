@@ -17,6 +17,7 @@ import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import currencies from '../../assets/currencies.json';
+import * as Currency from '../services/currency';
 
 /**
  * Get currency symbol from currency code
@@ -423,7 +424,7 @@ const OperationsScreen = () => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return '';
     const symbol = getCurrencySymbol(account.currency);
-    return `${symbol}${account.balance}`;
+    return `${symbol}${Currency.formatAmount(account.balance, account.currency)}`;
   }, [accounts]);
 
   // Get category info
@@ -833,8 +834,8 @@ const OperationsScreen = () => {
                     >
                       <View style={styles.accountOption}>
                         <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}> 
-                          {getCurrencySymbol(item.currency)}{item.balance}
+                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}>
+                          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
                         </Text>
                       </View>
                     </Pressable>

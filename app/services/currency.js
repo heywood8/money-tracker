@@ -29,7 +29,7 @@ export const getDecimalPlaces = (currencyCode) => {
   if (!currencyCode || !currenciesData[currencyCode]) {
     return 2; // Default to 2 decimal places
   }
-  return currenciesData[currencyCode].decimal_digits || 2;
+  return currenciesData[currencyCode].decimal_digits ?? 2;
 };
 
 /**
