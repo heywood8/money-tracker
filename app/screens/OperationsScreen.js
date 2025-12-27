@@ -832,8 +832,8 @@ const OperationsScreen = () => {
                       ]}
                     >
                       <View style={styles.accountOption}>
-                        <Text style={styles.pickerOptionText}>{item.name}</Text>
-                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}>
+                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
+                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}> 
                           {getCurrencySymbol(item.currency)}{item.balance}
                         </Text>
                       </View>
