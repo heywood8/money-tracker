@@ -568,6 +568,7 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
     return {
       budgetId: budget.id,
       amount: budget.amount,
+      currency: budget.currency,
       spent,
       remaining,
       percentage: Math.round(percentage * 100) / 100, // Round to 2 decimals
