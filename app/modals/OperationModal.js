@@ -27,6 +27,7 @@ import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import currencies from '../../assets/currencies.json';
+import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 
 /**
  * Get currency symbol from currency code
@@ -137,32 +138,33 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     return () => { cancelled = true; };
   }, [operation, isNew, visible, accounts]);
 
-  const validateFields = useCallback(() => {
+  const validateFields = useCallback((valuesToValidate = null) => {
+    const vals = valuesToValidate || values;
     const newErrors = {};
 
-    if (!values.type) {
+    if (!vals.type) {
       newErrors.type = t('operation_type_required');
     }
 
-    if (!values.amount || isNaN(parseFloat(values.amount)) || parseFloat(values.amount) <= 0) {
+    if (!vals.amount || isNaN(parseFloat(vals.amount)) || parseFloat(vals.amount) <= 0) {
       newErrors.amount = t('valid_amount_required');
     }
 
-    if (!values.accountId) {
+    if (!vals.accountId) {
       newErrors.accountId = t('account_required');
     }
 
-    if (values.type === 'transfer') {
-      if (!values.toAccountId) {
+    if (vals.type === 'transfer') {
+      if (!vals.toAccountId) {
         newErrors.toAccountId = t('destination_account_required');
-      } else if (values.accountId === values.toAccountId) {
+      } else if (vals.accountId === vals.toAccountId) {
         newErrors.toAccountId = t('accounts_must_be_different');
       }
-    } else if (!values.categoryId) {
+    } else if (!vals.categoryId) {
       newErrors.categoryId = t('category_required');
     }
 
-    if (!values.date) {
+    if (!vals.date) {
       newErrors.date = t('date_required');
     }
 
@@ -171,11 +173,27 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   }, [values, t]);
 
   const handleSave = useCallback(async () => {
-    if (!validateFields()) {
+    // Automatically evaluate any pending math operation before saving
+    let finalAmount = values.amount;
+    if (hasOperation(values.amount)) {
+      const evaluated = evaluateExpression(values.amount);
+      if (evaluated !== null) {
+        finalAmount = evaluated;
+      }
+    }
+
+    // Create updated values with evaluated amount for validation
+    const valuesToValidate = { ...values, amount: finalAmount };
+
+    if (!validateFields(valuesToValidate)) {
       return;
     }
 
-    const operationData = prepareOperationData();
+    // Update the state with evaluated amount
+    setValues(v => ({ ...v, amount: finalAmount }));
+
+    // Pass the evaluated amount to prepareOperationData
+    const operationData = prepareOperationData(finalAmount);
 
     if (isNew) {
       await addOperation(operationData);
@@ -189,7 +207,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
 
     onClose();
-  }, [validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose]);
+  }, [values, validateFields, prepareOperationData, isNew, addOperation, updateOperation, operation, onClose]);
 
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
@@ -386,8 +404,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, values.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
 
   // Prepare operation data with currency information for saving
-  const prepareOperationData = useCallback(() => {
+  const prepareOperationData = useCallback((customAmount = null) => {
     const data = { ...values };
+
+    // Override amount if provided (used when evaluating expressions)
+    if (customAmount !== null) {
+      data.amount = customAmount;
+    }
 
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
@@ -403,7 +426,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     if (data.amount && sourceAccount) {
       data.amount = Currency.formatAmount(data.amount, sourceAccount.currency);
     }
-    
+
     if (data.destinationAmount && destinationAccount) {
       data.destinationAmount = Currency.formatAmount(data.destinationAmount, destinationAccount.currency);
     }
@@ -813,59 +836,50 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                           // Navigate into folder
                           navigateIntoFolder(item);
                         } else {
-                          // Select entry category
-                          setValues(v => ({ ...v, categoryId: item.id }));
+                          // Automatically evaluate any pending math operation before saving
+                          let finalAmount = values.amount;
+
+                          if (hasOperation(values.amount)) {
+                            const evaluated = evaluateExpression(values.amount);
+                            if (evaluated !== null) {
+                              finalAmount = evaluated;
+                            }
+                          }
+
+                          // Select entry category and update amount in one setState call
+                          setValues(v => ({ ...v, categoryId: item.id, amount: finalAmount }));
                           closePicker();
 
                           // Only auto-add for new operations, not when editing
                           if (isNew) {
                             // Check if amount is valid and auto-save
-                            const hasValidAmount = values.amount &&
-                              !isNaN(parseFloat(values.amount)) &&
-                              parseFloat(values.amount) > 0;
+                            const hasValidAmount = finalAmount &&
+                              !isNaN(parseFloat(finalAmount)) &&
+                              parseFloat(finalAmount) > 0;
 
                             if (hasValidAmount) {
-                              // Small delay to ensure state is updated
-                              setTimeout(async () => {
-                                // Validate all fields with the new category
-                                const tempValues = { ...values, categoryId: item.id };
-                                const newErrors = {};
+                              // Build operation data directly with evaluated amount
+                              const operationData = {
+                                type: values.type,
+                                amount: finalAmount, // Use the evaluated amount directly
+                                accountId: values.accountId,
+                                categoryId: item.id,
+                                date: values.date,
+                                description: values.description || null,
+                              };
 
-                                if (!tempValues.type) {
-                                  newErrors.type = t('operation_type_required');
+                              try {
+                                await addOperation(operationData);
+
+                                // Save last accessed account
+                                if (operationData.accountId) {
+                                  setLastAccessedAccount(operationData.accountId);
                                 }
 
-                                if (!tempValues.amount || isNaN(parseFloat(tempValues.amount)) || parseFloat(tempValues.amount) <= 0) {
-                                  newErrors.amount = t('valid_amount_required');
-                                }
-
-                                if (!tempValues.accountId) {
-                                  newErrors.accountId = t('account_required');
-                                }
-
-                                if (!tempValues.categoryId) {
-                                  newErrors.categoryId = t('category_required');
-                                }
-
-                                if (!tempValues.date) {
-                                  newErrors.date = t('date_required');
-                                }
-
-                                // If all fields are valid, save automatically
-                                if (Object.keys(newErrors).length === 0) {
-                                  const operationData = prepareOperationData();
-                                  operationData.categoryId = item.id; // Ensure the category is set
-
-                                  await addOperation(operationData);
-
-                                  // Save last accessed account
-                                  if (operationData.accountId) {
-                                    setLastAccessedAccount(operationData.accountId);
-                                  }
-
-                                  onClose();
-                                }
-                              }, 100);
+                                onClose();
+                              } catch (error) {
+                                console.error('[OperationModal] Failed to add operation:', error);
+                              }
                             }
                           }
                         }

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
+import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } from '../utils/calculatorUtils';
 
 /**
  * Calculator button component - Memoized for performance
@@ -77,40 +78,12 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }, [value]);
 
   // Check if expression contains a mathematical operation - Memoized
-  const hasOperation = useMemo(() => /[+\-×÷]/.test(expression), [expression]);
+  const hasOperation = useMemo(() => checkHasOperation(expression), [expression]);
 
   // Get the last number in the expression - Memoized
   const getLastNumber = useCallback((expr) => {
     const match = expr.match(/[+\-×÷]?([0-9.]+)$/);
     return match ? match[1] : expr;
-  }, []);
-
-  // Evaluate mathematical expression - Memoized
-  const evaluateExpression = useCallback((expr) => {
-    if (!expr || expr.trim() === '') return null;
-
-    try {
-      // Replace '×' with '*' for multiplication and '÷' with '/' for division
-      let sanitized = expr.replace(/×/g, '*').replace(/÷/g, '/');
-
-      // Validate expression (only allow numbers, operators, and decimal points)
-      if (!/^[0-9+\-*/.() ]+$/.test(sanitized)) {
-        return null;
-      }
-
-      // Use Function constructor to safely evaluate (no access to external scope)
-      // Note: This is safer than eval() but still requires validation above
-      const result = Function('"use strict"; return (' + sanitized + ')')();
-
-      if (isNaN(result) || !isFinite(result)) {
-        return null;
-      }
-
-      // Round to 2 decimal places to avoid floating point issues
-      return Math.round(result * 100) / 100;
-    } catch (error) {
-      return null;
-    }
   }, []);
 
   // Handle button press - Wrapped with useCallback for performance
@@ -121,14 +94,9 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
       newExpression = expression.slice(0, -1);
     } else if (key === '=') {
       // Evaluate the expression
-      try {
-        const result = evaluateExpression(expression);
-        if (result !== null) {
-          newExpression = String(result);
-        }
-      } catch (error) {
-        // If evaluation fails, keep the expression as is
-        console.warn('Invalid expression:', expression);
+      const result = evalExpr(expression);
+      if (result !== null) {
+        newExpression = result;
       }
     } else if (key === '.') {
       // Only allow one decimal point per number
@@ -154,7 +122,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
     setExpression(newExpression);
     onValueChange(newExpression);
-  }, [expression, onValueChange, getLastNumber, evaluateExpression]);
+  }, [expression, onValueChange, getLastNumber]);
 
   // Handle equals button press - Wrapped with useCallback
   const handleEqualsPress = useCallback(() => {

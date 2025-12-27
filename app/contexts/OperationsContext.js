@@ -327,7 +327,7 @@ export const OperationsProvider = ({ children }) => {
     if (!operation.type) {
       return t('operation_type_required') || 'Operation type is required';
     }
-    if (!operation.amount || isNaN(Number(operation.amount)) || Number(operation.amount) <= 0) {
+    if (!operation.amount || isNaN(parseFloat(operation.amount)) || parseFloat(operation.amount) <= 0) {
       return t('valid_amount_required') || 'Valid amount is required';
     }
     if (!operation.accountId) {
