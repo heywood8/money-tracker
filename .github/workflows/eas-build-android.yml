@@ -54,9 +54,9 @@ jobs:
         run: |
           cat >> android/gradle.properties << EOF
           # Increase JVM memory for Gradle
-          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError
+          org.gradle.jvmargs=-Xmx8192m -XX:MaxMetaspaceSize=2048m -XX:+HeapDumpOnOutOfMemoryError
           # Increase memory for Kotlin daemon
-          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=2048m
           # Enable Gradle daemon
           org.gradle.daemon=true
           # Enable parallel builds
