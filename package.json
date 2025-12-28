@@ -71,13 +71,14 @@
       "<rootDir>/jest.setup.js"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|@sentry/react-native|@sentry/core|@sentry/types|@sentry/utils)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|@sentry/react-native|@sentry/core|@sentry/types|@sentry/utils|drizzle-orm|drizzle-kit)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
     ],
     "coverageReporters": [
       "json-summary",
       "text",
       "lcov"
-    ]
+    ],
+    "testEnvironment": "node"
   },
   "private": true
 }
