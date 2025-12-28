@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/heywood8/money-tracker/compare/penny-v0.20.0...penny-v0.20.1) (2025-12-28)
+
+
+### Bug Fixes
+
+* remove unnecessary jest import from app.config.js ([#151](https://github.com/heywood8/money-tracker/issues/151)) ([d8b2708](https://github.com/heywood8/money-tracker/commit/d8b2708559711291585bef0600a7c5a88cad88de))
+
 ## [0.20.0](https://github.com/heywood8/money-tracker/compare/penny-v0.19.1...penny-v0.20.0) (2025-12-28)
 
 
