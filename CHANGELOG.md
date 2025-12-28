@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/heywood8/money-tracker/compare/penny-v0.20.1...penny-v0.20.2) (2025-12-28)
+
+
+### Bug Fixes
+
+* increase Gradle memory allocation to resolve Metaspace OOM error ([#153](https://github.com/heywood8/money-tracker/issues/153)) ([ca859e9](https://github.com/heywood8/money-tracker/commit/ca859e9a1b14ae94e833a4ab0e5c0b208cc6bab3))
+
 ## [0.20.1](https://github.com/heywood8/money-tracker/compare/penny-v0.20.0...penny-v0.20.1) (2025-12-28)
 
 
