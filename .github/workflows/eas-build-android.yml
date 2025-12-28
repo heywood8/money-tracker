@@ -19,6 +19,8 @@ jobs:
   build:
     name: EAS Build Android
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 🏗 Setup repo
