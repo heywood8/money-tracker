@@ -50,9 +50,20 @@ jobs:
       - name: 🏗 Prebuild Android
         run: npx expo prebuild --platform android --clean
 
-      - name: 🔧 Configure packaging options
+      - name: 🔧 Configure Gradle JVM and packaging options
         run: |
-          echo "android.packagingOptions.excludes=META-INF/versions/**" >> android/gradle.properties
+          cat >> android/gradle.properties << EOF
+          # Increase JVM memory for Gradle
+          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError
+          # Increase memory for Kotlin daemon
+          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+          # Enable Gradle daemon
+          org.gradle.daemon=true
+          # Enable parallel builds
+          org.gradle.parallel=true
+          # Packaging options
+          android.packagingOptions.excludes=META-INF/versions/**
+          EOF
 
       - name: 🔐 Decode keystore
         run: |
