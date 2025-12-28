@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.3](https://github.com/heywood8/money-tracker/compare/penny-v0.20.2...penny-v0.20.3) (2025-12-28)
+
+
+### Bug Fixes
+
+* increase gradle settings ([d670a5c](https://github.com/heywood8/money-tracker/commit/d670a5c0deb16dca49f1b435bb66c05d7e225435))
+* revert eas.json changes ([24e91d3](https://github.com/heywood8/money-tracker/commit/24e91d343270afe7afca2c23fa509fa83a227deb))
+
 ## [0.20.2](https://github.com/heywood8/money-tracker/compare/penny-v0.20.1...penny-v0.20.2) (2025-12-28)
 
 
