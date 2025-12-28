@@ -1,3 +1,23 @@
+// Mock Expo's internal module registry and utilities to prevent "outside scope" errors
+global.__ExpoImportMetaRegistry = {};
+
+// Mock structuredClone which is causing scope issues
+if (typeof global.structuredClone === 'undefined') {
+  global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+}
+
+// Mock Expo's winter module to bypass scope checks
+jest.mock('expo/src/winter/runtime.native.ts', () => ({
+  require: jest.fn((module) => require(module)),
+}), { virtual: true });
+
+jest.mock('expo/src/winter/installGlobal.ts', () => ({
+  getValue: jest.fn((key) => {
+    if (key === 'structuredClone') return global.structuredClone;
+    return undefined;
+  }),
+}), { virtual: true });
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
