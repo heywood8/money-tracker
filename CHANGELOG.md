@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.4](https://github.com/heywood8/money-tracker/compare/penny-v0.20.3...penny-v0.20.4) (2025-12-28)
+
+
+### Bug Fixes
+
+* -XX:MaxMetaspaceSize ([f893215](https://github.com/heywood8/money-tracker/commit/f893215ae702c915cbab8f8bc4a3434dd22f1076))
+
 ## [0.20.3](https://github.com/heywood8/money-tracker/compare/penny-v0.20.2...penny-v0.20.3) (2025-12-28)
 
 
