@@ -50,7 +50,7 @@
     "babel-preset-expo": "~54.0.0",
     "better-sqlite3": "^12.5.0",
     "coverage-badge-creator": "^1.0.21",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^1.0.0-beta.6-7aaf14b",
     "eslint": "^9.39.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-native": "^5.0.0",
