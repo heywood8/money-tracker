@@ -7,19 +7,23 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import LanguageSelectionScreen from '../../app/screens/LanguageSelectionScreen';
 
-// Mock i18n data
-jest.mock('../../assets/i18n.json', () => ({
-  en: {
-    welcome_title: 'Welcome to Penny',
-    welcome_subtitle: 'Choose your language',
-    continue: 'Continue',
-  },
-  ru: {
-    welcome_title: 'Добро пожаловать в Penny',
-    welcome_subtitle: 'Выберите язык',
-    continue: 'Продолжить',
-  },
+// Mock individual i18n language files
+jest.mock('../../assets/i18n/en.json', () => ({
+  welcome_title: 'Welcome to Penny',
+  welcome_subtitle: 'Please select your preferred language',
+  continue: 'Continue',
 }), { virtual: true });
+
+jest.mock('../../assets/i18n/it.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/ru.json', () => ({
+  welcome_title: 'Добро пожаловать в Penny',
+  welcome_subtitle: 'Выберите язык',
+  continue: 'Продолжить',
+}), { virtual: true });
+jest.mock('../../assets/i18n/es.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/fr.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/zh.json', () => ({}), { virtual: true });
+jest.mock('../../assets/i18n/de.json', () => ({}), { virtual: true });
 
 describe('LanguageSelectionScreen', () => {
   let mockOnLanguageSelected;
@@ -49,7 +53,7 @@ describe('LanguageSelectionScreen', () => {
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
-      expect(getByText('Choose your language')).toBeTruthy();
+      expect(getByText('Please select your preferred language')).toBeTruthy();
     });
 
     it('displays language options', () => {
@@ -117,7 +121,7 @@ describe('LanguageSelectionScreen', () => {
 
       // Check translated strings
       expect(getByText('Welcome to Penny')).toBeTruthy();
-      expect(getByText('Choose your language')).toBeTruthy();
+      expect(getByText('Please select your preferred language')).toBeTruthy();
       expect(getByText('Continue')).toBeTruthy();
     });
 
@@ -164,7 +168,7 @@ describe('LanguageSelectionScreen', () => {
 
       // Important text should be present for screen readers
       expect(getByText('Welcome to Penny')).toBeTruthy();
-      expect(getByText('Choose your language')).toBeTruthy();
+      expect(getByText('Please select your preferred language')).toBeTruthy();
     });
   });
 
@@ -266,7 +270,7 @@ describe('LanguageSelectionScreen', () => {
 
       // Title, subtitle, languages, and button should all be present
       expect(getByText('Welcome to Penny')).toBeTruthy();
-      expect(getByText('Choose your language')).toBeTruthy();
+      expect(getByText('Please select your preferred language')).toBeTruthy();
       expect(getByText('Русский')).toBeTruthy();
       expect(getByText('Continue')).toBeTruthy();
     });
