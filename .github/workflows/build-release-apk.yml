@@ -1,0 +1,115 @@
+name: Build Android APK (Gradle)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v6
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 🏗 Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # EAS is not used for this workflow; build using Gradle directly below.
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗 Prebuild Android
+        run: npx expo prebuild --platform android --clean
+
+      - name: 🔧 Configure Gradle JVM and packaging options
+        run: |
+          cat >> android/gradle.properties << EOF
+          # Increase JVM memory for Gradle
+          org.gradle.jvmargs=-Xmx8192m -XX:MaxMetaspaceSize -XX:+HeapDumpOnOutOfMemoryError
+          # Increase memory for Kotlin daemon
+          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize
+          # Enable Gradle daemon
+          org.gradle.daemon=true
+          # Enable parallel builds
+          org.gradle.parallel=true
+          # Packaging options
+          android.packagingOptions.excludes=META-INF/versions/**
+          EOF
+
+      - name: 🔐 Decode keystore
+        run: |
+          echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+
+      - name: 🔐 Setup gradle.properties
+        run: |
+          cat >> android/gradle.properties << EOF
+          MYAPP_UPLOAD_STORE_FILE=keystore.jks
+          MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
+          EOF
+
+      - name: 🚀 Build APK (Gradle assembleRelease)
+        if: github.ref_type == 'tag'
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -e
+          echo "Building Android release APK with Gradle"
+          cd android
+          ./gradlew clean assembleRelease --no-daemon -Pandroid.injected.signing.store.file=app/keystore.jks
+          cd ..
+
+      - name: 📦 Find and rename APK
+        if: github.ref_type == 'tag'
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v unaligned | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "APK not found in expected location, searching entire workspace..."
+            APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | grep -v "node_modules" | grep -v unaligned | head -1)
+          fi
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK file found!"
+            exit 1
+          fi
+          echo "Found APK: $APK_PATH"
+          ls -lh "$APK_PATH"
+
+          # Rename APK with version tag
+          TAG_NAME="${{ github.ref_name }}"
+          NEW_NAME="penny-${TAG_NAME}.apk"
+          cp "$APK_PATH" "$NEW_NAME"
+          echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "Renamed to: $NEW_NAME"
+          ls -lh "$NEW_NAME"
+
+      - name: 📤 Upload APK to Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find_apk.outputs.apk_path }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post build summary
+        if: github.ref_type == 'tag'
+        run: |
+          echo "## 🚀 EAS Build Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Profile:** ${{ github.event.inputs.profile || 'preview' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
