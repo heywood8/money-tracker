@@ -2,6 +2,9 @@ name: Build Android APK (Gradle)
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'penny-v*'
 
 jobs:
   build:
