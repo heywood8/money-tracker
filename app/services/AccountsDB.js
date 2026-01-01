@@ -386,7 +386,6 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
     // Import necessary modules within the function to avoid circular dependencies
     const OperationsDB = require('./OperationsDB');
     const CategoriesDB = require('./CategoriesDB');
-    const uuid = require('react-native-uuid').default || require('react-native-uuid');
 
     await executeTransaction(async (db) => {
       // Get current balance
@@ -547,19 +546,16 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
         }
       } else {
         // Create new adjustment operation
-        const operationId = uuid.v4();
         console.log('Creating new adjustment operation:', {
-          id: operationId,
           type: operationType,
           amount: absoluteDelta.toFixed(2),
           categoryId,
           date: today,
         });
 
-        await db.runAsync(
-          'INSERT INTO operations (id, type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        const result = await db.runAsync(
+          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [
-            operationId,
             operationType,
             absoluteDelta.toFixed(2),
             accountId,
@@ -570,7 +566,8 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
             fullDescription,
           ],
         );
-        console.log('Adjustment operation created successfully');
+        const newOperationId = result.lastInsertRowId;
+        console.log('Adjustment operation created successfully with ID:', newOperationId);
 
         // Update account balance based on operation type
         const delta = operationType === 'expense' ? -absoluteDelta : absoluteDelta;
