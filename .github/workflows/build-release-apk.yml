@@ -70,7 +70,10 @@ jobs:
           set -e
           echo "Building Android release APK with Gradle"
           cd android
-          ./gradlew clean assembleRelease --no-daemon -Pandroid.injected.signing.store.file=app/keystore.jks
+          ./gradlew clean assembleRelease \
+            --no-daemon \
+            -Pandroid.injected.signing.store.file=app/keystore.jks \
+            -PreactNativeArchitectures=arm64-v8a
           cd ..
 
       - name: 📦 Find and rename APK
