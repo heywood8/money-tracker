@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.21.0](https://github.com/heywood8/money-tracker/compare/penny-v0.20.4...penny-v0.21.0) (2026-01-01)
+
+
+### Features
+
+* add burndown for previous month ([443b10d](https://github.com/heywood8/money-tracker/commit/443b10dea42161aec31e55ac84fb211a62b92862))
+* added armenian language ([4d5b24b](https://github.com/heywood8/money-tracker/commit/4d5b24b482846d74d249fcafb6d6647d56d8262a))
+
+
+### Bug Fixes
+
+* add missing files for translations ([b577f8b](https://github.com/heywood8/money-tracker/commit/b577f8b44a0000eabb01c07b8d751cd7c8301c28))
+* adjustment operations ([2a030b7](https://github.com/heywood8/money-tracker/commit/2a030b703c51cbb848e95d05b763736d8e031759))
+* export modal options fitting ([4c6e1f0](https://github.com/heywood8/money-tracker/commit/4c6e1f0d3dddd543d3676cc61daf13e4b9f59c56))
+* failing tests ([de9d737](https://github.com/heywood8/money-tracker/commit/de9d737593c067a6f1be9bc2d4d3e911254e7a59))
+* missing armenian translation file ([a0c1987](https://github.com/heywood8/money-tracker/commit/a0c1987704d3c012695c710d09cf2b2a1e7d30ab))
+
 ## [0.20.4](https://github.com/heywood8/money-tracker/compare/penny-v0.20.3...penny-v0.20.4) (2025-12-28)
 
 
