@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.21.1](https://github.com/heywood8/money-tracker/compare/penny-v0.21.0...penny-v0.21.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* -XX:MaxMetaspaceSize=2g ([f1a9fb4](https://github.com/heywood8/money-tracker/commit/f1a9fb45507e1d8a74bd787813bd653a13296809))
+* **build:** for assembleRelease, only do arm64-v82 ([763a15f](https://github.com/heywood8/money-tracker/commit/763a15fe98858e2d8826b6de64062c6a97c8b374))
+* **build:** get version from metadata ([86052c2](https://github.com/heywood8/money-tracker/commit/86052c2ff120d9134dc78ac897dc73851fd945d0))
+
 ## [0.21.0](https://github.com/heywood8/money-tracker/compare/penny-v0.20.4...penny-v0.21.0) (2026-01-01)
 
 
