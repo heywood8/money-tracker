@@ -391,7 +391,7 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.languageItemContent}>
                 <View style={styles.formatItemRow}>
                   <Ionicons name="code-outline" size={24} color={colors.text} />
-                  <View>
+                  <View style={styles.formatTextContainer}>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
                       JSON
                     </Text>
@@ -411,7 +411,7 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.languageItemContent}>
                 <View style={styles.formatItemRow}>
                   <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                  <View>
+                  <View style={styles.formatTextContainer}>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
                       CSV
                     </Text>
@@ -431,7 +431,7 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.languageItemContent}>
                 <View style={styles.formatItemRow}>
                   <Ionicons name="server-outline" size={24} color={colors.text} />
-                  <View>
+                  <View style={styles.formatTextContainer}>
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
                       SQLite Database
                     </Text>
@@ -478,12 +478,16 @@ const styles = StyleSheet.create({
   formatDescription: {
     fontSize: 12,
     marginTop: SPACING.xs,
-    padding: HORIZONTAL_PADDING + SPACING.sm,
   },
   formatItemRow: {
     alignItems: 'center',
+    flex: 1,
     flexDirection: 'row',
     gap: SPACING.md,
+  },
+  formatTextContainer: {
+    flex: 1,
+    flexShrink: 1,
   },
   hidden: {
     opacity: 0,
