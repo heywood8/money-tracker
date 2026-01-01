@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app now supports only Android, with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (English/Russian) and theme support (light/dark/system).
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app now supports only Android, with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (7 languages: English, Italian, Russian, Spanish, French, Chinese, German) and theme support (light/dark/system).
 
 ## Development Commands
 
@@ -61,9 +61,9 @@ The app follows a feature-based organization under the `app/` directory:
 The app uses React Context API for global state, with primary contexts that wrap the entire application in App.js:
 
 1. **LocalizationContext** (`app/contexts/LocalizationContext.js`)
-   - Manages app language (English/Russian)
-   - Loads translations from `assets/i18n.json`
-   - Persists language preference to AsyncStorage
+   - Manages app language (7 supported languages: en, it, ru, es, fr, zh, de)
+   - Loads translations from separate files in `assets/i18n/` directory (one file per language)
+   - Persists language preference to database (PreferencesDB)
    - Provides `t(key)` function for translations
 
 2. **ThemeContext** (`app/contexts/ThemeContext.js`)
@@ -127,7 +127,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Assets Structure
 
-- `assets/i18n.json`: Translation strings for en/ru
+- `assets/i18n/`: Translation files, one per language (en.json, it.json, ru.json, es.json, fr.json, zh.json, de.json)
 - `assets/currencies.json`: Currency list for accounts
 - `assets/*.png`: App icons and splash screens
 
