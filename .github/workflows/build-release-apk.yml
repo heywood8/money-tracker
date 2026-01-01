@@ -63,7 +63,6 @@ jobs:
           EOF
 
       - name: 🚀 Build APK (Gradle assembleRelease)
-        if: github.ref_type == 'tag'
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -75,7 +74,6 @@ jobs:
           cd ..
 
       - name: 📦 Find and rename APK
-        if: github.ref_type == 'tag'
         id: find_apk
         run: |
           APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v unaligned | head -1)
@@ -90,8 +88,23 @@ jobs:
           echo "Found APK: $APK_PATH"
           ls -lh "$APK_PATH"
 
-          # Rename APK with version tag
-          TAG_NAME="${{ github.ref_name }}"
+          # Try to read version from Gradle output metadata
+          META_FILE="android/app/build/outputs/apk/release/output-metadata.json"
+          if [ -f "$META_FILE" ]; then
+            echo "Found metadata: $META_FILE"
+            VERSION_NAME=$(jq -r '.outputs[0].versionName // empty' "$META_FILE" 2>/dev/null || true)
+            VERSION_CODE=$(jq -r '.outputs[0].versionCode // empty' "$META_FILE" 2>/dev/null || true)
+            if [ -n "$VERSION_NAME" ]; then
+              TAG_NAME="$VERSION_NAME"
+            elif [ -n "$VERSION_CODE" ]; then
+              TAG_NAME="$VERSION_CODE"
+            else
+              TAG_NAME="${{ github.ref_name }}"
+            fi
+          else
+            echo "Metadata file not found, falling back to git tag"
+            TAG_NAME="${{ github.ref_name }}"
+          fi
           NEW_NAME="penny-${TAG_NAME}.apk"
           cp "$APK_PATH" "$NEW_NAME"
           echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
@@ -108,8 +121,7 @@ jobs:
       - name: Post build summary
         if: github.ref_type == 'tag'
         run: |
-          echo "## 🚀 EAS Build Completed" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Android Build Completed (Gradle)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Profile:** ${{ github.event.inputs.profile || 'preview' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
