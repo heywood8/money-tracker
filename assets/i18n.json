@@ -294,6 +294,7 @@
     "actual": "Actual",
     "trend": "Trend",
     "burndown": "Burndown",
+    "prev_month": "Prev Month",
     "no_balance_history": "No balance history available for this month",
     "balance_history_details": "Balance History Details",
     "actions": "Actions"
@@ -651,6 +652,7 @@
     "actual": "Фактический",
     "trend": "Тренд",
     "burndown": "Среднее",
+    "prev_month": "Пред. месяц",
     "no_balance_history": "Нет истории баланса за этот месяц",
     "balance_history_details": "Детали истории баланса",
     "actions": "Действия"
@@ -950,6 +952,7 @@
     "actual": "Real",
     "trend": "Tendencia",
     "burndown": "Reducción",
+    "prev_month": "Mes Ant.",
     "no_balance_history": "No hay historial de saldo disponible para este mes",
     "balance_history_details": "Detalles del historial de saldo",
     "actions": "Acciones"
@@ -1249,6 +1252,7 @@
     "actual": "Réel",
     "trend": "Tendance",
     "burndown": "Diminution",
+    "prev_month": "Mois préc.",
     "no_balance_history": "Aucun historique de solde disponible pour ce mois",
     "balance_history_details": "Détails de l'historique du solde",
     "actions": "Actions"
@@ -1548,6 +1552,7 @@
     "actual": "实际",
     "trend": "趋势",
     "burndown": "消耗",
+    "prev_month": "上月",
     "no_balance_history": "本月没有可用的余额历史",
     "balance_history_details": "余额历史详情",
     "actions": "操作"
@@ -1847,6 +1852,7 @@
     "actual": "Tatsächlich",
     "trend": "Trend",
     "burndown": "Abbau",
+    "prev_month": "Vorh. Monat",
     "no_balance_history": "Keine Saldohistorie für diesen Monat verfügbar",
     "balance_history_details": "Saldohistorie Details",
     "actions": "Aktionen"

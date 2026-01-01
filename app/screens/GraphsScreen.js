@@ -630,6 +630,15 @@ const GraphsScreen = () => {
       // Get balance history from database
       const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
 
+      // Calculate previous month dates
+      const prevMonthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const prevMonthEnd = new Date(selectedYear, selectedMonth, 0);
+      const prevStartDateStr = formatDate(prevMonthStart);
+      const prevEndDateStr = formatDate(prevMonthEnd);
+
+      // Get previous month's balance history
+      const prevHistory = await getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr);
+
       // Helper function to calculate linear regression
       const calculateTrendLine = (data) => {
         if (data.length < 2) return null;
@@ -709,6 +718,42 @@ const GraphsScreen = () => {
         }));
       }
 
+      // Process previous month data
+      const prevMonthDataPoints = prevHistory.map(item => ({
+        date: item.date,
+        balance: parseFloat(item.balance),
+      }));
+
+      // Get days in previous month
+      const prevMonthDays = prevMonthEnd.getDate();
+
+      // Map previous month balance history to days
+      const prevBalanceByDay = {};
+      prevMonthDataPoints.forEach(point => {
+        const day = parseInt(point.date.split('-')[2], 10);
+        prevBalanceByDay[day] = point.balance;
+      });
+
+      // Create previous month data line (forward-filled for all available days)
+      const prevMonthData = allDays.map(day => {
+        // Only include data if the day exists in previous month
+        if (day > prevMonthDays) return undefined;
+
+        if (prevBalanceByDay[day] !== undefined) {
+          return prevBalanceByDay[day];
+        }
+
+        // Forward fill: use the most recent balance before this day
+        for (let d = day - 1; d >= 1; d--) {
+          if (prevBalanceByDay[d] !== undefined) {
+            return prevBalanceByDay[d];
+          }
+        }
+
+        // No data yet
+        return undefined;
+      });
+
       // Create forward-filled data for chart (to connect dots properly)
       // This ensures the chart line is continuous up to current day only
       const actualForChart = allDays.map(day => {
@@ -734,6 +779,7 @@ const GraphsScreen = () => {
         actualForChart: actualForChart,
         trend: trendData,
         burndown: burndownData,
+        prevMonth: prevMonthData,
         labels: allDays,
       });
     } catch (error) {
@@ -1093,6 +1139,12 @@ const GraphsScreen = () => {
                             strokeWidth: 2,
                             withDots: false,
                           },
+                          ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
+                            data: balanceHistoryData.prevMonth.filter(v => v !== undefined),
+                            color: () => 'rgba(156, 39, 176, 0.5)',
+                            strokeWidth: 2,
+                            withDots: false,
+                          }] : []),
                         ],
                       }}
                       width={screenWidth - 64}
@@ -1142,6 +1194,7 @@ const GraphsScreen = () => {
 
                     let actualValue = null;
                     let burndownValue = null;
+                    let prevMonthValue = null;
 
                     if (currentDay) {
                       const actualPoint = balanceHistoryData.actual.find(p => p.x === currentDay);
@@ -1154,7 +1207,12 @@ const GraphsScreen = () => {
                       if (burndownPoint) {
                         burndownValue = formatCurrency(burndownPoint.y, selectedAccountData?.currency || 'USD');
                       }
+                      if (balanceHistoryData.prevMonth && balanceHistoryData.prevMonth[currentDay - 1] !== undefined) {
+                        prevMonthValue = formatCurrency(balanceHistoryData.prevMonth[currentDay - 1], selectedAccountData?.currency || 'USD');
+                      }
                     }
+
+                    const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
 
                     return (
                       <View style={styles.burndownLegendContainer}>
@@ -1171,9 +1229,17 @@ const GraphsScreen = () => {
                               {t('burndown') || 'Burndown'}
                             </Text>
                           </View>
+                          {hasPrevMonthData && (
+                            <View style={styles.burndownLegendItem}>
+                              <View style={[styles.burndownLegendDot, styles.prevMonthDatasetColor]} />
+                              <Text style={[styles.burndownLegendText, { color: colors.text }]}>
+                                {t('prev_month') || 'Prev Month'}
+                              </Text>
+                            </View>
+                          )}
                         </View>
 
-                        {(actualValue || burndownValue) && (
+                        {(actualValue || burndownValue || prevMonthValue) && (
                           <View style={styles.todayValuesContainer}>
                             <View style={styles.todayValueItem}>
                               <Text style={[styles.todayValueText, { color: colors.text }]}>
@@ -1185,6 +1251,13 @@ const GraphsScreen = () => {
                                 {burndownValue || '-'}
                               </Text>
                             </View>
+                            {hasPrevMonthData && (
+                              <View style={styles.todayValueItem}>
+                                <Text style={[styles.todayValueText, { color: colors.text }]}>
+                                  {prevMonthValue || '-'}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         )}
                       </View>
@@ -1724,6 +1797,9 @@ const styles = StyleSheet.create({
   burndownLegend: {
     flexDirection: 'column',
     gap: 6,
+  },
+  prevMonthDatasetColor: {
+    backgroundColor: 'rgba(156, 39, 176, 0.5)',
   },
   burndownLegendContainer: {
     alignItems: 'flex-start',
