@@ -11,9 +11,6 @@ on:
         options:
           - preview
           - production
-  push:
-    tags:
-      - '*'
 
 jobs:
   build:
@@ -32,12 +29,6 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: 🏗 Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
         with:
@@ -47,38 +38,7 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🏗 Prebuild Android
-        run: npx expo prebuild --platform android --clean
-
-      - name: 🔧 Configure Gradle JVM and packaging options
-        run: |
-          cat >> android/gradle.properties << EOF
-          # Increase JVM memory for Gradle
-          org.gradle.jvmargs=-Xmx8192m -XX:MaxMetaspaceSize -XX:+HeapDumpOnOutOfMemoryError
-          # Increase memory for Kotlin daemon
-          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize
-          # Enable Gradle daemon
-          org.gradle.daemon=true
-          # Enable parallel builds
-          org.gradle.parallel=true
-          # Packaging options
-          android.packagingOptions.excludes=META-INF/versions/**
-          EOF
-
-      - name: 🔐 Decode keystore
-        run: |
-          echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
-
-      - name: 🔐 Setup gradle.properties
-        run: |
-          cat >> android/gradle.properties << EOF
-          MYAPP_UPLOAD_STORE_FILE=keystore.jks
-          MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}
-          MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}
-          MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
-          EOF
-
-      - name: 🚀 Build APK
+      - name: 🚀 Build tag
         if: github.ref_type == 'tag'
         env:
           NODE_OPTIONS: --max_old_space_size=4096
@@ -86,44 +46,25 @@ jobs:
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
           echo "Building with profile: $PROFILE"
-          eas build --platform android --local --profile $PROFILE --non-interactive
+          eas build --platform android --profile $PROFILE --non-interactive --no-wait 2>&1 | tee eas-build-output.txt
+          
+          # Extract the build URL from EAS output
+          BUILD_URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' eas-build-output.txt | head -1)
+          echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
 
-      - name: 📦 Find and rename APK
-        if: github.ref_type == 'tag'
-        id: find_apk
+      - name: 🚀 Build main
+        if: github.ref_type == 'branch' && github.ref == 'refs/heads/main'
         run: |
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v unaligned | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "APK not found in expected location, searching entire workspace..."
-            APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | grep -v "node_modules" | grep -v unaligned | head -1)
-          fi
-          if [ -z "$APK_PATH" ]; then
-            echo "Error: No APK file found!"
-            exit 1
-          fi
-          echo "Found APK: $APK_PATH"
-          ls -lh "$APK_PATH"
+          eas update --platform android --non-interactive --auto 2>&1 | tee eas-build-output.txt
+          
+          # Extract the build URL from EAS output
+          BUILD_URL=$(grep -oE 'https://expo\.dev/accounts/[^[:space:]]+/builds/[a-f0-9-]+' eas-build-output.txt | head -1)
+          echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
 
-          # Rename APK with version tag
-          TAG_NAME="${{ github.ref_name }}"
-          NEW_NAME="penny-${TAG_NAME}.apk"
-          cp "$APK_PATH" "$NEW_NAME"
-          echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
-          echo "Renamed to: $NEW_NAME"
-          ls -lh "$NEW_NAME"
-
-      - name: 📤 Upload APK to Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.find_apk.outputs.apk_path }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Post build summary
-        if: github.ref_type == 'tag'
+      - name: Post build URL to summary
         run: |
-          echo "## 🚀 EAS Build Completed" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 EAS Build Started" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Build Profile:** ${{ github.event.inputs.profile || 'preview' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build URL:** [$BUILD_URL]($BUILD_URL)" >> $GITHUB_STEP_SUMMARY
