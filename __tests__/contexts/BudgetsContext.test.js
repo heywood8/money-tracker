@@ -545,7 +545,7 @@ describe('BudgetsContext', () => {
           currency: 'USD',
           periodType: 'weekly',
           startDate: '2025-01-01',
-          endDate: '2025-12-31',
+          endDate: '2026-12-31',
         },
         {
           id: '3',
