@@ -1798,9 +1798,6 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 6,
   },
-  prevMonthDatasetColor: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
-  },
   burndownLegendContainer: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -2046,6 +2043,9 @@ const styles = StyleSheet.create({
   predictionTitle: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  prevMonthDatasetColor: {
+    backgroundColor: 'rgba(156, 39, 176, 0.5)',
   },
   scrollView: {
     flex: 1,

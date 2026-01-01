@@ -1,6 +1,23 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import defaultCategories from '../defaults/defaultCategories.json';
-import i18nData from '../../assets/i18n.json';
+import enTranslations from '../../assets/i18n/en.json';
+import itTranslations from '../../assets/i18n/it.json';
+import ruTranslations from '../../assets/i18n/ru.json';
+import esTranslations from '../../assets/i18n/es.json';
+import frTranslations from '../../assets/i18n/fr.json';
+import zhTranslations from '../../assets/i18n/zh.json';
+import deTranslations from '../../assets/i18n/de.json';
+
+// Map language codes to their translation data
+const i18nData = {
+  en: enTranslations,
+  it: itTranslations,
+  ru: ruTranslations,
+  es: esTranslations,
+  fr: frTranslations,
+  zh: zhTranslations,
+  de: deTranslations,
+};
 
 /**
  * Map database field names to camelCase for application use

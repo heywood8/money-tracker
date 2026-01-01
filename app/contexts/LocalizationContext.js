@@ -1,10 +1,28 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import i18nData from '../../assets/i18n.json';
+import enTranslations from '../../assets/i18n/en.json';
+import itTranslations from '../../assets/i18n/it.json';
+import ruTranslations from '../../assets/i18n/ru.json';
+import esTranslations from '../../assets/i18n/es.json';
+import frTranslations from '../../assets/i18n/fr.json';
+import zhTranslations from '../../assets/i18n/zh.json';
+import deTranslations from '../../assets/i18n/de.json';
 import { getPreference, setPreference, deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+
 const defaultLang = 'en';
+
+// Map language codes to their translation data
+const i18nData = {
+  en: enTranslations,
+  it: itTranslations,
+  ru: ruTranslations,
+  es: esTranslations,
+  fr: frTranslations,
+  zh: zhTranslations,
+  de: deTranslations,
+};
 
 const LocalizationContext = createContext({
   t: (key) => key,
