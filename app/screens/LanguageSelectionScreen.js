@@ -16,6 +16,7 @@ import esTranslations from '../../assets/i18n/es.json';
 import frTranslations from '../../assets/i18n/fr.json';
 import zhTranslations from '../../assets/i18n/zh.json';
 import deTranslations from '../../assets/i18n/de.json';
+import hyTranslations from '../../assets/i18n/hy.json';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 
 // Map language codes to their translation data
@@ -27,6 +28,7 @@ const i18nData = {
   fr: frTranslations,
   zh: zhTranslations,
   de: deTranslations,
+  hy: hyTranslations,
 };
 
 const LanguageSelectionScreen = ({ onLanguageSelected }) => {
@@ -39,6 +41,7 @@ const LanguageSelectionScreen = ({ onLanguageSelected }) => {
     { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
     { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
     { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
+    { code: 'hy', name: 'Armenian', nativeName: 'Հայերեն', flag: '🇦🇲' },
   ];
 
   const handleLanguageSelect = (code) => {
