@@ -8,6 +8,7 @@ import esTranslations from '../../assets/i18n/es.json';
 import frTranslations from '../../assets/i18n/fr.json';
 import zhTranslations from '../../assets/i18n/zh.json';
 import deTranslations from '../../assets/i18n/de.json';
+import hyTranslations from '../../assets/i18n/hy.json';
 import { getPreference, setPreference, deletePreference, PREF_KEYS } from '../services/PreferencesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
@@ -22,6 +23,7 @@ const i18nData = {
   fr: frTranslations,
   zh: zhTranslations,
   de: deTranslations,
+  hy: hyTranslations,
 };
 
 const LocalizationContext = createContext({
