@@ -188,13 +188,37 @@ export const AccountsProvider = ({ children }) => {
 
   const reorderAccounts = useCallback(async (newOrder) => {
     try {
-      // Update local state immediately for responsive UI
-      setAccounts(newOrder);
+      // newOrder contains only displayed accounts (visible or all, depending on showHiddenAccounts)
+      // We need to merge with accounts that aren't in newOrder to preserve them
 
-      // Prepare data for database update
-      const orderedAccounts = newOrder.map((account, index) => ({
-        id: account.id,
+      // Create a map of new order by ID
+      const newOrderIds = new Set(newOrder.map(acc => acc.id));
+
+      // Get accounts that aren't in the new order (hidden accounts when showHiddenAccounts=false)
+      const unchangedAccounts = accounts.filter(acc => !newOrderIds.has(acc.id));
+
+      // Assign display_order to reordered accounts
+      const reorderedAccounts = newOrder.map((account, index) => ({
+        ...account,
         display_order: index,
+      }));
+
+      // Append unchanged accounts at the end with sequential display_order
+      const mergedAccounts = [
+        ...reorderedAccounts,
+        ...unchangedAccounts.map((account, index) => ({
+          ...account,
+          display_order: reorderedAccounts.length + index,
+        })),
+      ];
+
+      // Update local state with merged array
+      setAccounts(mergedAccounts);
+
+      // Prepare all accounts for database update
+      const orderedAccounts = mergedAccounts.map(account => ({
+        id: account.id,
+        display_order: account.display_order,
       }));
 
       // Persist to database
@@ -210,7 +234,7 @@ export const AccountsProvider = ({ children }) => {
       );
       throw err;
     }
-  }, [reloadAccounts, showDialog]);
+  }, [accounts, reloadAccounts, showDialog]);
 
   const resetDatabase = useCallback(async () => {
     try {
