@@ -74,6 +74,7 @@ For detailed guidelines, see [Commit Message Guidelines](docs/COMMIT_MESSAGE_GUI
 - **[Database Architecture](docs/DATABASE.md)** - Complete guide to the SQLite/Drizzle ORM database implementation, schema design, and development workflow
 - **[EAS Credentials Setup](docs/EAS_CREDENTIALS_SETUP.md)** - Guide for setting up Android signing credentials for EAS builds
 - **[Commit Message Guidelines](docs/COMMIT_MESSAGE_GUIDELINES.md)** - Guide for writing conventional commits that work with release-please
+- **[Privacy Policy](https://heywood8.github.io/money-tracker/PRIVACY_POLICY)** - App privacy policy and data handling practices
 
 ## Building with EAS
 
