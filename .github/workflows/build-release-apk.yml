@@ -131,7 +131,7 @@ jobs:
             echo "Metadata file not found, falling back to git tag"
             TAG_NAME="${{ github.ref_name }}"
           fi
-          NEW_NAME="penny-${TAG_NAME}.apk"
+          NEW_NAME="${TAG_NAME}.apk"
           cp "$APK_PATH" "$NEW_NAME"
           echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
           echo "Renamed to: $NEW_NAME"
