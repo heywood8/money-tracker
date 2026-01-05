@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.3](https://github.com/heywood8/money-tracker/compare/penny-v0.22.2...penny-v0.22.3) (2026-01-05)
+
+
+### Bug Fixes
+
+* configure Gradle JVM memory via config plugin ([9556f41](https://github.com/heywood8/money-tracker/commit/9556f418d626ea9f1c430372f966a061680c0753))
+* reduce Gradle memory and remove --no-wait from local builds ([113b7ce](https://github.com/heywood8/money-tracker/commit/113b7ceb188e8321ae3e5181d30e0b78f711dc7c))
+
 ## [0.22.2](https://github.com/heywood8/money-tracker/compare/penny-v0.22.1...penny-v0.22.2) (2026-01-05)
 
 
