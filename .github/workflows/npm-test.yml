@@ -111,7 +111,7 @@ jobs:
         uses: actions/github-script@v8
         id: set-results
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             let output = fs.readFileSync('test-output.txt', 'utf8');
