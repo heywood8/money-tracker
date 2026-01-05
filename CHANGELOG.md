@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.2](https://github.com/heywood8/money-tracker/compare/penny-v0.22.1...penny-v0.22.2) (2026-01-05)
+
+
+### Bug Fixes
+
+* set APP_VARIANT=production to build production APK ([256c058](https://github.com/heywood8/money-tracker/commit/256c0586c877696fb71b580b7380edad3d788b0d))
+* use APP_VARIANT=preview instead of production ([27d093b](https://github.com/heywood8/money-tracker/commit/27d093b3e4f4802a19dec1226db5a18fa068894a))
+
 ## [0.22.1](https://github.com/heywood8/money-tracker/compare/penny-v0.22.0...penny-v0.22.1) (2026-01-05)
 
 
