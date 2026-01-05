@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.2](https://github.com/heywood8/money-tracker/compare/penny-v0.21.1...penny-v0.21.2) (2026-01-05)
+
+
+### Bug Fixes
+
+* "Show hidden accounts" button disappearing after account reorder ([aa17a61](https://github.com/heywood8/money-tracker/commit/aa17a61d349669fcbda64225157159f070d5d286))
+* lints for AccountsScreen ([6d05e3d](https://github.com/heywood8/money-tracker/commit/6d05e3dbaabc4e3e2233a40b40b9f731bc0629c9))
+
 ## [0.21.1](https://github.com/heywood8/money-tracker/compare/penny-v0.21.0...penny-v0.21.1) (2026-01-01)
 
 
