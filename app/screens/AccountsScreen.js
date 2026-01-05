@@ -839,15 +839,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  draggableListContent: {
-    paddingBottom: SPACING.md,
-  },
   dragHandle: {
     alignItems: 'center',
     height: 32,
     justifyContent: 'center',
     marginRight: SPACING.xs,
     width: 32,
+  },
+  draggableListContent: {
+    paddingBottom: SPACING.md,
   },
   error: {
     color: 'red',
