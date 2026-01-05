@@ -17,6 +17,13 @@ const withR8Config = (config) => {
       'android.enableMinifyInReleaseBuilds': 'true',
       'android.enableShrinkResourcesInReleaseBuilds': 'true',
       'android.enablePngCrunchInReleaseBuilds': 'true',
+      // Gradle JVM args - reduced for GitHub Actions runners (7GB total RAM)
+      // Leaving headroom for OS, Node.js, and other processes
+      'org.gradle.jvmargs': '-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC',
+      'org.gradle.parallel': 'true',
+      'org.gradle.configureondemand': 'true',
+      'org.gradle.caching': 'true',
+      'org.gradle.daemon': 'true',
     };
 
     // Update or add each property

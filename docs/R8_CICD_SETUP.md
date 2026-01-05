@@ -33,6 +33,7 @@ money-tracker/
 
 Expo Config Plugin that automatically:
 - Sets gradle properties to enable R8
+- Configures Gradle JVM memory settings for optimal CI/CD performance
 - Copies ProGuard rules from root to `android/app/`
 - Executes on every `expo prebuild` (locally and in EAS Build)
 
@@ -43,6 +44,11 @@ const { withGradleProperties, withDangerousMod } = require('@expo/config-plugins
 // - android.enableMinifyInReleaseBuilds=true
 // - android.enableShrinkResourcesInReleaseBuilds=true
 // - android.enablePngCrunchInReleaseBuilds=true
+// - org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m (optimized for GitHub Actions)
+// - org.gradle.parallel=true
+// - org.gradle.configureondemand=true
+// - org.gradle.caching=true
+// - org.gradle.daemon=true
 ```
 
 ### 2. `proguard-rules.pro` (in project root)
