@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/heywood8/money-tracker/compare/penny-v0.21.2...penny-v0.22.0) (2026-01-05)
+
+
+### Features
+
+* privacy policy added; disabled sending usage data ([0811c9e](https://github.com/heywood8/money-tracker/commit/0811c9e2f358a1a06effc570557dddab98cadd75))
+
+
+### Bug Fixes
+
+* on a new tag, build preview release, not a debug release ([d92aaea](https://github.com/heywood8/money-tracker/commit/d92aaeac945848256c2b79cb03b081c23063bafa))
+
 ## [0.21.2](https://github.com/heywood8/money-tracker/compare/penny-v0.21.1...penny-v0.21.2) (2026-01-05)
 
 
