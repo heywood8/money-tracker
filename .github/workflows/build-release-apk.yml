@@ -36,7 +36,7 @@ jobs:
 
       - name: 🏗 Prebuild Android
         env:
-          APP_VARIANT: production
+          APP_VARIANT: preview
         run: npx expo prebuild --platform android --clean
 
       - name: 🔍 Verify build configuration
