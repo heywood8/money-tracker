@@ -60,7 +60,7 @@ jobs:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          eas build --platform android --local --profile preview --non-interactive --no-wait
+          eas build --platform android --local --profile preview --non-interactive
 
       - name: 📦 Find and rename APK
         id: find_apk
