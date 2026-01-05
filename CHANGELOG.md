@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.1](https://github.com/heywood8/money-tracker/compare/penny-v0.22.0...penny-v0.22.1) (2026-01-05)
+
+
+### Bug Fixes
+
+* APK file name when uploading to a release ([7e0aad2](https://github.com/heywood8/money-tracker/commit/7e0aad21a8827f3e4cab200531e05857bb00a5f5))
+* update build workflow to use assembleRelease and configure signing ([58ce2a9](https://github.com/heywood8/money-tracker/commit/58ce2a9a1bbd85c5db7709f10f5ccffe507f8e5b))
+
 ## [0.22.0](https://github.com/heywood8/money-tracker/compare/penny-v0.21.2...penny-v0.22.0) (2026-01-05)
 
 
