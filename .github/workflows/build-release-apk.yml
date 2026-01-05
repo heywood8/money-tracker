@@ -1,4 +1,4 @@
-name: Build Android APK (Gradle)
+name: Build Android APK (EAS)
 
 on:
   workflow_dispatch:
@@ -29,92 +29,44 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # EAS is not used for this workflow; build using Gradle directly below.
-
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🏗 Prebuild Android
-        env:
-          APP_VARIANT: preview
-        run: npx expo prebuild --platform android --clean
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: 🔍 Verify build configuration
+      - name: 🔐 Setup credentials.json for signing
         run: |
-          echo "Checking generated package configuration..."
-          grep -E "(namespace|applicationId)" android/app/build.gradle || true
-          echo "Expected: com.heywood8.monkeep (production)"
-
-      - name: 🔧 Configure release signing in build.gradle
-        run: |
-          # Add release signing config after debug config
-          sed -i'' -e '/keyPassword.*android/a\
-                  }\
-                  release {\
-                      if (project.hasProperty("MYAPP_UPLOAD_STORE_FILE")) {\
-                          storeFile file(MYAPP_UPLOAD_STORE_FILE)\
-                          storePassword MYAPP_UPLOAD_STORE_PASSWORD\
-                          keyAlias MYAPP_UPLOAD_KEY_ALIAS\
-                          keyPassword MYAPP_UPLOAD_KEY_PASSWORD\
-                      }
-          ' android/app/build.gradle
-
-          # Change release buildType to use release signing config instead of debug
-          sed -i'' -e 's/signingConfig signingConfigs\.debug$/signingConfig signingConfigs.release/' android/app/build.gradle
-
-          echo "Modified build.gradle signing configuration"
-          grep -A 10 "signingConfigs {" android/app/build.gradle || true
-
-      - name: 🔧 Configure Gradle JVM and packaging options
-        run: |
-          cat >> android/gradle.properties << EOF
-          # Increase JVM memory for Gradle
-          org.gradle.jvmargs=-Xmx8192m -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError
-          # Increase memory for Kotlin daemon
-          kotlin.daemon.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=2g
-          # Enable Gradle daemon
-          org.gradle.daemon=true
-          # Enable parallel builds
-          org.gradle.parallel=true
-          # Packaging options
-          android.packagingOptions.excludes=META-INF/versions/**
-          EOF
-
-      - name: 🔐 Decode keystore
-        run: |
+          mkdir -p android/app
           echo "${{ secrets.MYAPP_UPLOAD_STORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
-
-      - name: 🔐 Setup gradle.properties
-        run: |
-          cat >> android/gradle.properties << EOF
-          MYAPP_UPLOAD_STORE_FILE=keystore.jks
-          MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}
-          MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}
-          MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
+          cat > credentials.json << EOF
+          {
+            "android": {
+              "keystore": {
+                "keystorePath": "android/app/keystore.jks",
+                "keystorePassword": "${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}",
+                "keyAlias": "${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}",
+                "keyPassword": "${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}"
+              }
+            }
+          }
           EOF
 
-      - name: 🚀 Build APK (Gradle assembleRelease)
+      - name: 🚀 Build APK with EAS
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          set -e
-          echo "Building release variant"
-          cd android
-          ./gradlew :app:assembleRelease --no-daemon \
-          -Pandroid.injected.signing.store.file=app/keystore.jks \
-          -PreactNativeArchitectures=arm64-v8a
-          echo "assembleRelease completed"
-          cd ..
+          eas build --platform android --local --profile preview --non-interactive --no-wait
 
       - name: 📦 Find and rename APK
         id: find_apk
         run: |
-          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v unaligned | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "APK not found in expected location, searching entire workspace..."
-            APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | grep -v "node_modules" | grep -v unaligned | head -1)
-          fi
+          # EAS build outputs APK in current directory or android/app/build/outputs/apk
+          APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | grep -v "node_modules" | grep -v unaligned | head -1)
           if [ -z "$APK_PATH" ]; then
             echo "Error: No APK file found!"
             exit 1
@@ -122,23 +74,8 @@ jobs:
           echo "Found APK: $APK_PATH"
           ls -lh "$APK_PATH"
 
-          # Try to read version from Gradle output metadata
-          META_FILE="android/app/build/outputs/apk/release/output-metadata.json"
-          if [ -f "$META_FILE" ]; then
-            echo "Found metadata: $META_FILE"
-            VERSION_NAME=$(jq -r '.outputs[0].versionName // empty' "$META_FILE" 2>/dev/null || true)
-            VERSION_CODE=$(jq -r '.outputs[0].versionCode // empty' "$META_FILE" 2>/dev/null || true)
-            if [ -n "$VERSION_NAME" ]; then
-              TAG_NAME="$VERSION_NAME"
-            elif [ -n "$VERSION_CODE" ]; then
-              TAG_NAME="$VERSION_CODE"
-            else
-              TAG_NAME="${{ github.ref_name }}"
-            fi
-          else
-            echo "Metadata file not found, falling back to git tag"
-            TAG_NAME="${{ github.ref_name }}"
-          fi
+          # Use git tag for filename
+          TAG_NAME="${{ github.ref_name }}"
           NEW_NAME="${TAG_NAME}.apk"
           cp "$APK_PATH" "$NEW_NAME"
           echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
@@ -155,7 +92,8 @@ jobs:
       - name: Post build summary
         if: github.ref_type == 'tag'
         run: |
-          echo "## 🚀 Android Build Completed (Gradle)" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Android Build Completed (EAS)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Profile:** preview" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
