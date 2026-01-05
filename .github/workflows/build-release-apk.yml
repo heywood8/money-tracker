@@ -65,18 +65,18 @@ jobs:
           MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
           EOF
 
-      - name: 🚀 Build APK (Gradle assembleRelease)
+      - name: 🚀 Build APK (Gradle assemblePreviewRelease)
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           set -e
-          echo "Building Android release APK with Gradle"
+          echo "Building 'preview' release variant"
           cd android
-          ./gradlew clean assembleRelease \
-            --no-daemon \
-            -Pandroid.injected.signing.store.file=app/keystore.jks \
-            -PreactNativeArchitectures=arm64-v8a
+          ./gradlew :app:assemblePreviewRelease --no-daemon \
+          -Pandroid.injected.signing.store.file=app/keystore.jks \
+          -PreactNativeArchitectures=arm64-v8a
+          echo "assemblePreviewRelease completed"
           cd ..
 
       - name: 📦 Find and rename APK
