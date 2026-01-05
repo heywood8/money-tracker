@@ -35,7 +35,15 @@ jobs:
         run: npm ci
 
       - name: 🏗 Prebuild Android
+        env:
+          APP_VARIANT: production
         run: npx expo prebuild --platform android --clean
+
+      - name: 🔍 Verify build configuration
+        run: |
+          echo "Checking generated package configuration..."
+          grep -E "(namespace|applicationId)" android/app/build.gradle || true
+          echo "Expected: com.heywood8.monkeep (production)"
 
       - name: 🔧 Configure release signing in build.gradle
         run: |
