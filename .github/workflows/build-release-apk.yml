@@ -37,6 +37,26 @@ jobs:
       - name: 🏗 Prebuild Android
         run: npx expo prebuild --platform android --clean
 
+      - name: 🔧 Configure release signing in build.gradle
+        run: |
+          # Add release signing config after debug config
+          sed -i'' -e '/keyPassword.*android/a\
+                  }\
+                  release {\
+                      if (project.hasProperty("MYAPP_UPLOAD_STORE_FILE")) {\
+                          storeFile file(MYAPP_UPLOAD_STORE_FILE)\
+                          storePassword MYAPP_UPLOAD_STORE_PASSWORD\
+                          keyAlias MYAPP_UPLOAD_KEY_ALIAS\
+                          keyPassword MYAPP_UPLOAD_KEY_PASSWORD\
+                      }
+          ' android/app/build.gradle
+
+          # Change release buildType to use release signing config instead of debug
+          sed -i'' -e 's/signingConfig signingConfigs\.debug$/signingConfig signingConfigs.release/' android/app/build.gradle
+
+          echo "Modified build.gradle signing configuration"
+          grep -A 10 "signingConfigs {" android/app/build.gradle || true
+
       - name: 🔧 Configure Gradle JVM and packaging options
         run: |
           cat >> android/gradle.properties << EOF
@@ -65,18 +85,18 @@ jobs:
           MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
           EOF
 
-      - name: 🚀 Build APK (Gradle assemblePreviewRelease)
+      - name: 🚀 Build APK (Gradle assembleRelease)
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           set -e
-          echo "Building 'preview' release variant"
+          echo "Building release variant"
           cd android
-          ./gradlew :app:assemblePreviewRelease --no-daemon \
+          ./gradlew :app:assembleRelease --no-daemon \
           -Pandroid.injected.signing.store.file=app/keystore.jks \
           -PreactNativeArchitectures=arm64-v8a
-          echo "assemblePreviewRelease completed"
+          echo "assembleRelease completed"
           cd ..
 
       - name: 📦 Find and rename APK
