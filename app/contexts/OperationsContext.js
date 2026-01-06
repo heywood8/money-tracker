@@ -323,6 +323,37 @@ export const OperationsProvider = ({ children }) => {
     await updateFilters(emptyFilters);
   }, [updateFilters]);
 
+  // Jump to a specific date (loads a week of operations starting from that date)
+  const jumpToDate = useCallback(async (date) => {
+    try {
+      setLoading(true);
+      const isFiltered = hasActiveFilters(activeFilters);
+
+      // Load a week of operations starting from the selected date
+      const operationsData = isFiltered
+        ? await OperationsDB.getFilteredOperationsByWeekFromDate(date, activeFilters)
+        : await OperationsDB.getOperationsByWeekFromDate(date);
+
+      setOperations(operationsData);
+
+      // Track the oldest date in the loaded data
+      if (operationsData.length > 0) {
+        const oldestOp = operationsData[operationsData.length - 1];
+        setOldestLoadedDate(oldestOp.date);
+      } else {
+        setOldestLoadedDate(date);
+      }
+
+      // Assume there might be more operations
+      setHasMoreOperations(true);
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Failed to jump to date:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeFilters, hasActiveFilters]);
+
   const validateOperation = useCallback((operation, t = (key) => key) => {
     if (!operation.type) {
       return t('operation_type_required') || 'Operation type is required';
@@ -382,6 +413,7 @@ export const OperationsProvider = ({ children }) => {
     reloadOperations,
     loadMoreOperations,
     loadInitialOperations,
+    jumpToDate,
     activeFilters,
     filtersActive,
     updateFilters,
@@ -402,6 +434,7 @@ export const OperationsProvider = ({ children }) => {
     reloadOperations,
     loadMoreOperations,
     loadInitialOperations,
+    jumpToDate,
     activeFilters,
     filtersActive,
     updateFilters,
