@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.6](https://github.com/heywood8/money-tracker/compare/penny-v0.22.5...penny-v0.22.6) (2026-01-06)
+
+
+### Bug Fixes
+
+* pie chart back swipe now navigates to parent category ([#178](https://github.com/heywood8/money-tracker/issues/178)) ([8447a28](https://github.com/heywood8/money-tracker/commit/8447a28406a582c008d5d9d80e4abae68013ac52))
+
 ## [0.22.5](https://github.com/heywood8/money-tracker/compare/penny-v0.22.4...penny-v0.22.5) (2026-01-06)
 
 
