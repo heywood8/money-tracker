@@ -59,6 +59,17 @@ const GraphsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
 
+  // Handler to navigate back to parent category
+  const handleBackToParent = useCallback(() => {
+    if (modalType === 'expense') {
+      const parentId = getParentCategoryId(selectedCategory);
+      setSelectedCategory(parentId);
+    } else {
+      const parentId = getParentCategoryId(selectedIncomeCategory);
+      setSelectedIncomeCategory(parentId);
+    }
+  }, [modalType, selectedCategory, selectedIncomeCategory, getParentCategoryId]);
+
   // Pan Responder for swipe gestures
   const panResponder = useRef(
     PanResponder.create({
@@ -70,13 +81,9 @@ const GraphsScreen = () => {
         return currentCategory !== 'all' && gestureState.dx > 20 && Math.abs(gestureState.dy) < 80;
       },
       onPanResponderRelease: (evt, gestureState) => {
-        // Swipe right to go back to "All"
+        // Swipe right to go back to parent category
         if (gestureState.dx > 100) {
-          if (modalType === 'expense') {
-            setSelectedCategory('all');
-          } else {
-            setSelectedIncomeCategory('all');
-          }
+          handleBackToParent();
         }
       },
     }),
@@ -91,13 +98,19 @@ const GraphsScreen = () => {
     setSelectedIncomeCategory(categoryId);
   }, []);
 
-  const handleBackToAll = useCallback(() => {
-    if (modalType === 'expense') {
-      setSelectedCategory('all');
-    } else {
-      setSelectedIncomeCategory('all');
-    }
-  }, [modalType]);
+  // Helper function to get parent category ID
+  const getParentCategoryId = useCallback((categoryId) => {
+    if (categoryId === 'all') return 'all';
+
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return 'all';
+
+    // If category has no parent, go back to 'all'
+    if (category.parentId === null) return 'all';
+
+    // Otherwise, return the parent ID
+    return category.parentId;
+  }, [categories]);
 
   // Month names translation keys
   const monthKeys = [
@@ -1075,11 +1088,11 @@ const GraphsScreen = () => {
                 {((modalType === 'expense' && selectedCategory !== 'all') ||
                   (modalType === 'income' && selectedIncomeCategory !== 'all')) && (
                   <TouchableOpacity
-                    onPress={handleBackToAll}
+                    onPress={handleBackToParent}
                     style={styles.backButton}
                     accessibilityRole="button"
-                    accessibilityLabel={t('back') || 'Back to all categories'}
-                    accessibilityHint="Returns to viewing all categories"
+                    accessibilityLabel={t('back') || 'Back to parent category'}
+                    accessibilityHint="Returns to parent category level"
                   >
                     <Icon name="arrow-left" size={24} color={colors.primary} />
                   </TouchableOpacity>
