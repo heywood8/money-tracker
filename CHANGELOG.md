@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.5](https://github.com/heywood8/money-tracker/compare/penny-v0.22.4...penny-v0.22.5) (2026-01-06)
+
+
+### Bug Fixes
+
+* lint ([797028e](https://github.com/heywood8/money-tracker/commit/797028e718725e54b55cae9239b9ad6ce026608f))
+* Show/Hide hidden accounts button misbehaving ([fca1c87](https://github.com/heywood8/money-tracker/commit/fca1c879299c8311408feb6ab3940bb8450cd1fe))
+
 ## [0.22.4](https://github.com/heywood8/money-tracker/compare/penny-v0.22.3...penny-v0.22.4) (2026-01-06)
 
 
