@@ -91,27 +91,45 @@ SpendingPredictionCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  predictionArrow: {
+    marginHorizontal: 8,
+  },
   predictionCard: {
-    marginBottom: 16,
-    padding: 16,
     borderRadius: 8,
     borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  predictionFooter: {
+    alignItems: 'center',
+  },
+  predictionFooterLabel: {
+    fontSize: 14,
+  },
+  predictionFooterValue: {
+    fontWeight: '600',
   },
   predictionHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
   },
-  predictionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  predictionProgressBar: {
+    borderRadius: 4,
+    height: 8,
   },
-  predictionStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  predictionProgressContainer: {
+    marginBottom: 12,
+  },
+  predictionProgressText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  predictionProgressTrack: {
+    borderRadius: 4,
+    height: 8,
+    marginBottom: 8,
   },
   predictionStat: {
     flex: 1,
@@ -124,33 +142,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  predictionArrow: {
-    marginHorizontal: 8,
-  },
-  predictionProgressContainer: {
-    marginBottom: 12,
-  },
-  predictionProgressTrack: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  predictionProgressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  predictionProgressText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  predictionFooter: {
+  predictionStats: {
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  predictionFooterLabel: {
-    fontSize: 14,
-  },
-  predictionFooterValue: {
-    fontWeight: '600',
+  predictionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

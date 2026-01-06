@@ -230,75 +230,81 @@ BalanceHistoryCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  accountPickerWrapper: {
+    borderRadius: 4,
+    borderWidth: 1,
+    minWidth: 120,
+  },
   balanceHistoryCard: {
-    marginBottom: 16,
-    padding: 16,
     borderRadius: 8,
     borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  balanceHistoryChartContainer: {
+    alignItems: 'center',
   },
   balanceHistoryHeader: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
-  balanceHistoryTitleContainer: {
-    flexDirection: 'row',
+  balanceHistoryLoading: {
     alignItems: 'center',
-    gap: 8,
+    height: 220,
+    justifyContent: 'center',
+  },
+  balanceHistoryNoData: {
+    alignItems: 'center',
+    height: 220,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  balanceHistoryNoDataText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   balanceHistoryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  accountPickerWrapper: {
-    borderWidth: 1,
-    borderRadius: 4,
-    minWidth: 120,
-  },
-  balanceHistoryLoading: {
-    height: 220,
-    justifyContent: 'center',
+  balanceHistoryTitleContainer: {
     alignItems: 'center',
-  },
-  balanceHistoryChartContainer: {
-    alignItems: 'center',
-  },
-  lineChartStyle: {
-    borderRadius: 8,
-  },
-  burndownLegendContainer: {
-    marginTop: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
+  },
+  burndownDatasetColor: {
+    backgroundColor: 'rgba(255, 99, 132, 0.4)',
   },
   burndownLegend: {
     flexDirection: 'row',
     gap: 16,
   },
-  burndownLegendItem: {
-    flexDirection: 'row',
+  burndownLegendContainer: {
     alignItems: 'center',
-    gap: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   burndownLegendDot: {
-    width: 10,
-    height: 10,
     borderRadius: 5,
+    height: 10,
+    width: 10,
   },
-  burndownDatasetColor: {
-    backgroundColor: 'rgba(255, 99, 132, 0.4)',
-  },
-  prevMonthDatasetColor: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
+  burndownLegendItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   burndownLegendText: {
     fontSize: 12,
   },
-  todayValuesContainer: {
-    flexDirection: 'row',
-    gap: 16,
+  lineChartStyle: {
+    borderRadius: 8,
+  },
+  prevMonthDatasetColor: {
+    backgroundColor: 'rgba(156, 39, 176, 0.5)',
   },
   todayValueItem: {
     alignItems: 'flex-end',
@@ -307,15 +313,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  balanceHistoryNoData: {
-    height: 220,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  balanceHistoryNoDataText: {
-    fontSize: 14,
-    textAlign: 'center',
+  todayValuesContainer: {
+    flexDirection: 'row',
+    gap: 16,
   },
 });
 

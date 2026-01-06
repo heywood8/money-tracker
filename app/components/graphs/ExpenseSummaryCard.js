@@ -75,16 +75,35 @@ ExpenseSummaryCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  miniChartContainer: {
+    alignItems: 'center',
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
+  },
+  noDataPlaceholder: {
+    alignItems: 'center',
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
+  },
+  noDataText: {
+    fontSize: 32,
+  },
+  summaryAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
   summaryCard: {
-    marginBottom: 16,
-    padding: 16,
     borderRadius: 8,
     borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
   },
   summaryCardContent: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
   summaryInfo: {
     flex: 1,
@@ -92,25 +111,6 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 14,
     marginBottom: 8,
-  },
-  summaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  miniChartContainer: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataPlaceholder: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataText: {
-    fontSize: 32,
   },
 });
 

@@ -94,52 +94,52 @@ CustomLegend.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  legendContainer: {
-    marginTop: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-  },
-  legendItemClickable: {
-    opacity: 0.9,
-  },
-  legendLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
   colorIndicator: {
-    width: 12,
-    height: 12,
     borderRadius: 6,
-  },
-  legendIcon: {
-    marginLeft: 4,
-  },
-  legendName: {
-    fontSize: 14,
-    flex: 1,
-  },
-  legendChevron: {
-    marginLeft: 4,
-  },
-  legendRight: {
-    alignItems: 'flex-end',
-    marginLeft: 8,
+    height: 12,
+    width: 12,
   },
   legendAmount: {
     fontSize: 14,
     fontWeight: '600',
   },
+  legendChevron: {
+    marginLeft: 4,
+  },
+  legendContainer: {
+    marginTop: 16,
+  },
+  legendIcon: {
+    marginLeft: 4,
+  },
+  legendItem: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingVertical: 12,
+  },
+  legendItemClickable: {
+    opacity: 0.9,
+  },
+  legendLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+    gap: 8,
+  },
+  legendName: {
+    flex: 1,
+    fontSize: 14,
+  },
   legendPercentage: {
     fontSize: 12,
     marginTop: 2,
+  },
+  legendRight: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
   },
 });
 

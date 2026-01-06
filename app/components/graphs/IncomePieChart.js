@@ -69,22 +69,22 @@ IncomePieChart.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 14,
-  },
   chartContainer: {
     alignItems: 'center',
     marginBottom: 16,
   },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  loadingText: {
+    fontSize: 14,
+    marginTop: 8,
+  },
   noData: {
-    textAlign: 'center',
     fontSize: 14,
     paddingVertical: 32,
+    textAlign: 'center',
   },
 });
 
