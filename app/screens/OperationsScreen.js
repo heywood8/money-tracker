@@ -16,6 +16,8 @@ import OperationModal from '../modals/OperationModal';
 import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
+import DateSeparator from '../components/operations/DateSeparator';
+import OperationListItem from '../components/operations/OperationListItem';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
@@ -646,119 +648,31 @@ const OperationsScreen = () => {
   const renderItem = useCallback(({ item }) => {
     // Render date separator
     if (item.type === 'separator') {
-      const hasSpending = item.spendingSums && Object.keys(item.spendingSums).length > 0;
-
       return (
-        <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
-          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-          <View style={styles.dateSeparatorContent}>
-            <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}> 
-              {formatDate(item.date)}
-            </Text>
-            {hasSpending && (
-              <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}> 
-                {t('spent_amount')}: {Object.entries(item.spendingSums)
-                  .map(([currency, amount]) => {
-                    const symbol = getCurrencySymbol(currency);
-                    const currencyInfo = currencies[currency];
-                    const decimals = currencyInfo?.decimal_digits ?? 2;
-                    return `${symbol}${amount.toFixed(decimals)}`;
-                  })
-                  .join(', ')}
-              </Text>
-            )}
-          </View>
-          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-        </View>
+        <DateSeparator
+          date={item.date}
+          spendingSums={item.spendingSums}
+          formatDate={formatDate}
+          colors={colors}
+          t={t}
+        />
       );
     }
 
     // Render operation
-    const operation = item;
-    const isExpense = operation.type === 'expense';
-    const isIncome = operation.type === 'income';
-    const isTransfer = operation.type === 'transfer';
-
-    // Check if this is a multi-currency transfer
-    const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
-
-    // For transfers, use transfer icon and localized name instead of category
-    const categoryInfo = isTransfer
-      ? { name: t('transfer'), icon: 'swap-horizontal' }
-      : getCategoryInfo(operation.categoryId);
-
-    const accountName = getAccountName(operation.accountId);
-
-    // Build comprehensive accessibility label
-    const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
-    let accessibilityLabel = `${typeLabel}, ${categoryInfo.name}, ${formatCurrency(operation.accountId, operation.amount)}, ${accountName}, ${formatDate(operation.date)}`;
-
-    if (isTransfer && operation.toAccountId) {
-      const toAccountName = getAccountName(operation.toAccountId);
-      accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}, ${formatDate(operation.date)}`;
-
-      if (isMultiCurrencyTransfer) {
-        accessibilityLabel += `, exchange rate ${operation.exchangeRate}`;
-      }
-    }
-
-    if (operation.description) {
-      accessibilityLabel += `, note: ${operation.description}`;
-    }
-
     return (
-      <ListCard
-        variant={operation.type}
-        onPress={() => handleEditOperation(operation)}
-        leftIcon={categoryInfo.icon}
-        leftIconBackground={true}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityHint={t('edit_operation_hint')}
-      >
-        <View style={styles.operationContent}>
-          {/* Operation Info */}
-          <View style={styles.operationInfo}>
-            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-              {categoryInfo.name}
-            </Text>
-            <Text style={[styles.accountName, { color: colors.mutedText }]} numberOfLines={1}>
-              {accountName}
-              {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
-            </Text>
-            {/* Note: Description/exchange rate hidden in list view to fit 56px height */}
-            {/* They are still visible in the edit modal */}
-          </View>
-
-          {/* Date and Amount */}
-          <View style={styles.operationRight}>
-            <Text
-              style={[
-                styles.amount,
-                {
-                  color: isExpense
-                    ? colors.expense
-                    : isIncome
-                      ? colors.income
-                      : colors.text,
-                },
-              ]}
-              numberOfLines={1}
-            >
-              {formatCurrency(operation.accountId, operation.amount)}
-            </Text>
-            {isMultiCurrencyTransfer && operation.toAccountId && (
-              <Text style={[styles.destinationAmount, { color: colors.mutedText }]} numberOfLines={1}>
-                → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
-              </Text>
-            )}
-            <Text style={[styles.date, { color: colors.mutedText }]} numberOfLines={1}>
-              {formatDate(operation.date)}
-            </Text>
-          </View>
-        </View>
-      </ListCard>
+      <OperationListItem
+        operation={item}
+        colors={colors}
+        t={t}
+        getCategoryInfo={getCategoryInfo}
+        getAccountName={getAccountName}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+        onPress={() => handleEditOperation(item)}
+      />
     );
-  }, [colors, t, getCategoryInfo, getAccountName, handleEditOperation, formatDate, formatCurrency]);
+  }, [colors, t, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation]);
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
@@ -984,10 +898,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  accountName: {
-    fontSize: 13,
-    marginBottom: 2,
-  },
   accountOption: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -997,11 +907,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 2,
   },
   backButton: {
     marginRight: SPACING.sm,
@@ -1024,11 +929,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
   },
   categoryOption: {
     alignItems: 'center',
@@ -1055,40 +955,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  date: {
-    fontSize: 12,
-  },
-  dateSeparator: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.md,
-  },
-  dateSeparatorContent: {
-    alignItems: 'center',
-  },
-  dateSeparatorLine: {
-    flex: 1,
-    height: 1,
-  },
-  dateSeparatorSpent: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  dateSeparatorText: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  destinationAmount: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  
-  
   emptyContainer: {
     alignItems: 'center',
     flex: 1,
@@ -1170,19 +1036,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  operationContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
-  },
-  operationInfo: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  operationRight: {
-    alignItems: 'flex-end',
-  },
-  
   pickerModalContent: {
     borderRadius: BORDER_RADIUS.lg,
     maxHeight: '70%',
