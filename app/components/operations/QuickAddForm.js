@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginHorizontal: SPACING.sm,
     marginVertical: SPACING.md,
-    padding: SPACING.lg,
+    padding: SPACING.xsm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -290,6 +290,7 @@ const styles = StyleSheet.create({
   typeSelector: {
     flexDirection: 'row',
     gap: SPACING.sm,
+    marginBottom: SPACING.md,
   },
 });
 
