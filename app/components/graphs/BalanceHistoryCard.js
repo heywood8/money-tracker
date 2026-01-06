@@ -63,7 +63,7 @@ const BalanceHistoryCard = ({
                 labels: balanceHistoryData.labels.map(d => d.toString()),
                 datasets: [
                   {
-                    data: balanceHistoryData.actualForChart.map(v => v ?? null),
+                    data: balanceHistoryData.actualForChart.map(v => v !== undefined ? v : NaN),
                     color: () => colors.primary,
                     strokeWidth: 3,
                   },
@@ -74,7 +74,7 @@ const BalanceHistoryCard = ({
                     withDots: false,
                   },
                   ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
-                    data: balanceHistoryData.prevMonth.map(v => v ?? null),
+                    data: balanceHistoryData.prevMonth.map(v => v !== undefined ? v : NaN),
                     color: () => 'rgba(156, 39, 176, 0.5)',
                     strokeWidth: 2,
                     withDots: false,
