@@ -271,26 +271,19 @@ const styles = StyleSheet.create({
   burndownDatasetColor: {
     backgroundColor: 'rgba(255, 99, 132, 0.4)',
   },
-  burndownLegend: {
-    flexDirection: 'row',
-    gap: 16,
-  },
   burndownLegendContainer: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
   },
-  burndownLegendRow: {
-    flexDirection: 'row',
-    gap: 24,
-    alignItems: 'center',
+  burndownLegendDot: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
   },
-  legendItem: {
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: 6,
-    minWidth: 96,
+  burndownLegendText: {
+    fontSize: 12,
   },
   legendColumn: {
     flexDirection: 'column',
@@ -298,28 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   legendRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
-  },
-  valuesColumn: {
-    flexDirection: 'column',
-    gap: 12,
-    alignItems: 'flex-end',
-    minWidth: 120,
-  },
-  burndownLegendDot: {
-    borderRadius: 5,
-    height: 10,
-    width: 10,
-  },
-  burndownLegendItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  burndownLegendText: {
-    fontSize: 12,
   },
   lineChartStyle: {
     borderRadius: 8,
@@ -327,16 +301,15 @@ const styles = StyleSheet.create({
   prevMonthDatasetColor: {
     backgroundColor: 'rgba(156, 39, 176, 0.5)',
   },
-  todayValueItem: {
-    alignItems: 'flex-end',
-  },
   todayValueText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  todayValuesContainer: {
-    flexDirection: 'row',
-    gap: 16,
+  valuesColumn: {
+    alignItems: 'flex-end',
+    flexDirection: 'column',
+    gap: 12,
+    minWidth: 120,
   },
 });
 
