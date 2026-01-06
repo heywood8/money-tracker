@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.1](https://github.com/heywood8/money-tracker/compare/penny-v0.23.0...penny-v0.23.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* use NaN for missing data points instead of null ([329be66](https://github.com/heywood8/money-tracker/commit/329be669ffe9bc989cdad6d732dc9f3f2ae37087))
+
 ## [0.23.0](https://github.com/heywood8/money-tracker/compare/penny-v0.22.6...penny-v0.23.0) (2026-01-06)
 
 
