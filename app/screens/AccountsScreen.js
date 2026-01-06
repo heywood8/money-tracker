@@ -845,9 +845,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
   },
-  footerContainer: {
-    paddingBottom: 0,
-  },
   listContentContainer: {
     paddingBottom: SPACING.xl,
   },
