@@ -139,6 +139,54 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 - New Architecture enabled (`newArchEnabled: true`)
 - EAS project ID: `89372eb2-93f5-475a-a630-9caa827d8406`
 
+#### EAS Build & CI/CD
+
+**Gradle Properties Configuration:**
+
+The project uses an Expo config plugin (`plugins/withR8Config.js`) to configure Gradle properties for both local and CI/CD builds. The `android/` folder is gitignored (managed workflow), so **all Gradle configuration must be done through config plugins**.
+
+**Important:** Do NOT create or use `eas-build-gradle.properties` or similar files - they are not part of the EAS Build process. The proper way to configure Gradle is through:
+
+1. **Expo Config Plugin** - `plugins/withR8Config.js` (using `withGradleProperties`)
+2. **expo-build-properties** plugin (for SDK-level settings)
+
+**Memory Configuration:**
+
+The `withR8Config.js` plugin sets Gradle JVM memory limits optimized for GitHub Actions runners:
+
+```javascript
+'org.gradle.jvmargs': '-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC'
+```
+
+- **4GB heap + 1GB Metaspace = 5GB total**
+- GitHub Actions runners have 7GB RAM, leaving 2GB for OS, Node.js, and EAS CLI
+- Previous configuration (6GB+2GB=8GB) caused builds to hang due to memory pressure
+
+**Build Workflows:**
+
+- `.github/workflows/build-release-apk.yml` - Local APK builds with EAS (`--local`)
+- `.github/workflows/eas-build-android.yml` - Cloud builds with EAS
+
+**Local Builds on CI:**
+
+When using `eas build --local` in CI:
+- ✅ DO wait for build completion (no `--no-wait` flag)
+- ✅ DO set appropriate memory limits for the runner
+- ❌ DO NOT use `--no-wait` with `--local` (meaningless for synchronous local builds)
+
+**Troubleshooting Build Hangs:**
+
+If builds hang on GitHub Actions:
+1. Check Gradle memory settings in `plugins/withR8Config.js`
+2. Verify runner has enough RAM (GitHub Actions standard: 7GB)
+3. Look for OOM errors in build logs
+4. Consider reducing parallel builds or caching if memory-constrained
+
+**Reference Documentation:**
+- See `docs/R8_CICD_SETUP.md` for complete R8/ProGuard configuration
+- [EAS Build Local Builds](https://docs.expo.dev/build-reference/local-builds/)
+- [Expo Config Plugins](https://docs.expo.dev/config-plugins/introduction/)
+
 ## Development Guidelines (from .github/copilot-instructions.md)
 
 ### Code Organization
