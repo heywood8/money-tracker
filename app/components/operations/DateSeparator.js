@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 
@@ -9,13 +9,22 @@ const getCurrencySymbol = (currencyCode) => {
   return currency ? currency.symbol : currencyCode;
 };
 
-const DateSeparator = ({ date, spendingSums, formatDate, colors, t }) => {
+const DateSeparator = ({ date, spendingSums, formatDate, colors, t, onPress }) => {
   const hasSpending = spendingSums && Object.keys(spendingSums).length > 0;
 
   return (
     <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
       <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-      <View style={styles.dateSeparatorContent}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.dateSeparatorContent,
+          pressed && styles.pressed,
+        ]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${formatDate(date)}, press to select date`}
+        accessibilityHint="Opens date picker to jump to a specific date"
+      >
         <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
           {formatDate(date)}
         </Text>
@@ -31,7 +40,7 @@ const DateSeparator = ({ date, spendingSums, formatDate, colors, t }) => {
               .join(', ')}
           </Text>
         )}
-      </View>
+      </Pressable>
       <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
     </View>
   );
@@ -43,6 +52,7 @@ DateSeparator.propTypes = {
   formatDate: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  onPress: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -57,6 +67,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'column',
     gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   dateSeparatorLine: {
     flex: 1,
@@ -69,6 +82,9 @@ const styles = StyleSheet.create({
   dateSeparatorText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });
 
