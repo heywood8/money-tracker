@@ -124,76 +124,70 @@ const BalanceHistoryCard = ({
           {(() => {
             const now = new Date();
             const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-            const currentDay = isCurrentMonth ? now.getDate() : null;
+            const displayDay = isCurrentMonth
+              ? now.getDate()
+              : (balanceHistoryData.labels && balanceHistoryData.labels.length > 0
+                ? balanceHistoryData.labels[balanceHistoryData.labels.length - 1]
+                : null);
 
-            let actualValue = null;
-            let burndownValue = null;
-            let prevMonthValue = null;
+            const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
 
-            if (currentDay) {
-              const actualPoint = balanceHistoryData.actual.find(p => p.x === currentDay);
-              const burndownPoint = balanceHistoryData.burndown.find(p => p.x === currentDay);
-              const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
+            const findActualAtDay = (day) => {
+              if (!day) return undefined;
+              const point = (balanceHistoryData.actual || []).find(p => p.x === day);
+              if (point) return point.y;
+              const prior = (balanceHistoryData.actual || []).filter(p => p.x <= day);
+              if (prior.length > 0) return prior[prior.length - 1].y;
+              return undefined;
+            };
 
-              if (actualPoint) {
-                actualValue = formatCurrency(actualPoint.y, selectedAccountData?.currency || 'USD');
-              }
-              if (burndownPoint) {
-                burndownValue = formatCurrency(burndownPoint.y, selectedAccountData?.currency || 'USD');
-              }
-              if (balanceHistoryData.prevMonth && balanceHistoryData.prevMonth[currentDay - 1] !== undefined) {
-                prevMonthValue = formatCurrency(balanceHistoryData.prevMonth[currentDay - 1], selectedAccountData?.currency || 'USD');
-              }
-            }
+            const findBurndownAtDay = (day) => {
+              if (!day) return undefined;
+              const point = (balanceHistoryData.burndown || []).find(p => p.x === day);
+              if (point) return point.y;
+              const prior = (balanceHistoryData.burndown || []).filter(p => p.x <= day);
+              if (prior.length > 0) return prior[prior.length - 1].y;
+              return undefined;
+            };
+
+            const actualValNum = findActualAtDay(displayDay);
+            const burndownValNum = findBurndownAtDay(displayDay);
+            const prevMonthValNum = (balanceHistoryData.prevMonth && displayDay)
+              ? balanceHistoryData.prevMonth[displayDay - 1]
+              : undefined;
+
+            const actualValue = actualValNum !== undefined ? formatCurrency(actualValNum, selectedAccountData?.currency || 'USD') : '-';
+            const burndownValue = burndownValNum !== undefined ? formatCurrency(burndownValNum, selectedAccountData?.currency || 'USD') : '-';
+            const prevMonthValue = prevMonthValNum !== undefined ? formatCurrency(prevMonthValNum, selectedAccountData?.currency || 'USD') : '-';
 
             const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
 
             return (
               <View style={styles.burndownLegendContainer}>
-                <View style={styles.burndownLegend}>
-                  <View style={styles.burndownLegendItem}>
+                <View style={styles.legendColumn}>
+                  <View style={styles.legendRow}>
                     <View style={[styles.burndownLegendDot, { backgroundColor: colors.primary }]} />
-                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                      {t('actual') || 'Actual'}
-                    </Text>
+                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('actual') || 'Actual'}</Text>
                   </View>
-                  <View style={styles.burndownLegendItem}>
+                  <View style={styles.legendRow}>
                     <View style={[styles.burndownLegendDot, styles.burndownDatasetColor]} />
-                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                      {t('burndown') || 'Burndown'}
-                    </Text>
+                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('burndown') || 'Burndown'}</Text>
                   </View>
                   {hasPrevMonthData && (
-                    <View style={styles.burndownLegendItem}>
+                    <View style={styles.legendRow}>
                       <View style={[styles.burndownLegendDot, styles.prevMonthDatasetColor]} />
-                      <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                        {t('prev_month') || 'Prev Month'}
-                      </Text>
+                      <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('prev_month') || 'Prev Month'}</Text>
                     </View>
                   )}
                 </View>
 
-                {(actualValue || burndownValue || prevMonthValue) && (
-                  <View style={styles.todayValuesContainer}>
-                    <View style={styles.todayValueItem}>
-                      <Text style={[styles.todayValueText, { color: colors.text }]}>
-                        {actualValue || '-'}
-                      </Text>
-                    </View>
-                    <View style={styles.todayValueItem}>
-                      <Text style={[styles.todayValueText, { color: colors.text }]}>
-                        {burndownValue || '-'}
-                      </Text>
-                    </View>
-                    {hasPrevMonthData && (
-                      <View style={styles.todayValueItem}>
-                        <Text style={[styles.todayValueText, { color: colors.text }]}>
-                          {prevMonthValue || '-'}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
+                <View style={styles.valuesColumn}>
+                  <Text style={[styles.todayValueText, { color: colors.text }]}>{actualValue}</Text>
+                  <Text style={[styles.todayValueText, { color: colors.text }]}>{burndownValue}</Text>
+                  {hasPrevMonthData && (
+                    <Text style={[styles.todayValueText, { color: colors.text }]}>{prevMonthValue}</Text>
+                  )}
+                </View>
               </View>
             );
           })()}
@@ -286,6 +280,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
+  },
+  burndownLegendRow: {
+    flexDirection: 'row',
+    gap: 24,
+    alignItems: 'center',
+  },
+  legendItem: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: 6,
+    minWidth: 96,
+  },
+  legendColumn: {
+    flexDirection: 'column',
+    gap: 12,
+    justifyContent: 'flex-start',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  valuesColumn: {
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'flex-end',
+    minWidth: 120,
   },
   burndownLegendDot: {
     borderRadius: 5,
