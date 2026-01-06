@@ -46,7 +46,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const { t } = useLocalization();
   const { addOperation, updateOperation, validateOperation } = useOperations();
   const { visibleAccounts: accounts } = useAccounts();
-  const { categories } = useCategories();
+  const { categories, getCategoryPath } = useCategories();
 
   const [values, setValues] = useState({
     type: 'expense',
@@ -269,7 +269,19 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     if (!categoryId) return t('select_category');
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return t('select_category');
-    return category.nameKey ? t(category.nameKey) : category.name;
+
+    const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+
+    // If category has a parent, show parent name in brackets
+    if (category.parentId) {
+      const parentCategory = categories.find(cat => cat.id === category.parentId);
+      if (parentCategory) {
+        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
+        return `${categoryName} (${parentName})`;
+      }
+    }
+
+    return categoryName;
   }, [categories, t]);
 
   // Navigate into a category folder

@@ -56,7 +56,7 @@ const OperationsScreen = () => {
     getActiveFilterCount,
   } = useOperations();
   const { accounts, visibleAccounts, loading: accountsLoading } = useAccounts();
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { categories, loading: categoriesLoading, getCategoryPath } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
@@ -273,8 +273,20 @@ const OperationsScreen = () => {
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
+
+    let categoryName = category.nameKey ? t(category.nameKey) : category.name;
+
+    // If category has a parent, show parent name in brackets
+    if (category.parentId) {
+      const parentCategory = categories.find(cat => cat.id === category.parentId);
+      if (parentCategory) {
+        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
+        categoryName = `${categoryName} (${parentName})`;
+      }
+    }
+
     return {
-      name: category.nameKey ? t(category.nameKey) : category.name,
+      name: categoryName,
       icon: category.icon || 'help-circle',
     };
   }, [categories, t]);
@@ -284,7 +296,19 @@ const OperationsScreen = () => {
     if (!categoryId) return t('select_category');
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return t('select_category');
-    return category.nameKey ? t(category.nameKey) : category.name;
+
+    const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+
+    // If category has a parent, show parent name in brackets
+    if (category.parentId) {
+      const parentCategory = categories.find(cat => cat.id === category.parentId);
+      if (parentCategory) {
+        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
+        return `${categoryName} (${parentName})`;
+      }
+    }
+
+    return categoryName;
   }, [categories, t]);
 
   // Filtered categories for quick add form (excluding shadow categories)
