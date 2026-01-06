@@ -561,29 +561,10 @@ export default function AccountsScreen() {
         onDragEnd={handleDragEnd}
         activationDistance={20}
         ListEmptyComponent={<Text style={[styles.listEmptyText, { color: colors.mutedText }]}>{t('no_accounts') || 'No accounts yet.'}</Text>}
+        ListFooterComponent={renderFooter}
         contentContainerStyle={styles.draggableListContent}
       />
-      {hiddenAccounts.length > 0 && (
-        <View style={styles.footerContainer}>
-          <TouchableRipple
-            onPress={toggleShowHiddenAccounts}
-            style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <View style={styles.showHiddenContent}>
-              <Icon
-                name={showHiddenAccounts ? 'eye-off' : 'eye'}
-                size={24}
-                color={colors.primary}
-              />
-              <Text style={[styles.showHiddenText, { color: colors.text }]}>
-                {showHiddenAccounts
-                  ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
-                  : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
-              </Text>
-            </View>
-          </TouchableRipple>
-        </View>
-      )}
+      {/* Footer is rendered as ListFooterComponent to stay with the list content */}
       <FAB
         icon="plus"
         label={t('add_account') || 'Add Account'}
@@ -847,7 +828,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   draggableListContent: {
-    paddingBottom: SPACING.md,
+    paddingBottom: SPACING.xs,
   },
   error: {
     color: 'red',
@@ -865,7 +846,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   footerContainer: {
-    paddingBottom: SPACING.md,
+    paddingBottom: 0,
   },
   listContentContainer: {
     paddingBottom: SPACING.xl,
@@ -945,6 +926,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     marginHorizontal: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   showHiddenContent: {
     alignItems: 'center',
