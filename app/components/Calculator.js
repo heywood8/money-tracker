@@ -153,8 +153,9 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.primary]);
 
   const surfaceButtonStyle = useMemo(() => ({
-    backgroundColor: colors.background,
-  }), [colors.background]);
+    // Use inputBackground for number buttons so they match surfaced inputs
+    backgroundColor: colors.inputBackground,
+  }), [colors.inputBackground]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
@@ -172,6 +173,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.deleteBackground, colors.background]);
 
   return (
+    // Use altRow so Calculator background matches the gray inner card
     <View style={[styles.container, { backgroundColor: colors.altRow }]}>
       {/* Display */}
       <View style={styles.display}>
