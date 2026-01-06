@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.0](https://github.com/heywood8/money-tracker/compare/penny-v0.22.6...penny-v0.23.0) (2026-01-06)
+
+
+### Features
+
+* add date picker to operations screen for quick date navigation ([#182](https://github.com/heywood8/money-tracker/issues/182)) ([95bbd8d](https://github.com/heywood8/money-tracker/commit/95bbd8d543fca541b59a497f3ed69269ecdee3b8))
+* show parent category name in brackets when selecting categories ([#183](https://github.com/heywood8/money-tracker/issues/183)) ([31ce0a4](https://github.com/heywood8/money-tracker/commit/31ce0a475b875e6f6c53fc381112602bc843b1f2))
+
+
+### Bug Fixes
+
+* extend balance graph line to end of month for previous months ([#180](https://github.com/heywood8/money-tracker/issues/180)) ([cd54851](https://github.com/heywood8/money-tracker/commit/cd548516c6dc9f9695c5645e71ca516ef5f49eb8))
+
 ## [0.22.6](https://github.com/heywood8/money-tracker/compare/penny-v0.22.5...penny-v0.22.6) (2026-01-06)
 
 
