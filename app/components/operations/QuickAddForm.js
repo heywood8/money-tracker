@@ -26,8 +26,14 @@ const QuickAddForm = memo(({
   handleQuickAdd,
   TYPES,
 }) => {
+  const containerThemed = React.useMemo(() => ({
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  }), [colors]);
+
   return (
-    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
+    <View style={[styles.quickAddForm, containerThemed]}>
       {/* Type Selector */}
       <View style={styles.typeSelector}>
         {TYPES.map(type => (
@@ -244,8 +250,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickAddForm: {
-    borderWidth: 0,
     borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 0,
     elevation: 2,
     gap: SPACING.sm,
     marginHorizontal: SPACING.sm,
