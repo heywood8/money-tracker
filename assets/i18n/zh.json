@@ -151,6 +151,7 @@
   "delete_operation_confirm": "确定要删除此操作吗？",
   "loading_operations": "加载操作中...",
   "loading_more": "加载更多...",
+  "loading_newer": "Loading newer...",
   "transfer": "转账",
   "to_account": "到账户",
   "today": "今天",

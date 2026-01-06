@@ -151,6 +151,7 @@
   "delete_operation_confirm": "Are you sure you want to delete this operation?",
   "loading_operations": "Loading operations...",
   "loading_more": "Loading more...",
+  "loading_newer": "Loading newer...",
   "transfer": "Transfer",
   "to_account": "To Account",
   "today": "Today",

@@ -149,6 +149,7 @@
   "delete_operation_confirm": "Вы уверены, что хотите удалить эту операцию?",
   "loading_operations": "Загрузка операций...",
   "loading_more": "Загрузка...",
+  "loading_newer": "Loading newer...",
   "transfer": "Перевод",
   "to_account": "На счет",
   "today": "Сегодня",

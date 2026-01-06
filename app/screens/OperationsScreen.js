@@ -46,11 +46,14 @@ const OperationsScreen = () => {
     operations,
     loading: operationsLoading,
     loadingMore,
+    loadingNewer,
     hasMoreOperations,
+    hasNewerOperations,
     deleteOperation,
     addOperation,
     validateOperation,
     loadMoreOperations,
+    loadNewerOperations,
     jumpToDate,
     activeFilters,
     filtersActive,
@@ -450,21 +453,32 @@ const OperationsScreen = () => {
   ], [t]);
 
   const quickAddFormComponent = useMemo(() => (
-    <QuickAddForm
-      colors={colors}
-      t={t}
-      quickAddValues={quickAddValues}
-      setQuickAddValues={setQuickAddValues}
-      accounts={visibleAccounts}
-      filteredCategories={filteredCategories}
-      getAccountName={getAccountName}
-      getAccountBalance={getAccountBalance}
-      getCategoryName={getCategoryName}
-      openPicker={openPicker}
-      handleQuickAdd={handleQuickAdd}
-      TYPES={TYPES}
-    />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+    <>
+      {/* Loading indicator for newer operations at the top */}
+      {loadingNewer && (
+        <View style={styles.loadingNewerContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.loadingNewerText, { color: colors.mutedText }]}>
+            {t('loading_newer')}
+          </Text>
+        </View>
+      )}
+      <QuickAddForm
+        colors={colors}
+        t={t}
+        quickAddValues={quickAddValues}
+        setQuickAddValues={setQuickAddValues}
+        accounts={visibleAccounts}
+        filteredCategories={filteredCategories}
+        getAccountName={getAccountName}
+        getAccountBalance={getAccountBalance}
+        getCategoryName={getCategoryName}
+        openPicker={openPicker}
+        handleQuickAdd={handleQuickAdd}
+        TYPES={TYPES}
+      />
+    </>
+  ), [colors, t, loadingNewer, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   // Handle end reached for lazy loading
   const handleEndReached = useCallback(() => {
@@ -473,12 +487,18 @@ const OperationsScreen = () => {
     }
   }, [loadingMore, hasMoreOperations, loadMoreOperations]);
 
-  // Handle scroll event to show/hide scroll-to-top button
+  // Handle scroll event to show/hide scroll-to-top button and load newer operations
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
-  }, []);
+
+    // Load newer operations when scrolling near the top
+    // Trigger when offset is less than 50px from top
+    if (offsetY < 50 && !loadingNewer && hasNewerOperations) {
+      loadNewerOperations();
+    }
+  }, [loadingNewer, hasNewerOperations, loadNewerOperations]);
 
   // Scroll to top handler
   const scrollToTop = useCallback(() => {
@@ -837,6 +857,15 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     fontSize: 14,
     marginTop: SPACING.sm,
+  },
+  loadingNewerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+  },
+  loadingNewerText: {
+    fontSize: 14,
+    marginTop: SPACING.xs,
   },
   loadingText: {
     fontSize: 16,

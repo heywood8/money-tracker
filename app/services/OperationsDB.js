@@ -1026,3 +1026,252 @@ export const getFilteredOperationsByWeekOffset = async (weekOffset, filters = {}
     throw error;
   }
 };
+
+/**
+ * Get the next newest operation after a given date
+ * @param {string} afterDate - ISO date string (YYYY-MM-DD)
+ * @returns {Promise<Object|null>}
+ */
+export const getNextNewestOperation = async (afterDate) => {
+  try {
+    const operation = await queryFirst(
+      'SELECT * FROM operations WHERE date > ? ORDER BY date ASC, created_at ASC LIMIT 1',
+      [afterDate],
+    );
+    return mapOperationFields(operation);
+  } catch (error) {
+    console.error('Failed to get next newest operation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get operations for a week ending at (and including) a specific date, going forward 6 days
+ * @param {string} startDate - ISO date string (YYYY-MM-DD) - the oldest date in the range
+ * @returns {Promise<Array>}
+ */
+export const getOperationsByWeekToDate = async (startDate) => {
+  try {
+    // Parse the start date
+    const start = new Date(startDate + 'T00:00:00');
+
+    // Calculate end date (6 days after start date)
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+
+    const startDateStr = formatLocalDate(start);
+    const endDateStr = formatLocalDate(end);
+
+    console.log(`Loading week from ${startDateStr} to ${endDateStr}`);
+
+    const operations = await queryAll(
+      'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
+      [startDateStr, endDateStr],
+    );
+
+    console.log(`Week loaded: ${operations?.length || 0} operations`);
+
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get operations by week to date:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the next newest operation after a given date that matches filters
+ * @param {string} afterDate - ISO date string (YYYY-MM-DD)
+ * @param {Object} filters - Same filter object as getFilteredOperationsByWeekFromDate
+ * @returns {Promise<Object|null>}
+ */
+export const getNextNewestFilteredOperation = async (afterDate, filters = {}) => {
+  try {
+    // Build dynamic SQL query similar to getNextOldestFilteredOperation
+    let sql = `
+      SELECT DISTINCT o.*
+      FROM operations o
+      LEFT JOIN accounts a ON o.account_id = a.id
+      LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
+      LEFT JOIN categories c ON o.category_id = c.id
+      WHERE o.date > ?
+    `;
+
+    const params = [afterDate];
+
+    // Apply type filters
+    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+      const placeholders = filters.types.map(() => '?').join(',');
+      sql += ` AND o.type IN (${placeholders})`;
+      params.push(...filters.types);
+    }
+
+    // Apply account filters
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const placeholders = filters.accountIds.map(() => '?').join(',');
+      sql += ` AND (o.account_id IN (${placeholders}) OR o.to_account_id IN (${placeholders}))`;
+      params.push(...filters.accountIds, ...filters.accountIds);
+    }
+
+    // Apply category filters
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND o.category_id IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    }
+
+    // Apply amount range filters
+    if (filters.amountRange) {
+      if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
+        params.push(filters.amountRange.min);
+      }
+      if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
+        params.push(filters.amountRange.max);
+      }
+    }
+
+    // Apply date range filters
+    if (filters.dateRange) {
+      if (filters.dateRange.startDate) {
+        sql += ' AND o.date >= ?';
+        params.push(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        sql += ' AND o.date <= ?';
+        params.push(filters.dateRange.endDate);
+      }
+    }
+
+    // Apply search text filter
+    if (filters.searchText && filters.searchText.trim()) {
+      const searchTerm = `%${filters.searchText.trim()}%`;
+      sql += ` AND (
+        o.description LIKE ? COLLATE NOCASE
+        OR o.amount LIKE ?
+        OR a.name LIKE ? COLLATE NOCASE
+        OR to_a.name LIKE ? COLLATE NOCASE
+        OR c.name LIKE ? COLLATE NOCASE
+      )`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    sql += ' ORDER BY o.date ASC, o.created_at ASC LIMIT 1';
+
+    const operation = await queryFirst(sql, params);
+    return mapOperationFields(operation);
+  } catch (error) {
+    console.error('Failed to get next newest filtered operation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get filtered operations for a week ending at a specific date, going forward 6 days
+ * Applies multiple filter criteria while maintaining week-based pagination
+ * @param {string} startDate - ISO date string (YYYY-MM-DD) - the oldest date in the range
+ * @param {Object} filters - Filter criteria object
+ * @param {string[]} filters.types - Array of operation types to include (['expense', 'income', 'transfer'])
+ * @param {string[]} filters.accountIds - Array of account IDs to filter by
+ * @param {string[]} filters.categoryIds - Array of category IDs to filter by
+ * @param {string} filters.searchText - Text to search in description, amount, account names, category names
+ * @param {Object} filters.dateRange - {startDate, endDate} for additional date filtering
+ * @param {Object} filters.amountRange - {min, max} for amount filtering
+ * @returns {Promise<Array>}
+ */
+export const getFilteredOperationsByWeekToDate = async (startDate, filters = {}) => {
+  try {
+    // Parse the start date
+    const start = new Date(startDate + 'T00:00:00');
+
+    // Calculate end date (6 days after start date)
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+
+    const startDateStr = formatLocalDate(start);
+    const endDateStr = formatLocalDate(end);
+
+    // Build dynamic SQL query
+    let sql = `
+      SELECT DISTINCT o.*
+      FROM operations o
+      LEFT JOIN accounts a ON o.account_id = a.id
+      LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
+      LEFT JOIN categories c ON o.category_id = c.id
+      WHERE o.date >= ? AND o.date <= ?
+    `;
+
+    const params = [startDateStr, endDateStr];
+
+    // Apply type filters
+    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+      const placeholders = filters.types.map(() => '?').join(',');
+      sql += ` AND o.type IN (${placeholders})`;
+      params.push(...filters.types);
+    }
+
+    // Apply account filters
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const placeholders = filters.accountIds.map(() => '?').join(',');
+      sql += ` AND (o.account_id IN (${placeholders}) OR o.to_account_id IN (${placeholders}))`;
+      params.push(...filters.accountIds, ...filters.accountIds);
+    }
+
+    // Apply category filters
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND o.category_id IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    }
+
+    // Apply amount range filters
+    if (filters.amountRange) {
+      if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
+        params.push(filters.amountRange.min);
+      }
+      if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
+        params.push(filters.amountRange.max);
+      }
+    }
+
+    // Apply date range filters (additional constraints on top of week range)
+    if (filters.dateRange) {
+      if (filters.dateRange.startDate) {
+        sql += ' AND o.date >= ?';
+        params.push(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        sql += ' AND o.date <= ?';
+        params.push(filters.dateRange.endDate);
+      }
+    }
+
+    // Apply search text filter
+    if (filters.searchText && filters.searchText.trim()) {
+      const searchTerm = `%${filters.searchText.trim()}%`;
+      sql += ` AND (
+        o.description LIKE ? COLLATE NOCASE
+        OR o.amount LIKE ?
+        OR a.name LIKE ? COLLATE NOCASE
+        OR to_a.name LIKE ? COLLATE NOCASE
+        OR c.name LIKE ? COLLATE NOCASE
+      )`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    sql += ' ORDER BY o.date DESC, o.created_at DESC';
+
+    console.log(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
+
+    const operations = await queryAll(sql, params);
+
+    console.log(`Filtered week loaded: ${operations?.length || 0} operations`);
+
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get filtered operations by week to date:', error);
+    throw error;
+  }
+};

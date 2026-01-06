@@ -32,10 +32,13 @@ export const OperationsProvider = ({ children }) => {
   const [saveError, setSaveError] = useState(null);
   const { reloadAccounts } = useAccounts();
 
-  // Lazy-loading state - track the oldest date we've loaded so far
+  // Lazy-loading state - track the oldest and newest dates we've loaded so far
   const [oldestLoadedDate, setOldestLoadedDate] = useState(null);
+  const [newestLoadedDate, setNewestLoadedDate] = useState(null);
   const [hasMoreOperations, setHasMoreOperations] = useState(true);
+  const [hasNewerOperations, setHasNewerOperations] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
 
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -84,12 +87,18 @@ export const OperationsProvider = ({ children }) => {
         : await OperationsDB.getOperationsByWeekOffset(0);
       setOperations(operationsData);
 
-      // Track the oldest date in the initial load
+      // Track the oldest and newest dates in the initial load
       if (operationsData.length > 0) {
+        const newestOp = operationsData[0]; // Operations are sorted DESC by date
         const oldestOp = operationsData[operationsData.length - 1];
+        setNewestLoadedDate(newestOp.date);
         setOldestLoadedDate(oldestOp.date);
+        // When loading initial (current week), there are no newer operations
+        setHasNewerOperations(false);
       } else {
+        setNewestLoadedDate(null);
         setOldestLoadedDate(null);
+        setHasNewerOperations(false);
       }
 
       // Always assume there might be more operations initially
@@ -134,7 +143,7 @@ export const OperationsProvider = ({ children }) => {
           return [...prevOps, ...newOps];
         });
 
-        // Update the oldest loaded date
+        // Update the oldest loaded date (newest stays the same)
         if (moreOperations.length > 0) {
           const oldestOp = moreOperations[moreOperations.length - 1];
           setOldestLoadedDate(oldestOp.date);
@@ -146,6 +155,51 @@ export const OperationsProvider = ({ children }) => {
       setLoadingMore(false);
     }
   }, [oldestLoadedDate, hasMoreOperations, loadingMore, activeFilters, hasActiveFilters]);
+
+  // Load newer operations (previous week with operations)
+  // Triggered when user scrolls to the top
+  // Finds the next operation newer than what we've loaded and loads a week from that date
+  const loadNewerOperations = useCallback(async () => {
+    if (loadingNewer || !hasNewerOperations || !newestLoadedDate) return;
+
+    try {
+      setLoadingNewer(true);
+
+      const isFiltered = hasActiveFilters(activeFilters);
+
+      // Find the next newest operation after our current newest date
+      const nextOp = isFiltered
+        ? await OperationsDB.getNextNewestFilteredOperation(newestLoadedDate, activeFilters)
+        : await OperationsDB.getNextNewestOperation(newestLoadedDate);
+
+      if (!nextOp) {
+        // No more newer operations found
+        setHasNewerOperations(false);
+      } else {
+        // Load a week of operations ending at this operation's date
+        const newerOperations = isFiltered
+          ? await OperationsDB.getFilteredOperationsByWeekToDate(nextOp.date, activeFilters)
+          : await OperationsDB.getOperationsByWeekToDate(nextOp.date);
+
+        // Merge and deduplicate operations by ID
+        setOperations(prevOps => {
+          const existingIds = new Set(prevOps.map(op => op.id));
+          const newOps = newerOperations.filter(op => !existingIds.has(op.id));
+          return [...newOps, ...prevOps];
+        });
+
+        // Update the newest loaded date (oldest stays the same)
+        if (newerOperations.length > 0) {
+          const newestOp = newerOperations[0]; // Operations are sorted DESC by date
+          setNewestLoadedDate(newestOp.date);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load newer operations:', error);
+    } finally {
+      setLoadingNewer(false);
+    }
+  }, [newestLoadedDate, hasNewerOperations, loadingNewer, activeFilters, hasActiveFilters]);
 
   // Reload operations from database (loads all operations)
   const reloadOperations = useCallback(async () => {
@@ -336,15 +390,29 @@ export const OperationsProvider = ({ children }) => {
 
       setOperations(operationsData);
 
-      // Track the oldest date in the loaded data
+      // Track the oldest and newest dates in the loaded data
       if (operationsData.length > 0) {
+        const newestOp = operationsData[0]; // Operations are sorted DESC by date
         const oldestOp = operationsData[operationsData.length - 1];
+        setNewestLoadedDate(newestOp.date);
         setOldestLoadedDate(oldestOp.date);
+
+        // Check if there might be newer operations (compare with today)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const newestDate = new Date(newestOp.date);
+        newestDate.setHours(0, 0, 0, 0);
+
+        // If the newest loaded operation is before today, there are newer operations
+        setHasNewerOperations(newestDate < today);
       } else {
+        setNewestLoadedDate(date);
         setOldestLoadedDate(date);
+        // If no operations at this date, assume there might be newer ones
+        setHasNewerOperations(true);
       }
 
-      // Assume there might be more operations
+      // Assume there might be more older operations
       setHasMoreOperations(true);
       setDataLoaded(true);
     } catch (error) {
@@ -402,7 +470,9 @@ export const OperationsProvider = ({ children }) => {
     operations,
     loading,
     loadingMore,
+    loadingNewer,
     hasMoreOperations,
+    hasNewerOperations,
     addOperation,
     updateOperation,
     deleteOperation,
@@ -412,6 +482,7 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByDateRange,
     reloadOperations,
     loadMoreOperations,
+    loadNewerOperations,
     loadInitialOperations,
     jumpToDate,
     activeFilters,
@@ -423,7 +494,9 @@ export const OperationsProvider = ({ children }) => {
     operations,
     loading,
     loadingMore,
+    loadingNewer,
     hasMoreOperations,
+    hasNewerOperations,
     addOperation,
     updateOperation,
     deleteOperation,
@@ -433,6 +506,7 @@ export const OperationsProvider = ({ children }) => {
     getOperationsByDateRange,
     reloadOperations,
     loadMoreOperations,
+    loadNewerOperations,
     loadInitialOperations,
     jumpToDate,
     activeFilters,
