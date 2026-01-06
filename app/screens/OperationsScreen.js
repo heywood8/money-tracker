@@ -21,6 +21,7 @@ import QuickAddForm from '../components/operations/QuickAddForm';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 
 /**
  * Get currency symbol from currency code
@@ -56,7 +57,7 @@ const OperationsScreen = () => {
     getActiveFilterCount,
   } = useOperations();
   const { accounts, visibleAccounts, loading: accountsLoading } = useAccounts();
-  const { categories, loading: categoriesLoading, getCategoryPath } = useCategories();
+  const { categories, loading: categoriesLoading } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
@@ -274,19 +275,10 @@ const OperationsScreen = () => {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
 
-    let categoryName = category.nameKey ? t(category.nameKey) : category.name;
-
-    // If category has a parent, show parent name in brackets
-    if (category.parentId) {
-      const parentCategory = categories.find(cat => cat.id === category.parentId);
-      if (parentCategory) {
-        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
-        categoryName = `${categoryName} (${parentName})`;
-      }
-    }
+    const categoryName = getCategoryDisplayName(categoryId, categories, t);
 
     return {
-      name: categoryName,
+      name: categoryName || t('unknown_category'),
       icon: category.icon || 'help-circle',
     };
   }, [categories, t]);
@@ -294,21 +286,8 @@ const OperationsScreen = () => {
   // Get category name for form
   const getCategoryName = useCallback((categoryId) => {
     if (!categoryId) return t('select_category');
-    const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return t('select_category');
-
-    const categoryName = category.nameKey ? t(category.nameKey) : category.name;
-
-    // If category has a parent, show parent name in brackets
-    if (category.parentId) {
-      const parentCategory = categories.find(cat => cat.id === category.parentId);
-      if (parentCategory) {
-        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
-        return `${categoryName} (${parentName})`;
-      }
-    }
-
-    return categoryName;
+    const displayName = getCategoryDisplayName(categoryId, categories, t);
+    return displayName || t('select_category');
   }, [categories, t]);
 
   // Filtered categories for quick add form (excluding shadow categories)

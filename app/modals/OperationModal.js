@@ -29,6 +29,7 @@ import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 
 /**
  * Get currency symbol from currency code
@@ -46,7 +47,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const { t } = useLocalization();
   const { addOperation, updateOperation, validateOperation } = useOperations();
   const { visibleAccounts: accounts } = useAccounts();
-  const { categories, getCategoryPath } = useCategories();
+  const { categories } = useCategories();
 
   const [values, setValues] = useState({
     type: 'expense',
@@ -267,21 +268,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   const getCategoryName = useCallback((categoryId) => {
     if (!categoryId) return t('select_category');
-    const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return t('select_category');
-
-    const categoryName = category.nameKey ? t(category.nameKey) : category.name;
-
-    // If category has a parent, show parent name in brackets
-    if (category.parentId) {
-      const parentCategory = categories.find(cat => cat.id === category.parentId);
-      if (parentCategory) {
-        const parentName = parentCategory.nameKey ? t(parentCategory.nameKey) : parentCategory.name;
-        return `${categoryName} (${parentName})`;
-      }
-    }
-
-    return categoryName;
+    const displayName = getCategoryDisplayName(categoryId, categories, t);
+    return displayName || t('select_category');
   }, [categories, t]);
 
   // Navigate into a category folder
