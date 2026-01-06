@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
+import { useTheme } from '../contexts/ThemeContext';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 
 /**
@@ -26,7 +27,7 @@ const QuickAddForm = memo(({
   TYPES,
 }) => {
   return (
-    <View style={[styles.quickAddForm, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+    <View style={[styles.quickAddForm, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
       {/* Type Selector */}
       <View style={styles.typeSelector}>
         {TYPES.map(type => (
@@ -187,43 +188,43 @@ const styles = StyleSheet.create({
   },
   accountPickersRow: {
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
   },
   categoryAddRow: {
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
   },
   flex1: {
     flex: 1,
   },
   formInput: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
     minHeight: 48,
-    padding: SPACING,
+    padding: SPACING.md,
   },
   formInputCategory: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
     minHeight: 48,
-    padding: SPACING,
+    padding: SPACING.md,
   },
   formInputHalf: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
     minHeight: 48,
-    padding: SPACING / 2,
+    padding: SPACING.md,
   },
   formInputText: {
     fontSize: 14,
@@ -231,11 +232,11 @@ const styles = StyleSheet.create({
   },
   quickAddButton: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
     minWidth: 80,
-    paddingHorizontal: SPACING * 1.5,
-    paddingVertical: SPACING,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
   quickAddButtonText: {
     color: '#fff',
@@ -243,20 +244,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickAddForm: {
-    borderBottomWidth: 1,
-    gap: SPACING,
-    padding: SPACING,
+    borderWidth: 0,
+    borderRadius: BORDER_RADIUS.lg,
+    elevation: 2,
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.sm,
+    marginVertical: SPACING.md,
+    padding: SPACING.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   typeButton: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
     justifyContent: 'center',
-    paddingHorizontal: SPACING,
-    paddingVertical: SPACING / 2,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
   typeButtonText: {
     fontSize: 14,
@@ -264,7 +273,7 @@ const styles = StyleSheet.create({
   },
   typeSelector: {
     flexDirection: 'row',
-    gap: SPACING / 2,
+    gap: SPACING.sm,
   },
 });
 
