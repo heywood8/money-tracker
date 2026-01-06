@@ -65,11 +65,11 @@ const styles = StyleSheet.create({
   },
   dateSeparatorContent: {
     alignItems: 'center',
+    borderRadius: 8,
     flexDirection: 'column',
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
   },
   dateSeparatorLine: {
     flex: 1,
