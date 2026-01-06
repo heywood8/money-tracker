@@ -27,145 +27,155 @@ const QuickAddForm = memo(({
   TYPES,
 }) => {
   const containerThemed = React.useMemo(() => ({
-    backgroundColor: colors.surface,
+    // Use altRow for outer background so QuickAdd area appears slightly gray
+    backgroundColor: colors.altRow,
     borderWidth: 1,
     borderColor: colors.border,
   }), [colors]);
 
+  const innerCardThemed = React.useMemo(() => ({
+    // Make inner card also gray so the whole form area is grayish
+    backgroundColor: colors.altRow,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+  }), [colors]);
+
   return (
     <View style={[styles.quickAddForm, containerThemed]}>
-      {/* Type Selector */}
-      <View style={styles.typeSelector}>
-        {TYPES.map(type => (
-          <TouchableOpacity
-            key={type.key}
-            style={[
-              styles.typeButton,
-              {
-                backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => setQuickAddValues(v => ({
-              ...v,
-              type: type.key,
-              categoryId: type.key === 'transfer' ? '' : v.categoryId,
-              toAccountId: '',
-            }))}
-          >
-            <Icon
-              name={type.icon}
-              size={18}
-              color={quickAddValues.type === type.key ? '#fff' : colors.text}
-            />
-            <Text style={quickAddValues.type === type.key ? [styles.typeButtonText, { color: '#fff' }] : [styles.typeButtonText, { color: colors.text }]}>
-              {type.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <View style={innerCardThemed}>
+        {/* Type Selector */}
+        <View style={styles.typeSelector}>
+          {TYPES.map(type => (
+            <TouchableOpacity
+              key={type.key}
+              style={[
+                styles.typeButton,
+                {
+                  backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => setQuickAddValues(v => ({
+                ...v,
+                type: type.key,
+                categoryId: type.key === 'transfer' ? '' : v.categoryId,
+                toAccountId: '',
+              }))}
+            >
+              <Icon
+                name={type.icon}
+                size={18}
+                color={quickAddValues.type === type.key ? '#fff' : colors.text}
+              />
+              <Text style={quickAddValues.type === type.key ? [styles.typeButtonText, { color: '#fff' }] : [styles.typeButtonText, { color: colors.text }]}>
+                {type.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Account Pickers - Side by side for transfers */}
-      {quickAddValues.type === 'transfer' ? (
-        <View style={styles.accountPickersRow}>
-          {/* From Account Picker */}
+        {/* Account Pickers - Side by side for transfers */}
+        {quickAddValues.type === 'transfer' ? (
+          <View style={styles.accountPickersRow}>
+            {/* From Account Picker */}
+            <Pressable
+              style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              onPress={() => openPicker('account', visibleAccounts)}
+            >
+              <Icon name="wallet" size={18} color={colors.mutedText} />
+              <View style={styles.flex1}>
+                <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
+                  {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
+                </Text>
+                {quickAddValues.accountId && (
+                  <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+                    {getAccountBalance(quickAddValues.accountId)}
+                  </Text>
+                )}
+              </View>
+              <Icon name="chevron-down" size={18} color={colors.mutedText} />
+            </Pressable>
+
+            {/* To Account Picker */}
+            <Pressable
+              style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
+            >
+              <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
+              <View style={styles.flex1}>
+                <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
+                  {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+                </Text>
+                {quickAddValues.toAccountId && (
+                  <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+                    {getAccountBalance(quickAddValues.toAccountId)}
+                  </Text>
+                )}
+              </View>
+              <Icon name="chevron-down" size={18} color={colors.mutedText} />
+            </Pressable>
+          </View>
+        ) : (
+        /* Account Picker for non-transfer operations */
           <Pressable
-            style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
             onPress={() => openPicker('account', visibleAccounts)}
           >
             <Icon name="wallet" size={18} color={colors.mutedText} />
             <View style={styles.flex1}>
-              <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.formInputText, { color: colors.text }]}>
                 {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
               </Text>
               {quickAddValues.accountId && (
-                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
                   {getAccountBalance(quickAddValues.accountId)}
                 </Text>
               )}
             </View>
             <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </Pressable>
+        )}
 
-          {/* To Account Picker */}
-          <Pressable
-            style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
-          >
-            <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
-            <View style={styles.flex1}>
-              <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
-                {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
+        {/* Amount Calculator */}
+        <Calculator
+          value={quickAddValues.amount}
+          onValueChange={text => setQuickAddValues(v => ({ ...v, amount: text }))}
+          colors={colors}
+          placeholder={t('amount')}
+        />
+
+        {/* Category Picker and Add Button Row */}
+        {quickAddValues.type !== 'transfer' && (
+          <View style={styles.categoryAddRow}>
+            <Pressable
+              style={[styles.formInputCategory, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+              onPress={() => openPicker('category', filteredCategories)}
+            >
+              <Icon name="tag" size={18} color={colors.mutedText} />
+              <Text style={[styles.formInputText, { color: colors.text }]}>
+                {getCategoryName(quickAddValues.categoryId)}
               </Text>
-              {quickAddValues.toAccountId && (
-                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-                  {getAccountBalance(quickAddValues.toAccountId)}
-                </Text>
-              )}
-            </View>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
-          </Pressable>
-        </View>
-      ) : (
-        /* Account Picker for non-transfer operations */
-        <Pressable
-          style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-          onPress={() => openPicker('account', visibleAccounts)}
-        >
-          <Icon name="wallet" size={18} color={colors.mutedText} />
-          <View style={styles.flex1}>
-            <Text style={[styles.formInputText, { color: colors.text }]}>
-              {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-            </Text>
-            {quickAddValues.accountId && (
-              <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
-                {getAccountBalance(quickAddValues.accountId)}
-              </Text>
-            )}
+              <Icon name="chevron-down" size={18} color={colors.mutedText} />
+            </Pressable>
+            <TouchableOpacity
+              style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
+              onPress={() => handleQuickAdd()}
+            >
+              <Text style={styles.quickAddButtonText}>{t('add')}</Text>
+            </TouchableOpacity>
           </View>
-          <Icon name="chevron-down" size={18} color={colors.mutedText} />
-        </Pressable>
-      )}
+        )}
 
-      {/* Amount Calculator */}
-      <Calculator
-        value={quickAddValues.amount}
-        onValueChange={text => setQuickAddValues(v => ({ ...v, amount: text }))}
-        colors={colors}
-        placeholder={t('amount')}
-      />
-
-      {/* Category Picker and Add Button Row */}
-      {quickAddValues.type !== 'transfer' && (
-        <View style={styles.categoryAddRow}>
-          <Pressable
-            style={[styles.formInputCategory, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('category', filteredCategories)}
-          >
-            <Icon name="tag" size={18} color={colors.mutedText} />
-            <Text style={[styles.formInputText, { color: colors.text }]}>
-              {getCategoryName(quickAddValues.categoryId)}
-            </Text>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
-          </Pressable>
+        {/* Add Button for transfers (full width) */}
+        {quickAddValues.type === 'transfer' && (
           <TouchableOpacity
             style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
             onPress={() => handleQuickAdd()}
           >
             <Text style={styles.quickAddButtonText}>{t('add')}</Text>
           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Add Button for transfers (full width) */}
-      {quickAddValues.type === 'transfer' && (
-        <TouchableOpacity
-          style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-          onPress={() => handleQuickAdd()}
-        >
-          <Text style={styles.quickAddButtonText}>{t('add')}</Text>
-        </TouchableOpacity>
-      )}
+        )}
+      </View>
     </View>
   );
 });
