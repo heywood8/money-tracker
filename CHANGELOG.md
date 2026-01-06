@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.4](https://github.com/heywood8/money-tracker/compare/penny-v0.22.3...penny-v0.22.4) (2026-01-06)
+
+
+### Bug Fixes
+
+* adjust colors ([f32cb99](https://github.com/heywood8/money-tracker/commit/f32cb995b8d3472a897f10142476d9884b19ba63))
+* adjust spacing ([58e33bb](https://github.com/heywood8/money-tracker/commit/58e33bb2af9a7cf70c797727ff6a86a343de4962))
+* Balance history legend ([a10a690](https://github.com/heywood8/money-tracker/commit/a10a690548cf7f976e3071a6d5e9e516acfbdd98))
+* calculator button colors ([9723428](https://github.com/heywood8/money-tracker/commit/9723428a288345771103ddd3559c31bcf9a1d5e8))
+* component splitting ([#175](https://github.com/heywood8/money-tracker/issues/175)) ([e76dbbd](https://github.com/heywood8/money-tracker/commit/e76dbbd8b1bf1beb376fe7fd6edbf7de96b9b922))
+* lint for balancehistoryCard ([86bc5fa](https://github.com/heywood8/money-tracker/commit/86bc5fafdf09cf8cbd063dfd5b6b02b00c2f3e7c))
+* linting ([a34f95e](https://github.com/heywood8/money-tracker/commit/a34f95ed99290f64ce8b2b97b3ea07e8a658eeec))
+* tests ([8405a6f](https://github.com/heywood8/money-tracker/commit/8405a6fd3fa0f5cc4c8da9854e6d65dd8e7abfc8))
+* UI inconsistencies after components refactor ([3e5699c](https://github.com/heywood8/money-tracker/commit/3e5699c8fd49a6dfaceaeb6b93b84d467540b15b))
+
 ## [0.22.3](https://github.com/heywood8/money-tracker/compare/penny-v0.22.2...penny-v0.22.3) (2026-01-05)
 
 
