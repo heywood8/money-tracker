@@ -21,6 +21,7 @@ import QuickAddForm from '../components/operations/QuickAddForm';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 
 /**
  * Get currency symbol from currency code
@@ -273,8 +274,11 @@ const OperationsScreen = () => {
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
+
+    const categoryName = getCategoryDisplayName(categoryId, categories, t);
+
     return {
-      name: category.nameKey ? t(category.nameKey) : category.name,
+      name: categoryName || t('unknown_category'),
       icon: category.icon || 'help-circle',
     };
   }, [categories, t]);
@@ -282,9 +286,8 @@ const OperationsScreen = () => {
   // Get category name for form
   const getCategoryName = useCallback((categoryId) => {
     if (!categoryId) return t('select_category');
-    const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return t('select_category');
-    return category.nameKey ? t(category.nameKey) : category.name;
+    const displayName = getCategoryDisplayName(categoryId, categories, t);
+    return displayName || t('select_category');
   }, [categories, t]);
 
   // Filtered categories for quick add form (excluding shadow categories)
