@@ -142,20 +142,18 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   ], [colors.text]);
 
   // Memoize button styles for better performance
-  const operationButtonStyle = useMemo(() => ({
-    backgroundColor: colors.operationBackground || colors.background,
-  }), [colors.operationBackground, colors.background]);
+  // Use a single background for all calculator buttons
+  const buttonBackground = colors.calcButtonBackground || colors.inputBackground || colors.background;
+
+  const sharedButtonStyle = useMemo(() => ({
+    backgroundColor: buttonBackground,
+  }), [buttonBackground]);
 
   const operationTextStyle = useMemo(() => ({
     color: colors.primary,
     fontSize: 24,
     fontWeight: 'bold',
   }), [colors.primary]);
-
-  const surfaceButtonStyle = useMemo(() => ({
-    // Use inputBackground for number buttons so they match surfaced inputs
-    backgroundColor: colors.inputBackground,
-  }), [colors.inputBackground]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
@@ -169,8 +167,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.text]);
 
   const deleteButtonStyle = useMemo(() => ({
-    backgroundColor: colors.deleteBackground || colors.background,
-  }), [colors.deleteBackground, colors.background]);
+    backgroundColor: colors.deleteBackground || buttonBackground,
+  }), [colors.deleteBackground, buttonBackground]);
 
   return (
     // Use altRow so Calculator background matches the gray inner card
@@ -199,28 +197,28 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="+"
             onPress={handlePress}
-            style={operationButtonStyle}
+            style={sharedButtonStyle}
             textStyle={operationTextStyle}
             colors={colors}
           />
           <CalcButton
             value="1"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="2"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="3"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
@@ -231,28 +229,28 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="-"
             onPress={handlePress}
-            style={operationButtonStyle}
+            style={sharedButtonStyle}
             textStyle={operationTextStyle}
             colors={colors}
           />
           <CalcButton
             value="4"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="5"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="6"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
@@ -263,28 +261,28 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="×"
             onPress={handlePress}
-            style={operationButtonStyle}
+            style={sharedButtonStyle}
             textStyle={operationTextStyle}
             colors={colors}
           />
           <CalcButton
             value="7"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="8"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
           <CalcButton
             value="9"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
@@ -295,21 +293,21 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="÷"
             onPress={handlePress}
-            style={operationButtonStyle}
+            style={sharedButtonStyle}
             textStyle={operationTextStyle}
             colors={colors}
           />
           <CalcButton
             value="."
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={decimalTextStyle}
             colors={colors}
           />
           <CalcButton
             value="0"
             onPress={handlePress}
-            style={surfaceButtonStyle}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
