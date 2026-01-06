@@ -24,10 +24,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: 🏗 Setup Node
-        uses: actions/setup-node@v6
+        uses: oven-sh/setup-bun@v2
         with:
           node-version: '20.x'
-          cache: 'npm'
 
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
@@ -36,7 +35,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: bun install
 
       - name: 🚀 Build tag
         if: github.ref_type == 'tag'
