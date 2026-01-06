@@ -23,6 +23,7 @@ import { useAccounts } from '../contexts/AccountsContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import Calculator from '../components/Calculator';
+import MultiCurrencyFields from '../components/modals/MultiCurrencyFields';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -533,77 +534,27 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
                       {/* Multi-currency transfer fields */}
                       {isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
-                        <>
-                          {/* Currency info display */}
-                          <View style={styles.currencyInfo}>
-                            <Icon name="swap-horizontal-circle" size={16} color={colors.mutedText} />
-                            <Text style={[styles.currencyInfoText, { color: colors.mutedText }]}>
-                              {getCurrencySymbol(sourceAccount.currency)} → {getCurrencySymbol(destinationAccount.currency)}
-                            </Text>
-                          </View>
-
-                          {/* Exchange Rate Input */}
-                          <View style={styles.inputRow}>
-                            <Text style={[styles.inputLabel, { color: colors.text }]}>
-                              {t('exchange_rate')}:
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.smallInput,
-                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                                isShadowOperation && styles.disabledInput,
-                              ]}
-                              value={values.exchangeRate}
-                              onChangeText={text => {
-                                if (!isShadowOperation) {
-                                  setValues(v => ({ ...v, exchangeRate: text }));
-                                  setLastEditedField('exchangeRate');
-                                }
-                              }}
-                              placeholder="0.00"
-                              placeholderTextColor={colors.mutedText}
-                              keyboardType="decimal-pad"
-                              returnKeyType="done"
-                              onSubmitEditing={Keyboard.dismiss}
-                              editable={!isShadowOperation}
-                            />
-                          </View>
-
-                          {/* Destination Amount Input */}
-                          <View style={styles.inputRow}>
-                            <Text style={[styles.inputLabel, { color: colors.text }]}>
-                              {t('destination_amount')}:
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.smallInput,
-                                { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                                isShadowOperation && styles.disabledInput,
-                              ]}
-                              value={values.destinationAmount}
-                              onChangeText={text => {
-                                if (!isShadowOperation) {
-                                  setValues(v => ({ ...v, destinationAmount: text }));
-                                  setLastEditedField('destinationAmount');
-                                }
-                              }}
-                              placeholder="0.00"
-                              placeholderTextColor={colors.mutedText}
-                              keyboardType="decimal-pad"
-                              returnKeyType="done"
-                              onSubmitEditing={Keyboard.dismiss}
-                              editable={!isShadowOperation}
-                            />
-                            <Text style={[styles.currencyLabel, { color: colors.mutedText }]}>
-                              {getCurrencySymbol(destinationAccount.currency)}
-                            </Text>
-                          </View>
-
-                          {/* Exchange rate source info */}
-                          <Text style={[styles.rateInfo, { color: colors.mutedText }]}>
-                            {t('offline_rate_info')} ({Currency.getExchangeRatesLastUpdated()})
-                          </Text>
-                        </>
+                        <MultiCurrencyFields
+                          colors={colors}
+                          t={t}
+                          sourceAccount={sourceAccount}
+                          destinationAccount={destinationAccount}
+                          exchangeRate={values.exchangeRate}
+                          destinationAmount={values.destinationAmount}
+                          isShadowOperation={isShadowOperation}
+                          onExchangeRateChange={(text) => {
+                            if (!isShadowOperation) {
+                              setValues(v => ({ ...v, exchangeRate: text }));
+                              setLastEditedField('exchangeRate');
+                            }
+                          }}
+                          onDestinationAmountChange={(text) => {
+                            if (!isShadowOperation) {
+                              setValues(v => ({ ...v, destinationAmount: text }));
+                              setLastEditedField('destinationAmount');
+                            }
+                          }}
+                        />
                       )}
                     </>
                   )}
@@ -970,21 +921,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  currencyInfo: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-  },
-  currencyInfoText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  currencyLabel: {
-    fontSize: 14,
-    minWidth: 40,
-  },
   deleteButtonContainer: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1021,16 +957,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     padding: 12,
-  },
-  inputLabel: {
-    fontSize: 14,
-    minWidth: 110,
-  },
-  inputRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
   },
   modalButton: {
     alignItems: 'center',
@@ -1116,25 +1042,12 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     fontSize: 18,
   },
-  rateInfo: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
   scrollContent: {
     paddingBottom: 20,
   },
   scrollView: {
     flexGrow: 0,
     flexShrink: 1,
-  },
-  smallInput: {
-    borderRadius: 4,
-    borderWidth: 1,
-    flex: 1,
-    fontSize: 16,
-    padding: 12,
   },
 });
 
