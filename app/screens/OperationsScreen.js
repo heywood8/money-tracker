@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../contexts/ThemeContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -21,6 +22,7 @@ import QuickAddForm from '../components/operations/QuickAddForm';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 
 /**
  * Get currency symbol from currency code
@@ -49,6 +51,7 @@ const OperationsScreen = () => {
     addOperation,
     validateOperation,
     loadMoreOperations,
+    jumpToDate,
     activeFilters,
     filtersActive,
     updateFilters,
@@ -63,6 +66,8 @@ const OperationsScreen = () => {
   const [isNew, setIsNew] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -143,6 +148,24 @@ const OperationsScreen = () => {
       ],
     );
   };
+
+  const handleDateSeparatorPress = useCallback((dateString) => {
+    // Parse the date and set it as the selected date
+    const date = new Date(dateString);
+    setSelectedDate(date);
+    setShowDatePicker(true);
+  }, []);
+
+  const handleDatePickerChange = useCallback((event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      // Jump to the selected date
+      const dateString = toDateString(date);
+      jumpToDate(dateString);
+      // Scroll to top to show the newly loaded operations
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }
+  }, [jumpToDate]);
 
   // Quick add handlers
   const openPicker = useCallback((type, data) => {
@@ -273,8 +296,11 @@ const OperationsScreen = () => {
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
+
+    const categoryName = getCategoryDisplayName(categoryId, categories, t);
+
     return {
-      name: category.nameKey ? t(category.nameKey) : category.name,
+      name: categoryName || t('unknown_category'),
       icon: category.icon || 'help-circle',
     };
   }, [categories, t]);
@@ -282,9 +308,8 @@ const OperationsScreen = () => {
   // Get category name for form
   const getCategoryName = useCallback((categoryId) => {
     if (!categoryId) return t('select_category');
-    const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return t('select_category');
-    return category.nameKey ? t(category.nameKey) : category.name;
+    const displayName = getCategoryDisplayName(categoryId, categories, t);
+    return displayName || t('select_category');
   }, [categories, t]);
 
   // Filtered categories for quick add form (excluding shadow categories)
@@ -483,6 +508,7 @@ const OperationsScreen = () => {
           formatDate={formatDate}
           colors={colors}
           t={t}
+          onPress={() => handleDateSeparatorPress(item.date)}
         />
       );
     }
@@ -500,7 +526,7 @@ const OperationsScreen = () => {
         onPress={() => handleEditOperation(item)}
       />
     );
-  }, [colors, t, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation]);
+  }, [colors, t, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation, handleDateSeparatorPress]);
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
@@ -717,6 +743,16 @@ const OperationsScreen = () => {
         isNew={isNew}
         onDelete={handleDeleteOperation}
       />
+
+      {/* Date Picker for jumping to a specific date */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={handleDatePickerChange}
+        />
+      )}
     </View>
   );
 };
