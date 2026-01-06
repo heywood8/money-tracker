@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, Modal, PanResponder, TextInput } from 'react-native';
-import PropTypes from 'prop-types';
-import { PieChart, LineChart } from 'react-native-chart-kit';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, PanResponder, TextInput } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -11,6 +9,12 @@ import { getSpendingByCategoryAndCurrency, getIncomeByCategoryAndCurrency, getAv
 import { getAllCategories } from '../services/CategoriesDB';
 import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
 import SimplePicker from '../components/SimplePicker';
+import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
+import SpendingPredictionCard from '../components/graphs/SpendingPredictionCard';
+import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
+import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
+import ExpensePieChart from '../components/graphs/ExpensePieChart';
+import IncomePieChart from '../components/graphs/IncomePieChart';
 
 // Currency formatting helper
 import currencies from '../../assets/currencies.json';
@@ -19,90 +23,6 @@ const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
   const decimals = currencyInfo?.decimal_digits ?? 2;
   return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
-};
-
-// Custom Legend Component
-const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
-  const total = data.reduce((sum, item) => sum + item.amount, 0);
-
-  return (
-    <View style={styles.legendContainer}>
-      {data.map((item, index) => {
-        const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
-        const ItemWrapper = isClickable && item.categoryId ? TouchableOpacity : View;
-        const wrapperProps = isClickable && item.categoryId ? {
-          onPress: () => onItemPress(item.categoryId),
-          activeOpacity: 0.7,
-          accessibilityRole: 'button',
-          accessibilityLabel: `View details for ${item.name}`,
-          accessibilityHint: 'Double tap to filter by this category',
-        } : {};
-
-        return (
-          <ItemWrapper
-            key={index}
-            style={[
-              styles.legendItem,
-              { borderBottomColor: colors.border },
-              isClickable && item.categoryId && styles.legendItemClickable,
-            ]}
-            {...wrapperProps}
-          >
-            <View style={styles.legendLeft}>
-              <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-              {item.icon && (
-                <Icon
-                  name={item.icon}
-                  size={18}
-                  color={colors.text}
-                  style={styles.legendIcon}
-                />
-              )}
-              <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
-                {item.name}
-              </Text>
-              {isClickable && item.categoryId && (
-                <Icon
-                  name="chevron-right"
-                  size={16}
-                  color={colors.mutedText}
-                  style={styles.legendChevron}
-                />
-              )}
-            </View>
-            <View style={styles.legendRight}>
-              <Text style={[styles.legendAmount, { color: colors.text }]}>
-                {formatCurrency(item.amount, currency)}
-              </Text>
-              <Text style={[styles.legendPercentage, { color: colors.mutedText }]}>
-                {percentage}%
-              </Text>
-            </View>
-          </ItemWrapper>
-        );
-      })}
-    </View>
-  );
-};
-
-CustomLegend.propTypes = {
-  data: PropTypes.arrayOf(
-    PropTypes.shape({
-      name: PropTypes.string,
-      amount: PropTypes.number,
-      color: PropTypes.string,
-      icon: PropTypes.string,
-      categoryId: PropTypes.string,
-    }),
-  ).isRequired,
-  currency: PropTypes.string.isRequired,
-  colors: PropTypes.shape({
-    border: PropTypes.string,
-    text: PropTypes.string,
-    mutedText: PropTypes.string,
-  }).isRequired,
-  onItemPress: PropTypes.func.isRequired,
-  isClickable: PropTypes.bool.isRequired,
 };
 
 const GraphsScreen = () => {
@@ -1094,332 +1014,50 @@ const GraphsScreen = () => {
 
           {/* Balance History Card */}
           {selectedMonth !== null && selectedAccount && (
-            <View style={[styles.balanceHistoryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-              <View style={styles.balanceHistoryHeader}>
-                <View style={styles.balanceHistoryTitleContainer}>
-                  <Icon name="chart-line" size={24} color={colors.primary} />
-                  <Text style={[styles.balanceHistoryTitle, { color: colors.text }]}>
-                    {t('balance') || 'Balance'}
-                  </Text>
-                </View>
-                {/* Account Picker */}
-                <View style={[styles.accountPickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedAccount}
-                    onValueChange={setSelectedAccount}
-                    items={accountItems}
-                    colors={colors}
-                  />
-                </View>
-              </View>
-
-              {loadingBalanceHistory ? (
-                <View style={styles.balanceHistoryLoading}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                </View>
-              ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.balanceHistoryChartContainer}
-                    onPress={handleBalanceHistoryPress}
-                    activeOpacity={0.7}
-                  >
-                    <LineChart
-                      data={{
-                        labels: balanceHistoryData.labels.map(d => d.toString()),
-                        datasets: [
-                          {
-                            data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
-                            color: () => colors.primary,
-                            strokeWidth: 3,
-                          },
-                          {
-                            data: balanceHistoryData.burndown.map(p => p.y),
-                            color: () => 'rgba(255, 99, 132, 0.4)',
-                            strokeWidth: 2,
-                            withDots: false,
-                          },
-                          ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
-                            data: balanceHistoryData.prevMonth.filter(v => v !== undefined),
-                            color: () => 'rgba(156, 39, 176, 0.5)',
-                            strokeWidth: 2,
-                            withDots: false,
-                          }] : []),
-                        ],
-                      }}
-                      width={screenWidth - 64}
-                      height={220}
-                      yAxisLabel=""
-                      yAxisSuffix=""
-                      formatXLabel={(value) => {
-                        // Show every 5th label to avoid crowding
-                        const day = parseInt(value);
-                        return day % 5 === 1 ? value : '';
-                      }}
-                      chartConfig={{
-                        backgroundColor: colors.altRow,
-                        backgroundGradientFrom: colors.altRow,
-                        backgroundGradientTo: colors.altRow,
-                        decimalPlaces: 0,
-                        color: (_opacity = 1) => colors.text,
-                        labelColor: (_opacity = 1) => colors.mutedText,
-                        style: {
-                          borderRadius: 16,
-                        },
-                        propsForDots: {
-                          r: '2',
-                          strokeWidth: '2',
-                        },
-                        propsForBackgroundLines: {
-                          strokeWidth: 1,
-                          stroke: colors.border,
-                          strokeDasharray: '0',
-                        },
-                      }}
-                      bezier
-                      withInnerLines={true}
-                      withOuterLines={true}
-                      withVerticalLines={false}
-                      withHorizontalLines={true}
-                      withLegend={false}
-                      style={styles.lineChartStyle}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Legend at bottom with values on the right */}
-                  {(() => {
-                    const now = new Date();
-                    const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-                    const currentDay = isCurrentMonth ? now.getDate() : null;
-
-                    let actualValue = null;
-                    let burndownValue = null;
-                    let prevMonthValue = null;
-
-                    if (currentDay) {
-                      const actualPoint = balanceHistoryData.actual.find(p => p.x === currentDay);
-                      const burndownPoint = balanceHistoryData.burndown.find(p => p.x === currentDay);
-                      const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
-
-                      if (actualPoint) {
-                        actualValue = formatCurrency(actualPoint.y, selectedAccountData?.currency || 'USD');
-                      }
-                      if (burndownPoint) {
-                        burndownValue = formatCurrency(burndownPoint.y, selectedAccountData?.currency || 'USD');
-                      }
-                      if (balanceHistoryData.prevMonth && balanceHistoryData.prevMonth[currentDay - 1] !== undefined) {
-                        prevMonthValue = formatCurrency(balanceHistoryData.prevMonth[currentDay - 1], selectedAccountData?.currency || 'USD');
-                      }
-                    }
-
-                    const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
-
-                    return (
-                      <View style={styles.burndownLegendContainer}>
-                        <View style={styles.burndownLegend}>
-                          <View style={styles.burndownLegendItem}>
-                            <View style={[styles.burndownLegendDot, { backgroundColor: colors.primary }]} />
-                            <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                              {t('actual') || 'Actual'}
-                            </Text>
-                          </View>
-                          <View style={styles.burndownLegendItem}>
-                            <View style={[styles.burndownLegendDot, styles.burndownDatasetColor]} />
-                            <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                              {t('burndown') || 'Burndown'}
-                            </Text>
-                          </View>
-                          {hasPrevMonthData && (
-                            <View style={styles.burndownLegendItem}>
-                              <View style={[styles.burndownLegendDot, styles.prevMonthDatasetColor]} />
-                              <Text style={[styles.burndownLegendText, { color: colors.text }]}>
-                                {t('prev_month') || 'Prev Month'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-
-                        {(actualValue || burndownValue || prevMonthValue) && (
-                          <View style={styles.todayValuesContainer}>
-                            <View style={styles.todayValueItem}>
-                              <Text style={[styles.todayValueText, { color: colors.text }]}>
-                                {actualValue || '-'}
-                              </Text>
-                            </View>
-                            <View style={styles.todayValueItem}>
-                              <Text style={[styles.todayValueText, { color: colors.text }]}>
-                                {burndownValue || '-'}
-                              </Text>
-                            </View>
-                            {hasPrevMonthData && (
-                              <View style={styles.todayValueItem}>
-                                <Text style={[styles.todayValueText, { color: colors.text }]}>
-                                  {prevMonthValue || '-'}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })()}
-                </>
-              ) : (
-                <View style={styles.balanceHistoryNoData}>
-                  <Text style={[styles.balanceHistoryNoDataText, { color: colors.mutedText }]}>
-                    {t('no_balance_history') || 'No balance history available for this month'}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <BalanceHistoryCard
+              colors={colors}
+              t={t}
+              selectedAccount={selectedAccount}
+              onAccountChange={setSelectedAccount}
+              accountItems={accountItems}
+              loadingBalanceHistory={loadingBalanceHistory}
+              balanceHistoryData={balanceHistoryData}
+              onChartPress={handleBalanceHistoryPress}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              accounts={accounts}
+            />
           )}
 
           {/* Spending Prediction Card */}
-          {spendingPrediction && (
-            <View style={[styles.predictionCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-              <View style={styles.predictionHeader}>
-                <Icon name="chart-line" size={24} color={colors.primary} />
-                <Text style={[styles.predictionTitle, { color: colors.text }]}>
-                  {t('spending_prediction')}
-                </Text>
-              </View>
-
-              {/* Current vs Predicted */}
-              <View style={styles.predictionStats}>
-                <View style={styles.predictionStat}>
-                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
-                    {t('current_spending')}
-                  </Text>
-                  <Text style={[styles.predictionStatValue, { color: colors.expense || '#ff4444' }]}>
-                    {formatCurrency(spendingPrediction.currentSpending, selectedCurrency)}
-                  </Text>
-                </View>
-                <Icon name="arrow-right" size={20} color={colors.mutedText} style={styles.predictionArrow} />
-                <View style={styles.predictionStat}>
-                  <Text style={[styles.predictionStatLabel, { color: colors.mutedText }]}>
-                    {t('predicted_spending')}
-                  </Text>
-                  <Text style={[styles.predictionStatValue, { color: colors.text }]}>
-                    {formatCurrency(spendingPrediction.predictedRemaining, selectedCurrency)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress Bar */}
-              <View style={styles.predictionProgressContainer}>
-                <View style={[styles.predictionProgressTrack, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[
-                      styles.predictionProgressBar,
-                      {
-                        width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
-                        backgroundColor: colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
-                  {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()}
-                </Text>
-              </View>
-
-              {/* Daily Average */}
-              <View style={styles.predictionFooter}>
-                <Text style={[styles.predictionFooterLabel, { color: colors.mutedText }]}>
-                  {t('daily_average')}:{' '}
-                  <Text style={[styles.predictionFooterValue, { color: colors.text }]}>
-                    {formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-          )}
+          <SpendingPredictionCard
+            colors={colors}
+            t={t}
+            spendingPrediction={spendingPrediction}
+            selectedCurrency={selectedCurrency}
+          />
 
           {/* Expenses Summary Card */}
-          <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+          <ExpenseSummaryCard
+            colors={colors}
+            t={t}
+            loading={loading}
+            totalExpenses={totalExpenses}
+            selectedCurrency={selectedCurrency}
+            chartData={chartData}
             onPress={openExpenseModal}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('expenses_by_category')}
-          >
-            <View style={styles.summaryCardContent}>
-              <View style={styles.summaryInfo}>
-                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-                  {t('total_expenses')}
-                </Text>
-                <Text style={[styles.summaryAmount, { color: colors.text }]}>
-                  {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
-                </Text>
-              </View>
-              <View style={styles.miniChartContainer}>
-                {loading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : chartData.length > 0 ? (
-                  <PieChart
-                    data={chartData}
-                    width={80}
-                    height={80}
-                    chartConfig={{
-                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    }}
-                    accessor="amount"
-                    backgroundColor="transparent"
-                    paddingLeft="0"
-                    hasLegend={false}
-                    center={[20, 0]}
-                  />
-                ) : (
-                  <View style={styles.noDataPlaceholder}>
-                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
+          />
 
           {/* Income Summary Card */}
-          <TouchableOpacity
-            style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+          <IncomeSummaryCard
+            colors={colors}
+            t={t}
+            loadingIncome={loadingIncome}
+            totalIncome={totalIncome}
+            selectedCurrency={selectedCurrency}
+            incomeChartData={incomeChartData}
             onPress={openIncomeModal}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('income_by_category')}
-          >
-            <View style={styles.summaryCardContent}>
-              <View style={styles.summaryInfo}>
-                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-                  {t('total_income')}
-                </Text>
-                <Text style={[styles.summaryAmount, { color: colors.text }]}>
-                  {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
-                </Text>
-              </View>
-              <View style={styles.miniChartContainer}>
-                {loadingIncome ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : incomeChartData.length > 0 ? (
-                  <PieChart
-                    data={incomeChartData}
-                    width={80}
-                    height={80}
-                    chartConfig={{
-                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    }}
-                    accessor="amount"
-                    backgroundColor="transparent"
-                    paddingLeft="0"
-                    hasLegend={false}
-                    center={[20, 0]}
-                  />
-                ) : (
-                  <View style={styles.noDataPlaceholder}>
-                    <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
+          />
         </View>
       </ScrollView>
 
@@ -1477,43 +1115,15 @@ const GraphsScreen = () => {
                 )}
 
                 <ScrollView style={styles.modalScrollView}>
-                  {loading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary} />
-                      <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-                        {t('loading_operations')}
-                      </Text>
-                    </View>
-                  ) : chartData.length > 0 ? (
-                    <>
-                      <View style={styles.chartContainer}>
-                        <PieChart
-                          data={chartData}
-                          width={screenWidth - 64}
-                          height={220}
-                          chartConfig={{
-                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                          }}
-                          accessor="amount"
-                          backgroundColor="transparent"
-                          paddingLeft="15"
-                          center={[0, 0]}
-                          hasLegend={false}
-                        />
-                      </View>
-                      <CustomLegend
-                        data={chartData}
-                        currency={selectedCurrency}
-                        colors={colors}
-                        onItemPress={handleExpenseLegendItemPress}
-                        isClickable={selectedCategory === 'all'}
-                      />
-                    </>
-                  ) : (
-                    <Text style={[styles.noData, { color: colors.mutedText }]}>
-                      {t('no_expense_data')}
-                    </Text>
-                  )}
+                  <ExpensePieChart
+                    colors={colors}
+                    t={t}
+                    loading={loading}
+                    chartData={chartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleExpenseLegendItemPress}
+                    selectedCategory={selectedCategory}
+                  />
                 </ScrollView>
               </>
             )}
@@ -1533,43 +1143,15 @@ const GraphsScreen = () => {
                 )}
 
                 <ScrollView style={styles.modalScrollView}>
-                  {loadingIncome ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary} />
-                      <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-                        {t('loading_operations')}
-                      </Text>
-                    </View>
-                  ) : incomeChartData.length > 0 ? (
-                    <>
-                      <View style={styles.chartContainer}>
-                        <PieChart
-                          data={incomeChartData}
-                          width={screenWidth - 64}
-                          height={220}
-                          chartConfig={{
-                            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                          }}
-                          accessor="amount"
-                          backgroundColor="transparent"
-                          paddingLeft="15"
-                          center={[0, 0]}
-                          hasLegend={false}
-                        />
-                      </View>
-                      <CustomLegend
-                        data={incomeChartData}
-                        currency={selectedCurrency}
-                        colors={colors}
-                        onItemPress={handleIncomeLegendItemPress}
-                        isClickable={selectedIncomeCategory === 'all'}
-                      />
-                    </>
-                  ) : (
-                    <Text style={[styles.noData, { color: colors.mutedText }]}>
-                      {t('no_income_data')}
-                    </Text>
-                  )}
+                  <IncomePieChart
+                    colors={colors}
+                    t={t}
+                    loadingIncome={loadingIncome}
+                    incomeChartData={incomeChartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleIncomeLegendItemPress}
+                    selectedIncomeCategory={selectedIncomeCategory}
+                  />
                 </ScrollView>
               </>
             )}
@@ -1693,13 +1275,6 @@ const GraphsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  accountPickerWrapper: {
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 40,
-    minWidth: 140,
-    overflow: 'hidden',
-  },
   backButton: {
     marginRight: 12,
     padding: 4,
@@ -1710,43 +1285,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     width: 32,
-  },
-  balanceHistoryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  balanceHistoryChartContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  balanceHistoryHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  balanceHistoryLoading: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  balanceHistoryNoData: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  balanceHistoryNoDataText: {
-    fontSize: 14,
-  },
-  balanceHistoryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  balanceHistoryTitleContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginRight: 12,
   },
   balanceTable: {
     borderRadius: 8,
@@ -1791,51 +1329,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
-  burndownDatasetColor: {
-    backgroundColor: 'rgba(255, 99, 132, 0.4)',
-  },
-  burndownLegend: {
-    flexDirection: 'column',
-    gap: 6,
-  },
-  burndownLegendContainer: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 20,
-    justifyContent: 'center',
-    marginTop: 0,
-    paddingHorizontal: HORIZONTAL_PADDING * 3,
-  },
-  burndownLegendDot: {
-    borderRadius: 6,
-    height: 10,
-    marginRight: 8,
-    width: 3,
-  },
-  burndownLegendItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  burndownLegendText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chartContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
   closeButton: {
     padding: 4,
   },
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  colorIndicator: {
-    borderRadius: 6,
-    height: 12,
-    marginRight: 8,
-    width: 12,
   },
   container: {
     flex: 1,
@@ -1851,69 +1350,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 20,
-  },
-  legendAmount: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  legendChevron: {
-    marginLeft: 4,
-  },
-  legendContainer: {
-    marginTop: 20,
-  },
-  legendIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  legendItem: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-  },
-  legendItemClickable: {
-    paddingHorizontal: 8,
-  },
-  legendLeft: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
-    marginRight: 12,
-  },
-  legendName: {
-    flex: 1,
-    fontSize: 15,
-  },
-  legendPercentage: {
-    fontSize: 14,
-    minWidth: 45,
-    textAlign: 'right',
-  },
-  legendRight: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  lineChartStyle: {
-    borderRadius: 16,
-    marginVertical: 8,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  loadingText: {
-    fontSize: 14,
-    marginTop: 12,
-  },
-  miniChartContainer: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
   },
   modalContent: {
     borderRadius: 16,
@@ -1959,20 +1395,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  noData: {
-    fontSize: 16,
-    marginTop: 40,
-    textAlign: 'center',
-  },
-  noDataPlaceholder: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataText: {
-    fontSize: 32,
-  },
   pickerWrapper: {
     borderRadius: 8,
     borderWidth: 1,
@@ -1980,110 +1402,8 @@ const styles = StyleSheet.create({
     height: 40,
     overflow: 'hidden',
   },
-  predictionArrow: {
-    marginHorizontal: 8,
-  },
-  predictionCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  predictionFooter: {
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    borderTopWidth: 1,
-    paddingTop: 12,
-  },
-  predictionFooterLabel: {
-    fontSize: 14,
-  },
-  predictionFooterValue: {
-    fontWeight: '600',
-  },
-  predictionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  predictionProgressBar: {
-    borderRadius: 4,
-    height: '100%',
-  },
-  predictionProgressContainer: {
-    marginBottom: 12,
-  },
-  predictionProgressText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  predictionProgressTrack: {
-    borderRadius: 4,
-    height: 8,
-    marginBottom: 4,
-    overflow: 'hidden',
-  },
-  predictionStat: {
-    flex: 1,
-  },
-  predictionStatLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  predictionStatValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  predictionStats: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  predictionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  prevMonthDatasetColor: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
-  },
   scrollView: {
     flex: 1,
-  },
-  summaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  summaryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  summaryCardContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryInfo: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  todayValueItem: {
-    alignItems: 'flex-end',
-  },
-  todayValueText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  todayValuesContainer: {
-    alignItems: 'flex-end',
-    flexDirection: 'column',
-    gap: 6,
   },
 });
 
