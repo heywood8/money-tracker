@@ -1275,13 +1275,6 @@ const GraphsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  accountPickerWrapper: {
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 40,
-    minWidth: 140,
-    overflow: 'hidden',
-  },
   backButton: {
     marginRight: 12,
     padding: 4,
@@ -1292,43 +1285,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     width: 32,
-  },
-  balanceHistoryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  balanceHistoryChartContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  balanceHistoryHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  balanceHistoryLoading: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  balanceHistoryNoData: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  balanceHistoryNoDataText: {
-    fontSize: 14,
-  },
-  balanceHistoryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  balanceHistoryTitleContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginRight: 12,
   },
   balanceTable: {
     borderRadius: 8,
@@ -1373,51 +1329,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 12,
   },
-  burndownDatasetColor: {
-    backgroundColor: 'rgba(255, 99, 132, 0.4)',
-  },
-  burndownLegend: {
-    flexDirection: 'column',
-    gap: 6,
-  },
-  burndownLegendContainer: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 20,
-    justifyContent: 'center',
-    marginTop: 0,
-    paddingHorizontal: HORIZONTAL_PADDING * 3,
-  },
-  burndownLegendDot: {
-    borderRadius: 6,
-    height: 10,
-    marginRight: 8,
-    width: 3,
-  },
-  burndownLegendItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  burndownLegendText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chartContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
   closeButton: {
     padding: 4,
   },
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  colorIndicator: {
-    borderRadius: 6,
-    height: 12,
-    marginRight: 8,
-    width: 12,
   },
   container: {
     flex: 1,
@@ -1433,69 +1350,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 20,
-  },
-  legendAmount: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  legendChevron: {
-    marginLeft: 4,
-  },
-  legendContainer: {
-    marginTop: 20,
-  },
-  legendIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  legendItem: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-  },
-  legendItemClickable: {
-    paddingHorizontal: 8,
-  },
-  legendLeft: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
-    marginRight: 12,
-  },
-  legendName: {
-    flex: 1,
-    fontSize: 15,
-  },
-  legendPercentage: {
-    fontSize: 14,
-    minWidth: 45,
-    textAlign: 'right',
-  },
-  legendRight: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  lineChartStyle: {
-    borderRadius: 16,
-    marginVertical: 8,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  loadingText: {
-    fontSize: 14,
-    marginTop: 12,
-  },
-  miniChartContainer: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
   },
   modalContent: {
     borderRadius: 16,
@@ -1541,20 +1395,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  noData: {
-    fontSize: 16,
-    marginTop: 40,
-    textAlign: 'center',
-  },
-  noDataPlaceholder: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataText: {
-    fontSize: 32,
-  },
   pickerWrapper: {
     borderRadius: 8,
     borderWidth: 1,
@@ -1562,110 +1402,8 @@ const styles = StyleSheet.create({
     height: 40,
     overflow: 'hidden',
   },
-  predictionArrow: {
-    marginHorizontal: 8,
-  },
-  predictionCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  predictionFooter: {
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    borderTopWidth: 1,
-    paddingTop: 12,
-  },
-  predictionFooterLabel: {
-    fontSize: 14,
-  },
-  predictionFooterValue: {
-    fontWeight: '600',
-  },
-  predictionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  predictionProgressBar: {
-    borderRadius: 4,
-    height: '100%',
-  },
-  predictionProgressContainer: {
-    marginBottom: 12,
-  },
-  predictionProgressText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  predictionProgressTrack: {
-    borderRadius: 4,
-    height: 8,
-    marginBottom: 4,
-    overflow: 'hidden',
-  },
-  predictionStat: {
-    flex: 1,
-  },
-  predictionStatLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  predictionStatValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  predictionStats: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  predictionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  prevMonthDatasetColor: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
-  },
   scrollView: {
     flex: 1,
-  },
-  summaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  summaryCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
-  },
-  summaryCardContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryInfo: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  todayValueItem: {
-    alignItems: 'flex-end',
-  },
-  todayValueText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  todayValuesContainer: {
-    alignItems: 'flex-end',
-    flexDirection: 'column',
-    gap: 6,
   },
 });
 
