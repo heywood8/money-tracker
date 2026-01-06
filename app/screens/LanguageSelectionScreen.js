@@ -5,10 +5,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import enTranslations from '../../assets/i18n/en.json';
 import itTranslations from '../../assets/i18n/it.json';
 import ruTranslations from '../../assets/i18n/ru.json';
