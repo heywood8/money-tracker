@@ -14,6 +14,38 @@ const formatCurrency = (amount, currency) => {
   return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
 };
 
+// Helper function to calculate nice Y-axis scale
+// Returns max value and interval for 4 evenly spaced segments
+const calculateNiceScale = (maxValue) => {
+  if (maxValue === 0) return { max: 0, interval: 0 };
+
+  // Calculate rough interval for 4 segments
+  const roughInterval = maxValue / 4;
+
+  // Get the order of magnitude
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughInterval)));
+
+  // Normalize to range [1, 10)
+  const normalized = roughInterval / magnitude;
+
+  // Round to nearest nice number: 1, 2, or 5
+  let niceNormalized;
+  if (normalized <= 1.5) {
+    niceNormalized = 1;
+  } else if (normalized <= 3.5) {
+    niceNormalized = 2;
+  } else if (normalized <= 7.5) {
+    niceNormalized = 5;
+  } else {
+    niceNormalized = 10;
+  }
+
+  const niceInterval = niceNormalized * magnitude;
+  const niceMax = niceInterval * 4;
+
+  return { max: niceMax, interval: niceInterval };
+};
+
 const BalanceHistoryCard = ({
   colors,
   t,
@@ -58,66 +90,101 @@ const BalanceHistoryCard = ({
             onPress={onChartPress}
             activeOpacity={0.7}
           >
-            <LineChart
-              data={{
-                labels: balanceHistoryData.labels.map(d => d.toString()),
-                datasets: [
-                  {
-                    data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
-                    color: () => colors.primary,
-                    strokeWidth: 3,
-                  },
-                  {
-                    data: balanceHistoryData.burndown.map(p => p.y),
-                    color: () => 'rgba(255, 99, 132, 0.4)',
-                    strokeWidth: 2,
-                    withDots: false,
-                  },
-                  ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
-                    data: balanceHistoryData.prevMonth.map(v => v ?? null),
-                    color: () => 'rgba(156, 39, 176, 0.5)',
-                    strokeWidth: 2,
-                    withDots: false,
-                  }] : []),
-                ],
-              }}
-              width={screenWidth - 64}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=""
-              formatXLabel={(value) => {
-                // Show every 5th label to avoid crowding
-                const day = parseInt(value);
-                return day % 5 === 1 ? value : '';
-              }}
-              chartConfig={{
-                backgroundColor: colors.altRow,
-                backgroundGradientFrom: colors.altRow,
-                backgroundGradientTo: colors.altRow,
-                decimalPlaces: 0,
-                color: (_opacity = 1) => colors.text,
-                labelColor: (_opacity = 1) => colors.mutedText,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForDots: {
-                  r: '2',
-                  strokeWidth: '2',
-                },
-                propsForBackgroundLines: {
-                  strokeWidth: 1,
-                  stroke: colors.border,
-                  strokeDasharray: '0',
-                },
-              }}
-              bezier
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={false}
-              withHorizontalLines={true}
-              withLegend={false}
-              style={styles.lineChartStyle}
-            />
+            {(() => {
+              // Calculate max value from all datasets to determine Y-axis scale
+              const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
+              const burndownValues = balanceHistoryData.burndown.map(p => p.y);
+              const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
+
+              const allValues = [...actualValues, ...burndownValues, ...prevMonthValues];
+              const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
+
+              // Calculate nice scale for Y-axis
+              const { max: niceMax, interval: niceInterval } = calculateNiceScale(maxValue);
+
+              // Get last day for X-axis labels
+              const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
+
+              return (
+                <LineChart
+                  data={{
+                    labels: balanceHistoryData.labels.map(d => d.toString()),
+                    datasets: [
+                      {
+                        data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
+                        color: () => colors.primary,
+                        strokeWidth: 3,
+                      },
+                      {
+                        data: balanceHistoryData.burndown.map(p => p.y),
+                        color: () => 'rgba(255, 99, 132, 0.4)',
+                        strokeWidth: 2,
+                        withDots: false,
+                      },
+                      ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
+                        data: balanceHistoryData.prevMonth.map(v => v ?? null),
+                        color: () => 'rgba(156, 39, 176, 0.5)',
+                        strokeWidth: 2,
+                        withDots: false,
+                      }] : []),
+                    ],
+                  }}
+                  width={screenWidth - 64}
+                  height={220}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  yAxisInterval={niceInterval}
+                  segments={4}
+                  fromZero={true}
+                  formatYLabel={(value) => {
+                    // Format Y-axis labels to show nice rounded values
+                    const numValue = parseFloat(value);
+                    if (numValue >= 1000000) {
+                      return `${(numValue / 1000000).toFixed(0)}M`;
+                    } else if (numValue >= 1000) {
+                      return `${(numValue / 1000).toFixed(0)}K`;
+                    }
+                    return numValue.toFixed(0);
+                  }}
+                  formatXLabel={(value) => {
+                    // Show: 1, 5, 10, 15, 20, 25, and last day of month
+                    const day = parseInt(value);
+                    if (day === 1 || day === 5 || day === 10 || day === 15 ||
+                        day === 20 || day === 25 || day === lastDay) {
+                      return value;
+                    }
+                    return '';
+                  }}
+                  chartConfig={{
+                    backgroundColor: colors.altRow,
+                    backgroundGradientFrom: colors.altRow,
+                    backgroundGradientTo: colors.altRow,
+                    decimalPlaces: 0,
+                    color: (_opacity = 1) => colors.text,
+                    labelColor: (_opacity = 1) => colors.mutedText,
+                    style: {
+                      borderRadius: 16,
+                    },
+                    propsForDots: {
+                      r: '2',
+                      strokeWidth: '2',
+                    },
+                    propsForBackgroundLines: {
+                      strokeWidth: 1,
+                      stroke: colors.border,
+                      strokeDasharray: '0',
+                    },
+                  }}
+                  bezier
+                  withInnerLines={true}
+                  withOuterLines={true}
+                  withVerticalLines={false}
+                  withHorizontalLines={true}
+                  withLegend={false}
+                  style={styles.lineChartStyle}
+                />
+              );
+            })()}
           </TouchableOpacity>
 
           {/* Legend at bottom with values on the right */}
