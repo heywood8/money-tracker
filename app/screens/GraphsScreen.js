@@ -942,9 +942,9 @@ const GraphsScreen = () => {
     // Calculate days in the selected month
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
-    // Calculate days elapsed (from 1st to today)
+    // Calculate days elapsed (from 1st to today, excluding current day)
     const currentDay = now.getDate();
-    const daysElapsed = currentDay;
+    const daysElapsed = currentDay - 1;
 
     // If it's the first day, we can't make a good prediction yet
     if (daysElapsed < 1) {
