@@ -46,14 +46,11 @@ const OperationsScreen = () => {
     operations,
     loading: operationsLoading,
     loadingMore,
-    loadingNewer,
     hasMoreOperations,
-    hasNewerOperations,
     deleteOperation,
     addOperation,
     validateOperation,
     loadMoreOperations,
-    loadNewerOperations,
     jumpToDate,
     activeFilters,
     filtersActive,
@@ -71,6 +68,8 @@ const OperationsScreen = () => {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [scrollToDateString, setScrollToDateString] = useState(null);
+  const [pendingScroll, setPendingScroll] = useState(false);
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -114,6 +113,76 @@ const OperationsScreen = () => {
     }
     setDefaultAccount();
   }, [visibleAccounts]);
+
+  // Scroll to date after operations are loaded
+  useEffect(() => {
+    if (scrollToDateString && !operationsLoading && groupedOperations.length > 0) {
+      const separatorIndex = groupedOperations.findIndex(
+        item => item.type === 'separator' && item.date === scrollToDateString,
+      );
+
+      if (separatorIndex !== -1) {
+        // Mark that we have a pending scroll
+        setPendingScroll(true);
+      } else {
+        // Date not found, clear the scroll target
+        setScrollToDateString(null);
+        setPendingScroll(false);
+      }
+    }
+  }, [scrollToDateString, operationsLoading, groupedOperations]);
+
+  // Handle content size change - this fires after FlatList has laid out content
+  const handleContentSizeChange = useCallback((width, height) => {
+    if (pendingScroll && scrollToDateString && !operationsLoading) {
+      const separatorIndex = groupedOperations.findIndex(
+        item => item.type === 'separator' && item.date === scrollToDateString,
+      );
+
+      console.log('handleContentSizeChange:', {
+        pendingScroll,
+        scrollToDateString,
+        separatorIndex,
+        totalItems: groupedOperations.length,
+        contentHeight: height,
+      });
+
+      if (separatorIndex !== -1) {
+        // Use scrollToOffset with estimated position
+        // Each item is roughly 70-80px tall (operations) + separators are ~60px
+        // This is more reliable than scrollToIndex for virtualized lists
+        const estimatedItemHeight = 75;
+        const estimatedOffset = separatorIndex * estimatedItemHeight;
+
+        setTimeout(() => {
+          console.log('Scrolling to offset:', estimatedOffset, 'for index:', separatorIndex);
+
+          // Use scrollToOffset which works better for large lists
+          flatListRef.current?.scrollToOffset({
+            offset: estimatedOffset,
+            animated: false, // Use non-animated scroll for large distances
+          });
+
+          // After scrolling to approximate position, try to fine-tune with scrollToIndex
+          setTimeout(() => {
+            try {
+              flatListRef.current?.scrollToIndex({
+                index: separatorIndex,
+                animated: true,
+                viewPosition: 0,
+              });
+            } catch (error) {
+              console.log('Fine-tuning scroll failed, staying at estimated position');
+            }
+          }, 100);
+
+          // Clear the scroll target
+          setScrollToDateString(null);
+          setPendingScroll(false);
+        }, 100);
+      }
+    }
+  }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
 
   // Auto-prefill "To Account" for transfers with same currency
   useEffect(() => {
@@ -159,16 +228,31 @@ const OperationsScreen = () => {
     setShowDatePicker(true);
   }, []);
 
-  const handleDatePickerChange = useCallback((event, date) => {
+  const handleDatePickerChange = useCallback(async (event, date) => {
     setShowDatePicker(false);
     if (date) {
-      // Jump to the selected date
       const dateString = toDateString(date);
-      jumpToDate(dateString);
-      // Scroll to top to show the newly loaded operations
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+
+      // Find the index of the date separator for this date in current list
+      const separatorIndex = groupedOperations.findIndex(
+        item => item.type === 'separator' && item.date === dateString,
+      );
+
+      if (separatorIndex !== -1) {
+        // Date is in the current list - scroll to it immediately
+        flatListRef.current?.scrollToIndex({
+          index: separatorIndex,
+          animated: true,
+          viewPosition: 0, // Position at the top of the viewport
+        });
+      } else {
+        // Date is not in current list - load from that date to today
+        // Set the target date for scrolling after load completes
+        setScrollToDateString(dateString);
+        await jumpToDate(dateString);
+      }
     }
-  }, [jumpToDate]);
+  }, [groupedOperations, jumpToDate]);
 
   // Quick add handlers
   const openPicker = useCallback((type, data) => {
@@ -453,32 +537,21 @@ const OperationsScreen = () => {
   ], [t]);
 
   const quickAddFormComponent = useMemo(() => (
-    <>
-      {/* Loading indicator for newer operations at the top */}
-      {loadingNewer && (
-        <View style={styles.loadingNewerContainer}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.loadingNewerText, { color: colors.mutedText }]}>
-            {t('loading_newer')}
-          </Text>
-        </View>
-      )}
-      <QuickAddForm
-        colors={colors}
-        t={t}
-        quickAddValues={quickAddValues}
-        setQuickAddValues={setQuickAddValues}
-        accounts={visibleAccounts}
-        filteredCategories={filteredCategories}
-        getAccountName={getAccountName}
-        getAccountBalance={getAccountBalance}
-        getCategoryName={getCategoryName}
-        openPicker={openPicker}
-        handleQuickAdd={handleQuickAdd}
-        TYPES={TYPES}
-      />
-    </>
-  ), [colors, t, loadingNewer, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+    <QuickAddForm
+      colors={colors}
+      t={t}
+      quickAddValues={quickAddValues}
+      setQuickAddValues={setQuickAddValues}
+      accounts={visibleAccounts}
+      filteredCategories={filteredCategories}
+      getAccountName={getAccountName}
+      getAccountBalance={getAccountBalance}
+      getCategoryName={getCategoryName}
+      openPicker={openPicker}
+      handleQuickAdd={handleQuickAdd}
+      TYPES={TYPES}
+    />
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
 
   // Handle end reached for lazy loading
   const handleEndReached = useCallback(() => {
@@ -487,22 +560,43 @@ const OperationsScreen = () => {
     }
   }, [loadingMore, hasMoreOperations, loadMoreOperations]);
 
-  // Handle scroll event to show/hide scroll-to-top button and load newer operations
+  // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
-
-    // Load newer operations when scrolling near the top
-    // Trigger when offset is less than 50px from top
-    if (offsetY < 50 && !loadingNewer && hasNewerOperations) {
-      loadNewerOperations();
-    }
-  }, [loadingNewer, hasNewerOperations, loadNewerOperations]);
+  }, []);
 
   // Scroll to top handler
   const scrollToTop = useCallback(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  // Handle scroll to index failures (when item is not rendered yet)
+  const handleScrollToIndexFailed = useCallback((info) => {
+    console.log('scrollToIndex failed for index:', info.index, 'Using offset fallback');
+
+    // Scroll to approximate position using offset
+    const estimatedItemHeight = 75;
+    const estimatedOffset = info.index * estimatedItemHeight;
+
+    flatListRef.current?.scrollToOffset({
+      offset: estimatedOffset,
+      animated: false,
+    });
+
+    // Try scrollToIndex again after a delay
+    setTimeout(() => {
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: info.index,
+          animated: true,
+          viewPosition: 0,
+        });
+      } catch (error) {
+        console.log('Second scrollToIndex attempt failed');
+      }
+    }, 500);
   }, []);
 
   // Footer component showing loading indicator
@@ -573,7 +667,7 @@ const OperationsScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}> 
+            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
               {t('no_operations')}
             </Text>
           </View>
@@ -583,6 +677,8 @@ const OperationsScreen = () => {
         scrollEventThrottle={16}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
+        onContentSizeChange={handleContentSizeChange}
         windowSize={10}
         maxToRenderPerBatch={10}
         initialNumToRender={15}
@@ -857,15 +953,6 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     fontSize: 14,
     marginTop: SPACING.sm,
-  },
-  loadingNewerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-  },
-  loadingNewerText: {
-    fontSize: 14,
-    marginTop: SPACING.xs,
   },
   loadingText: {
     fontSize: 16,

@@ -377,16 +377,21 @@ export const OperationsProvider = ({ children }) => {
     await updateFilters(emptyFilters);
   }, [updateFilters]);
 
-  // Jump to a specific date (loads a week of operations starting from that date)
+  // Jump to a specific date (loads all operations from selected date to today)
   const jumpToDate = useCallback(async (date) => {
     try {
       setLoading(true);
       const isFiltered = hasActiveFilters(activeFilters);
 
-      // Load a week of operations starting from the selected date
+      // Calculate today's date in YYYY-MM-DD format
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+
+      // Load all operations from the selected date to today
       const operationsData = isFiltered
-        ? await OperationsDB.getFilteredOperationsByWeekFromDate(date, activeFilters)
-        : await OperationsDB.getOperationsByWeekFromDate(date);
+        ? await OperationsDB.getFilteredOperationsByDateRange(date, todayStr, activeFilters)
+        : await OperationsDB.getOperationsByDateRange(date, todayStr);
 
       setOperations(operationsData);
 
@@ -397,19 +402,13 @@ export const OperationsProvider = ({ children }) => {
         setNewestLoadedDate(newestOp.date);
         setOldestLoadedDate(oldestOp.date);
 
-        // Check if there might be newer operations (compare with today)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const newestDate = new Date(newestOp.date);
-        newestDate.setHours(0, 0, 0, 0);
-
-        // If the newest loaded operation is before today, there are newer operations
-        setHasNewerOperations(newestDate < today);
+        // No newer operations since we loaded up to today
+        setHasNewerOperations(false);
       } else {
-        setNewestLoadedDate(date);
+        setNewestLoadedDate(todayStr);
         setOldestLoadedDate(date);
-        // If no operations at this date, assume there might be newer ones
-        setHasNewerOperations(true);
+        // No newer operations since we loaded up to today
+        setHasNewerOperations(false);
       }
 
       // Assume there might be more older operations

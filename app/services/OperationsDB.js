@@ -117,6 +117,100 @@ export const getOperationsByDateRange = async (startDate, endDate) => {
 };
 
 /**
+ * Get filtered operations by date range
+ * @param {string} startDate - ISO date string (YYYY-MM-DD)
+ * @param {string} endDate - ISO date string (YYYY-MM-DD)
+ * @param {Object} filters - Filter object with types, accountIds, categoryIds, searchText, dateRange, amountRange
+ * @returns {Promise<Array>}
+ */
+export const getFilteredOperationsByDateRange = async (startDate, endDate, filters = {}) => {
+  try {
+    // Build dynamic SQL query
+    let sql = `
+      SELECT DISTINCT o.*
+      FROM operations o
+      LEFT JOIN accounts a ON o.account_id = a.id
+      LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
+      LEFT JOIN categories c ON o.category_id = c.id
+      WHERE o.date >= ? AND o.date <= ?
+    `;
+
+    const params = [startDate, endDate];
+
+    // Apply type filters
+    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+      const placeholders = filters.types.map(() => '?').join(',');
+      sql += ` AND o.type IN (${placeholders})`;
+      params.push(...filters.types);
+    }
+
+    // Apply account filters
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const placeholders = filters.accountIds.map(() => '?').join(',');
+      sql += ` AND (o.account_id IN (${placeholders}) OR o.to_account_id IN (${placeholders}))`;
+      params.push(...filters.accountIds, ...filters.accountIds);
+    }
+
+    // Apply category filters
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND o.category_id IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    }
+
+    // Apply amount range filters
+    if (filters.amountRange) {
+      if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
+        params.push(filters.amountRange.min);
+      }
+      if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
+        params.push(filters.amountRange.max);
+      }
+    }
+
+    // Apply additional date range filters (independent of main range)
+    if (filters.dateRange) {
+      if (filters.dateRange.startDate) {
+        sql += ' AND o.date >= ?';
+        params.push(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        sql += ' AND o.date <= ?';
+        params.push(filters.dateRange.endDate);
+      }
+    }
+
+    // Apply search text filter (searches across multiple fields)
+    if (filters.searchText && filters.searchText.trim()) {
+      const searchTerm = `%${filters.searchText.trim()}%`;
+      sql += ` AND (
+        o.description LIKE ? COLLATE NOCASE
+        OR o.amount LIKE ?
+        OR a.name LIKE ? COLLATE NOCASE
+        OR to_a.name LIKE ? COLLATE NOCASE
+        OR c.name LIKE ? COLLATE NOCASE
+      )`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    sql += ' ORDER BY o.date DESC, o.created_at DESC';
+
+    console.log(`Loading filtered operations from ${startDate} to ${endDate}`, filters);
+
+    const operations = await queryAll(sql, params);
+
+    console.log(`Filtered operations loaded: ${operations?.length || 0} operations`);
+
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get filtered operations by date range:', error);
+    throw error;
+  }
+};
+
+/**
  * Get operations by type
  * @param {string} type - 'expense', 'income', or 'transfer'
  * @returns {Promise<Array>}
