@@ -59,7 +59,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
           />
         </View>
         <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
-          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()} • {t('daily_average')}: <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}</Text>
+          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()} • {t('daily_average')}: <Text style={[styles.dailyAverageValue, { color: colors.text }]}>{formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}</Text>
         </Text>
       </View>
     </View>
@@ -81,6 +81,9 @@ SpendingPredictionCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  dailyAverageValue: {
+    fontWeight: '600',
+  },
   predictionArrow: {
     marginHorizontal: 8,
   },

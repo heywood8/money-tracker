@@ -36,7 +36,8 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             ]}
             {...wrapperProps}
           >
-            <View style={styles.legendLeft}>
+            {/* Category column (flexible width) */}
+            <View style={styles.categoryColumn}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
               {item.icon && (
                 <Icon
@@ -58,11 +59,20 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
                 />
               )}
             </View>
-            <View style={styles.legendRight}>
-              <Text style={[styles.legendAmount, { color: colors.text }]}>
+
+            {/* Amount column (fixed width) */}
+            <View style={styles.amountColumn}>
+              <Text style={[styles.legendAmount, { color: colors.text }]} numberOfLines={1}>
                 {formatCurrency(item.amount, currency)}
               </Text>
-              <Text style={[styles.legendPercentage, { color: colors.mutedText }]}>
+            </View>
+
+            {/* Separator */}
+            <View style={styles.verticalDivider} />
+
+            {/* Percentage column (fixed width) */}
+            <View style={styles.percentageColumn}>
+              <Text style={[styles.legendPercentage, { color: colors.text }]}>
                 {percentage}%
               </Text>
             </View>
@@ -94,6 +104,18 @@ CustomLegend.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  amountColumn: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    width: 100,
+  },
+  categoryColumn: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
+  },
   colorIndicator: {
     borderRadius: 6,
     height: 12,
@@ -116,30 +138,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 12,
   },
   legendItemClickable: {
     opacity: 0.9,
   },
-  legendLeft: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
-    gap: 8,
-  },
   legendName: {
     flex: 1,
     fontSize: 14,
   },
   legendPercentage: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '500',
   },
-  legendRight: {
+  percentageColumn: {
     alignItems: 'flex-end',
-    marginLeft: 8,
+    justifyContent: 'center',
+    width: 50,
+  },
+  verticalDivider: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(120,120,120,0.13)',
+    height: '70%',
+    marginHorizontal: 8,
+    width: 1,
   },
 });
 
