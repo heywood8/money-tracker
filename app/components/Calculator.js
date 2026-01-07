@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
@@ -7,10 +7,104 @@ import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } fro
 
 /**
  * Calculator button component - Memoized for performance
+ * Executes on press down and repeats during long holds
  */
 const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => {
-  const handlePress = useCallback(() => {
+  const timeoutRef = useRef(null);
+  const intervalRef = useRef(null);
+  const isPressedRef = useRef(false);
+  const intervalActiveRef = useRef(false);
+  const stopRequestedRef = useRef(false);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const clearTimers = useCallback(() => {
+    // If interval is active, request stop instead of clearing directly
+    if (intervalActiveRef.current) {
+      stopRequestedRef.current = true;
+      return;
+    }
+
+    // Normal release (for short presses)
+    isPressedRef.current = false;
+
+    // Clear timeout if exists
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    // Clear interval if exists
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  // Press down - execute immediately for instant feedback
+  const handlePressIn = useCallback(() => {
+    isPressedRef.current = true;
+    intervalActiveRef.current = false; // Reset interval flag
+    stopRequestedRef.current = false; // Reset stop flag
+    // Execute immediately on press down
     onPress(value);
+  }, [onPress, value]);
+
+  // Long press - start repeating after 500ms hold
+  const handleLongPress = useCallback(() => {
+    // Mark interval as active - this blocks onPressOut from interfering
+    intervalActiveRef.current = true;
+    isPressedRef.current = true;
+
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    // Execute once immediately when long press triggers
+    onPress(value);
+
+    // Safety counter to prevent infinite loop if onPressOut never fires
+    let tickCount = 0;
+    const maxTicks = 200; // 20 seconds max (200 * 100ms)
+
+    // Start repeating - checks stopRequestedRef to know when to stop
+    intervalRef.current = setInterval(() => {
+      tickCount++;
+
+      // Check if stop was requested (user released button)
+      if (stopRequestedRef.current) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        intervalActiveRef.current = false;
+        stopRequestedRef.current = false;
+        isPressedRef.current = false;
+        return;
+      }
+
+      // Safety: auto-stop after max iterations
+      if (tickCount >= maxTicks) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        intervalActiveRef.current = false;
+        isPressedRef.current = false;
+        return;
+      }
+
+      // Execute the action
+      onPress(value);
+    }, 100); // Repeat every 100ms
   }, [onPress, value]);
 
   const buttonStyle = useMemo(() => [
@@ -25,9 +119,17 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
   ], [textStyle]);
 
   return (
-    <TouchableOpacity
-      style={buttonStyle}
-      onPress={handlePress}
+    <Pressable
+      style={({ pressed }) => [
+        buttonStyle,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPressIn={handlePressIn}
+      onLongPress={handleLongPress}
+      onPressOut={clearTimers}
+      delayLongPress={500}
+      unstable_pressDelay={0}
+      android_disableSound={true}
       accessibilityRole="button"
       accessibilityLabel={value}
     >
@@ -36,7 +138,7 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
       ) : (
         <Text style={finalTextStyle}>{value}</Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 CalcButton.displayName = 'CalcButton';
@@ -88,41 +190,45 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
   // Handle button press - Wrapped with useCallback for performance
   const handlePress = useCallback((key) => {
-    let newExpression = expression;
+    // Use functional setState to avoid stale closure issues during rapid updates
+    setExpression((prevExpression) => {
+      let newExpression = prevExpression;
 
-    if (key === 'backspace') {
-      newExpression = expression.slice(0, -1);
-    } else if (key === '=') {
-      // Evaluate the expression
-      const result = evalExpr(expression);
-      if (result !== null) {
-        newExpression = result;
-      }
-    } else if (key === '.') {
-      // Only allow one decimal point per number
-      const lastNumber = getLastNumber(expression);
-      if (!lastNumber.includes('.')) {
-        newExpression = expression + key;
-      }
-    } else if (['+', '-', '×', '÷'].includes(key)) {
-      // Don't allow operation at the start (except minus for negative numbers)
-      if (expression.length === 0 && key !== '-') {
-        return;
-      }
-      // Don't allow consecutive operations
-      if (/[+\-×÷]$/.test(expression)) {
-        newExpression = expression.slice(0, -1) + key;
+      if (key === 'backspace') {
+        newExpression = prevExpression.slice(0, -1);
+      } else if (key === '=') {
+        // Evaluate the expression
+        const result = evalExpr(prevExpression);
+        if (result !== null) {
+          newExpression = result;
+        }
+      } else if (key === '.') {
+        // Only allow one decimal point per number
+        const lastNumber = getLastNumber(prevExpression);
+        if (!lastNumber.includes('.')) {
+          newExpression = prevExpression + key;
+        }
+      } else if (['+', '-', '×', '÷'].includes(key)) {
+        // Don't allow operation at the start (except minus for negative numbers)
+        if (prevExpression.length === 0 && key !== '-') {
+          return prevExpression; // No change
+        }
+        // Don't allow consecutive operations
+        if (/[+\-×÷]$/.test(prevExpression)) {
+          newExpression = prevExpression.slice(0, -1) + key;
+        } else {
+          newExpression = prevExpression + key;
+        }
       } else {
-        newExpression = expression + key;
+        // Numeric key
+        newExpression = prevExpression + key;
       }
-    } else {
-      // Numeric key
-      newExpression = expression + key;
-    }
 
-    setExpression(newExpression);
-    onValueChange(newExpression);
-  }, [expression, onValueChange, getLastNumber]);
+      // Call onValueChange with new expression
+      onValueChange(newExpression);
+      return newExpression;
+    });
+  }, [onValueChange, getLastNumber]);
 
   // Handle equals button press - Wrapped with useCallback
   const handleEqualsPress = useCallback(() => {
@@ -179,14 +285,14 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           {expression}
         </Text>
         {hasOperation && (
-          <TouchableOpacity
+          <Pressable
             style={styles.equalsButton}
             onPress={handleEqualsPress}
             accessibilityRole="button"
             accessibilityLabel="equals"
           >
             <Text style={equalsButtonTextStyle}>=</Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
       </View>
 
