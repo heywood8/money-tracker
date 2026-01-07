@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.0](https://github.com/heywood8/money-tracker/compare/penny-v0.23.1...penny-v0.24.0) (2026-01-07)
+
+
+### Features
+
+* add date picker to operations screen for quick date navigation ([#186](https://github.com/heywood8/money-tracker/issues/186)) ([eb7d64d](https://github.com/heywood8/money-tracker/commit/eb7d64d0cff877559d1eafb05280f2a023561ee4))
+* lowering the apk build time ([1dca76f](https://github.com/heywood8/money-tracker/commit/1dca76f020bd7363dee6055738c9cdb06d66d072))
+
+
+### Bug Fixes
+
+* balance graphs ([e0af4c7](https://github.com/heywood8/money-tracker/commit/e0af4c731b5527e0e469a5a97d2cdf16535b8b79))
+
 ## [0.23.1](https://github.com/heywood8/money-tracker/compare/penny-v0.23.0...penny-v0.23.1) (2026-01-06)
 
 
