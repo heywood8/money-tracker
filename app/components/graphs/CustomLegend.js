@@ -68,7 +68,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             </View>
 
             {/* Separator */}
-            <Text style={[styles.separator, { color: colors.mutedText }]}>|</Text>
+            <View style={styles.verticalDivider} />
 
             {/* Percentage column (fixed width) */}
             <View style={styles.percentageColumn}>
@@ -157,9 +157,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 50,
   },
-  separator: {
-    fontSize: 14,
+  verticalDivider: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(120,120,120,0.13)',
+    height: '70%',
     marginHorizontal: 8,
+    width: 1,
   },
 });
 
