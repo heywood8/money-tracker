@@ -151,6 +151,7 @@
   "delete_operation_confirm": "Վստա՞հ եք, որ ցանկանում եք ջնջել այս գործարքը։",
   "loading_operations": "Բեռնվում են գործարքները...",
   "loading_more": "Բեռնվում են ավելին...",
+  "loading_newer": "Loading newer...",
   "transfer": "Փոխանցում",
   "to_account": "Հաշվին",
   "today": "Այսօր",
