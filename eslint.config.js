@@ -15,6 +15,9 @@ module.exports = [
       'android/',
       'ios/',
       '**/*.config.js',
+      // Allow app.config.js to be linted even though other "*.config.js" files are ignored
+      '!app.config.js',
+      '!./app.config.js',
     ],
   },
   {

@@ -38,7 +38,7 @@ const postMigration = async (db) => {
     // Get current balance
     const accountResult = await db.getAllAsync(
       'SELECT * FROM accounts WHERE id = ? LIMIT 1',
-      [accountId]
+      [accountId],
     );
     const account = accountResult && accountResult.length > 0 ? accountResult[0] : null;
     if (!account) return '0';
@@ -51,7 +51,7 @@ const postMigration = async (db) => {
        WHERE (account_id = ? OR to_account_id = ?)
          AND date > ?
        ORDER BY date DESC, created_at DESC`,
-      [accountId, accountId, targetDate]
+      [accountId, accountId, targetDate],
     );
 
     // Reverse each operation
@@ -96,7 +96,7 @@ const postMigration = async (db) => {
           if (lastSnapshotBalance === null || lastSnapshotBalance !== balanceOnDate) {
             await db.runAsync(
               'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
-              [account.id, dateStr, balanceOnDate, new Date().toISOString()]
+              [account.id, dateStr, balanceOnDate, new Date().toISOString()],
             );
             lastSnapshotBalance = balanceOnDate;
           }
