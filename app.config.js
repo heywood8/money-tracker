@@ -10,6 +10,10 @@ const APP_NAME = IS_DEV ? 'PennyDev' : 'Penny';
 // Package name: .dev suffix for local dev/development, clean for preview/production
 const PACKAGE_NAME = IS_DEV ? 'com.heywood8.monkeep.dev' : 'com.heywood8.monkeep';
 
+// Architecture filtering: Only arm64-v8a for preview builds to speed up build time
+const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
+const ANDROID_ARCHITECTURES = IS_PREVIEW ? ['arm64-v8a'] : undefined; // undefined = all architectures
+
 module.exports = {
   expo: {
     name: APP_NAME,
@@ -50,6 +54,16 @@ module.exports = {
           url: 'https://sentry.io/',
           project: 'penny',
           organization: 'heywood8',
+        },
+      ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            // Only build arm64-v8a for preview builds to speed up build time (~75% faster)
+            // For production, build all architectures (default)
+            ...(ANDROID_ARCHITECTURES && { buildArchs: ANDROID_ARCHITECTURES }),
+          },
         },
       ],
       './plugins/withR8Config.js',

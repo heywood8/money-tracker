@@ -26,6 +26,13 @@ const withR8Config = (config) => {
       'org.gradle.daemon': 'true',
     };
 
+    // For preview builds, restrict to arm64-v8a only for faster builds
+    // This is a more reliable method than expo-build-properties buildArchs (known issues)
+    if (process.env.APP_VARIANT === 'preview') {
+      properties['reactNativeArchitectures'] = 'arm64-v8a';
+      console.log('🏗️  Building for arm64-v8a only (preview build)');
+    }
+
     // Update or add each property
     Object.entries(properties).forEach(([key, value]) => {
       const existingIndex = config.modResults.findIndex((item) => item.key === key);
@@ -57,13 +64,13 @@ const withR8Config = (config) => {
       // Only copy if source file exists
       if (fs.existsSync(sourceProguardFile)) {
         const proguardContent = fs.readFileSync(sourceProguardFile, 'utf-8');
-        
+
         // Ensure target directory exists
         const targetDir = path.dirname(targetProguardFile);
         if (!fs.existsSync(targetDir)) {
           fs.mkdirSync(targetDir, { recursive: true });
         }
-        
+
         fs.writeFileSync(targetProguardFile, proguardContent);
         console.log('✅ ProGuard rules copied to android/app/proguard-rules.pro');
       } else {
