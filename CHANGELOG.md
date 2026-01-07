@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/heywood8/money-tracker/compare/penny-v0.25.0...penny-v0.25.1) (2026-01-07)
+
+
+### Bug Fixes
+
+* calculator long press repeat functionality ([035eae1](https://github.com/heywood8/money-tracker/commit/035eae189a8f97e35e12cd78cb6afeedd61ba3bb))
+
 ## [0.25.0](https://github.com/heywood8/money-tracker/compare/penny-v0.24.0...penny-v0.25.0) (2026-01-07)
 
 
