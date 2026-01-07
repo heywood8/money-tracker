@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.0](https://github.com/heywood8/money-tracker/compare/penny-v0.25.1...penny-v0.26.0) (2026-01-07)
+
+
+### Features
+
+* combine daily average with days elapsed text in spending prediction ([#192](https://github.com/heywood8/money-tracker/issues/192)) ([e0ea348](https://github.com/heywood8/money-tracker/commit/e0ea34838f98b6992eefdd59ff747be91328a304))
+* format category reports in single line with columns ([#193](https://github.com/heywood8/money-tracker/issues/193)) ([aef8093](https://github.com/heywood8/money-tracker/commit/aef809345fd822effcdd9146c960072c101159be))
+
+
+### Bug Fixes
+
+* correct days elapsed calculation in expense prediction ([#190](https://github.com/heywood8/money-tracker/issues/190)) ([a0c278f](https://github.com/heywood8/money-tracker/commit/a0c278fa515e2e0edb2fd2910fc28de8400c695e))
+* improve balance history graph axis scaling ([#194](https://github.com/heywood8/money-tracker/issues/194)) ([1a4b48e](https://github.com/heywood8/money-tracker/commit/1a4b48e5c3c16584648a4d1530e79ba53b63b683))
+
 ## [0.25.1](https://github.com/heywood8/money-tracker/compare/penny-v0.25.0...penny-v0.25.1) (2026-01-07)
 
 
