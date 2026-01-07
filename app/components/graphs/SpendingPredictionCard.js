@@ -59,17 +59,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
           />
         </View>
         <Text style={[styles.predictionProgressText, { color: colors.mutedText }]}>
-          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()}
-        </Text>
-      </View>
-
-      {/* Daily Average */}
-      <View style={styles.predictionFooter}>
-        <Text style={[styles.predictionFooterLabel, { color: colors.mutedText }]}>
-          {t('daily_average')}:{' '}
-          <Text style={[styles.predictionFooterValue, { color: colors.text }]}>
-            {formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}
-          </Text>
+          {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {t('days_elapsed').toLowerCase()} • {t('daily_average')}: <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(spendingPrediction.dailyAverage, selectedCurrency)}</Text>
         </Text>
       </View>
     </View>
@@ -100,15 +90,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     padding: 16,
   },
-  predictionFooter: {
-    alignItems: 'center',
-  },
-  predictionFooterLabel: {
-    fontSize: 14,
-  },
-  predictionFooterValue: {
-    fontWeight: '600',
-  },
   predictionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -120,7 +101,7 @@ const styles = StyleSheet.create({
     height: 8,
   },
   predictionProgressContainer: {
-    marginBottom: 12,
+    marginBottom: 0,
   },
   predictionProgressText: {
     fontSize: 12,
