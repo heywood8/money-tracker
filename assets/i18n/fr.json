@@ -151,6 +151,7 @@
   "delete_operation_confirm": "Êtes-vous sûr de vouloir supprimer cette opération ?",
   "loading_operations": "Chargement des opérations...",
   "loading_more": "Chargement...",
+  "loading_newer": "Loading newer...",
   "transfer": "Virement",
   "to_account": "Vers le compte",
   "today": "Aujourd'hui",
