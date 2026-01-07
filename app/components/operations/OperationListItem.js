@@ -2,11 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import ListCard from '../ListCard';
+import { getCategoryNames } from '../../utils/categoryUtils';
 
 const OperationListItem = ({
   operation,
   colors,
   t,
+  categories,
   getCategoryInfo,
   getAccountName,
   formatCurrency,
@@ -22,18 +24,29 @@ const OperationListItem = ({
 
   // For transfers, use transfer icon and localized name instead of category
   const categoryInfo = isTransfer
-    ? { name: t('transfer'), icon: 'swap-horizontal' }
+    ? { icon: 'swap-horizontal' }
     : getCategoryInfo(operation.categoryId);
+
+  // Get category and parent names separately
+  const { categoryName, parentName } = isTransfer
+    ? { categoryName: t('transfer'), parentName: null }
+    : getCategoryNames(operation.categoryId, categories, t);
 
   const accountName = getAccountName(operation.accountId);
 
   // Build comprehensive accessibility label
   const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
-  let accessibilityLabel = `${typeLabel}, ${categoryInfo.name}, ${formatCurrency(operation.accountId, operation.amount)}, ${accountName}, ${formatDate(operation.date)}`;
+  let accessibilityLabel = `${typeLabel}, ${categoryName}`;
+
+  if (parentName) {
+    accessibilityLabel += `, ${parentName}`;
+  }
+
+  accessibilityLabel += `, ${formatCurrency(operation.accountId, operation.amount)}, ${accountName}`;
 
   if (isTransfer && operation.toAccountId) {
     const toAccountName = getAccountName(operation.toAccountId);
-    accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}, ${formatDate(operation.date)}`;
+    accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}`;
 
     if (isMultiCurrencyTransfer) {
       accessibilityLabel += `, exchange rate ${operation.exchangeRate}`;
@@ -54,20 +67,19 @@ const OperationListItem = ({
       accessibilityHint={t('edit_operation_hint')}
     >
       <View style={styles.operationContent}>
-        {/* Operation Info */}
+        {/* Category & Parent Category */}
         <View style={styles.operationInfo}>
           <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-            {categoryInfo.name}
+            {categoryName}
           </Text>
-          <Text style={[styles.accountName, { color: colors.mutedText }]} numberOfLines={1}>
-            {accountName}
-            {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
-          </Text>
-          {/* Note: Description/exchange rate hidden in list view to fit 56px height */}
-          {/* They are still visible in the edit modal */}
+          {parentName && (
+            <Text style={[styles.parentName, { color: colors.mutedText }]} numberOfLines={1}>
+              {parentName}
+            </Text>
+          )}
         </View>
 
-        {/* Date and Amount */}
+        {/* Amount & Account */}
         <View style={styles.operationRight}>
           <Text
             style={[
@@ -89,8 +101,9 @@ const OperationListItem = ({
               → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
             </Text>
           )}
-          <Text style={[styles.date, { color: colors.mutedText }]} numberOfLines={1}>
-            {formatDate(operation.date)}
+          <Text style={[styles.accountName, { color: colors.mutedText }]} numberOfLines={1}>
+            {accountName}
+            {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
           </Text>
         </View>
       </View>
@@ -112,6 +125,7 @@ OperationListItem.propTypes = {
   }).isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  categories: PropTypes.array.isRequired,
   getCategoryInfo: PropTypes.func.isRequired,
   getAccountName: PropTypes.func.isRequired,
   formatCurrency: PropTypes.func.isRequired,
@@ -123,6 +137,7 @@ const styles = StyleSheet.create({
   accountName: {
     fontSize: 13,
     marginTop: 2,
+    textAlign: 'right',
   },
   amount: {
     fontSize: 16,
@@ -132,11 +147,6 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 15,
     fontWeight: '500',
-  },
-  date: {
-    fontSize: 13,
-    marginTop: 2,
-    textAlign: 'right',
   },
   destinationAmount: {
     fontSize: 13,
@@ -158,6 +168,10 @@ const styles = StyleSheet.create({
   operationRight: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+  },
+  parentName: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });
 

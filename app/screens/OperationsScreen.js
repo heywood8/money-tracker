@@ -633,6 +633,7 @@ const OperationsScreen = () => {
         operation={item}
         colors={colors}
         t={t}
+        categories={categories}
         getCategoryInfo={getCategoryInfo}
         getAccountName={getAccountName}
         formatCurrency={formatCurrency}
@@ -640,7 +641,7 @@ const OperationsScreen = () => {
         onPress={() => handleEditOperation(item)}
       />
     );
-  }, [colors, t, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation, handleDateSeparatorPress]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation, handleDateSeparatorPress]);
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
