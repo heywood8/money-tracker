@@ -12,10 +12,10 @@ export default {
     m0000,
     m0001,
     m0002,
-    m0003
+    m0003,
   },
   postMigrationHandlers: {
-    m0003: m0003PostMigration
-  }
-}
+    m0003: m0003PostMigration,
+  },
+};
   

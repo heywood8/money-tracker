@@ -1,6 +1,7 @@
 const {
-  getSentryExpoConfig
-} = require("@sentry/react-native/metro");
+  getSentryExpoConfig,
+} = require('@sentry/react-native/metro');
+
 
 const config = getSentryExpoConfig(__dirname);
 
@@ -12,7 +13,7 @@ if (!config.resolver.assetExts.includes('wasm')) {
 
 // Ensure wasm is not in sourceExts
 config.resolver.sourceExts = (config.resolver.sourceExts || []).filter(
-  ext => ext !== 'wasm'
+  ext => ext !== 'wasm',
 );
 
 // Resolve Node.js built-in modules to empty modules for React Native compatibility
