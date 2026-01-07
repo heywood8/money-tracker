@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/heywood8/money-tracker/compare/penny-v0.24.0...penny-v0.25.0) (2026-01-07)
+
+
+### Features
+
+* redesigned operationListItem ([efe4747](https://github.com/heywood8/money-tracker/commit/efe4747dbe1c5c2d751b2eba79e8e5186fde95aa))
+
 ## [0.24.0](https://github.com/heywood8/money-tracker/compare/penny-v0.23.1...penny-v0.24.0) (2026-01-07)
 
 
