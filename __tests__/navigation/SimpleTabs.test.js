@@ -586,7 +586,7 @@ describe('SimpleTabs Navigation', () => {
         container: { flex: 1 },
         content: { flex: 1 },
       };
-      
+
       expect(styles.container.flex).toBe(1);
       expect(styles.content.flex).toBe(1);
     });
@@ -596,7 +596,7 @@ describe('SimpleTabs Navigation', () => {
         tabBar: { flexDirection: 'row' },
         tab: { flex: 1, minHeight: 56 },
       };
-      
+
       expect(styles.tabBar.flexDirection).toBe('row');
       expect(styles.tab.flex).toBe(1);
       expect(styles.tab.minHeight).toBe(56);
@@ -612,9 +612,215 @@ describe('SimpleTabs Navigation', () => {
           height: 3,
         },
       };
-      
+
       expect(styles.indicator.position).toBe('absolute');
       expect(styles.indicator.height).toBe(3);
+    });
+  });
+
+  describe('Swipe Navigation', () => {
+    const TABS = [
+      { key: 'Operations', label: 'Operations' },
+      { key: 'Accounts', label: 'Accounts' },
+      { key: 'Categories', label: 'Categories' },
+      { key: 'Graphs', label: 'Graphs' },
+    ];
+
+    it('should navigate to next tab on left swipe', () => {
+      // Simulates navigateToTab function for left swipe
+      const navigateToTab = (currentTab, direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        return TABS[newIndex].key;
+      };
+
+      expect(navigateToTab('Operations', 'left')).toBe('Accounts');
+      expect(navigateToTab('Accounts', 'left')).toBe('Categories');
+      expect(navigateToTab('Categories', 'left')).toBe('Graphs');
+    });
+
+    it('should navigate to previous tab on right swipe', () => {
+      const navigateToTab = (currentTab, direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        return TABS[newIndex].key;
+      };
+
+      expect(navigateToTab('Graphs', 'right')).toBe('Categories');
+      expect(navigateToTab('Categories', 'right')).toBe('Accounts');
+      expect(navigateToTab('Accounts', 'right')).toBe('Operations');
+    });
+
+    it('should not navigate past first tab on right swipe', () => {
+      const navigateToTab = (currentTab, direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        return TABS[newIndex].key;
+      };
+
+      expect(navigateToTab('Operations', 'right')).toBe('Operations');
+    });
+
+    it('should not navigate past last tab on left swipe', () => {
+      const navigateToTab = (currentTab, direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        return TABS[newIndex].key;
+      };
+
+      expect(navigateToTab('Graphs', 'left')).toBe('Graphs');
+    });
+
+    it('should detect left swipe based on translation threshold', () => {
+      const SWIPE_THRESHOLD = 50;
+      const isLeftSwipe = (translationX) => translationX < -SWIPE_THRESHOLD;
+
+      expect(isLeftSwipe(-51)).toBe(true);
+      expect(isLeftSwipe(-100)).toBe(true);
+      expect(isLeftSwipe(-49)).toBe(false);
+      expect(isLeftSwipe(0)).toBe(false);
+    });
+
+    it('should detect right swipe based on translation threshold', () => {
+      const SWIPE_THRESHOLD = 50;
+      const isRightSwipe = (translationX) => translationX > SWIPE_THRESHOLD;
+
+      expect(isRightSwipe(51)).toBe(true);
+      expect(isRightSwipe(100)).toBe(true);
+      expect(isRightSwipe(49)).toBe(false);
+      expect(isRightSwipe(0)).toBe(false);
+    });
+
+    it('should detect left swipe based on velocity threshold', () => {
+      const VELOCITY_THRESHOLD = 500;
+      const isLeftSwipeByVelocity = (velocityX) => velocityX < -VELOCITY_THRESHOLD;
+
+      expect(isLeftSwipeByVelocity(-501)).toBe(true);
+      expect(isLeftSwipeByVelocity(-1000)).toBe(true);
+      expect(isLeftSwipeByVelocity(-499)).toBe(false);
+    });
+
+    it('should detect right swipe based on velocity threshold', () => {
+      const VELOCITY_THRESHOLD = 500;
+      const isRightSwipeByVelocity = (velocityX) => velocityX > VELOCITY_THRESHOLD;
+
+      expect(isRightSwipeByVelocity(501)).toBe(true);
+      expect(isRightSwipeByVelocity(1000)).toBe(true);
+      expect(isRightSwipeByVelocity(499)).toBe(false);
+    });
+
+    it('should navigate through all tabs sequentially with swipes', () => {
+      let currentTab = 'Operations';
+
+      const navigateToTab = (direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        currentTab = TABS[newIndex].key;
+      };
+
+      expect(currentTab).toBe('Operations');
+
+      navigateToTab('left');
+      expect(currentTab).toBe('Accounts');
+
+      navigateToTab('left');
+      expect(currentTab).toBe('Categories');
+
+      navigateToTab('left');
+      expect(currentTab).toBe('Graphs');
+
+      navigateToTab('right');
+      expect(currentTab).toBe('Categories');
+
+      navigateToTab('right');
+      expect(currentTab).toBe('Accounts');
+
+      navigateToTab('right');
+      expect(currentTab).toBe('Operations');
+    });
+
+    it('should handle rapid swipe gestures', () => {
+      let currentTab = 'Operations';
+
+      const navigateToTab = (direction) => {
+        const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
+        let newIndex;
+
+        if (direction === 'left') {
+          newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
+        } else {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
+        }
+
+        currentTab = TABS[newIndex].key;
+      };
+
+      // Rapid left swipes
+      for (let i = 0; i < 10; i++) {
+        navigateToTab('left');
+      }
+      expect(currentTab).toBe('Graphs'); // Should stop at last tab
+
+      // Rapid right swipes
+      for (let i = 0; i < 10; i++) {
+        navigateToTab('right');
+      }
+      expect(currentTab).toBe('Operations'); // Should stop at first tab
+    });
+
+    it('should ignore small swipes below threshold', () => {
+      const SWIPE_THRESHOLD = 50;
+      const VELOCITY_THRESHOLD = 500;
+
+      const shouldTriggerSwipe = (translationX, velocityX) => {
+        return Math.abs(translationX) > SWIPE_THRESHOLD || Math.abs(velocityX) > VELOCITY_THRESHOLD;
+      };
+
+      // Small swipes that shouldn't trigger navigation
+      expect(shouldTriggerSwipe(30, 200)).toBe(false);
+      expect(shouldTriggerSwipe(-30, -200)).toBe(false);
+      expect(shouldTriggerSwipe(10, 100)).toBe(false);
+
+      // Large enough swipes that should trigger navigation
+      expect(shouldTriggerSwipe(60, 200)).toBe(true);
+      expect(shouldTriggerSwipe(30, 600)).toBe(true);
+      expect(shouldTriggerSwipe(-60, -200)).toBe(true);
+      expect(shouldTriggerSwipe(-30, -600)).toBe(true);
     });
   });
 });
