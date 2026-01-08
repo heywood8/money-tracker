@@ -291,6 +291,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     <View style={[styles.container, { backgroundColor: containerBackground || colors.altRow }]}> 
       {/* Display */}
       <View style={styles.display}>
+        <View style={styles.displayLeftSpacer} />
         <Text style={displayTextStyle} numberOfLines={1}>
           {expression}
         </Text>
@@ -521,6 +522,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: SPACING.xs,
+    width: 80,
+    justifyContent: 'flex-end',
+  },
+  displayLeftSpacer: {
+    width: 80,
   },
   displayText: {
     flex: 1,
