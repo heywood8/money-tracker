@@ -93,7 +93,6 @@ const QuickAddForm = memo(({
                   </Text>
                 )}
               </View>
-              <Icon name="chevron-down" size={18} color={colors.mutedText} />
             </Pressable>
 
             {/* To Account Picker */}
@@ -112,7 +111,6 @@ const QuickAddForm = memo(({
                   </Text>
                 )}
               </View>
-              <Icon name="chevron-down" size={18} color={colors.mutedText} />
             </Pressable>
           </View>
         ) : (
@@ -132,7 +130,6 @@ const QuickAddForm = memo(({
                 </Text>
               )}
             </View>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </Pressable>
         )}
 
@@ -155,7 +152,6 @@ const QuickAddForm = memo(({
             <Text style={[styles.formInputText, { color: colors.text }]}>
               {getCategoryName(quickAddValues.categoryId)}
             </Text>
-            <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </Pressable>
         )}
       </View>
