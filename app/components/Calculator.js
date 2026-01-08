@@ -479,8 +479,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   deleteButtonInDisplay: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    elevation: 0,
     flex: 0,
     height: 40,
+    shadowOpacity: 0,
     width: 50,
   },
   display: {
