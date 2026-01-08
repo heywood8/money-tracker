@@ -458,7 +458,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
               <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
                 <ScrollView
                   style={styles.scrollView}
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[styles.scrollContent, { paddingRight: SPACING.md }]}
+                  scrollIndicatorInsets={{ right: SPACING.md }}
                   keyboardShouldPersistTaps="handled"
                 >
                   <Text style={[styles.modalTitle, { color: colors.text }]}>
