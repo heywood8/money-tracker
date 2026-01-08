@@ -487,9 +487,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   scrollIndicatorInsets={{ right: SPACING.md }}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>
-                    {isNew ? t('add_operation') : t('edit_operation')}
-                  </Text>
+                  {isNew && (
+                    <Text style={[styles.modalTitle, { color: colors.text }]}> 
+                      {t('add_operation')}
+                    </Text>
+                  )}
 
                   {/* Type Picker */}
                   <Pressable
