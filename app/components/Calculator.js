@@ -522,8 +522,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: SPACING.xs,
-    width: 80,
     justifyContent: 'flex-end',
+    width: 80,
   },
   displayLeftSpacer: {
     width: 80,
