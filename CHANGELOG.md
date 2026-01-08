@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0](https://github.com/heywood8/money-tracker/compare/penny-v0.26.0...penny-v0.27.0) (2026-01-08)
+
+
+### Features
+
+* Implement left/right swipe screen switching ([#195](https://github.com/heywood8/money-tracker/issues/195)) ([f7e0513](https://github.com/heywood8/money-tracker/commit/f7e05136ae0d1525b654ca34a33d3b5e60be3c17))
+* move delete button to amount row in calculator ([#197](https://github.com/heywood8/money-tracker/issues/197)) ([f749a9b](https://github.com/heywood8/money-tracker/commit/f749a9ba40302983521f7cacc770e44574922d7c))
+
 ## [0.26.0](https://github.com/heywood8/money-tracker/compare/penny-v0.25.1...penny-v0.26.0) (2026-01-07)
 
 
