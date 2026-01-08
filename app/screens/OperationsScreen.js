@@ -133,7 +133,7 @@ const OperationsScreen = () => {
   }, [scrollToDateString, operationsLoading, groupedOperations]);
 
   // Handle content size change - this fires after FlatList has laid out content
-  // Wait for interactions/layout to finish, then perform a single animated scroll to the target
+  // Wait for interactions/layout to finish, then perform a fast, graceful scroll to the target
   const handleContentSizeChange = useCallback((width, height) => {
     if (pendingScroll && scrollToDateString && !operationsLoading) {
       const separatorIndex = groupedOperations.findIndex(
@@ -141,12 +141,13 @@ const OperationsScreen = () => {
       );
 
       if (separatorIndex !== -1) {
-        // Defer scroll until after interactions/layout have settled to ensure smooth animation
+        // Defer scroll until after interactions/layout have settled
         InteractionManager.runAfterInteractions(() => {
           try {
+            // Use animated: false for instant, graceful jump to distant dates
             flatListRef.current?.scrollToIndex({
               index: separatorIndex,
-              animated: true,
+              animated: false,
               viewPosition: 0,
             });
           } catch (error) {
@@ -155,7 +156,7 @@ const OperationsScreen = () => {
             const estimatedOffset = separatorIndex * estimatedItemHeight;
             flatListRef.current?.scrollToOffset({
               offset: estimatedOffset,
-              animated: true,
+              animated: false,
             });
           } finally {
             setScrollToDateString(null);
@@ -571,18 +572,18 @@ const OperationsScreen = () => {
       animated: false,
     });
 
-    // Try scrollToIndex again after a delay
+    // Try scrollToIndex again after a delay for precise positioning
     setTimeout(() => {
       try {
         flatListRef.current?.scrollToIndex({
           index: info.index,
-          animated: true,
+          animated: false,
           viewPosition: 0,
         });
       } catch (error) {
         console.log('Second scrollToIndex attempt failed');
       }
-    }, 500);
+    }, 100);
   }, []);
 
   // Footer component showing loading indicator
