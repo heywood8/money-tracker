@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import ListCard from '../ListCard';
@@ -175,4 +175,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OperationListItem;
+export default memo(OperationListItem);

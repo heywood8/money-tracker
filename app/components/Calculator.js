@@ -423,13 +423,18 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
             colors={colors}
           />
           {onAdd ? (
-            <CalcButton
-              value="add"
-              onPress={onAdd}
-              style={[sharedButtonStyle, { backgroundColor: colors.primary }]}
-              icon="check"
-              colors={colors}
-            />
+            <Pressable
+              style={[
+                styles.button,
+                sharedButtonStyle,
+                { backgroundColor: colors.primary, borderColor: colors.border },
+              ]}
+              onPress={() => onAdd()}
+              accessibilityRole="button"
+              accessibilityLabel="add"
+            >
+              <Icon name="check" size={24} color={colors.text} />
+            </Pressable>
           ) : (
             <View style={styles.emptySpace} />
           )}
