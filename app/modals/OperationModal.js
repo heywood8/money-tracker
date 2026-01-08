@@ -495,6 +495,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       onValueChange={handleAmountChange}
                       colors={colors}
                       placeholder={t('amount')}
+                      containerBackground={colors.card}
                     />
                   </View>
 
