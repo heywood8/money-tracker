@@ -171,7 +171,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0' }) {
+export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd }) {
   const [expression, setExpression] = useState(value || '');
 
   // Sync internal state with prop changes
@@ -272,10 +272,6 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     fontWeight: 'bold',
   }), [colors.text]);
 
-  const deleteButtonStyle = useMemo(() => ({
-    backgroundColor: colors.deleteBackground || buttonBackground,
-  }), [colors.deleteBackground, buttonBackground]);
-
   return (
     // Use altRow so Calculator background matches the gray inner card
     <View style={[styles.container, { backgroundColor: colors.altRow }]}>
@@ -284,16 +280,25 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
         <Text style={displayTextStyle} numberOfLines={1}>
           {expression}
         </Text>
-        {hasOperation && (
-          <Pressable
-            style={styles.equalsButton}
-            onPress={handleEqualsPress}
-            accessibilityRole="button"
-            accessibilityLabel="equals"
-          >
-            <Text style={equalsButtonTextStyle}>=</Text>
-          </Pressable>
-        )}
+        <View style={styles.displayButtonsContainer}>
+          {hasOperation && (
+            <Pressable
+              style={styles.equalsButton}
+              onPress={handleEqualsPress}
+              accessibilityRole="button"
+              accessibilityLabel="equals"
+            >
+              <Text style={equalsButtonTextStyle}>=</Text>
+            </Pressable>
+          )}
+          <CalcButton
+            value="backspace"
+            onPress={handlePress}
+            style={[sharedButtonStyle, styles.deleteButtonInDisplay]}
+            icon="backspace-outline"
+            colors={colors}
+          />
+        </View>
       </View>
 
       {/* Keypad */}
@@ -394,7 +399,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           />
         </View>
 
-        {/* Row 4: ÷ . 0 <- */}
+        {/* Row 4: ÷ . 0 ✓ */}
         <View style={styles.row}>
           <CalcButton
             value="÷"
@@ -417,13 +422,17 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
             textStyle={numberTextStyle}
             colors={colors}
           />
-          <CalcButton
-            value="backspace"
-            onPress={handlePress}
-            style={deleteButtonStyle}
-            icon="backspace-outline"
-            colors={colors}
-          />
+          {onAdd ? (
+            <CalcButton
+              value="add"
+              onPress={onAdd}
+              style={[sharedButtonStyle, { backgroundColor: colors.primary }]}
+              icon="check"
+              colors={colors}
+            />
+          ) : (
+            <View style={styles.emptySpace} />
+          )}
         </View>
       </View>
     </View>
@@ -437,12 +446,14 @@ Calculator.propTypes = {
   onValueChange: PropTypes.func,
   colors: PropTypes.object.isRequired,
   placeholder: PropTypes.string,
+  onAdd: PropTypes.func,
 };
 
 Calculator.defaultProps = {
   value: '',
   onValueChange: () => {},
   placeholder: '0',
+  onAdd: null,
 };
 
 const styles = StyleSheet.create({
@@ -467,24 +478,41 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     width: '100%',
   },
+  deleteButtonInDisplay: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    elevation: 0,
+    flex: 0,
+    height: 46,
+    shadowOpacity: 0,
+    width: 58,
+  },
   display: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: SPACING.xs,
     minHeight: 40,
     paddingVertical: SPACING.sm,
     width: '100%',
   },
+  displayButtonsContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
   displayText: {
+    flex: 1,
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
   },
+  emptySpace: {
+    flex: 1,
+  },
   equalsButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SPACING.md,
     paddingHorizontal: SPACING.xs,
   },
   equalsButtonText: {
