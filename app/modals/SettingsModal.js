@@ -238,7 +238,7 @@ export default function SettingsModal({ visible, onClose }) {
       <Modal
         visible={visible}
         onDismiss={exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)}
-        contentContainerStyle={[styles.modalWrapper, styles.modalWrapperTransparent]}
+        dismissable={true}
       >
         <Animated.View style={[
           styles.content,
@@ -554,12 +554,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 16,
   },
-  modalWrapper: {
+  resetButton: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  modalWrapperTransparent: {
-    backgroundColor: 'transparent',
   },
   subtitle: {
     marginBottom: 8,
