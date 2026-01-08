@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.3](https://github.com/heywood8/money-tracker/compare/penny-v0.27.2...penny-v0.27.3) (2026-01-08)
+
+
+### Bug Fixes
+
+* smoother jump to date ([1a64656](https://github.com/heywood8/money-tracker/commit/1a64656f4b854065605d208760987f1b18733707))
+
 ## [0.27.2](https://github.com/heywood8/money-tracker/compare/penny-v0.27.1...penny-v0.27.2) (2026-01-08)
 
 
