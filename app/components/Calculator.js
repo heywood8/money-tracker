@@ -171,7 +171,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0' }) {
+export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd }) {
   const [expression, setExpression] = useState(value || '');
 
   // Sync internal state with prop changes
@@ -403,7 +403,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           />
         </View>
 
-        {/* Row 4: ÷ . 0 [empty] */}
+        {/* Row 4: ÷ . 0 ✓ */}
         <View style={styles.row}>
           <CalcButton
             value="÷"
@@ -426,7 +426,17 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
             textStyle={numberTextStyle}
             colors={colors}
           />
-          <View style={styles.emptySpace} />
+          {onAdd ? (
+            <CalcButton
+              value="add"
+              onPress={onAdd}
+              style={[sharedButtonStyle, { backgroundColor: colors.primary }]}
+              icon="check"
+              colors={colors}
+            />
+          ) : (
+            <View style={styles.emptySpace} />
+          )}
         </View>
       </View>
     </View>
@@ -440,12 +450,14 @@ Calculator.propTypes = {
   onValueChange: PropTypes.func,
   colors: PropTypes.object.isRequired,
   placeholder: PropTypes.string,
+  onAdd: PropTypes.func,
 };
 
 Calculator.defaultProps = {
   value: '',
   onValueChange: () => {},
   placeholder: '0',
+  onAdd: null,
 };
 
 const styles = StyleSheet.create({

@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -46,7 +46,7 @@ const QuickAddForm = memo(({
         {/* Type Selector */}
         <View style={styles.typeSelector}>
           {TYPES.map(type => (
-            <TouchableOpacity
+            <Pressable
               key={type.key}
               style={[
                 styles.typeButton,
@@ -70,7 +70,7 @@ const QuickAddForm = memo(({
               <Text style={quickAddValues.type === type.key ? [styles.typeButtonText, { color: '#fff' }] : [styles.typeButtonText, { color: colors.text }]}>
                 {type.label}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
 
@@ -142,38 +142,21 @@ const QuickAddForm = memo(({
           onValueChange={text => setQuickAddValues(v => ({ ...v, amount: text }))}
           colors={colors}
           placeholder={t('amount')}
+          onAdd={handleQuickAdd}
         />
 
-        {/* Category Picker and Add Button Row */}
+        {/* Category Picker */}
         {quickAddValues.type !== 'transfer' && (
-          <View style={styles.categoryAddRow}>
-            <Pressable
-              style={[styles.formInputCategory, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => openPicker('category', filteredCategories)}
-            >
-              <Icon name="tag" size={18} color={colors.mutedText} />
-              <Text style={[styles.formInputText, { color: colors.text }]}>
-                {getCategoryName(quickAddValues.categoryId)}
-              </Text>
-              <Icon name="chevron-down" size={18} color={colors.mutedText} />
-            </Pressable>
-            <TouchableOpacity
-              style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-              onPress={() => handleQuickAdd()}
-            >
-              <Text style={styles.quickAddButtonText}>{t('add')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Add Button for transfers (full width) */}
-        {quickAddValues.type === 'transfer' && (
-          <TouchableOpacity
-            style={[styles.quickAddButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleQuickAdd()}
+          <Pressable
+            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+            onPress={() => openPicker('category', filteredCategories)}
           >
-            <Text style={styles.quickAddButtonText}>{t('add')}</Text>
-          </TouchableOpacity>
+            <Icon name="tag" size={18} color={colors.mutedText} />
+            <Text style={[styles.formInputText, { color: colors.text }]}>
+              {getCategoryName(quickAddValues.categoryId)}
+            </Text>
+            <Icon name="chevron-down" size={18} color={colors.mutedText} />
+          </Pressable>
         )}
       </View>
     </View>
@@ -206,10 +189,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
   },
-  categoryAddRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
   flex1: {
     flex: 1,
   },
@@ -217,16 +196,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 48,
-    padding: SPACING.md,
-  },
-  formInputCategory: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
     minHeight: 48,
@@ -245,19 +214,6 @@ const styles = StyleSheet.create({
   formInputText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  quickAddButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    justifyContent: 'center',
-    minWidth: 80,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  quickAddButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   quickAddForm: {
     borderRadius: BORDER_RADIUS.lg,
