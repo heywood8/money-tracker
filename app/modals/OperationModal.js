@@ -33,6 +33,16 @@ import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 
 /**
+ * OperationModal Component
+ *
+ * Note: This modal uses a picker-based UI pattern (where fields open modal pickers)
+ * which differs from QuickAddForm's inline field pattern. While QuickAddForm uses
+ * the shared OperationFormFields component, this modal maintains its own field
+ * rendering to preserve the existing UI/UX pattern and field ordering.
+ * Both components share the Calculator component for amount entry.
+ */
+
+/**
  * Get currency symbol from currency code
  * @param {string} currencyCode - Currency code like 'USD', 'EUR', etc.
  * @returns {string} Currency symbol or code if not found
