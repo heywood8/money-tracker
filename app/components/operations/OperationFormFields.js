@@ -9,7 +9,18 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  * OperationFormFields Component
  *
  * Reusable form fields for operation entry (expense, income, transfer)
- * Used by both QuickAddForm and OperationModal
+ *
+ * DEPENDENCIES:
+ * - QuickAddForm (app/components/operations/QuickAddForm.js)
+ * - Can be used by other operation forms
+ *
+ * IMPORTANT: When modifying this component, ensure you test ALL dependent components:
+ * 1. QuickAddForm - Verify type selector, account pickers, calculator, category picker
+ * 2. Any other future consumers of this component
+ *
+ * Test both:
+ * - UI/Layout (side-by-side vs stacked, account balance display, disabled state)
+ * - Functionality (picker callbacks, amount changes, type switching, transfer logic)
  *
  * @param {Object} props
  * @param {Object} props.colors - Theme colors

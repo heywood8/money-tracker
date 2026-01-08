@@ -9,6 +9,13 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  *
  * A compact form for quickly adding operations (expenses, income, transfers)
  * Displays different fields based on operation type
+ *
+ * DEPENDENCIES:
+ * - OperationFormFields (app/components/operations/OperationFormFields.js) - Shared form fields
+ *
+ * NOTE: This component uses OperationFormFields for rendering form inputs.
+ * If modifying form field behavior, check if changes should be made in
+ * OperationFormFields instead to benefit all consumers.
  */
 const QuickAddForm = memo(({
   colors,
