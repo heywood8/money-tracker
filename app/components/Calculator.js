@@ -483,9 +483,9 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     elevation: 0,
     flex: 0,
-    height: 40,
+    height: 46,
     shadowOpacity: 0,
-    width: 50,
+    width: 58,
   },
   display: {
     alignItems: 'center',
