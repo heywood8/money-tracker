@@ -27,7 +27,7 @@ describe('OperationsDB Data Type Validation', () => {
       };
 
       expect(() => validateAccountId(operation.accountId)).toThrow(
-        'accountId must be a number, got string'
+        'accountId must be a number, got string',
       );
     });
 
@@ -77,7 +77,7 @@ describe('OperationsDB Data Type Validation', () => {
         }
         if (typeof categoryId !== 'string' && typeof categoryId !== 'number') {
           throw new Error(
-            `categoryId must be a string or number, got ${typeof categoryId}`
+            `categoryId must be a string or number, got ${typeof categoryId}`,
           );
         }
         // Additional check: not an object with event properties
@@ -88,7 +88,7 @@ describe('OperationsDB Data Type Validation', () => {
       };
 
       expect(() => validateCategoryId(operation.categoryId)).toThrow(
-        'categoryId must be a string or number, got object'
+        'categoryId must be a string or number, got object',
       );
     });
 
@@ -106,7 +106,7 @@ describe('OperationsDB Data Type Validation', () => {
         }
         if (typeof categoryId !== 'string' && typeof categoryId !== 'number') {
           throw new Error(
-            `categoryId must be a string or number, got ${typeof categoryId}`
+            `categoryId must be a string or number, got ${typeof categoryId}`,
           );
         }
         if (typeof categoryId === 'object') {
@@ -134,7 +134,7 @@ describe('OperationsDB Data Type Validation', () => {
         }
         if (typeof categoryId !== 'string' && typeof categoryId !== 'number') {
           throw new Error(
-            `categoryId must be a string or number, got ${typeof categoryId}`
+            `categoryId must be a string or number, got ${typeof categoryId}`,
           );
         }
         if (typeof categoryId === 'object') {

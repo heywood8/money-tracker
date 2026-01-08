@@ -31,7 +31,7 @@ describe('Quick Add Flow - Regression Tests', () => {
           onValueChange={mockOnValueChange}
           colors={mockColors}
           onAdd={mockOnAdd}
-        />
+        />,
       );
 
       // Press the checkmark button
@@ -57,7 +57,7 @@ describe('Quick Add Flow - Regression Tests', () => {
           onValueChange={mockOnValueChange}
           colors={mockColors}
           onAdd={mockOnAdd}
-        />
+        />,
       );
 
       const addButton = getByLabelText('add');
@@ -87,7 +87,7 @@ describe('Quick Add Flow - Regression Tests', () => {
           onValueChange={mockOnValueChange}
           colors={mockColors}
           onAdd={mockOnAdd}
-        />
+        />,
       );
 
       const addButton = getByLabelText('add');
@@ -111,11 +111,11 @@ describe('Quick Add Flow - Regression Tests', () => {
       };
 
       OperationsDB.createOperation.mockRejectedValue(
-        new Error('FOREIGN KEY constraint failed')
+        new Error('FOREIGN KEY constraint failed'),
       );
 
       await expect(
-        OperationsDB.createOperation(invalidOperation)
+        OperationsDB.createOperation(invalidOperation),
       ).rejects.toThrow('FOREIGN KEY constraint failed');
     });
 
@@ -249,7 +249,7 @@ describe('Quick Add Flow - Regression Tests', () => {
           value=""
           onValueChange={mockOnValueChange}
           colors={mockColors}
-        />
+        />,
       );
 
       const button5 = getByText('5');
@@ -267,7 +267,7 @@ describe('Quick Add Flow - Regression Tests', () => {
           value="123"
           onValueChange={mockOnValueChange}
           colors={mockColors}
-        />
+        />,
       );
 
       const backspaceButton = getByLabelText('backspace');
