@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.4](https://github.com/heywood8/money-tracker/compare/penny-v0.27.3...penny-v0.27.4) (2026-01-08)
+
+
+### Bug Fixes
+
+* enable vertical scrolling with horizontal swipe gestures ([#201](https://github.com/heywood8/money-tracker/issues/201)) ([c02578e](https://github.com/heywood8/money-tracker/commit/c02578e2524344445c41033993400de6b1c18704))
+
 ## [0.27.3](https://github.com/heywood8/money-tracker/compare/penny-v0.27.2...penny-v0.27.3) (2026-01-08)
 
 
