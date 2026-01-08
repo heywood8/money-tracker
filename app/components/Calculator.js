@@ -179,6 +179,15 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     setExpression(value || '');
   }, [value]);
 
+  // Notify parent of expression changes (after render completes)
+  // Only notify if expression differs from prop to avoid infinite loops
+  useEffect(() => {
+    const propValue = value || '';
+    if (expression !== propValue) {
+      onValueChange(expression);
+    }
+  }, [expression, value, onValueChange]);
+
   // Check if expression contains a mathematical operation - Memoized
   const hasOperation = useMemo(() => checkHasOperation(expression), [expression]);
 
@@ -224,11 +233,9 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
         newExpression = prevExpression + key;
       }
 
-      // Call onValueChange with new expression
-      onValueChange(newExpression);
       return newExpression;
     });
-  }, [onValueChange, getLastNumber]);
+  }, [getLastNumber]);
 
   // Handle equals button press - Wrapped with useCallback
   const handleEqualsPress = useCallback(() => {
