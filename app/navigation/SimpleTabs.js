@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  runOnJS
+  runOnJS,
 } from 'react-native-reanimated';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
@@ -243,21 +243,21 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  screensContainer: {
-    flexDirection: 'row',
-    flex: 1,
-    width: SCREEN_WIDTH * 4,
-  },
-  screen: {
-    width: SCREEN_WIDTH,
-    height: '100%',
-  },
   indicator: {
     bottom: 0,
     height: 3,
     left: 0,
     position: 'absolute',
     right: 0,
+  },
+  screen: {
+    height: '100%',
+    width: SCREEN_WIDTH,
+  },
+  screensContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    width: SCREEN_WIDTH * 4,
   },
   tab: {
     flex: 1,
