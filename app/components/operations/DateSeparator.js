@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
@@ -88,4 +88,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DateSeparator;
+export default memo(DateSeparator);

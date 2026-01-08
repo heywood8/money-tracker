@@ -78,9 +78,11 @@ export const OperationsProvider = ({ children }) => {
   }, [activeFilters]);
 
   // Load initial week of operations
-  const loadInitialOperations = useCallback(async (filters = activeFilters) => {
+  const loadInitialOperations = useCallback(async (filters = activeFilters, showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const isFiltered = hasActiveFilters(filters);
       const operationsData = isFiltered
         ? await OperationsDB.getFilteredOperationsByWeekOffset(0, filters)
@@ -107,7 +109,9 @@ export const OperationsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to load initial operations:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [activeFilters, hasActiveFilters]);
 
@@ -261,14 +265,16 @@ export const OperationsProvider = ({ children }) => {
         date: operation.date,
         description: operation.description,
       });
-      
+
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
 
       console.log('[OperationsContext] Operation created successfully:', createdOperation?.id);
-      
-      // Reload from the beginning to ensure consistency
-      await loadInitialOperations();
+
+      // Reload operations to include the new one (without showing loading spinner)
+      // Note: We reload to ensure consistency with lazy-loaded week ranges
+      await loadInitialOperations(activeFilters, false);
+
       setSaveError(null);
 
       // Reload accounts to reflect balance changes
@@ -288,7 +294,7 @@ export const OperationsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {

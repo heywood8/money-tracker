@@ -680,6 +680,10 @@ const OperationsScreen = () => {
         onEndReachedThreshold={0.5}
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onContentSizeChange={handleContentSizeChange}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
         windowSize={10}
         maxToRenderPerBatch={10}
         initialNumToRender={15}
@@ -748,17 +752,32 @@ const OperationsScreen = () => {
                           // Navigate into folder
                           navigateIntoFolder(item);
                         } else {
-                          // Select entry category
-                          setQuickAddValues(v => ({ ...v, categoryId: item.id }));
-                          closePicker();
-
                           // Check if amount is valid and auto-add operation
                           const hasValidAmount = quickAddValues.amount &&
                             quickAddValues.amount.trim() !== '';
 
                           if (hasValidAmount) {
+                            // Capture values before clearing
+                            const savedType = quickAddValues.type;
+                            const savedAccountId = quickAddValues.accountId;
+
+                            // Clear form immediately to avoid showing old values during save
+                            setQuickAddValues({
+                              type: savedType,
+                              amount: '',
+                              accountId: savedAccountId,
+                              categoryId: '',
+                              description: '',
+                              toAccountId: '',
+                            });
+                            closePicker();
+
                             // Pass the selected categoryId directly to avoid race conditions
                             await handleQuickAdd(item.id);
+                          } else {
+                            // Just select the category without auto-add
+                            setQuickAddValues(v => ({ ...v, categoryId: item.id }));
+                            closePicker();
                           }
                         }
                       }}
