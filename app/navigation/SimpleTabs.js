@@ -4,6 +4,7 @@ import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text, Surface } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
@@ -113,17 +114,18 @@ export default function SimpleTabs() {
   const panGesture = useMemo(() => {
     return Gesture.Pan()
       .onEnd((event) => {
+        'worklet';
         const { translationX, velocityX } = event;
         const SWIPE_THRESHOLD = 50; // minimum swipe distance
         const VELOCITY_THRESHOLD = 500; // minimum swipe velocity
 
         // Swipe left (next tab)
         if (translationX < -SWIPE_THRESHOLD || velocityX < -VELOCITY_THRESHOLD) {
-          navigateToTab('left');
+          runOnJS(navigateToTab)('left');
         }
         // Swipe right (previous tab)
         else if (translationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
-          navigateToTab('right');
+          runOnJS(navigateToTab)('right');
         }
       });
   }, [navigateToTab]);
