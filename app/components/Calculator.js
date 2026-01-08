@@ -173,15 +173,22 @@ CalcButton.defaultProps = {
  */
 export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd }) {
   const [expression, setExpression] = useState(value || '');
+  const syncedFromPropRef = useRef(false);
 
-  // Sync internal state with prop changes
+  // Sync internal state with prop changes (only when prop changes, not when user types)
   useEffect(() => {
+    syncedFromPropRef.current = true;
     setExpression(value || '');
   }, [value]);
 
-  // Notify parent of expression changes (after render completes)
-  // Only notify if expression differs from prop to avoid infinite loops
+  // Notify parent of expression changes (only for user-driven changes)
+  // Skip notification if update came from prop sync (to prevent feedback loop)
   useEffect(() => {
+    if (syncedFromPropRef.current) {
+      syncedFromPropRef.current = false;
+      return;
+    }
+    
     const propValue = value || '';
     if (expression !== propValue) {
       onValueChange(expression);
