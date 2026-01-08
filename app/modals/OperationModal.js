@@ -335,6 +335,24 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     return accounts.find(acc => acc.id === values.accountId);
   }, [accounts, values.accountId]);
 
+  // Clear category when switching between expense and income to avoid mismatched categories
+  useEffect(() => {
+    // Only run when modal is visible (avoid interfering while modal closed)
+    if (!visible) return;
+
+    setValues(v => {
+      // If switching to transfer already handled elsewhere
+      if (v.type === 'transfer') return v;
+
+      // If current category exists but doesn't match new type, clear it
+      const cat = categories.find(c => c.id === v.categoryId);
+      if (v.categoryId && cat && cat.categoryType !== v.type) {
+        return { ...v, categoryId: '' };
+      }
+      return v;
+    });
+  }, [values.type, visible, categories]);
+
   const destinationAccount = useMemo(() => {
     return accounts.find(acc => acc.id === values.toAccountId);
   }, [accounts, values.toAccountId]);
@@ -729,11 +747,21 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   return (
                     <Pressable
                       onPress={() => {
-                        setValues(v => ({
-                          ...v,
-                          type: item.key,
-                          categoryId: item.key === 'transfer' ? '' : v.categoryId,
-                        }));
+                        setValues(v => {
+                          // If switching to transfer, always clear categoryId
+                          if (item.key === 'transfer') {
+                            return { ...v, type: item.key, categoryId: '' };
+                          }
+
+                          // If switching between expense <-> income, clear categoryId
+                          // to force user to pick a category appropriate for the new type.
+                          if ((v.type === 'expense' && item.key === 'income') || (v.type === 'income' && item.key === 'expense')) {
+                            return { ...v, type: item.key, categoryId: '' };
+                          }
+
+                          // For other switches (e.g., same type), keep existing categoryId
+                          return { ...v, type: item.key, categoryId: v.categoryId };
+                        });
                         closePicker();
                       }}
                       style={({ pressed }) => [
