@@ -90,6 +90,7 @@ export default function SimpleTabs() {
   // Animation shared values
   const translateX = useSharedValue(0);
   const activeIndex = useSharedValue(0);
+  const startTranslateX = useSharedValue(0);
 
   // Update activeIndex when active tab changes
   useEffect(() => {
@@ -135,8 +136,6 @@ export default function SimpleTabs() {
 
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
-    const startTranslateX = useSharedValue(0);
-
     return Gesture.Pan()
       .onStart(() => {
         'worklet';
@@ -181,7 +180,7 @@ export default function SimpleTabs() {
           });
         }
       });
-  }, [navigateToTab, translateX, activeIndex, TABS.length]);
+  }, [navigateToTab, translateX, activeIndex, startTranslateX, TABS.length]);
 
   // Animated style for the sliding container
   const animatedStyle = useAnimatedStyle(() => {
@@ -247,10 +246,11 @@ const styles = StyleSheet.create({
   screensContainer: {
     flexDirection: 'row',
     flex: 1,
+    width: SCREEN_WIDTH * 4,
   },
   screen: {
     width: SCREEN_WIDTH,
-    flex: 1,
+    height: '100%',
   },
   indicator: {
     bottom: 0,
