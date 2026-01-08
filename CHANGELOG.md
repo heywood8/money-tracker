@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.27.1](https://github.com/heywood8/money-tracker/compare/penny-v0.27.0...penny-v0.27.1) (2026-01-08)
+
+
+### Bug Fixes
+
+* calc additional tests ([7cf7105](https://github.com/heywood8/money-tracker/commit/7cf7105327d31724276f998c04fb002e53425f6c))
+* calculator alternative add operation; tests ([9aa0f08](https://github.com/heywood8/money-tracker/commit/9aa0f08c263e344cf8a620c350e0d1b7886c1057))
+* make swiping between screens smoother ([534cfd0](https://github.com/heywood8/money-tracker/commit/534cfd02f0245ec2576309fae048be84f574b407))
+* prevent unwanted loops ([c301811](https://github.com/heywood8/money-tracker/commit/c301811727ce1845f17a2b3ade6dad565da303d2))
+* tapping outside of settings modal now closes it; tests ([eae8503](https://github.com/heywood8/money-tracker/commit/eae8503f2803fed54f365a1b7c35b2dde4c5b8ad))
+
 ## [0.27.0](https://github.com/heywood8/money-tracker/compare/penny-v0.26.0...penny-v0.27.0) (2026-01-08)
 
 
