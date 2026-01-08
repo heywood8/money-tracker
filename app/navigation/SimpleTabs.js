@@ -45,7 +45,6 @@ const TabButton = memo(({ tab, isActive, colors, onPress }) => {
         <Text variant="labelMedium" style={textStyle}>
           {tab.label}
         </Text>
-        {isActive && <View style={[styles.indicator, { backgroundColor: colors.primary }]} />}
       </View>
     </TouchableRipple>
   );
@@ -79,6 +78,7 @@ export default function SimpleTabs() {
   const { t } = useLocalization();
   const [active, setActive] = React.useState('Operations');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
+  const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
 
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
@@ -91,6 +91,7 @@ export default function SimpleTabs() {
   const translateX = useSharedValue(0);
   const activeIndex = useSharedValue(0);
   const startTranslateX = useSharedValue(0);
+  const tabBarWidthShared = useSharedValue(SCREEN_WIDTH);
 
   // Update activeIndex when active tab changes
   useEffect(() => {
@@ -98,8 +99,8 @@ export default function SimpleTabs() {
     if (index !== -1) {
       activeIndex.value = index;
       translateX.value = withSpring(-index * SCREEN_WIDTH, {
-        damping: 20,
-        stiffness: 90,
+        damping: 40,
+        stiffness: 150,
       });
     }
   }, [active, TABS, activeIndex, translateX]);
@@ -175,8 +176,8 @@ export default function SimpleTabs() {
         } else {
           // Snap back to current position if threshold not met
           translateX.value = withSpring(-activeIndex.value * SCREEN_WIDTH, {
-            damping: 20,
-            stiffness: 90,
+            damping: 40,
+            stiffness: 150,
           });
         }
       });
@@ -186,6 +187,30 @@ export default function SimpleTabs() {
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  // Handler for tab bar layout measurement
+  const handleTabBarLayout = useCallback((event) => {
+    const { width } = event.nativeEvent.layout;
+    setTabBarWidth(width);
+    tabBarWidthShared.value = width;
+  }, [tabBarWidthShared]);
+
+  // Animated style for the tab indicator
+  const indicatorAnimatedStyle = useAnimatedStyle(() => {
+    // Calculate the current fractional index based on screen position
+    const currentIndex = -translateX.value / SCREEN_WIDTH;
+
+    // Calculate tab width in pixels using measured tab bar width
+    const tabWidth = tabBarWidthShared.value / TABS.length;
+
+    // Position in pixels
+    const position = currentIndex * tabWidth;
+
+    return {
+      transform: [{ translateX: position }],
+      width: tabWidth,
     };
   });
 
@@ -222,15 +247,18 @@ export default function SimpleTabs() {
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
       <Surface style={styles.tabBarSurface} elevation={3}>
         <SafeAreaView style={styles.tabBar} edges={['bottom']}>
-          {TABS.map(tab => (
-            <TabButton
-              key={tab.key}
-              tab={tab}
-              isActive={active === tab.key}
-              colors={colors}
-              onPress={handleTabPress}
-            />
-          ))}
+          <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
+            {TABS.map(tab => (
+              <TabButton
+                key={tab.key}
+                tab={tab}
+                isActive={active === tab.key}
+                colors={colors}
+                onPress={handleTabPress}
+              />
+            ))}
+          </View>
+          <Animated.View style={[styles.indicator, { backgroundColor: colors.primary }, indicatorAnimatedStyle]} />
         </SafeAreaView>
       </Surface>
     </SafeAreaView>
@@ -244,11 +272,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   indicator: {
-    bottom: 0,
-    height: 3,
-    left: 0,
     position: 'absolute',
-    right: 0,
+    top: 0,
+    height: 3,
   },
   screen: {
     height: '100%',
@@ -264,7 +290,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   tabBar: {
-    flexDirection: 'row',
+    position: 'relative',
   },
   tabBarSurface: {
     elevation: 3,
@@ -274,5 +300,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     position: 'relative',
+  },
+  tabsRow: {
+    flexDirection: 'row',
   },
 });
