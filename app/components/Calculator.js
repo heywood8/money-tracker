@@ -284,16 +284,25 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
         <Text style={displayTextStyle} numberOfLines={1}>
           {expression}
         </Text>
-        {hasOperation && (
-          <Pressable
-            style={styles.equalsButton}
-            onPress={handleEqualsPress}
-            accessibilityRole="button"
-            accessibilityLabel="equals"
-          >
-            <Text style={equalsButtonTextStyle}>=</Text>
-          </Pressable>
-        )}
+        <View style={styles.displayButtonsContainer}>
+          {hasOperation && (
+            <Pressable
+              style={styles.equalsButton}
+              onPress={handleEqualsPress}
+              accessibilityRole="button"
+              accessibilityLabel="equals"
+            >
+              <Text style={equalsButtonTextStyle}>=</Text>
+            </Pressable>
+          )}
+          <CalcButton
+            value="backspace"
+            onPress={handlePress}
+            style={[deleteButtonStyle, styles.deleteButtonInDisplay]}
+            icon="backspace-outline"
+            colors={colors}
+          />
+        </View>
       </View>
 
       {/* Keypad */}
@@ -394,7 +403,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           />
         </View>
 
-        {/* Row 4: ÷ . 0 <- */}
+        {/* Row 4: ÷ . 0 */}
         <View style={styles.row}>
           <CalcButton
             value="÷"
@@ -413,15 +422,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="0"
             onPress={handlePress}
-            style={sharedButtonStyle}
+            style={[sharedButtonStyle, styles.zeroButton]}
             textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="backspace"
-            onPress={handlePress}
-            style={deleteButtonStyle}
-            icon="backspace-outline"
             colors={colors}
           />
         </View>
@@ -467,16 +469,26 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     width: '100%',
   },
+  deleteButtonInDisplay: {
+    height: 40,
+    minWidth: 50,
+  },
   display: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: SPACING.xs,
     minHeight: 40,
     paddingVertical: SPACING.sm,
     width: '100%',
   },
+  displayButtonsContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
   displayText: {
+    flex: 1,
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
@@ -484,7 +496,6 @@ const styles = StyleSheet.create({
   equalsButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SPACING.md,
     paddingHorizontal: SPACING.xs,
   },
   equalsButtonText: {
@@ -499,5 +510,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
     width: '100%',
+  },
+  zeroButton: {
+    flex: 2,
   },
 });
