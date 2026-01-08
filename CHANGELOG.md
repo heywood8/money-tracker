@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.5](https://github.com/heywood8/money-tracker/compare/penny-v0.27.4...penny-v0.27.5) (2026-01-08)
+
+
+### Bug Fixes
+
+* instant scroll to date when jumping to past dates ([#203](https://github.com/heywood8/money-tracker/issues/203)) ([f0223a4](https://github.com/heywood8/money-tracker/commit/f0223a4ce6a49ad96290b0ca2ecbf07c5b588eb1))
+
 ## [0.27.4](https://github.com/heywood8/money-tracker/compare/penny-v0.27.3...penny-v0.27.4) (2026-01-08)
 
 
