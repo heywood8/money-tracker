@@ -1,10 +1,15 @@
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text, Surface } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  runOnJS
+} from 'react-native-reanimated';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
@@ -13,6 +18,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import Header from '../components/Header';
 import SettingsModal from '../modals/SettingsModal';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Memoized tab button component to prevent unnecessary re-renders
 const TabButton = memo(({ tab, isActive, colors, onPress }) => {
@@ -80,6 +87,22 @@ export default function SimpleTabs() {
     { key: 'Graphs', label: t('graphs') || 'Graphs' },
   ], [t]);
 
+  // Animation shared values
+  const translateX = useSharedValue(0);
+  const activeIndex = useSharedValue(0);
+
+  // Update activeIndex when active tab changes
+  useEffect(() => {
+    const index = TABS.findIndex(tab => tab.key === active);
+    if (index !== -1) {
+      activeIndex.value = index;
+      translateX.value = withSpring(-index * SCREEN_WIDTH, {
+        damping: 20,
+        stiffness: 90,
+      });
+    }
+  }, [active, TABS, activeIndex, translateX]);
+
   const handleTabPress = useCallback((tabKey) => {
     setActive(tabKey);
   }, []);
@@ -110,47 +133,93 @@ export default function SimpleTabs() {
     }
   }, [active, TABS]);
 
-  // Pan gesture for swipe navigation
+  // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
+    const startTranslateX = useSharedValue(0);
+
     return Gesture.Pan()
+      .onStart(() => {
+        'worklet';
+        startTranslateX.value = translateX.value;
+      })
+      .onUpdate((event) => {
+        'worklet';
+        const newTranslateX = startTranslateX.value + event.translationX;
+        const maxTranslateX = 0;
+        const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH;
+
+        // Clamp the translation to prevent over-scrolling
+        translateX.value = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
+      })
       .onEnd((event) => {
         'worklet';
-        const { translationX, velocityX } = event;
-        const SWIPE_THRESHOLD = 50; // minimum swipe distance
-        const VELOCITY_THRESHOLD = 500; // minimum swipe velocity
+        const { translationX: gestureTranslationX, velocityX } = event;
+        const SWIPE_THRESHOLD = 50;
+        const VELOCITY_THRESHOLD = 500;
+
+        let shouldNavigate = false;
+        let direction = '';
 
         // Swipe left (next tab)
-        if (translationX < -SWIPE_THRESHOLD || velocityX < -VELOCITY_THRESHOLD) {
-          runOnJS(navigateToTab)('left');
+        if (gestureTranslationX < -SWIPE_THRESHOLD || velocityX < -VELOCITY_THRESHOLD) {
+          shouldNavigate = true;
+          direction = 'left';
         }
         // Swipe right (previous tab)
-        else if (translationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
-          runOnJS(navigateToTab)('right');
+        else if (gestureTranslationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
+          shouldNavigate = true;
+          direction = 'right';
+        }
+
+        if (shouldNavigate) {
+          runOnJS(navigateToTab)(direction);
+        } else {
+          // Snap back to current position if threshold not met
+          translateX.value = withSpring(-activeIndex.value * SCREEN_WIDTH, {
+            damping: 20,
+            stiffness: 90,
+          });
         }
       });
-  }, [navigateToTab]);
+  }, [navigateToTab, translateX, activeIndex, TABS.length]);
 
-  const renderActive = useCallback(() => {
-    switch (active) {
-    case 'Operations':
-      return <OperationsScreen />;
-    case 'Accounts':
-      return <AccountsScreen />;
-    case 'Categories':
-      return <CategoriesScreen />;
-    case 'Graphs':
-      return <GraphsScreen />;
-    default:
-      return <OperationsScreen />;
-    }
-  }, [active]);
+  // Animated style for the sliding container
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  // Render all screens side-by-side for smooth transitions
+  const renderScreens = useCallback(() => {
+    return (
+      <>
+        <View style={styles.screen}>
+          <OperationsScreen />
+        </View>
+        <View style={styles.screen}>
+          <AccountsScreen />
+        </View>
+        <View style={styles.screen}>
+          <CategoriesScreen />
+        </View>
+        <View style={styles.screen}>
+          <GraphsScreen />
+        </View>
+      </>
+    );
+  }, []);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <Header onOpenSettings={handleOpenSettings} />
-      <GestureDetector gesture={panGesture}>
-        <View style={styles.content}>{renderActive()}</View>
-      </GestureDetector>
+      <View style={styles.content}>
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[styles.screensContainer, animatedStyle]}>
+            {renderScreens()}
+          </Animated.View>
+        </GestureDetector>
+      </View>
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
       <Surface style={styles.tabBarSurface} elevation={3}>
         <SafeAreaView style={styles.tabBar} edges={['bottom']}>
@@ -171,7 +240,18 @@ export default function SimpleTabs() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1 },
+  content: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  screensContainer: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  screen: {
+    width: SCREEN_WIDTH,
+    flex: 1,
+  },
   indicator: {
     bottom: 0,
     height: 3,
