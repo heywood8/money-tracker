@@ -171,7 +171,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd }) {
+export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -287,8 +287,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [colors.text]);
 
   return (
-    // Use altRow so Calculator background matches the gray inner card
-    <View style={[styles.container, { backgroundColor: colors.altRow }]}>
+    // Use provided containerBackground or fallback to altRow for compatibility
+    <View style={[styles.container, { backgroundColor: containerBackground || colors.altRow }]}> 
       {/* Display */}
       <View style={styles.display}>
         <Text style={displayTextStyle} numberOfLines={1}>
@@ -466,6 +466,7 @@ Calculator.propTypes = {
   colors: PropTypes.object.isRequired,
   placeholder: PropTypes.string,
   onAdd: PropTypes.func,
+  containerBackground: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
 };
 
 Calculator.defaultProps = {
@@ -473,6 +474,7 @@ Calculator.defaultProps = {
   onValueChange: () => {},
   placeholder: '0',
   onAdd: null,
+  containerBackground: null,
 };
 
 const styles = StyleSheet.create({
