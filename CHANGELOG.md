@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.27.2](https://github.com/heywood8/money-tracker/compare/penny-v0.27.1...penny-v0.27.2) (2026-01-08)
+
+
+### Bug Fixes
+
+* calculator amount center alignment ([eb4d9ec](https://github.com/heywood8/money-tracker/commit/eb4d9ecefed277b8461c0389c1ff556fa85a4ef0))
+* calculator amount center alignment ([90b6b0c](https://github.com/heywood8/money-tracker/commit/90b6b0c3515eb8207308457adedf261bb64506de))
+* calculator color on "Edit operation" modal ([15619f2](https://github.com/heywood8/money-tracker/commit/15619f267d6c815d19eb97cdb402d471886ad046))
+* flashy calc amounts ([3031565](https://github.com/heywood8/money-tracker/commit/3031565c2bcc58e212b6172ce21e0a8ffc01e91d))
+* move scroll on modals to the right ([3a63df3](https://github.com/heywood8/money-tracker/commit/3a63df3f80965a985b868d2a42ef07c380186def))
+* remove "Edit operation" title from modal ([96dde15](https://github.com/heywood8/money-tracker/commit/96dde1522d96cfc3ef90c568a6758b8381b43de3))
+* removed chevron-down from dropdowns ([c0ce7e0](https://github.com/heywood8/money-tracker/commit/c0ce7e0fa1bd02fff6efec86fd5a8083cae15057))
+* show category is required on operation edit if category is not chosen ([570f77d](https://github.com/heywood8/money-tracker/commit/570f77d2897831cf721737fd5f1a41d692360267))
+* smoother swipes between screens ([9f29ada](https://github.com/heywood8/money-tracker/commit/9f29ada25a9efd8a9c2c57c065bb2c1c8997df67))
+* when changing operation type, reset category ([1b101f0](https://github.com/heywood8/money-tracker/commit/1b101f0873e746aeac968663fb0e63f4334d64b2))
+
 ## [0.27.1](https://github.com/heywood8/money-tracker/compare/penny-v0.27.0...penny-v0.27.1) (2026-01-08)
 
 
