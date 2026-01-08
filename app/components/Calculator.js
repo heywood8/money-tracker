@@ -403,7 +403,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           />
         </View>
 
-        {/* Row 4: ÷ . 0 */}
+        {/* Row 4: ÷ . 0 [empty] */}
         <View style={styles.row}>
           <CalcButton
             value="÷"
@@ -422,10 +422,11 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="0"
             onPress={handlePress}
-            style={[sharedButtonStyle, styles.zeroButton]}
+            style={sharedButtonStyle}
             textStyle={numberTextStyle}
             colors={colors}
           />
+          <View style={styles.emptySpace} />
         </View>
       </View>
     </View>
@@ -470,8 +471,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   deleteButtonInDisplay: {
+    flex: 0,
     height: 40,
-    minWidth: 50,
+    width: 50,
   },
   display: {
     alignItems: 'center',
@@ -493,6 +495,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  emptySpace: {
+    flex: 1,
+  },
   equalsButton: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -510,8 +515,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
     width: '100%',
-  },
-  zeroButton: {
-    flex: 2,
   },
 });
