@@ -272,10 +272,6 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     fontWeight: 'bold',
   }), [colors.text]);
 
-  const deleteButtonStyle = useMemo(() => ({
-    backgroundColor: colors.deleteBackground || buttonBackground,
-  }), [colors.deleteBackground, buttonBackground]);
-
   return (
     // Use altRow so Calculator background matches the gray inner card
     <View style={[styles.container, { backgroundColor: colors.altRow }]}>
@@ -298,7 +294,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
           <CalcButton
             value="backspace"
             onPress={handlePress}
-            style={[deleteButtonStyle, styles.deleteButtonInDisplay]}
+            style={[sharedButtonStyle, styles.deleteButtonInDisplay]}
             icon="backspace-outline"
             colors={colors}
           />
