@@ -187,7 +187,6 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                   <Text style={[styles.pickerValue, { color: colors.text }]}>
                     {TYPE_OPTIONS.find(to => to.key === values.type)?.label}
                   </Text>
-                  <Icon name="chevron-down" size={20} color={colors.text} />
                 </View>
               </Pressable>
 
@@ -203,7 +202,6 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                   <Text style={[styles.pickerValue, { color: colors.text }]}>
                     {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
                   </Text>
-                  <Icon name="chevron-down" size={20} color={colors.text} />
                 </View>
               </Pressable>
 
@@ -219,7 +217,6 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                   <Text style={[styles.pickerValue, { color: colors.text }]}>
                     {getParentName(values.parentId)}
                   </Text>
-                  <Icon name="chevron-down" size={20} color={colors.text} />
                 </View>
               </Pressable>
 

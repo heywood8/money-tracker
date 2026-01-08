@@ -486,7 +486,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                         {TYPES.find(tp => tp.key === values.type)?.label}
                       </Text>
                     </View>
-                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* Amount Calculator */}
@@ -513,7 +512,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                       {getAccountName(values.accountId)}
                     </Text>
-                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* To Account Picker (only for transfers) */}
@@ -531,7 +529,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                         <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                           {t('to_account')}: {getAccountName(values.toAccountId)}
                         </Text>
-                        <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                       </Pressable>
 
                       {/* Multi-currency transfer fields */}
@@ -575,7 +572,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
                         {getCategoryName(values.categoryId)}
                       </Text>
-                      <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                     </Pressable>
                   )}
 
@@ -598,7 +594,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                         {formatDateForDisplay(values.date)}
                       </Text>
                     </View>
-                    <Icon name="chevron-down" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
                   </Pressable>
 
                   {/* Description Input - Only show when editing existing operations */}
