@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { useDialog } from '../contexts/DialogContext';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAccounts } from '../contexts/AccountsContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -45,6 +46,7 @@ const getCurrencySymbol = (currencyCode) => {
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const { showDialog } = useDialog();
   const { addOperation, updateOperation, validateOperation } = useOperations();
   const { visibleAccounts: accounts } = useAccounts();
   const { categories } = useCategories();
@@ -188,6 +190,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     const valuesToValidate = { ...values, amount: finalAmount };
 
     if (!validateFields(valuesToValidate)) {
+      // Mirror Quick Add behavior: show a dialog with the validation error
+      const error = validateOperation(valuesToValidate, t);
+      if (error) {
+        showDialog(t('error'), error, [{ text: 'OK' }]);
+      }
       return;
     }
 
