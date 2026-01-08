@@ -272,9 +272,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   indicator: {
+    height: 3,
     position: 'absolute',
     top: 0,
-    height: 3,
   },
   screen: {
     height: '100%',
