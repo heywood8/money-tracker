@@ -138,6 +138,9 @@ export default function SimpleTabs() {
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
     return Gesture.Pan()
+      // Only activate on horizontal movements, allow vertical scrolling
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-10, 10])
       .onStart(() => {
         'worklet';
         startTranslateX.value = translateX.value;
