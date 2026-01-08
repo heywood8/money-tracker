@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -133,53 +133,38 @@ const OperationsScreen = () => {
   }, [scrollToDateString, operationsLoading, groupedOperations]);
 
   // Handle content size change - this fires after FlatList has laid out content
+  // Wait for interactions/layout to finish, then perform a single animated scroll to the target
   const handleContentSizeChange = useCallback((width, height) => {
     if (pendingScroll && scrollToDateString && !operationsLoading) {
       const separatorIndex = groupedOperations.findIndex(
         item => item.type === 'separator' && item.date === scrollToDateString,
       );
 
-      console.log('handleContentSizeChange:', {
-        pendingScroll,
-        scrollToDateString,
-        separatorIndex,
-        totalItems: groupedOperations.length,
-        contentHeight: height,
-      });
-
       if (separatorIndex !== -1) {
-        // Use scrollToOffset with estimated position
-        // Each item is roughly 70-80px tall (operations) + separators are ~60px
-        // This is more reliable than scrollToIndex for virtualized lists
-        const estimatedItemHeight = 75;
-        const estimatedOffset = separatorIndex * estimatedItemHeight;
-
-        setTimeout(() => {
-          console.log('Scrolling to offset:', estimatedOffset, 'for index:', separatorIndex);
-
-          // Use scrollToOffset which works better for large lists
-          flatListRef.current?.scrollToOffset({
-            offset: estimatedOffset,
-            animated: false, // Use non-animated scroll for large distances
-          });
-
-          // After scrolling to approximate position, try to fine-tune with scrollToIndex
-          setTimeout(() => {
-            try {
-              flatListRef.current?.scrollToIndex({
-                index: separatorIndex,
-                animated: true,
-                viewPosition: 0,
-              });
-            } catch (error) {
-              console.log('Fine-tuning scroll failed, staying at estimated position');
-            }
-          }, 100);
-
-          // Clear the scroll target
-          setScrollToDateString(null);
-          setPendingScroll(false);
-        }, 100);
+        // Defer scroll until after interactions/layout have settled to ensure smooth animation
+        InteractionManager.runAfterInteractions(() => {
+          try {
+            flatListRef.current?.scrollToIndex({
+              index: separatorIndex,
+              animated: true,
+              viewPosition: 0,
+            });
+          } catch (error) {
+            // Fallback to estimated offset if scrollToIndex fails
+            const estimatedItemHeight = 75;
+            const estimatedOffset = separatorIndex * estimatedItemHeight;
+            flatListRef.current?.scrollToOffset({
+              offset: estimatedOffset,
+              animated: true,
+            });
+          } finally {
+            setScrollToDateString(null);
+            setPendingScroll(false);
+          }
+        });
+      } else {
+        setScrollToDateString(null);
+        setPendingScroll(false);
       }
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
@@ -249,6 +234,7 @@ const OperationsScreen = () => {
         // Date is not in current list - load from that date to today
         // Set the target date for scrolling after load completes
         setScrollToDateString(dateString);
+        setPendingScroll(true);
         await jumpToDate(dateString);
       }
     }
