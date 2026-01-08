@@ -157,31 +157,38 @@ export default function SimpleTabs() {
         const SWIPE_THRESHOLD = 50;
         const VELOCITY_THRESHOLD = 500;
 
-        let shouldNavigate = false;
-        let direction = '';
+        const currentIndex = activeIndex.value;
+        let newIndex = currentIndex;
 
-        // Swipe left (next tab)
+        // Determine new index based on gesture
         if (gestureTranslationX < -SWIPE_THRESHOLD || velocityX < -VELOCITY_THRESHOLD) {
-          shouldNavigate = true;
-          direction = 'left';
-        }
-        // Swipe right (previous tab)
-        else if (gestureTranslationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
-          shouldNavigate = true;
-          direction = 'right';
+          newIndex = Math.min(currentIndex + 1, TABS.length - 1);
+        } else if (gestureTranslationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
+          newIndex = Math.max(currentIndex - 1, 0);
         }
 
-        if (shouldNavigate) {
-          runOnJS(navigateToTab)(direction);
+        // If index changed, update shared values on the UI thread and defer React state update
+        if (newIndex !== currentIndex) {
+          activeIndex.value = newIndex;
+          const target = -newIndex * SCREEN_WIDTH;
+          translateX.value = withSpring(target, {
+            damping: 40,
+            stiffness: 150,
+          }, (isFinished) => {
+            if (isFinished) {
+              // Update React state on the JS thread after animation completes
+              runOnJS(setActive)(TABS[newIndex].key);
+            }
+          });
         } else {
           // Snap back to current position if threshold not met
-          translateX.value = withSpring(-activeIndex.value * SCREEN_WIDTH, {
+          translateX.value = withSpring(-currentIndex * SCREEN_WIDTH, {
             damping: 40,
             stiffness: 150,
           });
         }
       });
-  }, [navigateToTab, translateX, activeIndex, startTranslateX, TABS.length]);
+  }, [translateX, activeIndex, startTranslateX, TABS, setActive]);
 
   // Animated style for the sliding container
   const animatedStyle = useAnimatedStyle(() => {
