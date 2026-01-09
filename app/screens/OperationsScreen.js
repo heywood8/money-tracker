@@ -16,8 +16,7 @@ import OperationModal from '../modals/OperationModal';
 import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
-import DateSeparator from '../components/operations/DateSeparator';
-import OperationListItem from '../components/operations/OperationListItem';
+import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import currencies from '../../assets/currencies.json';
 import * as Currency from '../services/currency';
@@ -569,47 +568,6 @@ const OperationsScreen = () => {
     return grouped;
   }, [operations, calculateSpendingSums]);
 
-  // Format date (memoized)
-  const formatDate = useCallback((dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const compareDate = new Date(date);
-    compareDate.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.floor((today - compareDate) / 86400000);
-
-    if (diffDays === 0) {
-      return t('today');
-    } else if (diffDays === 1) {
-      return t('yesterday');
-    } else {
-      return date.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    }
-  }, [t]);
-
-  // Format amount with currency (memoized)
-  const formatCurrency = useCallback((accountId, amount) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    if (!account) return amount;
-
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return amount;
-
-    // Get currency-specific decimal places
-    const currency = currencies[account.currency];
-    const decimals = currency?.decimal_digits ?? 2;
-
-    // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
-    const symbol = getCurrencySymbol(account.currency || 'USD');
-    return `${symbol}${numAmount.toFixed(decimals)}`;
-  }, [accounts]);
-
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
     { key: 'income', label: t('income'), icon: 'plus-circle' },
@@ -652,13 +610,6 @@ const OperationsScreen = () => {
     />
   ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, TYPES]);
 
-  // Handle end reached for lazy loading
-  const handleEndReached = useCallback(() => {
-    if (!loadingMore && hasMoreOperations) {
-      loadMoreOperations();
-    }
-  }, [loadingMore, hasMoreOperations, loadMoreOperations]);
-
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -698,50 +649,6 @@ const OperationsScreen = () => {
     }, 100);
   }, []);
 
-  // Footer component showing loading indicator
-  const renderFooter = useCallback(() => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingMoreContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={[styles.loadingMoreText, { color: colors.mutedText }]}> 
-          {t('loading_more')}
-        </Text>
-      </View>
-    );
-  }, [loadingMore, colors, t]);
-
-  const renderItem = useCallback(({ item }) => {
-    // Render date separator
-    if (item.type === 'separator') {
-      return (
-        <DateSeparator
-          date={item.date}
-          spendingSums={item.spendingSums}
-          formatDate={formatDate}
-          colors={colors}
-          t={t}
-          onPress={() => handleDateSeparatorPress(item.date)}
-        />
-      );
-    }
-
-    // Render operation
-    return (
-      <OperationListItem
-        operation={item}
-        colors={colors}
-        t={t}
-        categories={categories}
-        getCategoryInfo={getCategoryInfo}
-        getAccountName={getAccountName}
-        formatCurrency={formatCurrency}
-        formatDate={formatDate}
-        onPress={() => handleEditOperation(item)}
-      />
-    );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, handleEditOperation, handleDateSeparatorPress]);
-
   if (operationsLoading || accountsLoading || categoriesLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -755,39 +662,22 @@ const OperationsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
+      <OperationsList
         ref={flatListRef}
-        contentInsetAdjustmentBehavior="automatic"
-        data={groupedOperations}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        extraData={[accounts, categories]}
-        ListHeaderComponent={quickAddFormComponent}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Icon name="cash-multiple" size={64} color={colors.mutedText} />
-            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-              {t('no_operations')}
-            </Text>
-          </View>
-        }
-        contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : null}
+        groupedOperations={groupedOperations}
+        accounts={accounts}
+        categories={categories}
+        colors={colors}
+        t={t}
+        loadingMore={loadingMore}
+        hasMoreOperations={hasMoreOperations}
+        onLoadMore={loadMoreOperations}
+        onEditOperation={handleEditOperation}
+        onDateSeparatorPress={handleDateSeparatorPress}
         onScroll={handleScroll}
-        scrollEventThrottle={16}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5}
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onContentSizeChange={handleContentSizeChange}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10,
-        }}
-        windowSize={10}
-        maxToRenderPerBatch={10}
-        initialNumToRender={15}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
+        headerComponent={quickAddFormComponent}
       />
 
       {/* Picker Modal for Account/Category selection */}
@@ -1042,20 +932,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingTop: TOP_CONTENT_SPACING,
-  },
-  emptyList: {
-    flex: 1,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: SPACING.lg,
-  },
-  /* removed unused styles: description, exchangeRate */
+  /* removed unused styles: description, exchangeRate, emptyContainer, emptyList, emptyText, loadingMoreContainer, loadingMoreText */
   filterFab: {
     bottom: 0,
     margin: SPACING.lg,
@@ -1065,15 +942,6 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  loadingMoreContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.xl,
-  },
-  loadingMoreText: {
-    fontSize: 14,
-    marginTop: SPACING.sm,
   },
   loadingText: {
     fontSize: 16,
