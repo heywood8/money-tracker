@@ -98,38 +98,43 @@ const OperationFormFields = memo(({
   // Render type selector buttons
   const renderTypeSelector = () => (
     <View style={styles.typeSelector}>
-      {TYPES.map(type => (
-        <Pressable
-          key={type.key}
-          style={[
-            styles.typeButton,
-            {
-              backgroundColor: values.type === type.key ? colors.primary : colors.inputBackground,
-              borderColor: colors.border,
-            },
-            disabledStyle,
-          ]}
-          onPress={() => !disabled && setValues(v => ({
-            ...v,
-            type: type.key,
-            categoryId: type.key === 'transfer' ? '' : v.categoryId,
-            toAccountId: '',
-          }))}
-          disabled={disabled}
-        >
-          <Icon
-            name={type.icon}
-            size={18}
-            color={values.type === type.key ? '#fff' : (disabled ? colors.mutedText : colors.text)}
-          />
-          <Text style={[
-            styles.typeButtonText,
-            { color: values.type === type.key ? '#fff' : (disabled ? colors.mutedText : colors.text) }
-          ]}>
-            {type.label}
-          </Text>
-        </Pressable>
-      ))}
+      {TYPES.map(type => {
+        const isSelected = values.type === type.key;
+        const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+
+        return (
+          <Pressable
+            key={type.key}
+            style={[
+              styles.typeButton,
+              {
+                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                borderColor: colors.border,
+              },
+              disabledStyle,
+            ]}
+            onPress={() => !disabled && setValues(v => ({
+              ...v,
+              type: type.key,
+              categoryId: type.key === 'transfer' ? '' : v.categoryId,
+              toAccountId: '',
+            }))}
+            disabled={disabled}
+          >
+            <Icon
+              name={type.icon}
+              size={18}
+              color={textColor}
+            />
+            <Text style={[
+              styles.typeButtonText,
+              { color: textColor },
+            ]}>
+              {type.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 
@@ -139,7 +144,7 @@ const OperationFormFields = memo(({
     onPress,
     label,
     iconName = 'wallet',
-    style = styles.formInput
+    style = styles.formInput,
   ) => (
     <Pressable
       style={[style, inputStyle, disabledStyle]}
@@ -184,14 +189,14 @@ const OperationFormFields = memo(({
             () => !disabled && openPicker('account', accounts),
             t('select_account'),
             'wallet',
-            styles.formInputHalf
+            styles.formInputHalf,
           )}
           {renderAccountPicker(
             values.toAccountId,
             () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
             t('to_account'),
             'swap-horizontal',
-            styles.formInputHalf
+            styles.formInputHalf,
           )}
         </View>
       );
@@ -202,12 +207,12 @@ const OperationFormFields = memo(({
           {renderAccountPicker(
             values.accountId,
             () => !disabled && openPicker('account', accounts),
-            t('select_account')
+            t('select_account'),
           )}
           {renderAccountPicker(
             values.toAccountId,
             () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
-            `${t('to_account')}: ${values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}`
+            `${t('to_account')}: ${values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}`,
           )}
         </>
       );
@@ -216,7 +221,7 @@ const OperationFormFields = memo(({
       return renderAccountPicker(
         values.accountId,
         () => !disabled && openPicker('account', accounts),
-        t('select_account')
+        t('select_account'),
       );
     }
   };
@@ -284,6 +289,8 @@ OperationFormFields.propTypes = {
     toAccountId: PropTypes.string,
     amount: PropTypes.string,
     categoryId: PropTypes.string,
+    exchangeRate: PropTypes.string,
+    destinationAmount: PropTypes.string,
   }).isRequired,
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
