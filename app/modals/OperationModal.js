@@ -24,6 +24,7 @@ import { useAccounts } from '../contexts/AccountsContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import Calculator from '../components/Calculator';
+import OperationFormFields from '../components/operations/OperationFormFields';
 import MultiCurrencyFields from '../components/modals/MultiCurrencyFields';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
@@ -35,11 +36,16 @@ import { getCategoryDisplayName } from '../utils/categoryUtils';
 /**
  * OperationModal Component
  *
- * Note: This modal uses a picker-based UI pattern (where fields open modal pickers)
- * which differs from QuickAddForm's inline field pattern. While QuickAddForm uses
- * the shared OperationFormFields component, this modal maintains its own field
- * rendering to preserve the existing UI/UX pattern and field ordering.
- * Both components share the Calculator component for amount entry.
+ * Modal for adding/editing financial operations (expenses, income, transfers).
+ * Uses the shared OperationFormFields component for common form fields
+ * (amount, accounts, category) with showTypeSelector={false} and showFieldIcons={false}
+ * to match the modal's simpler UI pattern.
+ *
+ * Additional modal-specific fields:
+ * - Type picker (opens modal picker)
+ * - Date picker
+ * - Description field (only when editing)
+ * - Multi-currency fields (for cross-currency transfers)
  */
 
 /**
@@ -525,91 +531,50 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     </View>
                   </Pressable>
 
-                  {/* Amount Calculator */}
-                  <View style={isShadowOperation && styles.disabledInput}>
-                    <Calculator
-                      value={values.amount}
-                      onValueChange={handleAmountChange}
-                      colors={colors}
-                      placeholder={t('amount')}
-                      containerBackground={colors.card}
-                    />
-                  </View>
-
-                  {/* Account Picker */}
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput,
-                    ]}
-                    onPress={() => !isShadowOperation && openPicker('account', accounts)}
+                  {/* Shared Form Fields: Amount, Account(s), Category */}
+                  <OperationFormFields
+                    colors={colors}
+                    t={t}
+                    values={values}
+                    setValues={setValues}
+                    accounts={accounts}
+                    categories={filteredCategories}
+                    getAccountName={getAccountName}
+                    getCategoryName={getCategoryName}
+                    openPicker={openPicker}
+                    onAmountChange={handleAmountChange}
+                    TYPES={TYPES}
+                    showTypeSelector={false}
+                    showAccountBalance={false}
+                    showFieldIcons={false}
+                    transferLayout="stacked"
                     disabled={isShadowOperation}
-                  >
-                    <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
-                      {getAccountName(values.accountId)}
-                    </Text>
-                  </Pressable>
+                    containerBackground={colors.card}
+                  />
 
-                  {/* To Account Picker (only for transfers) */}
-                  {values.type === 'transfer' && (
-                    <>
-                      <Pressable
-                        style={[
-                          styles.pickerButton,
-                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                          isShadowOperation && styles.disabledInput,
-                        ]}
-                        onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
-                        disabled={isShadowOperation}
-                      >
-                        <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
-                          {t('to_account')}: {getAccountName(values.toAccountId)}
-                        </Text>
-                      </Pressable>
-
-                      {/* Multi-currency transfer fields */}
-                      {isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
-                        <MultiCurrencyFields
-                          colors={colors}
-                          t={t}
-                          sourceAccount={sourceAccount}
-                          destinationAccount={destinationAccount}
-                          exchangeRate={values.exchangeRate}
-                          destinationAmount={values.destinationAmount}
-                          isShadowOperation={isShadowOperation}
-                          onExchangeRateChange={(text) => {
-                            if (!isShadowOperation) {
-                              setValues(v => ({ ...v, exchangeRate: text }));
-                              setLastEditedField('exchangeRate');
-                            }
-                          }}
-                          onDestinationAmountChange={(text) => {
-                            if (!isShadowOperation) {
-                              setValues(v => ({ ...v, destinationAmount: text }));
-                              setLastEditedField('destinationAmount');
-                            }
-                          }}
-                        />
-                      )}
-                    </>
-                  )}
-
-                  {/* Category Picker (not for transfers) */}
-                  {values.type !== 'transfer' && (
-                    <Pressable
-                      style={[
-                        styles.pickerButton,
-                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                        isShadowOperation && styles.disabledInput,
-                      ]}
-                      onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
-                      disabled={isShadowOperation}
-                    >
-                      <Text style={{ color: isShadowOperation ? colors.mutedText : colors.text }}>
-                        {getCategoryName(values.categoryId)}
-                      </Text>
-                    </Pressable>
+                  {/* Multi-currency transfer fields (only for multi-currency transfers) */}
+                  {values.type === 'transfer' && isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
+                    <MultiCurrencyFields
+                      colors={colors}
+                      t={t}
+                      sourceAccount={sourceAccount}
+                      destinationAccount={destinationAccount}
+                      exchangeRate={values.exchangeRate}
+                      destinationAmount={values.destinationAmount}
+                      isShadowOperation={isShadowOperation}
+                      onExchangeRateChange={(text) => {
+                        if (!isShadowOperation) {
+                          setValues(v => ({ ...v, exchangeRate: text }));
+                          setLastEditedField('exchangeRate');
+                        }
+                      }}
+                      onDestinationAmountChange={(text) => {
+                        if (!isShadowOperation) {
+                          setValues(v => ({ ...v, destinationAmount: text }));
+                          setLastEditedField('destinationAmount');
+                        }
+                      }}
+                    />
                   )}
 
                   {/* Date Picker Button */}

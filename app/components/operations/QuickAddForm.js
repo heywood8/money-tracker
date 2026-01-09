@@ -67,6 +67,7 @@ const QuickAddForm = memo(({
           onAdd={handleQuickAdd}
           TYPES={TYPES}
           showAccountBalance={true}
+          showFieldIcons={true}
           transferLayout="sideBySide"
         />
       </View>

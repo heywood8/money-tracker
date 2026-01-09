@@ -12,11 +12,11 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  *
  * DEPENDENCIES:
  * - QuickAddForm (app/components/operations/QuickAddForm.js)
- * - Can be used by other operation forms
+ * - OperationModal (app/modals/OperationModal.js)
  *
  * IMPORTANT: When modifying this component, ensure you test ALL dependent components:
- * 1. QuickAddForm - Verify type selector, account pickers, calculator, category picker
- * 2. Any other future consumers of this component
+ * 1. QuickAddForm - Verify type selector, account pickers (with icons/balance), calculator, category picker
+ * 2. OperationModal - Verify account pickers (no icons), calculator, category picker (type picker is separate)
  *
  * Test both:
  * - UI/Layout (side-by-side vs stacked, account balance display, disabled state)
@@ -38,6 +38,7 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  * @param {Array} props.TYPES - Operation types [{key, label, icon}]
  * @param {boolean} props.showTypeSelector - Whether to show inline type selector buttons
  * @param {boolean} props.showAccountBalance - Whether to show account balance in picker
+ * @param {boolean} props.showFieldIcons - Whether to show icons in account/category pickers
  * @param {string} props.transferLayout - 'sideBySide' or 'stacked' layout for transfer accounts
  * @param {boolean} props.disabled - Whether form is disabled
  * @param {string} props.containerBackground - Background color for calculator container
@@ -58,6 +59,7 @@ const OperationFormFields = memo(({
   TYPES,
   showTypeSelector = true,
   showAccountBalance = false,
+  showFieldIcons = true,
   transferLayout = 'stacked',
   disabled = false,
   containerBackground,
@@ -110,7 +112,7 @@ const OperationFormFields = memo(({
     </View>
   );
 
-  // Render account picker with optional balance
+  // Render account picker with optional balance and icon
   const renderAccountPicker = (
     accountId,
     onPress,
@@ -123,20 +125,30 @@ const OperationFormFields = memo(({
       onPress={onPress}
       disabled={disabled}
     >
-      <Icon name={iconName} size={18} color={disabled ? colors.mutedText : colors.mutedText} />
-      <View style={styles.flex1}>
+      {showFieldIcons && (
+        <Icon name={iconName} size={18} color={disabled ? colors.mutedText : colors.mutedText} />
+      )}
+      {showFieldIcons || showAccountBalance ? (
+        <View style={styles.flex1}>
+          <Text
+            style={[styles.formInputText, { color: disabled ? colors.mutedText : colors.text }]}
+            numberOfLines={1}
+          >
+            {accountId ? getAccountName(accountId) : label}
+          </Text>
+          {showAccountBalance && accountId && (
+            <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+              {getAccountBalance(accountId)}
+            </Text>
+          )}
+        </View>
+      ) : (
         <Text
           style={[styles.formInputText, { color: disabled ? colors.mutedText : colors.text }]}
-          numberOfLines={1}
         >
           {accountId ? getAccountName(accountId) : label}
         </Text>
-        {showAccountBalance && accountId && (
-          <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-            {getAccountBalance(accountId)}
-          </Text>
-        )}
-      </View>
+      )}
     </Pressable>
   );
 
@@ -198,7 +210,9 @@ const OperationFormFields = memo(({
         onPress={() => !disabled && openPicker('category', categories)}
         disabled={disabled}
       >
-        <Icon name="tag" size={18} color={disabled ? colors.mutedText : colors.mutedText} />
+        {showFieldIcons && (
+          <Icon name="tag" size={18} color={disabled ? colors.mutedText : colors.mutedText} />
+        )}
         <Text style={[styles.formInputText, { color: disabled ? colors.mutedText : colors.text }]}>
           {getCategoryName(values.categoryId)}
         </Text>
@@ -249,6 +263,7 @@ OperationFormFields.propTypes = {
   TYPES: PropTypes.array.isRequired,
   showTypeSelector: PropTypes.bool,
   showAccountBalance: PropTypes.bool,
+  showFieldIcons: PropTypes.bool,
   transferLayout: PropTypes.oneOf(['sideBySide', 'stacked']),
   disabled: PropTypes.bool,
   containerBackground: PropTypes.string,
