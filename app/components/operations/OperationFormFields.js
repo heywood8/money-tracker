@@ -191,6 +191,9 @@ const OperationFormFields = memo(({
             'wallet',
             styles.formInputHalf,
           )}
+          <View style={styles.arrowContainer}>
+            <Icon name="arrow-right" size={20} color={colors.mutedText} />
+          </View>
           {renderAccountPicker(
             values.toAccountId,
             () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
@@ -321,6 +324,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
   },
+  arrowContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xs,
+  },
   disabledInput: {
     opacity: 0.6,
   },
@@ -333,6 +341,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
+    marginBottom: SPACING.md,
     minHeight: 48,
     padding: SPACING.md,
   },
