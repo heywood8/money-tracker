@@ -25,7 +25,6 @@ import { useCategories } from '../contexts/CategoriesContext';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import Calculator from '../components/Calculator';
 import OperationFormFields from '../components/operations/OperationFormFields';
-import MultiCurrencyFields from '../components/modals/MultiCurrencyFields';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -531,7 +530,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     </View>
                   </Pressable>
 
-                  {/* Shared Form Fields: Amount, Account(s), Category */}
+                  {/* Shared Form Fields: Amount, Account(s), Category, Multi-currency */}
                   <OperationFormFields
                     colors={colors}
                     t={t}
@@ -550,32 +549,19 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     transferLayout="stacked"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
+                    onExchangeRateChange={(text) => {
+                      if (!isShadowOperation) {
+                        setValues(v => ({ ...v, exchangeRate: text }));
+                        setLastEditedField('exchangeRate');
+                      }
+                    }}
+                    onDestinationAmountChange={(text) => {
+                      if (!isShadowOperation) {
+                        setValues(v => ({ ...v, destinationAmount: text }));
+                        setLastEditedField('destinationAmount');
+                      }
+                    }}
                   />
-
-                  {/* Multi-currency transfer fields (only for multi-currency transfers) */}
-                  {values.type === 'transfer' && isMultiCurrencyTransfer && sourceAccount && destinationAccount && (
-                    <MultiCurrencyFields
-                      colors={colors}
-                      t={t}
-                      sourceAccount={sourceAccount}
-                      destinationAccount={destinationAccount}
-                      exchangeRate={values.exchangeRate}
-                      destinationAmount={values.destinationAmount}
-                      isShadowOperation={isShadowOperation}
-                      onExchangeRateChange={(text) => {
-                        if (!isShadowOperation) {
-                          setValues(v => ({ ...v, exchangeRate: text }));
-                          setLastEditedField('exchangeRate');
-                        }
-                      }}
-                      onDestinationAmountChange={(text) => {
-                        if (!isShadowOperation) {
-                          setValues(v => ({ ...v, destinationAmount: text }));
-                          setLastEditedField('destinationAmount');
-                        }
-                      }}
-                    />
-                  )}
 
                   {/* Date Picker Button */}
                   <Pressable

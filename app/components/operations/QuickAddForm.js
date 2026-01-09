@@ -29,6 +29,9 @@ const QuickAddForm = memo(({
   getCategoryName,
   openPicker,
   handleQuickAdd,
+  handleAmountChange,
+  handleExchangeRateChange,
+  handleDestinationAmountChange,
   TYPES,
 }) => {
   const containerThemed = React.useMemo(() => ({
@@ -44,10 +47,6 @@ const QuickAddForm = memo(({
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
   }), [colors]);
-
-  const handleAmountChange = useCallback((text) => {
-    setQuickAddValues(v => ({ ...v, amount: text }));
-  }, [setQuickAddValues]);
 
   return (
     <View style={[styles.quickAddForm, containerThemed]}>
@@ -69,6 +68,8 @@ const QuickAddForm = memo(({
           showAccountBalance={true}
           showFieldIcons={true}
           transferLayout="sideBySide"
+          onExchangeRateChange={handleExchangeRateChange}
+          onDestinationAmountChange={handleDestinationAmountChange}
         />
       </View>
     </View>
@@ -89,6 +90,9 @@ QuickAddForm.propTypes = {
   getCategoryName: PropTypes.func.isRequired,
   openPicker: PropTypes.func.isRequired,
   handleQuickAdd: PropTypes.func.isRequired,
+  handleAmountChange: PropTypes.func.isRequired,
+  handleExchangeRateChange: PropTypes.func.isRequired,
+  handleDestinationAmountChange: PropTypes.func.isRequired,
   TYPES: PropTypes.array.isRequired,
 };
 

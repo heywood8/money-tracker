@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
+import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 
 /**
@@ -42,6 +43,8 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  * @param {string} props.transferLayout - 'sideBySide' or 'stacked' layout for transfer accounts
  * @param {boolean} props.disabled - Whether form is disabled
  * @param {string} props.containerBackground - Background color for calculator container
+ * @param {Function} props.onExchangeRateChange - Callback for exchange rate change (multi-currency transfers)
+ * @param {Function} props.onDestinationAmountChange - Callback for destination amount change (multi-currency transfers)
  */
 const OperationFormFields = memo(({
   colors,
@@ -63,6 +66,8 @@ const OperationFormFields = memo(({
   transferLayout = 'stacked',
   disabled = false,
   containerBackground,
+  onExchangeRateChange,
+  onDestinationAmountChange,
 }) => {
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -73,6 +78,22 @@ const OperationFormFields = memo(({
   const disabledStyle = useMemo(() =>
     disabled ? styles.disabledInput : null
   , [disabled]);
+
+  // Get source and destination accounts for multi-currency detection
+  const sourceAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.accountId);
+  }, [accounts, values.accountId]);
+
+  const destinationAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === values.toAccountId);
+  }, [accounts, values.toAccountId]);
+
+  // Check if this is a multi-currency transfer
+  const isMultiCurrencyTransfer = useMemo(() => {
+    if (values.type !== 'transfer') return false;
+    if (!sourceAccount || !destinationAccount) return false;
+    return sourceAccount.currency !== destinationAccount.currency;
+  }, [values.type, sourceAccount, destinationAccount]);
 
   // Render type selector buttons
   const renderTypeSelector = () => (
@@ -234,6 +255,19 @@ const OperationFormFields = memo(({
           containerBackground={containerBackground}
         />
       </View>
+      {isMultiCurrencyTransfer && sourceAccount && destinationAccount && onExchangeRateChange && onDestinationAmountChange && (
+        <MultiCurrencyFields
+          colors={colors}
+          t={t}
+          sourceAccount={sourceAccount}
+          destinationAccount={destinationAccount}
+          exchangeRate={values.exchangeRate || ''}
+          destinationAmount={values.destinationAmount || ''}
+          isShadowOperation={disabled}
+          onExchangeRateChange={onExchangeRateChange}
+          onDestinationAmountChange={onDestinationAmountChange}
+        />
+      )}
       {renderCategoryPicker()}
     </>
   );
@@ -267,6 +301,8 @@ OperationFormFields.propTypes = {
   transferLayout: PropTypes.oneOf(['sideBySide', 'stacked']),
   disabled: PropTypes.bool,
   containerBackground: PropTypes.string,
+  onExchangeRateChange: PropTypes.func,
+  onDestinationAmountChange: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
