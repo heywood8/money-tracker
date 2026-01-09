@@ -95,12 +95,12 @@ const OperationListItem = ({
             numberOfLines={1}
           >
             {formatCurrency(operation.accountId, operation.amount)}
+            {isMultiCurrencyTransfer && operation.toAccountId && (
+              <Text style={styles.destinationAmount}>
+                {' → '}{formatCurrency(operation.toAccountId, operation.destinationAmount)}
+              </Text>
+            )}
           </Text>
-          {isMultiCurrencyTransfer && operation.toAccountId && (
-            <Text style={[styles.destinationAmount, { color: colors.mutedText }]} numberOfLines={1}>
-              → {formatCurrency(operation.toAccountId, operation.destinationAmount)}
-            </Text>
-          )}
           <Text style={[styles.accountName, { color: colors.mutedText }]} numberOfLines={1}>
             {accountName}
             {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
@@ -136,22 +136,26 @@ OperationListItem.propTypes = {
 const styles = StyleSheet.create({
   accountName: {
     fontSize: 13,
+    includeFontPadding: false,
     marginTop: 2,
     textAlign: 'right',
+    textAlignVertical: 'center',
   },
   amount: {
     fontSize: 16,
     fontWeight: '600',
+    includeFontPadding: false,
     textAlign: 'right',
+    textAlignVertical: 'center',
   },
   categoryName: {
     fontSize: 15,
     fontWeight: '500',
   },
   destinationAmount: {
-    fontSize: 13,
-    marginTop: 2,
+    includeFontPadding: false,
     textAlign: 'right',
+    textAlignVertical: 'center',
   },
   operationContent: {
     alignItems: 'center',

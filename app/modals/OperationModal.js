@@ -498,8 +498,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
               <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
                 <ScrollView
                   style={styles.scrollView}
-                  contentContainerStyle={[styles.scrollContent, { paddingRight: SPACING.md }]}
-                  scrollIndicatorInsets={{ right: SPACING.md }}
+                  contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                 >
                   {isNew && (
@@ -546,7 +545,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     showTypeSelector={false}
                     showAccountBalance={false}
                     showFieldIcons={false}
-                    transferLayout="stacked"
+                    transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
                     onExchangeRateChange={(text) => {
@@ -941,25 +940,25 @@ const styles = StyleSheet.create({
   error: {
     color: '#ff6b6b',
     fontSize: 12,
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   fullFlex: {
     flex: 1,
   },
   input: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     fontSize: 16,
-    marginBottom: 12,
-    padding: 12,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
   },
   modalButton: {
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: BORDER_RADIUS.md,
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: SPACING.sm,
     minHeight: 48,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   modalButtonRow: {
     flexDirection: 'row',
@@ -967,12 +966,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   modalContent: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     elevation: 5,
     flexDirection: 'column',
     maxHeight: '80%',
     minHeight: '60%',
-    padding: 20,
+    padding: SPACING.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -993,13 +992,13 @@ const styles = StyleSheet.create({
   },
   pickerButton: {
     alignItems: 'center',
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
     minHeight: 48,
-    padding: 12,
+    padding: SPACING.md,
   },
   pickerButtonContent: {
     alignItems: 'center',
@@ -1014,9 +1013,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pickerModalContent: {
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     maxHeight: '70%',
-    padding: 12,
+    padding: SPACING.md,
     width: '90%',
   },
   pickerOption: {
@@ -1038,7 +1037,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: SPACING.xl,
   },
   scrollView: {
     flexGrow: 0,
