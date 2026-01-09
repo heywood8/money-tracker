@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.6](https://github.com/heywood8/money-tracker/compare/penny-v0.27.5...penny-v0.27.6) (2026-01-09)
+
+
+### Bug Fixes
+
+* UI tweaks: gaps between pickers, rounding, multi-currency transfer operation text positioning ([1aa1068](https://github.com/heywood8/money-tracker/commit/1aa1068425067b0bba86a803cddeb1053c1819a7))
+
 ## [0.27.5](https://github.com/heywood8/money-tracker/compare/penny-v0.27.4...penny-v0.27.5) (2026-01-08)
 
 
