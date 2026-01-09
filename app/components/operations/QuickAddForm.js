@@ -1,9 +1,7 @@
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import Calculator from '../Calculator';
-import { useTheme } from '../../contexts/ThemeContext';
+import { View, StyleSheet } from 'react-native';
+import OperationFormFields from './OperationFormFields';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 
 /**
@@ -11,6 +9,13 @@ import { SPACING, BORDER_RADIUS } from '../../styles/layout';
  *
  * A compact form for quickly adding operations (expenses, income, transfers)
  * Displays different fields based on operation type
+ *
+ * DEPENDENCIES:
+ * - OperationFormFields (app/components/operations/OperationFormFields.js) - Shared form fields
+ *
+ * NOTE: This component uses OperationFormFields for rendering form inputs.
+ * If modifying form field behavior, check if changes should be made in
+ * OperationFormFields instead to benefit all consumers.
  */
 const QuickAddForm = memo(({
   colors,
@@ -24,6 +29,9 @@ const QuickAddForm = memo(({
   getCategoryName,
   openPicker,
   handleQuickAdd,
+  handleAmountChange,
+  handleExchangeRateChange,
+  handleDestinationAmountChange,
   TYPES,
 }) => {
   const containerThemed = React.useMemo(() => ({
@@ -43,117 +51,26 @@ const QuickAddForm = memo(({
   return (
     <View style={[styles.quickAddForm, containerThemed]}>
       <View style={innerCardThemed}>
-        {/* Type Selector */}
-        <View style={styles.typeSelector}>
-          {TYPES.map(type => (
-            <Pressable
-              key={type.key}
-              style={[
-                styles.typeButton,
-                {
-                  backgroundColor: quickAddValues.type === type.key ? colors.primary : colors.inputBackground,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={() => setQuickAddValues(v => ({
-                ...v,
-                type: type.key,
-                categoryId: type.key === 'transfer' ? '' : v.categoryId,
-                toAccountId: '',
-              }))}
-            >
-              <Icon
-                name={type.icon}
-                size={18}
-                color={quickAddValues.type === type.key ? '#fff' : colors.text}
-              />
-              <Text style={quickAddValues.type === type.key ? [styles.typeButtonText, { color: '#fff' }] : [styles.typeButtonText, { color: colors.text }]}>
-                {type.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Account Pickers - Side by side for transfers */}
-        {quickAddValues.type === 'transfer' ? (
-          <View style={styles.accountPickersRow}>
-            {/* From Account Picker */}
-            <Pressable
-              style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => openPicker('account', visibleAccounts)}
-            >
-              <Icon name="wallet" size={18} color={colors.mutedText} />
-              <View style={styles.flex1}>
-                <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
-                  {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-                </Text>
-                {quickAddValues.accountId && (
-                  <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-                    {getAccountBalance(quickAddValues.accountId)}
-                  </Text>
-                )}
-              </View>
-            </Pressable>
-
-            {/* To Account Picker */}
-            <Pressable
-              style={[styles.formInputHalf, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-              onPress={() => openPicker('toAccount', visibleAccounts.filter(acc => acc.id !== quickAddValues.accountId))}
-            >
-              <Icon name="swap-horizontal" size={18} color={colors.mutedText} />
-              <View style={styles.flex1}>
-                <Text style={[styles.formInputText, { color: colors.text }]} numberOfLines={1}>
-                  {quickAddValues.toAccountId ? getAccountName(quickAddValues.toAccountId) : t('to_account')}
-                </Text>
-                {quickAddValues.toAccountId && (
-                  <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-                    {getAccountBalance(quickAddValues.toAccountId)}
-                  </Text>
-                )}
-              </View>
-            </Pressable>
-          </View>
-        ) : (
-        /* Account Picker for non-transfer operations */
-          <Pressable
-            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('account', visibleAccounts)}
-          >
-            <Icon name="wallet" size={18} color={colors.mutedText} />
-            <View style={styles.flex1}>
-              <Text style={[styles.formInputText, { color: colors.text }]}>
-                {quickAddValues.accountId ? getAccountName(quickAddValues.accountId) : t('select_account')}
-              </Text>
-              {quickAddValues.accountId && (
-                <Text style={[styles.accountBalanceText, { color: colors.mutedText }]}>
-                  {getAccountBalance(quickAddValues.accountId)}
-                </Text>
-              )}
-            </View>
-          </Pressable>
-        )}
-
-        {/* Amount Calculator */}
-        <Calculator
-          value={quickAddValues.amount}
-          onValueChange={text => setQuickAddValues(v => ({ ...v, amount: text }))}
+        <OperationFormFields
           colors={colors}
-          placeholder={t('amount')}
+          t={t}
+          values={quickAddValues}
+          setValues={setQuickAddValues}
+          accounts={visibleAccounts}
+          categories={filteredCategories}
+          getAccountName={getAccountName}
+          getAccountBalance={getAccountBalance}
+          getCategoryName={getCategoryName}
+          openPicker={openPicker}
+          onAmountChange={handleAmountChange}
           onAdd={handleQuickAdd}
+          TYPES={TYPES}
+          showAccountBalance={true}
+          showFieldIcons={true}
+          transferLayout="sideBySide"
+          onExchangeRateChange={handleExchangeRateChange}
+          onDestinationAmountChange={handleDestinationAmountChange}
         />
-
-        {/* Category Picker */}
-        {quickAddValues.type !== 'transfer' && (
-          <Pressable
-            style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-            onPress={() => openPicker('category', filteredCategories)}
-          >
-            <Icon name="tag" size={18} color={colors.mutedText} />
-            <Text style={[styles.formInputText, { color: colors.text }]}>
-              {getCategoryName(quickAddValues.categoryId)}
-            </Text>
-          </Pressable>
-        )}
       </View>
     </View>
   );
@@ -173,44 +90,13 @@ QuickAddForm.propTypes = {
   getCategoryName: PropTypes.func.isRequired,
   openPicker: PropTypes.func.isRequired,
   handleQuickAdd: PropTypes.func.isRequired,
+  handleAmountChange: PropTypes.func.isRequired,
+  handleExchangeRateChange: PropTypes.func.isRequired,
+  handleDestinationAmountChange: PropTypes.func.isRequired,
   TYPES: PropTypes.array.isRequired,
 };
 
 const styles = StyleSheet.create({
-  accountBalanceText: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  accountPickersRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  flex1: {
-    flex: 1,
-  },
-  formInput: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 48,
-    padding: SPACING.md,
-  },
-  formInputHalf: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    minHeight: 48,
-    padding: SPACING.md,
-  },
-  formInputText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
   quickAddForm: {
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 0,
@@ -223,26 +109,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-  },
-  typeButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  typeButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
   },
 });
 

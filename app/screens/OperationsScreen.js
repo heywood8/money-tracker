@@ -82,6 +82,8 @@ const OperationsScreen = () => {
     categoryId: '',
     description: '',
     toAccountId: '',
+    exchangeRate: '',
+    destinationAmount: '',
   });
   const [pickerState, setPickerState] = useState({
     visible: false,
@@ -322,6 +324,20 @@ const OperationsScreen = () => {
       date: toDateString(new Date()),
     };
 
+    // Add currency information for multi-currency transfers
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
+      operationData.sourceCurrency = sourceAccount.currency;
+      operationData.destinationCurrency = destinationAccount.currency;
+      // Format amounts based on currency decimal places
+      operationData.amount = Currency.formatAmount(operationData.amount, sourceAccount.currency);
+      if (operationData.destinationAmount) {
+        operationData.destinationAmount = Currency.formatAmount(operationData.destinationAmount, destinationAccount.currency);
+      }
+    } else if (sourceAccount) {
+      // Format amount for same-currency operations
+      operationData.amount = Currency.formatAmount(operationData.amount, sourceAccount.currency);
+    }
+
     const error = validateOperation(operationData, t);
     if (error) {
       showDialog(t('error'), error, [{ text: 'OK' }]);
@@ -344,13 +360,15 @@ const OperationsScreen = () => {
         categoryId: '',
         description: '',
         toAccountId: '',
+        exchangeRate: '',
+        destinationAmount: '',
       });
 
       Keyboard.dismiss();
     } catch (error) {
       // Error already shown in addOperation
     }
-  }, [quickAddValues, validateOperation, addOperation, t, showDialog]);
+  }, [quickAddValues, validateOperation, addOperation, t, showDialog, isMultiCurrencyTransfer, sourceAccount, destinationAccount]);
 
   // Get account name
   const getAccountName = useCallback((accountId) => {
@@ -396,6 +414,81 @@ const OperationsScreen = () => {
       return cat.categoryType === quickAddValues.type;
     });
   }, [categories, quickAddValues.type]);
+
+  // Multi-currency transfer support
+  const [lastEditedField, setLastEditedField] = useState(null);
+
+  // Get source and destination accounts for multi-currency detection
+  const sourceAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === quickAddValues.accountId);
+  }, [accounts, quickAddValues.accountId]);
+
+  const destinationAccount = useMemo(() => {
+    return accounts.find(acc => acc.id === quickAddValues.toAccountId);
+  }, [accounts, quickAddValues.toAccountId]);
+
+  // Check if this is a multi-currency transfer
+  const isMultiCurrencyTransfer = useMemo(() => {
+    if (quickAddValues.type !== 'transfer') return false;
+    if (!sourceAccount || !destinationAccount) return false;
+    return sourceAccount.currency !== destinationAccount.currency;
+  }, [quickAddValues.type, sourceAccount, destinationAccount]);
+
+  // Auto-populate exchange rate when accounts change
+  useEffect(() => {
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !quickAddValues.exchangeRate) {
+      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+      if (rate) {
+        setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
+        setLastEditedField('exchangeRate');
+      }
+    }
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
+
+  // Auto-calculate based on which field was last edited
+  useEffect(() => {
+    if (!isMultiCurrencyTransfer) {
+      // Clear exchange rate fields for same-currency transfers
+      if (quickAddValues.exchangeRate || quickAddValues.destinationAmount) {
+        setQuickAddValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+        setLastEditedField(null);
+      }
+      return;
+    }
+
+    if (!sourceAccount || !destinationAccount) return;
+
+    // If user edited destination amount, calculate the rate
+    if (lastEditedField === 'destinationAmount') {
+      if (quickAddValues.amount && quickAddValues.destinationAmount) {
+        const sourceAmount = parseFloat(quickAddValues.amount);
+        const destAmount = parseFloat(quickAddValues.destinationAmount);
+
+        if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
+          const calculatedRate = (destAmount / sourceAmount).toFixed(6);
+          const currentRate = parseFloat(quickAddValues.exchangeRate || '0');
+          const newRate = parseFloat(calculatedRate);
+          if (Math.abs(currentRate - newRate) > 0.000001) {
+            setQuickAddValues(v => ({ ...v, exchangeRate: calculatedRate }));
+          }
+        }
+      }
+    }
+    // If user edited amount or rate, calculate destination amount
+    else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
+      if (quickAddValues.amount && quickAddValues.exchangeRate) {
+        const converted = Currency.convertAmount(
+          quickAddValues.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          quickAddValues.exchangeRate,
+        );
+        if (converted && converted !== quickAddValues.destinationAmount) {
+          setQuickAddValues(v => ({ ...v, destinationAmount: converted }));
+        }
+      }
+    }
+  }, [isMultiCurrencyTransfer, quickAddValues.amount, quickAddValues.exchangeRate, quickAddValues.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
 
   // Calculate spending sums by currency for a group of operations
   const calculateSpendingSums = useCallback((operations) => {
@@ -523,6 +616,22 @@ const OperationsScreen = () => {
     { key: 'transfer', label: t('transfer'), icon: 'swap-horizontal' },
   ], [t]);
 
+  // Callbacks for multi-currency fields
+  const handleExchangeRateChange = useCallback((text) => {
+    setQuickAddValues(v => ({ ...v, exchangeRate: text }));
+    setLastEditedField('exchangeRate');
+  }, []);
+
+  const handleDestinationAmountChange = useCallback((text) => {
+    setQuickAddValues(v => ({ ...v, destinationAmount: text }));
+    setLastEditedField('destinationAmount');
+  }, []);
+
+  const handleAmountChange = useCallback((text) => {
+    setQuickAddValues(v => ({ ...v, amount: text }));
+    setLastEditedField('amount');
+  }, []);
+
   const quickAddFormComponent = useMemo(() => (
     <QuickAddForm
       colors={colors}
@@ -536,9 +645,12 @@ const OperationsScreen = () => {
       getCategoryName={getCategoryName}
       openPicker={openPicker}
       handleQuickAdd={handleQuickAdd}
+      handleAmountChange={handleAmountChange}
+      handleExchangeRateChange={handleExchangeRateChange}
+      handleDestinationAmountChange={handleDestinationAmountChange}
       TYPES={TYPES}
     />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, TYPES]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, TYPES]);
 
   // Handle end reached for lazy loading
   const handleEndReached = useCallback(() => {
@@ -756,6 +868,8 @@ const OperationsScreen = () => {
                               categoryId: '',
                               description: '',
                               toAccountId: '',
+                              exchangeRate: '',
+                              destinationAmount: '',
                             });
                             closePicker();
 
