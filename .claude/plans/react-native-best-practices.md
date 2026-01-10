@@ -5,10 +5,10 @@ Analysis of the Penny Finance Tracker codebase identified numerous violations of
 
 ---
 
-## 🔴 #1 - Component Size (CRITICAL)
+## 🔴 #1 - Component Size (CRITICAL) - ⚠️ PARTIALLY COMPLETE
 
-### Problem
-Multiple screen components violate the single responsibility principle and are extremely difficult to maintain:
+### Original Problem
+Three massively oversized screen components violated the single responsibility principle:
 
 - **GraphsScreen.js**: 2,091 lines
 - **OperationsScreen.js**: 1,284 lines
@@ -21,48 +21,130 @@ Multiple screen components violate the single responsibility principle and are e
 - **Code reuse**: Logic is locked inside massive components
 - **Team collaboration**: High merge conflict potential
 
-### Solution
-Break down each massive component into focused, single-purpose components:
+---
 
-**GraphsScreen.js → 5-6 components:**
-- `BalanceHistoryCard` (chart + data table)
-- `ExpensePieChart` (pie chart + category breakdown)
-- `IncomePieChart` (pie chart + category breakdown)
-- `SpendingPredictionCard` (prediction progress + stats)
-- `ExpenseSummaryCard` (monthly summary)
-- `IncomeSummaryCard` (monthly summary)
+### ✅ Phase 1: Component Extraction (COMPLETED)
 
-**OperationsScreen.js → 4-5 components:**
-- `QuickAddForm` (quick entry form at top)
-- `OperationsList` (FlatList with filters)
-- `OperationListItem` (single operation row)
-- `DateSeparator` (date header between groups)
-- Keep main screen for coordination
+**GraphsScreen.js: 2,091 → 1,423 lines (-668 lines, -32%)**
+- ✅ `BalanceHistoryCard.js` - Balance history chart with data table
+- ✅ `CustomLegend.js` - Reusable chart legend component
+- ✅ `ExpensePieChart.js` - Expense category pie chart
+- ✅ `ExpenseSummaryCard.js` - Monthly expense summary
+- ✅ `IncomePieChart.js` - Income category pie chart
+- ✅ `IncomeSummaryCard.js` - Monthly income summary
+- ✅ `SpendingPredictionCard.js` - Spending prediction with progress
 
-**OperationModal.js → 3-4 components:**
-- `OperationForm` (main form fields)
-- `CategoryPicker` (modal for category selection)
-- `MultiCurrencyFields` (exchange rate fields)
-- Keep modal wrapper for orchestration
+**OperationsScreen.js: 1,284 → 1,011 lines (-273 lines, -21%)**
+- ✅ `DateSeparator.js` - Date header between operation groups
+- ✅ `OperationFormFields.js` (12KB) - Reusable form fields for operations
+- ✅ `OperationListItem.js` - Single operation row
+- ✅ `OperationsList.js` - FlatList with filters
+- ✅ `QuickAddForm.js` - Quick entry form
 
-### Files to Modify
-- `app/screens/GraphsScreen.js`
-- `app/screens/OperationsScreen.js`
-- `app/modals/OperationModal.js`
+**OperationModal.js: 1,167 → 1,074 lines (-93 lines, -8%)**
+- ✅ `OperationFormFields.js` - Shared form fields (reused with OperationsScreen)
 
-### Files to Create
-- `app/components/graphs/BalanceHistoryCard.js`
-- `app/components/graphs/ExpensePieChart.js`
-- `app/components/graphs/IncomePieChart.js`
-- `app/components/graphs/SpendingPredictionCard.js`
-- `app/components/graphs/ExpenseSummaryCard.js`
-- `app/components/graphs/IncomeSummaryCard.js`
-- `app/components/operations/QuickAddForm.js`
-- `app/components/operations/OperationsList.js`
-- `app/components/operations/OperationListItem.js`
-- `app/components/operations/DateSeparator.js`
-- `app/components/operations/CategoryPicker.js`
-- `app/components/operations/MultiCurrencyFields.js`
+**Progress**: 13 components extracted, **1,034 lines removed** total.
+
+---
+
+### ⚠️ Current Status
+
+While component extraction goals were met, **all three files remain over 1,000 lines**, which is still quite large. Ideally, screen components should be **under 500-600 lines** for optimal maintainability.
+
+| File | Original | Current | Reduction | Target | Remaining Work |
+|------|----------|---------|-----------|--------|----------------|
+| **GraphsScreen.js** | 2,091 | 1,423 | -32% | <600 | ~800 lines |
+| **OperationsScreen.js** | 1,284 | 1,011 | -21% | <600 | ~400 lines |
+| **OperationModal.js** | 1,167 | 1,074 | -8% | <600 | ~450 lines |
+
+---
+
+### 🎯 Phase 2: Custom Hooks & Additional Extraction (REMAINING)
+
+**GraphsScreen.js → Target: <600 lines**
+
+Extract stateful logic into custom hooks:
+- [ ] `app/hooks/useExpenseData.js` (~200 lines) - loadExpenseData logic + state
+- [ ] `app/hooks/useIncomeData.js` (~140 lines) - loadIncomeData logic + state
+- [ ] `app/hooks/useBalanceHistory.js` (~180 lines) - loadBalanceHistory + calculations
+
+Extract remaining modals:
+- [ ] `app/components/graphs/ChartModal.js` (~100 lines) - Expense/Income chart modal
+- [ ] `app/components/graphs/BalanceHistoryModal.js` (~110 lines) - Balance edit table modal
+
+**Expected reduction**: 1,423 → ~400 lines
+
+---
+
+**OperationsScreen.js → Target: <600 lines**
+
+Extract stateful logic into custom hooks:
+- [ ] `app/hooks/useOperationPicker.js` (~150 lines) - Picker state + category navigation
+- [ ] `app/hooks/useMultiCurrencyTransfer.js` (~100 lines) - Multi-currency logic + calculations
+- [ ] `app/hooks/useQuickAddForm.js` (~120 lines) - Quick add state + handlers
+
+Extract modal:
+- [ ] `app/components/operations/PickerModal.js` (~130 lines) - Unified picker with breadcrumb
+
+**Expected reduction**: 1,011 → ~500 lines
+
+---
+
+**OperationModal.js → Target: <600 lines**
+
+Extract stateful logic into custom hooks:
+- [ ] `app/hooks/useOperationForm.js` (~150 lines) - Form state + validation + save logic
+- [ ] Reuse `app/hooks/useMultiCurrencyTransfer.js` from OperationsScreen
+- [ ] `app/hooks/useCategoryNavigation.js` (~80 lines) - Category folder navigation
+
+Extract modal:
+- [ ] Reuse `app/components/operations/PickerModal.js` from OperationsScreen
+
+**Expected reduction**: 1,074 → ~550 lines
+
+---
+
+### Files Modified (Phase 1)
+- ✅ `app/screens/GraphsScreen.js`
+- ✅ `app/screens/OperationsScreen.js`
+- ✅ `app/modals/OperationModal.js`
+
+### Files Created (Phase 1)
+- ✅ `app/components/graphs/BalanceHistoryCard.js`
+- ✅ `app/components/graphs/CustomLegend.js`
+- ✅ `app/components/graphs/ExpensePieChart.js`
+- ✅ `app/components/graphs/ExpenseSummaryCard.js`
+- ✅ `app/components/graphs/IncomePieChart.js`
+- ✅ `app/components/graphs/IncomeSummaryCard.js`
+- ✅ `app/components/graphs/SpendingPredictionCard.js`
+- ✅ `app/components/operations/DateSeparator.js`
+- ✅ `app/components/operations/OperationFormFields.js`
+- ✅ `app/components/operations/OperationListItem.js`
+- ✅ `app/components/operations/OperationsList.js`
+- ✅ `app/components/operations/QuickAddForm.js`
+
+### Files to Create (Phase 2)
+- [ ] `app/hooks/useExpenseData.js`
+- [ ] `app/hooks/useIncomeData.js`
+- [ ] `app/hooks/useBalanceHistory.js`
+- [ ] `app/hooks/useOperationPicker.js`
+- [ ] `app/hooks/useMultiCurrencyTransfer.js`
+- [ ] `app/hooks/useQuickAddForm.js`
+- [ ] `app/hooks/useOperationForm.js`
+- [ ] `app/hooks/useCategoryNavigation.js`
+- [ ] `app/components/graphs/ChartModal.js`
+- [ ] `app/components/graphs/BalanceHistoryModal.js`
+- [ ] `app/components/operations/PickerModal.js`
+
+### Benefits of Phase 2
+1. **Custom Hooks** - Extract complex stateful logic (data loading, form management, calculations)
+2. **Modal Components** - Separate picker/table modals for better reusability
+3. **Better Testing** - Hooks and modals can be tested independently
+4. **Code Reuse** - `useMultiCurrencyTransfer` and `PickerModal` shared across screens
+5. **Easier Debugging** - Smaller, focused components with single responsibilities
+
+**Estimated total reduction**: 3,508 → ~1,550 lines (**~2,000 lines removed, 57% reduction**)
 
 ---
 
