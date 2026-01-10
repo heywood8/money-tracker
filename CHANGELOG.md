@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/heywood8/money-tracker/compare/penny-v0.27.6...penny-v0.28.0) (2026-01-10)
+
+
+### Features
+
+* Extract custom hooks and modal components to reduce component size ([#209](https://github.com/heywood8/money-tracker/issues/209)) ([ef0cab9](https://github.com/heywood8/money-tracker/commit/ef0cab9a60f1b76f2d86d84d1d349f5b3e6c33c8))
+
 ## [0.27.6](https://github.com/heywood8/money-tracker/compare/penny-v0.27.5...penny-v0.27.6) (2026-01-09)
 
 
