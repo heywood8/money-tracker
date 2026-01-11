@@ -165,13 +165,13 @@ const OperationsScreen = () => {
     }
   }, [quickAddValues.type, quickAddValues.accountId, accounts, visibleAccounts]);
 
-  const handleEditOperation = (operation) => {
+  const handleEditOperation = useCallback((operation) => {
     setEditingOperation(operation);
     setIsNew(false);
     setModalVisible(true);
-  };
+  }, []);
 
-  const handleDeleteOperation = (operation) => {
+  const handleDeleteOperation = useCallback((operation) => {
     showDialog(
       t('delete_operation'),
       t('delete_operation_confirm'),
@@ -184,7 +184,7 @@ const OperationsScreen = () => {
         },
       ],
     );
-  };
+  }, [t, showDialog, deleteOperation]);
 
   const handleDateSeparatorPress = useCallback((dateString) => {
     // Parse the date and set it as the selected date
