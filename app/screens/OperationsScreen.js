@@ -388,6 +388,32 @@ const OperationsScreen = () => {
     setLastEditedField('amount');
   }, []);
 
+  // Handlers for picker modal selections
+  const handleSelectAccount = useCallback((id) => {
+    setQuickAddValues(v => ({ ...v, accountId: id }));
+  }, []);
+
+  const handleSelectToAccount = useCallback((id) => {
+    setQuickAddValues(v => ({ ...v, toAccountId: id }));
+  }, []);
+
+  const handleSelectCategory = useCallback((id) => {
+    setQuickAddValues(v => ({ ...v, categoryId: id }));
+  }, []);
+
+  // Handlers for modal visibility
+  const handleOpenFilterModal = useCallback(() => {
+    setFilterModalVisible(true);
+  }, []);
+
+  const handleCloseFilterModal = useCallback(() => {
+    setFilterModalVisible(false);
+  }, []);
+
+  const handleCloseOperationModal = useCallback(() => {
+    setModalVisible(false);
+  }, []);
+
   const quickAddFormComponent = useMemo(() => (
     <QuickAddForm
       colors={colors}
@@ -486,13 +512,13 @@ const OperationsScreen = () => {
         colors={colors}
         t={t}
         onClose={closePicker}
-        onSelectAccount={(id) => setQuickAddValues(v => ({ ...v, accountId: id }))}
-        onSelectToAccount={(id) => setQuickAddValues(v => ({ ...v, toAccountId: id }))}
+        onSelectAccount={handleSelectAccount}
+        onSelectToAccount={handleSelectToAccount}
         categoryNavigation={categoryNavigation}
         quickAddValues={quickAddValues}
         onNavigateBack={navigateBack}
         onNavigateIntoFolder={navigateIntoFolder}
-        onSelectCategory={(id) => setQuickAddValues(v => ({ ...v, categoryId: id }))}
+        onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
       />
 
@@ -519,7 +545,7 @@ const OperationsScreen = () => {
               { backgroundColor: filtersActive ? colors.primary : colors.surface },
             ]}
             color={filtersActive ? '#fff' : colors.text}
-            onPress={() => setFilterModalVisible(true)}
+            onPress={handleOpenFilterModal}
             label={filtersActive ? String(getActiveFilterCount()) : undefined}
             small={false}
           />
@@ -542,7 +568,7 @@ const OperationsScreen = () => {
       {/* Filter Modal */}
       <FilterModal
         visible={filterModalVisible}
-        onClose={() => setFilterModalVisible(false)}
+        onClose={handleCloseFilterModal}
         filters={activeFilters}
         onApplyFilters={updateFilters}
         accounts={visibleAccounts}
@@ -553,7 +579,7 @@ const OperationsScreen = () => {
 
       <OperationModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        onClose={handleCloseOperationModal}
         operation={editingOperation}
         isNew={isNew}
         onDelete={handleDeleteOperation}
