@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.0](https://github.com/heywood8/money-tracker/compare/penny-v0.28.0...penny-v0.29.0) (2026-01-11)
+
+
+### Features
+
+* performance optimization by eliminating anonymous function creation in JSX render cycles. ([#212](https://github.com/heywood8/money-tracker/issues/212)) ([7e46997](https://github.com/heywood8/money-tracker/commit/7e469979d69ba28554c50c2ae438e55e4961124c))
+
+
+### Performance Improvements
+
+* complete anonymous function optimization in OperationsScreen ([8ebffc4](https://github.com/heywood8/money-tracker/commit/8ebffc4eab4915ee007554503d44d3fdfaea56f1))
+
 ## [0.28.0](https://github.com/heywood8/money-tracker/compare/penny-v0.27.6...penny-v0.28.0) (2026-01-10)
 
 
