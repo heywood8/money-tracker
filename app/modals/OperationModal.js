@@ -251,7 +251,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         }
       }
     }
-  }, [values, setValues, closePicker, isNew, addOperation, onClose]);
+  }, [values, setValues, closePicker, isNew, addOperation, onClose, hasOperation, evaluateExpression]);
 
   // FlatList key extractor
   const keyExtractor = useCallback((item) => {
