@@ -322,19 +322,23 @@ const GraphsScreen = () => {
   }, [chartData, categories, selectedYear, selectedMonth]);
 
   // Handlers for opening modals
-  const openExpenseModal = () => {
+  const openExpenseModal = useCallback(() => {
     setModalType('expense');
     setModalVisible(true);
-  };
+  }, []);
 
-  const openIncomeModal = () => {
+  const openIncomeModal = useCallback(() => {
     setModalType('income');
     setModalVisible(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalVisible(false);
-  };
+  }, []);
+
+  const closeBalanceHistoryModal = useCallback(() => {
+    setBalanceHistoryModalVisible(false);
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -450,7 +454,7 @@ const GraphsScreen = () => {
         visible={balanceHistoryModalVisible}
         colors={colors}
         t={t}
-        onClose={() => setBalanceHistoryModalVisible(false)}
+        onClose={closeBalanceHistoryModal}
         balanceHistoryTableData={balanceHistoryTableData}
         editingBalanceRow={editingBalanceRow}
         editingBalanceValue={editingBalanceValue}
