@@ -420,6 +420,30 @@ export default function AccountsScreen() {
     setCreateAdjustmentOperation(prev => !prev);
   }, []);
 
+  const handleToggleHiddenSwitch = useCallback((value) => {
+    setEditValues(prev => ({ ...prev, hidden: value ? 1 : 0 }));
+  }, []);
+
+  const handleDeleteEditingAccount = useCallback(() => {
+    deleteAccountHandler(editingId);
+  }, [deleteAccountHandler, editingId]);
+
+  const handleCloseDeleteConfirm = useCallback(() => {
+    setDeleteConfirmVisible(false);
+  }, []);
+
+  const handleCloseTransferConfirm = useCallback(() => {
+    setTransferConfirmVisible(false);
+    setAccountToDelete(null);
+    setAccountToDeleteCurrency(null);
+    setOperationCount(0);
+    setTransferConfirmDestinationId(null);
+  }, []);
+
+  const handleCloseNoCurrencyMatch = useCallback(() => {
+    setNoCurrencyMatchVisible(false);
+  }, []);
+
   const handleCloseTransferModal = useCallback(() => {
     setTransferModalVisible(false);
     setAccountToDelete(null);
@@ -486,6 +510,15 @@ export default function AccountsScreen() {
       currencySymbol: currencies[acc.currency]?.symbol || acc.currency,
     }));
   }, [displayedAccounts, currencies]);
+
+  // Memoize transfer confirmation message
+  const transferConfirmMessage = useMemo(() => {
+    if (!accountToDelete || !transferConfirmDestinationId) return '';
+    const sourceAccount = accounts.find(a => a.id === accountToDelete);
+    const destAccount = accounts.find(a => a.id === transferConfirmDestinationId);
+    if (!sourceAccount || !destAccount) return '';
+    return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
+  }, [accountToDelete, transferConfirmDestinationId, accounts, operationCount, t]);
 
   const renderItem = useCallback(({ item, index, drag, isActive }) => (
     <AccountRow
@@ -637,7 +670,7 @@ export default function AccountsScreen() {
                 </View>
                 <Switch
                   value={!!editValues.hidden}
-                  onValueChange={(value) => setEditValues(prev => ({ ...prev, hidden: value ? 1 : 0 }))}
+                  onValueChange={handleToggleHiddenSwitch}
                   color={colors.primary}
                 />
               </View>
@@ -658,7 +691,7 @@ export default function AccountsScreen() {
                 <Button
                   mode="contained"
                   buttonColor={colors.delete}
-                  onPress={() => deleteAccountHandler(editingId)}
+                  onPress={handleDeleteEditingAccount}
                   style={styles.modalButton}
                 >
                   {t('delete') || 'Delete'}
@@ -695,7 +728,7 @@ export default function AccountsScreen() {
       {/* Simple delete confirmation */}
       <ConfirmationDialog
         visible={deleteConfirmVisible}
-        onClose={() => setDeleteConfirmVisible(false)}
+        onClose={handleCloseDeleteConfirm}
         title={t('delete_account') || 'Delete Account'}
         message={t('delete_account_confirm') || 'Are you sure you want to delete this account?'}
         cancelText={t('cancel') || 'Cancel'}
@@ -708,21 +741,9 @@ export default function AccountsScreen() {
       {/* Transfer and delete confirmation */}
       <ConfirmationDialog
         visible={transferConfirmVisible}
-        onClose={() => {
-          setTransferConfirmVisible(false);
-          setAccountToDelete(null);
-          setAccountToDeleteCurrency(null);
-          setOperationCount(0);
-          setTransferConfirmDestinationId(null);
-        }}
+        onClose={handleCloseTransferConfirm}
         title={t('confirm_delete_and_transfer') || 'Confirm Deletion'}
-        message={(() => {
-          if (!accountToDelete || !transferConfirmDestinationId) return '';
-          const sourceAccount = accounts.find(a => a.id === accountToDelete);
-          const destAccount = accounts.find(a => a.id === transferConfirmDestinationId);
-          if (!sourceAccount || !destAccount) return '';
-          return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
-        })()}
+        message={transferConfirmMessage}
         cancelText={t('cancel') || 'Cancel'}
         confirmText={t('delete') || 'Delete'}
         onConfirm={handleConfirmTransferAndDelete}
@@ -733,12 +754,12 @@ export default function AccountsScreen() {
       {/* Error/info dialog (no currency match, errors, etc.) */}
       <ConfirmationDialog
         visible={noCurrencyMatchVisible}
-        onClose={() => setNoCurrencyMatchVisible(false)}
+        onClose={handleCloseNoCurrencyMatch}
         title={t('cannot_delete_account') || 'Cannot Delete Account'}
         message={noCurrencyMatchMessage}
         cancelText=""
         confirmText={t('ok') || 'OK'}
-        onConfirm={() => setNoCurrencyMatchVisible(false)}
+        onConfirm={handleCloseNoCurrencyMatch}
         colors={colors}
       />
 

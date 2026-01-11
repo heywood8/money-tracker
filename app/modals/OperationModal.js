@@ -120,6 +120,217 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
   }, [isShadowOperation, setValues, setLastEditedField]);
 
+  // Handler for exchange rate changes
+  const handleExchangeRateChange = useCallback((text) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, exchangeRate: text }));
+      setLastEditedField('exchangeRate');
+    }
+  }, [isShadowOperation, setValues, setLastEditedField]);
+
+  // Handler for destination amount changes
+  const handleDestinationAmountChange = useCallback((text) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, destinationAmount: text }));
+      setLastEditedField('destinationAmount');
+    }
+  }, [isShadowOperation, setValues, setLastEditedField]);
+
+  // Handler for description changes
+  const handleDescriptionChange = useCallback((text) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, description: text }));
+    }
+  }, [isShadowOperation, setValues]);
+
+  // Handler for opening type picker
+  const handleOpenTypePicker = useCallback(() => {
+    if (!isShadowOperation) {
+      openPicker('type', TYPES);
+    }
+  }, [isShadowOperation, openPicker]);
+
+  // Handler for opening date picker
+  const handleOpenDatePicker = useCallback(() => {
+    if (!isShadowOperation) {
+      setShowDatePicker(true);
+    }
+  }, [isShadowOperation, setShowDatePicker]);
+
+  // Handler for date picker change
+  const handleDateChange = useCallback((event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setValues(v => ({
+        ...v,
+        date: formatDate(selectedDate),
+      }));
+    }
+  }, [setValues]);
+
+  // Empty handler for preventing event propagation
+  const handleStopPropagation = useCallback(() => {}, []);
+
+  // Handler for type selection in picker
+  const handleTypeSelect = useCallback((selectedType) => {
+    setValues(v => {
+      // If switching to transfer, always clear categoryId
+      if (selectedType === 'transfer') {
+        return { ...v, type: selectedType, categoryId: '' };
+      }
+
+      // If switching between expense <-> income, clear categoryId
+      // to force user to pick a category appropriate for the new type.
+      if ((v.type === 'expense' && selectedType === 'income') || (v.type === 'income' && selectedType === 'expense')) {
+        return { ...v, type: selectedType, categoryId: '' };
+      }
+
+      // For other switches (e.g., same type), keep existing categoryId
+      return { ...v, type: selectedType, categoryId: v.categoryId };
+    });
+    closePicker();
+  }, [setValues, closePicker]);
+
+  // Handler for account selection in picker
+  const handleAccountSelect = useCallback((accountId) => {
+    setValues(v => ({ ...v, accountId }));
+    closePicker();
+  }, [setValues, closePicker]);
+
+  // Handler for "to account" selection in picker
+  const handleToAccountSelect = useCallback((accountId) => {
+    setValues(v => ({ ...v, toAccountId: accountId }));
+    closePicker();
+  }, [setValues, closePicker]);
+
+  // Handler for category selection in picker
+  const handleCategorySelect = useCallback(async (category) => {
+    // Automatically evaluate any pending math operation before saving
+    let finalAmount = values.amount;
+
+    if (hasOperation(values.amount)) {
+      const evaluated = evaluateExpression(values.amount);
+      if (evaluated !== null) {
+        finalAmount = evaluated;
+      }
+    }
+
+    // Select entry category and update amount in one setState call
+    setValues(v => ({ ...v, categoryId: category.id, amount: finalAmount }));
+    closePicker();
+
+    // Only auto-add for new operations, not when editing
+    if (isNew) {
+      // Check if amount is valid and auto-save
+      const hasValidAmount = finalAmount &&
+        !isNaN(parseFloat(finalAmount)) &&
+        parseFloat(finalAmount) > 0;
+
+      if (hasValidAmount) {
+        // Build operation data directly with evaluated amount
+        const operationData = {
+          type: values.type,
+          amount: finalAmount, // Use the evaluated amount directly
+          accountId: values.accountId,
+          categoryId: category.id,
+          date: values.date,
+          description: values.description || null,
+        };
+
+        try {
+          await addOperation(operationData);
+
+          // Save last accessed account
+          if (operationData.accountId) {
+            setLastAccessedAccount(operationData.accountId);
+          }
+
+          onClose();
+        } catch (error) {
+          console.error('[OperationModal] Failed to add operation:', error);
+        }
+      }
+    }
+  }, [values, setValues, closePicker, isNew, addOperation, onClose]);
+
+  // FlatList key extractor
+  const keyExtractor = useCallback((item) => {
+    if (pickerState.type === 'type') return item.key;
+    if (pickerState.type === 'account' || pickerState.type === 'toAccount') return item.id;
+    if (pickerState.type === 'category') return item.id;
+    return item.id || item.key;
+  }, [pickerState.type]);
+
+  // FlatList render item
+  const renderPickerItem = useCallback(({ item }) => {
+    if (pickerState.type === 'type') {
+      return (
+        <Pressable
+          onPress={() => handleTypeSelect(item.key)}
+          style={({ pressed }) => [
+            styles.pickerOption,
+            { borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <View style={styles.pickerOptionContent}>
+            <Icon name={item.icon} size={24} color={colors.text} />
+            <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.label}</Text>
+          </View>
+        </Pressable>
+      );
+    } else if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
+      const handlePress = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
+      return (
+        <Pressable
+          onPress={() => handlePress(item.id)}
+          style={({ pressed }) => [
+            styles.pickerOption,
+            { borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <View style={styles.accountOption}>
+            <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
+            <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}>
+              {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    } else if (pickerState.type === 'category') {
+      // Determine if this is a folder or entry
+      const isFolder = item.type === 'folder';
+
+      return (
+        <Pressable
+          onPress={() => {
+            if (isFolder) {
+              // Navigate into folder
+              navigateIntoFolder(item);
+            } else {
+              handleCategorySelect(item);
+            }
+          }}
+          style={({ pressed }) => [
+            styles.pickerOption,
+            { borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <View style={styles.categoryOption}>
+            <Icon name={item.icon} size={24} color={colors.text} />
+            <Text style={[styles.pickerOptionText, styles.categoryLabel, { color: colors.text }]}>
+              {item.nameKey ? t(item.nameKey) : item.name}
+            </Text>
+            {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
+          </View>
+        </Pressable>
+      );
+    }
+    return null;
+  }, [pickerState.type, colors, handleTypeSelect, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
+
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
     { key: 'income', label: t('income'), icon: 'plus-circle' },
@@ -140,7 +351,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             style={styles.fullFlex}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
-              <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
                 <ScrollView
                   style={styles.scrollView}
                   contentContainerStyle={styles.scrollContent}
@@ -159,7 +370,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                       isShadowOperation && styles.disabledInput,
                     ]}
-                    onPress={() => !isShadowOperation && openPicker('type', TYPES)}
+                    onPress={handleOpenTypePicker}
                     disabled={isShadowOperation}
                   >
                     <View style={styles.pickerButtonContent}>
@@ -193,18 +404,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
-                    onExchangeRateChange={(text) => {
-                      if (!isShadowOperation) {
-                        setValues(v => ({ ...v, exchangeRate: text }));
-                        setLastEditedField('exchangeRate');
-                      }
-                    }}
-                    onDestinationAmountChange={(text) => {
-                      if (!isShadowOperation) {
-                        setValues(v => ({ ...v, destinationAmount: text }));
-                        setLastEditedField('destinationAmount');
-                      }
-                    }}
+                    onExchangeRateChange={handleExchangeRateChange}
+                    onDestinationAmountChange={handleDestinationAmountChange}
                   />
 
                   {/* Date Picker Button */}
@@ -214,7 +415,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                       isShadowOperation && styles.disabledInput,
                     ]}
-                    onPress={() => !isShadowOperation && setShowDatePicker(true)}
+                    onPress={handleOpenDatePicker}
                     disabled={isShadowOperation}
                     accessibilityRole="button"
                     accessibilityLabel={t('select_date')}
@@ -238,7 +439,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                         isShadowOperation && styles.disabledInput,
                       ]}
                       value={values.description}
-                      onChangeText={text => !isShadowOperation && setValues(v => ({ ...v, description: text }))}
+                      onChangeText={handleDescriptionChange}
                       placeholder={t('description')}
                       placeholderTextColor={colors.mutedText}
                       multiline
@@ -315,15 +516,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           value={new Date(values.date)}
           mode="date"
           display="default"
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              setValues(v => ({
-                ...v,
-                date: formatDate(selectedDate),
-              }));
-            }
-          }}
+          onChange={handleDateChange}
         />
       )}
 
@@ -335,7 +528,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         onRequestClose={closePicker}
       >
         <Pressable style={styles.modalOverlay} onPress={closePicker}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
             {/* Breadcrumb navigation for categories */}
             {pickerState.type === 'category' && categoryNavigation.breadcrumb.length > 0 && (
               <View style={[styles.breadcrumbContainer, { borderBottomColor: colors.border }]}>
@@ -350,150 +543,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
             <FlatList
               data={pickerState.data}
-              keyExtractor={(item) => {
-                if (pickerState.type === 'type') return item.key;
-                if (pickerState.type === 'account' || pickerState.type === 'toAccount') return item.id;
-                if (pickerState.type === 'category') return item.id;
-                return item.id || item.key;
-              }}
-              renderItem={({ item }) => {
-                if (pickerState.type === 'type') {
-                  return (
-                    <Pressable
-                      onPress={() => {
-                        setValues(v => {
-                          // If switching to transfer, always clear categoryId
-                          if (item.key === 'transfer') {
-                            return { ...v, type: item.key, categoryId: '' };
-                          }
-
-                          // If switching between expense <-> income, clear categoryId
-                          // to force user to pick a category appropriate for the new type.
-                          if ((v.type === 'expense' && item.key === 'income') || (v.type === 'income' && item.key === 'expense')) {
-                            return { ...v, type: item.key, categoryId: '' };
-                          }
-
-                          // For other switches (e.g., same type), keep existing categoryId
-                          return { ...v, type: item.key, categoryId: v.categoryId };
-                        });
-                        closePicker();
-                      }}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <View style={styles.pickerOptionContent}>
-                        <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.label}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                } else if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
-                  return (
-                    <Pressable
-                      onPress={() => {
-                        if (pickerState.type === 'account') {
-                          setValues(v => ({ ...v, accountId: item.id }));
-                        } else {
-                          setValues(v => ({ ...v, toAccountId: item.id }));
-                        }
-                        closePicker();
-                      }}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <View style={styles.accountOption}>
-                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}>
-                          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                } else if (pickerState.type === 'category') {
-                  // Determine if this is a folder or entry
-                  const isFolder = item.type === 'folder';
-
-                  return (
-                    <Pressable
-                      onPress={async () => {
-                        if (isFolder) {
-                          // Navigate into folder
-                          navigateIntoFolder(item);
-                        } else {
-                          // Automatically evaluate any pending math operation before saving
-                          let finalAmount = values.amount;
-
-                          if (hasOperation(values.amount)) {
-                            const evaluated = evaluateExpression(values.amount);
-                            if (evaluated !== null) {
-                              finalAmount = evaluated;
-                            }
-                          }
-
-                          // Select entry category and update amount in one setState call
-                          setValues(v => ({ ...v, categoryId: item.id, amount: finalAmount }));
-                          closePicker();
-
-                          // Only auto-add for new operations, not when editing
-                          if (isNew) {
-                            // Check if amount is valid and auto-save
-                            const hasValidAmount = finalAmount &&
-                              !isNaN(parseFloat(finalAmount)) &&
-                              parseFloat(finalAmount) > 0;
-
-                            if (hasValidAmount) {
-                              // Build operation data directly with evaluated amount
-                              const operationData = {
-                                type: values.type,
-                                amount: finalAmount, // Use the evaluated amount directly
-                                accountId: values.accountId,
-                                categoryId: item.id,
-                                date: values.date,
-                                description: values.description || null,
-                              };
-
-                              try {
-                                await addOperation(operationData);
-
-                                // Save last accessed account
-                                if (operationData.accountId) {
-                                  setLastAccessedAccount(operationData.accountId);
-                                }
-
-                                onClose();
-                              } catch (error) {
-                                console.error('[OperationModal] Failed to add operation:', error);
-                              }
-                            }
-                          }
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <View style={styles.categoryOption}>
-                        <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, styles.categoryLabel, { color: colors.text }]}> 
-                          {item.nameKey ? t(item.nameKey) : item.name}
-                        </Text>
-                        {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
-                      </View>
-                    </Pressable>
-                  );
-                }
-                return null;
-              }}
+              keyExtractor={keyExtractor}
+              renderItem={renderPickerItem}
               ListEmptyComponent={
-                <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}> 
+                <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
                   {pickerState.type === 'category' ? t('no_categories') : t('no_accounts')}
                 </Text>
               }
