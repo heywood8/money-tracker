@@ -47,7 +47,7 @@
     "@testing-library/react-native": "^12.6.1",
     "babel-preset-expo": "~54.0.9",
     "better-sqlite3": "^12.5.0",
-    "coverage-badge-creator": "^1.0.21",
+    "coverage-badge-creator": "^2.0.0",
     "drizzle-kit": "^1.0.0-beta.8-734e789",
     "eslint": "^9.39.2",
     "eslint-plugin-react": "^7.37.5",
