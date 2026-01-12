@@ -4,14 +4,6 @@
  * Similar to SimpleTabs.test.js approach for complex components with many dependencies
  */
 
-// Unmock the split contexts to use real implementations
-jest.unmock('../../app/contexts/ThemeConfigContext');
-jest.unmock('../../app/contexts/ThemeColorsContext');
-jest.unmock('../../app/contexts/AccountsDataContext');
-jest.unmock('../../app/contexts/AccountsActionsContext');
-jest.unmock('../../app/contexts/OperationsDataContext');
-jest.unmock('../../app/contexts/OperationsActionsContext');
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
@@ -38,8 +30,15 @@ jest.mock('react-native-draggable-flatlist', () => {
   };
 });
 
-jest.mock('../../app/contexts/ThemeContext', () => ({
-  useTheme: jest.fn(() => ({
+// Mock split theme contexts
+jest.mock('../../app/contexts/ThemeConfigContext', () => ({
+  useThemeConfig: jest.fn(() => ({
+    colorScheme: 'light',
+  })),
+}));
+
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: jest.fn(() => ({
     colors: {
       background: '#ffffff',
       surface: '#f5f5f5',
@@ -54,22 +53,27 @@ jest.mock('../../app/contexts/ThemeContext', () => ({
   })),
 }));
 
-jest.mock('../../app/contexts/AccountsContext', () => ({
-  useAccounts: jest.fn(() => ({
+// Mock split accounts contexts
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: jest.fn(() => ({
     accounts: [],
     displayedAccounts: [],
     hiddenAccounts: [],
     showHiddenAccounts: false,
-    toggleShowHiddenAccounts: jest.fn(),
     loading: false,
     error: null,
+  })),
+}));
+
+jest.mock('../../app/contexts/AccountsActionsContext', () => ({
+  useAccountsActions: jest.fn(() => ({
+    toggleShowHiddenAccounts: jest.fn(),
     addAccount: jest.fn(),
     updateAccount: jest.fn(),
     deleteAccount: jest.fn(),
     reorderAccounts: jest.fn(),
     validateAccount: jest.fn(),
     getOperationCount: jest.fn(() => Promise.resolve(0)),
-    currencies: require('../../assets/currencies.json'),
   })),
 }));
 
@@ -80,31 +84,36 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   })),
 }));
 
-// Helper function to create complete mock for AccountsContext
-const createAccountsMock = (overrides = {}) => ({
+// Helper functions to create complete mocks for split contexts
+const createAccountsDataMock = (overrides = {}) => ({
   accounts: [],
   displayedAccounts: [],
   hiddenAccounts: [],
   showHiddenAccounts: false,
-  toggleShowHiddenAccounts: jest.fn(),
   loading: false,
   error: null,
+  ...overrides,
+});
+
+const createAccountsActionsMock = (overrides = {}) => ({
+  toggleShowHiddenAccounts: jest.fn(),
   addAccount: jest.fn(),
   updateAccount: jest.fn(),
   deleteAccount: jest.fn(),
   reorderAccounts: jest.fn(),
   validateAccount: jest.fn(),
   getOperationCount: jest.fn(() => Promise.resolve(0)),
-  currencies: require('../../assets/currencies.json'),
   ...overrides,
 });
 
 describe('AccountsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset to default mock
-    const { useAccounts } = require('../../app/contexts/AccountsContext');
-    useAccounts.mockReturnValue(createAccountsMock());
+    // Reset to default mocks
+    const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+    const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+    useAccountsData.mockReturnValue(createAccountsDataMock());
+    useAccountsActions.mockReturnValue(createAccountsActionsMock());
   });
 
   describe('Component Structure', () => {
@@ -116,20 +125,24 @@ describe('AccountsScreen', () => {
 
     it('uses ThemeContext for styling', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeConfig } = require('../../app/contexts/ThemeConfigContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       render(<AccountsScreen />);
 
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeConfig).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('uses AccountsContext for account data', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       render(<AccountsScreen />);
 
-      expect(useAccounts).toHaveBeenCalled();
+      expect(useAccountsData).toHaveBeenCalled();
+      expect(useAccountsActions).toHaveBeenCalled();
     });
 
     it('uses LocalizationContext for translations', () => {
@@ -145,22 +158,19 @@ describe('AccountsScreen', () => {
   describe('Integration with Contexts', () => {
     it('handles empty account list', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      useAccounts.mockReturnValue(createAccountsMock({
-        currencies: {},
-      }));
+      useAccountsData.mockReturnValue(createAccountsDataMock());
 
       expect(() => render(<AccountsScreen />)).not.toThrow();
     });
 
     it('handles loading state', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         loading: true,
-        currencies: {},
       }));
 
       expect(() => render(<AccountsScreen />)).not.toThrow();
@@ -168,17 +178,16 @@ describe('AccountsScreen', () => {
 
     it('handles account list with data', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: '1', name: 'Cash', balance: '1000.00', currency: 'USD', order: 0 },
         { id: '2', name: 'Bank', balance: '5000.00', currency: 'USD', order: 1 },
       ];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: mockAccounts,
         displayedAccounts: mockAccounts,
-        currencies: { USD: { symbol: '$', decimal_digits: 2 } },
       }));
 
       expect(() => render(<AccountsScreen />)).not.toThrow();
@@ -197,7 +206,8 @@ describe('AccountsScreen', () => {
 
     it('handles multiple currencies', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const mockAccounts = [
         { id: '1', name: 'USD Account', balance: '1000.00', currency: 'USD', order: 0 },
@@ -205,7 +215,7 @@ describe('AccountsScreen', () => {
         { id: '3', name: 'RUB Account', balance: '75000.00', currency: 'RUB', order: 2 },
       ];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: mockAccounts,
         displayedAccounts: mockAccounts,
         currencies: {
@@ -268,7 +278,7 @@ describe('AccountsScreen', () => {
   describe('Theme Integration', () => {
     it('applies theme colors to components', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       const mockColors = {
         background: '#000000',
@@ -277,17 +287,17 @@ describe('AccountsScreen', () => {
         text: '#ffffff',
       };
 
-      useTheme.mockReturnValue({ colors: mockColors });
+      useThemeColors.mockReturnValue({ colors: mockColors });
 
       expect(() => render(<AccountsScreen />)).not.toThrow();
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('handles dark theme', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      useTheme.mockReturnValue({
+      useThemeColors.mockReturnValue({
         colors: {
           background: '#111111',
           surface: '#222222',
@@ -334,9 +344,10 @@ describe('AccountsScreen', () => {
   describe('Edge Cases', () => {
     it('handles empty accounts array when context provides empty state', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: [],
         displayedAccounts: [],
         currencies: {},
@@ -348,11 +359,12 @@ describe('AccountsScreen', () => {
 
     it('handles empty displayed accounts with hidden accounts', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const hiddenAccounts = [{ id: '1', name: 'Hidden', balance: '100', currency: 'USD', hidden: true }];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: hiddenAccounts,
         displayedAccounts: [], // All accounts are hidden
         hiddenAccounts: hiddenAccounts,
@@ -364,14 +376,15 @@ describe('AccountsScreen', () => {
 
     it('handles accounts with missing properties', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const mockAccounts = [
         { id: '1' }, // Missing name, balance, currency
         { id: '2', name: 'Test' }, // Missing balance, currency
       ];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: mockAccounts,
         displayedAccounts: mockAccounts,
         currencies: {},
@@ -382,11 +395,12 @@ describe('AccountsScreen', () => {
 
     it('handles empty currencies object', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: mockAccounts,
         displayedAccounts: mockAccounts,
         currencies: {},
@@ -407,7 +421,8 @@ describe('AccountsScreen', () => {
 
     it('maintains stability when accounts change', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const initialAccounts = [{ id: '1', name: 'Account 1', balance: '100', currency: 'USD' }];
       const updatedAccounts = [
@@ -415,7 +430,7 @@ describe('AccountsScreen', () => {
         { id: '2', name: 'Account 2', balance: '300', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: initialAccounts,
         displayedAccounts: initialAccounts,
         currencies: {},
@@ -423,7 +438,7 @@ describe('AccountsScreen', () => {
 
       const { rerender } = render(<AccountsScreen />);
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: updatedAccounts,
         displayedAccounts: updatedAccounts,
         currencies: {},
@@ -434,16 +449,17 @@ describe('AccountsScreen', () => {
 
     it('handles rapid loading state changes', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         loading: true,
         currencies: {},
       }));
 
       const { rerender } = render(<AccountsScreen />);
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         loading: false,
         currencies: {},
       }));
@@ -469,7 +485,8 @@ describe('AccountsScreen', () => {
 
     it('integrates with DraggableFlatList for account reordering', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
       const mockAccounts = [
         { id: '1', name: 'First', balance: '100', currency: 'USD', order: 0 },
@@ -477,7 +494,7 @@ describe('AccountsScreen', () => {
         { id: '3', name: 'Third', balance: '300', currency: 'USD', order: 2 },
       ];
 
-      useAccounts.mockReturnValue(createAccountsMock({
+      useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: mockAccounts,
         displayedAccounts: mockAccounts,
         currencies: {},

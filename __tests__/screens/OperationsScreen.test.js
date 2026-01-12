@@ -4,20 +4,12 @@
  * This is the most complex screen in the app with extensive features
  */
 
-// Unmock the split contexts to use real implementations
-jest.unmock('../../app/contexts/ThemeConfigContext');
-jest.unmock('../../app/contexts/ThemeColorsContext');
-jest.unmock('../../app/contexts/AccountsDataContext');
-jest.unmock('../../app/contexts/AccountsActionsContext');
-jest.unmock('../../app/contexts/OperationsDataContext');
-jest.unmock('../../app/contexts/OperationsActionsContext');
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
 // Mock all dependencies
-jest.mock('../../app/contexts/ThemeContext', () => ({
-  useTheme: jest.fn(() => ({
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: jest.fn(() => ({
     colors: {
       background: '#ffffff',
       surface: '#f5f5f5',
@@ -47,11 +39,16 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   })),
 }));
 
-jest.mock('../../app/contexts/OperationsContext', () => ({
-  useOperations: jest.fn(() => ({
+jest.mock('../../app/contexts/OperationsDataContext', () => ({
+  useOperationsData: jest.fn(() => ({
     operations: [],
     loading: false,
-    hasMore: false,
+    hasMoreOperations: false,
+  })),
+}));
+
+jest.mock('../../app/contexts/OperationsActionsContext', () => ({
+  useOperationsActions: jest.fn(() => ({
     loadMoreOperations: jest.fn(),
     addOperation: jest.fn(),
     updateOperation: jest.fn(),
@@ -59,8 +56,8 @@ jest.mock('../../app/contexts/OperationsContext', () => ({
   })),
 }));
 
-jest.mock('../../app/contexts/AccountsContext', () => ({
-  useAccounts: jest.fn(() => ({
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: jest.fn(() => ({
     accounts: [],
     visibleAccounts: [],
     loading: false,
@@ -112,29 +109,30 @@ describe('OperationsScreen', () => {
 
     it('uses ThemeContext for styling', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       render(<OperationsScreen />);
 
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('uses OperationsContext for operation data', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       render(<OperationsScreen />);
 
-      expect(useOperations).toHaveBeenCalled();
+      expect(useOperationsData).toHaveBeenCalled();
     });
 
     it('uses AccountsContext for account data', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       render(<OperationsScreen />);
 
-      expect(useAccounts).toHaveBeenCalled();
+      expect(useAccountsData).toHaveBeenCalled();
     });
 
     it('uses CategoriesContext for category data', () => {
@@ -168,12 +166,16 @@ describe('OperationsScreen', () => {
   describe('Integration with Contexts', () => {
     it('handles empty operations list', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
+      });
+
+      useOperationsActions.mockReturnValue({
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -185,12 +187,16 @@ describe('OperationsScreen', () => {
 
     it('handles loading state', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: true,
-        hasMore: false,
+        hasMoreOperations: false,
+      });
+
+      useOperationsActions.mockReturnValue({
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -202,7 +208,8 @@ describe('OperationsScreen', () => {
 
     it('handles operations list with data', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockOperations = [
         {
@@ -225,10 +232,10 @@ describe('OperationsScreen', () => {
         },
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: mockOperations,
         loading: false,
-        hasMore: true,
+        hasMoreOperations: true,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -240,7 +247,8 @@ describe('OperationsScreen', () => {
 
     it('handles transfer operations', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockOperations = [
         {
@@ -254,10 +262,10 @@ describe('OperationsScreen', () => {
         },
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: mockOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -271,14 +279,14 @@ describe('OperationsScreen', () => {
   describe('Account and Category Integration', () => {
     it('handles operations with accounts', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'Cash', balance: '1000.00', currency: 'USD' },
         { id: 'acc-2', name: 'Bank', balance: '5000.00', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
         visibleAccounts: mockAccounts,
         loading: false,
@@ -305,9 +313,9 @@ describe('OperationsScreen', () => {
 
     it('handles empty accounts list', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: [],
         visibleAccounts: [],
         loading: false,
@@ -361,12 +369,13 @@ describe('OperationsScreen', () => {
   describe('Lazy Loading', () => {
     it('handles hasMore flag for pagination', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [{ id: '1', type: 'expense', amount: '100' }],
         loading: false,
-        hasMore: true,
+        hasMoreOperations: true,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -378,12 +387,13 @@ describe('OperationsScreen', () => {
 
     it('handles end of operations list', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [{ id: '1', type: 'expense', amount: '100' }],
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -397,7 +407,7 @@ describe('OperationsScreen', () => {
   describe('Theme Integration', () => {
     it('applies theme colors to components', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       const mockColors = {
         background: '#000000',
@@ -413,17 +423,17 @@ describe('OperationsScreen', () => {
         error: '#ff0000',
       };
 
-      useTheme.mockReturnValue({ colors: mockColors });
+      useThemeColors.mockReturnValue({ colors: mockColors });
 
       expect(() => render(<OperationsScreen />)).not.toThrow();
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('handles dark theme', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      useTheme.mockReturnValue({
+      useThemeColors.mockReturnValue({
         colors: {
           background: '#111111',
           surface: '#222222',
@@ -470,12 +480,13 @@ describe('OperationsScreen', () => {
   describe('Edge Cases', () => {
     it('handles empty operations array when context provides empty state', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -488,12 +499,13 @@ describe('OperationsScreen', () => {
 
     it('handles initial loading state with empty operations', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: true,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -505,17 +517,18 @@ describe('OperationsScreen', () => {
 
     it('handles operations with missing properties', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockOperations = [
         { id: '1' }, // Missing all properties
         { id: '2', type: 'expense' }, // Missing amount, account, category
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: mockOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -527,17 +540,18 @@ describe('OperationsScreen', () => {
 
     it('handles operations with invalid dates', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockOperations = [
         { id: '1', type: 'expense', amount: '100', date: 'invalid-date' },
         { id: '2', type: 'income', amount: '200', date: null },
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: mockOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -549,16 +563,17 @@ describe('OperationsScreen', () => {
 
     it('handles very large operation amounts', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const mockOperations = [
         { id: '1', type: 'expense', amount: '999999999999.99', accountId: 'acc-1', categoryId: 'cat-1' },
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: mockOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -580,7 +595,8 @@ describe('OperationsScreen', () => {
 
     it('maintains stability when operations change', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
       const initialOperations = [{ id: '1', type: 'expense', amount: '100' }];
       const updatedOperations = [
@@ -588,10 +604,10 @@ describe('OperationsScreen', () => {
         { id: '2', type: 'income', amount: '200' },
       ];
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: initialOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -600,10 +616,10 @@ describe('OperationsScreen', () => {
 
       const { rerender } = render(<OperationsScreen />);
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: updatedOperations,
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -615,12 +631,13 @@ describe('OperationsScreen', () => {
 
     it('handles rapid loading state changes', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperations } = require('../../app/contexts/OperationsContext');
+      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: true,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -629,10 +646,10 @@ describe('OperationsScreen', () => {
 
       const { rerender } = render(<OperationsScreen />);
 
-      useOperations.mockReturnValue({
+      useOperationsData.mockReturnValue({
         operations: [],
         loading: false,
-        hasMore: false,
+        hasMoreOperations: false,
         loadMoreOperations: jest.fn(),
         addOperation: jest.fn(),
         updateOperation: jest.fn(),
@@ -692,7 +709,7 @@ describe('OperationsScreen', () => {
   describe('Transfer Auto-Prefill', () => {
     it('auto-prefills toAccount with same currency account when switching to transfer', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'USD Cash', balance: '1000.00', currency: 'USD' },
@@ -700,7 +717,7 @@ describe('OperationsScreen', () => {
         { id: 'acc-3', name: 'EUR Cash', balance: '500.00', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
         visibleAccounts: mockAccounts,
         loading: false,
@@ -712,14 +729,14 @@ describe('OperationsScreen', () => {
 
     it('handles transfer when no matching currency account exists', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'USD Cash', balance: '1000.00', currency: 'USD' },
         { id: 'acc-2', name: 'EUR Cash', balance: '500.00', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
         visibleAccounts: mockAccounts,
         loading: false,
@@ -731,13 +748,13 @@ describe('OperationsScreen', () => {
 
     it('handles transfer with only one account', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'USD Cash', balance: '1000.00', currency: 'USD' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
         visibleAccounts: mockAccounts,
         loading: false,
@@ -749,7 +766,7 @@ describe('OperationsScreen', () => {
 
     it('handles transfer when accounts have different currencies', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'USD Cash', balance: '1000.00', currency: 'USD' },
@@ -757,7 +774,7 @@ describe('OperationsScreen', () => {
         { id: 'acc-3', name: 'RUB Cash', balance: '10000.00', currency: 'RUB' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
         visibleAccounts: mockAccounts,
         loading: false,

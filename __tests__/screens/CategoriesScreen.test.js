@@ -3,10 +3,6 @@
  * Logic-based tests focusing on component behavior and integration patterns
  */
 
-// Unmock the split contexts to use real implementations
-jest.unmock('../../app/contexts/ThemeConfigContext');
-jest.unmock('../../app/contexts/ThemeColorsContext');
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import PropTypes from 'prop-types';
@@ -48,8 +44,8 @@ jest.mock('react-native-paper', () => {
   };
 });
 
-jest.mock('../../app/contexts/ThemeContext', () => ({
-  useTheme: jest.fn(() => ({
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: jest.fn(() => ({
     colors: {
       background: '#ffffff',
       surface: '#f5f5f5',
@@ -128,11 +124,11 @@ describe('CategoriesScreen', () => {
 
     it('uses ThemeContext for styling', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       render(<CategoriesScreen />);
 
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('uses CategoriesContext for category data', () => {
@@ -362,7 +358,7 @@ describe('CategoriesScreen', () => {
   describe('Theme Integration', () => {
     it('applies theme colors to components', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       const mockColors = {
         background: '#000000',
@@ -375,17 +371,17 @@ describe('CategoriesScreen', () => {
         altRow: '#181818',
       };
 
-      useTheme.mockReturnValue({ colors: mockColors });
+      useThemeColors.mockReturnValue({ colors: mockColors });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('handles dark theme', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      useTheme.mockReturnValue({
+      useThemeColors.mockReturnValue({
         colors: {
           background: '#111111',
           surface: '#222222',

@@ -3,16 +3,11 @@
  * These tests ensure proper handling of first-time setup and app initialization
  */
 
-// Unmock the split contexts to use real implementations
-jest.unmock('../../app/contexts/ThemeConfigContext');
-jest.unmock('../../app/contexts/ThemeColorsContext');
-
 import React from 'react';
 import PropTypes from 'prop-types';
 import { render, waitFor } from '@testing-library/react-native';
 import AppInitializer from '../../app/screens/AppInitializer';
 import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
-import { ThemeProvider } from '../../app/contexts/ThemeContext';
 
 // Mock the navigation components
 jest.mock('../../app/screens/LanguageSelectionScreen', () => {
@@ -73,26 +68,15 @@ jest.mock('../../app/contexts/LocalizationContext', () => {
   };
 });
 
-jest.mock('../../app/contexts/ThemeContext', () => {
-  const React = require('react');
-  const PropTypes = require('prop-types');
-  function ThemeProvider({ children }) {
-    return React.createElement(React.Fragment, null, children);
-  }
-  ThemeProvider.propTypes = {
-    children: PropTypes.node,
-  };
-
-  return {
-    ThemeProvider,
-    useTheme: jest.fn(() => ({
-      colors: {
-        background: '#ffffff',
-        primary: '#2196f3',
-      },
-    })),
-  };
-});
+// Mock split theme contexts
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: jest.fn(() => ({
+    colors: {
+      background: '#ffffff',
+      primary: '#2196f3',
+    },
+  })),
+}));
 
 describe('AppInitializer', () => {
   beforeEach(() => {
@@ -222,11 +206,11 @@ describe('AppInitializer', () => {
 
   describe('Theme Integration', () => {
     it('uses theme colors for loading indicator', () => {
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       render(<AppInitializer />);
 
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('applies theme background color to loading container', () => {
@@ -234,9 +218,9 @@ describe('AppInitializer', () => {
 
       render(<AppInitializer />);
 
-      // The component should use colors from ThemeContext
-      const { useTheme } = require('../../app/contexts/ThemeContext');
-      expect(useTheme).toHaveBeenCalled();
+      // The component should use colors from ThemeColorsContext
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
+      expect(useThemeColors).toHaveBeenCalled();
     });
   });
 

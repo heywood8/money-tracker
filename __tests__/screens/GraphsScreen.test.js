@@ -4,14 +4,6 @@
  * This screen handles complex data visualization with PieChart components
  */
 
-// Unmock the split contexts to use real implementations
-jest.unmock('../../app/contexts/ThemeConfigContext');
-jest.unmock('../../app/contexts/ThemeColorsContext');
-jest.unmock('../../app/contexts/AccountsDataContext');
-jest.unmock('../../app/contexts/AccountsActionsContext');
-jest.unmock('../../app/contexts/OperationsDataContext');
-jest.unmock('../../app/contexts/OperationsActionsContext');
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
@@ -20,8 +12,8 @@ jest.mock('react-native-chart-kit', () => ({
   PieChart: () => 'PieChart',
 }));
 
-jest.mock('../../app/contexts/ThemeContext', () => ({
-  useTheme: jest.fn(() => ({
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: jest.fn(() => ({
     colors: {
       background: '#ffffff',
       surface: '#f5f5f5',
@@ -41,8 +33,8 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   })),
 }));
 
-jest.mock('../../app/contexts/AccountsContext', () => ({
-  useAccounts: jest.fn(() => ({
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: jest.fn(() => ({
     accounts: [],
   })),
 }));
@@ -84,11 +76,11 @@ describe('GraphsScreen', () => {
 
     it('uses ThemeContext for styling', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       render(<GraphsScreen />);
 
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('uses LocalizationContext for translations', () => {
@@ -102,11 +94,11 @@ describe('GraphsScreen', () => {
 
     it('uses AccountsContext for account data', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       render(<GraphsScreen />);
 
-      expect(useAccounts).toHaveBeenCalled();
+      expect(useAccountsData).toHaveBeenCalled();
     });
   });
 
@@ -199,9 +191,9 @@ describe('GraphsScreen', () => {
   describe('Account Integration', () => {
     it('handles empty accounts list', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: [],
       });
 
@@ -210,7 +202,7 @@ describe('GraphsScreen', () => {
 
     it('handles accounts with different currencies', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', name: 'USD Account', currency: 'USD', balance: '1000.00' },
@@ -218,7 +210,7 @@ describe('GraphsScreen', () => {
         { id: 'acc-3', name: 'RUB Account', currency: 'RUB', balance: '75000.00' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
       });
 
@@ -227,7 +219,7 @@ describe('GraphsScreen', () => {
 
     it('extracts unique currencies from accounts', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const mockAccounts = [
         { id: 'acc-1', currency: 'USD' },
@@ -235,7 +227,7 @@ describe('GraphsScreen', () => {
         { id: 'acc-3', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: mockAccounts,
       });
 
@@ -376,7 +368,7 @@ describe('GraphsScreen', () => {
   describe('Theme Integration', () => {
     it('applies theme colors to components', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
       const mockColors = {
         background: '#000000',
@@ -387,17 +379,17 @@ describe('GraphsScreen', () => {
         border: '#333333',
       };
 
-      useTheme.mockReturnValue({ colors: mockColors });
+      useThemeColors.mockReturnValue({ colors: mockColors });
 
       expect(() => render(<GraphsScreen />)).not.toThrow();
-      expect(useTheme).toHaveBeenCalled();
+      expect(useThemeColors).toHaveBeenCalled();
     });
 
     it('handles dark theme', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useTheme } = require('../../app/contexts/ThemeContext');
+      const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      useTheme.mockReturnValue({
+      useThemeColors.mockReturnValue({
         colors: {
           background: '#111111',
           surface: '#222222',
@@ -493,9 +485,9 @@ describe('GraphsScreen', () => {
 
     it('handles empty currency list', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: [],
       });
 
@@ -514,7 +506,7 @@ describe('GraphsScreen', () => {
 
     it('maintains stability when accounts change', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { useAccounts } = require('../../app/contexts/AccountsContext');
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       const initialAccounts = [{ id: 'acc-1', currency: 'USD' }];
       const updatedAccounts = [
@@ -522,13 +514,13 @@ describe('GraphsScreen', () => {
         { id: 'acc-2', currency: 'EUR' },
       ];
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: initialAccounts,
       });
 
       const { rerender } = render(<GraphsScreen />);
 
-      useAccounts.mockReturnValue({
+      useAccountsData.mockReturnValue({
         accounts: updatedAccounts,
       });
 
