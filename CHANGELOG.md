@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.31.0](https://github.com/heywood8/money-tracker/compare/penny-v0.30.0...penny-v0.31.0) (2026-01-12)
+
+
+### Features
+
+* reorder screens, graph is now the second screen ([#222](https://github.com/heywood8/money-tracker/issues/222)) ([309761a](https://github.com/heywood8/money-tracker/commit/309761a4d3b95bae7ae3bd142e41d78bd4d73c09))
+
+
+### Bug Fixes
+
+* db schema test coverage ([70841b0](https://github.com/heywood8/money-tracker/commit/70841b053c20b6a9e8dfef42a282606c01ffef57))
+* tests for app/utils ([66803ed](https://github.com/heywood8/money-tracker/commit/66803ed4b82ab3d3d0a7b009d74342d16838cb97))
+* utils tests ([a711c8a](https://github.com/heywood8/money-tracker/commit/a711c8a76bbf0cc674abf16758b603a2820436b4))
+
 ## [0.30.0](https://github.com/heywood8/money-tracker/compare/penny-v0.29.0...penny-v0.30.0) (2026-01-12)
 
 
