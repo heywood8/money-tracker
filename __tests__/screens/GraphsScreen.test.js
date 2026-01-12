@@ -4,6 +4,14 @@
  * This screen handles complex data visualization with PieChart components
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/ThemeConfigContext');
+jest.unmock('../../app/contexts/ThemeColorsContext');
+jest.unmock('../../app/contexts/AccountsDataContext');
+jest.unmock('../../app/contexts/AccountsActionsContext');
+jest.unmock('../../app/contexts/OperationsDataContext');
+jest.unmock('../../app/contexts/OperationsActionsContext');
+
 import React from 'react';
 import { render } from '@testing-library/react-native';
 

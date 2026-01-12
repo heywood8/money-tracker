@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TextInput, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { BORDER_RADIUS, SPACING, HEIGHTS, FONT_SIZE, OPACITY } from '../styles/designTokens';
 
 /**
@@ -60,7 +60,7 @@ export default function FormInput({
   style,
   inputRef,
 }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
 
   return (
     <View style={[styles.container, style]}>

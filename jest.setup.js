@@ -144,6 +144,233 @@ jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   removeChangeListener: jest.fn(),
 }));
 
+// Mock split context providers for tests that don't explicitly mock them
+// These mocks provide the split contexts needed by the deprecated wrappers
+jest.mock('./app/contexts/ThemeConfigContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const ThemeConfigContext = React.createContext();
+
+  function ThemeConfigProvider({ children }) {
+    const value = {
+      theme: 'light',
+      colorScheme: 'light',
+      setTheme: jest.fn(),
+    };
+    return React.createElement(ThemeConfigContext.Provider, { value }, children);
+  }
+  ThemeConfigProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    ThemeConfigProvider,
+    useThemeConfig: jest.fn(() => ({
+      theme: 'light',
+      colorScheme: 'light',
+      setTheme: jest.fn(),
+    })),
+  };
+});
+
+jest.mock('./app/contexts/ThemeColorsContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const ThemeColorsContext = React.createContext();
+
+  const mockColors = {
+    background: '#ffffff',
+    surface: '#ffffff',
+    primary: '#007AFF',
+    text: '#111111',
+    mutedText: '#666666',
+    border: '#e6e6e6',
+    danger: 'red',
+  };
+
+  function ThemeColorsProvider({ children }) {
+    return React.createElement(ThemeColorsContext.Provider, { value: { colors: mockColors } }, children);
+  }
+  ThemeColorsProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    ThemeColorsProvider,
+    useThemeColors: jest.fn(() => ({ colors: mockColors })),
+  };
+});
+
+jest.mock('./app/contexts/AccountsDataContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const AccountsDataContext = React.createContext();
+
+  function AccountsDataProvider({ children }) {
+    const value = {
+      accounts: [],
+      visibleAccounts: [],
+      hiddenAccounts: [],
+      displayedAccounts: [],
+      showHiddenAccounts: false,
+      loading: false,
+      error: null,
+    };
+    return React.createElement(AccountsDataContext.Provider, { value }, children);
+  }
+  AccountsDataProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    AccountsDataProvider,
+    useAccountsData: jest.fn(() => ({
+      accounts: [],
+      visibleAccounts: [],
+      hiddenAccounts: [],
+      displayedAccounts: [],
+      showHiddenAccounts: false,
+      loading: false,
+      error: null,
+    })),
+  };
+});
+
+jest.mock('./app/contexts/AccountsActionsContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const AccountsActionsContext = React.createContext();
+
+  function AccountsActionsProvider({ children }) {
+    const value = {
+      addAccount: jest.fn(),
+      updateAccount: jest.fn(),
+      deleteAccount: jest.fn(),
+      reloadAccounts: jest.fn(),
+      reorderAccounts: jest.fn(),
+      resetDatabase: jest.fn(),
+      validateAccount: jest.fn(),
+      getOperationCount: jest.fn(),
+      toggleShowHiddenAccounts: jest.fn(),
+    };
+    return React.createElement(AccountsActionsContext.Provider, { value }, children);
+  }
+  AccountsActionsProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    AccountsActionsProvider,
+    useAccountsActions: jest.fn(() => ({
+      addAccount: jest.fn(),
+      updateAccount: jest.fn(),
+      deleteAccount: jest.fn(),
+      reloadAccounts: jest.fn(),
+      reorderAccounts: jest.fn(),
+      resetDatabase: jest.fn(),
+      validateAccount: jest.fn(),
+      getOperationCount: jest.fn(),
+      toggleShowHiddenAccounts: jest.fn(),
+    })),
+  };
+});
+
+jest.mock('./app/contexts/OperationsDataContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const OperationsDataContext = React.createContext();
+
+  function OperationsDataProvider({ children }) {
+    const value = {
+      operations: [],
+      loading: false,
+      loadingMore: false,
+      loadingNewer: false,
+      hasMoreOperations: false,
+      hasNewerOperations: false,
+      activeFilters: {
+        types: [],
+        accountIds: [],
+        categoryIds: [],
+        searchText: '',
+        dateRange: { startDate: null, endDate: null },
+        amountRange: { min: null, max: null },
+      },
+      filtersActive: false,
+    };
+    return React.createElement(OperationsDataContext.Provider, { value }, children);
+  }
+  OperationsDataProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    OperationsDataProvider,
+    useOperationsData: jest.fn(() => ({
+      operations: [],
+      loading: false,
+      loadingMore: false,
+      loadingNewer: false,
+      hasMoreOperations: false,
+      hasNewerOperations: false,
+      activeFilters: {
+        types: [],
+        accountIds: [],
+        categoryIds: [],
+        searchText: '',
+        dateRange: { startDate: null, endDate: null },
+        amountRange: { min: null, max: null },
+      },
+      filtersActive: false,
+    })),
+  };
+});
+
+jest.mock('./app/contexts/OperationsActionsContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const OperationsActionsContext = React.createContext();
+
+  function OperationsActionsProvider({ children }) {
+    const value = {
+      addOperation: jest.fn(),
+      updateOperation: jest.fn(),
+      deleteOperation: jest.fn(),
+      validateOperation: jest.fn(),
+      getOperationsByAccount: jest.fn(),
+      getOperationsByCategory: jest.fn(),
+      getOperationsByDateRange: jest.fn(),
+      reloadOperations: jest.fn(),
+      loadMoreOperations: jest.fn(),
+      loadNewerOperations: jest.fn(),
+      loadInitialOperations: jest.fn(),
+      jumpToDate: jest.fn(),
+      updateFilters: jest.fn(),
+      clearFilters: jest.fn(),
+      getActiveFilterCount: jest.fn(() => 0),
+    };
+    return React.createElement(OperationsActionsContext.Provider, { value }, children);
+  }
+  OperationsActionsProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    OperationsActionsProvider,
+    useOperationsActions: jest.fn(() => ({
+      addOperation: jest.fn(),
+      updateOperation: jest.fn(),
+      deleteOperation: jest.fn(),
+      validateOperation: jest.fn(),
+      getOperationsByAccount: jest.fn(),
+      getOperationsByCategory: jest.fn(),
+      getOperationsByDateRange: jest.fn(),
+      reloadOperations: jest.fn(),
+      loadMoreOperations: jest.fn(),
+      loadNewerOperations: jest.fn(),
+      loadInitialOperations: jest.fn(),
+      jumpToDate: jest.fn(),
+      updateFilters: jest.fn(),
+      clearFilters: jest.fn(),
+      getActiveFilterCount: jest.fn(() => 0),
+    })),
+  };
+});
+
 // Mock DateTimePicker
 jest.mock('@react-native-community/datetimepicker', () => {
   const React = require('react');

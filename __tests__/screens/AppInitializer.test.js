@@ -3,6 +3,10 @@
  * These tests ensure proper handling of first-time setup and app initialization
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/ThemeConfigContext');
+jest.unmock('../../app/contexts/ThemeColorsContext');
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import { render, waitFor } from '@testing-library/react-native';

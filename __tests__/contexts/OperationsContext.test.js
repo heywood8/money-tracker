@@ -3,6 +3,12 @@
  * These tests ensure operations CRUD, pagination, validation, and balance synchronization work correctly
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/OperationsDataContext');
+jest.unmock('../../app/contexts/OperationsActionsContext');
+jest.unmock('../../app/contexts/AccountsDataContext');
+jest.unmock('../../app/contexts/AccountsActionsContext');
+
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { OperationsProvider, useOperations } from '../../app/contexts/OperationsContext';
@@ -22,10 +28,10 @@ jest.mock('../../app/services/eventEmitter', () => ({
   },
 }));
 
-// Mock AccountsContext
+// Mock AccountsActionsContext
 const mockReloadAccounts = jest.fn();
-jest.mock('../../app/contexts/AccountsContext', () => ({
-  useAccounts: () => ({
+jest.mock('../../app/contexts/AccountsActionsContext', () => ({
+  useAccountsActions: () => ({
     reloadAccounts: mockReloadAccounts,
   }),
 }));

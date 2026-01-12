@@ -2,7 +2,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeConfig } from '../contexts/ThemeConfigContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { getDatabaseVersion } from '../services/db';
@@ -12,7 +13,8 @@ import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings }) {
-  const { colors, colorScheme, setTheme } = useTheme();
+  const { colorScheme, setTheme } = useThemeConfig();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const [dbVersion, setDbVersion] = useState(null);
 

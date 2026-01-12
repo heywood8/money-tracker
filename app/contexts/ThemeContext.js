@@ -1,107 +1,55 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import { Appearance } from 'react-native';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
-const ThemeContext = createContext();
+import { ThemeConfigProvider, useThemeConfig } from './ThemeConfigContext';
+import { ThemeColorsProvider, useThemeColors } from './ThemeColorsContext';
 
-const lightTheme = {
-  mode: 'light',
-  colors: {
-    background: '#ffffff',
-    surface: '#ffffff',
-    primary: '#007AFF',
-    secondary: '#e0e0e0',
-    text: '#111111',
-    mutedText: '#666666',
-    border: '#e6e6e6',
-    card: '#fff',
-    modalBackground: 'rgba(0,0,0,0.65)',
-    inputBackground: '#fff',
-    inputBorder: '#cccccc',
-    calcButtonBackground: '#ffffff',
-    danger: 'red',
-    delete: '#d9534f',
-    selected: '#c0e0ff',
-    altRow: '#f8f8f8', // Added for alternating rows
-    expense: '#5a3030',
-    income: '#44aa44',
-    transfer: '#4444ff',
-    expenseBackground: '#f5f0f0',
-    incomeBackground: '#e5ffe5',
-    transferBackground: '#e5e5ff',
-  },
-};
+/**
+ * DEPRECATED: This file provides backward compatibility wrappers.
+ *
+ * ThemeContext has been split into two separate contexts:
+ * - ThemeConfigContext (theme configuration and preferences)
+ * - ThemeColorsContext (computed color values)
+ *
+ * New code should import useThemeConfig and useThemeColors directly.
+ * This wrapper is maintained for backward compatibility with existing tests.
+ *
+ * Migration guide:
+ * Before:
+ *   const { colors, colorScheme, theme, setTheme } = useTheme();
+ *
+ * After:
+ *   const { colorScheme, theme, setTheme } = useThemeConfig();
+ *   const { colors } = useThemeColors();
+ */
 
-const darkTheme = {
-  mode: 'dark',
-  colors: {
-    background: '#111111',
-    surface: '#1a1a1a',
-    primary: '#4da3ff',
-    secondary: '#333333',
-    text: '#ffffff',
-    mutedText: '#aaaaaa',
-    border: '#2a2a2a',
-    card: '#222222',
-    modalBackground: 'rgba(0,0,0,0.65)',
-    inputBackground: '#333333',
-    inputBorder: '#555555',
-    calcButtonBackground: '#000000',
-    danger: 'red',
-    delete: '#ff6b6b',
-    selected: '#005fa3',
-    altRow: '#1a1a1a', // Added for alternating rows
-    expense: '#e6cccc',
-    income: '#66dd66',
-    transfer: '#6b6bff',
-    expenseBackground: '#2a2020',
-    incomeBackground: '#204a20',
-    transferBackground: '#20204a',
-  },
-};
+/**
+ * Deprecated hook that combines both config and colors.
+ * Use useThemeConfig() and useThemeColors() separately instead.
+ */
+export const useTheme = () => {
+  const config = useThemeConfig();
+  const colors = useThemeColors();
 
-export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('system');
-  const [osColorScheme, setOsColorScheme] = useState(Appearance.getColorScheme() || 'light');
-  const [colorScheme, setColorScheme] = useState('light');
-
-  useEffect(() => {
-    getPreference(PREF_KEYS.THEME, 'system').then(stored => {
-      if (stored) setTheme(stored);
-    });
-  }, []);
-
-  useEffect(() => {
-    const sub = Appearance.addChangeListener(({ colorScheme }) => setOsColorScheme(colorScheme || 'light'));
-    setOsColorScheme(Appearance.getColorScheme() || 'light');
-    return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    // compute effective color scheme: if user selected 'system', use OS scheme
-    if (theme === 'system') {
-      setColorScheme(osColorScheme);
-    } else {
-      setColorScheme(theme);
-    }
-  }, [theme, osColorScheme]);
-
-  const updateTheme = async (newTheme) => {
-    setTheme(newTheme);
-    await setPreference(PREF_KEYS.THEME, newTheme);
+  return {
+    ...config,
+    ...colors,
   };
+};
 
-  const colors = colorScheme === 'dark' ? darkTheme.colors : lightTheme.colors;
-
+/**
+ * Deprecated provider that wraps both split contexts.
+ * Use ThemeConfigProvider and ThemeColorsProvider directly in App.js.
+ */
+export const ThemeProvider = ({ children }) => {
   return (
-    <ThemeContext.Provider value={{ theme, colorScheme, colors, setTheme: updateTheme }}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeConfigProvider>
+      <ThemeColorsProvider>
+        {children}
+      </ThemeColorsProvider>
+    </ThemeConfigProvider>
   );
 };
 
 ThemeProvider.propTypes = {
   children: PropTypes.node,
 };
-
-export const useTheme = () => useContext(ThemeContext);

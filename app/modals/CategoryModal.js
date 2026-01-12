@@ -15,7 +15,7 @@ import {
   Switch,
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -23,7 +23,7 @@ import IconPicker from '../components/IconPicker';
 import PropTypes from 'prop-types';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const themed = useMemo(() => ({
     closeText: { color: colors.primary },
     parentText: { color: colors.text, fontSize: 18, marginLeft: 12 },

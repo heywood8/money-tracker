@@ -5,19 +5,21 @@ import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeConfig } from '../contexts/ThemeConfigContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
 export default function SettingsModal({ visible, onClose }) {
-  const { colors, theme } = useTheme();
+  const { theme } = useThemeConfig();
+  const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
-  const { resetDatabase } = useAccounts();
+  const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
   const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);

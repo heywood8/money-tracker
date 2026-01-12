@@ -3,6 +3,12 @@
  * Tests the complete filter workflow from UI interaction to data persistence
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/OperationsDataContext');
+jest.unmock('../../app/contexts/OperationsActionsContext');
+jest.unmock('../../app/contexts/AccountsDataContext');
+jest.unmock('../../app/contexts/AccountsActionsContext');
+
 import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import * as PreferencesDB from '../../app/services/PreferencesDB';
@@ -17,6 +23,19 @@ jest.mock('../../app/contexts/AccountsContext', () => ({
   AccountsProvider: ({ children }) => children,
   useAccounts: () => ({
     reloadAccounts: jest.fn(),
+  }),
+}));
+jest.mock('../../app/contexts/AccountsActionsContext', () => ({
+  AccountsActionsProvider: ({ children }) => children,
+  useAccountsActions: () => ({
+    reloadAccounts: jest.fn(),
+  }),
+}));
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  AccountsDataProvider: ({ children }) => children,
+  useAccountsData: () => ({
+    accounts: [],
+    loading: false,
   }),
 }));
 jest.mock('../../app/contexts/DialogContext', () => ({

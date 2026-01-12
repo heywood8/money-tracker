@@ -3,6 +3,10 @@
  * Logic-based tests focusing on component behavior and integration patterns
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/ThemeConfigContext');
+jest.unmock('../../app/contexts/ThemeColorsContext');
+
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import PropTypes from 'prop-types';

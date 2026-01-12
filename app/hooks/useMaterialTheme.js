@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeConfig } from '../contexts/ThemeConfigContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 
 /**
  * Hook to bridge our existing ThemeContext with React Native Paper's theme
  * Maps our custom colors to Material Design 3 color tokens
  */
 export function useMaterialTheme() {
-  const { colorScheme, colors } = useTheme();
+  const { colorScheme } = useThemeConfig();
+  const { colors } = useThemeColors();
 
   const paperTheme = useMemo(() => {
     const baseTheme = colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
