@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/heywood8/money-tracker/compare/penny-v0.29.0...penny-v0.30.0) (2026-01-12)
+
+
+### Features
+
+* split React contexts to optimize re-renders ([#3](https://github.com/heywood8/money-tracker/issues/3)) ([#219](https://github.com/heywood8/money-tracker/issues/219)) ([781eddf](https://github.com/heywood8/money-tracker/commit/781eddf661086e495f9137faa8eb43c87dcd59df))
+
 ## [0.29.0](https://github.com/heywood8/money-tracker/compare/penny-v0.28.0...penny-v0.29.0) (2026-01-11)
 
 
