@@ -3,6 +3,10 @@
  * These tests ensure the context provides correct state and operations
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/AccountsDataContext');
+jest.unmock('../../app/contexts/AccountsActionsContext');
+
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AccountsProvider, useAccounts } from '../../app/contexts/AccountsContext';

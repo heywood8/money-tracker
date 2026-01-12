@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
@@ -18,9 +18,9 @@ import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const GraphsScreen = () => {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { accounts } = useAccounts();
+  const { accounts } = useAccountsData();
 
   // Get current month and year
   const now = new Date();

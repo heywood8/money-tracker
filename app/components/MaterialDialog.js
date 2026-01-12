@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { HORIZONTAL_PADDING } from '../styles/layout';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 
 /**
  * Material Design Dialog Component
@@ -22,7 +22,7 @@ export default function MaterialDialog({
   buttons = [],
   onDismiss,
 }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
 
   const handleButtonPress = (button) => {
     if (button.onPress) {

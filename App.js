@@ -1,9 +1,12 @@
 import React from 'react';
 import AppInitializer from './app/screens/AppInitializer';
-import { ThemeProvider } from './app/contexts/ThemeContext';
-import { AccountsProvider } from './app/contexts/AccountsContext';
+import { ThemeConfigProvider } from './app/contexts/ThemeConfigContext';
+import { ThemeColorsProvider } from './app/contexts/ThemeColorsContext';
+import { AccountsDataProvider } from './app/contexts/AccountsDataContext';
+import { AccountsActionsProvider } from './app/contexts/AccountsActionsContext';
 import { CategoriesProvider } from './app/contexts/CategoriesContext';
-import { OperationsProvider } from './app/contexts/OperationsContext';
+import { OperationsDataProvider } from './app/contexts/OperationsDataContext';
+import { OperationsActionsProvider } from './app/contexts/OperationsActionsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
@@ -37,7 +40,8 @@ Sentry.init({
 });
 
 function ThemedStatusBar() {
-  const { colorScheme, colors } = require('./app/contexts/ThemeContext').useTheme();
+  const { colorScheme } = require('./app/contexts/ThemeConfigContext').useThemeConfig();
+  const { colors } = require('./app/contexts/ThemeColorsContext').useThemeColors();
   const barStyle = colorScheme === 'dark' ? 'light-content' : 'dark-content';
   React.useEffect(() => {
     try {
@@ -71,21 +75,27 @@ export default Sentry.wrap(function App() {
       <GestureHandlerRootView style={styles.container}>
         <SafeAreaProvider>
           <LocalizationProvider>
-            <ThemeProvider>
-              <DialogProvider>
+            <ThemeConfigProvider>
+              <ThemeColorsProvider>
+                <DialogProvider>
                 <ImportProgressProvider>
-                  <AccountsProvider>
-                    <CategoriesProvider>
-                      <OperationsProvider>
-                        <BudgetsProvider>
-                          <AppContent />
-                        </BudgetsProvider>
-                      </OperationsProvider>
-                    </CategoriesProvider>
-                  </AccountsProvider>
+                  <AccountsDataProvider>
+                    <AccountsActionsProvider>
+                      <CategoriesProvider>
+                        <OperationsDataProvider>
+                          <OperationsActionsProvider>
+                            <BudgetsProvider>
+                              <AppContent />
+                            </BudgetsProvider>
+                          </OperationsActionsProvider>
+                        </OperationsDataProvider>
+                      </CategoriesProvider>
+                    </AccountsActionsProvider>
+                  </AccountsDataProvider>
                 </ImportProgressProvider>
-              </DialogProvider>
-            </ThemeProvider>
+                </DialogProvider>
+              </ThemeColorsProvider>
+            </ThemeConfigProvider>
           </LocalizationProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

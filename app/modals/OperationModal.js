@@ -16,11 +16,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { useOperations } from '../contexts/OperationsContext';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useOperationsActions } from '../contexts/OperationsActionsContext';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import OperationFormFields from '../components/operations/OperationFormFields';
@@ -59,11 +59,11 @@ const getCurrencySymbol = (currencyCode) => {
 };
 
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { addOperation, updateOperation, validateOperation } = useOperations();
-  const { visibleAccounts: accounts } = useAccounts();
+  const { addOperation, updateOperation, validateOperation } = useOperationsActions();
+  const { visibleAccounts: accounts } = useAccountsData();
   const { categories } = useCategories();
 
   // Operation form hook (includes multi-currency logic)
