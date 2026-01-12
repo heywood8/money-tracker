@@ -82,9 +82,9 @@ export default function SimpleTabs() {
 
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
+    { key: 'Graphs', label: t('graphs') || 'Graphs' },
     { key: 'Accounts', label: t('accounts') || 'Accounts' },
     { key: 'Categories', label: t('categories') || 'Categories' },
-    { key: 'Graphs', label: t('graphs') || 'Graphs' },
   ], [t]);
 
   // Animation shared values
@@ -232,13 +232,13 @@ export default function SimpleTabs() {
           <OperationsScreen />
         </View>
         <View style={styles.screen}>
+          <GraphsScreen />
+        </View>
+        <View style={styles.screen}>
           <AccountsScreen />
         </View>
         <View style={styles.screen}>
           <CategoriesScreen />
-        </View>
-        <View style={styles.screen}>
-          <GraphsScreen />
         </View>
       </>
     );
