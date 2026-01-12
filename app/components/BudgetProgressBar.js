@@ -2,13 +2,13 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useBudgets } from '../contexts/BudgetsContext';
 import * as Currency from '../services/currency';
 
 const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, style }) => {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { getBudgetStatus } = useBudgets();
 

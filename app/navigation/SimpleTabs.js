@@ -14,7 +14,7 @@ import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import Header from '../components/Header';
 import SettingsModal from '../modals/SettingsModal';
@@ -74,7 +74,7 @@ TabButton.defaultProps = {
 ;
 
 export default function SimpleTabs() {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const [active, setActive] = React.useState('Operations');
   const [settingsVisible, setSettingsVisible] = React.useState(false);

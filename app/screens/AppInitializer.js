@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from '../navigation/SimpleTabs';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -11,7 +11,7 @@ import { useTheme } from '../contexts/ThemeContext';
  */
 const AppInitializer = () => {
   const { isFirstLaunch, setFirstLaunchComplete, language } = useLocalization();
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const [isInitializing, setIsInitializing] = useState(false);
 
   const handleLanguageSelected = async (selectedLanguage) => {

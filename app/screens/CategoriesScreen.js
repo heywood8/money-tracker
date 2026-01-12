@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
@@ -14,7 +14,7 @@ import BudgetProgressBar from '../components/BudgetProgressBar';
 import ListCard from '../components/ListCard';
 
 const CategoriesScreen = () => {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();

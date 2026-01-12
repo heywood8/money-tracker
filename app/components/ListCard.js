@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Card, TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { HEIGHTS, BORDER_RADIUS, SPACING, ICON_SIZE } from '../styles/designTokens';
 
 /**
@@ -67,7 +67,7 @@ export default function ListCard({
   accessibilityHint,
   children,
 }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
 
   /**
    * Determine background color based on variant and alternateBackground

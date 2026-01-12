@@ -5,9 +5,11 @@ import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, To
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeConfig } from '../contexts/ThemeConfigContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useAccountsData } from '../contexts/AccountsDataContext';
+import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import currencies from '../../assets/currencies.json';
 import ListCard from '../components/ListCard';
@@ -307,8 +309,10 @@ export default function AccountsScreen() {
   const [noCurrencyMatchVisible, setNoCurrencyMatchVisible] = useState(false);
   const [noCurrencyMatchMessage, setNoCurrencyMatchMessage] = useState('');
 
-  const { colorScheme, colors } = useTheme();
-  const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, toggleShowHiddenAccounts, loading, error, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount, currencies } = useAccounts();
+  const { colorScheme } = useThemeConfig();
+  const { colors } = useThemeColors();
+  const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
+  const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);

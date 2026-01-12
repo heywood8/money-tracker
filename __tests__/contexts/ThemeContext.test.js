@@ -3,6 +3,10 @@
  * These tests ensure theme switching works correctly and persists preferences
  */
 
+// Unmock the split contexts to use real implementations
+jest.unmock('../../app/contexts/ThemeConfigContext');
+jest.unmock('../../app/contexts/ThemeColorsContext');
+
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Appearance } from 'react-native';

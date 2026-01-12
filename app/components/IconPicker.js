@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 
 const COMMON_ICONS = [
@@ -51,7 +51,7 @@ const COMMON_ICONS = [
 ];
 
 export default function IconPicker({ visible, onClose, onSelect, selectedIcon }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { width } = useWindowDimensions();
   const iconSize = Math.floor((width - 64) / 6); // 6 icons per row with padding

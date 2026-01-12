@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
-import { useOperations } from '../contexts/OperationsContext';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useOperationsData } from '../contexts/OperationsDataContext';
+import { useOperationsActions } from '../contexts/OperationsActionsContext';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
@@ -28,7 +29,7 @@ import useQuickAddForm from '../hooks/useQuickAddForm';
 // Note: dynamic createStyles removed to keep linting stable.
 
 const OperationsScreen = () => {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -37,18 +38,20 @@ const OperationsScreen = () => {
     loading: operationsLoading,
     loadingMore,
     hasMoreOperations,
+    activeFilters,
+    filtersActive,
+  } = useOperationsData();
+  const {
     deleteOperation,
     addOperation,
     validateOperation,
     loadMoreOperations,
     jumpToDate,
-    activeFilters,
-    filtersActive,
     updateFilters,
     clearFilters,
     getActiveFilterCount,
-  } = useOperations();
-  const { accounts, visibleAccounts, loading: accountsLoading } = useAccounts();
+  } = useOperationsActions();
+  const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
   const { categories, loading: categoriesLoading } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);

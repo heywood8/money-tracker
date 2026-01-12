@@ -3,11 +3,11 @@ import { View, StyleSheet, ScrollView, Platform } from 'react-native';
 import { Portal, Modal, Text, ActivityIndicator, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 
 export default function ImportProgressModal() {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { isImporting, steps, currentStep, finishImport } = useImportProgress();
   const scrollViewRef = useRef(null);
   const stepPositions = useRef({});
