@@ -17,12 +17,12 @@ const DB_NAME = 'penny.db';
  *
  * @returns {Promise<boolean>} true if successful, false otherwise
  */
-export const forceDeleteDatabase = async () => {
+export const forceDeleteDatabase = async (baseDir = FileSystem.documentDirectory) => {
   try {
     console.log('Emergency database deletion initiated...');
 
     // Construct database file path
-    const dbPath = `${FileSystem.documentDirectory}SQLite/${DB_NAME}`;
+    const dbPath = `${baseDir}SQLite/${DB_NAME}`;
     console.log('Database path:', dbPath);
 
     // Check if file exists
