@@ -9,6 +9,11 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-test-renderer"
   - package-ecosystem: "github-actions"
     directory: "/" # Location of package manifests
     schedule:
