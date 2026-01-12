@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, Platform, TouchableOpacity, Animated, ScrollView } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -342,7 +342,7 @@ export default function SettingsModal({ visible, onClose }) {
 
           <Divider />
 
-          <View style={styles.languageList}>
+          <ScrollView style={styles.languageList}>
             {availableLanguages.map(lng => {
               return (
                 <TouchableRipple
@@ -351,7 +351,7 @@ export default function SettingsModal({ visible, onClose }) {
                   style={styles.languageItem}
                 >
                   <View style={styles.languageItemContent}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}> 
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
                       {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
                     </Text>
                     {localLang === lng && (
@@ -361,7 +361,7 @@ export default function SettingsModal({ visible, onClose }) {
                 </TouchableRipple>
               );
             })}
-          </View>
+          </ScrollView>
         </Animated.View>
 
         <Animated.View style={[
@@ -385,7 +385,7 @@ export default function SettingsModal({ visible, onClose }) {
 
           <Divider />
 
-          <View style={styles.languageList}>
+          <ScrollView style={styles.languageList}>
             <TouchableRipple
               onPress={() => handleExportFormatSelect('json')}
               style={styles.languageItem}
@@ -445,7 +445,7 @@ export default function SettingsModal({ visible, onClose }) {
                 <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
               </View>
             </TouchableRipple>
-          </View>
+          </ScrollView>
         </Animated.View>
       </Modal>
     </Portal>
