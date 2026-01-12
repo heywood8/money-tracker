@@ -405,6 +405,46 @@ jest.mock('react-native/Libraries/NativeComponent/ViewConfigIgnore', () => ({
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
   const View = require('react-native/Libraries/Components/View/View');
+  const React = require('react');
+
+  const PropTypes = require('prop-types');
+
+  const GestureDetector = ({ children }) => React.createElement(View, {}, children);
+  GestureDetector.propTypes = { children: PropTypes.node };
+
+  const Gesture = {
+    Pan: jest.fn(() => ({
+      onStart: jest.fn().mockReturnThis(),
+      onUpdate: jest.fn().mockReturnThis(),
+      onEnd: jest.fn().mockReturnThis(),
+      onFinalize: jest.fn().mockReturnThis(),
+      enabled: jest.fn().mockReturnThis(),
+      shouldCancelWhenOutside: jest.fn().mockReturnThis(),
+      activeOffsetX: jest.fn().mockReturnThis(),
+      activeOffsetY: jest.fn().mockReturnThis(),
+      failOffsetX: jest.fn().mockReturnThis(),
+      failOffsetY: jest.fn().mockReturnThis(),
+      minDistance: jest.fn().mockReturnThis(),
+      minPointers: jest.fn().mockReturnThis(),
+      maxPointers: jest.fn().mockReturnThis(),
+    })),
+    Tap: jest.fn(() => ({
+      onStart: jest.fn().mockReturnThis(),
+      onEnd: jest.fn().mockReturnThis(),
+      onFinalize: jest.fn().mockReturnThis(),
+      enabled: jest.fn().mockReturnThis(),
+      numberOfTaps: jest.fn().mockReturnThis(),
+      maxDuration: jest.fn().mockReturnThis(),
+    })),
+    LongPress: jest.fn(() => ({
+      onStart: jest.fn().mockReturnThis(),
+      onEnd: jest.fn().mockReturnThis(),
+      onFinalize: jest.fn().mockReturnThis(),
+      enabled: jest.fn().mockReturnThis(),
+      minDuration: jest.fn().mockReturnThis(),
+    })),
+  };
+
   return {
     Swipeable: View,
     DrawerLayout: View,
@@ -433,6 +473,8 @@ jest.mock('react-native-gesture-handler', () => {
     gestureHandlerRootHOC: jest.fn(component => component),
     Directions: {},
     GestureHandlerRootView: View,
+    GestureDetector,
+    Gesture,
   };
 });
 
@@ -528,6 +570,75 @@ jest.mock('react-native-draggable-flatlist', () => {
   return {
     __esModule: true,
     default: (props) => React.createElement(FlatList, props),
+  };
+});
+
+// Mock react-native-worklets
+jest.mock('react-native-worklets', () => ({
+  useSharedValue: jest.fn((value) => ({ value })),
+  useWorklet: jest.fn((fn) => fn),
+  createWorklet: jest.fn((fn) => fn),
+  runOnJS: jest.fn((fn) => fn),
+  runOnUI: jest.fn((fn) => fn),
+}));
+
+// Mock react-native-reanimated
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { View, Text, Image, ScrollView } = require('react-native');
+
+  return {
+    __esModule: true,
+    default: {
+      View,
+      Text,
+      Image,
+      ScrollView,
+      createAnimatedComponent: (Component) => Component,
+    },
+    useSharedValue: jest.fn((value) => ({ value })),
+    useAnimatedStyle: jest.fn((fn) => ({})),
+    useDerivedValue: jest.fn((fn) => ({ value: fn() })),
+    useAnimatedProps: jest.fn(() => ({})),
+    useAnimatedScrollHandler: jest.fn(() => () => {}),
+    useAnimatedGestureHandler: jest.fn(() => () => {}),
+    useAnimatedReaction: jest.fn(),
+    useAnimatedRef: jest.fn(() => ({ current: null })),
+    useWorkletCallback: jest.fn((fn) => fn),
+    withTiming: jest.fn((value) => value),
+    withSpring: jest.fn((value) => value),
+    withDecay: jest.fn((value) => value),
+    withDelay: jest.fn((delay, value) => value),
+    withRepeat: jest.fn((value) => value),
+    withSequence: jest.fn((...values) => values[0]),
+    cancelAnimation: jest.fn(),
+    runOnJS: jest.fn((fn) => fn),
+    runOnUI: jest.fn((fn) => fn),
+    createWorklet: jest.fn((fn) => fn),
+    Easing: {
+      linear: jest.fn(),
+      ease: jest.fn(),
+      quad: jest.fn(),
+      cubic: jest.fn(),
+      bezier: jest.fn(() => jest.fn()),
+      in: jest.fn((easing) => easing),
+      out: jest.fn((easing) => easing),
+      inOut: jest.fn((easing) => easing),
+    },
+    Extrapolation: {
+      CLAMP: 'clamp',
+      EXTEND: 'extend',
+      IDENTITY: 'identity',
+    },
+    interpolate: jest.fn((value, input, output) => output[0]),
+    Keyframe: class Keyframe {
+      duration(ms) { return this; }
+      delay(ms) { return this; }
+      withCallback(callback) { return this; }
+    },
+    SharedValue: class SharedValue {
+      constructor(value) { this.value = value; }
+    },
   };
 });
 
