@@ -441,7 +441,7 @@ describe('Database Schema', () => {
       // Verify indexes are defined on the table
       const tableSymbols = Object.getOwnPropertySymbols(schema.accounts);
       const hasIndexSymbol = tableSymbols.some(sym =>
-        sym.toString().includes('Indexes') || sym.toString().includes('indexes')
+        sym.toString().includes('Indexes') || sym.toString().includes('indexes'),
       );
 
       // Indexes should be part of table definition
