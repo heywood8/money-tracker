@@ -16,20 +16,20 @@ import {
 import PropTypes from 'prop-types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useBudgets } from '../contexts/BudgetsContext';
-import { useAccounts } from '../contexts/AccountsContext';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
-  const { colors } = useTheme();
+  const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const { addBudget, updateBudget, deleteBudget } = useBudgets();
-  const { accounts } = useAccounts();
+  const { accounts } = useAccountsData();
 
   // Get unique currencies from user's accounts
   const availableCurrencies = useMemo(() => {
