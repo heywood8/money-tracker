@@ -78,21 +78,21 @@ export default Sentry.wrap(function App() {
             <ThemeConfigProvider>
               <ThemeColorsProvider>
                 <DialogProvider>
-                <ImportProgressProvider>
-                  <AccountsDataProvider>
-                    <AccountsActionsProvider>
-                      <CategoriesProvider>
-                        <OperationsDataProvider>
-                          <OperationsActionsProvider>
-                            <BudgetsProvider>
-                              <AppContent />
-                            </BudgetsProvider>
-                          </OperationsActionsProvider>
-                        </OperationsDataProvider>
-                      </CategoriesProvider>
-                    </AccountsActionsProvider>
-                  </AccountsDataProvider>
-                </ImportProgressProvider>
+                  <ImportProgressProvider>
+                    <AccountsDataProvider>
+                      <AccountsActionsProvider>
+                        <CategoriesProvider>
+                          <OperationsDataProvider>
+                            <OperationsActionsProvider>
+                              <BudgetsProvider>
+                                <AppContent />
+                              </BudgetsProvider>
+                            </OperationsActionsProvider>
+                          </OperationsDataProvider>
+                        </CategoriesProvider>
+                      </AccountsActionsProvider>
+                    </AccountsDataProvider>
+                  </ImportProgressProvider>
                 </DialogProvider>
               </ThemeColorsProvider>
             </ThemeConfigProvider>
