@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
 import { HORIZONTAL_PADDING } from '../styles/layout';
@@ -10,14 +10,37 @@ import { HORIZONTAL_PADDING } from '../styles/layout';
 const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Defensive check for undefined items with warning
+  const safeItems = useMemo(() => {
+    if (items === undefined || items === null) {
+      console.warn('SimplePicker: items prop is undefined or null. Using empty array.');
+      return [];
+    }
+    return items;
+  }, [items]);
+
+  // Defensive check for colors with fallback
+  const safeColors = useMemo(() => {
+    if (!colors || typeof colors !== 'object') {
+      console.warn('SimplePicker: colors prop is missing or invalid. Using fallback colors.');
+      return {
+        text: '#000000',
+        surface: '#ffffff',
+        border: '#cccccc',
+        selected: '#e0e0e0',
+      };
+    }
+    return colors;
+  }, [colors]);
+
   const webSelectStyle = ({
     ...baseWebSelectStyle,
-    color: colors && colors.text,
+    color: safeColors.text,
     ...(style || {}),
   });
 
   // Get label for current value
-  const selectedItem = items.find(item => item.value === value);
+  const selectedItem = safeItems.find(item => item.value === value);
   const selectedLabel = selectedItem ? selectedItem.label : '';
 
   // Web: Use native select element
@@ -28,7 +51,7 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
         onChange={(e) => onValueChange(e.target.value)}
         style={webSelectStyle}
       >
-        {items.map(item => (
+        {safeItems.map(item => (
           <option key={item.value} value={item.value}>
             {item.label}
           </option>
@@ -45,7 +68,7 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
         onPress={() => setModalVisible(true)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.androidButtonText, textStyle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.androidButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
           {selectedLabel}
         </Text>
       </TouchableOpacity>
@@ -61,23 +84,23 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
           activeOpacity={1}
           onPress={() => setModalVisible(false)}
         >
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalContent, { backgroundColor: safeColors.surface }]}>
             <FlatList
-              data={items}
+              data={safeItems}
               keyExtractor={(item) => String(item.value)}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.modalItem,
-                    { borderBottomColor: colors.border },
-                    item.value === value && { backgroundColor: colors.selected },
+                    { borderBottomColor: safeColors.border },
+                    item.value === value && { backgroundColor: safeColors.selected },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
                     setModalVisible(false);
                   }}
                 >
-                  <Text style={[styles.modalItemText, { color: colors.text }]}>
+                  <Text style={[styles.modalItemText, { color: safeColors.text }]}>
                     {item.label}
                   </Text>
                 </TouchableOpacity>
