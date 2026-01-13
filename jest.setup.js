@@ -23,25 +23,6 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
-// Mock Sentry to prevent open handle from AsyncExpiringMap timer
-jest.mock('@sentry/react-native', () => ({
-  init: jest.fn(),
-  wrap: jest.fn((component) => component),
-  ReactNativeProfiler: ({ children }) => children,
-  ReactNavigationInstrumentation: jest.fn(),
-  TouchEventBoundary: ({ children }) => children,
-  FeedbackWidgetProvider: ({ children }) => children,
-  withScope: jest.fn(),
-  captureException: jest.fn(),
-  captureMessage: jest.fn(),
-  setUser: jest.fn(),
-  setTag: jest.fn(),
-  setExtra: jest.fn(),
-  addBreadcrumb: jest.fn(),
-  mobileReplayIntegration: jest.fn(() => ({})),
-  feedbackIntegration: jest.fn(() => ({})),
-}));
-
 // Mock expo-sqlite with async methods
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(() => Promise.resolve({
@@ -682,8 +663,6 @@ beforeAll(() => {
       'Check the render method',
       'React will try to recreate',
       'The above error occurred',
-      // Sentry-related messages
-      '@sentry',
     ];
     
     const shouldSuppress = suppressedPatterns.some(pattern => 

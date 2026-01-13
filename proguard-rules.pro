@@ -29,11 +29,6 @@
 -keep class org.sqlite.** { *; }
 -keep class org.sqlite.database.** { *; }
 
-# Sentry
--keepattributes LineNumberTable,SourceFile
--dontwarn org.slf4j.**
--dontwarn javax.**
-
 # Keep BuildConfig
 -keep class com.heywood8.monkeep.BuildConfig { *; }
 -keep class com.heywood8.monkeep.dev.BuildConfig { *; }
