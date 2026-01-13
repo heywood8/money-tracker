@@ -2,12 +2,19 @@ import { renderHook, act } from '@testing-library/react-native';
 import { Keyboard } from 'react-native';
 import useOperationPicker from '../../app/hooks/useOperationPicker';
 
-// Mock React Native Keyboard
-jest.mock('react-native', () => ({
-  Keyboard: {
-    dismiss: jest.fn(),
-  },
-}), { virtual: true });
+// Mock Keyboard
+jest.mock('react-native', () => {
+  const RN = jest.requireActual('react-native');
+  return Object.defineProperty(RN, 'Keyboard', {
+    value: {
+      dismiss: jest.fn(),
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
+      removeListener: jest.fn(),
+      removeAllListeners: jest.fn(),
+    },
+    writable: false,
+  });
+});
 
 describe('useOperationPicker', () => {
   const mockT = (key) => key;
