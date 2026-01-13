@@ -94,6 +94,7 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 jest.mock('../../app/components/IconPicker', () => {
   const React = require('react');
   const { Modal, Pressable, Text } = require('react-native');
+  // eslint-disable-next-line react/prop-types
   return function IconPicker({ visible, onClose, onSelect }) {
     if (!visible) return null;
     return (
