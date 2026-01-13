@@ -5,7 +5,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 
-const COMMON_ICONS = [
+export const COMMON_ICONS = [
   // Money & Finance
   'cash', 'cash-multiple', 'credit-card', 'credit-card-outline', 'wallet', 'bank',
   'currency-usd', 'currency-eur', 'currency-gbp', 'chart-line', 'chart-bar',
@@ -74,8 +74,8 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
             <Text style={[styles.title, { color: colors.text }]}>
               {t('select_icon')}
             </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Icon name="close" size={24} color={colors.text} />
+            <TouchableOpacity onPress={onClose} testID="close-button">
+              <Icon name="close" size={24} color={colors.text} testID="icon-close" />
             </TouchableOpacity>
           </View>
 
