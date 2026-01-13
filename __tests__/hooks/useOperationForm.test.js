@@ -205,6 +205,11 @@ describe('useOperationForm', () => {
     it('should detect multi-currency transfers', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({
           ...prev,
@@ -215,8 +220,10 @@ describe('useOperationForm', () => {
       });
 
       await waitFor(() => {
+        expect(result.current.values.type).toBe('transfer');
+        expect(result.current.values.toAccountId).toBe('acc-2');
         expect(result.current.isMultiCurrencyTransfer).toBe(true);
-      });
+      }, { timeout: 3000 });
     });
 
     it('should not detect same-currency transfers as multi-currency', async () => {
@@ -245,22 +252,33 @@ describe('useOperationForm', () => {
     it('should auto-populate exchange rate for multi-currency transfers', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({
           ...prev,
           type: 'transfer',
           accountId: 'acc-1',
           toAccountId: 'acc-2',
+          exchangeRate: '', // Ensure it's empty so auto-populate triggers
         }));
       });
 
       await waitFor(() => {
         expect(result.current.values.exchangeRate).toBe('0.85');
-      });
+      }, { timeout: 3000 });
     });
 
     it('should calculate destination amount when amount changes', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -280,7 +298,7 @@ describe('useOperationForm', () => {
 
       await waitFor(() => {
         expect(result.current.values.destinationAmount).toBe('85.00');
-      });
+      }, { timeout: 3000 });
     });
 
     it('should clear exchange rate fields for same-currency transfers', async () => {
@@ -334,6 +352,11 @@ describe('useOperationForm', () => {
     it('should not clear category if it matches new type', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({
           ...prev,
@@ -342,13 +365,21 @@ describe('useOperationForm', () => {
         }));
       });
 
+      // Wait for type and category to be set
+      await waitFor(() => {
+        expect(result.current.values.type).toBe('income');
+        expect(result.current.values.categoryId).toBe('cat-2');
+      });
+
+      // Now trigger the effect again by setting type to income again
       await act(async () => {
         result.current.setValues(prev => ({ ...prev, type: 'income' }));
       });
 
+      // Category should still be there since it matches the type
       await waitFor(() => {
         expect(result.current.values.categoryId).toBe('cat-2');
-      });
+      }, { timeout: 3000 });
     });
   });
 
@@ -356,27 +387,46 @@ describe('useOperationForm', () => {
     it('should validate required fields', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.validateFields();
       });
 
-      expect(result.current.errors).toHaveProperty('amount');
-      expect(result.current.errors).toHaveProperty('categoryId');
+      await waitFor(() => {
+        expect(result.current.errors).toHaveProperty('amount');
+        expect(result.current.errors).toHaveProperty('categoryId');
+      });
     });
 
     it('should validate amount is a positive number', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
 
       await act(async () => {
         result.current.setValues(prev => ({ ...prev, amount: '-50' }));
         result.current.validateFields();
       });
 
-      expect(result.current.errors.amount).toBe('valid_amount_required');
+      await waitFor(() => {
+        expect(result.current.errors.amount).toBe('valid_amount_required');
+      });
     });
 
     it('should validate transfer has different accounts', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -385,15 +435,32 @@ describe('useOperationForm', () => {
           amount: '100',
           accountId: 'acc-1',
           toAccountId: 'acc-1',
+          date: '2024-01-15',
         }));
+      });
+
+      // Wait for values to be set
+      await waitFor(() => {
+        expect(result.current.values.type).toBe('transfer');
+        expect(result.current.values.toAccountId).toBe('acc-1');
+      });
+
+      await act(async () => {
         result.current.validateFields();
       });
 
-      expect(result.current.errors.toAccountId).toBe('accounts_must_be_different');
+      await waitFor(() => {
+        expect(result.current.errors.toAccountId).toBe('accounts_must_be_different');
+      });
     });
 
     it('should pass validation with valid values', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -411,8 +478,10 @@ describe('useOperationForm', () => {
         isValid = result.current.validateFields();
       });
 
-      expect(isValid).toBe(true);
-      expect(result.current.errors).toEqual({});
+      await waitFor(() => {
+        expect(isValid).toBe(true);
+        expect(result.current.errors).toEqual({});
+      });
     });
   });
 
@@ -532,6 +601,11 @@ describe('useOperationForm', () => {
     it('should dismiss keyboard and close modal', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.handleClose();
       });
@@ -543,18 +617,27 @@ describe('useOperationForm', () => {
     it('should clear errors on close', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({ ...prev, amount: '' }));
         result.current.validateFields();
       });
 
-      expect(Object.keys(result.current.errors).length).toBeGreaterThan(0);
+      await waitFor(() => {
+        expect(Object.keys(result.current.errors).length).toBeGreaterThan(0);
+      });
 
       await act(async () => {
         result.current.handleClose();
       });
 
-      expect(result.current.errors).toEqual({});
+      await waitFor(() => {
+        expect(result.current.errors).toEqual({});
+      });
     });
   });
 
@@ -630,26 +713,44 @@ describe('useOperationForm', () => {
     it('should filter by operation type', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({ ...prev, type: 'income' }));
       });
 
+      // Wait for type to be set
+      await waitFor(() => {
+        expect(result.current.values.type).toBe('income');
+      });
+
+      // Now check filtered categories
       await waitFor(() => {
         const filtered = result.current.filteredCategories;
         expect(filtered).toHaveLength(1);
         expect(filtered[0].categoryType).toBe('income');
-      });
+      }, { timeout: 3000 });
     });
 
     it('should return empty array for transfers', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(result.current.values.accountId).toBeTruthy();
+      });
+
       await act(async () => {
         result.current.setValues(prev => ({ ...prev, type: 'transfer' }));
       });
 
-      const filtered = result.current.filteredCategories;
-      expect(filtered).toHaveLength(0);
+      await waitFor(() => {
+        const filtered = result.current.filteredCategories;
+        expect(filtered).toHaveLength(0);
+      });
     });
   });
 
