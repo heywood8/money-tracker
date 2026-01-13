@@ -52,10 +52,12 @@ export default function MaterialDialog({
       onRequestClose={onDismiss}
     >
       <Pressable
+        testID="material-dialog-overlay"
         style={styles.overlay}
         onPress={onDismiss}
       >
         <Pressable
+          testID="material-dialog-content"
           style={[styles.dialog, { backgroundColor: colors.card }]}
           onPress={() => {}}
         >
