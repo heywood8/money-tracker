@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.2](https://github.com/heywood8/money-tracker/compare/penny-v0.31.1...penny-v0.31.2) (2026-01-13)
+
+
+### Bug Fixes
+
+* improve BalanceHistoryCard.js coverage ([91efb9c](https://github.com/heywood8/money-tracker/commit/91efb9cc3db30ca4df841562693837fe7e597224))
+* remove Sentry from the project ([#233](https://github.com/heywood8/money-tracker/issues/233)) ([ac41477](https://github.com/heywood8/money-tracker/commit/ac414776775ded48b8fc07c3bad5d03c884068b9))
+
 ## [0.31.1](https://github.com/heywood8/money-tracker/compare/penny-v0.31.0...penny-v0.31.1) (2026-01-13)
 
 
