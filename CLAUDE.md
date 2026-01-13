@@ -241,6 +241,12 @@ npm test -- --watch      # Run in watch mode
 npm test -- <pattern>    # Run specific test files matching pattern
 ```
 
+**IMPORTANT: When running tests as an AI agent, always use the silent/quiet mode to reduce token usage:**
+```bash
+npm test -- --silent     # Only show test failures, not passing tests
+```
+This minimizes output and focuses on what needs attention.
+
 **CRITICAL: Test Quality Requirements**
 
 **All tests must be 100% passing before any code changes are committed or considered complete.**
