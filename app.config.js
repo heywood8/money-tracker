@@ -49,14 +49,6 @@ module.exports = {
     plugins: [
       'expo-sqlite',
       [
-        '@sentry/react-native/expo',
-        {
-          url: 'https://sentry.io/',
-          project: 'penny',
-          organization: 'heywood8',
-        },
-      ],
-      [
         'expo-build-properties',
         {
           android: {
