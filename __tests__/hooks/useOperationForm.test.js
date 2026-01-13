@@ -5,12 +5,19 @@ import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
 
-// Mock dependencies
-jest.mock('react-native', () => ({
-  Keyboard: {
-    dismiss: jest.fn(),
-  },
-}), { virtual: true });
+// Mock Keyboard
+jest.mock('react-native', () => {
+  const RN = jest.requireActual('react-native');
+  return Object.defineProperty(RN, 'Keyboard', {
+    value: {
+      dismiss: jest.fn(),
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
+      removeListener: jest.fn(),
+      removeAllListeners: jest.fn(),
+    },
+    writable: false,
+  });
+});
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn((date) => {
