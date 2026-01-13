@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.1](https://github.com/heywood8/money-tracker/compare/penny-v0.31.0...penny-v0.31.1) (2026-01-13)
+
+
+### Bug Fixes
+
+* components tests ([#231](https://github.com/heywood8/money-tracker/issues/231)) ([7f2bd39](https://github.com/heywood8/money-tracker/commit/7f2bd39b3465887d1a05af080ef81b40758146ed))
+* picker tests ([4bd7406](https://github.com/heywood8/money-tracker/commit/4bd7406b4e5f2c52f29138a40c9f6405c376bc39))
+
 ## [0.31.0](https://github.com/heywood8/money-tracker/compare/penny-v0.30.0...penny-v0.31.0) (2026-01-12)
 
 
