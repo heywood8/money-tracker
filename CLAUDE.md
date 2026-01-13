@@ -241,6 +241,33 @@ npm test -- --watch      # Run in watch mode
 npm test -- <pattern>    # Run specific test files matching pattern
 ```
 
+**CRITICAL: Test Quality Requirements**
+
+**All tests must be 100% passing before any code changes are committed or considered complete.**
+
+When working on this codebase, you MUST:
+
+1. **Run tests before making changes** - Verify the test suite is passing before you begin
+2. **Run tests during development** - Test frequently as you make changes to catch issues early
+3. **Run tests before committing** - All tests must pass before creating any commit
+4. **Fix broken tests immediately** - If your changes break existing tests, fix them before proceeding
+5. **Add tests for new functionality** - New features and bug fixes should include appropriate test coverage
+6. **Never commit failing tests** - Under no circumstances should code be committed with failing tests
+7. **Investigate test failures thoroughly** - Understand why a test failed; don't skip or disable tests without excellent reason
+
+**Test failures are blockers.** If tests are failing:
+- Stop and investigate the root cause
+- Fix the underlying issue (don't modify tests to pass without fixing the actual problem)
+- Only proceed when all tests pass
+- If a test is genuinely incorrect, fix the test AND document why in your commit message
+
+**Before pushing to remote:**
+```bash
+npm test  # Must show all tests passing (0 failed)
+```
+
+If tests fail, DO NOT push. Fix the failures first.
+
 **Testing Patterns:**
 
 1. **Context Testing** (see `__tests__/contexts/ThemeContext.test.js`):
