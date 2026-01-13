@@ -4,7 +4,7 @@ module.exports = {
     '<rootDir>/jest.setup.js',
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@sentry/react-native|@sentry/core|@sentry/types|@sentry/utils|drizzle-orm|drizzle-kit|decimal|invariant)|@unimodules|unimodules|sentry-expo|native-base|react-native-svg)/',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|drizzle-orm|drizzle-kit|decimal|invariant)|@unimodules|unimodules|native-base|react-native-svg)/',
   ],
   coverageReporters: [
     'json-summary',
