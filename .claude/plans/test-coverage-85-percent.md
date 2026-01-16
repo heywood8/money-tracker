@@ -16,6 +16,7 @@
 | 1.5 | App.js | 100% | 100% | 100% | 100% | ✅ Complete |
 | 1.6 | BudgetProgressBar.js | 100% | 100% | 100% | 100% | ✅ Complete |
 | 1.7 | PickerModal.js | 100% | 92.1% | 88.88% | 100% | ✅ Complete |
+| 1.8 | BalanceHistoryDB.js | 96.58% | 90.76% | 100% | 96.55% | ✅ Complete |
 
 ## Strategy
 
@@ -201,28 +202,25 @@ These files have the lowest coverage and will provide the biggest impact.
 
 ---
 
-### 1.8 BalanceHistoryDB.js (23.07% → 85%)
+### 1.8 BalanceHistoryDB.js (23.07% → 85%) ✅ COMPLETE
 **Location:** `app/services/BalanceHistoryDB.js`
-**Current:** 23.07% statements | 6.15% branches | 26.66% functions | 23.27% lines
-**Uncovered Lines:** 36-100, 112, 126-199, 224-225, 236-248, 261-272, 283-295, 308-321, 333-343, 379
-**Test File:** Create `__tests__/services/BalanceHistoryDB.test.js`
+**Final:** 96.58% statements | 90.76% branches | 100% functions | 96.55% lines
+**Test File:** `__tests__/services/BalanceHistoryDB.test.js` (41 tests)
 
-**What to Test:**
-- Insert balance history record
-- Get balance history for account
-- Get balance history for date range
-- Update balance history record
-- Delete balance history record
-- Calculate balance changes over time
-- Handle multiple accounts
-- Error handling for invalid data
-- Database transaction handling
-
-**Testing Patterns:**
-- Mock expo-sqlite database
-- Test CRUD operations
-- Test date range queries
-- Verify data integrity
+**Completed Testing:**
+- ✅ formatDate helper function (YYYY-MM-DD format, padding)
+- ✅ snapshotPreviousDayBalances (no-op function)
+- ✅ getBalanceHistory (date range queries, empty results, errors)
+- ✅ getAllAccountsBalanceOnDate (all accounts, empty results, errors)
+- ✅ getAccountBalanceOnDate (specific date, null when missing, errors)
+- ✅ getLastSnapshotDate (most recent, null when none, errors)
+- ✅ upsertBalanceHistory (insert/replace, error handling)
+- ✅ deleteBalanceHistory (delete entry, error handling)
+- ✅ updateTodayBalance (with/without db instance, accountId conversion, graceful errors)
+- ✅ populateCurrentMonthHistory (full workflow, provided db, transaction conflicts)
+- ✅ Balance calculation by reversing operations (expense, income, transfer)
+- ✅ Transfer with destination_amount handling
+- ✅ Account creation date respect, balance change optimization
 
 ---
 
