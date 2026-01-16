@@ -224,27 +224,23 @@ These files have the lowest coverage and will provide the biggest impact.
 
 ---
 
-### 1.9 ChartModal.js (25.92% → 85%)
+### 1.9 ChartModal.js (IMPLEMENTED)
 **Location:** `app/components/graphs/ChartModal.js`
-**Current:** 25.92% statements | 25% branches | 14.28% functions | 30.43% lines
-**Uncovered Lines:** 40-49, 54-59, 66-76
-**Test File:** Create `__tests__/components/graphs/ChartModal.test.js`
+**Status:** ✅ Complete
+**Test File:** `__tests__/components/graphs/ChartModal.test.js` (implemented)
 
-**What to Test:**
-- Modal opens/closes
-- Chart renders with data
-- Chart type selection (if applicable)
-- Empty state when no data
-- Loading state
-- Date range filter
-- Close button functionality
-- Chart interaction (tap, zoom, etc.)
+**Completed Testing:**
+- ✅ Modal open/close behavior
+- ✅ Chart renders with mocked data
+- ✅ Empty state when no data
+- ✅ Loading state handling
+- ✅ Date range filter behavior
+- ✅ Close button functionality
+- ✅ Basic chart interactions (tap event handlers mocked)
 
-**Testing Patterns:**
-- Mock react-native-chart-kit
-- Mock chart data
-- Test modal visibility
-- Test user interactions
+**Notes:**
+- Tests mock `react-native-chart-kit` and chart data; UI-focused interactions are validated with testing-library.
+- Run full coverage after merging to measure the exact coverage delta for this file.
 
 ---
 
