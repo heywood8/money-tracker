@@ -15,6 +15,7 @@
 | 1.4 | Header.js | 100% | 100% | 85.71% | 100% | ✅ Complete |
 | 1.5 | App.js | 100% | 100% | 100% | 100% | ✅ Complete |
 | 1.6 | BudgetProgressBar.js | 100% | 100% | 100% | 100% | ✅ Complete |
+| 1.7 | PickerModal.js | 100% | 92.1% | 88.88% | 100% | ✅ Complete |
 
 ## Strategy
 
@@ -177,27 +178,26 @@ These files have the lowest coverage and will provide the biggest impact.
 
 ---
 
-### 1.7 PickerModal.js (17.24% → 85%)
+### 1.7 PickerModal.js (17.24% → 85%) ✅ COMPLETE
 **Location:** `app/components/operations/PickerModal.js`
-**Current:** 17.24% statements | 10.52% branches | 11.11% functions | 17.85% lines
-**Uncovered Lines:** 12-14, 62-132
-**Test File:** Create `__tests__/components/operations/PickerModal.test.js`
+**Final:** 100% statements | 92.1% branches | 88.88% functions | 100% lines
+**Test File:** `__tests__/components/operations/PickerModal.test.js` (27 tests)
 
-**What to Test:**
-- Modal opens/closes correctly
-- Displays list of items
-- Item selection triggers callback
-- Search/filter functionality (if exists)
-- Empty state when no items
-- Selected item visual indicator
-- Cancel button closes modal
-- Keyboard handling
-
-**Testing Patterns:**
-- Mock FlatList data
-- Test onSelect callback
-- Test modal visibility
-- Test user interactions
+**Completed Testing:**
+- ✅ Modal rendering (visible/hidden)
+- ✅ Account picker: list rendering, balance display, currency symbols
+- ✅ Account selection callback (onSelectAccount)
+- ✅ toAccount selection callback (onSelectToAccount)
+- ✅ Category picker: list rendering, icons, folder chevrons
+- ✅ Category folder navigation (onNavigateIntoFolder)
+- ✅ Category entry selection (onSelectCategory)
+- ✅ Auto-add with category when amount is valid (onAutoAddWithCategory)
+- ✅ Breadcrumb navigation display and back button
+- ✅ Empty states (no accounts, no categories)
+- ✅ Currency symbol helper (known, unknown, missing currencies)
+- ✅ Close button (only for non-category pickers)
+- ✅ Selected category highlighting
+- ✅ Translated category names via nameKey
 
 ---
 
