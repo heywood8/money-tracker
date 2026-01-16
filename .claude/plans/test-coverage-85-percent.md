@@ -1,9 +1,16 @@
 # Test Coverage Plan: Increase to 85%
 
-**Current Coverage:** 67.48% statements | 57.7% branches | 59.2% functions | 67.81% lines
+**Current Coverage:** 69.15% statements | 59.61% branches | 62.41% functions | 69.42% lines
 **Target Coverage:** 85% (all metrics)
 **Approach:** Iterative, one file at a time
 **Estimated Files to Update:** ~45 files
+
+## Progress Tracking
+
+| Section | File | Statements | Branches | Functions | Lines | Status |
+|---------|------|------------|----------|-----------|-------|--------|
+| 1.1 | BudgetModal.js | 90% | 69.07% | 79.16% | 89.89% | ✅ Complete |
+| 1.2 | SimpleTabs.js | 65% | 26.47% | 69.56% | 64.47% | ⚠️ Worklets untestable |
 
 ## Strategy
 
@@ -26,57 +33,54 @@ To reach 85% coverage from current 67.48%, we need to add approximately **17-18%
 
 These files have the lowest coverage and will provide the biggest impact.
 
-### 1.1 BudgetModal.js (2.72% → 85%)
+### 1.1 BudgetModal.js (2.72% → 85%) ✅ COMPLETE
 **Location:** `app/modals/BudgetModal.js`
-**Current:** 2.72% statements | 0% branches | 0% functions | 3.03% lines
-**Uncovered Lines:** 28-541 (almost entire file)
-**Test File:** Create `__tests__/modals/BudgetModal.test.js` (already exists, needs expansion)
+**Final:** 90% statements | 69.07% branches | 79.16% functions | 89.89% lines
+**Test File:** `__tests__/modals/BudgetModal.test.js` (38 tests)
 
-**What to Test:**
-- Modal open/close behavior
-- Budget creation with valid inputs
-- Budget editing with existing data
-- Budget deletion flow
-- Form validation (empty fields, invalid amounts, date validation)
-- Account selection dropdown
-- Category selection dropdown
-- Amount input with currency formatting
-- Date picker interactions
-- Period selection (daily, weekly, monthly, yearly)
-- Save button enabled/disabled states
-- Cancel button behavior
-- Error handling and error messages
+**Completed Testing:**
+- ✅ Modal open/close behavior
+- ✅ Budget creation with valid inputs
+- ✅ Budget editing with existing data
+- ✅ Budget deletion flow (with dialog confirmation)
+- ✅ Form validation (amount validation, end date after start date)
+- ✅ Currency selection via picker modal
+- ✅ Period selection (weekly, monthly, yearly)
+- ✅ Amount input
+- ✅ Start/end date display
+- ✅ Recurring and rollover switch toggles
+- ✅ Save/cancel button behavior
+- ✅ Error handling (save errors, delete errors)
 
-**Testing Patterns:**
-- Mock AccountsContext and CategoriesContext
-- Mock BudgetsContext for CRUD operations
-- Use `render` with all required context providers
-- Test user interactions with `fireEvent`
-- Verify modal visibility with `queryByTestId` or `queryByText`
+**Remaining Uncovered (impractical to test):**
+- Lines 108, 113, 118: Dead code - validation branches unreachable due to fallback values in useEffect
+- Lines 209-211: handleEndDateChange requires native DateTimePicker onChange simulation
+- Lines 472-474, 516-518: Modal onRequestClose requires Android back button simulation
 
 ---
 
-### 1.2 SimpleTabs.js (7.5% → 85%)
+### 1.2 SimpleTabs.js (7.5% → 85%) ⚠️ PARTIALLY COMPLETE
 **Location:** `app/navigation/SimpleTabs.js`
-**Current:** 7.5% statements | 0% branches | 0% functions | 7.89% lines
-**Uncovered Lines:** 26-35, 77-262
-**Test File:** Expand `__tests__/navigation/SimpleTabs.test.js`
+**Final:** 65% statements | 26.47% branches | 69.56% functions | 64.47% lines
+**Test File:** `__tests__/navigation/SimpleTabs.test.js` (72 tests)
 
-**What to Test:**
-- Tab rendering with correct labels and icons
-- Tab switching changes active screen
-- Active tab visual indicator (color, underline)
-- All 4 tabs render correctly (Operations, Accounts, Categories, Graphs)
-- Tab press navigates to correct screen
-- Screen content renders for each tab
-- Tab bar accessibility labels
-- Safe area insets handling
+**Completed Testing:**
+- ✅ Tab rendering with correct labels
+- ✅ Tab switching via tab press
+- ✅ All 4 tabs render correctly (Operations, Accounts, Categories, Graphs)
+- ✅ Tab press navigation
+- ✅ Screen content renders for each tab
+- ✅ Tab bar accessibility labels
+- ✅ Settings modal open/close
+- ✅ Tab bar layout event handling
 
-**Testing Patterns:**
-- Mock all screen components (OperationsScreen, AccountsScreen, etc.)
-- Test tab press with `fireEvent.press`
-- Verify screen changes with `queryByTestId`
-- Mock all required contexts
+**Remaining Uncovered (reanimated worklets - cannot be tested with Jest):**
+- Lines 122-134: `navigateToTab` function (only called from worklet)
+- Lines 146-188: `panGesture` worklet handlers (onStart, onUpdate, onEnd)
+  - These use the 'worklet' directive and run on the UI thread
+  - Would require React Native E2E testing (Detox) to cover
+
+**Note:** Reanimated worklets are fundamentally untestable with Jest because they run in a separate JavaScript runtime on the native UI thread.
 
 ---
 
