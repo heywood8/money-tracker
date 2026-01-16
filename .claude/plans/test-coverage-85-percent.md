@@ -12,6 +12,8 @@
 | 1.1 | BudgetModal.js | 90% | 69.07% | 79.16% | 89.89% | ✅ Complete |
 | 1.2 | SimpleTabs.js | 65% | 26.47% | 69.56% | 64.47% | ⚠️ Worklets untestable |
 | 1.3 | ImportProgressContext.js | 100% | 100% | 100% | 100% | ✅ Complete |
+| 1.4 | Header.js | 100% | 100% | 85.71% | 100% | ✅ Complete |
+| 1.5 | App.js | 100% | 100% | 100% | 100% | ✅ Complete |
 
 ## Strategy
 
@@ -105,49 +107,49 @@ These files have the lowest coverage and will provide the biggest impact.
 
 ---
 
-### 1.4 Header.js (15.38% → 85%)
+### 1.4 Header.js (15.38% → 85%) ✅ COMPLETE
 **Location:** `app/components/Header.js`
-**Current:** 15.38% statements | 0% branches | 0% functions | 15.38% lines
-**Uncovered Lines:** 16-53
-**Test File:** Create `__tests__/components/Header.test.js`
+**Final:** 100% statements | 100% branches | 85.71% functions | 100% lines
+**Test File:** `__tests__/components/Header.test.js` (22 tests)
 
-**What to Test:**
-- Header renders with title
-- Settings icon button renders
-- Settings icon press opens SettingsModal
-- Modal open/close state management
-- Header styling and theme colors
-- Accessibility labels for icon button
-
-**Testing Patterns:**
-- Mock SettingsModal component
-- Test button press with `fireEvent.press`
-- Mock ThemeContext for colors
-- Verify modal visibility changes
+**Completed Testing:**
+- ✅ Header renders with title ("Penny")
+- ✅ Renders app version and database version
+- ✅ Settings icon button renders and triggers callback
+- ✅ Theme toggle icon (sunny for light, moon for dark)
+- ✅ Theme toggle switches between light/dark themes
+- ✅ Accessibility labels and hints
+- ✅ Database version fetch on mount
+- ✅ Database version error handling (shows "?")
+- ✅ Import progress event listener subscription
+- ✅ Import progress event listener unsubscription on unmount
+- ✅ DB version refresh when import completes
+- ✅ Non-complete events don't trigger refresh
+- ✅ Dark theme mode tests (icon, label, setTheme)
 
 ---
 
-### 1.5 App.js (15.38% → 85%)
+### 1.5 App.js (15.38% → 85%) ✅ COMPLETE
 **Location:** `App.js`
-**Current:** 15.38% statements | 0% branches | 25% functions | 15.38% lines
-**Uncovered Lines:** 23-43
-**Test File:** Expand `__tests__/App.test.js`
+**Final:** 100% statements | 100% branches | 100% functions | 100% lines
+**Test File:** `__tests__/App.test.js` (15 tests)
 
-**What to Test:**
-- App renders without crashing (already tested)
-- All context providers wrap the component tree
-- Theme provider initialization
-- Localization provider initialization
-- Accounts/Operations/Categories contexts initialize
-- Error boundary catches errors
-- App initializer runs on mount
-- Loading states during initialization
-
-**Testing Patterns:**
-- Mock AppInitializer component
-- Mock all contexts
-- Mock expo-font loading
-- Test provider hierarchy
+**Completed Testing:**
+- ✅ App renders without crashing
+- ✅ ErrorBoundary wrapper renders
+- ✅ GestureHandlerRootView renders
+- ✅ SafeAreaProvider renders
+- ✅ PaperProvider renders
+- ✅ AppInitializer renders
+- ✅ ImportProgressModal renders
+- ✅ ThemedStatusBar sets dark-content for light theme
+- ✅ ThemedStatusBar sets light-content for dark theme
+- ✅ StatusBar.setBackgroundColor called on Android
+- ✅ StatusBar dark background on Android in dark mode
+- ✅ Error handling for StatusBar.setBarStyle
+- ✅ Error handling for StatusBar.setBackgroundColor
+- ✅ Provider hierarchy test
+- ✅ useMaterialTheme integration with PaperProvider
 
 ---
 
