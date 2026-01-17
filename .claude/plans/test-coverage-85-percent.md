@@ -1,6 +1,6 @@
 # Test Coverage Plan: Increase to 85%
 
-**Current Coverage:** 69.15% statements | 59.61% branches | 62.41% functions | 69.42% lines
+**Current Coverage:** 74.51% statements | 65.09% branches | 68.75% functions | 74.97% lines
 **Target Coverage:** 85% (all metrics)
 **Approach:** Iterative, one file at a time
 **Estimated Files to Update:** ~45 files
@@ -17,6 +17,11 @@
 | 1.6 | BudgetProgressBar.js | 100% | 100% | 100% | 100% | ✅ Complete |
 | 1.7 | PickerModal.js | 100% | 92.1% | 88.88% | 100% | ✅ Complete |
 | 1.8 | BalanceHistoryDB.js | 96.58% | 90.76% | 100% | 96.55% | ✅ Complete |
+| 1.9 | ChartModal.js | - | - | - | - | ✅ Complete |
+| 1.10 | CustomLegend.js | 100% | 100% | 100% | 100% | ✅ Complete |
+| 1.11 | schema.js | 64.7% | 100% | 45.45% | 64.7% | ⚠️ FK callbacks untestable |
+| 1.12 | PreferencesDB.js | 100% | 100% | 100% | 100% | ✅ Complete |
+| 1.13 | layout.js | 100% | 100% | 100% | 100% | ✅ Complete |
 
 ## Strategy
 
