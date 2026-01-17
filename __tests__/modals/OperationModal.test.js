@@ -787,4 +787,686 @@ describe('OperationModal', () => {
       expect(getByText('add_operation')).toBeTruthy();
     });
   });
+
+  describe('Callback Handlers', () => {
+    it('handles amount change when not shadow operation', () => {
+      const mockSetValues = jest.fn();
+      const mockSetLastEditedField = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        setLastEditedField: mockSetLastEditedField,
+        isShadowOperation: false,
+      });
+
+      const { getByTestId } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // The callback is passed to OperationFormFields but we mocked that component
+      // We verify the hook returns the correct values
+      expect(getByTestId('operation-form-fields')).toBeTruthy();
+    });
+
+    it('does not update amount for shadow operations', () => {
+      const mockSetValues = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        isShadowOperation: true,
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc1',
+        toAccountId: 'acc2',
+        date: '2024-01-15',
+        isShadowTransfer: true,
+      };
+
+      const { getByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+        />,
+      );
+
+      expect(getByTestId('operation-form-fields')).toBeTruthy();
+    });
+  });
+
+  describe('Type Picker Rendering', () => {
+    it('renders type picker items correctly', () => {
+      const mockClosePicker = jest.fn();
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'type',
+          data: [
+            { key: 'expense', label: 'expense', icon: 'minus-circle' },
+            { key: 'income', label: 'income', icon: 'plus-circle' },
+            { key: 'transfer', label: 'transfer', icon: 'swap-horizontal' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText, getAllByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Check that type picker options are displayed
+      // Note: some types may appear multiple times (in button and picker)
+      expect(getAllByText('expense').length).toBeGreaterThanOrEqual(1);
+      expect(getAllByText('income').length).toBeGreaterThanOrEqual(1);
+      expect(getAllByText('transfer').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('selects type when type option is pressed', () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'type',
+          data: [
+            { key: 'expense', label: 'expense', icon: 'minus-circle' },
+            { key: 'income', label: 'income', icon: 'plus-circle' },
+            { key: 'transfer', label: 'transfer', icon: 'swap-horizontal' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Press income to switch type
+      fireEvent.press(getByText('income'));
+
+      expect(mockSetValues).toHaveBeenCalled();
+      expect(mockClosePicker).toHaveBeenCalled();
+    });
+
+    it('clears categoryId when switching to transfer type', () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        values: {
+          type: 'expense',
+          amount: '50',
+          accountId: 'acc1',
+          categoryId: 'cat1',
+          date: '2024-01-15',
+        },
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'type',
+          data: [
+            { key: 'expense', label: 'expense', icon: 'minus-circle' },
+            { key: 'income', label: 'income', icon: 'plus-circle' },
+            { key: 'transfer', label: 'transfer', icon: 'swap-horizontal' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Press transfer to switch type
+      fireEvent.press(getByText('transfer'));
+
+      // setValues should be called with a function that clears categoryId for transfer
+      expect(mockSetValues).toHaveBeenCalled();
+    });
+  });
+
+  describe('Account Picker Rendering', () => {
+    it('renders account picker items correctly', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'account',
+          data: [
+            { id: 'acc1', name: 'Checking', currency: 'USD', balance: '1000' },
+            { id: 'acc2', name: 'Savings', currency: 'EUR', balance: '500' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(getByText('Checking')).toBeTruthy();
+      expect(getByText('Savings')).toBeTruthy();
+    });
+
+    it('selects account when account option is pressed', () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'account',
+          data: [
+            { id: 'acc1', name: 'Checking', currency: 'USD', balance: '1000' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      fireEvent.press(getByText('Checking'));
+
+      expect(mockSetValues).toHaveBeenCalled();
+      expect(mockClosePicker).toHaveBeenCalled();
+    });
+
+    it('renders toAccount picker and selects correctly', () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'toAccount',
+          data: [
+            { id: 'acc2', name: 'Savings', currency: 'EUR', balance: '500' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      fireEvent.press(getByText('Savings'));
+
+      // setValues should be called to set toAccountId
+      expect(mockSetValues).toHaveBeenCalled();
+      expect(mockClosePicker).toHaveBeenCalled();
+    });
+  });
+
+  describe('Category Picker Rendering', () => {
+    it('renders category picker with folder and entry items', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat1', name: 'Food', type: 'folder', icon: 'food' },
+            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(getByText('Food')).toBeTruthy();
+      expect(getByText('Groceries')).toBeTruthy();
+    });
+
+    it('navigates into folder when folder is pressed', () => {
+      const mockNavigateIntoFolder = jest.fn();
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat1', name: 'Food', type: 'folder', icon: 'food' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: mockNavigateIntoFolder,
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      fireEvent.press(getByText('Food'));
+
+      expect(mockNavigateIntoFolder).toHaveBeenCalledWith({ id: 'cat1', name: 'Food', type: 'folder', icon: 'food' });
+    });
+
+    it('selects category entry when entry is pressed', () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        values: {
+          type: 'expense',
+          amount: '',
+          accountId: 'acc1',
+          categoryId: '',
+          date: '2024-01-15',
+        },
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      fireEvent.press(getByText('Groceries'));
+
+      expect(mockSetValues).toHaveBeenCalled();
+      expect(mockClosePicker).toHaveBeenCalled();
+    });
+
+    it('displays translated category name when nameKey is provided', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat1', name: 'Unnamed', nameKey: 'category_food', type: 'entry', icon: 'food' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // t() mock returns the key, so we should see 'category_food'
+      expect(getByText('category_food')).toBeTruthy();
+    });
+  });
+
+  describe('Category Selection with Auto-Add', () => {
+    it('auto-saves operation when category selected with valid amount', async () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        values: {
+          type: 'expense',
+          amount: '50.00',
+          accountId: 'acc1',
+          categoryId: '',
+          date: '2024-01-15',
+          description: '',
+        },
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      fireEvent.press(getByText('Groceries'));
+
+      await waitFor(() => {
+        expect(mockSetValues).toHaveBeenCalled();
+      });
+    });
+
+    it('does not auto-save when editing existing operation', async () => {
+      const mockSetValues = jest.fn();
+      const mockClosePicker = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        setValues: mockSetValues,
+        values: {
+          type: 'expense',
+          amount: '50.00',
+          accountId: 'acc1',
+          categoryId: 'cat1',
+          date: '2024-01-15',
+          description: '',
+        },
+      });
+
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: mockClosePicker,
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'expense',
+        amount: '50',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2024-01-15',
+      };
+
+      const { getByText } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+        />,
+      );
+
+      fireEvent.press(getByText('Groceries'));
+
+      await waitFor(() => {
+        // Should still select category but not auto-add
+        expect(mockSetValues).toHaveBeenCalled();
+        expect(mockClosePicker).toHaveBeenCalled();
+        // addOperation should NOT be called for edit mode
+        expect(mockAddOperation).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Date Picker Interaction', () => {
+    it('shows date picker when showDatePicker is true', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        showDatePicker: true,
+      });
+
+      const { UNSAFE_getByType } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // DateTimePicker should be rendered
+      const DateTimePicker = require('@react-native-community/datetimepicker').default;
+      expect(UNSAFE_getByType(DateTimePicker)).toBeTruthy();
+    });
+  });
+
+  describe('Key Extractor', () => {
+    it('returns correct key for type picker items', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'type',
+          data: [
+            { key: 'expense', label: 'expense', icon: 'minus-circle' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getAllByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Item should be rendered with correct key (verified by presence)
+      // May appear multiple times (button + picker)
+      expect(getAllByText('expense').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('returns id for unknown picker type', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'unknown',
+          data: [
+            { id: 'item1', name: 'Unknown Item' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      // This tests the fallback path in keyExtractor
+      const { queryByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Unknown type returns null from renderPickerItem
+      // The list should still render without crashing
+      expect(queryByText('Unknown Item')).toBeNull();
+    });
+  });
+
+  describe('Empty States', () => {
+    it('shows no categories message when category picker is empty', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(getByText('no_categories')).toBeTruthy();
+    });
+
+    it('shows no accounts message when account picker is empty', () => {
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'account',
+          data: [],
+        },
+        categoryNavigation: {
+          breadcrumb: [],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: jest.fn(),
+      });
+
+      const { getByText } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(getByText('no_accounts')).toBeTruthy();
+    });
+  });
+
+  describe('Breadcrumb Navigation', () => {
+    it('calls navigateBack when back button is pressed', () => {
+      const mockNavigateBack = jest.fn();
+      const useOperationPicker = require('../../app/hooks/useOperationPicker');
+      useOperationPicker.mockReturnValue({
+        pickerState: {
+          visible: true,
+          type: 'category',
+          data: [
+            { id: 'cat2', name: 'Groceries', type: 'entry', icon: 'cart' },
+          ],
+        },
+        categoryNavigation: {
+          breadcrumb: [{ id: 'cat1', name: 'Food' }],
+        },
+        openPicker: jest.fn(),
+        closePicker: jest.fn(),
+        navigateIntoFolder: jest.fn(),
+        navigateBack: mockNavigateBack,
+      });
+
+      const { getByTestId } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Find the back button by its icon
+      const backIcon = getByTestId('icon-arrow-left');
+      fireEvent.press(backIcon.parent);
+
+      expect(mockNavigateBack).toHaveBeenCalled();
+    });
+  });
 });

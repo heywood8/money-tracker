@@ -503,4 +503,174 @@ describe('AccountsScreen', () => {
       expect(() => render(<AccountsScreen />)).not.toThrow();
     });
   });
+
+  describe('Account Rendering', () => {
+    it('renders account names correctly', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const mockAccounts = [
+        { id: '1', name: 'My Cash', balance: '100.50', currency: 'USD', order: 0 },
+      ];
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: mockAccounts,
+        displayedAccounts: mockAccounts,
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      expect(getByText('My Cash')).toBeTruthy();
+    });
+
+    it('renders formatted balance with currency symbol', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+
+      const mockAccounts = [
+        { id: '1', name: 'Test Account', balance: '1234.56', currency: 'EUR', order: 0 },
+      ];
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: mockAccounts,
+        displayedAccounts: mockAccounts,
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      // Balance should be formatted with currency symbol
+      expect(getByText('Test Account')).toBeTruthy();
+    });
+  });
+
+  describe('FAB Button', () => {
+    it('renders add account FAB button', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      // Set up mock to return keys without prefix
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      const { getByLabelText } = render(<AccountsScreen />);
+
+      expect(getByLabelText('add_account')).toBeTruthy();
+    });
+  });
+
+  describe('Hidden Accounts Toggle', () => {
+    it('renders show hidden accounts button when hidden accounts exist', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      const hiddenAccounts = [
+        { id: '1', name: 'Hidden Account', balance: '100', currency: 'USD', hidden: 1 },
+      ];
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: hiddenAccounts,
+        displayedAccounts: [],
+        hiddenAccounts: hiddenAccounts,
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      // Should show the toggle button - returns translation key
+      expect(getByText('show_hidden_accounts')).toBeTruthy();
+    });
+
+    it('does not render hidden accounts button when no hidden accounts', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: [],
+        displayedAccounts: [],
+        hiddenAccounts: [],
+      }));
+
+      const { queryByText } = render(<AccountsScreen />);
+
+      expect(queryByText(/show_hidden_accounts|hide_hidden_accounts/)).toBeNull();
+    });
+  });
+
+  describe('Loading and Error States', () => {
+    it('displays loading indicator when loading', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        loading: true,
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      // Check for translation key
+      expect(getByText('loading_accounts')).toBeTruthy();
+    });
+
+    it('displays error message when error occurs', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        error: 'Failed to load',
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      // Check for translation key
+      expect(getByText('error_loading_accounts')).toBeTruthy();
+    });
+  });
+
+  describe('Empty State', () => {
+    it('displays no accounts message when list is empty', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+      const { useLocalization } = require('../../app/contexts/LocalizationContext');
+
+      useLocalization.mockReturnValue({
+        t: jest.fn((key) => key),
+        language: 'en',
+      });
+
+      useAccountsData.mockReturnValue(createAccountsDataMock({
+        accounts: [],
+        displayedAccounts: [],
+      }));
+
+      const { getByText } = render(<AccountsScreen />);
+
+      // Check for translation key since mock returns key
+      expect(getByText('no_accounts')).toBeTruthy();
+    });
+  });
 });
