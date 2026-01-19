@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
  * Custom hook for loading and managing balance history data
@@ -291,6 +292,15 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       console.error('Failed to delete balance:', error);
     }
   }, [selectedAccount, loadBalanceHistory]);
+
+  // Listen for operation changes and reload balance history
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
+      loadBalanceHistory();
+    });
+
+    return unsubscribe;
+  }, [loadBalanceHistory]);
 
   return {
     balanceHistoryData,

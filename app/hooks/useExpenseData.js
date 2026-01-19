@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getSpendingByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
  * Custom hook for loading and managing expense data for GraphsScreen
@@ -219,6 +220,15 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
   const totalExpenses = useMemo(() => {
     return chartData.reduce((sum, item) => sum + item.amount, 0);
   }, [chartData]);
+
+  // Listen for operation changes and reload expense data
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
+      loadExpenseData();
+    });
+
+    return unsubscribe;
+  }, [loadExpenseData]);
 
   return {
     chartData,

@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getIncomeByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
  * Custom hook for loading and managing income data for GraphsScreen
@@ -150,6 +151,15 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
   const totalIncome = useMemo(() => {
     return incomeChartData.reduce((sum, item) => sum + item.amount, 0);
   }, [incomeChartData]);
+
+  // Listen for operation changes and reload income data
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
+      loadIncomeData();
+    });
+
+    return unsubscribe;
+  }, [loadIncomeData]);
 
   return {
     incomeChartData,
