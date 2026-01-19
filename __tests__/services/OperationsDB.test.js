@@ -887,6 +887,799 @@ describe('OperationsDB Service', () => {
     });
   });
 
+  describe('getFilteredOperationsByDateRange', () => {
+    it('returns filtered operations by date range without filters', async () => {
+      const mockOperations = [
+        { id: 1, type: 'expense', amount: '100', account_id: 'acc1', category_id: 'cat1', date: '2025-12-05' },
+      ];
+      queryAll.mockResolvedValue(mockOperations);
+
+      const result = await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {});
+
+      expect(queryAll).toHaveBeenCalled();
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('WHERE o.date >= ? AND o.date <= ?');
+      expect(result).toHaveLength(1);
+    });
+
+    it('filters by operation types', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { types: ['expense', 'income'] };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.type IN (?,?)');
+    });
+
+    it('skips type filter when all 3 types selected', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { types: ['expense', 'income', 'transfer'] };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).not.toContain('o.type IN');
+    });
+
+    it('filters by account IDs', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { accountIds: ['acc1', 'acc2'] };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.account_id IN (?,?) OR o.to_account_id IN (?,?)');
+    });
+
+    it('filters by category IDs', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { categoryIds: ['cat1'] };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.category_id IN (?)');
+    });
+
+    it('filters by amount range (min only)', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { amountRange: { min: 50, max: null } };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+      expect(sqlCall).not.toContain('CAST(o.amount AS REAL) <= ?');
+    });
+
+    it('filters by amount range (max only)', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { amountRange: { min: null, max: 200 } };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).not.toContain('CAST(o.amount AS REAL) >= ?');
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+    });
+
+    it('filters by additional date range', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { dateRange: { startDate: '2025-12-10', endDate: '2025-12-20' } };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      // Should have date range from main params AND from filters
+      expect((sqlCall.match(/o\.date >=/g) || []).length).toBe(2);
+      expect((sqlCall.match(/o\.date <=/g) || []).length).toBe(2);
+    });
+
+    it('filters by date range with startDate only', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { dateRange: { startDate: '2025-12-10' } };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      expect(queryAll).toHaveBeenCalled();
+    });
+
+    it('filters by date range with endDate only', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { dateRange: { endDate: '2025-12-20' } };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      expect(queryAll).toHaveBeenCalled();
+    });
+
+    it('filters by search text', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: 'grocery' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+      expect(sqlCall).toContain('a.name LIKE ? COLLATE NOCASE');
+      expect(sqlCall).toContain('to_a.name LIKE ? COLLATE NOCASE');
+      expect(sqlCall).toContain('c.name LIKE ? COLLATE NOCASE');
+    });
+
+    it('trims search text before searching', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: '  coffee  ' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const params = queryAll.mock.calls[0][1];
+      expect(params).toContain('%coffee%');
+    });
+
+    it('combines all filters correctly', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = {
+        types: ['expense'],
+        accountIds: ['acc1'],
+        categoryIds: ['cat1'],
+        amountRange: { min: 10, max: 100 },
+        dateRange: { startDate: '2025-12-10' },
+        searchText: 'test',
+      };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.type IN');
+      expect(sqlCall).toContain('o.account_id IN');
+      expect(sqlCall).toContain('o.category_id IN');
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) >=');
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) <=');
+      expect(sqlCall).toContain('o.description LIKE');
+    });
+
+    it('handles null result from query', async () => {
+      queryAll.mockResolvedValue(null);
+
+      const result = await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {});
+
+      expect(result).toEqual([]);
+    });
+
+    it('throws error on query failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', {}),
+      ).rejects.toThrow('Query failed');
+    });
+  });
+
+  describe('Forward Pagination Functions', () => {
+    describe('getNextNewestOperation', () => {
+      it('finds next operation after given date', async () => {
+        const mockOperation = {
+          id: 1,
+          type: 'expense',
+          amount: '100',
+          account_id: 'acc1',
+          date: '2025-12-10',
+          created_at: '2025-12-10T10:00:00Z',
+        };
+        queryFirst.mockResolvedValue(mockOperation);
+
+        const result = await OperationsDB.getNextNewestOperation('2025-12-05');
+
+        expect(queryFirst).toHaveBeenCalledWith(
+          'SELECT * FROM operations WHERE date > ? ORDER BY date ASC, created_at ASC LIMIT 1',
+          ['2025-12-05'],
+        );
+        expect(result.id).toBe(1);
+        expect(result.accountId).toBe('acc1');
+      });
+
+      it('returns null when no newer operations exist', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const result = await OperationsDB.getNextNewestOperation('2025-12-31');
+
+        expect(result).toBeNull();
+      });
+
+      it('throws error on query failure', async () => {
+        queryFirst.mockRejectedValue(new Error('Query failed'));
+
+        await expect(
+          OperationsDB.getNextNewestOperation('2025-12-05'),
+        ).rejects.toThrow('Query failed');
+      });
+    });
+
+    describe('getOperationsByWeekToDate', () => {
+      it('gets operations for a week starting from date going forward', async () => {
+        const mockOperations = [
+          { id: 1, type: 'expense', amount: '100', account_id: 'acc1', date: '2025-12-05' },
+          { id: 2, type: 'income', amount: '200', account_id: 'acc2', date: '2025-12-10' },
+        ];
+        queryAll.mockResolvedValue(mockOperations);
+
+        const result = await OperationsDB.getOperationsByWeekToDate('2025-12-05');
+
+        expect(queryAll).toHaveBeenCalledWith(
+          expect.stringContaining('WHERE date >= ? AND date <= ?'),
+          expect.any(Array),
+        );
+        // Start date should be 2025-12-05, end date should be 2025-12-11 (6 days later)
+        const params = queryAll.mock.calls[0][1];
+        expect(params[0]).toBe('2025-12-05');
+        expect(params[1]).toBe('2025-12-11');
+        expect(result).toHaveLength(2);
+      });
+
+      it('returns empty array when no operations', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const result = await OperationsDB.getOperationsByWeekToDate('2025-12-05');
+
+        expect(result).toEqual([]);
+      });
+
+      it('handles null result from query', async () => {
+        queryAll.mockResolvedValue(null);
+
+        const result = await OperationsDB.getOperationsByWeekToDate('2025-12-05');
+
+        expect(result).toEqual([]);
+      });
+
+      it('throws error on query failure', async () => {
+        queryAll.mockRejectedValue(new Error('Query failed'));
+
+        await expect(
+          OperationsDB.getOperationsByWeekToDate('2025-12-05'),
+        ).rejects.toThrow('Query failed');
+      });
+    });
+
+    describe('getNextNewestFilteredOperation', () => {
+      it('finds next operation after date matching filters', async () => {
+        const mockOperation = {
+          id: 1,
+          type: 'expense',
+          amount: '100',
+          account_id: 'acc1',
+          date: '2025-12-10',
+          created_at: '2025-12-10T10:00:00Z',
+        };
+        queryFirst.mockResolvedValue(mockOperation);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        expect(queryFirst).toHaveBeenCalled();
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('WHERE o.date > ?');
+        expect(sqlCall).toContain('o.type IN (?)');
+        expect(sqlCall).toContain('ORDER BY o.date ASC, o.created_at ASC LIMIT 1');
+        expect(result.id).toBe(1);
+      });
+
+      it('returns null when no matching operations exist', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getNextNewestFilteredOperation('2025-12-31', filters);
+
+        expect(result).toBeNull();
+      });
+
+      it('applies account filters', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { accountIds: ['acc1', 'acc2'] };
+        await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('o.account_id IN (?,?) OR o.to_account_id IN (?,?)');
+      });
+
+      it('applies category filters', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { categoryIds: ['cat1'] };
+        await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('o.category_id IN (?)');
+      });
+
+      it('applies amount range filters', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { amountRange: { min: 10, max: 100 } };
+        await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+      });
+
+      it('applies date range filters', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { dateRange: { startDate: '2025-12-01', endDate: '2025-12-31' } };
+        await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('o.date >= ?');
+        expect(sqlCall).toContain('o.date <= ?');
+      });
+
+      it('applies search text filter', async () => {
+        queryFirst.mockResolvedValue(null);
+
+        const filters = { searchText: 'grocery' };
+        await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
+
+        const sqlCall = queryFirst.mock.calls[0][0];
+        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+      });
+
+      it('throws error on query failure', async () => {
+        queryFirst.mockRejectedValue(new Error('Query failed'));
+
+        await expect(
+          OperationsDB.getNextNewestFilteredOperation('2025-12-05', {}),
+        ).rejects.toThrow('Query failed');
+      });
+    });
+
+    describe('getFilteredOperationsByWeekToDate', () => {
+      it('gets filtered operations for a week starting from date', async () => {
+        const mockOperations = [
+          { id: 1, type: 'expense', amount: '100', account_id: 'acc1', date: '2025-12-05' },
+        ];
+        queryAll.mockResolvedValue(mockOperations);
+
+        const filters = { types: ['expense'] };
+        const result = await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        expect(queryAll).toHaveBeenCalled();
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('WHERE o.date >= ? AND o.date <= ?');
+        expect(sqlCall).toContain('o.type IN (?)');
+        expect(result).toHaveLength(1);
+      });
+
+      it('calculates correct week range (6 days forward)', async () => {
+        queryAll.mockResolvedValue([]);
+
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', {});
+
+        const params = queryAll.mock.calls[0][1];
+        expect(params[0]).toBe('2025-12-05');
+        expect(params[1]).toBe('2025-12-11');
+      });
+
+      it('applies account filters', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { accountIds: ['acc1'] };
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.account_id IN (?)');
+      });
+
+      it('applies category filters', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { categoryIds: ['cat1', 'cat2'] };
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.category_id IN (?,?)');
+      });
+
+      it('applies amount range filters', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { amountRange: { min: 50, max: null } };
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+      });
+
+      it('applies date range filters', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { dateRange: { startDate: '2025-12-06' } };
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect((sqlCall.match(/o\.date >=/g) || []).length).toBe(2);
+      });
+
+      it('applies search text filter', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: 'test' };
+        await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+      });
+
+      it('returns empty array when no operations match', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const result = await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', {});
+
+        expect(result).toEqual([]);
+      });
+
+      it('handles null result from query', async () => {
+        queryAll.mockResolvedValue(null);
+
+        const result = await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', {});
+
+        expect(result).toEqual([]);
+      });
+
+      it('throws error on query failure', async () => {
+        queryAll.mockRejectedValue(new Error('Query failed'));
+
+        await expect(
+          OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', {}),
+        ).rejects.toThrow('Query failed');
+      });
+    });
+  });
+
+  describe('Additional Error Handling', () => {
+    it('getOperationsByAccount throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.getOperationsByAccount('acc1')).rejects.toThrow('Query failed');
+    });
+
+    it('getOperationsByCategory throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.getOperationsByCategory('cat1')).rejects.toThrow('Query failed');
+    });
+
+    it('getOperationsByDateRange throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getOperationsByDateRange('2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getOperationsByType throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.getOperationsByType('expense')).rejects.toThrow('Query failed');
+    });
+
+    it('getTotalExpenses throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getTotalIncome throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getTotalIncome('acc1', '2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getSpendingByCategory throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getSpendingByCategory('2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getIncomeByCategory throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getIncomeByCategory('2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getSpendingByCategoryAndCurrency throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getSpendingByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getIncomeByCategoryAndCurrency throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getIncomeByCategoryAndCurrency('USD', '2025-12-01', '2025-12-31'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('operationExists throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.operationExists(1)).rejects.toThrow('Query failed');
+    });
+
+    it('getTodayAdjustmentOperation throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getTodayAdjustmentOperation('acc1'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getAvailableMonths throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.getAvailableMonths()).rejects.toThrow('Query failed');
+    });
+
+    it('getOperationsByWeekOffset throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(OperationsDB.getOperationsByWeekOffset(0)).rejects.toThrow('Query failed');
+    });
+
+    it('getNextOldestOperation throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getNextOldestOperation('2025-12-05'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getOperationsByWeekFromDate throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getOperationsByWeekFromDate('2025-12-05'),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getFilteredOperationsByWeekFromDate throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', {}),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getNextOldestFilteredOperation throws error on failure', async () => {
+      queryFirst.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getNextOldestFilteredOperation('2025-12-05', {}),
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('getFilteredOperationsByWeekOffset throws error on failure', async () => {
+      queryAll.mockRejectedValue(new Error('Query failed'));
+
+      await expect(
+        OperationsDB.getFilteredOperationsByWeekOffset(0, {}),
+      ).rejects.toThrow('Query failed');
+    });
+  });
+
+  describe('Update Operation - Additional Cases', () => {
+    it('updates toAccountId field', async () => {
+      const oldOperation = {
+        id: 1,
+        type: 'transfer',
+        amount: '100',
+        account_id: 'acc1',
+        to_account_id: 'acc2',
+        date: '2025-12-05',
+      };
+
+      const updatedOperation = {
+        ...oldOperation,
+        to_account_id: 'acc3',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation)
+        .mockResolvedValueOnce({ balance: '1000' })  // acc1
+        .mockResolvedValueOnce({ balance: '500' })   // acc2
+        .mockResolvedValueOnce({ balance: '800' });  // acc3
+
+      await OperationsDB.updateOperation(1, { toAccountId: 'acc3' });
+
+      // Should update the operation
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('to_account_id = ?'),
+        expect.arrayContaining(['acc3', 1]),
+      );
+    });
+
+    it('extracts ID from object for toAccountId', async () => {
+      const oldOperation = {
+        id: 1,
+        type: 'transfer',
+        amount: '100',
+        account_id: 'acc1',
+        to_account_id: 'acc2',
+        date: '2025-12-05',
+      };
+
+      const updatedOperation = {
+        ...oldOperation,
+        to_account_id: 'acc3',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)
+        .mockResolvedValueOnce(updatedOperation);
+
+      await OperationsDB.updateOperation(1, { toAccountId: { id: 'acc3' } });
+
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('to_account_id = ?'),
+        expect.arrayContaining(['acc3', 1]),
+      );
+    });
+  });
+
+  describe('Delete Operation - Additional Cases', () => {
+    it('skips balance update when account not found during delete', async () => {
+      const operation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        date: '2025-12-05',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(operation)  // Get operation
+        .mockResolvedValueOnce(null);      // Account not found
+
+      await OperationsDB.deleteOperation(1);
+
+      // Should still delete the operation
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'DELETE FROM operations WHERE id = ?',
+        [1],
+      );
+
+      // Should only have delete call, no balance update
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getNextOldestFilteredOperation - Additional Filters', () => {
+    it('applies amount range min filter', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { amountRange: { min: 50, max: null } };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+    });
+
+    it('applies amount range max filter', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { amountRange: { min: null, max: 200 } };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+    });
+
+    it('applies date range startDate filter', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { dateRange: { startDate: '2025-11-01' } };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('o.date >= ?');
+    });
+
+    it('applies date range endDate filter', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { dateRange: { endDate: '2025-12-31' } };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('o.date <= ?');
+    });
+
+    it('applies search text filter', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { searchText: 'coffee' };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+    });
+
+    it('applies category filters to getNextOldestFilteredOperation', async () => {
+      queryFirst.mockResolvedValue(null);
+
+      const filters = { categoryIds: ['cat1', 'cat2'] };
+      await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
+
+      const sqlCall = queryFirst.mock.calls[0][0];
+      expect(sqlCall).toContain('o.category_id IN (?,?)');
+      const params = queryFirst.mock.calls[0][1];
+      expect(params).toContain('cat1');
+      expect(params).toContain('cat2');
+    });
+  });
+
+  describe('getFilteredOperationsByWeekToDate - Additional Filters', () => {
+    it('applies amount range max filter', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { amountRange: { min: null, max: 500 } };
+      await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+      const params = queryAll.mock.calls[0][1];
+      expect(params).toContain(500);
+    });
+
+    it('applies amount range with both min and max', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { amountRange: { min: 10, max: 100 } };
+      await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
+      expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
+    });
+
+    it('applies date range endDate filter', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { dateRange: { endDate: '2025-12-10' } };
+      await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('o.date <= ?');
+      const params = queryAll.mock.calls[0][1];
+      expect(params).toContain('2025-12-10');
+    });
+
+    it('applies date range with both startDate and endDate', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { dateRange: { startDate: '2025-12-06', endDate: '2025-12-09' } };
+      await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect((sqlCall.match(/o\.date >=/g) || []).length).toBe(2);
+      expect((sqlCall.match(/o\.date <=/g) || []).length).toBe(2);
+    });
+  });
+
   describe('Filtered Query Operations', () => {
     describe('getFilteredOperationsByWeekFromDate', () => {
       it('filters operations by type', async () => {
