@@ -484,6 +484,462 @@ describe('AccountsDB', () => {
     });
   });
 
+  describe('transferOperations', () => {
+    it('transfers operations between accounts with same currency', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ id: 'from-id', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'to-id', currency: 'USD' }),
+        runAsync: jest.fn()
+          .mockResolvedValueOnce({ changes: 3 })
+          .mockResolvedValueOnce({ changes: 2 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      const result = await AccountsDB.transferOperations('from-id', 'to-id');
+
+      expect(result).toBe(5);
+      expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(2);
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws error when source account not found', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn().mockResolvedValueOnce(null),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      await expect(AccountsDB.transferOperations('missing', 'to-id'))
+        .rejects.toThrow('Source account missing not found');
+    });
+
+    it('throws error when destination account not found', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ id: 'from-id', currency: 'USD' })
+          .mockResolvedValueOnce(null),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      await expect(AccountsDB.transferOperations('from-id', 'missing'))
+        .rejects.toThrow('Destination account missing not found');
+    });
+
+    it('throws error when accounts have different currencies', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ id: 'from-id', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'to-id', currency: 'EUR' }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      await expect(AccountsDB.transferOperations('from-id', 'to-id'))
+        .rejects.toThrow('Cannot transfer operations: accounts have different currencies (USD → EUR)');
+    });
+
+    it('handles case when no operations to transfer', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ id: 'from-id', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'to-id', currency: 'USD' }),
+        runAsync: jest.fn()
+          .mockResolvedValueOnce({ changes: 0 })
+          .mockResolvedValueOnce({ changes: 0 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      const result = await AccountsDB.transferOperations('from-id', 'to-id');
+
+      expect(result).toBe(0);
+    });
+
+    it('rethrows transaction error', async () => {
+      const error = new Error('Transaction failed');
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(error);
+
+      await expect(AccountsDB.transferOperations('from-id', 'to-id'))
+        .rejects.toThrow('Transaction failed');
+    });
+  });
+
+  describe('getOperationCount', () => {
+    it('returns count of operations for account', async () => {
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 10 });
+
+      const result = await AccountsDB.getOperationCount('acc-1');
+
+      expect(result).toBe(10);
+      expect(db.queryFirst).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT COUNT(*) as count'),
+        ['acc-1', 'acc-1'],
+      );
+    });
+
+    it('returns 0 when no operations exist', async () => {
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 0 });
+
+      const result = await AccountsDB.getOperationCount('acc-1');
+
+      expect(result).toBe(0);
+    });
+
+    it('returns 0 when query returns null', async () => {
+      jest.spyOn(db, 'queryFirst').mockResolvedValue(null);
+
+      const result = await AccountsDB.getOperationCount('acc-1');
+
+      expect(result).toBe(0);
+    });
+
+    it('throws error when query fails', async () => {
+      jest.spyOn(db, 'queryFirst').mockRejectedValue(new Error('Query failed'));
+
+      await expect(AccountsDB.getOperationCount('acc-1'))
+        .rejects.toThrow('Query failed');
+    });
+  });
+
+  describe('deleteAccount with transfer', () => {
+    it('transfers operations before deleting account', async () => {
+      // Mock getOperationCount
+      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 3 });
+
+      // Mock transferOperations transaction
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ id: 'to-delete', currency: 'USD' })
+          .mockResolvedValueOnce({ id: 'transfer-to', currency: 'USD' }),
+        runAsync: jest.fn()
+          .mockResolvedValueOnce({ changes: 2 })
+          .mockResolvedValueOnce({ changes: 1 }),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        return await callback(mockDb);
+      });
+
+      // Mock delete operation
+      mockDrizzle.where.mockResolvedValue(undefined);
+
+      await AccountsDB.deleteAccount('to-delete', 'transfer-to');
+
+      expect(db.executeTransaction).toHaveBeenCalled();
+      expect(mockDrizzle.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('reorderAccounts', () => {
+    it('reorders accounts with new display orders', async () => {
+      const mockDb = {
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      const orderedAccounts = [
+        { id: 'acc-1', display_order: 0 },
+        { id: 'acc-2', display_order: 1 },
+        { id: 'acc-3', display_order: 2 },
+      ];
+
+      await AccountsDB.reorderAccounts(orderedAccounts);
+
+      expect(mockDb.runAsync).toHaveBeenCalledTimes(3);
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+        [0, expect.any(String), 'acc-1'],
+      );
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+        [1, expect.any(String), 'acc-2'],
+      );
+    });
+
+    it('handles empty array', async () => {
+      const mockDb = {
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await AccountsDB.reorderAccounts([]);
+
+      expect(mockDb.runAsync).not.toHaveBeenCalled();
+    });
+
+    it('throws error when reorder fails', async () => {
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(new Error('Reorder failed'));
+
+      await expect(AccountsDB.reorderAccounts([{ id: '1', display_order: 0 }]))
+        .rejects.toThrow('Reorder failed');
+    });
+  });
+
+  describe('updateAccount additional cases', () => {
+    it('updates hidden field converting true to 1', async () => {
+      mockDrizzle.where.mockResolvedValue(undefined);
+
+      await AccountsDB.updateAccount('1', { hidden: true });
+
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hidden: 1,
+        }),
+      );
+    });
+
+    it('updates hidden field converting false to 0', async () => {
+      mockDrizzle.where.mockResolvedValue(undefined);
+
+      await AccountsDB.updateAccount('1', { hidden: false });
+
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hidden: 0,
+        }),
+      );
+    });
+
+    it('updates monthly_target field', async () => {
+      mockDrizzle.where.mockResolvedValue(undefined);
+
+      await AccountsDB.updateAccount('1', { monthly_target: '500' });
+
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monthlyTarget: '500',
+        }),
+      );
+    });
+
+    it('updates monthlyTarget field (camelCase)', async () => {
+      mockDrizzle.where.mockResolvedValue(undefined);
+
+      await AccountsDB.updateAccount('1', { monthlyTarget: '1000' });
+
+      expect(mockDrizzle.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monthlyTarget: '1000',
+        }),
+      );
+    });
+  });
+
+  describe('batchUpdateBalances error handling', () => {
+    it('throws error when transaction fails', async () => {
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(new Error('Batch update failed'));
+
+      const balanceChanges = new Map([
+        ['account1', '50.00'],
+      ]);
+
+      await expect(AccountsDB.batchUpdateBalances(balanceChanges))
+        .rejects.toThrow('Batch update failed');
+    });
+  });
+
+  describe('adjustAccountBalance', () => {
+    beforeEach(() => {
+      // Reset modules to ensure fresh mocks
+      jest.resetModules();
+    });
+
+    it('creates new adjustment operation when increasing balance', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '100.00' }) // Current account balance
+          .mockResolvedValueOnce(null), // No existing adjustment operation
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 123 }),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await AccountsDB.adjustAccountBalance('acc-1', '150.00', 'Test adjustment');
+
+      expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
+        'SELECT balance FROM accounts WHERE id = ?',
+        ['acc-1'],
+      );
+      expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+        'SELECT * FROM categories WHERE is_shadow = 1',
+      );
+      // Verify income operation was created (balance increased)
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO operations'),
+        expect.arrayContaining(['income', '50.00', 'acc-1', 'shadow-income']),
+      );
+    });
+
+    it('creates new adjustment operation when decreasing balance', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '100.00' }) // Current account balance
+          .mockResolvedValueOnce(null), // No existing adjustment operation
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 123 }),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await AccountsDB.adjustAccountBalance('acc-1', '75.00');
+
+      // Verify expense operation was created (balance decreased)
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO operations'),
+        expect.arrayContaining(['expense', '25.00', 'acc-1', 'shadow-expense']),
+      );
+    });
+
+    it('throws error when account not found', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn().mockResolvedValueOnce(null),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await expect(AccountsDB.adjustAccountBalance('missing', '100.00'))
+        .rejects.toThrow('Account missing not found');
+    });
+
+    it('throws error when shadow categories not found', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '100.00' })
+          .mockResolvedValueOnce(null),
+        getAllAsync: jest.fn().mockResolvedValue([]), // No shadow categories
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await expect(AccountsDB.adjustAccountBalance('acc-1', '150.00'))
+        .rejects.toThrow('Shadow categories not found');
+    });
+
+    it('updates existing adjustment operation', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '100.00' })
+          .mockResolvedValueOnce({
+            id: 'existing-op',
+            amount: '20.00',
+            type: 'income',
+            description: 'Balance adjusted from 80.00 → 100.00',
+            category_type: 'income',
+          }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      await AccountsDB.adjustAccountBalance('acc-1', '120.00');
+
+      // Should update existing operation
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE operations SET'),
+        expect.arrayContaining(['existing-op']),
+      );
+    });
+
+    it('deletes adjustment operation when cumulative delta is zero', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '100.00' })
+          .mockResolvedValueOnce({
+            id: 'existing-op',
+            amount: '20.00',
+            type: 'income',
+            description: 'Balance adjusted from 80.00 → 100.00',
+            category_type: 'income',
+          }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      // Adjust back to original balance (80.00)
+      await AccountsDB.adjustAccountBalance('acc-1', '80.00');
+
+      // Should delete the operation
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'DELETE FROM operations WHERE id = ?',
+        ['existing-op'],
+      );
+    });
+
+    it('handles expense type existing operation correctly', async () => {
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '80.00' })
+          .mockResolvedValueOnce({
+            id: 'existing-op',
+            amount: '20.00',
+            type: 'expense',
+            description: 'Balance adjusted from 100.00 → 80.00',
+            category_type: 'expense',
+          }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      // Further decrease balance
+      await AccountsDB.adjustAccountBalance('acc-1', '60.00');
+
+      expect(mockDb.runAsync).toHaveBeenCalled();
+    });
+
+    it('rethrows error on failure', async () => {
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(new Error('Adjustment failed'));
+
+      await expect(AccountsDB.adjustAccountBalance('acc-1', '100.00'))
+        .rejects.toThrow('Adjustment failed');
+    });
+  });
+
   // Regression tests for data integrity
   describe('Regression Tests - Data Integrity', () => {
     it('prevents deletion of accounts with operations', async () => {
