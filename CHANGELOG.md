@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.31.3](https://github.com/heywood8/money-tracker/compare/penny-v0.31.2...penny-v0.31.3) (2026-01-19)
+
+
+### Bug Fixes
+
+* budgetMonal.test ([4079d4f](https://github.com/heywood8/money-tracker/commit/4079d4fe3d3439c1e7929a0e2b896670196ffe7c))
+* coverage for BudgetModal ([ee20204](https://github.com/heywood8/money-tracker/commit/ee202045c89cbe60712742612cbe6b4a8fc20a92))
+* lint SimpleTabs test mocks ([9e978e4](https://github.com/heywood8/money-tracker/commit/9e978e4ed3a28543394481abe271a2b6c87d7f00))
+* more tests ([8231662](https://github.com/heywood8/money-tracker/commit/8231662295bc08082f1206498c080d7172088040))
+* more tests ([715e42a](https://github.com/heywood8/money-tracker/commit/715e42ad6d85cde285724e9b54e619cc5d57eaa6))
+* npm tests ([bd39ffe](https://github.com/heywood8/money-tracker/commit/bd39ffe30eebfea233b0fb12b9d27609edd8d389))
+* **test:** resolve parsing error in summary card tests ([90a5954](https://github.com/heywood8/money-tracker/commit/90a59542ab182f40be4274477d6f58e20420efc2))
+* update graphs on a new operation ([84c6b29](https://github.com/heywood8/money-tracker/commit/84c6b29d295fb231b125825128d7b242337b3212))
+
 ## [0.31.2](https://github.com/heywood8/money-tracker/compare/penny-v0.31.1...penny-v0.31.2) (2026-01-13)
 
 
