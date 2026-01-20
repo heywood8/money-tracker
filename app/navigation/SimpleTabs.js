@@ -117,24 +117,6 @@ export default function SimpleTabs() {
     setSettingsVisible(false);
   }, []);
 
-  // Navigate to next or previous tab
-  const navigateToTab = useCallback((direction) => {
-    const currentIndex = TABS.findIndex(tab => tab.key === active);
-    let newIndex;
-
-    if (direction === 'left') {
-      // Swipe left = next tab
-      newIndex = currentIndex < TABS.length - 1 ? currentIndex + 1 : currentIndex;
-    } else {
-      // Swipe right = previous tab
-      newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
-    }
-
-    if (newIndex !== currentIndex) {
-      setActive(TABS[newIndex].key);
-    }
-  }, [active, TABS]);
-
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
     return Gesture.Pan()

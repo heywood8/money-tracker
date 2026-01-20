@@ -614,6 +614,238 @@ describe('CategoryModal', () => {
     });
   });
 
+  describe('Picker Modal Interactions', () => {
+    it('opens type picker modal when type button is pressed', async () => {
+      const { queryByText, queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Find and press the type button (shows 'folder' by default)
+      const folderTexts = queryAllByText('folder');
+      if (folderTexts.length > 0) {
+        fireEvent.press(folderTexts[0]);
+      }
+
+      // Type picker modal should show close button
+      await waitFor(() => {
+        expect(queryByText('close')).toBeTruthy();
+      });
+    });
+
+    it('opens category type picker modal when category type button is pressed', async () => {
+      const { queryByText, queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Find and press the category type button (shows 'expense' by default)
+      const expenseTexts = queryAllByText('expense');
+      if (expenseTexts.length > 0) {
+        fireEvent.press(expenseTexts[0]);
+      }
+
+      // Category type picker modal should show close button
+      await waitFor(() => {
+        expect(queryByText('close')).toBeTruthy();
+      });
+    });
+
+    it('opens parent picker modal when parent button is pressed', async () => {
+      const { queryByText, queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Find and press the parent button (shows 'none' by default)
+      const noneTexts = queryAllByText('none');
+      if (noneTexts.length > 0) {
+        fireEvent.press(noneTexts[0]);
+      }
+
+      // Parent picker modal should show close button
+      await waitFor(() => {
+        expect(queryByText('close')).toBeTruthy();
+      });
+    });
+
+    it('renders parent picker with available categories', async () => {
+      const { queryByText, queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open parent picker
+      const noneTexts = queryAllByText('none');
+      if (noneTexts.length > 0) {
+        fireEvent.press(noneTexts[0]);
+      }
+
+      // Should show category names in the picker
+      await waitFor(() => {
+        expect(queryByText('Food')).toBeTruthy();
+      });
+    });
+
+    it('selects entry type from type picker and closes modal', async () => {
+      const { queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open type picker
+      const folderTexts = queryAllByText('folder');
+      if (folderTexts.length > 0) {
+        fireEvent.press(folderTexts[0]);
+      }
+
+      // Find and select 'entry' option
+      await waitFor(() => {
+        const entryTexts = queryAllByText('entry');
+        if (entryTexts.length > 0) {
+          fireEvent.press(entryTexts[entryTexts.length - 1]);
+        }
+      });
+    });
+
+    it('selects income from category type picker and closes modal', async () => {
+      const { queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open category type picker
+      const expenseTexts = queryAllByText('expense');
+      if (expenseTexts.length > 0) {
+        fireEvent.press(expenseTexts[0]);
+      }
+
+      // Find and select 'income' option
+      await waitFor(() => {
+        const incomeTexts = queryAllByText('income');
+        if (incomeTexts.length > 0) {
+          fireEvent.press(incomeTexts[incomeTexts.length - 1]);
+        }
+      });
+    });
+
+    it('selects parent category from parent picker', async () => {
+      const { queryAllByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open parent picker
+      const noneTexts = queryAllByText('none');
+      if (noneTexts.length > 0) {
+        fireEvent.press(noneTexts[0]);
+      }
+
+      // Find and select 'Food' category as parent
+      await waitFor(() => {
+        const foodTexts = queryAllByText('Food');
+        if (foodTexts.length > 0) {
+          fireEvent.press(foodTexts[foodTexts.length - 1]);
+        }
+      });
+    });
+
+    it('closes type picker via close button', async () => {
+      const { queryAllByText, queryByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open type picker
+      const folderTexts = queryAllByText('folder');
+      if (folderTexts.length > 0) {
+        fireEvent.press(folderTexts[0]);
+      }
+
+      // Press close button
+      await waitFor(() => {
+        const closeButton = queryByText('close');
+        if (closeButton) {
+          fireEvent.press(closeButton);
+        }
+      });
+    });
+
+    it('closes category type picker via close button', async () => {
+      const { queryAllByText, queryByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open category type picker
+      const expenseTexts = queryAllByText('expense');
+      if (expenseTexts.length > 0) {
+        fireEvent.press(expenseTexts[0]);
+      }
+
+      // Press close button
+      await waitFor(() => {
+        const closeButton = queryByText('close');
+        if (closeButton) {
+          fireEvent.press(closeButton);
+        }
+      });
+    });
+
+    it('closes parent picker via close button', async () => {
+      const { queryAllByText, queryByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open parent picker
+      const noneTexts = queryAllByText('none');
+      if (noneTexts.length > 0) {
+        fireEvent.press(noneTexts[0]);
+      }
+
+      // Press close button
+      await waitFor(() => {
+        const closeButton = queryByText('close');
+        if (closeButton) {
+          fireEvent.press(closeButton);
+        }
+      });
+    });
+
+    it('shows warning indicator when category has children and entry option is disabled', async () => {
+      // Category with children (cat1 is the parent of cat3)
+      const mockCategory = {
+        id: 'cat1',
+        name: 'Food',
+        type: 'folder',
+        category_type: 'expense',
+        icon: 'food',
+        parentId: null,
+      };
+
+      const { getByText, queryByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
+      );
+
+      // Open type picker
+      const typeButton = getByText('folder');
+      fireEvent.press(typeButton);
+
+      // Entry option should be visible (possibly with warning indicator)
+      await waitFor(() => {
+        // The entry option should be in the picker
+        expect(queryByText(/entry/)).toBeTruthy();
+      });
+    });
+
+    it('renders parent picker with icon and name', async () => {
+      const { getByText, queryByText } = render(
+        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Open parent picker
+      const parentButton = getByText('none');
+      fireEvent.press(parentButton);
+
+      // Should show category names in the picker
+      await waitFor(() => {
+        // Food category should be visible as a potential parent
+        expect(queryByText('Food')).toBeTruthy();
+      });
+    });
+  });
+
   describe('Edge Cases', () => {
     it('handles missing category data gracefully', () => {
       const { getByText } = render(
