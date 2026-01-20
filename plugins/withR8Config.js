@@ -13,18 +13,31 @@ const withR8Config = (config) => {
     config.modResults = config.modResults || [];
 
     // Properties to add/update
+    // CI detection: Check for common CI environment variables
+    const isCI = process.env.CI === 'true' ||
+                 process.env.GITHUB_ACTIONS === 'true' ||
+                 process.env.EAS_BUILD === 'true';
+
     const properties = {
       'android.enableMinifyInReleaseBuilds': 'true',
       'android.enableShrinkResourcesInReleaseBuilds': 'true',
       'android.enablePngCrunchInReleaseBuilds': 'true',
-      // Gradle JVM args - reduced for GitHub Actions runners (7GB total RAM)
-      // Leaving headroom for OS, Node.js, and other processes
-      'org.gradle.jvmargs': '-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC',
-      'org.gradle.parallel': 'true',
+      // Gradle JVM args - optimized for CI (GitHub Actions: 7GB RAM)
+      // CI: Conservative settings to avoid OOM
+      // Local: More aggressive settings for faster builds
+      'org.gradle.jvmargs': isCI
+        ? '-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC'
+        : '-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC',
+      // Disable parallel/daemon in CI for better memory control
+      'org.gradle.parallel': isCI ? 'false' : 'true',
+      'org.gradle.daemon': isCI ? 'false' : 'true',
       'org.gradle.configureondemand': 'true',
       'org.gradle.caching': 'true',
-      'org.gradle.daemon': 'true',
     };
+
+    if (isCI) {
+      console.log('🔧 CI detected: Using conservative Gradle memory settings (3GB heap + 768MB metaspace)');
+    }
 
     // For preview builds, restrict to arm64-v8a only for faster builds
     // This is a more reliable method than expo-build-properties buildArchs (known issues)
