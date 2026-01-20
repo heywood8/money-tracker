@@ -130,6 +130,18 @@ jobs:
             const failMatches = output.match(/FAIL[^\n]*\n([\s\S]*?)(?=\nPASS|\nTest Suites:|$)/g);
             const errors = failMatches ? failMatches.join('\n\n') : '';
 
+            // extract overall coverage percentage from coverage-summary.json
+            let overallCoverage = '';
+            try {
+              const coverageSummary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const total = coverageSummary.total;
+              overallCoverage = `| Statements | Branches | Functions | Lines |\n` +
+                               `|:----------:|:--------:|:---------:|:-----:|\n` +
+                               `| ${total.statements.pct}% | ${total.branches.pct}% | ${total.functions.pct}% | ${total.lines.pct}% |`;
+            } catch (e) {
+              // coverage summary not available
+            }
+
             // build comment
             let comment = '## Test Results\n\n';
 
@@ -137,14 +149,18 @@ jobs:
               comment += '### Summary\n\n```\n' + summary + '\n```\n\n';
             }
 
+            if (overallCoverage) {
+              comment += '### Overall Coverage\n\n' + overallCoverage + '\n\n';
+            }
+
             if (coverage) {
-              comment += '<details>\n<summary>Coverage</summary>\n\n```\n' + coverage + '\n```\n</details>\n\n';
+              comment += '<details>\n<summary>Coverage Details</summary>\n\n```\n' + coverage + '\n```\n</details>\n\n';
             }
 
             if (errors) {
               comment += '<details>\n<summary>Error Details</summary>\n\n```\n' + errors + '\n```\n</details>\n';
             }
-            
+
             // set comment in the output so that the next stage makes this comment sticky (non-repeatable)
             core.setOutput('message', comment);
 
