@@ -104,17 +104,27 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load more operations (next week with operations)
   const loadMoreOperations = useCallback(async () => {
-    if (loadingMore || !hasMoreOperations || !_oldestLoadedDate) return;
+    if (loadingMore || !hasMoreOperations) return;
 
     try {
       _setLoadingMore(true);
 
       const isFiltered = _hasActiveFilters(activeFilters);
 
-      // Find the next oldest operation before our current oldest date
-      const nextOp = isFiltered
-        ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, activeFilters)
-        : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
+      // If we don't have any operations loaded yet, find the most recent operation
+      // and load its week. This handles the case where the current week has no operations.
+      let nextOp;
+      if (!_oldestLoadedDate) {
+        // No operations loaded - find the most recent operation in the database
+        nextOp = isFiltered
+          ? await OperationsDB.getNextOldestFilteredOperation(new Date().toISOString().split('T')[0], activeFilters)
+          : await OperationsDB.getNextOldestOperation(new Date().toISOString().split('T')[0]);
+      } else {
+        // Find the next oldest operation before our current oldest date
+        nextOp = isFiltered
+          ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, activeFilters)
+          : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
+      }
 
       if (!nextOp) {
         // No more operations found

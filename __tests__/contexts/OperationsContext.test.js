@@ -880,8 +880,13 @@ describe('OperationsContext', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledTimes(2);
     });
 
-    it('does not load more when oldestLoadedDate is null', async () => {
+    it('loads older operations when current week is empty but older operations exist', async () => {
+      // Initially no operations in current week
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
+      // But there are older operations
+      const olderOp = { id: 2, type: 'expense', amount: '50', date: '2025-12-15', accountId: 'acc1', categoryId: 'cat1' };
+      OperationsDB.getNextOldestOperation.mockResolvedValue(olderOp);
+      OperationsDB.getOperationsByWeekFromDate.mockResolvedValue([olderOp]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -893,8 +898,10 @@ describe('OperationsContext', () => {
         await result.current.loadMoreOperations();
       });
 
-      // Should not call getNextOldestOperation since oldestLoadedDate is null
-      expect(OperationsDB.getNextOldestOperation).not.toHaveBeenCalled();
+      // Should call getNextOldestOperation to find older operations
+      expect(OperationsDB.getNextOldestOperation).toHaveBeenCalled();
+      // Should then load those operations
+      expect(OperationsDB.getOperationsByWeekFromDate).toHaveBeenCalledWith(olderOp.date);
     });
 
     it('preserves operation IDs across operations', async () => {
