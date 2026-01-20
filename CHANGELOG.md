@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.4](https://github.com/heywood8/money-tracker/compare/penny-v0.31.3...penny-v0.31.4) (2026-01-20)
+
+
+### Bug Fixes
+
+* ci memory allocations ([#238](https://github.com/heywood8/money-tracker/issues/238)) ([a20c5a2](https://github.com/heywood8/money-tracker/commit/a20c5a22acb28b6e65d44aa199a43c353a20f28e))
+
 ## [0.31.3](https://github.com/heywood8/money-tracker/compare/penny-v0.31.2...penny-v0.31.3) (2026-01-19)
 
 
