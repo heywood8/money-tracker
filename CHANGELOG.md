@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.31.5](https://github.com/heywood8/money-tracker/compare/penny-v0.31.4...penny-v0.31.5) (2026-01-20)
+
+
+### Bug Fixes
+
+* build-release-apk workflow ([5a5dc57](https://github.com/heywood8/money-tracker/commit/5a5dc57efba4da179c2b4b472d8f006285aa5435))
+* load older operations ([7b71443](https://github.com/heywood8/money-tracker/commit/7b7144306542e7c485d4ff9b4df6d4a874a744ac))
+
 ## [0.31.4](https://github.com/heywood8/money-tracker/compare/penny-v0.31.3...penny-v0.31.4) (2026-01-20)
 
 
