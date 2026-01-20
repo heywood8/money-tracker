@@ -5,7 +5,96 @@
 
 import * as Currency from '../../app/services/currency';
 
+// Mock exchange rates data for testing
+jest.mock('../../assets/exchange-rates.json', () => ({
+  lastUpdated: '2024-01-15T12:00:00Z',
+  rates: {
+    USD: {
+      EUR: 0.92,
+      GBP: 0.79,
+      JPY: 148.5,
+      AMD: 405.0,
+    },
+    EUR: {
+      USD: 1.09,
+      GBP: 0.86,
+    },
+  },
+}));
+
+// Mock currencies data for testing
+jest.mock('../../assets/currencies.json', () => ({
+  USD: { symbol: '$', decimal_digits: 2 },
+  EUR: { symbol: '€', decimal_digits: 2 },
+  GBP: { symbol: '£', decimal_digits: 2 },
+  JPY: { symbol: '¥', decimal_digits: 0 },
+  AMD: { symbol: '֏', decimal_digits: 0 },
+  BHD: { symbol: '.د.ب', decimal_digits: 3 },
+}));
+
 describe('Currency Service', () => {
+  describe('getDecimalPlaces', () => {
+    it('returns correct decimal places for known currencies', () => {
+      expect(Currency.getDecimalPlaces('USD')).toBe(2);
+      expect(Currency.getDecimalPlaces('EUR')).toBe(2);
+      expect(Currency.getDecimalPlaces('JPY')).toBe(0);
+      expect(Currency.getDecimalPlaces('AMD')).toBe(0);
+      expect(Currency.getDecimalPlaces('BHD')).toBe(3);
+    });
+
+    it('returns 2 as default for unknown currencies', () => {
+      expect(Currency.getDecimalPlaces('INVALID')).toBe(2);
+      expect(Currency.getDecimalPlaces('XYZ')).toBe(2);
+    });
+
+    it('returns 2 for null or undefined', () => {
+      expect(Currency.getDecimalPlaces(null)).toBe(2);
+      expect(Currency.getDecimalPlaces(undefined)).toBe(2);
+      expect(Currency.getDecimalPlaces('')).toBe(2);
+    });
+  });
+
+
+  describe('formatAmount', () => {
+    it('formats amount with default 2 decimals', () => {
+      expect(Currency.formatAmount('10.5')).toBe('10.50');
+      expect(Currency.formatAmount('100')).toBe('100.00');
+      expect(Currency.formatAmount('0.1')).toBe('0.10');
+    });
+
+    it('formats amount with currency code', () => {
+      expect(Currency.formatAmount('100', 'USD')).toBe('100.00');
+      expect(Currency.formatAmount('100', 'JPY')).toBe('100');
+      expect(Currency.formatAmount('100.123', 'BHD')).toBe('100.123');
+    });
+
+    it('formats amount with explicit decimal places', () => {
+      expect(Currency.formatAmount('100', 0)).toBe('100');
+      expect(Currency.formatAmount('100', 3)).toBe('100.000');
+      expect(Currency.formatAmount('10.5555', 3)).toBe('10.556'); // rounds
+    });
+
+    it('handles invalid amounts gracefully', () => {
+      expect(Currency.formatAmount(null)).toBe('0.00');
+      expect(Currency.formatAmount('')).toBe('0.00');
+      expect(Currency.formatAmount('invalid')).toBe('0.00');
+    });
+
+    it('handles Infinity and NaN', () => {
+      expect(Currency.formatAmount(Infinity)).toBe('0.00');
+      expect(Currency.formatAmount(-Infinity)).toBe('0.00');
+      expect(Currency.formatAmount(NaN)).toBe('0.00');
+    });
+
+    it('handles unsupported types gracefully', () => {
+      // Objects, arrays, functions - all should return 0.00
+      expect(Currency.formatAmount({})).toBe('0.00');
+      expect(Currency.formatAmount([])).toBe('0.00');
+      expect(Currency.formatAmount(() => {})).toBe('0.00');
+      expect(Currency.formatAmount(Symbol('test'))).toBe('0.00');
+    });
+  });
+
   describe('toCents', () => {
     it('converts string amounts to cents correctly', () => {
       expect(Currency.toCents('10.50')).toBe(1050);
@@ -36,6 +125,12 @@ describe('Currency Service', () => {
       expect(Currency.toCents(10.505)).toBe(1051); // Rounds up
       expect(Currency.toCents(10.504)).toBe(1050); // Rounds down
     });
+
+    it('converts with currency-specific decimal places', () => {
+      expect(Currency.toCents('100', 'JPY')).toBe(100); // JPY has 0 decimals
+      expect(Currency.toCents('100', 'BHD')).toBe(100000); // BHD has 3 decimals
+      expect(Currency.toCents('100', 'USD')).toBe(10000); // USD has 2 decimals
+    });
   });
 
   describe('fromCents', () => {
@@ -53,6 +148,16 @@ describe('Currency Service', () => {
     it('supports custom decimal places', () => {
       expect(Currency.fromCents(1050, 0)).toBe('11');
       expect(Currency.fromCents(1050, 3)).toBe('10.500');
+    });
+
+    it('converts with currency code string', () => {
+      expect(Currency.fromCents(10000, 'USD')).toBe('100.00');
+      expect(Currency.fromCents(100, 'JPY')).toBe('100');
+      expect(Currency.fromCents(100000, 'BHD')).toBe('100.000');
+    });
+
+    it('defaults to 2 decimals with no second argument', () => {
+      expect(Currency.fromCents(1050)).toBe('10.50');
     });
   });
 
@@ -78,6 +183,12 @@ describe('Currency Service', () => {
       expect(Currency.add('0.1', '0.2')).toBe('0.30');
       expect(Currency.add('10.1', '20.2')).toBe('30.30');
     });
+
+    it('formats result with currency code', () => {
+      expect(Currency.add('10.50', '5.25', 'USD')).toBe('15.75');
+      expect(Currency.add('100', '50', 'JPY')).toBe('150');
+      expect(Currency.add('10.123', '5.456', 'BHD')).toBe('15.579');
+    });
   });
 
   describe('subtract', () => {
@@ -98,6 +209,12 @@ describe('Currency Service', () => {
 
     it('avoids floating-point precision errors', () => {
       expect(Currency.subtract('0.3', '0.1')).toBe('0.20');
+    });
+
+    it('formats result with currency code', () => {
+      expect(Currency.subtract('10.50', '5.25', 'USD')).toBe('5.25');
+      expect(Currency.subtract('100', '30', 'JPY')).toBe('70');
+      expect(Currency.subtract('10.500', '5.123', 'BHD')).toBe('5.377');
     });
   });
 
@@ -120,6 +237,12 @@ describe('Currency Service', () => {
     it('rounds to nearest cent', () => {
       expect(Currency.multiply('10.00', 0.333)).toBe('3.33');
     });
+
+    it('formats result with currency code', () => {
+      expect(Currency.multiply('10.00', 2, 'USD')).toBe('20.00');
+      expect(Currency.multiply('100', 1.5, 'JPY')).toBe('150');
+      expect(Currency.multiply('10.000', 2.5, 'BHD')).toBe('25.000');
+    });
   });
 
   describe('divide', () => {
@@ -138,6 +261,12 @@ describe('Currency Service', () => {
 
     it('rounds to nearest cent', () => {
       expect(Currency.divide('10.00', 3)).toBe('3.33');
+    });
+
+    it('formats result with currency code', () => {
+      expect(Currency.divide('20.00', 2, 'USD')).toBe('10.00');
+      expect(Currency.divide('150', 3, 'JPY')).toBe('50');
+      expect(Currency.divide('25.000', 2, 'BHD')).toBe('12.500');
     });
   });
 
@@ -212,6 +341,12 @@ describe('Currency Service', () => {
     it('handles zero', () => {
       expect(Currency.abs('0')).toBe('0.00');
     });
+
+    it('formats result with currency code', () => {
+      expect(Currency.abs('-10.50', 'USD')).toBe('10.50');
+      expect(Currency.abs('-100', 'JPY')).toBe('100');
+      expect(Currency.abs('-10.123', 'BHD')).toBe('10.123');
+    });
   });
 
   describe('format', () => {
@@ -246,6 +381,12 @@ describe('Currency Service', () => {
       expect(Currency.parseInput('abc')).toBe(null);
       expect(Currency.parseInput(null)).toBe(null);
     });
+
+    it('formats with currency code', () => {
+      expect(Currency.parseInput('100', 'USD')).toBe('100.00');
+      expect(Currency.parseInput('100', 'JPY')).toBe('100');
+      expect(Currency.parseInput('100', 'BHD')).toBe('100.000');
+    });
   });
 
   describe('isValid', () => {
@@ -261,6 +402,150 @@ describe('Currency Service', () => {
       expect(Currency.isValid('')).toBe(false);
       expect(Currency.isValid(NaN)).toBe(false);
       expect(Currency.isValid(Infinity)).toBe(false);
+    });
+
+    it('invalidates non-string/non-number types', () => {
+      expect(Currency.isValid({})).toBe(false);
+      expect(Currency.isValid([])).toBe(false);
+      expect(Currency.isValid(() => {})).toBe(false);
+      expect(Currency.isValid(Symbol('test'))).toBe(false);
+    });
+  });
+
+  describe('getExchangeRate', () => {
+    it('returns exchange rate for valid currency pair', () => {
+      expect(Currency.getExchangeRate('USD', 'EUR')).toBe('0.92');
+      expect(Currency.getExchangeRate('USD', 'GBP')).toBe('0.79');
+      expect(Currency.getExchangeRate('USD', 'JPY')).toBe('148.5');
+    });
+
+    it('returns 1.0 for same currency', () => {
+      expect(Currency.getExchangeRate('USD', 'USD')).toBe('1.0');
+      expect(Currency.getExchangeRate('EUR', 'EUR')).toBe('1.0');
+    });
+
+    it('returns null for invalid or missing currency pairs', () => {
+      expect(Currency.getExchangeRate('USD', 'XYZ')).toBe(null);
+      expect(Currency.getExchangeRate('XYZ', 'USD')).toBe(null);
+      expect(Currency.getExchangeRate(null, 'USD')).toBe(null);
+      expect(Currency.getExchangeRate('USD', null)).toBe(null);
+      expect(Currency.getExchangeRate('', '')).toBe(null);
+    });
+  });
+
+  describe('convertAmount', () => {
+    it('converts amount using exchange rate', () => {
+      // 100 USD * 0.92 = 92 EUR
+      expect(Currency.convertAmount('100', 'USD', 'EUR')).toBe('92.00');
+      // 100 USD * 148.5 = 14850 JPY
+      expect(Currency.convertAmount('100', 'USD', 'JPY')).toBe('14850');
+    });
+
+    it('returns same amount for same currency', () => {
+      expect(Currency.convertAmount('100', 'USD', 'USD')).toBe('100.00');
+      expect(Currency.convertAmount('100', 'JPY', 'JPY')).toBe('100');
+    });
+
+    it('uses custom rate when provided', () => {
+      expect(Currency.convertAmount('100', 'USD', 'EUR', '0.95')).toBe('95.00');
+      expect(Currency.convertAmount('100', 'USD', 'EUR', 1.0)).toBe('100.00');
+    });
+
+    it('returns null for invalid inputs', () => {
+      expect(Currency.convertAmount(null, 'USD', 'EUR')).toBe(null);
+      expect(Currency.convertAmount('100', null, 'EUR')).toBe(null);
+      expect(Currency.convertAmount('100', 'USD', null)).toBe(null);
+      expect(Currency.convertAmount('', 'USD', 'EUR')).toBe(null);
+    });
+
+    it('returns null for unavailable rate', () => {
+      expect(Currency.convertAmount('100', 'XYZ', 'ABC')).toBe(null);
+    });
+
+    it('returns null for negative rate', () => {
+      // Note: 0 is falsy in JS, so it falls back to getExchangeRate, hence we only test negative
+      expect(Currency.convertAmount('100', 'USD', 'EUR', '-1')).toBe(null);
+      expect(Currency.convertAmount('100', 'USD', 'EUR', '-0.5')).toBe(null);
+    });
+  });
+
+  describe('reverseConvert', () => {
+    it('calculates source amount for desired destination', () => {
+      // To get 92 EUR, need 100 USD (92 / 0.92 = 100)
+      expect(Currency.reverseConvert('92', 'USD', 'EUR')).toBe('100.00');
+    });
+
+    it('returns same amount for same currency', () => {
+      expect(Currency.reverseConvert('100', 'USD', 'USD')).toBe('100.00');
+      expect(Currency.reverseConvert('100', 'JPY', 'JPY')).toBe('100');
+    });
+
+    it('uses custom rate when provided', () => {
+      expect(Currency.reverseConvert('95', 'USD', 'EUR', '0.95')).toBe('100.00');
+    });
+
+    it('returns null for invalid inputs', () => {
+      expect(Currency.reverseConvert(null, 'USD', 'EUR')).toBe(null);
+      expect(Currency.reverseConvert('100', null, 'EUR')).toBe(null);
+      expect(Currency.reverseConvert('100', 'USD', null)).toBe(null);
+      expect(Currency.reverseConvert('', 'USD', 'EUR')).toBe(null);
+    });
+
+    it('returns null for unavailable rate', () => {
+      expect(Currency.reverseConvert('100', 'XYZ', 'ABC')).toBe(null);
+    });
+
+    it('returns null for negative rate', () => {
+      // Note: 0 is falsy in JS, so it falls back to getExchangeRate, hence we only test negative
+      expect(Currency.reverseConvert('100', 'USD', 'EUR', '-1')).toBe(null);
+      expect(Currency.reverseConvert('100', 'USD', 'EUR', '-0.5')).toBe(null);
+    });
+  });
+
+  describe('isReasonableRate', () => {
+    it('returns true for reasonable rates within 50% of expected', () => {
+      // Expected USD->EUR rate is 0.92
+      expect(Currency.isReasonableRate('0.92', 'USD', 'EUR')).toBe(true);
+      expect(Currency.isReasonableRate('1.0', 'USD', 'EUR')).toBe(true); // within 50%
+      expect(Currency.isReasonableRate('0.80', 'USD', 'EUR')).toBe(true); // within 50%
+    });
+
+    it('returns false for unreasonable rates', () => {
+      // Expected USD->EUR rate is 0.92, so 0.1 is way outside 50% range
+      expect(Currency.isReasonableRate('0.1', 'USD', 'EUR')).toBe(false);
+      expect(Currency.isReasonableRate('5.0', 'USD', 'EUR')).toBe(false);
+    });
+
+    it('returns false for invalid inputs', () => {
+      expect(Currency.isReasonableRate(null, 'USD', 'EUR')).toBe(false);
+      expect(Currency.isReasonableRate('0.92', null, 'EUR')).toBe(false);
+      expect(Currency.isReasonableRate('0.92', 'USD', null)).toBe(false);
+      expect(Currency.isReasonableRate('', 'USD', 'EUR')).toBe(false);
+    });
+
+    it('returns false for zero or negative rates', () => {
+      expect(Currency.isReasonableRate(0, 'USD', 'EUR')).toBe(false);
+      expect(Currency.isReasonableRate(-1, 'USD', 'EUR')).toBe(false);
+    });
+
+    it('uses broad range check when expected rate unavailable', () => {
+      // No rate for XYZ->ABC, so uses 0.0001 to 10000 range
+      expect(Currency.isReasonableRate('1.0', 'XYZ', 'ABC')).toBe(true);
+      expect(Currency.isReasonableRate('100', 'XYZ', 'ABC')).toBe(true);
+      expect(Currency.isReasonableRate('0.0001', 'XYZ', 'ABC')).toBe(true);
+      expect(Currency.isReasonableRate('0.00001', 'XYZ', 'ABC')).toBe(false);
+      expect(Currency.isReasonableRate('100000', 'XYZ', 'ABC')).toBe(false);
+    });
+
+    it('returns false for non-finite rates', () => {
+      expect(Currency.isReasonableRate(Infinity, 'USD', 'EUR')).toBe(false);
+      expect(Currency.isReasonableRate(NaN, 'USD', 'EUR')).toBe(false);
+    });
+  });
+
+  describe('getExchangeRatesLastUpdated', () => {
+    it('returns the last updated date from exchange rates data', () => {
+      expect(Currency.getExchangeRatesLastUpdated()).toBe('2024-01-15T12:00:00Z');
     });
   });
 
