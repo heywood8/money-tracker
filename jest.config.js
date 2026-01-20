@@ -20,12 +20,12 @@ module.exports = {
   },
   // Coverage thresholds - relaxed for DSL/declarative code
   coverageThreshold: {
-    // global: {
-    //   statements: 70,
-    //   branches: 70,
-    //   functions: 70,
-    //   lines: 70,
-    // },
+    global: {
+      statements: 70,
+      branches: 70,
+      functions: 70,
+      lines: 70,
+    },
     // app/db/schema.js contains Drizzle ORM DSL code (declarative table definitions)
     // The index callbacks and .references() method chains can't be properly instrumented
     // by coverage tools, resulting in ~35% coverage despite comprehensive tests
