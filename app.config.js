@@ -48,6 +48,7 @@ module.exports = {
     platforms: ['android'],
     plugins: [
       'expo-sqlite',
+      'expo-font',
       [
         'expo-build-properties',
         {
