@@ -22,7 +22,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
-    newArchEnabled: true,
+    newArchEnabled: false, // Disabled due to codegen issues with async-storage, datetimepicker, gesture-handler
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
