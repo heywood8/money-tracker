@@ -9,11 +9,27 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-    groups:
-      react:
-        patterns:
-          - "react"
-          - "react-test-renderer"
+    # Ignore packages managed by Expo SDK - these should be upgraded together
+    # using `npx expo install --fix` when upgrading Expo SDK versions
+    ignore:
+      # Core React/React Native - version managed by Expo SDK
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+      - dependency-name: "react-test-renderer"
+      # Expo packages - version managed by Expo SDK
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "babel-preset-expo"
+      - dependency-name: "jest-expo"
+      # React Native ecosystem packages - version managed by Expo SDK
+      - dependency-name: "@react-native-async-storage/async-storage"
+      - dependency-name: "@react-native-community/datetimepicker"
+      - dependency-name: "@react-native-picker/picker"
+      - dependency-name: "react-native-gesture-handler"
+      - dependency-name: "react-native-reanimated"
+      - dependency-name: "react-native-safe-area-context"
+      - dependency-name: "react-native-svg"
+      - dependency-name: "react-native-worklets"
   - package-ecosystem: "github-actions"
     directory: "/" # Location of package manifests
     schedule:
