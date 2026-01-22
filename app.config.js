@@ -22,7 +22,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
-    newArchEnabled: false, // Disabled due to codegen issues with async-storage, datetimepicker, gesture-handler
+    newArchEnabled: true, // Required for react-native-worklets (used by reanimated 4.x)
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
