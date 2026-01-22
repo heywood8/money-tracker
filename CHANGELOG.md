@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.31.6](https://github.com/heywood8/money-tracker/compare/penny-v0.31.5...penny-v0.31.6) (2026-01-22)
+
+
+### Bug Fixes
+
+* build ([2c66f1e](https://github.com/heywood8/money-tracker/commit/2c66f1e9587f0eac316163fc1da1cbaf505e725f))
+* disable New Architecture to fix codegen build failures ([9308566](https://github.com/heywood8/money-tracker/commit/9308566042d3acb44f35fa081b4197fc01b7f0d4))
+* revert to Expo SDK 54 to fix build failures ([72b4999](https://github.com/heywood8/money-tracker/commit/72b49997fd9d8e367392d4ea02806f2e55da296b))
+* show overall coverage in the test results comment ([c2c6f04](https://github.com/heywood8/money-tracker/commit/c2c6f04d765703c55d0fb2fe11139290868d41d0))
+* skipped tests ([8664a23](https://github.com/heywood8/money-tracker/commit/8664a23ba806e67856bb0c9ddc59aee390247100))
+* upgrade to Expo SDK 55 canary to fix RN 0.83 build failures ([6702112](https://github.com/heywood8/money-tracker/commit/67021121c522773189aa7731ad75d67ac280c64e))
+
 ## [0.31.5](https://github.com/heywood8/money-tracker/compare/penny-v0.31.4...penny-v0.31.5) (2026-01-20)
 
 
