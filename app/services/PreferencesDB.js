@@ -27,20 +27,6 @@ export const getPreference = async (key, defaultValue = null) => {
       return result.value;
     }
 
-    // Fallback to AsyncStorage (for backward compatibility during migration)
-    try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      const value = await AsyncStorage.getItem(key);
-      if (value !== null) {
-        console.log(`[PreferencesDB] Migrating ${key} from AsyncStorage to SQLite`);
-        // Migrate to SQLite automatically
-        await setPreference(key, value);
-        return value;
-      }
-    } catch (error) {
-      console.warn('[PreferencesDB] AsyncStorage fallback failed:', error);
-    }
-
     return defaultValue;
   } catch (error) {
     console.error('[PreferencesDB] Error getting preference:', key, error);
