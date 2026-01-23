@@ -14,11 +14,8 @@
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix"
   },
   "dependencies": {
-    "@babel/runtime": "^7.28.4",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "8.5.1",
-    "@react-native-picker/picker": "2.11.1",
-    "@sentry/react-native": "~7.8.0",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^1.0.0-beta.6-7aaf14b",
     "expo": "~54.0.30",
@@ -47,8 +44,6 @@
     "@expo/vector-icons": "^15.0.3",
     "@testing-library/react-native": "^12.6.1",
     "babel-preset-expo": "~54.0.9",
-    "better-sqlite3": "^12.5.0",
-    "coverage-badge-creator": "^2.0.0",
     "drizzle-kit": "^1.0.0-beta.8-734e789",
     "eslint": "^9.39.2",
     "eslint-plugin-react": "^7.37.5",
