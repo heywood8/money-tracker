@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.31.7](https://github.com/heywood8/money-tracker/compare/penny-v0.31.6...penny-v0.31.7) (2026-01-23)
+
+
+### Bug Fixes
+
+* add expo prebuild step to fix New Architecture codegen failures ([88e4e7f](https://github.com/heywood8/money-tracker/commit/88e4e7f576ab7f33b4709c97e7e1629ca4437c09))
+* another try of fixing the ci build ([53e3b20](https://github.com/heywood8/money-tracker/commit/53e3b2053367cae9c6c320addeb5e3fdc0ee4821))
+* build ([0fd04b3](https://github.com/heywood8/money-tracker/commit/0fd04b38d694094d070f17c7d8c6f4db5fed20f3))
+* disable C++ autolinking for modules with codegen race condition ([cb329e4](https://github.com/heywood8/money-tracker/commit/cb329e44f10f0fcbb0435956c4f15cf5026a30a4))
+* readd gen native code back ([2172582](https://github.com/heywood8/money-tracker/commit/2172582b1ff13177e1ea548f3d7160131a7a6205))
+* removed async storage ([0365877](https://github.com/heywood8/money-tracker/commit/03658774a62321d96f680ac082133b0d207d2add))
+* replace canary expo packages with stable SDK 54 versions ([2e7af0e](https://github.com/heywood8/money-tracker/commit/2e7af0ed52a537f9db846ad05fc7489b9f68724d))
+* revert dependencies and settings to penny v0.31.0 ([#245](https://github.com/heywood8/money-tracker/issues/245)) ([1decfa9](https://github.com/heywood8/money-tracker/commit/1decfa90c60b0056459be01e502bd815b727daea))
+* with cmake lists ([cb2b946](https://github.com/heywood8/money-tracker/commit/cb2b9469592f574a345fe10d734451789fe8cfe6))
+
 ## [0.31.6](https://github.com/heywood8/money-tracker/compare/penny-v0.31.5...penny-v0.31.6) (2026-01-22)
 
 
