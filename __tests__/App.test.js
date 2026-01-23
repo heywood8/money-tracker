@@ -5,7 +5,6 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import { StatusBar, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import App from '../App';
 
 // Mock all the contexts
@@ -139,9 +138,8 @@ describe('App', () => {
   let setBarStyleSpy;
   let setBackgroundColorSpy;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks();
-    await AsyncStorage.clear();
     setBarStyleSpy = jest.spyOn(StatusBar, 'setBarStyle').mockImplementation(() => {});
     setBackgroundColorSpy = jest.spyOn(StatusBar, 'setBackgroundColor').mockImplementation(() => {});
   });
@@ -153,8 +151,6 @@ describe('App', () => {
 
   describe('Rendering', () => {
     it('renders without crashing', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { toJSON } = render(<App />);
 
       await waitFor(() => {
@@ -163,8 +159,6 @@ describe('App', () => {
     });
 
     it('renders with ErrorBoundary wrapper', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -173,8 +167,6 @@ describe('App', () => {
     });
 
     it('renders GestureHandlerRootView', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -183,8 +175,6 @@ describe('App', () => {
     });
 
     it('renders SafeAreaProvider', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -193,8 +183,6 @@ describe('App', () => {
     });
 
     it('renders PaperProvider', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -203,8 +191,6 @@ describe('App', () => {
     });
 
     it('renders AppInitializer', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -213,8 +199,6 @@ describe('App', () => {
     });
 
     it('renders ImportProgressModal', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {
@@ -231,7 +215,6 @@ describe('App', () => {
         setTheme: jest.fn(),
       });
 
-      await AsyncStorage.setItem('app_language', 'en');
       render(<App />);
 
       await waitFor(() => {
@@ -256,7 +239,6 @@ describe('App', () => {
         },
       });
 
-      await AsyncStorage.setItem('app_language', 'en');
       render(<App />);
 
       await waitFor(() => {
@@ -287,7 +269,6 @@ describe('App', () => {
         },
       });
 
-      await AsyncStorage.setItem('app_language', 'en');
       render(<App />);
 
       await waitFor(() => {
@@ -312,7 +293,6 @@ describe('App', () => {
         },
       });
 
-      await AsyncStorage.setItem('app_language', 'en');
       render(<App />);
 
       await waitFor(() => {
@@ -322,26 +302,22 @@ describe('App', () => {
   });
 
   describe('ThemedStatusBar error handling', () => {
-    it('handles StatusBar.setBarStyle errors gracefully', async () => {
+    it('handles StatusBar.setBarStyle errors gracefully', () => {
       setBarStyleSpy.mockImplementation(() => {
         throw new Error('StatusBar error');
       });
-
-      await AsyncStorage.setItem('app_language', 'en');
 
       // Should not throw
       expect(() => render(<App />)).not.toThrow();
     });
 
-    it('handles StatusBar.setBackgroundColor errors gracefully', async () => {
+    it('handles StatusBar.setBackgroundColor errors gracefully', () => {
       const originalPlatform = Platform.OS;
       Platform.OS = 'android';
 
       setBackgroundColorSpy.mockImplementation(() => {
         throw new Error('StatusBar error');
       });
-
-      await AsyncStorage.setItem('app_language', 'en');
 
       // Should not throw
       expect(() => render(<App />)).not.toThrow();
@@ -352,8 +328,6 @@ describe('App', () => {
 
   describe('Provider hierarchy', () => {
     it('provides all necessary contexts', async () => {
-      await AsyncStorage.setItem('app_language', 'en');
-
       const { toJSON } = render(<App />);
 
       await waitFor(() => {
@@ -375,7 +349,6 @@ describe('App', () => {
       };
       useMaterialTheme.mockReturnValue(mockTheme);
 
-      await AsyncStorage.setItem('app_language', 'en');
       const { getByTestId } = render(<App />);
 
       await waitFor(() => {

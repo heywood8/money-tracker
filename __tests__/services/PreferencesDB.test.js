@@ -2,7 +2,7 @@
  * PreferencesDB Service Tests
  *
  * Tests for preference management including get/set operations,
- * type conversions, AsyncStorage fallback/migration, and error handling.
+ * type conversions, and error handling.
  */
 
 import {
@@ -21,17 +21,6 @@ import { queryFirst, executeQuery } from '../../app/services/db';
 jest.mock('../../app/services/db', () => ({
   queryFirst: jest.fn(),
   executeQuery: jest.fn(),
-}));
-
-// Mock AsyncStorage explicitly for dynamic require in PreferencesDB
-const mockAsyncStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-};
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  default: mockAsyncStorage,
 }));
 
 describe('PreferencesDB', () => {
@@ -91,7 +80,6 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when SQLite returns null', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getPreference('missing_key', 'default');
 
@@ -100,40 +88,14 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when SQLite returns row with null value', async () => {
       queryFirst.mockResolvedValue({ value: null });
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getPreference('null_value_key', 'fallback');
 
       expect(result).toBe('fallback');
     });
 
-    it('falls back to AsyncStorage when SQLite returns null', async () => {
+    it('returns defaultValue when key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue('en');
-
-      const result = await getPreference('app_language');
-
-      expect(result).toBe('en');
-      expect(mockAsyncStorage.getItem).toHaveBeenCalledWith('app_language');
-    });
-
-    it('migrates value from AsyncStorage to SQLite', async () => {
-      queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue('light');
-      executeQuery.mockResolvedValue({ changes: 1 });
-
-      const result = await getPreference('theme_preference');
-
-      expect(result).toBe('light');
-      expect(executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO app_metadata'),
-        expect.arrayContaining(['theme_preference', 'light']),
-      );
-    });
-
-    it('returns defaultValue when AsyncStorage also returns null', async () => {
-      queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getPreference('nonexistent', 'myDefault');
 
@@ -142,7 +104,6 @@ describe('PreferencesDB', () => {
 
     it('returns null when no defaultValue provided and key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getPreference('nonexistent');
 
@@ -155,27 +116,6 @@ describe('PreferencesDB', () => {
       const result = await getPreference('error_key', 'fallbackValue');
 
       expect(result).toBe('fallbackValue');
-    });
-
-    it('returns defaultValue when AsyncStorage throws error', async () => {
-      queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockRejectedValue(new Error('AsyncStorage error'));
-
-      const result = await getPreference('async_error', 'defaultVal');
-
-      expect(result).toBe('defaultVal');
-    });
-
-    it('logs migration message when migrating from AsyncStorage', async () => {
-      queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue('migrated_value');
-      executeQuery.mockResolvedValue({ changes: 1 });
-
-      await getPreference('migration_key');
-
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Migrating migration_key from AsyncStorage to SQLite'),
-      );
     });
   });
 
@@ -247,7 +187,6 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when value is not a number', async () => {
       queryFirst.mockResolvedValue({ value: 'not-a-number' });
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getNumberPreference('nan_key', 100);
 
@@ -256,7 +195,6 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getNumberPreference('missing', 50);
 
@@ -265,7 +203,6 @@ describe('PreferencesDB', () => {
 
     it('returns null by default when key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getNumberPreference('missing');
 
@@ -319,7 +256,6 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getJsonPreference('missing', { default: true });
 
@@ -328,7 +264,6 @@ describe('PreferencesDB', () => {
 
     it('returns null by default when key not found', async () => {
       queryFirst.mockResolvedValue(null);
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getJsonPreference('missing');
 
@@ -337,7 +272,6 @@ describe('PreferencesDB', () => {
 
     it('returns defaultValue when JSON parsing fails', async () => {
       queryFirst.mockResolvedValue({ value: 'not-valid-json{' });
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getJsonPreference('invalid_json', { fallback: true });
 
@@ -346,7 +280,6 @@ describe('PreferencesDB', () => {
 
     it('logs warning when JSON parsing fails', async () => {
       queryFirst.mockResolvedValue({ value: 'invalid json' });
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       await getJsonPreference('bad_json');
 
@@ -359,7 +292,6 @@ describe('PreferencesDB', () => {
 
     it('handles empty string (invalid JSON)', async () => {
       queryFirst.mockResolvedValue({ value: '' });
-      mockAsyncStorage.getItem.mockResolvedValue(null);
 
       const result = await getJsonPreference('empty', []);
 

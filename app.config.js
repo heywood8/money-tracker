@@ -48,8 +48,6 @@ module.exports = {
     platforms: ['android'],
     plugins: [
       'expo-sqlite',
-      'expo-font',
-      '@react-native-community/datetimepicker',
       [
         'expo-build-properties',
         {
