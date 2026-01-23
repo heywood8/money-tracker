@@ -18,11 +18,6 @@ jest.mock('expo/src/winter/installGlobal.ts', () => ({
   }),
 }), { virtual: true });
 
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
-);
-
 // Mock expo-sqlite with async methods
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(() => Promise.resolve({
