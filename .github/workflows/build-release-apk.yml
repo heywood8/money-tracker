@@ -5,6 +5,8 @@ on:
   push:
     tags:
       - 'penny-v*'
+    branches:
+      - 'revert-*'
 
 jobs:
   build:
