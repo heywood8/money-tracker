@@ -57,5 +57,8 @@
   "folder": "Folder",
   "subfolder": "Subfolder",
   "entry": "Entry",
-  "expense": "Expense"
+  "expense": "Expense",
+  "category_spending_trend": "Tendenza delle spese",
+  "yearly_total": "Totale annuale",
+  "no_spending_data": "Nessun dato di spesa per questa categoria"
 }

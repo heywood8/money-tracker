@@ -297,5 +297,8 @@
   "prev_month": "Mois préc.",
   "no_balance_history": "Aucun historique de solde disponible pour ce mois",
   "balance_history_details": "Détails de l'historique du solde",
-  "actions": "Actions"
+  "actions": "Actions",
+  "category_spending_trend": "Tendance des depenses",
+  "yearly_total": "Total annuel",
+  "no_spending_data": "Aucune donnee de depenses pour cette categorie"
 }

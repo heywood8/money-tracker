@@ -297,5 +297,8 @@
   "prev_month": "上月",
   "no_balance_history": "本月没有可用的余额历史",
   "balance_history_details": "余额历史详情",
-  "actions": "操作"
+  "actions": "操作",
+  "category_spending_trend": "支出趋势",
+  "yearly_total": "年度总计",
+  "no_spending_data": "此类别没有支出数据"
 }

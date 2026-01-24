@@ -1961,4 +1961,134 @@ describe('OperationsDB Service', () => {
       });
     });
   });
+
+  describe('getMonthlySpendingByCategories', () => {
+    it('returns monthly totals for given categories', async () => {
+      const mockResults = [
+        { month: 1, total: 150.5 },
+        { month: 3, total: 200.0 },
+        { month: 6, total: 75.25 },
+      ];
+      queryAll.mockResolvedValue(mockResults);
+
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1', 'cat2']);
+
+      expect(queryAll).toHaveBeenCalled();
+      expect(result).toEqual([
+        { month: 1, total: 150.5 },
+        { month: 3, total: 200.0 },
+        { month: 6, total: 75.25 },
+      ]);
+    });
+
+    it('filters by currency correctly', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getMonthlySpendingByCategories('EUR', 2024, ['cat1']);
+
+      const params = queryAll.mock.calls[0][1];
+      expect(params[0]).toBe('EUR');
+    });
+
+    it('filters by year correctly', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getMonthlySpendingByCategories('USD', 2023, ['cat1']);
+
+      const params = queryAll.mock.calls[0][1];
+      expect(params[1]).toBe('2023-01-01');
+      expect(params[2]).toBe('2023-12-31');
+    });
+
+    it('returns empty array when no matches', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']);
+
+      expect(result).toEqual([]);
+    });
+
+    it('handles multiple category IDs', async () => {
+      queryAll.mockResolvedValue([{ month: 5, total: 100 }]);
+
+      await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1', 'cat2', 'cat3']);
+
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain('IN (?,?,?)');
+      const params = queryAll.mock.calls[0][1];
+      expect(params).toContain('cat1');
+      expect(params).toContain('cat2');
+      expect(params).toContain('cat3');
+    });
+
+    it('groups by month correctly', async () => {
+      const mockResults = [
+        { month: 1, total: 100 },
+        { month: 2, total: 200 },
+        { month: 12, total: 300 },
+      ];
+      queryAll.mockResolvedValue(mockResults);
+
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']);
+
+      expect(result).toHaveLength(3);
+      expect(result[0].month).toBe(1);
+      expect(result[1].month).toBe(2);
+      expect(result[2].month).toBe(12);
+    });
+
+    it('returns empty array when categoryIds is empty', async () => {
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, []);
+
+      expect(queryAll).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when categoryIds is null', async () => {
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, null);
+
+      expect(queryAll).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when categoryIds is undefined', async () => {
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, undefined);
+
+      expect(queryAll).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it('handles database errors gracefully', async () => {
+      queryAll.mockRejectedValue(new Error('Database error'));
+
+      await expect(
+        OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']),
+      ).rejects.toThrow('Database error');
+    });
+
+    it('parses total as float correctly', async () => {
+      queryAll.mockResolvedValue([
+        { month: 1, total: '123.45' },
+        { month: 2, total: null },
+      ]);
+
+      const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']);
+
+      expect(result[0].total).toBe(123.45);
+      expect(result[1].total).toBe(0); // null becomes 0
+    });
+
+    it('uses correct SQL query structure', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']);
+
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain("o.type = 'expense'");
+      expect(sql).toContain('a.currency = ?');
+      expect(sql).toContain('o.category_id IN');
+      expect(sql).toContain('GROUP BY');
+      expect(sql).toContain('ORDER BY month ASC');
+    });
+  });
 });

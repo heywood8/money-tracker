@@ -297,5 +297,8 @@
   "prev_month": "Prev Month",
   "no_balance_history": "No balance history available for this month",
   "balance_history_details": "Balance History Details",
-  "actions": "Actions"
+  "actions": "Actions",
+  "category_spending_trend": "Spending Trend",
+  "yearly_total": "Yearly Total",
+  "no_spending_data": "No spending data for this category"
 }

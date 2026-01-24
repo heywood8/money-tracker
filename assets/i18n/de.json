@@ -297,5 +297,8 @@
   "prev_month": "Vorh. Monat",
   "no_balance_history": "Keine Saldohistorie für diesen Monat verfügbar",
   "balance_history_details": "Saldohistorie Details",
-  "actions": "Aktionen"
+  "actions": "Aktionen",
+  "category_spending_trend": "Ausgabentrend",
+  "yearly_total": "Jahresgesamt",
+  "no_spending_data": "Keine Ausgabedaten fur diese Kategorie"
 }

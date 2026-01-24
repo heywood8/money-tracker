@@ -1369,3 +1369,47 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
     throw error;
   }
 };
+
+/**
+ * Get monthly spending totals for specified categories within a year
+ * Groups expenses by month (1-12) for the given category IDs
+ * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
+ * @param {number} year - Year to query (e.g., 2024)
+ * @param {string[]} categoryIds - Array of category IDs to include
+ * @returns {Promise<Array<{month: number, total: number}>>} Monthly totals (month is 1-12)
+ */
+export const getMonthlySpendingByCategories = async (currency, year, categoryIds) => {
+  try {
+    if (!categoryIds || categoryIds.length === 0) {
+      return [];
+    }
+
+    const placeholders = categoryIds.map(() => '?').join(',');
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+
+    const results = await queryAll(
+      `SELECT
+         CAST(strftime('%m', o.date) AS INTEGER) as month,
+         SUM(CAST(o.amount AS REAL)) as total
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.type = 'expense'
+         AND a.currency = ?
+         AND o.date >= ?
+         AND o.date <= ?
+         AND o.category_id IN (${placeholders})
+       GROUP BY strftime('%m', o.date)
+       ORDER BY month ASC`,
+      [currency, startDate, endDate, ...categoryIds],
+    );
+
+    return (results || []).map(row => ({
+      month: row.month,
+      total: parseFloat(row.total) || 0,
+    }));
+  } catch (error) {
+    console.error('Failed to get monthly spending by categories:', error);
+    throw error;
+  }
+};
