@@ -298,5 +298,10 @@
   "actions": "Действия",
   "category_spending_trend": "Тренд расходов",
   "yearly_total": "Итого за год",
-  "no_spending_data": "Нет данных о расходах в этой категории"
+  "no_spending_data": "Нет данных о расходах в этой категории",
+  "split": "Разделить",
+  "split_transaction": "Разделить операцию",
+  "split_amount": "Сумма разделения",
+  "split_amount_error": "Сумма должна быть меньше исходной",
+  "split_success": "Операция успешно разделена"
 }

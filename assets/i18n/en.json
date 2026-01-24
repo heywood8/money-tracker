@@ -300,5 +300,10 @@
   "actions": "Actions",
   "category_spending_trend": "Spending Trend",
   "yearly_total": "Yearly Total",
-  "no_spending_data": "No spending data for this category"
+  "no_spending_data": "No spending data for this category",
+  "split": "Split",
+  "split_transaction": "Split Transaction",
+  "split_amount": "Split Amount",
+  "split_amount_error": "Amount must be less than the original",
+  "split_success": "Transaction split successfully"
 }

@@ -300,5 +300,10 @@
   "actions": "Aktionen",
   "category_spending_trend": "Ausgabentrend",
   "yearly_total": "Jahresgesamt",
-  "no_spending_data": "Keine Ausgabedaten fur diese Kategorie"
+  "no_spending_data": "Keine Ausgabedaten fur diese Kategorie",
+  "split": "Teilen",
+  "split_transaction": "Vorgang teilen",
+  "split_amount": "Teilungsbetrag",
+  "split_amount_error": "Betrag muss kleiner als das Original sein",
+  "split_success": "Vorgang erfolgreich geteilt"
 }

@@ -60,5 +60,10 @@
   "expense": "Expense",
   "category_spending_trend": "Tendenza delle spese",
   "yearly_total": "Totale annuale",
-  "no_spending_data": "Nessun dato di spesa per questa categoria"
+  "no_spending_data": "Nessun dato di spesa per questa categoria",
+  "split": "Dividi",
+  "split_transaction": "Dividi transazione",
+  "split_amount": "Importo da dividere",
+  "split_amount_error": "L'importo deve essere inferiore all'originale",
+  "split_success": "Transazione divisa con successo"
 }

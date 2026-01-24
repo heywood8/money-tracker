@@ -300,5 +300,10 @@
   "actions": "Actions",
   "category_spending_trend": "Tendance des depenses",
   "yearly_total": "Total annuel",
-  "no_spending_data": "Aucune donnee de depenses pour cette categorie"
+  "no_spending_data": "Aucune donnee de depenses pour cette categorie",
+  "split": "Diviser",
+  "split_transaction": "Diviser la transaction",
+  "split_amount": "Montant a diviser",
+  "split_amount_error": "Le montant doit etre inferieur a l'original",
+  "split_success": "Transaction divisee avec succes"
 }
