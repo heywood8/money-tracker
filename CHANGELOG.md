@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.33.0](https://github.com/heywood8/money-tracker/compare/penny-v0.32.0...penny-v0.33.0) (2026-01-24)
+
+
+### Features
+
+* add transaction split feature ([1b00976](https://github.com/heywood8/money-tracker/commit/1b00976e3598332cc5e22b79b7a4a47abd018ea9))
+
+
+### Bug Fixes
+
+* run builds on dependabot branches ([165dde8](https://github.com/heywood8/money-tracker/commit/165dde8b3cddc455491d1edf426c1885d93be181))
+
 ## [0.32.0](https://github.com/heywood8/money-tracker/compare/penny-v0.31.7...penny-v0.32.0) (2026-01-24)
 
 
