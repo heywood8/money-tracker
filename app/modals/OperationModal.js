@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -24,6 +24,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import OperationFormFields from '../components/operations/OperationFormFields';
+import SplitOperationModal from '../components/operations/SplitOperationModal';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -84,6 +85,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     handleSave,
     handleClose,
     handleDelete,
+    handleSplit,
     getAccountName,
     getCategoryName,
     formatDateForDisplay,
@@ -111,6 +113,25 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     navigateIntoFolder,
     navigateBack,
   } = useOperationPicker(t);
+
+  // State for split modal
+  const [showSplitModal, setShowSplitModal] = useState(false);
+
+  // Determine if split button should be shown
+  // Only for editing expense/income (not transfers, not shadow operations, not new)
+  const canSplit = !isNew && !isShadowOperation && values.type !== 'transfer' && parseFloat(values.amount) > 0;
+
+  // Handle split confirmation
+  const handleSplitConfirm = useCallback(async (splitAmount, categoryId) => {
+    const result = await handleSplit(splitAmount, categoryId);
+    if (result.success) {
+      // Keep modal open with updated amount - user can split again
+      setShowSplitModal(false);
+    } else {
+      // Show error (dialog is handled inside handleSplit if needed)
+      console.error('[OperationModal] Split failed:', result.error);
+    }
+  }, [handleSplit]);
 
   // Memoize calculator amount change handler for performance
   const handleAmountChange = useCallback((text) => {
@@ -478,6 +499,32 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   )}
                 </View>
 
+                {/* Split Button (only for editing expense/income, not transfers or shadow) */}
+                {canSplit && (
+                  <Pressable
+                    style={[
+                      styles.splitButtonContainer,
+                      { backgroundColor: colors.card, borderColor: colors.primary },
+                    ]}
+                    onPress={() => setShowSplitModal(true)}
+                    testID="split-button"
+                  >
+                    <Icon
+                      name="call-split"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.splitButtonText,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      {t('split_transaction')}
+                    </Text>
+                  </Pressable>
+                )}
+
                 {/* Delete Button (only for editing) */}
                 {!isNew && onDelete && (
                   <Pressable
@@ -509,6 +556,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
+
+      {/* Split Operation Modal */}
+      <SplitOperationModal
+        visible={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        onConfirm={handleSplitConfirm}
+        originalAmount={values.amount}
+        operationType={values.type}
+        categories={categories}
+        colors={colors}
+        t={t}
+      />
 
       {/* Date Picker */}
       {showDatePicker && (
@@ -740,6 +799,21 @@ const styles = StyleSheet.create({
   scrollView: {
     flexGrow: 0,
     flexShrink: 1,
+  },
+  splitButtonContainer: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+    minHeight: 48,
+    paddingVertical: SPACING.md,
+  },
+  splitButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

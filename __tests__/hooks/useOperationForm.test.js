@@ -834,4 +834,243 @@ describe('useOperationForm', () => {
       );
     });
   });
+
+  describe('Split Operation', () => {
+    const existingOperation = {
+      id: 'op-1',
+      type: 'expense',
+      amount: '100.00',
+      accountId: 'acc-1',
+      categoryId: 'cat-1',
+      date: '2024-01-15',
+      description: 'Test expense',
+    };
+
+    it('should expose handleSplit function', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(typeof result.current.handleSplit).toBe('function');
+      });
+    });
+
+    it('should not split new operations', async () => {
+      const props = { ...defaultProps, operation: null, isNew: true };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.handleSplit).toBeDefined();
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('50.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockAddOperation).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid split amount (zero)', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('0', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockAddOperation).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid split amount (negative)', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('-10', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockAddOperation).not.toHaveBeenCalled();
+    });
+
+    it('should reject split amount equal to original', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('100.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockAddOperation).not.toHaveBeenCalled();
+    });
+
+    it('should reject split amount greater than original', async () => {
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('150.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      expect(mockAddOperation).not.toHaveBeenCalled();
+    });
+
+    it('should create new operation with split amount', async () => {
+      mockAddOperation.mockResolvedValue();
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(true);
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'expense',
+          amount: '30',
+          accountId: 'acc-1',
+          categoryId: 'cat-2',
+          date: '2024-01-15',
+        }),
+      );
+    });
+
+    it('should update original operation with reduced amount', async () => {
+      mockAddOperation.mockResolvedValue();
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      await act(async () => {
+        await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      expect(mockUpdateOperation).toHaveBeenCalledWith(
+        'op-1',
+        expect.objectContaining({
+          amount: '70',
+        }),
+      );
+    });
+
+    it('should update local state with new amount after split', async () => {
+      mockAddOperation.mockResolvedValue();
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      await act(async () => {
+        await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('70');
+      });
+    });
+
+    it('should return new amount in success result', async () => {
+      mockAddOperation.mockResolvedValue();
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(true);
+      expect(splitResult.newAmount).toBe('70');
+    });
+
+    it('should preserve description in new split operation', async () => {
+      mockAddOperation.mockResolvedValue();
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.description).toBe('Test expense');
+      });
+
+      await act(async () => {
+        await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Test expense',
+        }),
+      );
+    });
+
+    it('should handle addOperation failure', async () => {
+      mockAddOperation.mockRejectedValue(new Error('Database error'));
+
+      const props = { ...defaultProps, operation: existingOperation, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.amount).toBe('100.00');
+      });
+
+      let splitResult;
+      await act(async () => {
+        splitResult = await result.current.handleSplit('30.00', 'cat-2');
+      });
+
+      expect(splitResult.success).toBe(false);
+      // Original amount should not be changed
+      expect(result.current.values.amount).toBe('100.00');
+    });
+  });
 });

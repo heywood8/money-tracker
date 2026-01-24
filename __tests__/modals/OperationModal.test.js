@@ -1328,6 +1328,210 @@ describe('OperationModal', () => {
     });
   });
 
+  describe('Split Button', () => {
+    it('shows split button when editing expense operation', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+        values: {
+          type: 'expense',
+          amount: '50.00',
+          accountId: 'acc1',
+          categoryId: 'cat2',
+          date: '2024-01-15',
+        },
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'expense',
+        amount: '50',
+        accountId: 'acc1',
+        categoryId: 'cat2',
+        date: '2024-01-15',
+      };
+
+      const { getByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+          onDelete={mockOnDelete}
+        />,
+      );
+
+      expect(getByTestId('split-button')).toBeTruthy();
+    });
+
+    it('shows split button when editing income operation', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+        values: {
+          type: 'income',
+          amount: '100.00',
+          accountId: 'acc1',
+          categoryId: 'cat3',
+          date: '2024-01-15',
+        },
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'income',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat3',
+        date: '2024-01-15',
+      };
+
+      const { getByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+          onDelete={mockOnDelete}
+        />,
+      );
+
+      expect(getByTestId('split-button')).toBeTruthy();
+    });
+
+    it('does not show split button for new operations', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+        values: {
+          type: 'expense',
+          amount: '50.00',
+          accountId: 'acc1',
+          categoryId: '',
+          date: '2024-01-15',
+        },
+      });
+
+      const { queryByTestId } = render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(queryByTestId('split-button')).toBeNull();
+    });
+
+    it('does not show split button for transfer operations', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+        values: {
+          type: 'transfer',
+          amount: '50.00',
+          accountId: 'acc1',
+          toAccountId: 'acc2',
+          date: '2024-01-15',
+        },
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'transfer',
+        amount: '50',
+        accountId: 'acc1',
+        toAccountId: 'acc2',
+        date: '2024-01-15',
+      };
+
+      const { queryByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+          onDelete={mockOnDelete}
+        />,
+      );
+
+      expect(queryByTestId('split-button')).toBeNull();
+    });
+
+    it('does not show split button for shadow operations', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: true,
+        values: {
+          type: 'expense',
+          amount: '50.00',
+          accountId: 'acc1',
+          categoryId: 'cat2',
+          date: '2024-01-15',
+        },
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'expense',
+        amount: '50',
+        accountId: 'acc1',
+        categoryId: 'cat2',
+        date: '2024-01-15',
+        isShadow: true,
+      };
+
+      const { queryByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+          onDelete={mockOnDelete}
+        />,
+      );
+
+      expect(queryByTestId('split-button')).toBeNull();
+    });
+
+    it('does not show split button when amount is zero', () => {
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...useOperationForm(),
+        isShadowOperation: false,
+        values: {
+          type: 'expense',
+          amount: '0',
+          accountId: 'acc1',
+          categoryId: 'cat2',
+          date: '2024-01-15',
+        },
+      });
+
+      const mockOperation = {
+        id: 'op1',
+        type: 'expense',
+        amount: '0',
+        accountId: 'acc1',
+        categoryId: 'cat2',
+        date: '2024-01-15',
+      };
+
+      const { queryByTestId } = render(
+        <OperationModal
+          visible={true}
+          onClose={mockOnClose}
+          operation={mockOperation}
+          isNew={false}
+          onDelete={mockOnDelete}
+        />,
+      );
+
+      expect(queryByTestId('split-button')).toBeNull();
+    });
+  });
+
   describe('Key Extractor', () => {
     it('returns correct key for type picker items', () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');

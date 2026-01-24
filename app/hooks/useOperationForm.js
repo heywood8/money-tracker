@@ -356,6 +356,56 @@ const useOperationForm = ({
     });
   }, [categories, values.type]);
 
+  // Split operation: create new operation with split amount and reduce original
+  const handleSplit = useCallback(async (splitAmount, newCategoryId) => {
+    if (!operation || isNew) {
+      return { success: false, error: 'Cannot split new operations' };
+    }
+
+    const numSplitAmount = parseFloat(splitAmount);
+    const numOriginalAmount = parseFloat(values.amount);
+
+    // Validate split amount
+    if (isNaN(numSplitAmount) || numSplitAmount <= 0) {
+      return { success: false, error: t('valid_amount_required') };
+    }
+
+    if (numSplitAmount >= numOriginalAmount) {
+      return { success: false, error: t('split_amount_error') };
+    }
+
+    try {
+      // Create new operation with split amount
+      const newOperation = {
+        type: values.type,
+        amount: String(numSplitAmount),
+        accountId: values.accountId,
+        categoryId: newCategoryId,
+        date: values.date,
+        description: values.description || null,
+      };
+
+      await addOperation(newOperation);
+
+      // Calculate new amount for original operation
+      const newAmount = String(numOriginalAmount - numSplitAmount);
+
+      // Update local state with reduced amount
+      setValues(v => ({ ...v, amount: newAmount }));
+
+      // Update original operation in database
+      await updateOperation(operation.id, {
+        ...values,
+        amount: newAmount,
+      });
+
+      return { success: true, newAmount };
+    } catch (error) {
+      console.error('[useOperationForm] Failed to split operation:', error);
+      return { success: false, error: t('error') };
+    }
+  }, [operation, isNew, values, addOperation, updateOperation, t, setValues]);
+
   return {
     // State
     values,
@@ -378,6 +428,7 @@ const useOperationForm = ({
     handleSave,
     handleClose,
     handleDelete,
+    handleSplit,
 
     // Helpers
     getAccountName,

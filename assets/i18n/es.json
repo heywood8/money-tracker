@@ -300,5 +300,10 @@
   "actions": "Acciones",
   "category_spending_trend": "Tendencia de gastos",
   "yearly_total": "Total anual",
-  "no_spending_data": "No hay datos de gastos para esta categoria"
+  "no_spending_data": "No hay datos de gastos para esta categoria",
+  "split": "Dividir",
+  "split_transaction": "Dividir transaccion",
+  "split_amount": "Cantidad a dividir",
+  "split_amount_error": "La cantidad debe ser menor que la original",
+  "split_success": "Transaccion dividida con exito"
 }

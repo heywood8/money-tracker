@@ -300,5 +300,10 @@
   "actions": "操作",
   "category_spending_trend": "支出趋势",
   "yearly_total": "年度总计",
-  "no_spending_data": "此类别没有支出数据"
+  "no_spending_data": "此类别没有支出数据",
+  "split": "拆分",
+  "split_transaction": "拆分交易",
+  "split_amount": "拆分金额",
+  "split_amount_error": "金额必须小于原始金额",
+  "split_success": "交易拆分成功"
 }
