@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.0](https://github.com/heywood8/money-tracker/compare/penny-v0.31.7...penny-v0.32.0) (2026-01-24)
+
+
+### Features
+
+* add year-wide monthly spending by category graph ([fcacc16](https://github.com/heywood8/money-tracker/commit/fcacc1678599b47e0d9fbfe95b482dce0ee00f09))
+
 ## [0.31.7](https://github.com/heywood8/money-tracker/compare/penny-v0.31.6...penny-v0.31.7) (2026-01-23)
 
 
