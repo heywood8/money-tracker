@@ -295,5 +295,8 @@
   "prev_month": "Пред. месяц",
   "no_balance_history": "Нет истории баланса за этот месяц",
   "balance_history_details": "Детали истории баланса",
-  "actions": "Действия"
+  "actions": "Действия",
+  "category_spending_trend": "Тренд расходов",
+  "yearly_total": "Итого за год",
+  "no_spending_data": "Нет данных о расходах в этой категории"
 }

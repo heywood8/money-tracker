@@ -9,6 +9,7 @@ import { getAllCategories } from '../services/CategoriesDB';
 import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import SpendingPredictionCard from '../components/graphs/SpendingPredictionCard';
+import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
 import ChartModal from '../components/graphs/ChartModal';
@@ -33,6 +34,7 @@ const GraphsScreen = () => {
   const [topLevelCategories, setTopLevelCategories] = useState([]);
   const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
   const [availableMonths, setAvailableMonths] = useState([]);
+  const [selectedCategoryForTrend, setSelectedCategoryForTrend] = useState(null);
 
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -401,6 +403,19 @@ const GraphsScreen = () => {
             spendingPrediction={spendingPrediction}
             selectedCurrency={selectedCurrency}
           />
+
+          {/* Category Spending Trend Card - Full Year Only */}
+          {selectedMonth === null && (
+            <CategorySpendingCard
+              colors={colors}
+              t={t}
+              selectedYear={selectedYear}
+              selectedCurrency={selectedCurrency}
+              selectedCategory={selectedCategoryForTrend}
+              onCategoryChange={setSelectedCategoryForTrend}
+              categories={categories}
+            />
+          )}
 
           {/* Expenses Summary Card */}
           <ExpenseSummaryCard

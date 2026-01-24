@@ -297,5 +297,8 @@
   "prev_month": "Mes Ant.",
   "no_balance_history": "No hay historial de saldo disponible para este mes",
   "balance_history_details": "Detalles del historial de saldo",
-  "actions": "Acciones"
+  "actions": "Acciones",
+  "category_spending_trend": "Tendencia de gastos",
+  "yearly_total": "Total anual",
+  "no_spending_data": "No hay datos de gastos para esta categoria"
 }
