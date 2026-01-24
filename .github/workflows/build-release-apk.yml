@@ -6,7 +6,7 @@ on:
     tags:
       - 'penny-v*'
     branches:
-      - 'revert-*'
+      - 'dependabot/*'
 
 jobs:
   build:
