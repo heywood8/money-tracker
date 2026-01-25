@@ -67,25 +67,28 @@ describe('CategorySpendingCard', () => {
     { id: 'cat-shadow', name: 'Shadow', parentId: null, categoryType: 'expense', isShadow: true },
   ];
 
-  const defaultMonthlyData = [
-    { month: 1, total: 100 },
-    { month: 2, total: 150 },
-    { month: 3, total: 200 },
-    { month: 4, total: 50 },
-    { month: 5, total: 0 },
-    { month: 6, total: 300 },
-    { month: 7, total: 250 },
-    { month: 8, total: 0 },
-    { month: 9, total: 100 },
-    { month: 10, total: 75 },
-    { month: 11, total: 125 },
-    { month: 12, total: 200 },
-  ];
+  // Generate 12 months of mock data with yearMonth, year, month, total
+  const generateMonthlyData = () => {
+    const now = new Date();
+    const data = [];
+    const totals = [100, 150, 200, 50, 0, 300, 250, 0, 100, 75, 125, 200];
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      data.push({
+        yearMonth: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        year: date.getFullYear(),
+        month: date.getMonth(),
+        total: totals[11 - i],
+      });
+    }
+    return data;
+  };
+
+  const defaultMonthlyData = generateMonthlyData();
 
   const defaultProps = {
     colors: defaultColors,
     t: defaultT,
-    selectedYear: 2024,
     selectedCurrency: 'USD',
     selectedCategory: 'cat-food',
     onCategoryChange: jest.fn(),
@@ -130,7 +133,6 @@ describe('CategorySpendingCard', () => {
       const barChart = UNSAFE_getByType('BarChart');
       expect(barChart).toBeTruthy();
       expect(barChart.props.data.labels).toHaveLength(12);
-      expect(barChart.props.data.labels).toEqual(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']);
     });
 
     it('shows loading indicator when loading', () => {
@@ -150,21 +152,10 @@ describe('CategorySpendingCard', () => {
     });
 
     it('shows empty state when no data', () => {
+      const emptyData = generateMonthlyData().map(item => ({ ...item, total: 0 }));
+
       useCategoryMonthlySpending.mockReturnValue({
-        monthlyData: [
-          { month: 1, total: 0 },
-          { month: 2, total: 0 },
-          { month: 3, total: 0 },
-          { month: 4, total: 0 },
-          { month: 5, total: 0 },
-          { month: 6, total: 0 },
-          { month: 7, total: 0 },
-          { month: 8, total: 0 },
-          { month: 9, total: 0 },
-          { month: 10, total: 0 },
-          { month: 11, total: 0 },
-          { month: 12, total: 0 },
-        ],
+        monthlyData: emptyData,
         loading: false,
         totalYearlySpending: 0,
         loadData: jest.fn(),
@@ -320,9 +311,9 @@ describe('CategorySpendingCard', () => {
 
       const barChart = UNSAFE_getByType('BarChart');
 
-      expect(barChart.props.data.datasets[0].data).toEqual([
-        100, 150, 200, 50, 0, 300, 250, 0, 100, 75, 125, 200,
-      ]);
+      expect(barChart.props.data.datasets[0].data).toEqual(
+        defaultMonthlyData.map(item => item.total),
+      );
     });
 
     it('uses correct chart dimensions', () => {
@@ -346,12 +337,12 @@ describe('CategorySpendingCard', () => {
       expect(getByText('category_spending_trend')).toBeTruthy();
     });
 
-    it('displays yearly total label', () => {
+    it('displays last 12 months total label', () => {
       const { getByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByText('yearly_total')).toBeTruthy();
+      expect(getByText('last_12_months_total')).toBeTruthy();
     });
   });
 
@@ -360,14 +351,12 @@ describe('CategorySpendingCard', () => {
       render(
         <CategorySpendingCard
           {...defaultProps}
-          selectedYear={2023}
           selectedCurrency="EUR"
           selectedCategory="cat-transport"
         />,
       );
 
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
-        2023,
         'EUR',
         'cat-transport', // effectiveCategory matches selectedCategory when valid
         defaultCategories,
@@ -383,7 +372,6 @@ describe('CategorySpendingCard', () => {
       );
 
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
-        2024,
         'USD',
         'cat-food', // Falls back to first parent expense category
         defaultCategories,

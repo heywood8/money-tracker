@@ -1413,3 +1413,49 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
     throw error;
   }
 };
+
+/**
+ * Get spending by categories for the last 12 months (rolling)
+ * @param {string} currency - Currency code
+ * @param {Array<string>} categoryIds - Category IDs to include
+ * @returns {Promise<Array<{yearMonth: string, total: number}>>} Array of {yearMonth: 'YYYY-MM', total}
+ */
+export const getLast12MonthsSpendingByCategories = async (currency, categoryIds) => {
+  try {
+    if (!categoryIds || categoryIds.length === 0) {
+      return [];
+    }
+
+    const placeholders = categoryIds.map(() => '?').join(',');
+
+    // Calculate date 12 months ago from today
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-01`;
+    const endDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
+
+    const results = await queryAll(
+      `SELECT
+         strftime('%Y-%m', o.date) as year_month,
+         SUM(CAST(o.amount AS REAL)) as total
+       FROM operations o
+       JOIN accounts a ON o.account_id = a.id
+       WHERE o.type = 'expense'
+         AND a.currency = ?
+         AND o.date >= ?
+         AND o.date <= ?
+         AND o.category_id IN (${placeholders})
+       GROUP BY strftime('%Y-%m', o.date)
+       ORDER BY year_month ASC`,
+      [currency, startDateStr, endDateStr, ...categoryIds],
+    );
+
+    return (results || []).map(row => ({
+      yearMonth: row.year_month,
+      total: parseFloat(row.total) || 0,
+    }));
+  } catch (error) {
+    console.error('Failed to get last 12 months spending by categories:', error);
+    throw error;
+  }
+};

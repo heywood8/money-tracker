@@ -300,6 +300,7 @@
   "actions": "Aktionen",
   "category_spending_trend": "Ausgabentrend",
   "yearly_total": "Jahresgesamt",
+  "last_12_months_total": "Letzte 12 Monate",
   "no_spending_data": "Keine Ausgabedaten fur diese Kategorie",
   "split": "Teilen",
   "split_transaction": "Vorgang teilen",

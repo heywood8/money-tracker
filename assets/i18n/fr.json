@@ -300,6 +300,7 @@
   "actions": "Actions",
   "category_spending_trend": "Tendance des depenses",
   "yearly_total": "Total annuel",
+  "last_12_months_total": "12 derniers mois",
   "no_spending_data": "Aucune donnee de depenses pour cette categorie",
   "split": "Diviser",
   "split_transaction": "Diviser la transaction",

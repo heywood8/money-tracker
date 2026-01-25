@@ -6,7 +6,7 @@ import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 
 // Mock the services
 jest.mock('../../app/services/OperationsDB', () => ({
-  getMonthlySpendingByCategories: jest.fn(),
+  getLast12MonthsSpendingByCategories: jest.fn(),
 }));
 
 jest.mock('../../app/services/CategoriesDB', () => ({
@@ -23,7 +23,6 @@ jest.mock('../../app/services/eventEmitter', () => ({
 }));
 
 describe('useCategoryMonthlySpending', () => {
-  const mockYear = 2024;
   const mockCurrency = 'USD';
   const mockCategoryId = 'cat-food';
 
@@ -46,10 +45,10 @@ describe('useCategoryMonthlySpending', () => {
   describe('Initialization', () => {
     it('should initialize with loading=true and empty data', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       expect(result.current.loading).toBe(true);
@@ -59,22 +58,22 @@ describe('useCategoryMonthlySpending', () => {
   });
 
   describe('Data Loading', () => {
-    it('should load data for all 12 months', async () => {
+    it('should load data for last 12 months', async () => {
       const mockDescendants = [
         { id: 'cat-groceries' },
         { id: 'cat-restaurants' },
       ];
       const mockSpending = [
-        { month: 1, total: 100 },
-        { month: 3, total: 200 },
-        { month: 6, total: 150 },
+        { yearMonth: '2024-01', total: 100 },
+        { yearMonth: '2024-03', total: 200 },
+        { yearMonth: '2024-06', total: 150 },
       ];
 
       CategoriesDB.getAllDescendants.mockResolvedValue(mockDescendants);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue(mockSpending);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue(mockSpending);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
@@ -83,31 +82,29 @@ describe('useCategoryMonthlySpending', () => {
 
       // Should have 12 months
       expect(result.current.monthlyData).toHaveLength(12);
-      // Check specific months have data
-      expect(result.current.monthlyData[0]).toEqual({ month: 1, total: 100 });
-      expect(result.current.monthlyData[2]).toEqual({ month: 3, total: 200 });
-      expect(result.current.monthlyData[5]).toEqual({ month: 6, total: 150 });
+      // Each item should have yearMonth, year, month, and total
+      expect(result.current.monthlyData[0]).toHaveProperty('yearMonth');
+      expect(result.current.monthlyData[0]).toHaveProperty('year');
+      expect(result.current.monthlyData[0]).toHaveProperty('month');
+      expect(result.current.monthlyData[0]).toHaveProperty('total');
     });
 
     it('should return 0 for months with no spending', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([
-        { month: 3, total: 100 },
-      ]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Months without data should be 0
-      expect(result.current.monthlyData[0]).toEqual({ month: 1, total: 0 });
-      expect(result.current.monthlyData[1]).toEqual({ month: 2, total: 0 });
-      // Month 3 should have data
-      expect(result.current.monthlyData[2]).toEqual({ month: 3, total: 100 });
+      // All months should have total 0
+      result.current.monthlyData.forEach(item => {
+        expect(item.total).toBe(0);
+      });
     });
 
     it('should aggregate descendant categories', async () => {
@@ -117,10 +114,10 @@ describe('useCategoryMonthlySpending', () => {
       ];
 
       CategoriesDB.getAllDescendants.mockResolvedValue(mockDescendants);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
@@ -128,25 +125,23 @@ describe('useCategoryMonthlySpending', () => {
       });
 
       // Should include selected category + descendants
-      expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+      expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
         mockCurrency,
-        mockYear,
         [mockCategoryId, 'cat-groceries', 'cat-restaurants'],
       );
     });
 
     it('should filter by selected currency', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       renderHook(() =>
-        useCategoryMonthlySpending(mockYear, 'EUR', mockCategoryId, mockCategories),
+        useCategoryMonthlySpending('EUR', mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+        expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'EUR',
-          mockYear,
           [mockCategoryId],
         );
       });
@@ -154,32 +149,39 @@ describe('useCategoryMonthlySpending', () => {
 
     it('should calculate yearly total correctly', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([
-        { month: 1, total: 100 },
-        { month: 3, total: 200 },
-        { month: 6, total: 150 },
-        { month: 12, total: 50 },
-      ]);
+
+      // Generate mock data that matches the last 12 months format
+      const now = new Date();
+      const mockSpending = [];
+      for (let i = 0; i < 4; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        mockSpending.push({ yearMonth, total: 100 + i * 50 });
+      }
+
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue(mockSpending);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.totalYearlySpending).toBe(500);
+      // Total should be sum of all months with data
+      const expectedTotal = mockSpending.reduce((sum, item) => sum + item.total, 0);
+      expect(result.current.totalYearlySpending).toBe(expectedTotal);
     });
   });
 
   describe('Event Handling', () => {
     it('should subscribe to OPERATION_CHANGED event', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       expect(appEvents.on).toHaveBeenCalledWith(
@@ -193,10 +195,10 @@ describe('useCategoryMonthlySpending', () => {
       appEvents.on.mockReturnValue(unsubscribe);
 
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { unmount } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       unmount();
@@ -208,10 +210,10 @@ describe('useCategoryMonthlySpending', () => {
   describe('Edge Cases', () => {
     it('should handle empty categories array', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, []),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, []),
       );
 
       await waitFor(() => {
@@ -223,7 +225,7 @@ describe('useCategoryMonthlySpending', () => {
 
     it('should handle null selectedCategoryId', async () => {
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, null, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, null, mockCategories),
       );
 
       await waitFor(() => {
@@ -231,12 +233,12 @@ describe('useCategoryMonthlySpending', () => {
       });
 
       expect(result.current.monthlyData).toEqual([]);
-      expect(OperationsDB.getMonthlySpendingByCategories).not.toHaveBeenCalled();
+      expect(OperationsDB.getLast12MonthsSpendingByCategories).not.toHaveBeenCalled();
     });
 
     it('should handle empty currency', async () => {
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, '', mockCategoryId, mockCategories),
+        useCategoryMonthlySpending('', mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
@@ -244,14 +246,14 @@ describe('useCategoryMonthlySpending', () => {
       });
 
       expect(result.current.monthlyData).toEqual([]);
-      expect(OperationsDB.getMonthlySpendingByCategories).not.toHaveBeenCalled();
+      expect(OperationsDB.getLast12MonthsSpendingByCategories).not.toHaveBeenCalled();
     });
 
     it('should handle database errors gracefully', async () => {
       CategoriesDB.getAllDescendants.mockRejectedValue(new Error('Database error'));
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       await waitFor(() => {
@@ -269,10 +271,10 @@ describe('useCategoryMonthlySpending', () => {
   describe('loadData function', () => {
     it('should expose loadData function for manual refresh', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useCategoryMonthlySpending(mockYear, mockCurrency, mockCategoryId, mockCategories),
+        useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
       expect(typeof result.current.loadData).toBe('function');
@@ -287,70 +289,36 @@ describe('useCategoryMonthlySpending', () => {
       });
 
       // Should have been called at least twice (initial + manual)
-      expect(OperationsDB.getMonthlySpendingByCategories.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(OperationsDB.getLast12MonthsSpendingByCategories.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
   });
 
   describe('Dependency Changes', () => {
-    it('should reload data when year changes', async () => {
-      CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
-
-      const { rerender } = renderHook(
-        ({ year }) => useCategoryMonthlySpending(year, mockCurrency, mockCategoryId, mockCategories),
-        { initialProps: { year: 2024 } },
-      );
-
-      await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
-          mockCurrency,
-          2024,
-          [mockCategoryId],
-        );
-      });
-
-      jest.clearAllMocks();
-      CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
-
-      rerender({ year: 2025 });
-
-      await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
-          mockCurrency,
-          2025,
-          [mockCategoryId],
-        );
-      });
-    });
-
     it('should reload data when currency changes', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { rerender } = renderHook(
-        ({ currency }) => useCategoryMonthlySpending(mockYear, currency, mockCategoryId, mockCategories),
+        ({ currency }) => useCategoryMonthlySpending(currency, mockCategoryId, mockCategories),
         { initialProps: { currency: 'USD' } },
       );
 
       await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+        expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'USD',
-          mockYear,
           [mockCategoryId],
         );
       });
 
       jest.clearAllMocks();
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       rerender({ currency: 'EUR' });
 
       await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+        expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           'EUR',
-          mockYear,
           [mockCategoryId],
         );
       });
@@ -358,31 +326,29 @@ describe('useCategoryMonthlySpending', () => {
 
     it('should reload data when categoryId changes', async () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       const { rerender } = renderHook(
-        ({ categoryId }) => useCategoryMonthlySpending(mockYear, mockCurrency, categoryId, mockCategories),
+        ({ categoryId }) => useCategoryMonthlySpending(mockCurrency, categoryId, mockCategories),
         { initialProps: { categoryId: 'cat-food' } },
       );
 
       await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+        expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           mockCurrency,
-          mockYear,
           ['cat-food'],
         );
       });
 
       jest.clearAllMocks();
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getMonthlySpendingByCategories.mockResolvedValue([]);
+      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
       rerender({ categoryId: 'cat-transport' });
 
       await waitFor(() => {
-        expect(OperationsDB.getMonthlySpendingByCategories).toHaveBeenCalledWith(
+        expect(OperationsDB.getLast12MonthsSpendingByCategories).toHaveBeenCalledWith(
           mockCurrency,
-          mockYear,
           ['cat-transport'],
         );
       });
