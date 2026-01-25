@@ -404,18 +404,16 @@ const GraphsScreen = () => {
             selectedCurrency={selectedCurrency}
           />
 
-          {/* Category Spending Trend Card - Full Year Only */}
-          {selectedMonth === null && (
-            <CategorySpendingCard
-              colors={colors}
-              t={t}
-              selectedYear={selectedYear}
-              selectedCurrency={selectedCurrency}
-              selectedCategory={selectedCategoryForTrend}
-              onCategoryChange={setSelectedCategoryForTrend}
-              categories={categories}
-            />
-          )}
+          {/* Category Spending Trend Card */}
+          <CategorySpendingCard
+            colors={colors}
+            t={t}
+            selectedYear={selectedYear}
+            selectedCurrency={selectedCurrency}
+            selectedCategory={selectedCategoryForTrend}
+            onCategoryChange={setSelectedCategoryForTrend}
+            categories={categories}
+          />
 
           {/* Expenses Summary Card */}
           <ExpenseSummaryCard
