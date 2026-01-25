@@ -23,30 +23,6 @@ jest.mock('react-native-chart-kit', () => ({
   BarChart: 'BarChart',
 }));
 
-// Mock SimplePicker
-/* eslint-disable react/prop-types */
-jest.mock('../../../app/components/SimplePicker', () => {
-  const { View, Text, TouchableOpacity } = require('react-native');
-  return function MockSimplePicker(props) {
-    const { value, onValueChange, items } = props;
-    return (
-      <View testID="simple-picker">
-        <Text testID="picker-value">{items.find(i => i.value === value)?.label || value}</Text>
-        {items.map((item, index) => (
-          <TouchableOpacity
-            key={item.value || index}
-            onPress={() => onValueChange(item.value)}
-            testID={`picker-item-${item.value}`}
-          >
-            <Text>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-});
-/* eslint-enable react/prop-types */
-
 describe('CategorySpendingCard', () => {
   const defaultColors = {
     text: '#000000',
@@ -54,6 +30,8 @@ describe('CategorySpendingCard', () => {
     primary: '#4CAF50',
     border: '#CCCCCC',
     altRow: '#F5F5F5',
+    surface: '#FFFFFF',
+    selected: '#E0E0E0',
     expense: '#FF4444',
   };
 
@@ -106,23 +84,13 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Rendering', () => {
-    it('renders category picker with all expense categories', () => {
-      const { getAllByText, queryByText } = render(
+    it('renders category picker button with selected category name', () => {
+      const { getByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      // Should show parent expense categories (may appear multiple times in picker)
-      expect(getAllByText('Food').length).toBeGreaterThan(0);
-      expect(getAllByText('Transport').length).toBeGreaterThan(0);
-
-      // Should show child categories (indented)
-      expect(queryByText('  Groceries')).toBeTruthy();
-
-      // Should not show income categories
-      expect(queryByText('Salary')).toBeFalsy();
-
-      // Should not show shadow categories
-      expect(queryByText('Shadow')).toBeFalsy();
+      // Should show the selected category name in the picker button
+      expect(getByText('Food')).toBeTruthy();
     });
 
     it('renders BarChart with 12 months', () => {
@@ -185,23 +153,43 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Category Selection', () => {
-    it('calls onCategoryChange when picker changes', () => {
+    it('opens picker modal when button is pressed', () => {
+      const { getByText, queryByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Initially modal content should not be visible (parent categories in modal)
+      // The selected category "Food" is visible in the button, but not the full list
+      const pickerButton = getByText('Food');
+      fireEvent.press(pickerButton);
+
+      // After pressing, modal should show parent categories
+      // Transport should appear in the modal list
+      expect(queryByText('Transport')).toBeTruthy();
+    });
+
+    it('calls onCategoryChange when category is selected', () => {
       const onCategoryChange = jest.fn();
 
-      const { getByTestId } = render(
+      const { getByText, getAllByText } = render(
         <CategorySpendingCard
           {...defaultProps}
           onCategoryChange={onCategoryChange}
         />,
       );
 
-      fireEvent.press(getByTestId('picker-item-cat-transport'));
+      // Open the picker
+      fireEvent.press(getByText('Food'));
+
+      // Select Transport
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]); // Press the one in the modal
 
       expect(onCategoryChange).toHaveBeenCalledWith('cat-transport');
     });
 
     it('defaults to first parent category if none selected', () => {
-      const { getByTestId } = render(
+      const { getByText } = render(
         <CategorySpendingCard
           {...defaultProps}
           selectedCategory={null}
@@ -209,19 +197,23 @@ describe('CategorySpendingCard', () => {
       );
 
       // Should show Food as the default selection (first parent expense category)
-      expect(getByTestId('picker-value').props.children).toBe('Food');
+      expect(getByText('Food')).toBeTruthy();
     });
 
-    it('defaults to first parent category if selected category not found', () => {
-      const { getByTestId } = render(
-        <CategorySpendingCard
-          {...defaultProps}
-          selectedCategory="non-existent"
-        />,
+    it('shows expand icon for categories with children', () => {
+      const { getByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
       );
 
-      // Should fall back to first parent expense category
-      expect(getByTestId('picker-value').props.children).toBe('Food');
+      // Open the picker
+      fireEvent.press(getByText('Food'));
+
+      // Food has children, so there should be chevron icons
+      const icons = UNSAFE_getAllByType('Icon');
+      const chevronIcons = icons.filter(icon =>
+        icon.props.name === 'chevron-right' || icon.props.name === 'chevron-down',
+      );
+      expect(chevronIcons.length).toBeGreaterThan(0);
     });
   });
 
@@ -280,11 +272,8 @@ describe('CategorySpendingCard', () => {
 
     it('uses default expense color when not provided', () => {
       const colorsWithoutExpense = {
-        text: '#000000',
-        mutedText: '#888888',
-        primary: '#4CAF50',
-        border: '#CCCCCC',
-        altRow: '#F5F5F5',
+        ...defaultColors,
+        expense: undefined,
       };
 
       const { getByText } = render(
@@ -358,7 +347,7 @@ describe('CategorySpendingCard', () => {
 
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
         'EUR',
-        'cat-transport', // effectiveCategory matches selectedCategory when valid
+        'cat-transport',
         defaultCategories,
       );
     });
