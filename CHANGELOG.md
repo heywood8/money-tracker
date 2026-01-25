@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.33.1](https://github.com/heywood8/money-tracker/compare/penny-v0.33.0...penny-v0.33.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* added ability to choose subcategory as well ([b2e6242](https://github.com/heywood8/money-tracker/commit/b2e62429b783a3ea6c9b51a5b9d13cad4e78b747))
+* months namings on monthly spending by category ([0d96f65](https://github.com/heywood8/money-tracker/commit/0d96f65738556b4e113cb221aa9f21a4c6fc0027))
+* spending trend by month was only visible if the full year was selected ([291d2d9](https://github.com/heywood8/money-tracker/commit/291d2d998e64f02147ee1572e9821d0b6f9b6ac3))
+* splitted operation did not get updated amount on modal ([5818a5a](https://github.com/heywood8/money-tracker/commit/5818a5a89cffc4741dd2ff4e7cdbb5fc24c2cd67))
+* switch to last 12 months for spending by category trend ([ae21a0c](https://github.com/heywood8/money-tracker/commit/ae21a0cbc8d3fd3c3134984cf186ac19847b936f))
+* tests ([e511236](https://github.com/heywood8/money-tracker/commit/e511236d2a765fbd04a00ef3d5b245e62f760747))
+
 ## [0.33.0](https://github.com/heywood8/money-tracker/compare/penny-v0.32.0...penny-v0.33.0) (2026-01-24)
 
 
