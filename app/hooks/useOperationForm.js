@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Keyboard } from 'react-native';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
@@ -38,6 +38,11 @@ const useOperationForm = ({
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [lastEditedField, setLastEditedField] = useState(null);
+
+  // Track if form has been modified to prevent re-initialization from overwriting changes
+  // This is needed because split operations trigger context updates (reloadAccounts)
+  // which would cause the initialization useEffect to re-run with stale operation data
+  const formModifiedRef = useRef(false);
 
   // Check if operation belongs to a shadow category
   const isShadowOperation = useMemo(() => {
@@ -149,7 +154,17 @@ const useOperationForm = ({
 
   // Initialize form values when modal opens
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      // Reset the modified flag when modal closes so next open will initialize properly
+      formModifiedRef.current = false;
+      return;
+    }
+
+    // Skip re-initialization if form has been modified (e.g., after a split operation)
+    // This prevents context updates (reloadAccounts) from overwriting user changes
+    if (formModifiedRef.current) {
+      return;
+    }
 
     let cancelled = false;
     async function setDefaultAccount() {
@@ -375,7 +390,24 @@ const useOperationForm = ({
     }
 
     try {
-      // Create new operation with split amount
+      // Calculate new amount for original operation
+      const newAmount = String(numOriginalAmount - numSplitAmount);
+
+      // Mark form as modified BEFORE context operations run
+      // This prevents the initialization useEffect from re-running and
+      // overwriting our changes when reloadAccounts triggers a re-render
+      formModifiedRef.current = true;
+
+      // 1. FIRST update original operation in database (reduces amount)
+      // This must happen before addOperation, because addOperation calls
+      // loadInitialOperations() which would reload the old amount otherwise
+      await updateOperation(operation.id, {
+        ...values,
+        amount: newAmount,
+      });
+
+      // 2. THEN create new operation with split amount
+      // When addOperation reloads operations, the original will already have reduced amount
       const newOperation = {
         type: values.type,
         amount: String(numSplitAmount),
@@ -384,20 +416,10 @@ const useOperationForm = ({
         date: values.date,
         description: values.description || null,
       };
-
       await addOperation(newOperation);
 
-      // Calculate new amount for original operation
-      const newAmount = String(numOriginalAmount - numSplitAmount);
-
-      // Update local state with reduced amount
+      // 3. Update local form state AFTER both DB operations succeed
       setValues(v => ({ ...v, amount: newAmount }));
-
-      // Update original operation in database
-      await updateOperation(operation.id, {
-        ...values,
-        amount: newAmount,
-      });
 
       return { success: true, newAmount };
     } catch (error) {
