@@ -25,8 +25,6 @@ const formatYLabel = (value) => {
   return numValue.toFixed(0);
 };
 
-// Single-letter month abbreviations
-const monthAbbreviations = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 const CategorySpendingCard = ({
   colors,
@@ -68,7 +66,10 @@ const CategorySpendingCard = ({
     totalYearlySpending,
   } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
 
-  // Generate month labels based on the data (shows abbreviated month)
+  // Two-letter month abbreviations
+  const monthAbbreviations = ['Ja', 'Fe', 'Mr', 'Ap', 'My', 'Jn', 'Jl', 'Au', 'Se', 'Oc', 'No', 'De'];
+
+  // Generate month labels
   const monthLabels = useMemo(() => {
     return monthlyData.map(item => monthAbbreviations[item.month]);
   }, [monthlyData]);
@@ -128,7 +129,7 @@ const CategorySpendingCard = ({
           <View style={styles.chartContainer}>
             <BarChart
               data={chartData}
-              width={screenWidth - 64}
+              width={screenWidth - 50}
               height={220}
               yAxisLabel=""
               yAxisSuffix=""
@@ -147,6 +148,9 @@ const CategorySpendingCard = ({
                 barPercentage: 0.6,
                 style: {
                   borderRadius: 16,
+                },
+                propsForLabels: {
+                  fontSize: 11,
                 },
                 propsForBackgroundLines: {
                   strokeWidth: 1,
