@@ -106,7 +106,7 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Rendering', () => {
-    it('renders category picker with parent expense categories', () => {
+    it('renders category picker with all expense categories', () => {
       const { getAllByText, queryByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
@@ -115,8 +115,8 @@ describe('CategorySpendingCard', () => {
       expect(getAllByText('Food').length).toBeGreaterThan(0);
       expect(getAllByText('Transport').length).toBeGreaterThan(0);
 
-      // Should not show child categories
-      expect(queryByText('Groceries')).toBeFalsy();
+      // Should show child categories (indented)
+      expect(queryByText('  Groceries')).toBeTruthy();
 
       // Should not show income categories
       expect(queryByText('Salary')).toBeFalsy();
