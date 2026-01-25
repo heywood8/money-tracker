@@ -25,10 +25,12 @@ const formatYLabel = (value) => {
   return numValue.toFixed(0);
 };
 
+// Single-letter month abbreviations
+const monthAbbreviations = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
 const CategorySpendingCard = ({
   colors,
   t,
-  selectedYear,
   selectedCurrency,
   selectedCategory,
   onCategoryChange,
@@ -59,21 +61,17 @@ const CategorySpendingCard = ({
     return parentExpenseCategories.length > 0 ? parentExpenseCategories[0].id : null;
   }, [selectedCategory, parentExpenseCategories]);
 
-  // Get the selected category name for the title
-  const selectedCategoryName = useMemo(() => {
-    const cat = parentExpenseCategories.find(c => c.id === effectiveCategory);
-    return cat ? cat.name : '';
-  }, [parentExpenseCategories, effectiveCategory]);
-
-  // Use the hook to get monthly spending data
+  // Use the hook to get monthly spending data (last 12 months)
   const {
     monthlyData,
     loading,
     totalYearlySpending,
-  } = useCategoryMonthlySpending(selectedYear, selectedCurrency, effectiveCategory, categories);
+  } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
 
-  // Month abbreviations (1 character each)
-  const monthLabels = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+  // Generate month labels based on the data (shows abbreviated month)
+  const monthLabels = useMemo(() => {
+    return monthlyData.map(item => monthAbbreviations[item.month]);
+  }, [monthlyData]);
 
   // Prepare chart data
   const chartData = useMemo(() => {
@@ -160,10 +158,10 @@ const CategorySpendingCard = ({
             />
           </View>
 
-          {/* Yearly Total */}
+          {/* 12-Month Total */}
           <View style={styles.totalContainer}>
             <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
-              {t('yearly_total')}
+              {t('last_12_months_total')}
             </Text>
             <Text style={[styles.totalValue, { color: colors.expense || '#ff4444' }]}>
               {formatCurrency(totalYearlySpending, selectedCurrency)}
@@ -178,7 +176,6 @@ const CategorySpendingCard = ({
 CategorySpendingCard.propTypes = {
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
-  selectedYear: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
   selectedCategory: PropTypes.string,
   onCategoryChange: PropTypes.func.isRequired,

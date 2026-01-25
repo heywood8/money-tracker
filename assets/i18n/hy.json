@@ -298,9 +298,9 @@
   "no_balance_history": "Այս ամսվա համար մնացորդի պատմություն չկա",
   "balance_history_details": "Մնացորդի պատմության մանրամասներ",
   "actions": "Գործողություններ",
-  "split": "Բադdelays delay delays",
-  "split_transaction": "Բdelays delay delays delays delays delay",
-  "split_amount": "Բaddelays delay delays delays delays delays",
-  "split_amount_error": "Գdelays delay delays delays delay պdelays delay delays delays delay delays delay delays delay պdelays delay delays delays delay delays delay delays delay սdelays delay delays delays delay delays delay delays delay",
-  "split_success": "Գdelays delay delays delays delays delay հdelays delay delays delays delays delay delays delay delays delay բdelays delay delays delays delays delay delays delay delays delay"
+  "split": "Պառակտում",
+  "split_transaction": "Գործարքի բաժանում",
+  "split_amount": "Բաժին գումար",
+  "split_amount_error": "Գումարի սխալ բաժանում",
+  "split_success": "Գործարքը հաջողությամբ բաժանվեց"
 }

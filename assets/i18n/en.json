@@ -300,6 +300,7 @@
   "actions": "Actions",
   "category_spending_trend": "Spending Trend",
   "yearly_total": "Yearly Total",
+  "last_12_months_total": "Last 12 Months",
   "no_spending_data": "No spending data for this category",
   "split": "Split",
   "split_transaction": "Split Transaction",

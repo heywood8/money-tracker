@@ -298,6 +298,7 @@
   "actions": "Действия",
   "category_spending_trend": "Тренд расходов",
   "yearly_total": "Итого за год",
+  "last_12_months_total": "За последние 12 месяцев",
   "no_spending_data": "Нет данных о расходах в этой категории",
   "split": "Разделить",
   "split_transaction": "Разделить операцию",

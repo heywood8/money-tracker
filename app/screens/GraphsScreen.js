@@ -404,17 +404,6 @@ const GraphsScreen = () => {
             selectedCurrency={selectedCurrency}
           />
 
-          {/* Category Spending Trend Card */}
-          <CategorySpendingCard
-            colors={colors}
-            t={t}
-            selectedYear={selectedYear}
-            selectedCurrency={selectedCurrency}
-            selectedCategory={selectedCategoryForTrend}
-            onCategoryChange={setSelectedCategoryForTrend}
-            categories={categories}
-          />
-
           {/* Expenses Summary Card */}
           <ExpenseSummaryCard
             colors={colors}
@@ -435,6 +424,16 @@ const GraphsScreen = () => {
             selectedCurrency={selectedCurrency}
             incomeChartData={incomeChartData}
             onPress={openIncomeModal}
+          />
+
+          {/* Category Spending Trend Card - Last 12 Months */}
+          <CategorySpendingCard
+            colors={colors}
+            t={t}
+            selectedCurrency={selectedCurrency}
+            selectedCategory={selectedCategoryForTrend}
+            onCategoryChange={setSelectedCategoryForTrend}
+            categories={categories}
           />
         </View>
       </ScrollView>
