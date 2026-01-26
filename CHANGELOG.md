@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.34.0](https://github.com/heywood8/money-tracker/compare/penny-v0.33.1...penny-v0.34.0) (2026-01-26)
+
+
+### Features
+
+* collapsible category picker with single-expand behavior ([39dd794](https://github.com/heywood8/money-tracker/commit/39dd7949b73b11f3be24af7247ae744ca177bd76))
+
+
+### Bug Fixes
+
+* change CategorySpendingCard from barchart to linechart ([79079d5](https://github.com/heywood8/money-tracker/commit/79079d549c00f2d10c2e59486cd98d03490a9bf9))
+
 ## [0.33.1](https://github.com/heywood8/money-tracker/compare/penny-v0.33.0...penny-v0.33.1) (2026-01-25)
 
 
