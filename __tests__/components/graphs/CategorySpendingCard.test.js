@@ -20,7 +20,7 @@ jest.mock('../../../assets/currencies.json', () => ({
 
 // Mock react-native-chart-kit
 jest.mock('react-native-chart-kit', () => ({
-  BarChart: 'BarChart',
+  LineChart: 'LineChart',
 }));
 
 describe('CategorySpendingCard', () => {
@@ -93,12 +93,12 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('renders BarChart with 12 months', () => {
+    it('renders LineChart with 12 months', () => {
       const { UNSAFE_getByType } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const barChart = UNSAFE_getByType('BarChart');
+      const barChart = UNSAFE_getByType('LineChart');
       expect(barChart).toBeTruthy();
       expect(barChart.props.data.labels).toHaveLength(12);
     });
@@ -134,8 +134,8 @@ describe('CategorySpendingCard', () => {
       );
 
       expect(getByText('no_spending_data')).toBeTruthy();
-      // Should not render BarChart
-      expect(UNSAFE_queryByType('BarChart')).toBeFalsy();
+      // Should not render LineChart
+      expect(UNSAFE_queryByType('LineChart')).toBeFalsy();
     });
 
     it('renders null when no parent expense categories', () => {
@@ -344,12 +344,12 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Chart Configuration', () => {
-    it('passes correct data to BarChart', () => {
+    it('passes correct data to LineChart', () => {
       const { UNSAFE_getByType } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const barChart = UNSAFE_getByType('BarChart');
+      const barChart = UNSAFE_getByType('LineChart');
 
       expect(barChart.props.data.datasets[0].data).toEqual(
         defaultMonthlyData.map(item => item.total),
@@ -361,7 +361,7 @@ describe('CategorySpendingCard', () => {
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const barChart = UNSAFE_getByType('BarChart');
+      const barChart = UNSAFE_getByType('LineChart');
 
       expect(barChart.props.height).toBe(220);
       expect(barChart.props.fromZero).toBe(true);

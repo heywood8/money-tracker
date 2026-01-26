@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import { BarChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
@@ -239,16 +239,14 @@ const CategorySpendingCard = ({
       ) : (
         <>
           <View style={styles.chartContainer}>
-            <BarChart
+            <LineChart
               data={chartData}
               width={screenWidth - 50}
               height={220}
               yAxisLabel=""
               yAxisSuffix=""
               fromZero={true}
-              showValuesOnTopOfBars={false}
               withInnerLines={true}
-              flatColor={true}
               formatYLabel={formatYLabel}
               chartConfig={{
                 backgroundColor: colors.altRow,
@@ -257,7 +255,6 @@ const CategorySpendingCard = ({
                 decimalPlaces: 0,
                 color: () => colors.primary,
                 labelColor: () => colors.mutedText,
-                barPercentage: 0.6,
                 style: {
                   borderRadius: 16,
                 },
@@ -269,7 +266,13 @@ const CategorySpendingCard = ({
                   stroke: colors.border,
                   strokeDasharray: '0',
                 },
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: colors.primary,
+                },
               }}
+              bezier
               style={styles.chart}
             />
           </View>
