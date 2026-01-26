@@ -215,6 +215,57 @@ describe('CategorySpendingCard', () => {
       );
       expect(chevronIcons.length).toBeGreaterThan(0);
     });
+
+    it('collapses previous parent when expanding another one', () => {
+      // Categories with two parents that have children
+      const categoriesWithTwoParents = [
+        { id: 'cat-food', name: 'Food', parentId: null, categoryType: 'expense', isShadow: false },
+        { id: 'cat-groceries', name: 'Groceries', parentId: 'cat-food', categoryType: 'expense', isShadow: false },
+        { id: 'cat-transport', name: 'Transport', parentId: null, categoryType: 'expense', isShadow: false },
+        { id: 'cat-gas', name: 'Gas', parentId: 'cat-transport', categoryType: 'expense', isShadow: false },
+      ];
+
+      const { getByText, queryByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard
+          {...defaultProps}
+          categories={categoriesWithTwoParents}
+        />,
+      );
+
+      // Open the picker
+      fireEvent.press(getByText('Food'));
+
+      // Find and click the expand chevron for Food
+      const icons = UNSAFE_getAllByType('Icon');
+      const foodChevron = icons.find(icon =>
+        icon.props.name === 'chevron-right' &&
+        icon.parent?.parent?.props?.style?.[0]?.flexDirection === 'row',
+      );
+
+      // Click the first chevron-right to expand Food
+      const chevronButtons = icons.filter(icon => icon.props.name === 'chevron-right');
+      if (chevronButtons.length > 0) {
+        // Find the touchable parent of the first chevron
+        fireEvent.press(chevronButtons[0].parent);
+      }
+
+      // Groceries should now be visible (Food is expanded)
+      expect(queryByText('Groceries')).toBeTruthy();
+      // Gas should not be visible (Transport is collapsed)
+      expect(queryByText('Gas')).toBeFalsy();
+
+      // Now expand Transport by clicking its chevron
+      const updatedIcons = UNSAFE_getAllByType('Icon');
+      const transportChevrons = updatedIcons.filter(icon => icon.props.name === 'chevron-right');
+      if (transportChevrons.length > 0) {
+        fireEvent.press(transportChevrons[0].parent);
+      }
+
+      // Gas should now be visible (Transport is expanded)
+      expect(queryByText('Gas')).toBeTruthy();
+      // Groceries should no longer be visible (Food collapsed automatically)
+      expect(queryByText('Groceries')).toBeFalsy();
+    });
   });
 
   describe('Currency Formatting', () => {
