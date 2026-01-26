@@ -74,16 +74,16 @@ const CategorySpendingCard = ({
     return cat ? cat.name : '';
   }, [allExpenseCategories, effectiveCategory]);
 
-  // Toggle parent expansion
+  // Toggle parent expansion (only one can be expanded at a time)
   const toggleParent = useCallback((parentId) => {
     setExpandedParents(prev => {
-      const next = new Set(prev);
-      if (next.has(parentId)) {
-        next.delete(parentId);
+      if (prev.has(parentId)) {
+        // Collapse if already expanded
+        return new Set();
       } else {
-        next.add(parentId);
+        // Expand this one, collapse all others
+        return new Set([parentId]);
       }
-      return next;
     });
   }, []);
 
