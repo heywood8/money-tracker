@@ -8,7 +8,6 @@ import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
-import SpendingPredictionCard from '../components/graphs/SpendingPredictionCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -59,7 +58,7 @@ const GraphsScreen = () => {
     loading,
     loadExpenseData,
     totalExpenses,
-  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t);
+  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, selectedAccount);
 
   const {
     incomeChartData,
@@ -319,6 +318,12 @@ const GraphsScreen = () => {
     };
   }, [chartData, categories, selectedYear, selectedMonth]);
 
+  // Calculate if the selected period is the current month
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+  }, [selectedYear, selectedMonth]);
+
   // Handlers for opening modals
   const openExpenseModal = useCallback(() => {
     setModalType('expense');
@@ -379,16 +384,10 @@ const GraphsScreen = () => {
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               accounts={accounts}
+              spendingPrediction={spendingPrediction}
+              isCurrentMonth={isCurrentMonth}
             />
           )}
-
-          {/* Spending Prediction Card */}
-          <SpendingPredictionCard
-            colors={colors}
-            t={t}
-            spendingPrediction={spendingPrediction}
-            selectedCurrency={selectedCurrency}
-          />
 
           {/* Expenses Summary Card */}
           <ExpenseSummaryCard

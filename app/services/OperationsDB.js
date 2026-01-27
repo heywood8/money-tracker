@@ -674,23 +674,31 @@ export const getIncomeByCategory = async (startDate, endDate) => {
  * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
  * @param {string} startDate - ISO date string
  * @param {string} endDate - ISO date string
+ * @param {string} [accountId] - Optional account ID to filter by specific account
  * @returns {Promise<Array>}
  */
-export const getSpendingByCategoryAndCurrency = async (currency, startDate, endDate) => {
+export const getSpendingByCategoryAndCurrency = async (currency, startDate, endDate, accountId = null) => {
   try {
-    const results = await queryAll(
-      `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
+    let sql = `SELECT o.category_id, SUM(CAST(o.amount AS REAL)) as total
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'expense'
          AND a.currency = ?
          AND o.date >= ?
          AND o.date <= ?
-         AND o.category_id IS NOT NULL
-       GROUP BY o.category_id
-       ORDER BY total DESC`,
-      [currency, startDate, endDate],
-    );
+         AND o.category_id IS NOT NULL`;
+
+    const params = [currency, startDate, endDate];
+
+    // Filter by specific account if provided
+    if (accountId) {
+      sql += ' AND o.account_id = ?';
+      params.push(accountId);
+    }
+
+    sql += ' GROUP BY o.category_id ORDER BY total DESC';
+
+    const results = await queryAll(sql, params);
     return results || [];
   } catch (error) {
     console.error('Failed to get spending by category and currency:', error);
