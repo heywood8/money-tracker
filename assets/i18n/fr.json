@@ -294,6 +294,7 @@
   "actual": "Réel",
   "trend": "Tendance",
   "burndown": "Diminution",
+  "forecast": "Prévision",
   "prev_month": "Mois préc.",
   "no_balance_history": "Aucun historique de solde disponible pour ce mois",
   "balance_history_details": "Détails de l'historique du solde",

@@ -59,7 +59,7 @@ const GraphsScreen = () => {
     loading,
     loadExpenseData,
     totalExpenses,
-  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t);
+  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, selectedAccount);
 
   const {
     incomeChartData,
@@ -319,6 +319,12 @@ const GraphsScreen = () => {
     };
   }, [chartData, categories, selectedYear, selectedMonth]);
 
+  // Calculate if the selected period is the current month
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+  }, [selectedYear, selectedMonth]);
+
   // Handlers for opening modals
   const openExpenseModal = useCallback(() => {
     setModalType('expense');
@@ -379,6 +385,8 @@ const GraphsScreen = () => {
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               accounts={accounts}
+              spendingPrediction={spendingPrediction}
+              isCurrentMonth={isCurrentMonth}
             />
           )}
 
@@ -388,6 +396,8 @@ const GraphsScreen = () => {
             t={t}
             spendingPrediction={spendingPrediction}
             selectedCurrency={selectedCurrency}
+            selectedAccount={selectedAccount}
+            accounts={accounts}
           />
 
           {/* Expenses Summary Card */}

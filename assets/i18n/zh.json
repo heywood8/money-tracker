@@ -294,6 +294,7 @@
   "actual": "实际",
   "trend": "趋势",
   "burndown": "消耗",
+  "forecast": "预测",
   "prev_month": "上月",
   "no_balance_history": "本月没有可用的余额历史",
   "balance_history_details": "余额历史详情",

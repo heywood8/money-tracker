@@ -292,6 +292,7 @@
   "actual": "Фактический",
   "trend": "Тренд",
   "burndown": "Среднее",
+  "forecast": "Прогноз",
   "prev_month": "Пред. месяц",
   "no_balance_history": "Нет истории баланса за этот месяц",
   "balance_history_details": "Детали истории баланса",

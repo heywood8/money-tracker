@@ -37,6 +37,7 @@ const mockT = (key) => {
     balance: 'Balance',
     actual: 'Actual',
     burndown: 'Burndown',
+    forecast: 'Forecast',
     prev_month: 'Prev Month',
     no_balance_history: 'No balance history available for this month',
   };
@@ -331,12 +332,14 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
       expect(lineChart.props.data.labels).toEqual(['1', '5', '10', '15', '20', '25', '28']);
-      expect(lineChart.props.data.datasets).toHaveLength(3); // actual + burndown + prevMonth
+      expect(lineChart.props.data.datasets).toHaveLength(2); // actual + prevMonth (no forecast when not current month)
     });
 
     it('includes actual dataset with correct styling', () => {
@@ -362,7 +365,21 @@ describe('BalanceHistoryCard', () => {
       expect(actualDataset.strokeWidth).toBe(3);
     });
 
-    it('includes burndown dataset', () => {
+    it('includes forecast dataset when isCurrentMonth with spendingPrediction', () => {
+      const mockSpendingPrediction = {
+        dailyAverage: 100,
+        daysInMonth: 31,
+        daysElapsed: 15,
+        currentSpending: 1500,
+        predictedTotal: 3100,
+        predictedRemaining: 1600,
+        percentElapsed: 48,
+      };
+
+      // Mock current date to be mid-month
+      const mockDate = new Date(2024, 0, 16);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
       const { UNSAFE_getByType } = render(
         <BalanceHistoryCard
           colors={mockColors}
@@ -376,13 +393,18 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={mockSpendingPrediction}
         />,
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      const burndownDataset = lineChart.props.data.datasets[1];
-      expect(burndownDataset.data).toEqual([1000, 800]);
-      expect(burndownDataset.withDots).toBe(false);
+      // Should have 3 datasets: actual + forecast + prevMonth
+      expect(lineChart.props.data.datasets).toHaveLength(3);
+      const forecastDataset = lineChart.props.data.datasets[1];
+      expect(forecastDataset.withDots).toBe(false);
+
+      global.Date.mockRestore();
     });
 
     it('includes prevMonth dataset when available', () => {
@@ -399,12 +421,14 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      expect(lineChart.props.data.datasets).toHaveLength(3);
-      const prevMonthDataset = lineChart.props.data.datasets[2];
+      expect(lineChart.props.data.datasets).toHaveLength(2); // actual + prevMonth (no forecast)
+      const prevMonthDataset = lineChart.props.data.datasets[1];
       expect(prevMonthDataset.withDots).toBe(false);
     });
 
@@ -499,6 +523,45 @@ describe('BalanceHistoryCard', () => {
     };
 
     it('displays legend labels', () => {
+      const { getByText, queryByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          onChartPress={jest.fn()}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      expect(getByText('Actual')).toBeTruthy();
+      // Forecast only shows when isCurrentMonth and spendingPrediction are provided
+      expect(queryByText('Forecast')).toBeNull();
+      expect(getByText('Prev Month')).toBeTruthy();
+    });
+
+    it('displays forecast legend when isCurrentMonth with spendingPrediction', () => {
+      const mockSpendingPrediction = {
+        dailyAverage: 100,
+        daysInMonth: 31,
+        daysElapsed: 15,
+        currentSpending: 1500,
+        predictedTotal: 3100,
+        predictedRemaining: 1600,
+        percentElapsed: 48,
+      };
+
+      // Mock current date to be mid-month
+      const mockDate = new Date(2024, 0, 16);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
       const { getByText } = render(
         <BalanceHistoryCard
           colors={mockColors}
@@ -512,12 +575,15 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={mockSpendingPrediction}
         />,
       );
 
       expect(getByText('Actual')).toBeTruthy();
-      expect(getByText('Burndown')).toBeTruthy();
-      expect(getByText('Prev Month')).toBeTruthy();
+      expect(getByText('Forecast')).toBeTruthy();
+
+      global.Date.mockRestore();
     });
 
     it('hides prev month legend when no prev month data', () => {
@@ -539,6 +605,8 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
@@ -563,12 +631,14 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
       // Should show value at day 28 (last day in labels)
       expect(getByText(/1200\.00 USD/)).toBeTruthy(); // actual value
-      expect(getByText(/800\.00 USD/)).toBeTruthy(); // burndown value
+      // Forecast value only shows when isCurrentMonth is true with spendingPrediction
 
       global.Date.mockRestore();
     });
@@ -599,6 +669,8 @@ describe('BalanceHistoryCard', () => {
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
@@ -607,12 +679,12 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('shows dash when value is unavailable', () => {
-      // Provide minimal data to render chart but with gaps
-      const dataWithMissingValues = {
+    it('shows actual value when available', () => {
+      // Provide minimal data to render chart
+      const dataWithValues = {
         labels: [1, 15, 28],
-        actual: [{ x: 1, y: 1000 }], // Only first day has data
-        actualForChart: [1000],
+        actual: [{ x: 1, y: 1000 }, { x: 28, y: 1200 }],
+        actualForChart: [1000, undefined, 1200],
         burndown: [],
         prevMonth: [],
       };
@@ -620,7 +692,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 31);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getAllByText } = render(
+      const { getByText } = render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -628,17 +700,18 @@ describe('BalanceHistoryCard', () => {
           onAccountChange={jest.fn()}
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
-          balanceHistoryData={dataWithMissingValues}
+          balanceHistoryData={dataWithValues}
           onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
         />,
       );
 
-      // Burndown value should be dash since burndown array is empty
-      const dashes = getAllByText('-');
-      expect(dashes.length).toBeGreaterThan(0);
+      // Actual value should be shown
+      expect(getByText(/1200\.00 USD/)).toBeTruthy();
 
       global.Date.mockRestore();
     });

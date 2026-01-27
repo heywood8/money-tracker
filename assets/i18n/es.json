@@ -294,6 +294,7 @@
   "actual": "Real",
   "trend": "Tendencia",
   "burndown": "Reducción",
+  "forecast": "Pronóstico",
   "prev_month": "Mes Ant.",
   "no_balance_history": "No hay historial de saldo disponible para este mes",
   "balance_history_details": "Detalles del historial de saldo",

@@ -58,6 +58,8 @@ const BalanceHistoryCard = ({
   selectedYear,
   selectedMonth,
   accounts,
+  spendingPrediction,
+  isCurrentMonth,
 }) => {
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
@@ -91,12 +93,41 @@ const BalanceHistoryCard = ({
             activeOpacity={0.7}
           >
             {(() => {
+              // Calculate forecast data if we have spending prediction and it's the current month
+              const calculateForecastData = () => {
+                if (!spendingPrediction || !isCurrentMonth) return [];
+                const currentDay = new Date().getDate();
+                // Find the last actual balance point at or before current day
+                const actualPoints = (balanceHistoryData.actual || []).filter(p => p.x <= currentDay);
+                if (actualPoints.length === 0) return [];
+                const lastActualPoint = actualPoints[actualPoints.length - 1];
+
+                const predictions = [];
+                for (let day = currentDay; day <= spendingPrediction.daysInMonth; day++) {
+                  const daysFromNow = day - currentDay;
+                  const predictedBalance = Math.max(0, lastActualPoint.y - (spendingPrediction.dailyAverage * daysFromNow));
+                  predictions.push({ x: day, y: predictedBalance });
+                }
+                return predictions;
+              };
+
+              const forecastData = calculateForecastData();
+              const hasForecast = forecastData.length > 0;
+
+              // Create forecast array aligned with labels (null for days before forecast starts)
+              const forecastForChart = hasForecast
+                ? balanceHistoryData.labels.map(day => {
+                  const point = forecastData.find(p => p.x === day);
+                  return point ? point.y : null;
+                })
+                : [];
+
               // Calculate max value from all datasets to determine Y-axis scale
               const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
-              const burndownValues = balanceHistoryData.burndown.map(p => p.y);
+              const forecastValues = forecastForChart.filter(v => v !== null && v !== undefined);
               const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
 
-              const allValues = [...actualValues, ...burndownValues, ...prevMonthValues];
+              const allValues = [...actualValues, ...forecastValues, ...prevMonthValues];
               const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
               // Calculate nice scale for Y-axis
@@ -115,12 +146,12 @@ const BalanceHistoryCard = ({
                         color: () => colors.primary,
                         strokeWidth: 3,
                       },
-                      {
-                        data: balanceHistoryData.burndown.map(p => p.y),
-                        color: () => 'rgba(255, 99, 132, 0.4)',
+                      ...(hasForecast ? [{
+                        data: forecastForChart.map(v => v ?? null),
+                        color: () => 'rgba(255, 152, 0, 0.7)',
                         strokeWidth: 2,
                         withDots: false,
-                      },
+                      }] : []),
                       ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
                         data: balanceHistoryData.prevMonth.map(v => v ?? null),
                         color: () => 'rgba(156, 39, 176, 0.5)',
@@ -190,8 +221,8 @@ const BalanceHistoryCard = ({
           {/* Legend at bottom with values on the right */}
           {(() => {
             const now = new Date();
-            const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
-            const displayDay = isCurrentMonth
+            const isCurrentMonthLocal = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
+            const displayDay = isCurrentMonthLocal
               ? now.getDate()
               : (balanceHistoryData.labels && balanceHistoryData.labels.length > 0
                 ? balanceHistoryData.labels[balanceHistoryData.labels.length - 1]
@@ -208,24 +239,22 @@ const BalanceHistoryCard = ({
               return undefined;
             };
 
-            const findBurndownAtDay = (day) => {
-              if (!day) return undefined;
-              const point = (balanceHistoryData.burndown || []).find(p => p.x === day);
-              if (point) return point.y;
-              const prior = (balanceHistoryData.burndown || []).filter(p => p.x <= day);
-              if (prior.length > 0) return prior[prior.length - 1].y;
-              return undefined;
-            };
-
             const actualValNum = findActualAtDay(displayDay);
-            const burndownValNum = findBurndownAtDay(displayDay);
             const prevMonthValNum = (balanceHistoryData.prevMonth && displayDay)
               ? balanceHistoryData.prevMonth[displayDay - 1]
               : undefined;
 
             const actualValue = actualValNum !== undefined ? formatCurrency(actualValNum, selectedAccountData?.currency || 'USD') : '-';
-            const burndownValue = burndownValNum !== undefined ? formatCurrency(burndownValNum, selectedAccountData?.currency || 'USD') : '-';
             const prevMonthValue = prevMonthValNum !== undefined ? formatCurrency(prevMonthValNum, selectedAccountData?.currency || 'USD') : '-';
+
+            // Calculate forecast end-of-month value
+            const hasForecastData = spendingPrediction && isCurrentMonth;
+            let forecastValue = '-';
+            if (hasForecastData && actualValNum !== undefined) {
+              const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
+              const predictedEndBalance = Math.max(0, actualValNum - (spendingPrediction.dailyAverage * daysRemaining));
+              forecastValue = formatCurrency(predictedEndBalance, selectedAccountData?.currency || 'USD');
+            }
 
             const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
 
@@ -236,10 +265,12 @@ const BalanceHistoryCard = ({
                     <View style={[styles.burndownLegendDot, { backgroundColor: colors.primary }]} />
                     <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('actual') || 'Actual'}</Text>
                   </View>
-                  <View style={styles.legendRow}>
-                    <View style={[styles.burndownLegendDot, styles.burndownDatasetColor]} />
-                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('burndown') || 'Burndown'}</Text>
-                  </View>
+                  {hasForecastData && (
+                    <View style={styles.legendRow}>
+                      <View style={[styles.burndownLegendDot, styles.forecastDatasetColor]} />
+                      <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('forecast') || 'Forecast'}</Text>
+                    </View>
+                  )}
                   {hasPrevMonthData && (
                     <View style={styles.legendRow}>
                       <View style={[styles.burndownLegendDot, styles.prevMonthDatasetColor]} />
@@ -250,7 +281,9 @@ const BalanceHistoryCard = ({
 
                 <View style={styles.valuesColumn}>
                   <Text style={[styles.todayValueText, { color: colors.text }]}>{actualValue}</Text>
-                  <Text style={[styles.todayValueText, { color: colors.text }]}>{burndownValue}</Text>
+                  {hasForecastData && (
+                    <Text style={[styles.todayValueText, { color: colors.text }]}>{forecastValue}</Text>
+                  )}
                   {hasPrevMonthData && (
                     <Text style={[styles.todayValueText, { color: colors.text }]}>{prevMonthValue}</Text>
                   )}
@@ -288,6 +321,16 @@ BalanceHistoryCard.propTypes = {
   selectedYear: PropTypes.number.isRequired,
   selectedMonth: PropTypes.number,
   accounts: PropTypes.array.isRequired,
+  spendingPrediction: PropTypes.shape({
+    currentSpending: PropTypes.number,
+    predictedTotal: PropTypes.number,
+    predictedRemaining: PropTypes.number,
+    dailyAverage: PropTypes.number,
+    daysElapsed: PropTypes.number,
+    daysInMonth: PropTypes.number,
+    percentElapsed: PropTypes.number,
+  }),
+  isCurrentMonth: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
@@ -335,9 +378,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  burndownDatasetColor: {
-    backgroundColor: 'rgba(255, 99, 132, 0.4)',
-  },
   burndownLegendContainer: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -351,6 +391,9 @@ const styles = StyleSheet.create({
   },
   burndownLegendText: {
     fontSize: 12,
+  },
+  forecastDatasetColor: {
+    backgroundColor: 'rgba(255, 152, 0, 0.7)',
   },
   legendColumn: {
     flexDirection: 'column',

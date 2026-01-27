@@ -10,18 +10,30 @@ const formatCurrency = (amount, currency) => {
   return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
 };
 
-const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrency }) => {
+const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrency, selectedAccount, accounts }) => {
   if (!spendingPrediction) {
     return null;
   }
 
+  // Find the selected account name
+  const selectedAccountData = selectedAccount && accounts
+    ? accounts.find(acc => acc.id === selectedAccount)
+    : null;
+
   return (
     <View style={[styles.predictionCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       <View style={styles.predictionHeader}>
-        <Icon name="chart-line" size={24} color={colors.primary} />
-        <Text style={[styles.predictionTitle, { color: colors.text }]}>
-          {t('spending_prediction')}
-        </Text>
+        <View style={styles.predictionTitleContainer}>
+          <Icon name="chart-line" size={24} color={colors.primary} />
+          <Text style={[styles.predictionTitle, { color: colors.text }]}>
+            {t('spending_prediction')}
+          </Text>
+        </View>
+        {selectedAccountData && (
+          <Text style={[styles.accountName, { color: colors.mutedText }]}>
+            {selectedAccountData.name}
+          </Text>
+        )}
       </View>
 
       {/* Current vs Predicted */}
@@ -78,9 +90,14 @@ SpendingPredictionCard.propTypes = {
     dailyAverage: PropTypes.number,
   }),
   selectedCurrency: PropTypes.string.isRequired,
+  selectedAccount: PropTypes.string,
+  accounts: PropTypes.array,
 };
 
 const styles = StyleSheet.create({
+  accountName: {
+    fontSize: 12,
+  },
   dailyAverageValue: {
     fontWeight: '600',
   },
@@ -96,7 +113,7 @@ const styles = StyleSheet.create({
   predictionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
   predictionProgressBar: {
@@ -135,6 +152,11 @@ const styles = StyleSheet.create({
   predictionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  predictionTitleContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
 });
 
