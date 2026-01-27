@@ -91,6 +91,7 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-01-31',
+        null,
       );
       expect(result.current.chartData.length).toBeGreaterThan(0);
     });
@@ -118,6 +119,7 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-12-31',
+        null,
       );
     });
 

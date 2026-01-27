@@ -294,6 +294,7 @@
   "actual": "实际",
   "trend": "趋势",
   "burndown": "消耗",
+  "forecast": "预测",
   "prev_month": "上月",
   "no_balance_history": "本月没有可用的余额历史",
   "balance_history_details": "余额历史详情",
@@ -306,5 +307,10 @@
   "split_transaction": "拆分交易",
   "split_amount": "拆分金额",
   "split_amount_error": "金额必须小于原始金额",
-  "split_success": "交易拆分成功"
+  "split_success": "交易拆分成功",
+  "plain_avg": "线性平均",
+  "max": "最大",
+  "current": "当前",
+  "end": "期末",
+  "daily_avg": "日均"
 }

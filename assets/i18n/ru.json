@@ -292,6 +292,7 @@
   "actual": "Фактический",
   "trend": "Тренд",
   "burndown": "Среднее",
+  "forecast": "Прогноз",
   "prev_month": "Пред. месяц",
   "no_balance_history": "Нет истории баланса за этот месяц",
   "balance_history_details": "Детали истории баланса",
@@ -304,5 +305,10 @@
   "split_transaction": "Разделить операцию",
   "split_amount": "Сумма разделения",
   "split_amount_error": "Сумма должна быть меньше исходной",
-  "split_success": "Операция успешно разделена"
+  "split_success": "Операция успешно разделена",
+  "plain_avg": "Средний",
+  "max": "Макс.",
+  "current": "Текущий",
+  "end": "Конец",
+  "daily_avg": "Дн. средн."
 }

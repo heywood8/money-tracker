@@ -294,6 +294,7 @@
   "actual": "Tatsächlich",
   "trend": "Trend",
   "burndown": "Abbau",
+  "forecast": "Prognose",
   "prev_month": "Vorh. Monat",
   "no_balance_history": "Keine Saldohistorie für diesen Monat verfügbar",
   "balance_history_details": "Saldohistorie Details",
@@ -306,5 +307,10 @@
   "split_transaction": "Vorgang teilen",
   "split_amount": "Teilungsbetrag",
   "split_amount_error": "Betrag muss kleiner als das Original sein",
-  "split_success": "Vorgang erfolgreich geteilt"
+  "split_success": "Vorgang erfolgreich geteilt",
+  "plain_avg": "Lin. Durchs.",
+  "max": "Max",
+  "current": "Aktuell",
+  "end": "Ende",
+  "daily_avg": "Täglicher Ø"
 }

@@ -6,8 +6,16 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 /**
  * Custom hook for loading and managing expense data for GraphsScreen
  * Handles data aggregation by category, hierarchy navigation, and forecast calculations
+ * @param {number} selectedYear - The selected year
+ * @param {number|null} selectedMonth - The selected month (0-11) or null for full year
+ * @param {string} selectedCurrency - The selected currency code
+ * @param {string} selectedCategory - The selected category ID or 'all'
+ * @param {Array} categories - Array of all categories
+ * @param {Object} colors - Theme colors
+ * @param {Function} t - Translation function
+ * @param {string|null} [selectedAccountId] - Optional account ID to filter expenses by
  */
-const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t) => {
+const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, selectedAccountId = null) => {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,11 +41,12 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
 
-      // Get spending data
+      // Get spending data (optionally filtered by account)
       const spending = await getSpendingByCategoryAndCurrency(
         selectedCurrency,
         startDateStr,
         endDateStr,
+        selectedAccountId,
       );
 
       // Create a map of category ID to category object
@@ -214,7 +223,7 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors.text, t]);
+  }, [selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors.text, t, selectedAccountId]);
 
   // Calculate total expenses
   const totalExpenses = useMemo(() => {
