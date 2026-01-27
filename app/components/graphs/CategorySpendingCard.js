@@ -177,6 +177,7 @@ const CategorySpendingCard = ({
                         <TouchableOpacity
                           style={styles.expandButton}
                           onPress={() => toggleParent(parent.id)}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                         >
                           <Icon
                             name={isExpanded ? 'chevron-down' : 'chevron-right'}
@@ -346,11 +347,12 @@ const styles = StyleSheet.create({
   expandButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    width: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    width: 44,
   },
   expandPlaceholder: {
-    width: 36,
+    width: 44,
   },
   header: {
     alignItems: 'center',
