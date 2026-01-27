@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.0](https://github.com/heywood8/money-tracker/compare/penny-v0.34.2...penny-v0.35.0) (2026-01-27)
+
+
+### Features
+
+* combine year and month pickers into single period picker on GraphsScreen ([047046d](https://github.com/heywood8/money-tracker/commit/047046d8462d762c59c7e25788ecbec89742fd3a))
+
 ## [0.34.2](https://github.com/heywood8/money-tracker/compare/penny-v0.34.1...penny-v0.34.2) (2026-01-27)
 
 
