@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/heywood8/money-tracker/compare/penny-v0.35.0...penny-v0.36.0) (2026-01-27)
+
+
+### Features
+
+* combined balance history and spending prediction graphs ([#255](https://github.com/heywood8/money-tracker/issues/255)) ([91bc928](https://github.com/heywood8/money-tracker/commit/91bc92809f10d7c7bfbd110de11433b909b9ede6))
+
 ## [0.35.0](https://github.com/heywood8/money-tracker/compare/penny-v0.34.2...penny-v0.35.0) (2026-01-27)
 
 
