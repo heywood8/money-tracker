@@ -307,5 +307,10 @@
   "split_transaction": "Vorgang teilen",
   "split_amount": "Teilungsbetrag",
   "split_amount_error": "Betrag muss kleiner als das Original sein",
-  "split_success": "Vorgang erfolgreich geteilt"
+  "split_success": "Vorgang erfolgreich geteilt",
+  "plain_avg": "Lin. Durchs.",
+  "max": "Max",
+  "current": "Aktuell",
+  "end": "Ende",
+  "daily_avg": "Täglicher Ø"
 }

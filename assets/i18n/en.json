@@ -307,5 +307,10 @@
   "split_transaction": "Split Transaction",
   "split_amount": "Split Amount",
   "split_amount_error": "Amount must be less than the original",
-  "split_success": "Transaction split successfully"
+  "split_success": "Transaction split successfully",
+  "plain_avg": "Plain avg",
+  "max": "Max",
+  "current": "Current",
+  "end": "End",
+  "daily_avg": "Daily Avg"
 }

@@ -14,6 +14,24 @@ const formatCurrency = (amount, currency) => {
   return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
 };
 
+// Helper to format numbers compactly (e.g., 10K, 1.5M)
+const formatCompact = (value, currency) => {
+  if (value === null || value === undefined) return '-';
+  const currencyInfo = currencies[currency];
+  const decimals = currencyInfo?.decimal_digits ?? 2;
+
+  const absValue = Math.abs(value);
+  let formatted;
+  if (absValue >= 1000000) {
+    formatted = (value / 1000000).toFixed(1) + 'M';
+  } else if (absValue >= 1000) {
+    formatted = (value / 1000).toFixed(1) + 'K';
+  } else {
+    formatted = value.toFixed(Math.min(decimals, 2));
+  }
+  return formatted;
+};
+
 // Helper function to calculate nice Y-axis scale
 // Returns max value and interval for 4 evenly spaced segments
 const calculateNiceScale = (maxValue) => {
@@ -44,6 +62,16 @@ const calculateNiceScale = (maxValue) => {
   const niceMax = niceInterval * 4;
 
   return { max: niceMax, interval: niceInterval };
+};
+
+// Helper to convert hex color to rgba
+const hexToRgba = (hex, alpha) => {
+  // Remove # if present
+  const cleanHex = hex.replace('#', '');
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 const BalanceHistoryCard = ({
@@ -122,12 +150,21 @@ const BalanceHistoryCard = ({
                 })
                 : [];
 
-              // Calculate max value from all datasets to determine Y-axis scale
+              // Calculate max balance from actual values (for plain avg line)
               const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
+              const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
+
+              // Calculate plain avg line (linear from max balance to 0)
+              const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
+              const plainAvgData = balanceHistoryData.labels.map(day =>
+                maxBalance * (1 - (day - 1) / (daysInMonth - 1)),
+              );
+
+              // Calculate max value from all datasets to determine Y-axis scale
               const forecastValues = forecastForChart.filter(v => v !== null && v !== undefined);
               const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
 
-              const allValues = [...actualValues, ...forecastValues, ...prevMonthValues];
+              const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
               const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
               // Calculate nice scale for Y-axis
@@ -135,6 +172,9 @@ const BalanceHistoryCard = ({
 
               // Get last day for X-axis labels
               const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
+
+              // Forecast line color: 20% opacity of primary
+              const forecastColor = hexToRgba(colors.primary, 0.2);
 
               return (
                 <LineChart
@@ -146,9 +186,16 @@ const BalanceHistoryCard = ({
                         color: () => colors.primary,
                         strokeWidth: 3,
                       },
+                      // Plain avg line (always shown)
+                      {
+                        data: plainAvgData,
+                        color: () => 'rgba(128, 128, 128, 0.4)',
+                        strokeWidth: 2,
+                        withDots: false,
+                      },
                       ...(hasForecast ? [{
                         data: forecastForChart.map(v => v ?? null),
-                        color: () => 'rgba(255, 152, 0, 0.7)',
+                        color: () => forecastColor,
                         strokeWidth: 2,
                         withDots: false,
                       }] : []),
@@ -218,7 +265,27 @@ const BalanceHistoryCard = ({
             })()}
           </TouchableOpacity>
 
-          {/* Legend at bottom with values on the right */}
+          {/* Progress Bar (days elapsed) - only for current month with prediction */}
+          {spendingPrediction && isCurrentMonth && (
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.progressText, { color: colors.mutedText }]}>
+                {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {(t('days_elapsed') || 'days elapsed').toLowerCase()}
+              </Text>
+            </View>
+          )}
+
+          {/* Compact Table Legend */}
           {(() => {
             const now = new Date();
             const isCurrentMonthLocal = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
@@ -229,6 +296,11 @@ const BalanceHistoryCard = ({
                 : null);
 
             const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
+            const currency = selectedAccountData?.currency || 'USD';
+
+            // Calculate values for each line
+            const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
+            const maxBalance = actualValues.length > 0 ? Math.max(...actualValues) : 0;
 
             const findActualAtDay = (day) => {
               if (!day) return undefined;
@@ -239,55 +311,118 @@ const BalanceHistoryCard = ({
               return undefined;
             };
 
-            const actualValNum = findActualAtDay(displayDay);
-            const prevMonthValNum = (balanceHistoryData.prevMonth && displayDay)
-              ? balanceHistoryData.prevMonth[displayDay - 1]
-              : undefined;
+            const daysInMonth = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
 
-            const actualValue = actualValNum !== undefined ? formatCurrency(actualValNum, selectedAccountData?.currency || 'USD') : '-';
-            const prevMonthValue = prevMonthValNum !== undefined ? formatCurrency(prevMonthValNum, selectedAccountData?.currency || 'USD') : '-';
-
-            // Calculate forecast end-of-month value
-            const hasForecastData = spendingPrediction && isCurrentMonth;
-            let forecastValue = '-';
-            if (hasForecastData && actualValNum !== undefined) {
-              const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
-              const predictedEndBalance = Math.max(0, actualValNum - (spendingPrediction.dailyAverage * daysRemaining));
-              forecastValue = formatCurrency(predictedEndBalance, selectedAccountData?.currency || 'USD');
+            // Actual row values
+            const actualCurrent = findActualAtDay(displayDay);
+            const actualEnd = findActualAtDay(daysInMonth);
+            // Calculate actual daily avg from spending prediction or from data
+            let actualDailyAvg = null;
+            if (spendingPrediction && isCurrentMonth) {
+              actualDailyAvg = -spendingPrediction.dailyAverage;
+            } else if (actualValues.length > 1) {
+              // For past months, calculate from start to end
+              const startBalance = actualValues[0];
+              const endBalance = actualValues[actualValues.length - 1];
+              actualDailyAvg = (endBalance - startBalance) / (daysInMonth - 1);
             }
 
+            // Plain avg row values
+            const plainAvgDaily = daysInMonth > 1 ? -maxBalance / (daysInMonth - 1) : 0;
+            const plainAvgCurrent = displayDay ? maxBalance * (1 - (displayDay - 1) / (daysInMonth - 1)) : null;
+            // Plain avg end is always 0
+
+            // Forecast row values (only for current month)
+            let forecastEnd = null;
+            let forecastDailyAvg = null;
+            const hasForecastData = spendingPrediction && isCurrentMonth;
+            if (hasForecastData && actualCurrent !== undefined) {
+              const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
+              forecastEnd = Math.max(0, actualCurrent - (spendingPrediction.dailyAverage * daysRemaining));
+              forecastDailyAvg = -spendingPrediction.dailyAverage;
+            }
+
+            // Prev month row values
             const hasPrevMonthData = balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined);
+            let prevMonthMax = null;
+            let prevMonthCurrent = null;
+            let prevMonthEnd = null;
+            if (hasPrevMonthData) {
+              const prevMonthActualValues = balanceHistoryData.prevMonth.filter(v => v !== undefined);
+              prevMonthMax = prevMonthActualValues.length > 0 ? Math.max(...prevMonthActualValues) : null;
+              prevMonthCurrent = displayDay && balanceHistoryData.prevMonth[displayDay - 1] !== undefined
+                ? balanceHistoryData.prevMonth[displayDay - 1]
+                : null;
+              prevMonthEnd = balanceHistoryData.prevMonth[daysInMonth - 1] !== undefined
+                ? balanceHistoryData.prevMonth[daysInMonth - 1]
+                : null;
+            }
+
+            // Forecast line color: 20% opacity of primary
+            const forecastColor = hexToRgba(colors.primary, 0.2);
 
             return (
-              <View style={styles.burndownLegendContainer}>
-                <View style={styles.legendColumn}>
-                  <View style={styles.legendRow}>
-                    <View style={[styles.burndownLegendDot, { backgroundColor: colors.primary }]} />
-                    <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('actual') || 'Actual'}</Text>
-                  </View>
-                  {hasForecastData && (
-                    <View style={styles.legendRow}>
-                      <View style={[styles.burndownLegendDot, styles.forecastDatasetColor]} />
-                      <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('forecast') || 'Forecast'}</Text>
-                    </View>
-                  )}
-                  {hasPrevMonthData && (
-                    <View style={styles.legendRow}>
-                      <View style={[styles.burndownLegendDot, styles.prevMonthDatasetColor]} />
-                      <Text style={[styles.burndownLegendText, { color: colors.text }]}>{t('prev_month') || 'Prev Month'}</Text>
-                    </View>
-                  )}
+              <View style={styles.legendTableContainer}>
+                {/* Header row */}
+                <View style={styles.legendTableRow}>
+                  <View style={styles.legendTableLabelCell} />
+                  <Text style={[styles.legendTableHeader, { color: colors.mutedText }]}>{t('max') || 'Max'}</Text>
+                  <Text style={[styles.legendTableHeader, { color: colors.mutedText }]}>{t('current') || 'Current'}</Text>
+                  <Text style={[styles.legendTableHeader, { color: colors.mutedText }]}>{t('daily_avg') || 'Daily Avg'}</Text>
+                  <Text style={[styles.legendTableHeader, { color: colors.mutedText }]}>{t('end') || 'End'}</Text>
                 </View>
 
-                <View style={styles.valuesColumn}>
-                  <Text style={[styles.todayValueText, { color: colors.text }]}>{actualValue}</Text>
-                  {hasForecastData && (
-                    <Text style={[styles.todayValueText, { color: colors.text }]}>{forecastValue}</Text>
-                  )}
-                  {hasPrevMonthData && (
-                    <Text style={[styles.todayValueText, { color: colors.text }]}>{prevMonthValue}</Text>
-                  )}
+                {/* Actual row */}
+                <View style={styles.legendTableRow}>
+                  <View style={styles.legendTableLabelCell}>
+                    <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+                    <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('actual') || 'Actual'}</Text>
+                  </View>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(maxBalance, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualCurrent, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualDailyAvg, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualEnd, currency)}</Text>
                 </View>
+
+                {/* Plain avg row */}
+                <View style={styles.legendTableRow}>
+                  <View style={styles.legendTableLabelCell}>
+                    <View style={[styles.legendDot, styles.legendDotPlainAvg]} />
+                    <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('plain_avg') || 'Plain avg'}</Text>
+                  </View>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(maxBalance, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(plainAvgCurrent, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(plainAvgDaily, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>0</Text>
+                </View>
+
+                {/* Forecast row (only for current month) */}
+                {hasForecastData && (
+                  <View style={styles.legendTableRow}>
+                    <View style={styles.legendTableLabelCell}>
+                      <View style={[styles.legendDot, { backgroundColor: forecastColor }]} />
+                      <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('forecast') || 'Forecast'}</Text>
+                    </View>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>-</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualCurrent, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(forecastDailyAvg, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(forecastEnd, currency)}</Text>
+                  </View>
+                )}
+
+                {/* Prev month row */}
+                {hasPrevMonthData && (
+                  <View style={styles.legendTableRow}>
+                    <View style={styles.legendTableLabelCell}>
+                      <View style={[styles.legendDot, styles.legendDotPrevMonth]} />
+                      <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('prev_month') || 'Prev Month'}</Text>
+                    </View>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthMax, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthCurrent, currency)}</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>-</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthEnd, currency)}</Text>
+                  </View>
+                )}
               </View>
             );
           })()}
@@ -378,48 +513,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  burndownLegendContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  burndownLegendDot: {
+  legendDot: {
     borderRadius: 5,
     height: 10,
+    marginRight: 6,
     width: 10,
   },
-  burndownLegendText: {
-    fontSize: 12,
+  legendDotPlainAvg: {
+    backgroundColor: 'rgba(128, 128, 128, 0.4)',
   },
-  forecastDatasetColor: {
-    backgroundColor: 'rgba(255, 152, 0, 0.7)',
+  legendDotPrevMonth: {
+    backgroundColor: 'rgba(156, 39, 176, 0.5)',
   },
-  legendColumn: {
-    flexDirection: 'column',
-    gap: 12,
-    justifyContent: 'flex-start',
+  legendTableContainer: {
+    marginTop: 16,
   },
-  legendRow: {
+  legendTableHeader: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  legendTableLabel: {
+    fontSize: 11,
+  },
+  legendTableLabelCell: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    width: 80,
+  },
+  legendTableRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingVertical: 4,
+  },
+  legendTableValue: {
+    flex: 1,
+    fontSize: 11,
+    textAlign: 'right',
   },
   lineChartStyle: {
     borderRadius: 8,
   },
-  prevMonthDatasetColor: {
-    backgroundColor: 'rgba(156, 39, 176, 0.5)',
+  progressBar: {
+    borderRadius: 4,
+    height: 6,
   },
-  todayValueText: {
-    fontSize: 12,
-    fontWeight: '600',
+  progressContainer: {
+    marginTop: 12,
   },
-  valuesColumn: {
-    alignItems: 'flex-end',
-    flexDirection: 'column',
-    gap: 12,
-    minWidth: 120,
+  progressText: {
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  progressTrack: {
+    borderRadius: 4,
+    height: 6,
   },
 });
 

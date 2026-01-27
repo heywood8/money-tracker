@@ -67,5 +67,10 @@
   "split_transaction": "Dividi transazione",
   "split_amount": "Importo da dividere",
   "split_amount_error": "L'importo deve essere inferiore all'originale",
-  "split_success": "Transazione divisa con successo"
+  "split_success": "Transazione divisa con successo",
+  "plain_avg": "Media lin.",
+  "max": "Max",
+  "current": "Attuale",
+  "end": "Fine",
+  "daily_avg": "Media giorn."
 }

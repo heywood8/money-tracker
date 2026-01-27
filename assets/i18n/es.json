@@ -307,5 +307,10 @@
   "split_transaction": "Dividir transaccion",
   "split_amount": "Cantidad a dividir",
   "split_amount_error": "La cantidad debe ser menor que la original",
-  "split_success": "Transaccion dividida con exito"
+  "split_success": "Transaccion dividida con exito",
+  "plain_avg": "Prom. lineal",
+  "max": "Máx",
+  "current": "Actual",
+  "end": "Fin",
+  "daily_avg": "Prom. diario"
 }

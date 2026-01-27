@@ -307,5 +307,10 @@
   "split_transaction": "Diviser la transaction",
   "split_amount": "Montant a diviser",
   "split_amount_error": "Le montant doit etre inferieur a l'original",
-  "split_success": "Transaction divisee avec succes"
+  "split_success": "Transaction divisee avec succes",
+  "plain_avg": "Moy. linéaire",
+  "max": "Max",
+  "current": "Actuel",
+  "end": "Fin",
+  "daily_avg": "Moy. quotid."
 }

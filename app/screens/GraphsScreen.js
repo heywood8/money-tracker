@@ -8,7 +8,6 @@ import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
-import SpendingPredictionCard from '../components/graphs/SpendingPredictionCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
@@ -389,16 +388,6 @@ const GraphsScreen = () => {
               isCurrentMonth={isCurrentMonth}
             />
           )}
-
-          {/* Spending Prediction Card */}
-          <SpendingPredictionCard
-            colors={colors}
-            t={t}
-            spendingPrediction={spendingPrediction}
-            selectedCurrency={selectedCurrency}
-            selectedAccount={selectedAccount}
-            accounts={accounts}
-          />
 
           {/* Expenses Summary Card */}
           <ExpenseSummaryCard
