@@ -298,17 +298,10 @@ describe('GraphsScreen', () => {
       expect(() => render(<GraphsScreen />)).not.toThrow();
     });
 
-    it('handles month selection', () => {
+    it('handles period selection with combined picker', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
-      // Component should allow month selection
-      expect(() => render(<GraphsScreen />)).not.toThrow();
-    });
-
-    it('handles year selection', () => {
-      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-
-      // Component should allow year selection
+      // Component should allow combined month+year selection
       expect(() => render(<GraphsScreen />)).not.toThrow();
     });
 
@@ -325,6 +318,142 @@ describe('GraphsScreen', () => {
       getAvailableMonths.mockResolvedValue(mockMonths);
 
       expect(() => render(<GraphsScreen />)).not.toThrow();
+    });
+
+    it('handles multi-year available months data', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getAvailableMonths } = require('../../app/services/OperationsDB');
+
+      const mockMonths = [
+        { year: 2025, month: 0 },
+        { year: 2024, month: 11 },
+        { year: 2024, month: 10 },
+      ];
+
+      getAvailableMonths.mockResolvedValue(mockMonths);
+
+      expect(() => render(<GraphsScreen />)).not.toThrow();
+    });
+  });
+
+  describe('Combined Period Picker Logic', () => {
+    describe('Period string parsing', () => {
+      it('parses specific month period correctly', () => {
+        // Test the parsing logic: "2025-11" should give year=2025, month=11
+        const periodString = '2025-11';
+        const [yearStr, monthStr] = periodString.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
+
+        expect(year).toBe(2025);
+        expect(month).toBe(11);
+      });
+
+      it('parses full year period correctly', () => {
+        // Test the parsing logic: "2025-full" should give year=2025, month=null
+        const periodString = '2025-full';
+        const [yearStr, monthStr] = periodString.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
+
+        expect(year).toBe(2025);
+        expect(month).toBeNull();
+      });
+
+      it('parses January (month 0) correctly', () => {
+        // Edge case: month 0 should not be confused with falsy
+        const periodString = '2025-0';
+        const [yearStr, monthStr] = periodString.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
+
+        expect(year).toBe(2025);
+        expect(month).toBe(0);
+      });
+    });
+
+    describe('Period items generation order', () => {
+      it('generates items in descending date order with Full Year after each years months', () => {
+        // Simulate the periodItems generation logic
+        const availableYears = [2025, 2024];
+        const availableMonths = [
+          { year: 2025, month: 0 },  // Jan 2025
+          { year: 2025, month: 1 },  // Feb 2025
+          { year: 2024, month: 10 }, // Nov 2024
+          { year: 2024, month: 11 }, // Dec 2024
+        ];
+        const t = (key) => key;
+        const monthKeys = [
+          'month_january', 'month_february', 'month_march', 'month_april',
+          'month_may', 'month_june', 'month_july', 'month_august',
+          'month_september', 'month_october', 'month_november', 'month_december',
+        ];
+
+        const items = [];
+        availableYears.forEach(year => {
+          const monthsForYear = availableMonths
+            .filter(m => m.year === year)
+            .map(m => m.month)
+            .sort((a, b) => b - a); // Dec to Jan
+
+          monthsForYear.forEach(monthIndex => {
+            items.push({
+              label: `${t(monthKeys[monthIndex])} ${year}`,
+              value: `${year}-${monthIndex}`,
+            });
+          });
+
+          items.push({
+            label: `${t('full_year')} ${year}`,
+            value: `${year}-full`,
+          });
+        });
+
+        // Expected order for 2025: Feb, Jan, Full Year 2025
+        // Then for 2024: Dec, Nov, Full Year 2024
+        expect(items).toHaveLength(6);
+        expect(items[0].value).toBe('2025-1');  // Feb 2025
+        expect(items[1].value).toBe('2025-0');  // Jan 2025
+        expect(items[2].value).toBe('2025-full'); // Full Year 2025
+        expect(items[3].value).toBe('2024-11'); // Dec 2024
+        expect(items[4].value).toBe('2024-10'); // Nov 2024
+        expect(items[5].value).toBe('2024-full'); // Full Year 2024
+      });
+
+      it('includes Full Year option even with single month available', () => {
+        const availableYears = [2025];
+        const availableMonths = [{ year: 2025, month: 5 }]; // Only June
+        const t = (key) => key;
+        const monthKeys = [
+          'month_january', 'month_february', 'month_march', 'month_april',
+          'month_may', 'month_june', 'month_july', 'month_august',
+          'month_september', 'month_october', 'month_november', 'month_december',
+        ];
+
+        const items = [];
+        availableYears.forEach(year => {
+          const monthsForYear = availableMonths
+            .filter(m => m.year === year)
+            .map(m => m.month)
+            .sort((a, b) => b - a);
+
+          monthsForYear.forEach(monthIndex => {
+            items.push({
+              label: `${t(monthKeys[monthIndex])} ${year}`,
+              value: `${year}-${monthIndex}`,
+            });
+          });
+
+          items.push({
+            label: `${t('full_year')} ${year}`,
+            value: `${year}-full`,
+          });
+        });
+
+        expect(items).toHaveLength(2);
+        expect(items[0].value).toBe('2025-5');    // June 2025
+        expect(items[1].value).toBe('2025-full'); // Full Year 2025
+      });
     });
   });
 

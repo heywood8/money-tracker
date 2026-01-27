@@ -25,8 +25,8 @@ const GraphsScreen = () => {
 
   // Get current month and year
   const now = new Date();
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11, or null for full year
+  // Combined period state: "YYYY-MM" for specific month or "YYYY-full" for full year
+  const [selectedPeriod, setSelectedPeriod] = useState(`${now.getFullYear()}-${now.getMonth()}`);
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('all');
@@ -43,6 +43,15 @@ const GraphsScreen = () => {
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
+
+  // Derive selectedYear and selectedMonth from combined selectedPeriod
+  // This must be defined before the hooks that use these values
+  const { selectedYear, selectedMonth } = useMemo(() => {
+    const [yearStr, monthStr] = selectedPeriod.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = monthStr === 'full' ? null : parseInt(monthStr, 10);
+    return { selectedYear: year, selectedMonth: month };
+  }, [selectedPeriod]);
 
   // Custom hooks for data management
   const {
@@ -157,20 +166,6 @@ const GraphsScreen = () => {
     loadAvailableMonths();
   }, []);
 
-  // Ensure selected month is valid for selected year
-  useEffect(() => {
-    if (availableMonths.length === 0) return;
-
-    const monthsForYear = availableMonths
-      .filter(m => m.year === selectedYear)
-      .map(m => m.month);
-
-    // If current selected month is not available for this year and not "Full Year", select the first available month
-    if (selectedMonth !== null && monthsForYear.length > 0 && !monthsForYear.includes(selectedMonth)) {
-      const sortedMonths = monthsForYear.sort((a, b) => b - a); // Sort descending
-      setSelectedMonth(sortedMonths[0]);
-    }
-  }, [selectedYear, availableMonths, selectedMonth]);
 
 
 
@@ -223,35 +218,36 @@ const GraphsScreen = () => {
   [accounts],
   );
 
-  const yearItems = useMemo(() =>
-    availableYears.map(year => ({ label: year.toString(), value: year })),
-  [availableYears],
-  );
+  // Combined period picker items: months and "Full Year" for each year, sorted descending
+  const periodItems = useMemo(() => {
+    const items = [];
 
-  // Get available months for the selected year
-  const availableMonthsForYear = useMemo(() => {
-    if (availableMonths.length === 0) {
-      // If no operations, return current month as fallback
-      return [now.getMonth()];
-    }
-    const monthsForYear = availableMonths
-      .filter(m => m.year === selectedYear)
-      .map(m => m.month);
-    return monthsForYear.sort((a, b) => b - a); // Sort descending
-  }, [availableMonths, selectedYear]);
+    // Group available months by year, sorted descending
+    availableYears.forEach(year => {
+      const monthsForYear = availableMonths
+        .filter(m => m.year === year)
+        .map(m => m.month)
+        .sort((a, b) => b - a); // Dec to Jan
 
-  const monthItems = useMemo(() => {
-    const items = [
-      { label: t('full_year'), value: null },
-    ];
-    availableMonthsForYear.forEach(monthIndex => {
+      // If no months available for this year (fallback case), use current month
+      const monthsList = monthsForYear.length > 0 ? monthsForYear : [now.getMonth()];
+
+      monthsList.forEach(monthIndex => {
+        items.push({
+          label: `${t(monthKeys[monthIndex])} ${year}`,
+          value: `${year}-${monthIndex}`,
+        });
+      });
+
+      // Add "Full Year" after all months of this year (before previous year)
       items.push({
-        label: t(monthKeys[monthIndex]),
-        value: monthIndex,
+        label: `${t('full_year')} ${year}`,
+        value: `${year}-full`,
       });
     });
+
     return items;
-  }, [availableMonthsForYear, t, monthKeys]);
+  }, [availableYears, availableMonths, t, monthKeys]);
 
   // Calculate spending prediction (excluding categories marked as excluded from forecast)
   const spendingPrediction = useMemo(() => {
@@ -358,22 +354,12 @@ const GraphsScreen = () => {
               />
             </View>
 
-            {/* Year Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+            {/* Period Picker (Combined Month + Year) */}
+            <View style={[styles.periodPickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
               <SimplePicker
-                value={selectedYear}
-                onValueChange={setSelectedYear}
-                items={yearItems}
-                colors={colors}
-              />
-            </View>
-
-            {/* Month Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-              <SimplePicker
-                value={selectedMonth}
-                onValueChange={setSelectedMonth}
-                items={monthItems}
+                value={selectedPeriod}
+                onValueChange={setSelectedPeriod}
+                items={periodItems}
                 colors={colors}
               />
             </View>
@@ -492,6 +478,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 20,
+  },
+  periodPickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 2,
+    height: 40,
+    overflow: 'hidden',
   },
   pickerWrapper: {
     borderRadius: 8,
