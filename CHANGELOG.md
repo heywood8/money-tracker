@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.34.2](https://github.com/heywood8/money-tracker/compare/penny-v0.34.1...penny-v0.34.2) (2026-01-27)
+
+
+### Bug Fixes
+
+* include build commits in release-please changelog ([eadbd71](https://github.com/heywood8/money-tracker/commit/eadbd7110b5fd93dc5a0b10b9b52b7ae08af6c34))
+
+
+### Build System
+
+* **deps-dev:** bump @testing-library/react-native from 12.9.0 to 13.3.3 ([#249](https://github.com/heywood8/money-tracker/issues/249)) ([06ad9c5](https://github.com/heywood8/money-tracker/commit/06ad9c5e1d726a1ddca080049b5552ce2ec11e88))
+
 ## [0.34.1](https://github.com/heywood8/money-tracker/compare/penny-v0.34.0...penny-v0.34.1) (2026-01-27)
 
 
