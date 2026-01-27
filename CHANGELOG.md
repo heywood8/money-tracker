@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.1](https://github.com/heywood8/money-tracker/compare/penny-v0.34.0...penny-v0.34.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* expand button clickable area in category spending card ([#251](https://github.com/heywood8/money-tracker/issues/251)) ([3aa0806](https://github.com/heywood8/money-tracker/commit/3aa080655dba35cea26ba8d9aadac4bb3fa2b326))
+
 ## [0.34.0](https://github.com/heywood8/money-tracker/compare/penny-v0.33.1...penny-v0.34.0) (2026-01-26)
 
 
