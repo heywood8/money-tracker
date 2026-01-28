@@ -24,6 +24,8 @@ const QuickAddForm = memo(({
   setQuickAddValues,
   accounts: visibleAccounts,
   filteredCategories,
+  topCategoriesForType,
+  getCategoryInfo,
   getAccountName,
   getAccountBalance,
   getCategoryName,
@@ -58,6 +60,8 @@ const QuickAddForm = memo(({
           setValues={setQuickAddValues}
           accounts={visibleAccounts}
           categories={filteredCategories}
+          topCategoriesForType={topCategoriesForType}
+          getCategoryInfo={getCategoryInfo}
           getAccountName={getAccountName}
           getAccountBalance={getAccountBalance}
           getCategoryName={getCategoryName}
@@ -85,6 +89,8 @@ QuickAddForm.propTypes = {
   setQuickAddValues: PropTypes.func.isRequired,
   accounts: PropTypes.array,
   filteredCategories: PropTypes.array,
+  topCategoriesForType: PropTypes.array,
+  getCategoryInfo: PropTypes.func.isRequired,
   getAccountName: PropTypes.func.isRequired,
   getAccountBalance: PropTypes.func.isRequired,
   getCategoryName: PropTypes.func.isRequired,
