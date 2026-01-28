@@ -302,14 +302,6 @@ const BalanceHistoryCard = ({
             })()}
           </TouchableOpacity>
 
-          {/* Tap hint to indicate chart is interactive */}
-          <View style={styles.tapHintContainer}>
-            <Icon name="gesture-tap" size={14} color={colors.mutedText} />
-            <Text style={[styles.tapHintText, { color: colors.mutedText }]}>
-              {t('tap_for_details') || 'Tap for details'}
-            </Text>
-          </View>
-
           {/* Compact Table Legend */}
           {(() => {
             const now = new Date();
@@ -562,16 +554,6 @@ const styles = StyleSheet.create({
   },
   lineChartStyle: {
     borderRadius: 8,
-  },
-  tapHintContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 4,
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  tapHintText: {
-    fontSize: 11,
   },
 });
 
