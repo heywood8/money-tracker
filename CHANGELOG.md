@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.37.0](https://github.com/heywood8/money-tracker/compare/penny-v0.36.0...penny-v0.37.0) (2026-01-28)
+
+
+### Features
+
+* add vertical "today" line with day label on burndown graph ([5be5135](https://github.com/heywood8/money-tracker/commit/5be5135c64ed9ad11dd28082ed9b5c6790548ee1))
+* combine actual and forecast into single continuous line on burndown graph ([cac49be](https://github.com/heywood8/money-tracker/commit/cac49becc1313cbca17016402100ad42a62f3033))
+
+
+### Bug Fixes
+
+* added armenian language on burndown graph ([64a05b7](https://github.com/heywood8/money-tracker/commit/64a05b7338fa9f5b4b7d29d72f532aae17ee44d4))
+* ensure equal width for expense/income summary cards ([0064a1a](https://github.com/heywood8/money-tracker/commit/0064a1aba08b4971b259a409ca57ac94717d5859))
+* improve burndown graph UX with better visibility and tap hint ([07ed73e](https://github.com/heywood8/money-tracker/commit/07ed73e936d141435f886ba038e1f021a810ca58))
+* lint issues ([c3ebffe](https://github.com/heywood8/money-tracker/commit/c3ebffef99a4a25dc1fe169e72e80513defdd9f3))
+* use explicit calculated width for summary cards ([3356e37](https://github.com/heywood8/money-tracker/commit/3356e37dcff2f7edd616f83c01751b5feb1bd7ae))
+
+
+### Miscellaneous Chores
+
+* armenian translation ([38bedfa](https://github.com/heywood8/money-tracker/commit/38bedfa34c572097c9039d1eff7643210b1d171a))
+
+
+### Code Refactoring
+
+* arrange expense/income cards side by side and reduce height ([41d7483](https://github.com/heywood8/money-tracker/commit/41d748361c1957bead849b76dfe6a6cc2cec7914))
+* remove days elapsed progress bar from burndown graph ([62708be](https://github.com/heywood8/money-tracker/commit/62708be9a5e8b43157bc698ccf7f65d9c33ada3c))
+* remove pie chart previews from expense/income summary cards ([85c2cbc](https://github.com/heywood8/money-tracker/commit/85c2cbc4db365c6a7dfc66d70c9ea56a2b127973))
+* remove tap for details hint from burndown graph ([08de06e](https://github.com/heywood8/money-tracker/commit/08de06eaedfb3076beda368bb840fa189efd5076))
+
 ## [0.36.0](https://github.com/heywood8/money-tracker/compare/penny-v0.35.0...penny-v0.36.0) (2026-01-27)
 
 
