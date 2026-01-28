@@ -259,6 +259,7 @@ const OperationFormFields = memo(({
           {topCategoriesForType.map((category, index) => {
             const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon };
             const isSelected = values.categoryId === category.id;
+            const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
 
             return (
               <Pressable
@@ -277,14 +278,12 @@ const OperationFormFields = memo(({
                 <Icon
                   name={categoryInfo.icon}
                   size={16}
-                  color={isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text)}
+                  color={textColor}
                 />
                 <Text
                   style={[
                     styles.categoryShortcutText,
-                    {
-                      color: isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text),
-                    },
+                    { color: textColor },
                   ]}
                   numberOfLines={1}
                 >
