@@ -312,5 +312,6 @@
   "max": "Max",
   "current": "Current",
   "end": "End",
-  "daily_avg": "Daily Avg"
+  "daily_avg": "Daily Avg",
+  "tap_for_details": "Tap for details"
 }

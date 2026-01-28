@@ -173,8 +173,8 @@ const BalanceHistoryCard = ({
               // Get last day for X-axis labels
               const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
 
-              // Forecast line color: 20% opacity of primary
-              const forecastColor = hexToRgba(colors.primary, 0.2);
+              // Forecast line color: 50% opacity of primary for better visibility
+              const forecastColor = hexToRgba(colors.primary, 0.5);
 
               return (
                 <LineChart
@@ -264,6 +264,14 @@ const BalanceHistoryCard = ({
               );
             })()}
           </TouchableOpacity>
+
+          {/* Tap hint to indicate chart is interactive */}
+          <View style={styles.tapHintContainer}>
+            <Icon name="gesture-tap" size={14} color={colors.mutedText} />
+            <Text style={[styles.tapHintText, { color: colors.mutedText }]}>
+              {t('tap_for_details') || 'Tap for details'}
+            </Text>
+          </View>
 
           {/* Progress Bar (days elapsed) - only for current month with prediction */}
           {spendingPrediction && isCurrentMonth && (
@@ -358,8 +366,8 @@ const BalanceHistoryCard = ({
                 : null;
             }
 
-            // Forecast line color: 20% opacity of primary
-            const forecastColor = hexToRgba(colors.primary, 0.2);
+            // Forecast line color: 50% opacity of primary for better visibility
+            const forecastColor = hexToRgba(colors.primary, 0.5);
 
             return (
               <View style={styles.legendTableContainer}>
@@ -514,10 +522,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   legendDot: {
-    borderRadius: 5,
-    height: 10,
+    borderRadius: 6,
+    height: 12,
     marginRight: 6,
-    width: 10,
+    width: 12,
   },
   legendDotPlainAvg: {
     backgroundColor: 'rgba(128, 128, 128, 0.4)',
@@ -530,12 +538,12 @@ const styles = StyleSheet.create({
   },
   legendTableHeader: {
     flex: 1,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'right',
   },
   legendTableLabel: {
-    fontSize: 11,
+    fontSize: 12,
   },
   legendTableLabelCell: {
     alignItems: 'center',
@@ -549,7 +557,7 @@ const styles = StyleSheet.create({
   },
   legendTableValue: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     textAlign: 'right',
   },
   lineChartStyle: {
@@ -570,6 +578,16 @@ const styles = StyleSheet.create({
   progressTrack: {
     borderRadius: 4,
     height: 6,
+  },
+  tapHintContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  tapHintText: {
+    fontSize: 11,
   },
 });
 

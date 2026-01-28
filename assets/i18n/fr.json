@@ -312,5 +312,6 @@
   "max": "Max",
   "current": "Actuel",
   "end": "Fin",
-  "daily_avg": "Moy. quotid."
+  "daily_avg": "Moy. quotid.",
+  "tap_for_details": "Appuyez pour les détails"
 }
