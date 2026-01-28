@@ -312,5 +312,6 @@
   "max": "Máx",
   "current": "Actual",
   "end": "Fin",
-  "daily_avg": "Prom. diario"
+  "daily_avg": "Prom. diario",
+  "tap_for_details": "Toca para detalles"
 }
