@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getLastAccessedAccount } from '../services/LastAccount';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import * as Currency from '../services/currency';
+import * as OperationsDB from '../services/OperationsDB';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -82,6 +83,23 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return displayName || t('select_category');
   }, [categories, t]);
 
+  // Top 3 most used categories from last month
+  const [topCategories, setTopCategories] = useState([]);
+
+  // Load top categories from last month
+  useEffect(() => {
+    async function loadTopCategories() {
+      try {
+        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(3);
+        setTopCategories(topCats);
+      } catch (error) {
+        console.error('Failed to load top categories:', error);
+        setTopCategories([]);
+      }
+    }
+    loadTopCategories();
+  }, []);
+
   // Filtered categories for quick add form (excluding shadow categories)
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => {
@@ -92,6 +110,17 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
       return cat.categoryType === quickAddValues.type;
     });
   }, [categories, quickAddValues.type]);
+
+  // Get top 3 categories matching current operation type (expense/income)
+  const topCategoriesForType = useMemo(() => {
+    if (quickAddValues.type === 'transfer') return [];
+
+    // Filter top categories to match current type and exclude shadow categories
+    return topCategories
+      .map(tc => categories.find(cat => cat.id === tc.categoryId))
+      .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow)
+      .slice(0, 3);
+  }, [topCategories, categories, quickAddValues.type]);
 
   // Reset form but keep account and type
   const resetForm = useCallback(() => {
@@ -115,6 +144,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     getCategoryInfo,
     getCategoryName,
     filteredCategories,
+    topCategoriesForType,
     resetForm,
   };
 };

@@ -1467,3 +1467,43 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
     throw error;
   }
 };
+
+/**
+ * Get top N most frequently used categories from last month
+ * @param {number} limit - Number of top categories to return (default: 3)
+ * @returns {Promise<Array<{categoryId: string, count: number}>>} Array of category IDs with usage count
+ */
+export const getTopCategoriesFromLastMonth = async (limit = 3) => {
+  try {
+    // Calculate date range for last month
+    const now = new Date();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const startDateStr = formatLocalDate(lastMonthStart);
+    const endDateStr = formatLocalDate(lastMonthEnd);
+
+    const results = await queryAll(
+      `SELECT
+         category_id,
+         COUNT(*) as count
+       FROM operations
+       WHERE date >= ?
+         AND date <= ?
+         AND category_id IS NOT NULL
+         AND type IN ('expense', 'income')
+       GROUP BY category_id
+       ORDER BY count DESC
+       LIMIT ?`,
+      [startDateStr, endDateStr, limit],
+    );
+
+    return (results || []).map(row => ({
+      categoryId: row.category_id,
+      count: row.count,
+    }));
+  } catch (error) {
+    console.error('Failed to get top categories from last month:', error);
+    throw error;
+  }
+};

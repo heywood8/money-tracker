@@ -53,6 +53,8 @@ const OperationFormFields = memo(({
   setValues,
   accounts,
   categories,
+  topCategoriesForType,
+  getCategoryInfo,
   getAccountName,
   getAccountBalance,
   getCategoryName,
@@ -229,10 +231,73 @@ const OperationFormFields = memo(({
     }
   };
 
-  // Render category picker
+  // Render category picker with shortcuts
   const renderCategoryPicker = () => {
     if (values.type === 'transfer') return null;
 
+    // If showing shortcuts (topCategoriesForType is available), render button layout
+    if (topCategoriesForType && topCategoriesForType.length > 0) {
+      // Handler for category button press
+      const handleCategoryPress = (categoryId) => {
+        if (!disabled) {
+          setValues(v => ({ ...v, categoryId }));
+        }
+      };
+
+      return (
+        <View style={styles.categoryButtonsContainer}>
+          {/* Button to open picker */}
+          <Pressable
+            style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
+            onPress={() => !disabled && openPicker('category', categories)}
+            disabled={disabled}
+          >
+            <Icon name="format-list-bulleted" size={18} color={disabled ? colors.mutedText : colors.mutedText} />
+          </Pressable>
+
+          {/* Top 3 category shortcut buttons */}
+          {topCategoriesForType.map((category, index) => {
+            const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon };
+            const isSelected = values.categoryId === category.id;
+
+            return (
+              <Pressable
+                key={category.id}
+                style={[
+                  styles.categoryShortcutButton,
+                  {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                  },
+                  disabledStyle,
+                ]}
+                onPress={() => handleCategoryPress(category.id)}
+                disabled={disabled}
+              >
+                <Icon
+                  name={categoryInfo.icon}
+                  size={16}
+                  color={isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text)}
+                />
+                <Text
+                  style={[
+                    styles.categoryShortcutText,
+                    {
+                      color: isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text),
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {categoryInfo.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // Fallback: render single full-width picker (for OperationModal or when no top categories)
     return (
       <Pressable
         style={[styles.formInput, inputStyle, disabledStyle]}
@@ -298,6 +363,8 @@ OperationFormFields.propTypes = {
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
+  topCategoriesForType: PropTypes.array,
+  getCategoryInfo: PropTypes.func,
   getAccountName: PropTypes.func.isRequired,
   getAccountBalance: PropTypes.func,
   getCategoryName: PropTypes.func.isRequired,
@@ -328,6 +395,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xs,
+  },
+  categoryButtonsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  categoryPickerButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    padding: SPACING.md,
+    width: 48,
+  },
+  categoryShortcutButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  categoryShortcutText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
   },
   disabledInput: {
     opacity: 0.6,
