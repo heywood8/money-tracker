@@ -598,6 +598,61 @@ describe('OperationsDB Service', () => {
         ['EUR', '2025-12-01', '2025-12-31'],
       );
     });
+
+    it('gets top categories from last month', async () => {
+      const mockResults = [
+        { category_id: 'cat1', count: 15 },
+        { category_id: 'cat2', count: 10 },
+        { category_id: 'cat3', count: 8 },
+      ];
+      queryAll.mockResolvedValue(mockResults);
+
+      const result = await OperationsDB.getTopCategoriesFromLastMonth(3);
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining('COUNT(*) as count'),
+        expect.arrayContaining([expect.any(String), expect.any(String), 3]),
+      );
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ categoryId: 'cat1', count: 15 });
+      expect(result[1]).toEqual({ categoryId: 'cat2', count: 10 });
+      expect(result[2]).toEqual({ categoryId: 'cat3', count: 8 });
+    });
+
+    it('returns empty array when no operations in last month', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await OperationsDB.getTopCategoriesFromLastMonth(3);
+
+      expect(result).toEqual([]);
+    });
+
+    it('uses custom limit for top categories', async () => {
+      const mockResults = [
+        { category_id: 'cat1', count: 15 },
+        { category_id: 'cat2', count: 10 },
+        { category_id: 'cat3', count: 8 },
+        { category_id: 'cat4', count: 5 },
+        { category_id: 'cat5', count: 3 },
+      ];
+      queryAll.mockResolvedValue(mockResults);
+
+      const result = await OperationsDB.getTopCategoriesFromLastMonth(5);
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([expect.any(String), expect.any(String), 5]),
+      );
+      expect(result).toHaveLength(5);
+    });
+
+    it('filters out null categories and includes only expense/income operations', async () => {
+      await OperationsDB.getTopCategoriesFromLastMonth(3);
+
+      const sql = queryAll.mock.calls[0][0];
+      expect(sql).toContain('category_id IS NOT NULL');
+      expect(sql).toContain("type IN ('expense', 'income')");
+    });
   });
 
   describe('Utility Functions', () => {
