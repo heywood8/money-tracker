@@ -2,7 +2,7 @@
  * IncomeSummaryCard Component Tests
  *
  * Tests for the IncomeSummaryCard component which displays
- * total income summary with a mini pie chart.
+ * total income summary.
  */
 
 import React from 'react';
@@ -17,27 +17,6 @@ jest.mock('../../../assets/currencies.json', () => ({
   BTC: { symbol: '₿', name: 'Bitcoin', decimal_digits: 8 },
 }));
 
-// Mock PieChart
-jest.mock('react-native-chart-kit', () => {
-  const PropTypes = require('prop-types');
-
-  function PieChart({ data, chartConfig }) {
-    // Call the color function to get coverage
-    if (chartConfig && chartConfig.color) {
-      chartConfig.color(1);
-      chartConfig.color();
-    }
-    return null;
-  }
-
-  PieChart.propTypes = {
-    data: PropTypes.array,
-    chartConfig: PropTypes.shape({ color: PropTypes.func }),
-  };
-
-  return { PieChart };
-});
-
 describe('IncomeSummaryCard', () => {
   const defaultProps = {
     colors: {
@@ -51,10 +30,6 @@ describe('IncomeSummaryCard', () => {
     loadingIncome: false,
     totalIncome: 3500.50,
     selectedCurrency: 'USD',
-    incomeChartData: [
-      { name: 'Salary', amount: 3000, color: '#00FF00' },
-      { name: 'Freelance', amount: 500, color: '#00AA00' },
-    ],
     onPress: jest.fn(),
   };
 
@@ -139,29 +114,13 @@ describe('IncomeSummaryCard', () => {
       expect(getByText('...')).toBeTruthy();
     });
 
-    it('does not show pie chart when loading', () => {
+    it('does not show amount when loading', () => {
       const { queryByText } = render(
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
       // Amount shows loading indicator
       expect(queryByText('3500.50 USD')).toBeNull();
-    });
-  });
-
-  describe('Chart Display', () => {
-    it('renders pie chart when incomeChartData has items', () => {
-      const { toJSON } = render(<IncomeSummaryCard {...defaultProps} />);
-
-      expect(toJSON()).toBeTruthy();
-    });
-
-    it('shows placeholder when incomeChartData is empty', () => {
-      const { getByText } = render(
-        <IncomeSummaryCard {...defaultProps} incomeChartData={[]} />,
-      );
-
-      expect(getByText('—')).toBeTruthy();
     });
   });
 
