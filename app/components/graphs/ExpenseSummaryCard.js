@@ -1,7 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
+import { HORIZONTAL_PADDING } from '../../styles/layout';
+
+const screenWidth = Dimensions.get('window').width;
+const cardWidth = (screenWidth - (HORIZONTAL_PADDING * 2) - 8) / 2; // 8 is gap
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -52,9 +56,8 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderRadius: 8,
     borderWidth: 1,
-    flex: 1,
-    flexBasis: 0,
     padding: 10,
+    width: cardWidth,
   },
   summaryLabel: {
     fontSize: 12,
