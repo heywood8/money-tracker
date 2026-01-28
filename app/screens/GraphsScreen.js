@@ -389,25 +389,25 @@ const GraphsScreen = () => {
             />
           )}
 
-          {/* Expenses Summary Card */}
-          <ExpenseSummaryCard
-            colors={colors}
-            t={t}
-            loading={loading}
-            totalExpenses={totalExpenses}
-            selectedCurrency={selectedCurrency}
-            onPress={openExpenseModal}
-          />
-
-          {/* Income Summary Card */}
-          <IncomeSummaryCard
-            colors={colors}
-            t={t}
-            loadingIncome={loadingIncome}
-            totalIncome={totalIncome}
-            selectedCurrency={selectedCurrency}
-            onPress={openIncomeModal}
-          />
+          {/* Expenses and Income Summary Cards - side by side */}
+          <View style={styles.summaryCardsRow}>
+            <ExpenseSummaryCard
+              colors={colors}
+              t={t}
+              loading={loading}
+              totalExpenses={totalExpenses}
+              selectedCurrency={selectedCurrency}
+              onPress={openExpenseModal}
+            />
+            <IncomeSummaryCard
+              colors={colors}
+              t={t}
+              loadingIncome={loadingIncome}
+              totalIncome={totalIncome}
+              selectedCurrency={selectedCurrency}
+              onPress={openIncomeModal}
+            />
+          </View>
 
           {/* Category Spending Trend Card - Last 12 Months */}
           <CategorySpendingCard
@@ -475,6 +475,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 20,
+  },
+  summaryCardsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
   },
   periodPickerWrapper: {
     borderRadius: 8,
