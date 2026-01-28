@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
-import { PieChart } from 'react-native-chart-kit';
 import currencies from '../../../assets/currencies.json';
 
 const formatCurrency = (amount, currency) => {
@@ -16,7 +15,6 @@ const IncomeSummaryCard = ({
   loadingIncome,
   totalIncome,
   selectedCurrency,
-  incomeChartData,
   onPress,
 }) => {
   return (
@@ -27,39 +25,12 @@ const IncomeSummaryCard = ({
       accessibilityRole="button"
       accessibilityLabel={t('income_by_category')}
     >
-      <View style={styles.summaryCardContent}>
-        <View style={styles.summaryInfo}>
-          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-            {t('total_income')}
-          </Text>
-          <Text style={[styles.summaryAmount, { color: colors.text }]}>
-            {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
-          </Text>
-        </View>
-        <View style={styles.miniChartContainer}>
-          {loadingIncome ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : incomeChartData.length > 0 ? (
-            <PieChart
-              data={incomeChartData}
-              width={80}
-              height={80}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="0"
-              hasLegend={false}
-              center={[20, 0]}
-            />
-          ) : (
-            <View style={styles.noDataPlaceholder}>
-              <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+        {t('total_income')}
+      </Text>
+      <Text style={[styles.summaryAmount, { color: colors.text }]}>
+        {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -70,26 +41,10 @@ IncomeSummaryCard.propTypes = {
   loadingIncome: PropTypes.bool.isRequired,
   totalIncome: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
-  incomeChartData: PropTypes.array.isRequired,
   onPress: PropTypes.func.isRequired,
 };
 
 const styles = StyleSheet.create({
-  miniChartContainer: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataPlaceholder: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataText: {
-    fontSize: 32,
-  },
   summaryAmount: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -99,14 +54,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
     padding: 16,
-  },
-  summaryCardContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryInfo: {
-    flex: 1,
   },
   summaryLabel: {
     fontSize: 14,

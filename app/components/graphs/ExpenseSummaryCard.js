@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
-import { PieChart } from 'react-native-chart-kit';
 import currencies from '../../../assets/currencies.json';
 
 const formatCurrency = (amount, currency) => {
@@ -16,7 +15,6 @@ const ExpenseSummaryCard = ({
   loading,
   totalExpenses,
   selectedCurrency,
-  chartData,
   onPress,
 }) => {
   return (
@@ -27,39 +25,12 @@ const ExpenseSummaryCard = ({
       accessibilityRole="button"
       accessibilityLabel={t('expenses_by_category')}
     >
-      <View style={styles.summaryCardContent}>
-        <View style={styles.summaryInfo}>
-          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-            {t('total_expenses')}
-          </Text>
-          <Text style={[styles.summaryAmount, { color: colors.text }]}>
-            {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
-          </Text>
-        </View>
-        <View style={styles.miniChartContainer}>
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : chartData.length > 0 ? (
-            <PieChart
-              data={chartData}
-              width={80}
-              height={80}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="0"
-              hasLegend={false}
-              center={[20, 0]}
-            />
-          ) : (
-            <View style={styles.noDataPlaceholder}>
-              <Text style={[styles.noDataText, { color: colors.mutedText }]}>—</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+        {t('total_expenses')}
+      </Text>
+      <Text style={[styles.summaryAmount, { color: colors.text }]}>
+        {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -70,26 +41,10 @@ ExpenseSummaryCard.propTypes = {
   loading: PropTypes.bool.isRequired,
   totalExpenses: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
-  chartData: PropTypes.array.isRequired,
   onPress: PropTypes.func.isRequired,
 };
 
 const styles = StyleSheet.create({
-  miniChartContainer: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataPlaceholder: {
-    alignItems: 'center',
-    height: 80,
-    justifyContent: 'center',
-    width: 80,
-  },
-  noDataText: {
-    fontSize: 32,
-  },
   summaryAmount: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -99,14 +54,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
     padding: 16,
-  },
-  summaryCardContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryInfo: {
-    flex: 1,
   },
   summaryLabel: {
     fontSize: 14,

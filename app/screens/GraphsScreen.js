@@ -396,7 +396,6 @@ const GraphsScreen = () => {
             loading={loading}
             totalExpenses={totalExpenses}
             selectedCurrency={selectedCurrency}
-            chartData={chartData}
             onPress={openExpenseModal}
           />
 
@@ -407,7 +406,6 @@ const GraphsScreen = () => {
             loadingIncome={loadingIncome}
             totalIncome={totalIncome}
             selectedCurrency={selectedCurrency}
-            incomeChartData={incomeChartData}
             onPress={openIncomeModal}
           />
 

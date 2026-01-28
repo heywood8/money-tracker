@@ -2,7 +2,7 @@
  * ExpenseSummaryCard Component Tests
  *
  * Tests for the ExpenseSummaryCard component which displays
- * total expenses summary with a mini pie chart.
+ * total expenses summary.
  */
 
 import React from 'react';
@@ -17,27 +17,6 @@ jest.mock('../../../assets/currencies.json', () => ({
   BTC: { symbol: '₿', name: 'Bitcoin', decimal_digits: 8 },
 }));
 
-// Mock PieChart
-jest.mock('react-native-chart-kit', () => {
-  const PropTypes = require('prop-types');
-
-  function PieChart({ data, chartConfig }) {
-    // Call the color function to get coverage
-    if (chartConfig && chartConfig.color) {
-      chartConfig.color(1);
-      chartConfig.color();
-    }
-    return null;
-  }
-
-  PieChart.propTypes = {
-    data: PropTypes.array,
-    chartConfig: PropTypes.shape({ color: PropTypes.func }),
-  };
-
-  return { PieChart };
-});
-
 describe('ExpenseSummaryCard', () => {
   const defaultProps = {
     colors: {
@@ -51,10 +30,6 @@ describe('ExpenseSummaryCard', () => {
     loading: false,
     totalExpenses: 1500.75,
     selectedCurrency: 'USD',
-    chartData: [
-      { name: 'Food', amount: 500, color: '#FF0000' },
-      { name: 'Transport', amount: 300, color: '#00FF00' },
-    ],
     onPress: jest.fn(),
   };
 
@@ -131,7 +106,7 @@ describe('ExpenseSummaryCard', () => {
 
   describe('Loading State', () => {
     it('shows loading indicator when loading', () => {
-      const { getByText, UNSAFE_getByType } = render(
+      const { getByText } = render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
@@ -139,30 +114,13 @@ describe('ExpenseSummaryCard', () => {
       expect(getByText('...')).toBeTruthy();
     });
 
-    it('does not show pie chart when loading', () => {
+    it('does not show amount when loading', () => {
       const { queryByText } = render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
       // Amount shows loading indicator
       expect(queryByText('1500.75 USD')).toBeNull();
-    });
-  });
-
-  describe('Chart Display', () => {
-    it('renders pie chart when chartData has items', () => {
-      // This test verifies the chart renders without error
-      const { toJSON } = render(<ExpenseSummaryCard {...defaultProps} />);
-
-      expect(toJSON()).toBeTruthy();
-    });
-
-    it('shows placeholder when chartData is empty', () => {
-      const { getByText } = render(
-        <ExpenseSummaryCard {...defaultProps} chartData={[]} />,
-      );
-
-      expect(getByText('—')).toBeTruthy();
     });
   });
 
