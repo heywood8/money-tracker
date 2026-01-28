@@ -399,7 +399,7 @@ describe('BalanceHistoryCard', () => {
       expect(plainAvgDataset.color()).toBe('rgba(128, 128, 128, 0.4)');
     });
 
-    it('includes forecast dataset when isCurrentMonth with spendingPrediction', () => {
+    it('combines actual and forecast data when isCurrentMonth with spendingPrediction', () => {
       const mockSpendingPrediction = {
         dailyAverage: 100,
         daysInMonth: 31,
@@ -433,10 +433,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      // Should have 4 datasets: actual + plain avg + forecast + prevMonth
-      expect(lineChart.props.data.datasets).toHaveLength(4);
-      const forecastDataset = lineChart.props.data.datasets[2];
-      expect(forecastDataset.withDots).toBe(false);
+      // Should have 3 datasets: combined actual+forecast + plain avg + prevMonth
+      expect(lineChart.props.data.datasets).toHaveLength(3);
 
       global.Date.mockRestore();
     });
@@ -610,7 +608,7 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('Prev Month')).toBeTruthy();
     });
 
-    it('displays forecast legend row when isCurrentMonth with spendingPrediction', () => {
+    it('displays legend with combined actual+forecast when isCurrentMonth with spendingPrediction', () => {
       const mockSpendingPrediction = {
         dailyAverage: 100,
         daysInMonth: 31,
@@ -643,9 +641,10 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
+      // Actual row now includes forecast data (combined line)
       expect(getByText('Actual')).toBeTruthy();
       expect(getByText('Plain avg')).toBeTruthy();
-      expect(getByText('Forecast')).toBeTruthy();
+      // Forecast is now combined with Actual, no separate row
 
       global.Date.mockRestore();
     });
