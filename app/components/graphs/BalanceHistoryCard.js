@@ -310,26 +310,6 @@ const BalanceHistoryCard = ({
             </Text>
           </View>
 
-          {/* Progress Bar (days elapsed) - only for current month with prediction */}
-          {spendingPrediction && isCurrentMonth && (
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressBar,
-                    {
-                      width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
-                      backgroundColor: colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.progressText, { color: colors.mutedText }]}>
-                {spendingPrediction.daysElapsed} / {spendingPrediction.daysInMonth} {(t('days_elapsed') || 'days elapsed').toLowerCase()}
-              </Text>
-            </View>
-          )}
-
           {/* Compact Table Legend */}
           {(() => {
             const now = new Date();
@@ -582,22 +562,6 @@ const styles = StyleSheet.create({
   },
   lineChartStyle: {
     borderRadius: 8,
-  },
-  progressBar: {
-    borderRadius: 4,
-    height: 6,
-  },
-  progressContainer: {
-    marginTop: 12,
-  },
-  progressText: {
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  progressTrack: {
-    borderRadius: 4,
-    height: 6,
   },
   tapHintContainer: {
     alignItems: 'center',
