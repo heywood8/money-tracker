@@ -141,14 +141,22 @@ const BalanceHistoryCard = ({
 
               const forecastData = calculateForecastData();
               const hasForecast = forecastData.length > 0;
+              const currentDay = new Date().getDate();
 
-              // Create forecast array aligned with labels (null for days before forecast starts)
-              const forecastForChart = hasForecast
-                ? balanceHistoryData.labels.map(day => {
+              // Combine actual and forecast into one continuous line:
+              // - Up to today: actual balance from table
+              // - After today: forecast projection
+              const combinedActualForecast = balanceHistoryData.labels.map((day, index) => {
+                if (day <= currentDay) {
+                  // Use actual data up to and including today
+                  return balanceHistoryData.actualForChart[index];
+                } else if (hasForecast) {
+                  // Use forecast data after today
                   const point = forecastData.find(p => p.x === day);
-                  return point ? point.y : null;
-                })
-                : [];
+                  return point ? point.y : undefined;
+                }
+                return undefined;
+              });
 
               // Calculate max balance from actual values (for plain avg line)
               const actualValues = balanceHistoryData.actualForChart.filter(v => v !== undefined);
@@ -161,7 +169,7 @@ const BalanceHistoryCard = ({
               );
 
               // Calculate max value from all datasets to determine Y-axis scale
-              const forecastValues = forecastForChart.filter(v => v !== null && v !== undefined);
+              const forecastValues = combinedActualForecast.filter(v => v !== undefined);
               const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
 
               const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
@@ -173,16 +181,14 @@ const BalanceHistoryCard = ({
               // Get last day for X-axis labels
               const lastDay = balanceHistoryData.labels[balanceHistoryData.labels.length - 1];
 
-              // Forecast line color: 50% opacity of primary for better visibility
-              const forecastColor = hexToRgba(colors.primary, 0.5);
-
               return (
                 <LineChart
                   data={{
                     labels: balanceHistoryData.labels.map(d => d.toString()),
                     datasets: [
+                      // Combined actual + forecast line (actual up to today, forecast after)
                       {
-                        data: balanceHistoryData.actualForChart.filter(v => v !== undefined),
+                        data: combinedActualForecast.filter(v => v !== undefined),
                         color: () => colors.primary,
                         strokeWidth: 3,
                       },
@@ -193,12 +199,6 @@ const BalanceHistoryCard = ({
                         strokeWidth: 2,
                         withDots: false,
                       },
-                      ...(hasForecast ? [{
-                        data: forecastForChart.map(v => v ?? null),
-                        color: () => forecastColor,
-                        strokeWidth: 2,
-                        withDots: false,
-                      }] : []),
                       ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
                         data: balanceHistoryData.prevMonth.map(v => v ?? null),
                         color: () => 'rgba(156, 39, 176, 0.5)',
@@ -366,9 +366,6 @@ const BalanceHistoryCard = ({
                 : null;
             }
 
-            // Forecast line color: 50% opacity of primary for better visibility
-            const forecastColor = hexToRgba(colors.primary, 0.5);
-
             return (
               <View style={styles.legendTableContainer}>
                 {/* Header row */}
@@ -380,7 +377,7 @@ const BalanceHistoryCard = ({
                   <Text style={[styles.legendTableHeader, { color: colors.mutedText }]}>{t('end') || 'End'}</Text>
                 </View>
 
-                {/* Actual row */}
+                {/* Actual + Forecast row (combined line) */}
                 <View style={styles.legendTableRow}>
                   <View style={styles.legendTableLabelCell}>
                     <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
@@ -389,7 +386,7 @@ const BalanceHistoryCard = ({
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(maxBalance, currency)}</Text>
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualCurrent, currency)}</Text>
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualDailyAvg, currency)}</Text>
-                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualEnd, currency)}</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(hasForecastData ? forecastEnd : actualEnd, currency)}</Text>
                 </View>
 
                 {/* Plain avg row */}
@@ -403,20 +400,6 @@ const BalanceHistoryCard = ({
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(plainAvgDaily, currency)}</Text>
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>0</Text>
                 </View>
-
-                {/* Forecast row (only for current month) */}
-                {hasForecastData && (
-                  <View style={styles.legendTableRow}>
-                    <View style={styles.legendTableLabelCell}>
-                      <View style={[styles.legendDot, { backgroundColor: forecastColor }]} />
-                      <Text style={[styles.legendTableLabel, { color: colors.text }]}>{t('forecast') || 'Forecast'}</Text>
-                    </View>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>-</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(actualCurrent, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(forecastDailyAvg, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(forecastEnd, currency)}</Text>
-                  </View>
-                )}
 
                 {/* Prev month row */}
                 {hasPrevMonthData && (
