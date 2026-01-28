@@ -53,6 +53,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
+    flexBasis: 0,
     padding: 10,
   },
   summaryLabel: {
