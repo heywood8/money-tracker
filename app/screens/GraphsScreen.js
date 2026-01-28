@@ -476,11 +476,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
   },
-  summaryCardsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
   periodPickerWrapper: {
     borderRadius: 8,
     borderWidth: 1,
@@ -497,6 +492,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  summaryCardsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
   },
 });
 
