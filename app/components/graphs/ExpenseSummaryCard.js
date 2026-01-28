@@ -46,18 +46,18 @@ ExpenseSummaryCard.propTypes = {
 
 const styles = StyleSheet.create({
   summaryAmount: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   summaryCard: {
     borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 16,
-    padding: 16,
+    flex: 1,
+    padding: 10,
   },
   summaryLabel: {
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: 12,
+    marginBottom: 4,
   },
 });
 
