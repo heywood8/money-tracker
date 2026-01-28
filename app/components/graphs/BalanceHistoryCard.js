@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import { LineChart } from 'react-native-chart-kit';
+import { Line, Text as SvgText, G } from 'react-native-svg';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
@@ -253,6 +254,42 @@ const BalanceHistoryCard = ({
                       strokeDasharray: '0',
                     },
                   }}
+                  decorator={isCurrentMonth ? () => {
+                    // Draw vertical line at current day to show today
+                    const chartWidth = screenWidth - 64;
+                    const paddingLeft = 64; // Y-axis label space
+                    const paddingRight = 16;
+                    const dataLength = balanceHistoryData.labels.length;
+                    const usableWidth = chartWidth - paddingLeft - paddingRight;
+                    const xStep = usableWidth / (dataLength - 1);
+                    const todayIndex = currentDay - 1; // 0-indexed
+                    const xPosition = paddingLeft + (todayIndex * xStep);
+
+                    return (
+                      <G>
+                        <Line
+                          x1={xPosition}
+                          y1={12}
+                          x2={xPosition}
+                          y2={181}
+                          stroke={colors.primary}
+                          strokeWidth={1}
+                          strokeDasharray="4,4"
+                          opacity={0.6}
+                        />
+                        <SvgText
+                          x={xPosition}
+                          y={10}
+                          fontSize={10}
+                          fill={colors.primary}
+                          textAnchor="middle"
+                          fontWeight="bold"
+                        >
+                          {currentDay}
+                        </SvgText>
+                      </G>
+                    );
+                  } : undefined}
                   bezier
                   withInnerLines={true}
                   withOuterLines={true}
