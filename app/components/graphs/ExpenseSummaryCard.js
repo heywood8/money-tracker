@@ -5,9 +5,16 @@ import currencies from '../../../assets/currencies.json';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
-  const decimals = currencyInfo?.decimal_digits ?? 2;
   const symbol = currencyInfo?.symbol ?? currency;
-  return `${symbol}${parseFloat(amount).toFixed(decimals)}`;
+  const value = parseFloat(amount);
+  if (value >= 1000000) {
+    return `${symbol}${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `${symbol}${(value / 1000).toFixed(1)}K`;
+  }
+  const decimals = currencyInfo?.decimal_digits ?? 2;
+  return `${symbol}${value.toFixed(decimals)}`;
 };
 
 const ExpenseSummaryCard = ({
@@ -46,12 +53,13 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderRadius: 8,
     borderWidth: 1,
-    padding: 10,
     flex: 1,
+    padding: 10,
   },
   summaryText: {
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

@@ -38,10 +38,10 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders income categories label with amount', () => {
+    it('renders income categories label with abbreviated amount', () => {
       const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
 
-      expect(getByText(/income_categories.*\$3500\.50/)).toBeTruthy();
+      expect(getByText(/income_categories.*\$3\.5K/)).toBeTruthy();
     });
 
     it('uses translation function', () => {
@@ -57,31 +57,39 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats USD with symbol and 2 decimal places', () => {
+    it('formats small amounts with full decimals', () => {
+      const { getByText } = render(
+        <IncomeSummaryCard {...defaultProps} totalIncome={500.5} selectedCurrency="USD" />,
+      );
+
+      expect(getByText(/\$500\.50/)).toBeTruthy();
+    });
+
+    it('abbreviates thousands with K', () => {
       const { getByText } = render(
         <IncomeSummaryCard {...defaultProps} totalIncome={2500.5} selectedCurrency="USD" />,
       );
 
-      expect(getByText(/\$2500\.50/)).toBeTruthy();
+      expect(getByText(/\$2\.5K/)).toBeTruthy();
     });
 
-    it('formats EUR with symbol and 2 decimal places', () => {
+    it('abbreviates millions with M', () => {
       const { getByText } = render(
-        <IncomeSummaryCard {...defaultProps} totalIncome={1200.1} selectedCurrency="EUR" />,
+        <IncomeSummaryCard {...defaultProps} totalIncome={1200000} selectedCurrency="EUR" />,
       );
 
-      expect(getByText(/€1200\.10/)).toBeTruthy();
+      expect(getByText(/€1\.2M/)).toBeTruthy();
     });
 
-    it('formats JPY with symbol and 0 decimal places', () => {
+    it('formats JPY thousands with K', () => {
       const { getByText } = render(
         <IncomeSummaryCard {...defaultProps} totalIncome={150000.99} selectedCurrency="JPY" />,
       );
 
-      expect(getByText(/¥150001/)).toBeTruthy();
+      expect(getByText(/¥150\.0K/)).toBeTruthy();
     });
 
-    it('formats BTC with symbol and 8 decimal places', () => {
+    it('formats BTC with full decimals when small', () => {
       const { getByText } = render(
         <IncomeSummaryCard {...defaultProps} totalIncome={0.12345678} selectedCurrency="BTC" />,
       );
@@ -112,7 +120,7 @@ describe('IncomeSummaryCard', () => {
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
-      expect(queryByText(/\$3500\.50/)).toBeNull();
+      expect(queryByText(/\$3\.5K/)).toBeNull();
     });
   });
 
@@ -154,7 +162,7 @@ describe('IncomeSummaryCard', () => {
         <IncomeSummaryCard {...defaultProps} colors={customColors} />,
       );
 
-      const text = getByText(/income_categories.*\$3500\.50/);
+      const text = getByText(/income_categories.*\$3\.5K/);
       expect(text.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#00FF00' })]),
       );
