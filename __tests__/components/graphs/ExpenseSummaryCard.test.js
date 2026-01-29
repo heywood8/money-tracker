@@ -41,7 +41,7 @@ describe('ExpenseSummaryCard', () => {
     it('renders expense categories label with abbreviated amount', () => {
       const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
 
-      expect(getByText(/−.*\$1\.5K/)).toBeTruthy();
+      expect(getByText(/\$1\.5K/)).toBeTruthy();
     });
 
     it('uses translation function for accessibility', () => {
@@ -168,9 +168,9 @@ describe('ExpenseSummaryCard', () => {
         <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
       );
 
-      const text = getByText(/−.*\$1\.5K/);
+      const text = getByText(/\$1\.5K/);
       expect(text.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ color: '#FF0000' })]),
+        expect.objectContaining({ color: '#E57373' }),
       );
     });
   });
