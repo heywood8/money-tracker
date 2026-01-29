@@ -474,12 +474,12 @@ const styles = StyleSheet.create({
   filtersRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   periodPickerWrapper: {
     borderRadius: 8,
     borderWidth: 1,
-    flex: 2,
+    flex: 1,
     height: 40,
     overflow: 'hidden',
   },
