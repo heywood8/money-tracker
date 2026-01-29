@@ -38,10 +38,10 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders expense categories label with amount', () => {
+    it('renders expense categories label with abbreviated amount', () => {
       const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
 
-      expect(getByText(/expense_categories.*\$1500\.75/)).toBeTruthy();
+      expect(getByText(/expense_categories.*\$1\.5K/)).toBeTruthy();
     });
 
     it('uses translation function', () => {
@@ -57,7 +57,7 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats USD with symbol and 2 decimal places', () => {
+    it('formats small amounts with full decimals', () => {
       const { getByText } = render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={100.5} selectedCurrency="USD" />,
       );
@@ -65,7 +65,23 @@ describe('ExpenseSummaryCard', () => {
       expect(getByText(/\$100\.50/)).toBeTruthy();
     });
 
-    it('formats EUR with symbol and 2 decimal places', () => {
+    it('abbreviates thousands with K', () => {
+      const { getByText } = render(
+        <ExpenseSummaryCard {...defaultProps} totalExpenses={5400} selectedCurrency="USD" />,
+      );
+
+      expect(getByText(/\$5\.4K/)).toBeTruthy();
+    });
+
+    it('abbreviates millions with M', () => {
+      const { getByText } = render(
+        <ExpenseSummaryCard {...defaultProps} totalExpenses={2500000} selectedCurrency="USD" />,
+      );
+
+      expect(getByText(/\$2\.5M/)).toBeTruthy();
+    });
+
+    it('formats EUR with symbol', () => {
       const { getByText } = render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={85.1} selectedCurrency="EUR" />,
       );
@@ -73,15 +89,15 @@ describe('ExpenseSummaryCard', () => {
       expect(getByText(/€85\.10/)).toBeTruthy();
     });
 
-    it('formats JPY with symbol and 0 decimal places', () => {
+    it('formats JPY thousands with K', () => {
       const { getByText } = render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={1000.99} selectedCurrency="JPY" />,
       );
 
-      expect(getByText(/¥1001/)).toBeTruthy();
+      expect(getByText(/¥1\.0K/)).toBeTruthy();
     });
 
-    it('formats BTC with symbol and 8 decimal places', () => {
+    it('formats BTC with full decimals when small', () => {
       const { getByText } = render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={0.00012345} selectedCurrency="BTC" />,
       );
@@ -112,7 +128,7 @@ describe('ExpenseSummaryCard', () => {
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
-      expect(queryByText(/\$1500\.75/)).toBeNull();
+      expect(queryByText(/\$1\.5K/)).toBeNull();
     });
   });
 
@@ -145,30 +161,6 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Theming', () => {
-    it('applies background color from colors prop', () => {
-      const customColors = {
-        ...defaultProps.colors,
-        altRow: '#F0F0F0',
-      };
-      const { toJSON } = render(
-        <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
-      );
-
-      expect(toJSON()).toBeTruthy();
-    });
-
-    it('applies border color from colors prop', () => {
-      const customColors = {
-        ...defaultProps.colors,
-        border: '#DDDDDD',
-      };
-      const { toJSON } = render(
-        <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
-      );
-
-      expect(toJSON()).toBeTruthy();
-    });
-
     it('applies text color', () => {
       const customColors = {
         ...defaultProps.colors,
@@ -178,7 +170,7 @@ describe('ExpenseSummaryCard', () => {
         <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
       );
 
-      const text = getByText(/expense_categories.*\$1500\.75/);
+      const text = getByText(/expense_categories.*\$1\.5K/);
       expect(text.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#FF0000' })]),
       );
