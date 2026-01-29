@@ -23,6 +23,11 @@ jest.mock('../../app/utils/categoryUtils', () => ({
     const category = categories.find(c => c.id === categoryId);
     return category ? category.name : null;
   }),
+  getCategoryNames: jest.fn((categoryId, categories, t) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return { categoryName: t('unknown_category'), parentName: null };
+    return { categoryName: category.name, parentName: null };
+  }),
 }));
 
 describe('useQuickAddForm', () => {
@@ -175,6 +180,7 @@ describe('useQuickAddForm', () => {
       expect(info).toEqual({
         name: 'Food',
         icon: 'food-icon',
+        parentName: null,
       });
     });
 
@@ -187,6 +193,7 @@ describe('useQuickAddForm', () => {
       expect(info).toEqual({
         name: 'unknown_category',
         icon: 'help-circle',
+        parentName: null,
       });
     });
 

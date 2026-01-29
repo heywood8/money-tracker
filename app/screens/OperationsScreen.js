@@ -76,6 +76,7 @@ const OperationsScreen = () => {
     getCategoryInfo,
     getCategoryName,
     filteredCategories,
+    topCategoriesForType,
     resetForm,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
 
@@ -425,6 +426,8 @@ const OperationsScreen = () => {
       setQuickAddValues={setQuickAddValues}
       accounts={visibleAccounts}
       filteredCategories={filteredCategories}
+      topCategoriesForType={topCategoriesForType}
+      getCategoryInfo={getCategoryInfo}
       getAccountName={getAccountName}
       getAccountBalance={getAccountBalance}
       getCategoryName={getCategoryName}
@@ -433,9 +436,10 @@ const OperationsScreen = () => {
       handleAmountChange={handleAmountChange}
       handleExchangeRateChange={handleExchangeRateChange}
       handleDestinationAmountChange={handleDestinationAmountChange}
+      onAutoAddWithCategory={handleAutoAddWithCategory}
       TYPES={TYPES}
     />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, TYPES]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, TYPES]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
