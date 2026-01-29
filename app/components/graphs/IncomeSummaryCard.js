@@ -10,7 +10,8 @@ const cardWidth = (screenWidth - (HORIZONTAL_PADDING * 2) - 8) / 2; // 8 is gap
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
   const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
+  const symbol = currencyInfo?.symbol ?? currency;
+  return `${symbol}${parseFloat(amount).toFixed(decimals)}`;
 };
 
 const IncomeSummaryCard = ({
@@ -29,11 +30,8 @@ const IncomeSummaryCard = ({
       accessibilityRole="button"
       accessibilityLabel={t('income_by_category')}
     >
-      <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
-        {t('total_income')}
-      </Text>
-      <Text style={[styles.summaryAmount, { color: colors.text }]}>
-        {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+      <Text style={[styles.summaryText, { color: colors.text }]}>
+        {t('income_categories')}: {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
       </Text>
     </TouchableOpacity>
   );
@@ -49,19 +47,15 @@ IncomeSummaryCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  summaryAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   summaryCard: {
     borderRadius: 8,
     borderWidth: 1,
     padding: 10,
     width: cardWidth,
   },
-  summaryLabel: {
-    fontSize: 12,
-    marginBottom: 4,
+  summaryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
