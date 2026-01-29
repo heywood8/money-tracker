@@ -286,6 +286,7 @@ const OperationFormFields = memo(({
                     { color: textColor },
                   ]}
                   numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {categoryInfo.name}
                 </Text>
@@ -418,12 +419,12 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     justifyContent: 'center',
     minHeight: 48,
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
   },
   categoryShortcutText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   disabledInput: {
