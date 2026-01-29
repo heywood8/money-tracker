@@ -33,8 +33,8 @@ const ExpenseSummaryCard = ({
       accessibilityRole="button"
       accessibilityLabel={t('expenses_by_category')}
     >
-      <Text style={[styles.summaryText, { color: colors.text }]}>
-        {t('expense_categories')}: {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
+      <Text style={styles.summaryText}>
+        {loading ? '...' : formatCurrency(totalExpenses, selectedCurrency)}
       </Text>
     </TouchableOpacity>
   );
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   summaryText: {
+    color: '#E57373',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',

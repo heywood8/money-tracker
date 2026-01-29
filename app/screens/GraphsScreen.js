@@ -370,6 +370,26 @@ const GraphsScreen = () => {
             </View>
           </View>
 
+          {/* Income and Expenses Summary Cards - side by side */}
+          <View style={styles.summaryCardsRow}>
+            <IncomeSummaryCard
+              colors={colors}
+              t={t}
+              loadingIncome={loadingIncome}
+              totalIncome={totalIncome}
+              selectedCurrency={selectedCurrency}
+              onPress={openIncomeModal}
+            />
+            <ExpenseSummaryCard
+              colors={colors}
+              t={t}
+              loading={loading}
+              totalExpenses={totalExpenses}
+              selectedCurrency={selectedCurrency}
+              onPress={openExpenseModal}
+            />
+          </View>
+
           {/* Balance History Card */}
           {selectedMonth !== null && selectedAccount && (
             <BalanceHistoryCard
@@ -388,26 +408,6 @@ const GraphsScreen = () => {
               isCurrentMonth={isCurrentMonth}
             />
           )}
-
-          {/* Expenses and Income Summary Cards - side by side */}
-          <View style={styles.summaryCardsRow}>
-            <ExpenseSummaryCard
-              colors={colors}
-              t={t}
-              loading={loading}
-              totalExpenses={totalExpenses}
-              selectedCurrency={selectedCurrency}
-              onPress={openExpenseModal}
-            />
-            <IncomeSummaryCard
-              colors={colors}
-              t={t}
-              loadingIncome={loadingIncome}
-              totalIncome={totalIncome}
-              selectedCurrency={selectedCurrency}
-              onPress={openIncomeModal}
-            />
-          </View>
 
           {/* Category Spending Trend Card - Last 12 Months */}
           <CategorySpendingCard

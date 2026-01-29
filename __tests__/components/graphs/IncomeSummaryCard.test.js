@@ -41,18 +41,16 @@ describe('IncomeSummaryCard', () => {
     it('renders income categories label with abbreviated amount', () => {
       const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
 
-      expect(getByText(/income_categories.*\$3\.5K/)).toBeTruthy();
+      expect(getByText(/\+.*\$3\.5K/)).toBeTruthy();
     });
 
-    it('uses translation function', () => {
+    it('uses translation function for accessibility', () => {
       const customT = jest.fn((key) => `translated_${key}`);
-      const { getByText } = render(
+      render(
         <IncomeSummaryCard {...defaultProps} t={customT} />,
       );
 
-      expect(customT).toHaveBeenCalledWith('income_categories');
       expect(customT).toHaveBeenCalledWith('income_by_category');
-      expect(getByText(/translated_income_categories/)).toBeTruthy();
     });
   });
 
@@ -162,7 +160,7 @@ describe('IncomeSummaryCard', () => {
         <IncomeSummaryCard {...defaultProps} colors={customColors} />,
       );
 
-      const text = getByText(/income_categories.*\$3\.5K/);
+      const text = getByText(/\+.*\$3\.5K/);
       expect(text.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#00FF00' })]),
       );

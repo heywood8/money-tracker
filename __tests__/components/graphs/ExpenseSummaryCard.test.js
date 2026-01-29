@@ -41,18 +41,16 @@ describe('ExpenseSummaryCard', () => {
     it('renders expense categories label with abbreviated amount', () => {
       const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
 
-      expect(getByText(/expense_categories.*\$1\.5K/)).toBeTruthy();
+      expect(getByText(/−.*\$1\.5K/)).toBeTruthy();
     });
 
-    it('uses translation function', () => {
+    it('uses translation function for accessibility', () => {
       const customT = jest.fn((key) => `translated_${key}`);
-      const { getByText } = render(
+      render(
         <ExpenseSummaryCard {...defaultProps} t={customT} />,
       );
 
-      expect(customT).toHaveBeenCalledWith('expense_categories');
       expect(customT).toHaveBeenCalledWith('expenses_by_category');
-      expect(getByText(/translated_expense_categories/)).toBeTruthy();
     });
   });
 
@@ -170,7 +168,7 @@ describe('ExpenseSummaryCard', () => {
         <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
       );
 
-      const text = getByText(/expense_categories.*\$1\.5K/);
+      const text = getByText(/−.*\$1\.5K/);
       expect(text.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#FF0000' })]),
       );
