@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.38.0](https://github.com/heywood8/money-tracker/compare/penny-v0.37.0...penny-v0.38.0) (2026-01-29)
+
+
+### Features
+
+* abbreviate large amounts (K/M) and center-align summary cards ([c41acc5](https://github.com/heywood8/money-tracker/commit/c41acc53e6b7379a5cc725a7de1e08acbcc067fa))
+
+
+### Bug Fixes
+
+* equalize picker widths and consistent filter row spacing ([80930be](https://github.com/heywood8/money-tracker/commit/80930be66ec6faa144fcaa0e732ba27726d281f7))
+* update summary card tests to match simplified component output ([#260](https://github.com/heywood8/money-tracker/issues/260)) ([927fe74](https://github.com/heywood8/money-tracker/commit/927fe7451f1533e325d22a050ffbaac20e64a737))
+* use flex instead of explicit width for equal summary card sizing ([f84e766](https://github.com/heywood8/money-tracker/commit/f84e7665bbf68fcaf235709fd3edbff3344264a9))
+
+
+### Code Refactoring
+
+* restyle summary cards with muted color-coded amounts ([284d156](https://github.com/heywood8/money-tracker/commit/284d1565211b85690d137478528edfcd370491dc))
+* simplify summary cards to one-liner format with currency symbols ([95ac1a3](https://github.com/heywood8/money-tracker/commit/95ac1a38ee5cf4e5b91cceb525130fc36a483b5b))
+
 ## [0.37.0](https://github.com/heywood8/money-tracker/compare/penny-v0.36.0...penny-v0.37.0) (2026-01-28)
 
 
