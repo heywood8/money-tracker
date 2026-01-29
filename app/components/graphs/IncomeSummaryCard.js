@@ -33,8 +33,8 @@ const IncomeSummaryCard = ({
       accessibilityRole="button"
       accessibilityLabel={t('income_by_category')}
     >
-      <Text style={[styles.summaryText, { color: colors.text }]}>
-        {t('income_categories')}: {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+      <Text style={styles.summaryText}>
+        {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
       </Text>
     </TouchableOpacity>
   );
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   summaryText: {
+    color: '#81C784',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
