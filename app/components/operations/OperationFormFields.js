@@ -53,6 +53,8 @@ const OperationFormFields = memo(({
   setValues,
   accounts,
   categories,
+  topCategoriesForType,
+  getCategoryInfo,
   getAccountName,
   getAccountBalance,
   getCategoryName,
@@ -68,6 +70,7 @@ const OperationFormFields = memo(({
   containerBackground,
   onExchangeRateChange,
   onDestinationAmountChange,
+  onAutoAddWithCategory,
 }) => {
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -229,10 +232,96 @@ const OperationFormFields = memo(({
     }
   };
 
-  // Render category picker
+  // Render category picker with shortcuts
   const renderCategoryPicker = () => {
     if (values.type === 'transfer') return null;
 
+    // If showing shortcuts (topCategoriesForType is available), render button layout
+    if (topCategoriesForType && topCategoriesForType.length > 0) {
+      // Handler for category button press
+      const handleCategoryPress = (categoryId) => {
+        if (disabled) return;
+        const hasValidAmount = values.amount && values.amount.trim() !== '';
+        if (hasValidAmount && onAutoAddWithCategory) {
+          onAutoAddWithCategory(categoryId);
+        } else {
+          setValues(v => ({ ...v, categoryId }));
+        }
+      };
+
+      return (
+        <View style={styles.categoryButtonsContainer}>
+          {/* Button to open picker */}
+          <Pressable
+            style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
+            onPress={() => !disabled && openPicker('category', categories)}
+            disabled={disabled}
+          >
+            <Icon name="view-grid" size={20} color={disabled ? colors.mutedText : colors.text} />
+            <Text
+              style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
+              numberOfLines={2}
+            >
+              {t('all_categories')}
+            </Text>
+          </Pressable>
+
+          {/* Top 3 category shortcut buttons */}
+          {topCategoriesForType.map((category) => {
+            const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
+            const isSelected = values.categoryId === category.id;
+            const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+            const parentColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
+
+            return (
+              <Pressable
+                key={category.id}
+                style={[
+                  styles.categoryShortcutButton,
+                  {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                  },
+                  disabledStyle,
+                ]}
+                onPress={() => handleCategoryPress(category.id)}
+                disabled={disabled}
+              >
+                <Icon
+                  name={categoryInfo.icon}
+                  size={20}
+                  color={textColor}
+                />
+                <Text
+                  style={[
+                    styles.categoryShortcutText,
+                    { color: textColor },
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {categoryInfo.name}
+                </Text>
+                {categoryInfo.parentName && (
+                  <Text
+                    style={[
+                      styles.categoryShortcutParent,
+                      { color: parentColor },
+                    ]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {categoryInfo.parentName}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // Fallback: render single full-width picker (for OperationModal or when no top categories)
     return (
       <Pressable
         style={[styles.formInput, inputStyle, disabledStyle]}
@@ -298,6 +387,8 @@ OperationFormFields.propTypes = {
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
+  topCategoriesForType: PropTypes.array,
+  getCategoryInfo: PropTypes.func,
   getAccountName: PropTypes.func.isRequired,
   getAccountBalance: PropTypes.func,
   getCategoryName: PropTypes.func.isRequired,
@@ -313,6 +404,7 @@ OperationFormFields.propTypes = {
   containerBackground: PropTypes.string,
   onExchangeRateChange: PropTypes.func,
   onDestinationAmountChange: PropTypes.func,
+  onAutoAddWithCategory: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -328,6 +420,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xs,
+  },
+  categoryButtonsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  categoryPickerButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  categoryPickerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  categoryShortcutButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  categoryShortcutParent: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  categoryShortcutText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
   disabledInput: {
     opacity: 0.6,
