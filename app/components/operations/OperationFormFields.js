@@ -70,6 +70,7 @@ const OperationFormFields = memo(({
   containerBackground,
   onExchangeRateChange,
   onDestinationAmountChange,
+  onAutoAddWithCategory,
 }) => {
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -239,7 +240,11 @@ const OperationFormFields = memo(({
     if (topCategoriesForType && topCategoriesForType.length > 0) {
       // Handler for category button press
       const handleCategoryPress = (categoryId) => {
-        if (!disabled) {
+        if (disabled) return;
+        const hasValidAmount = values.amount && values.amount.trim() !== '';
+        if (hasValidAmount && onAutoAddWithCategory) {
+          onAutoAddWithCategory(categoryId);
+        } else {
           setValues(v => ({ ...v, categoryId }));
         }
       };
@@ -252,14 +257,21 @@ const OperationFormFields = memo(({
             onPress={() => !disabled && openPicker('category', categories)}
             disabled={disabled}
           >
-            <Icon name="format-list-bulleted" size={18} color={disabled ? colors.mutedText : colors.mutedText} />
+            <Icon name="view-grid" size={20} color={disabled ? colors.mutedText : colors.text} />
+            <Text
+              style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
+              numberOfLines={2}
+            >
+              {t('all_categories')}
+            </Text>
           </Pressable>
 
           {/* Top 3 category shortcut buttons */}
-          {topCategoriesForType.map((category, index) => {
-            const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon };
+          {topCategoriesForType.map((category) => {
+            const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
             const isSelected = values.categoryId === category.id;
             const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+            const parentColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
 
             return (
               <Pressable
@@ -277,7 +289,7 @@ const OperationFormFields = memo(({
               >
                 <Icon
                   name={categoryInfo.icon}
-                  size={16}
+                  size={20}
                   color={textColor}
                 />
                 <Text
@@ -290,6 +302,18 @@ const OperationFormFields = memo(({
                 >
                   {categoryInfo.name}
                 </Text>
+                {categoryInfo.parentName && (
+                  <Text
+                    style={[
+                      styles.categoryShortcutParent,
+                      { color: parentColor },
+                    ]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {categoryInfo.parentName}
+                  </Text>
+                )}
               </Pressable>
             );
           })}
@@ -380,6 +404,7 @@ OperationFormFields.propTypes = {
   containerBackground: PropTypes.string,
   onExchangeRateChange: PropTypes.func,
   onDestinationAmountChange: PropTypes.func,
+  onAutoAddWithCategory: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -405,27 +430,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
+    flex: 1,
+    flexDirection: 'column',
     justifyContent: 'center',
     minHeight: 48,
-    padding: SPACING.md,
-    width: 48,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  categoryPickerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
   categoryShortcutButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
+    flexDirection: 'column',
     justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
   },
+  categoryShortcutParent: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
   categoryShortcutText: {
-    flex: 1,
     fontSize: 12,
     fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
   disabledInput: {
     opacity: 0.6,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getLastAccessedAccount } from '../services/LastAccount';
-import { getCategoryDisplayName } from '../utils/categoryUtils';
+import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils';
 import * as Currency from '../services/currency';
 import * as OperationsDB from '../services/OperationsDB';
 import currencies from '../../assets/currencies.json';
@@ -66,13 +66,14 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   // Get category info
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
-    if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
+    if (!category) return { name: t('unknown_category'), icon: 'help-circle', parentName: null };
 
-    const categoryName = getCategoryDisplayName(categoryId, categories, t);
+    const { categoryName, parentName } = getCategoryNames(categoryId, categories, t);
 
     return {
       name: categoryName || t('unknown_category'),
       icon: category.icon || 'help-circle',
+      parentName,
     };
   }, [categories, t]);
 

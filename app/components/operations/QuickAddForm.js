@@ -34,6 +34,7 @@ const QuickAddForm = memo(({
   handleAmountChange,
   handleExchangeRateChange,
   handleDestinationAmountChange,
+  onAutoAddWithCategory,
   TYPES,
 }) => {
   const containerThemed = React.useMemo(() => ({
@@ -74,6 +75,7 @@ const QuickAddForm = memo(({
           transferLayout="sideBySide"
           onExchangeRateChange={handleExchangeRateChange}
           onDestinationAmountChange={handleDestinationAmountChange}
+          onAutoAddWithCategory={onAutoAddWithCategory}
         />
       </View>
     </View>
@@ -99,6 +101,7 @@ QuickAddForm.propTypes = {
   handleAmountChange: PropTypes.func.isRequired,
   handleExchangeRateChange: PropTypes.func.isRequired,
   handleDestinationAmountChange: PropTypes.func.isRequired,
+  onAutoAddWithCategory: PropTypes.func,
   TYPES: PropTypes.array.isRequired,
 };
 
