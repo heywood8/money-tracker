@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.0](https://github.com/heywood8/money-tracker/compare/penny-v0.38.0...penny-v0.39.0) (2026-01-29)
+
+
+### Features
+
+* add category shortcuts to quickadd form ([#259](https://github.com/heywood8/money-tracker/issues/259)) ([ff4491c](https://github.com/heywood8/money-tracker/commit/ff4491c39ceab70d5e314a6cc8c947ec0eb8ac43))
+
 ## [0.38.0](https://github.com/heywood8/money-tracker/compare/penny-v0.37.0...penny-v0.38.0) (2026-01-29)
 
 
