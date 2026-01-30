@@ -1,0 +1,36 @@
+appId: com.heywood8.monkeep.dev
+---
+# First launch: select English and continue
+- waitForAnimationToEnd:
+    timeout: 10000
+
+- assertVisible: "English"
+- tapOn: "English"
+- tapOn:
+    id: ".*continue.*"
+    optional: true
+- tapOn: "Continue"
+
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Screenshot 1: Operations screen (default first tab)
+- takeScreenshot: screenshots/01_operations
+
+# Navigate to Graphs tab
+- tapOn: "Graphs"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/02_graphs
+
+# Navigate to Accounts tab
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/03_accounts
+
+# Navigate to Categories tab
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/04_categories
