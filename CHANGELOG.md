@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.1](https://github.com/heywood8/money-tracker/compare/penny-v0.39.0...penny-v0.39.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* remove maxHeight constraint from language modal content ([#262](https://github.com/heywood8/money-tracker/issues/262)) ([94ab067](https://github.com/heywood8/money-tracker/commit/94ab0671c25980af27dc9b76c642ec602b0abc25))
+
 ## [0.39.0](https://github.com/heywood8/money-tracker/compare/penny-v0.38.0...penny-v0.39.0) (2026-01-29)
 
 
