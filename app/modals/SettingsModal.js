@@ -514,7 +514,6 @@ const styles = StyleSheet.create({
   languageModalContent: {
     borderRadius: 12,
     margin: 20,
-    maxHeight: '80%',
     padding: 0,
   },
   languageModalHeader: {
