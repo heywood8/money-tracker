@@ -35,6 +35,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Expo prebuild (generate android project)
         run: bunx expo prebuild --platform android --clean
 
@@ -46,12 +52,12 @@ jobs:
       - name: Run emulator and capture screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 31
           arch: x86_64
-          profile: pixel_6
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
+          emulator-boot-timeout: 300
           script: |
             # Build the debug APK (ANDROID_HOME is set by the emulator runner)
             ./android/gradlew -p android assembleDebug
