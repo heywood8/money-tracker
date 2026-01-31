@@ -43,7 +43,7 @@ jobs:
 
       - name: Expo prebuild (generate android project)
         env:
-          APP_VARIANT: preview
+          APP_VARIANT: production
         run: bunx expo prebuild --platform android --clean
 
       - name: Install Maestro
@@ -62,7 +62,7 @@ jobs:
           emulator-boot-timeout: 300
           script: |
             # Build release APK with embedded JS bundle (ANDROID_HOME is set by the emulator runner)
-            APP_VARIANT=preview ./android/gradlew -p android assembleRelease
+            APP_VARIANT=production ./android/gradlew -p android assembleRelease
 
             # Install the APK
             adb install android/app/build/outputs/apk/release/app-release.apk
