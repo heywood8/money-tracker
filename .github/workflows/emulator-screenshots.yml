@@ -56,9 +56,8 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
-          profile: pixel_7_pro
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -skin 1440x3120
           disable-animations: true
           emulator-boot-timeout: 300
           script: |
