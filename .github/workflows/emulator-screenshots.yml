@@ -17,7 +17,7 @@ concurrency:
 jobs:
   screenshots:
     name: Capture App Screenshots
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout code
@@ -36,8 +36,6 @@ jobs:
           java-version: 17
 
       - name: Expo prebuild (generate android project)
-        env:
-          APP_VARIANT: preview
         run: bunx expo prebuild --platform android --clean
 
       - name: Install Maestro
@@ -49,20 +47,20 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
-          arch: arm64-v8a
+          arch: x86_64
           profile: pixel_6
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
             # Build the debug APK (ANDROID_HOME is set by the emulator runner)
-            APP_VARIANT=preview ./android/gradlew -p android assembleDebug
+            ./android/gradlew -p android assembleDebug
 
             # Install the APK
             adb install android/app/build/outputs/apk/debug/app-debug.apk
 
             # Launch the app
-            adb shell am start -n com.heywood8.monkeep/.MainActivity
+            adb shell am start -n com.heywood8.monkeep.dev/.MainActivity
 
             # Wait for app to fully load
             sleep 10
