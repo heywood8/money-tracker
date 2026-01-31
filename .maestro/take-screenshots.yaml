@@ -1,4 +1,4 @@
-appId: com.heywood8.monkeep.dev
+appId: com.heywood8.monkeep
 ---
 # Wait for language selection screen to fully load
 - extendedWaitUntil:

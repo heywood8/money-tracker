@@ -42,6 +42,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Expo prebuild (generate android project)
+        env:
+          APP_VARIANT: preview
         run: bunx expo prebuild --platform android --clean
 
       - name: Install Maestro
@@ -59,35 +61,22 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 300
           script: |
-            # Build the debug APK (ANDROID_HOME is set by the emulator runner)
-            ./android/gradlew -p android assembleDebug
+            # Build release APK with embedded JS bundle (ANDROID_HOME is set by the emulator runner)
+            APP_VARIANT=preview ./android/gradlew -p android assembleRelease
 
             # Install the APK
-            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb install android/app/build/outputs/apk/release/app-release.apk
 
             # Launch the app
-            adb shell am start -n com.heywood8.monkeep.dev/.MainActivity
+            adb shell am start -n com.heywood8.monkeep/.MainActivity
 
             # Create output directory
             mkdir -p screenshots
 
-            # Wait for app to start and capture diagnostic info
-            sleep 15
-            echo "=== Device info ==="
-            adb shell getprop ro.build.version.sdk
-            echo "=== Running activities ==="
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" || true
-            echo "=== Logcat (last 50 app lines) ==="
-            adb logcat -d -t 50 --pid=$(adb shell pidof com.heywood8.monkeep.dev) 2>/dev/null || true
-            echo "=== ADB screenshot before Maestro ==="
-            adb shell screencap -p /sdcard/debug_before_maestro.png
-            adb pull /sdcard/debug_before_maestro.png screenshots/debug_before_maestro.png || true
-
             # Run Maestro flow to navigate and take screenshots
-            # Maestro uses extendedWaitUntil to poll for app readiness
             maestro test .maestro/take-screenshots.yaml || true
 
-            # Capture Maestro debug artifacts
+            # Capture Maestro debug artifacts on failure
             cp -r ~/.maestro/tests/* screenshots/ 2>/dev/null || true
 
             # List captured screenshots
