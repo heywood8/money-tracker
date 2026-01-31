@@ -68,13 +68,11 @@ jobs:
             # Launch the app
             adb shell am start -n com.heywood8.monkeep.dev/.MainActivity
 
-            # Wait for app to fully load
-            sleep 10
-
             # Create output directory
             mkdir -p screenshots
 
             # Run Maestro flow to navigate and take screenshots
+            # Maestro uses extendedWaitUntil to poll for app readiness
             maestro test .maestro/take-screenshots.yaml || true
 
             # List captured screenshots
@@ -104,6 +102,7 @@ jobs:
               '',
               '| Screen | Description |',
               '|--------|-------------|',
+              '| `00_language_selection` | First-launch language picker |',
               '| `01_operations` | Operations tab (default view) |',
               '| `02_graphs` | Graphs tab |',
               '| `03_accounts` | Accounts tab |',

@@ -1,18 +1,21 @@
 appId: com.heywood8.monkeep.dev
 ---
-# First launch: select English and continue
-- waitForAnimationToEnd:
-    timeout: 10000
+# Wait for language selection screen to fully load
+- extendedWaitUntil:
+    visible: "Welcome to Penny"
+    timeout: 30000
 
-- assertVisible: "English"
+# Screenshot 0: Language selection screen
+- takeScreenshot: screenshots/00_language_selection
+
+# Select English and continue
 - tapOn: "English"
-- tapOn:
-    id: ".*continue.*"
-    optional: true
 - tapOn: "Continue"
 
-- waitForAnimationToEnd:
-    timeout: 5000
+# Wait for main app to load (Operations tab is the default)
+- extendedWaitUntil:
+    visible: "Operations"
+    timeout: 30000
 
 # Screenshot 1: Operations screen (default first tab)
 - takeScreenshot: screenshots/01_operations
