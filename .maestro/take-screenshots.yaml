@@ -1,4 +1,4 @@
-appId: com.heywood8.monkeep.dev
+appId: com.heywood8.monkeep
 ---
 # First launch: select English and continue
 - waitForAnimationToEnd:
