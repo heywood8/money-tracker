@@ -71,9 +71,24 @@ jobs:
             # Create output directory
             mkdir -p screenshots
 
+            # Wait for app to start and capture diagnostic info
+            sleep 15
+            echo "=== Device info ==="
+            adb shell getprop ro.build.version.sdk
+            echo "=== Running activities ==="
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" || true
+            echo "=== Logcat (last 50 app lines) ==="
+            adb logcat -d -t 50 --pid=$(adb shell pidof com.heywood8.monkeep.dev) 2>/dev/null || true
+            echo "=== ADB screenshot before Maestro ==="
+            adb shell screencap -p /sdcard/debug_before_maestro.png
+            adb pull /sdcard/debug_before_maestro.png screenshots/debug_before_maestro.png || true
+
             # Run Maestro flow to navigate and take screenshots
             # Maestro uses extendedWaitUntil to poll for app readiness
             maestro test .maestro/take-screenshots.yaml || true
+
+            # Capture Maestro debug artifacts
+            cp -r ~/.maestro/tests/* screenshots/ 2>/dev/null || true
 
             # List captured screenshots
             ls -la screenshots/ || echo "No screenshots directory found"
