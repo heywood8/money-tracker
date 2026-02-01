@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   actions: read
 
@@ -91,31 +91,101 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Push screenshots to ci-screenshots branch
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          SCREENSHOT_DIR="pr-${PR_NUMBER}"
+          BACKUP_DIR="/tmp/screenshots-backup"
+
+          # Check if any screenshots exist
+          if ! ls screenshots/*.png 1>/dev/null 2>&1; then
+            echo "No screenshot files found, skipping upload"
+            exit 0
+          fi
+
+          # Save screenshots outside the working tree (branch switches may clean it)
+          mkdir -p "$BACKUP_DIR"
+          cp screenshots/*.png "$BACKUP_DIR/"
+
+          # Configure git for the push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create or switch to the ci-screenshots orphan branch
+          git fetch origin ci-screenshots 2>/dev/null || true
+          if git rev-parse --verify origin/ci-screenshots >/dev/null 2>&1; then
+            git checkout ci-screenshots
+          else
+            git checkout --orphan ci-screenshots
+            git rm -rf . 2>/dev/null || true
+            git clean -fd 2>/dev/null || true
+            git commit --allow-empty -m "Initialize ci-screenshots branch"
+          fi
+
+          # Copy screenshots into a PR-specific directory
+          mkdir -p "${SCREENSHOT_DIR}"
+          cp "$BACKUP_DIR"/*.png "${SCREENSHOT_DIR}/"
+
+          # Commit and push
+          git add "${SCREENSHOT_DIR}"
+          git commit -m "Update screenshots for PR #${PR_NUMBER}" || echo "No changes to commit"
+          git push origin ci-screenshots
+
+          # Switch back to the PR branch and restore screenshots
+          git checkout - 2>/dev/null || true
+          mkdir -p screenshots
+          cp "$BACKUP_DIR"/*.png screenshots/
+
       - name: Build PR comment body
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
         id: set-screenshot-results
         with:
           script: |
+            const fs = require('fs');
+            const prNumber = context.payload.pull_request.number;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const rawBase = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/ci-screenshots/pr-${prNumber}`;
 
-            const body = [
+            const screens = [
+              { file: '00_language_selection', desc: 'First-launch language picker' },
+              { file: '01_operations', desc: 'Operations tab (default view)' },
+              { file: '02_graphs', desc: 'Graphs tab' },
+              { file: '03_accounts', desc: 'Accounts tab' },
+              { file: '04_categories', desc: 'Categories tab' },
+            ];
+
+            // Check which screenshots actually exist
+            const available = screens.filter(s =>
+              fs.existsSync(`screenshots/${s.file}.png`)
+            );
+
+            const lines = [
               '## App Screenshots',
               '',
-              'Emulator screenshots of the main app screens have been captured for this PR.',
-              '',
-              '| Screen | Description |',
-              '|--------|-------------|',
-              '| `00_language_selection` | First-launch language picker |',
-              '| `01_operations` | Operations tab (default view) |',
-              '| `02_graphs` | Graphs tab |',
-              '| `03_accounts` | Accounts tab |',
-              '| `04_categories` | Categories tab |',
-              '',
-              `**[Download screenshots from workflow artifacts](${runUrl}#artifacts)**`,
-            ].join('\n');
+            ];
 
-            core.setOutput('message', body);
+            if (available.length > 0) {
+              // Build a table with embedded images
+              lines.push(
+                '| Screen | Screenshot |',
+                '|--------|-----------|',
+              );
+              for (const s of available) {
+                const imgUrl = `${rawBase}/${s.file}.png`;
+                lines.push(`| **${s.desc}** | <img src="${imgUrl}" width="270" /> |`);
+              }
+            } else {
+              lines.push('> No screenshots were captured for this run.');
+            }
+
+            lines.push(
+              '',
+              `**[Download full-resolution screenshots from workflow artifacts](${runUrl}#artifacts)**`,
+            );
+
+            core.setOutput('message', lines.join('\n'));
 
       - uses: marocchino/sticky-pull-request-comment@v2.9.4
         if: github.event_name == 'pull_request' && always()
