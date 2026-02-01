@@ -139,7 +139,7 @@ jobs:
 
       - name: Build PR comment body
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: set-screenshot-results
         with:
           script: |
