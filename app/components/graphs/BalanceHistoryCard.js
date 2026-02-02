@@ -148,7 +148,7 @@ const BalanceHistoryCard = ({
               // - Up to today: actual balance from table
               // - After today: forecast projection
               const combinedActualForecast = balanceHistoryData.labels.map((day, index) => {
-                if (day <= currentDay) {
+                if (!isCurrentMonth || day <= currentDay) {
                   // Use actual data up to and including today
                   return balanceHistoryData.actualForChart[index];
                 } else if (hasForecast) {
