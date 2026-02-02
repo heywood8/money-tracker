@@ -963,4 +963,234 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
   });
+
+  describe('Date-sensitive actual data rendering', () => {
+    const fullMonthData = {
+      labels: [1, 5, 10, 15, 20, 25, 31],
+      actual: [
+        { x: 1, y: 500 },
+        { x: 5, y: 600 },
+        { x: 10, y: 700 },
+        { x: 15, y: 800 },
+        { x: 20, y: 750 },
+        { x: 25, y: 900 },
+        { x: 31, y: 1000 },
+      ],
+      actualForChart: [500, 600, 700, 800, 750, 900, 1000],
+      burndown: [],
+      prevMonth: [],
+    };
+
+    afterEach(() => {
+      if (global.Date.mockRestore) {
+        global.Date.mockRestore();
+      }
+    });
+
+    it('shows all actual data for a past month regardless of current date (day 2)', () => {
+      const mockDate = new Date(2026, 1, 2); // Feb 2
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2025}
+          selectedMonth={11}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+    });
+
+    it('shows all actual data for a past month regardless of current date (day 15)', () => {
+      const mockDate = new Date(2026, 1, 15); // Feb 15
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2025}
+          selectedMonth={5}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+    });
+
+    it('shows all actual data for a past month regardless of current date (day 28)', () => {
+      const mockDate = new Date(2026, 1, 28); // Feb 28
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2025}
+          selectedMonth={10}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+    });
+
+    it('shows only data up to current day for the current month (day 10)', () => {
+      const mockDate = new Date(2024, 0, 10); // Jan 10
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      // Labels are [1, 5, 10, 15, 20, 25, 31] — days 1, 5, 10 are <= 10
+      expect(actualDataset.data).toEqual([500, 600, 700]);
+    });
+
+    it('shows only first data point for current month when date is early (day 3)', () => {
+      const mockDate = new Date(2024, 0, 3); // Jan 3
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      // Labels are [1, 5, 10, ...] — only day 1 is <= 3
+      expect(actualDataset.data).toEqual([500]);
+    });
+
+    it('shows all data points for current month at end of month (day 31)', () => {
+      const mockDate = new Date(2024, 0, 31); // Jan 31
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      // All labels [1, 5, 10, 15, 20, 25, 31] are <= 31
+      expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
+    });
+
+    it('includes forecast data after current day for current month', () => {
+      const mockDate = new Date(2024, 0, 16); // Jan 16
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const mockSpendingPrediction = {
+        dailyAverage: 50,
+        daysInMonth: 31,
+        daysElapsed: 16,
+        currentSpending: 800,
+        predictedTotal: 1550,
+        predictedRemaining: 750,
+        percentElapsed: 52,
+      };
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullMonthData}
+          onChartPress={jest.fn()}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={mockSpendingPrediction}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      const actualDataset = lineChart.props.data.datasets[0];
+      // Days 1, 5, 10, 15 are <= 16 (actual data), days 20, 25, 31 get forecast values
+      // Actual: [500, 600, 700, 800] + forecast for days 20, 25, 31
+      expect(actualDataset.data.length).toBeGreaterThan(4);
+      // First 4 values should be the actual data
+      expect(actualDataset.data.slice(0, 4)).toEqual([500, 600, 700, 800]);
+    });
+  });
 });
