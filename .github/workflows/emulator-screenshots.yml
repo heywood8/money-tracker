@@ -61,8 +61,8 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 300
           script: |
-            # Build release APK with embedded JS bundle (ANDROID_HOME is set by the emulator runner)
-            APP_VARIANT=production ./android/gradlew -p android assembleRelease
+            # Build release APK for x86_64 only (matches emulator arch, skips unnecessary ABIs)
+            APP_VARIANT=production ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
 
             # Install the APK
             adb install android/app/build/outputs/apk/release/app-release.apk
