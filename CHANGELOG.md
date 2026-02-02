@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.39.2](https://github.com/heywood8/money-tracker/compare/penny-v0.39.1...penny-v0.39.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* balance history chart to show full data for past months ([#273](https://github.com/heywood8/money-tracker/issues/273)) ([47a25ad](https://github.com/heywood8/money-tracker/commit/47a25ad693e1072fddbbfef5d5911ae0659a4c16))
+* store emulator screenshots in ci-screenshots branch with preview to post them as pictures to pull request  ([#266](https://github.com/heywood8/money-tracker/issues/266)) ([dc7efb1](https://github.com/heywood8/money-tracker/commit/dc7efb1f52cb3d5aab90d2dcc62f947de681ec35))
+* update emulator skin resolution for screenshot workflow ([#272](https://github.com/heywood8/money-tracker/issues/272)) ([4660d70](https://github.com/heywood8/money-tracker/commit/4660d70dbe9671de1fdfff934b535a42cbb9829c))
+
+
+### Build System
+
+* add emulator screenshot workflow for pull requests ([#264](https://github.com/heywood8/money-tracker/issues/264)) ([aaebeb8](https://github.com/heywood8/money-tracker/commit/aaebeb888e5b73f2cb90e6e3f12d7289226a265a))
+* **deps:** bump actions/checkout from 4 to 6 ([#268](https://github.com/heywood8/money-tracker/issues/268)) ([83cdc4a](https://github.com/heywood8/money-tracker/commit/83cdc4adc64f90ba01def0c2fc6992ec3f02877c))
+* **deps:** bump actions/github-script from 7 to 8 ([#269](https://github.com/heywood8/money-tracker/issues/269)) ([26dc5e0](https://github.com/heywood8/money-tracker/commit/26dc5e028bf345dd41dc9a391a02d717992d12d1))
+* **deps:** bump actions/setup-java from 4 to 5 ([#267](https://github.com/heywood8/money-tracker/issues/267)) ([bce7b97](https://github.com/heywood8/money-tracker/commit/bce7b97280079283e27ea1a0ffd1a61fe723128b))
+* **deps:** bump actions/upload-artifact from 4 to 6 ([#270](https://github.com/heywood8/money-tracker/issues/270)) ([7c98b65](https://github.com/heywood8/money-tracker/commit/7c98b656e191b44de3461de19509c8efa8009c74))
+
 ## [0.39.1](https://github.com/heywood8/money-tracker/compare/penny-v0.39.0...penny-v0.39.1) (2026-01-30)
 
 
