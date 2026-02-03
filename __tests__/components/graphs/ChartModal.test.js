@@ -389,4 +389,29 @@ describe('ChartModal', () => {
       expect(backButton.props.accessibilityHint).toBe('Returns to parent category level');
     });
   });
+
+  describe('Modal interaction', () => {
+    it('closes modal when tapping outside the modal content', () => {
+      const onClose = jest.fn();
+      const { getByTestId } = render(<ChartModal {...defaultProps} onClose={onClose} />);
+
+      // Find the modal overlay (TouchableWithoutFeedback)
+      const overlay = getByTestId('modal-overlay');
+      fireEvent.press(overlay);
+
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('does not close modal when tapping inside the modal content wrapper', () => {
+      const onClose = jest.fn();
+      const { getByTestId } = render(<ChartModal {...defaultProps} onClose={onClose} />);
+
+      // Find the inner TouchableWithoutFeedback (prevents bubbling)
+      const modalContentWrapper = getByTestId('modal-content-wrapper');
+      fireEvent.press(modalContentWrapper);
+
+      // Should not close because the inner TouchableWithoutFeedback prevents bubbling
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
 });
