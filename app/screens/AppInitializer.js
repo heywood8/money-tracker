@@ -7,6 +7,7 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import * as AccountsDB from '../services/AccountsDB';
 import * as OperationsDB from '../services/OperationsDB';
 import defaultAccounts from '../defaults/defaultAccounts';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -46,6 +47,9 @@ const AppInitializer = () => {
       if (firstVisibleAccount) {
         await OperationsDB.initializeDefaultOperations(firstVisibleAccount.id);
       }
+
+      // Emit reload event to refresh all contexts with the new data
+      appEvents.emit(EVENTS.RELOAD_ALL);
 
       // Initialization complete, will automatically show main app
     } catch (error) {
