@@ -6,6 +6,7 @@ import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import * as AccountsDB from '../services/AccountsDB';
 import * as OperationsDB from '../services/OperationsDB';
+import defaultAccounts from '../defaults/defaultAccounts';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -25,8 +26,22 @@ const AppInitializer = () => {
       await setFirstLaunchComplete(selectedLanguage);
 
       // Initialize default operations for first launch
+      // First ensure accounts exist (they may not be created yet by context)
+      let accounts = await AccountsDB.getAllAccounts();
+
+      // If no accounts exist, create default ones directly
+      if (accounts.length === 0) {
+        console.log('Creating default accounts for first launch...');
+        for (const acc of defaultAccounts) {
+          const created = await AccountsDB.createAccount({
+            ...acc,
+            balance: String(acc.balance),
+          });
+          accounts.push(created);
+        }
+      }
+
       // Get the first visible account to use for sample operations
-      const accounts = await AccountsDB.getAllAccounts();
       const firstVisibleAccount = accounts.find(acc => !acc.hidden);
       if (firstVisibleAccount) {
         await OperationsDB.initializeDefaultOperations(firstVisibleAccount.id);
