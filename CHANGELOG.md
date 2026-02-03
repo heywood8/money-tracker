@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.3](https://github.com/heywood8/money-tracker/compare/penny-v0.39.2...penny-v0.39.3) (2026-02-03)
+
+
+### Bug Fixes
+
+* add modal overlay tap-to-close functionality to ChartModal ([#275](https://github.com/heywood8/money-tracker/issues/275)) ([e808fbd](https://github.com/heywood8/money-tracker/commit/e808fbd5c441d24ebafc691ebce9f247102f8ee8))
+
 ## [0.39.2](https://github.com/heywood8/money-tracker/compare/penny-v0.39.1...penny-v0.39.2) (2026-02-02)
 
 
