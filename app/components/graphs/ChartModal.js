@@ -91,90 +91,90 @@ const ChartModal = ({
           <TouchableWithoutFeedback onPress={() => {}} testID="modal-content-wrapper">
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
               <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderLeft}>
-              {((modalType === 'expense' && selectedCategory !== 'all') ||
+                <View style={styles.modalHeaderLeft}>
+                  {((modalType === 'expense' && selectedCategory !== 'all') ||
                 (modalType === 'income' && selectedIncomeCategory !== 'all')) && (
+                    <TouchableOpacity
+                      onPress={handleBackToParent}
+                      style={styles.backButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back') || 'Back to parent category'}
+                      accessibilityHint="Returns to parent category level"
+                    >
+                      <Icon name="arrow-left" size={24} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  onPress={handleBackToParent}
-                  style={styles.backButton}
+                  onPress={onClose}
+                  style={styles.closeButton}
                   accessibilityRole="button"
-                  accessibilityLabel={t('back') || 'Back to parent category'}
-                  accessibilityHint="Returns to parent category level"
+                  accessibilityLabel={t('close')}
                 >
-                  <Icon name="arrow-left" size={24} color={colors.primary} />
+                  <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+                    {t('close')}
+                  </Text>
                 </TouchableOpacity>
-              )}
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {modalType === 'expense' ? t('expenses_by_category') : t('income_by_category')}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('close')}
-            >
-              <Text style={[styles.closeButtonText, { color: colors.primary }]}>
-                {t('close')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              </View>
 
-          {modalType === 'expense' && (
-            <>
-              {/* Expense Category Picker - Only show when not viewing "All" */}
-              {selectedCategory !== 'all' && (
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedCategory}
-                    onValueChange={onCategoryChange}
-                    items={categoryItems}
-                    colors={colors}
-                  />
-                </View>
-              )}
+              {modalType === 'expense' && (
+                <>
+                  {/* Expense Category Picker - Only show when not viewing "All" */}
+                  {selectedCategory !== 'all' && (
+                    <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <SimplePicker
+                        value={selectedCategory}
+                        onValueChange={onCategoryChange}
+                        items={categoryItems}
+                        colors={colors}
+                      />
+                    </View>
+                  )}
 
-              <ScrollView style={styles.modalScrollView}>
-                <ExpensePieChart
-                  colors={colors}
-                  t={t}
-                  loading={loading}
-                  chartData={chartData}
-                  selectedCurrency={selectedCurrency}
-                  onLegendItemPress={onExpenseLegendItemPress}
-                  selectedCategory={selectedCategory}
-                />
-              </ScrollView>
-            </>
-          )}
-
-          {modalType === 'income' && (
-            <>
-              {/* Income Category Picker - Only show when not viewing "All" */}
-              {selectedIncomeCategory !== 'all' && (
-                <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <SimplePicker
-                    value={selectedIncomeCategory}
-                    onValueChange={onIncomeCategoryChange}
-                    items={incomeCategoryItems}
-                    colors={colors}
-                  />
-                </View>
+                  <ScrollView style={styles.modalScrollView}>
+                    <ExpensePieChart
+                      colors={colors}
+                      t={t}
+                      loading={loading}
+                      chartData={chartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={onExpenseLegendItemPress}
+                      selectedCategory={selectedCategory}
+                    />
+                  </ScrollView>
+                </>
               )}
 
-              <ScrollView style={styles.modalScrollView}>
-                <IncomePieChart
-                  colors={colors}
-                  t={t}
-                  loadingIncome={loadingIncome}
-                  incomeChartData={incomeChartData}
-                  selectedCurrency={selectedCurrency}
-                  onLegendItemPress={onIncomeLegendItemPress}
-                  selectedIncomeCategory={selectedIncomeCategory}
-                />
-              </ScrollView>
-            </>
-          )}
+              {modalType === 'income' && (
+                <>
+                  {/* Income Category Picker - Only show when not viewing "All" */}
+                  {selectedIncomeCategory !== 'all' && (
+                    <View style={[styles.modalPickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <SimplePicker
+                        value={selectedIncomeCategory}
+                        onValueChange={onIncomeCategoryChange}
+                        items={incomeCategoryItems}
+                        colors={colors}
+                      />
+                    </View>
+                  )}
+
+                  <ScrollView style={styles.modalScrollView}>
+                    <IncomePieChart
+                      colors={colors}
+                      t={t}
+                      loadingIncome={loadingIncome}
+                      incomeChartData={incomeChartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={onIncomeLegendItemPress}
+                      selectedIncomeCategory={selectedIncomeCategory}
+                    />
+                  </ScrollView>
+                </>
+              )}
             </View>
           </TouchableWithoutFeedback>
         </View>
