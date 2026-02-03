@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ScrollView, PanResponder } from 'react-native';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
@@ -86,9 +86,11 @@ const ChartModal = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
-          <View style={styles.modalHeader}>
+      <TouchableWithoutFeedback onPress={onClose} testID="modal-overlay">
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => {}} testID="modal-content-wrapper">
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
+              <View style={styles.modalHeader}>
             <View style={styles.modalHeaderLeft}>
               {((modalType === 'expense' && selectedCategory !== 'all') ||
                 (modalType === 'income' && selectedIncomeCategory !== 'all')) && (
@@ -173,8 +175,10 @@ const ChartModal = ({
               </ScrollView>
             </>
           )}
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
