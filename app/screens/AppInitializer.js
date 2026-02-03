@@ -4,6 +4,8 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import * as AccountsDB from '../services/AccountsDB';
+import * as OperationsDB from '../services/OperationsDB';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -21,6 +23,14 @@ const AppInitializer = () => {
       // Set the language preference (this marks first launch as complete)
       // This will trigger CategoriesContext to automatically initialize categories
       await setFirstLaunchComplete(selectedLanguage);
+
+      // Initialize default operations for first launch
+      // Get the first visible account to use for sample operations
+      const accounts = await AccountsDB.getAllAccounts();
+      const firstVisibleAccount = accounts.find(acc => !acc.hidden);
+      if (firstVisibleAccount) {
+        await OperationsDB.initializeDefaultOperations(firstVisibleAccount.id);
+      }
 
       // Initialization complete, will automatically show main app
     } catch (error) {

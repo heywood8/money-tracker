@@ -1507,3 +1507,58 @@ export const getTopCategoriesFromLastMonth = async (limit = 3) => {
     throw error;
   }
 };
+
+/**
+ * Get the count of all operations
+ * @returns {Promise<number>}
+ */
+export const getOperationsCount = async () => {
+  try {
+    const result = await queryFirst('SELECT COUNT(*) as count FROM operations');
+    return result ? result.count : 0;
+  } catch (error) {
+    console.error('Failed to get operations count:', error);
+    throw error;
+  }
+};
+
+/**
+ * Initialize default operations for first app launch
+ * Only creates operations if the operations table is empty
+ * @param {number} accountId - ID of the account to use for operations
+ * @returns {Promise<Array>} Array of created operations, or empty array if operations already exist
+ */
+export const initializeDefaultOperations = async (accountId) => {
+  try {
+    // Check if operations already exist
+    const count = await getOperationsCount();
+    if (count > 0) {
+      console.log('Operations already exist, skipping initialization');
+      return [];
+    }
+
+    // Import default operations dynamically to avoid circular dependencies
+    const getDefaultOperations = (await import('../defaults/defaultOperations')).default;
+
+    // Get today's date in YYYY-MM-DD format
+    const today = formatLocalDate(new Date());
+
+    // Get the default operations for today
+    const defaultOps = getDefaultOperations(today, accountId);
+
+    console.log(`Initializing ${defaultOps.length} default operations for account ${accountId}`);
+
+    // Create each operation
+    const createdOperations = [];
+    for (const op of defaultOps) {
+      const created = await createOperation(op);
+      createdOperations.push(created);
+    }
+
+    console.log(`Successfully created ${createdOperations.length} default operations`);
+    return createdOperations;
+  } catch (error) {
+    console.error('Failed to initialize default operations:', error);
+    throw error;
+  }
+};
