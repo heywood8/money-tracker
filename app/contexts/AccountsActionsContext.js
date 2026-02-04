@@ -234,13 +234,23 @@ export const AccountsActionsProvider = ({ children }) => {
       _setAccounts(defaultAccounts);
       console.log('Default accounts initialized');
 
-      // Reload accounts to ensure consistency
+      // Create default operations only if categories exist
+      const OperationsDB = require('../services/OperationsDB');
+      const CategoriesDB = require('../services/CategoriesDB');
+      const categories = await CategoriesDB.getAllCategories();
+      if (categories && categories.length > 0) {
+        console.log('Creating default operations...');
+        await OperationsDB.initializeDefaultOperations();
+        console.log('Default operations initialized');
+      } else {
+        console.log('Skipping default operations - categories not initialized yet');
+      }
+
+      // Reload accounts to reflect balance changes from operations
       await reloadAccounts();
 
-      // Note: We don't emit RELOAD_ALL here because:
-      // - Categories will be initialized after the user selects a language
-      // - Operations will be empty anyway after reset
-      // The AppInitializer will handle category initialization with the selected language
+      // Emit RELOAD_ALL to refresh operations screen
+      appEvents.emit(EVENTS.RELOAD_ALL);
 
       showDialog(
         'Success',

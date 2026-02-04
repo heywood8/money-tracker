@@ -14,6 +14,9 @@ import * as AccountsDB from '../../app/services/AccountsDB';
 
 // Mock dependencies
 jest.mock('../../app/services/AccountsDB');
+jest.mock('../../app/services/OperationsDB', () => ({
+  initializeDefaultOperations: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock DialogContext
 const mockShowDialog = jest.fn();
@@ -63,7 +66,17 @@ describe('AccountsContext', () => {
     });
 
     it('creates default accounts when none exist', async () => {
-      AccountsDB.getAllAccounts.mockResolvedValueOnce([]);
+      // First call returns empty (triggers default creation)
+      // Second call returns the created accounts (after operations init)
+      const createdAccounts = Array.from({ length: 16 }, (_, i) => ({
+        id: `acc-${i}`,
+        name: `Account ${i}`,
+        balance: '100',
+        currency: 'USD',
+      }));
+      AccountsDB.getAllAccounts
+        .mockResolvedValueOnce([])  // First call - triggers default creation
+        .mockResolvedValueOnce(createdAccounts);  // Second call - after operations init
       AccountsDB.createAccount.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });

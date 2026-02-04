@@ -50,4 +50,5 @@ export const EVENTS = {
   RELOAD_ALL: 'reload:all',
   OPERATION_CHANGED: 'operation:changed',
   BUDGETS_NEED_REFRESH: 'budgets:refresh',
+  ACCOUNTS_INITIALIZED: 'accounts:initialized',
 };

@@ -10,6 +10,11 @@ import { executeQuery, queryAll, queryFirst, executeTransaction } from '../../ap
 // Mock dependencies
 jest.mock('../../app/services/db');
 jest.mock('../../app/services/currency');
+jest.mock('../../app/services/AccountsDB');
+jest.mock('../../app/defaults/defaultOperations');
+
+import * as AccountsDB from '../../app/services/AccountsDB';
+import getDefaultOperations from '../../app/defaults/defaultOperations';
 
 describe('OperationsDB Service', () => {
   let mockDb;
@@ -2144,6 +2149,186 @@ describe('OperationsDB Service', () => {
       expect(sql).toContain('o.category_id IN');
       expect(sql).toContain('GROUP BY');
       expect(sql).toContain('ORDER BY month ASC');
+    });
+  });
+
+  describe('initializeDefaultOperations', () => {
+    beforeEach(() => {
+      // Reset mocks for these tests
+      AccountsDB.getAllAccounts.mockReset();
+      getDefaultOperations.mockReset();
+
+      // Mock balance history update (called within transaction)
+      mockDb.getFirstAsync.mockImplementation(async (sql, params) => {
+        if (sql.includes('SELECT balance FROM accounts')) {
+          return { balance: '1000' };
+        }
+        return null;
+      });
+    });
+
+    it('skips initialization when no accounts exist', async () => {
+      AccountsDB.getAllAccounts.mockResolvedValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(AccountsDB.getAllAccounts).toHaveBeenCalled();
+      expect(getDefaultOperations).not.toHaveBeenCalled();
+    });
+
+    it('skips initialization when accounts is null', async () => {
+      AccountsDB.getAllAccounts.mockResolvedValue(null);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(getDefaultOperations).not.toHaveBeenCalled();
+    });
+
+    it('uses first visible account as primary', async () => {
+      const accounts = [
+        { id: 1, name: 'First', hidden: 0 },
+        { id: 2, name: 'Second', hidden: 0 },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(getDefaultOperations).toHaveBeenCalledWith(1, 2);
+    });
+
+    it('uses second visible account for transfers', async () => {
+      const accounts = [
+        { id: 1, name: 'First', hidden: 0 },
+        { id: 2, name: 'Second', hidden: 0 },
+        { id: 3, name: 'Third', hidden: 0 },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(getDefaultOperations).toHaveBeenCalledWith(1, 2);
+    });
+
+    it('passes null as secondary when only one visible account', async () => {
+      const accounts = [
+        { id: 1, name: 'First', hidden: 0 },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(getDefaultOperations).toHaveBeenCalledWith(1, null);
+    });
+
+    it('skips hidden accounts when selecting primary', async () => {
+      const accounts = [
+        { id: 1, name: 'Hidden', hidden: 1 },
+        { id: 2, name: 'Visible', hidden: 0 },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      expect(getDefaultOperations).toHaveBeenCalledWith(2, null);
+    });
+
+    it('falls back to first account when all accounts are hidden', async () => {
+      const accounts = [
+        { id: 1, name: 'Hidden1', hidden: 1 },
+        { id: 2, name: 'Hidden2', hidden: 1 },
+      ];
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue([]);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      // Falls back to first account when no visible accounts
+      expect(getDefaultOperations).toHaveBeenCalledWith(1, null);
+    });
+
+    it('creates operations for each default operation', async () => {
+      const accounts = [
+        { id: 1, name: 'Main', hidden: 0 },
+        { id: 2, name: 'Savings', hidden: 0 },
+      ];
+      const defaultOps = [
+        { type: 'income', amount: '2500', accountId: 1, categoryId: 'income-salary', date: '2025-01-15' },
+        { type: 'expense', amount: '25.50', accountId: 1, categoryId: 'expense-food', date: '2025-01-15' },
+        { type: 'transfer', amount: '100', accountId: 1, toAccountId: 2, categoryId: null, date: '2025-01-15' },
+      ];
+
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue(defaultOps);
+
+      await OperationsDB.initializeDefaultOperations();
+
+      // Each operation should trigger a transaction
+      // createOperation is called 3 times, each with executeTransaction
+      expect(executeTransaction).toHaveBeenCalledTimes(3);
+    });
+
+    it('throws error on database failure', async () => {
+      AccountsDB.getAllAccounts.mockRejectedValue(new Error('Database error'));
+
+      await expect(OperationsDB.initializeDefaultOperations()).rejects.toThrow('Database error');
+    });
+
+    it('handles operation creation failure', async () => {
+      const accounts = [{ id: 1, name: 'Main', hidden: 0 }];
+      const defaultOps = [{ type: 'expense', amount: '25', accountId: 1, categoryId: 'cat1', date: '2025-01-15' }];
+
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue(defaultOps);
+      executeTransaction.mockRejectedValue(new Error('Insert failed'));
+
+      await expect(OperationsDB.initializeDefaultOperations()).rejects.toThrow('Insert failed');
+    });
+
+    it('updates account balances via createOperation', async () => {
+      const accounts = [{ id: 1, name: 'Main', hidden: 0, balance: '1000' }];
+      const defaultOps = [
+        { type: 'income', amount: '500', accountId: 1, categoryId: 'income-salary', date: '2025-01-15' },
+      ];
+
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue(defaultOps);
+
+      // Mock for balance lookup and update within transaction
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.initializeDefaultOperations();
+
+      // Verify transaction was called (balance updates happen inside createOperation)
+      expect(executeTransaction).toHaveBeenCalled();
+      // Verify balance update was called within transaction
+      expect(mockDb.runAsync).toHaveBeenCalled();
+    });
+
+    it('updates balance history via createOperation', async () => {
+      const accounts = [{ id: 1, name: 'Main', hidden: 0 }];
+      const defaultOps = [
+        { type: 'expense', amount: '50', accountId: 1, categoryId: 'expense-food', date: '2025-01-15' },
+      ];
+
+      AccountsDB.getAllAccounts.mockResolvedValue(accounts);
+      getDefaultOperations.mockReturnValue(defaultOps);
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.initializeDefaultOperations();
+
+      // The createOperation function updates balance history via updateTodayBalance
+      // which is called within the transaction
+      expect(mockDb.runAsync).toHaveBeenCalled();
+      // Check that INSERT OR REPLACE for balance history was called
+      const calls = mockDb.runAsync.mock.calls;
+      const balanceHistoryCall = calls.find(call =>
+        call[0].includes('accounts_balance_history'),
+      );
+      expect(balanceHistoryCall).toBeDefined();
     });
   });
 });

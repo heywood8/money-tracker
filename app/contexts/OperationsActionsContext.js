@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccountsActions } from './AccountsActionsContext';
@@ -54,16 +54,29 @@ export const OperationsActionsProvider = ({ children }) => {
     hasNewerOperations,
   } = useOperationsData();
 
+  // Request ID counter to handle race conditions in loadInitialOperations
+  const loadRequestIdRef = useRef(0);
+
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters = activeFilters, showLoading = true) => {
+    // Increment request ID to track this specific call
+    const requestId = ++loadRequestIdRef.current;
+
     try {
       if (showLoading) {
         _setLoading(true);
       }
       const isFiltered = _hasActiveFilters(filters);
-      const operationsData = isFiltered
+      let operationsData = isFiltered
         ? await OperationsDB.getFilteredOperationsByWeekOffset(0, filters)
         : await OperationsDB.getOperationsByWeekOffset(0);
+
+      // Check if this request is still the latest (ignore stale results)
+      if (requestId !== loadRequestIdRef.current) {
+        console.log(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
+        return;
+      }
+
       _setOperations(operationsData);
 
       // Track the oldest and newest dates in the initial load
@@ -244,12 +257,14 @@ export const OperationsActionsProvider = ({ children }) => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       console.log('Reloading operations due to RELOAD_ALL event');
       // Use loadInitialOperations to load the current week's operations
-      // instead of reloadOperations which loads ALL operations
       loadInitialOperations();
     });
 
     return unsubscribe;
   }, [loadInitialOperations]);
+
+  // Note: Default operations are now created directly in AccountsDataContext
+  // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
 
   const addOperation = useCallback(async (operation) => {
     try {

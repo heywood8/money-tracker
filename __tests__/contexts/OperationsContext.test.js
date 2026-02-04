@@ -67,6 +67,7 @@ describe('OperationsContext', () => {
     OperationsDB.deleteOperation.mockResolvedValue(undefined);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
     OperationsDB.getOperationsByWeekFromDate.mockResolvedValue([]);
+    OperationsDB.initializeDefaultOperations.mockResolvedValue(undefined);
   });
 
   const wrapper = ({ children }) => <OperationsProvider>{children}</OperationsProvider>;
@@ -749,6 +750,10 @@ describe('OperationsContext', () => {
       });
 
       // Initially return empty, then return operation after RELOAD_ALL
+      // Note: getAllOperations returns existing data to prevent default operations initialization
+      OperationsDB.getAllOperations.mockResolvedValue([
+        { id: 99, type: 'expense', amount: '50', accountId: 'acc1', date: '2024-01-01' },
+      ]);
       OperationsDB.getOperationsByWeekOffset
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
@@ -773,6 +778,9 @@ describe('OperationsContext', () => {
         expect(result.current.operations).toHaveLength(1);
       });
     });
+
+    // Note: Default operations initialization is now handled directly in AccountsDataContext
+    // after creating default accounts, so ACCOUNTS_INITIALIZED event tests are no longer needed.
   });
 
   describe('Regression Tests', () => {

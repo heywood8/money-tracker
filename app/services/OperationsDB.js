@@ -1,6 +1,8 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
+import * as AccountsDB from './AccountsDB';
+import getDefaultOperations from '../defaults/defaultOperations';
 
 /**
  * Map database field names to camelCase for application use
@@ -39,6 +41,61 @@ export const getAllOperations = async () => {
     return (operations || []).map(mapOperationFields);
   } catch (error) {
     console.error('Failed to get operations:', error);
+    throw error;
+  }
+};
+
+/**
+ * Initialize default operations for first-time setup or database reset.
+ * Creates sample operations using today's date.
+ * Balance history is automatically updated via createOperation() -> updateTodayBalance().
+ *
+ * @returns {Promise<void>}
+ */
+export const initializeDefaultOperations = async () => {
+  try {
+    // Get all accounts
+    const accounts = await AccountsDB.getAllAccounts();
+
+    if (!accounts || accounts.length === 0) {
+      console.log('[OperationsDB] No accounts found, skipping default operations initialization');
+      return;
+    }
+
+    // Find visible accounts (hidden === 0)
+    const visibleAccounts = accounts.filter(acc => acc.hidden === 0);
+
+    if (visibleAccounts.length === 0) {
+      console.log('[OperationsDB] No visible accounts found, using first available account');
+      visibleAccounts.push(accounts[0]);
+    }
+
+    // Use first visible account as primary
+    const primaryAccount = visibleAccounts[0];
+
+    // Use second visible account for transfers (if available)
+    const secondaryAccount = visibleAccounts.length > 1 ? visibleAccounts[1] : null;
+
+    console.log('[OperationsDB] Initializing default operations with accounts:', {
+      primary: primaryAccount.id,
+      secondary: secondaryAccount?.id || null,
+    });
+
+    // Get default operations
+    const defaultOps = getDefaultOperations(
+      primaryAccount.id,
+      secondaryAccount?.id || null,
+    );
+
+    // Create each operation (this also updates account balances and balance history)
+    for (const op of defaultOps) {
+      await createOperation(op);
+      console.log(`[OperationsDB] Created default operation: ${op.type} - ${op.amount}`);
+    }
+
+    console.log(`[OperationsDB] Successfully initialized ${defaultOps.length} default operations`);
+  } catch (error) {
+    console.error('[OperationsDB] Failed to initialize default operations:', error);
     throw error;
   }
 };
