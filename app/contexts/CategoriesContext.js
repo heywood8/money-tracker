@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import defaultCategories from '../defaults/defaultCategories.json';
 import * as CategoriesDB from '../services/CategoriesDB';
+import * as AccountsDB from '../services/AccountsDB';
+import * as OperationsDB from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useLocalization } from './LocalizationContext';
 import { useDialog } from './DialogContext';
@@ -42,6 +44,26 @@ export const CategoriesProvider = ({ children }) => {
         // Reload to get the newly created categories (including shadow ones)
         const newCategories = await CategoriesDB.getAllCategories(true);
         setCategories(newCategories);
+
+        // Now that categories exist, check if we need to create default operations
+        // This handles the case where accounts were created but operations couldn't be
+        // (e.g., first launch where categories are created after language selection)
+        try {
+          const accounts = await AccountsDB.getAllAccounts();
+          if (accounts && accounts.length > 0) {
+            const existingOperations = await OperationsDB.getAllOperations();
+            if (existingOperations.length === 0) {
+              console.log('[CategoriesContext] Creating default operations after category initialization...');
+              await OperationsDB.initializeDefaultOperations();
+              console.log('[CategoriesContext] Default operations created');
+              // Emit RELOAD_ALL to refresh operations screen and account balances
+              appEvents.emit(EVENTS.RELOAD_ALL);
+            }
+          }
+        } catch (opError) {
+          console.error('[CategoriesContext] Failed to create default operations:', opError);
+          // Don't throw - category initialization succeeded, operations are secondary
+        }
       } else {
         setCategories(categoriesData);
       }

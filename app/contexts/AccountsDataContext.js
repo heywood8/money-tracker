@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 import PropTypes from 'prop-types';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
+import * as OperationsDB from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
@@ -42,11 +43,34 @@ export const AccountsDataProvider = ({ children }) => {
       setLoading(true);
       // Load accounts from SQLite
       let accountsData = await AccountsDB.getAllAccounts();
+      console.log(`[AccountsDataContext] loadAccounts: found ${accountsData.length} accounts, createDefaultsIfEmpty=${createDefaultsIfEmpty}`);
 
       // If no accounts exist and we should create defaults, create default ones
       if (accountsData.length === 0 && createDefaultsIfEmpty) {
-        console.log('No accounts found, creating defaults...');
+        console.log('[AccountsDataContext] No accounts found, creating defaults...');
         accountsData = await initializeDefaultAccounts();
+        console.log(`[AccountsDataContext] Created ${accountsData.length} default accounts`);
+
+        // Create default operations only if categories exist
+        // On first launch, categories are created after language selection
+        const CategoriesDB = require('../services/CategoriesDB');
+        const categories = await CategoriesDB.getAllCategories();
+        if (categories && categories.length > 0) {
+          console.log('[AccountsDataContext] Creating default operations...');
+          await OperationsDB.initializeDefaultOperations();
+          console.log('[AccountsDataContext] Default operations created');
+        } else {
+          console.log('[AccountsDataContext] Skipping default operations - categories not initialized yet');
+        }
+
+        // Reload accounts to reflect balance changes from operations
+        accountsData = await AccountsDB.getAllAccounts();
+
+        // Emit RELOAD_ALL to refresh all screens with new data
+        setTimeout(() => {
+          console.log('Emitting RELOAD_ALL after default data creation');
+          appEvents.emit(EVENTS.RELOAD_ALL);
+        }, 100);
       }
 
       setAccounts(accountsData);
