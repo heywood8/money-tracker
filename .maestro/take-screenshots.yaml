@@ -5,7 +5,7 @@ appId: com.heywood8.monkeep
     visible: "Welcome to Penny"
     timeout: 30000
 
-# Screenshot 0: Language selection screen
+# Screenshot 0: Language selection screen (only captured once, no dark/light variant)
 - takeScreenshot: screenshots/00_language_selection
 
 # Select English and continue
@@ -17,23 +17,62 @@ appId: com.heywood8.monkeep
     visible: "Operations"
     timeout: 30000
 
+# ============================================
+# LIGHT MODE SCREENSHOTS (default)
+# ============================================
+
 # Screenshot 1: Operations screen (default first tab)
-- takeScreenshot: screenshots/01_operations
+- takeScreenshot: screenshots/01_operations_light
 
 # Navigate to Graphs tab
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/02_graphs
+- takeScreenshot: screenshots/02_graphs_light
 
 # Navigate to Accounts tab
 - tapOn: "Accounts"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/03_accounts
+- takeScreenshot: screenshots/03_accounts_light
 
 # Navigate to Categories tab
 - tapOn: "Categories"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/04_categories
+- takeScreenshot: screenshots/04_categories_light
+
+# ============================================
+# SWITCH TO DARK MODE
+# ============================================
+
+# Tap the theme toggle button (sun/moon icon in header)
+- tapOn:
+    id: "theme-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# ============================================
+# DARK MODE SCREENSHOTS
+# ============================================
+
+# We're still on Categories tab
+- takeScreenshot: screenshots/04_categories_dark
+
+# Navigate to Accounts tab
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/03_accounts_dark
+
+# Navigate to Graphs tab
+- tapOn: "Graphs"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/02_graphs_dark
+
+# Navigate to Operations tab
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/01_operations_dark

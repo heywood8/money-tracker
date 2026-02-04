@@ -148,33 +148,59 @@ jobs:
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const rawBase = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/ci-screenshots/pr-${prNumber}`;
 
-            const screens = [
-              { file: '00_language_selection', desc: 'First-launch language picker' },
-              { file: '01_operations', desc: 'Operations tab (default view)' },
-              { file: '02_graphs', desc: 'Graphs tab' },
-              { file: '03_accounts', desc: 'Accounts tab' },
-              { file: '04_categories', desc: 'Categories tab' },
-            ];
+            // Welcome screen (no light/dark variants)
+            const welcomeScreen = { file: '00_language_selection', desc: 'Welcome / Language Selection' };
 
-            // Check which screenshots actually exist
-            const available = screens.filter(s =>
-              fs.existsSync(`screenshots/${s.file}.png`)
-            );
+            // Screens with light/dark variants
+            const themedScreens = [
+              { file: '01_operations', desc: 'Operations' },
+              { file: '02_graphs', desc: 'Graphs' },
+              { file: '03_accounts', desc: 'Accounts' },
+              { file: '04_categories', desc: 'Categories' },
+            ];
 
             const lines = [
               '## App Screenshots',
               '',
             ];
 
-            if (available.length > 0) {
-              // Build a table with embedded images
-              lines.push(
-                '| Screen | Screenshot |',
-                '|--------|-----------|',
-              );
-              for (const s of available) {
-                const imgUrl = `${rawBase}/${s.file}.png`;
-                lines.push(`| **${s.desc}** | <img src="${imgUrl}" width="270" /> |`);
+            // Check if welcome screen exists
+            const hasWelcome = fs.existsSync(`screenshots/${welcomeScreen.file}.png`);
+
+            // Check which themed screenshots exist
+            const availableThemed = themedScreens.filter(s =>
+              fs.existsSync(`screenshots/${s.file}_light.png`) || fs.existsSync(`screenshots/${s.file}_dark.png`)
+            );
+
+            if (hasWelcome || availableThemed.length > 0) {
+              // Welcome screen section (single image, no light/dark)
+              if (hasWelcome) {
+                const welcomeUrl = `${rawBase}/${welcomeScreen.file}.png`;
+                lines.push(
+                  '### Welcome Screen',
+                  '',
+                  `<img src="${welcomeUrl}" width="270" />`,
+                  '',
+                );
+              }
+
+              // Themed screens in a 3-column table
+              if (availableThemed.length > 0) {
+                lines.push(
+                  '### App Screens',
+                  '',
+                  '| Screen | Light | Dark |',
+                  '|--------|-------|------|',
+                );
+                for (const s of availableThemed) {
+                  const lightUrl = `${rawBase}/${s.file}_light.png`;
+                  const darkUrl = `${rawBase}/${s.file}_dark.png`;
+                  const hasLight = fs.existsSync(`screenshots/${s.file}_light.png`);
+                  const hasDark = fs.existsSync(`screenshots/${s.file}_dark.png`);
+                  const lightImg = hasLight ? `<img src="${lightUrl}" width="200" />` : '—';
+                  const darkImg = hasDark ? `<img src="${darkUrl}" width="200" />` : '—';
+                  lines.push(`| **${s.desc}** | ${lightImg} | ${darkImg} |`);
+                }
               }
             } else {
               lines.push('> No screenshots were captured for this run.');

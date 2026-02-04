@@ -76,6 +76,7 @@ export default function Header({ onOpenSettings }) {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           onPress={toggleTheme}
+          testID="theme-toggle-button"
           accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           accessibilityRole="button"
           accessibilityHint="Toggles between light and dark theme"
@@ -90,6 +91,7 @@ export default function Header({ onOpenSettings }) {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onOpenSettings}
+          testID="settings-button"
           accessibilityLabel={t('settings')}
           accessibilityRole="button"
           accessibilityHint="Opens settings menu"
