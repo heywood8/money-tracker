@@ -328,6 +328,7 @@ export const getDatabaseVersion = async () => {
 export const dropAllTables = async () => {
   try {
     let raw;
+    let openedNewConnection = false;
 
     // Try to get existing database connection, or open a new one
     try {
@@ -336,6 +337,7 @@ export const dropAllTables = async () => {
       } else {
         console.log('Opening database for table drop...');
         raw = await SQLite.openDatabaseAsync(DB_NAME);
+        openedNewConnection = true;
       }
     } catch (openError) {
       console.error('Failed to open database for dropping tables:', openError);
@@ -362,6 +364,15 @@ export const dropAllTables = async () => {
     await raw.runAsync('PRAGMA foreign_keys = ON');
 
     console.log('All tables dropped successfully');
+
+    // Close the database connection properly before resetting instances
+    // This ensures the native connection is released
+    try {
+      await raw.closeAsync();
+      console.log('Database connection closed after dropping tables');
+    } catch (closeError) {
+      console.error('Error closing database after dropping tables:', closeError);
+    }
 
     // Reset the instances to null so it reinitializes on next getDatabase call
     dbInstance = null;

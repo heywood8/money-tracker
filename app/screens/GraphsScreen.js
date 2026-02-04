@@ -6,6 +6,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
@@ -127,43 +128,73 @@ const GraphsScreen = () => {
     }
   }, [accounts, selectedAccount]);
 
-  // Load categories
+  // Load categories function
+  const loadCategories = useCallback(async () => {
+    try {
+      const cats = await getAllCategories(true); // Include shadow categories
+      setCategories(cats);
+
+      // Filter top-level expense categories (no parent, expense type, not shadow)
+      const topLevel = cats.filter(cat =>
+        cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow,
+      );
+      setTopLevelCategories(topLevel);
+
+      // Filter top-level income categories (no parent, income type)
+      const topLevelIncome = cats.filter(cat =>
+        cat.parentId === null && cat.categoryType === 'income',
+      );
+      setTopLevelIncomeCategories(topLevelIncome);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  }, []);
+
+  // Load available months function
+  const loadAvailableMonthsData = useCallback(async () => {
+    try {
+      const months = await getAvailableMonths();
+      setAvailableMonths(months);
+    } catch (error) {
+      console.error('Failed to load available months:', error);
+    }
+  }, []);
+
+  // Load categories on mount
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const cats = await getAllCategories(true); // Include shadow categories
-        setCategories(cats);
-
-        // Filter top-level expense categories (no parent, expense type, not shadow)
-        const topLevel = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'expense' && !cat.isShadow,
-        );
-        setTopLevelCategories(topLevel);
-
-        // Filter top-level income categories (no parent, income type)
-        const topLevelIncome = cats.filter(cat =>
-          cat.parentId === null && cat.categoryType === 'income',
-        );
-        setTopLevelIncomeCategories(topLevelIncome);
-      } catch (error) {
-        console.error('Failed to load categories:', error);
-      }
-    };
     loadCategories();
+  }, [loadCategories]);
+
+  // Load available months on mount
+  useEffect(() => {
+    loadAvailableMonthsData();
+  }, [loadAvailableMonthsData]);
+
+  // Listen for DATABASE_RESET event to clear data
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      console.log('GraphsScreen: Database reset detected, clearing data');
+      setCategories([]);
+      setTopLevelCategories([]);
+      setTopLevelIncomeCategories([]);
+      setAvailableMonths([]);
+      setSelectedCategory('all');
+      setSelectedIncomeCategory('all');
+    });
+
+    return unsubscribe;
   }, []);
 
-  // Load available months from database
+  // Listen for RELOAD_ALL event to reload data
   useEffect(() => {
-    const loadAvailableMonths = async () => {
-      try {
-        const months = await getAvailableMonths();
-        setAvailableMonths(months);
-      } catch (error) {
-        console.error('Failed to load available months:', error);
-      }
-    };
-    loadAvailableMonths();
-  }, []);
+    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
+      console.log('GraphsScreen: Reloading data due to RELOAD_ALL event');
+      loadCategories();
+      loadAvailableMonthsData();
+    });
+
+    return unsubscribe;
+  }, [loadCategories, loadAvailableMonthsData]);
 
 
 

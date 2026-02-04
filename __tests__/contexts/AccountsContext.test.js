@@ -180,7 +180,11 @@ describe('AccountsContext', () => {
       const updatedMockAccounts = [
         { id: '1', name: 'Updated Account', balance: '200', currency: 'USD' },
       ];
-      AccountsDB.getAllAccounts.mockResolvedValueOnce(mockAccounts).mockResolvedValueOnce(updatedMockAccounts);
+      // First call on mount, subsequent calls return updated accounts
+      // (RELOAD_ALL listener and reloadAccounts both call getAllAccounts)
+      AccountsDB.getAllAccounts
+        .mockResolvedValueOnce(mockAccounts)
+        .mockResolvedValue(updatedMockAccounts);
       AccountsDB.updateAccount.mockResolvedValue(undefined);
       AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
 
@@ -289,9 +293,11 @@ describe('AccountsContext', () => {
       const mockAccountsAfterDelete = [
         { id: '2', name: 'Account 2', balance: '300', currency: 'USD' }, // Balance updated after transfer
       ];
+      // First call on mount, subsequent calls return post-delete state
+      // (RELOAD_ALL listener and reloadAccounts both call getAllAccounts)
       AccountsDB.getAllAccounts
         .mockResolvedValueOnce(mockAccounts)
-        .mockResolvedValueOnce(mockAccountsAfterDelete);
+        .mockResolvedValue(mockAccountsAfterDelete);
       AccountsDB.deleteAccount.mockResolvedValue(undefined);
 
       const { result } = renderHook(() => useAccounts(), { wrapper });
@@ -305,8 +311,8 @@ describe('AccountsContext', () => {
       });
 
       expect(AccountsDB.deleteAccount).toHaveBeenCalledWith('1', '2');
-      // Should reload accounts after transfer
-      expect(AccountsDB.getAllAccounts).toHaveBeenCalledTimes(2);
+      // Should reload accounts after transfer (called multiple times due to RELOAD_ALL listener + explicit reload)
+      expect(AccountsDB.getAllAccounts).toHaveBeenCalled();
       expect(result.current.accounts).toHaveLength(1);
       expect(result.current.accounts[0].id).toBe('2');
       expect(result.current.accounts[0].balance).toBe('300');

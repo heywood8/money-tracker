@@ -748,10 +748,12 @@ describe('OperationsContext', () => {
         return jest.fn(); // Unsubscribe function
       });
 
-      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      OperationsDB.getAllOperations.mockResolvedValue([
-        { id: 1, type: 'expense', amount: '100', accountId: 'acc1' },
-      ]);
+      // Initially return empty, then return operation after RELOAD_ALL
+      OperationsDB.getOperationsByWeekOffset
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: 1, type: 'expense', amount: '100', accountId: 'acc1', date: '2024-01-15' },
+        ]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -761,7 +763,7 @@ describe('OperationsContext', () => {
 
       expect(appEvents.on).toHaveBeenCalledWith(EVENTS.RELOAD_ALL, expect.any(Function));
 
-      // Trigger the reload event
+      // Trigger the reload event - now uses loadInitialOperations which calls getOperationsByWeekOffset
       await act(async () => {
         reloadListener();
         await new Promise(resolve => setTimeout(resolve, 50));

@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import defaultAccounts from '../defaults/defaultAccounts';
 import * as AccountsDB from '../services/AccountsDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 
 const AccountsDataContext = createContext();
@@ -35,33 +36,59 @@ export const AccountsDataProvider = ({ children }) => {
     }
   }, []);
 
-  useEffect(() => {
-    const loadAccounts = async () => {
-      try {
-        // Load accounts from SQLite
-        let accountsData = await AccountsDB.getAllAccounts();
+  // Reusable function to load accounts
+  const loadAccounts = useCallback(async (createDefaultsIfEmpty = true) => {
+    try {
+      setLoading(true);
+      // Load accounts from SQLite
+      let accountsData = await AccountsDB.getAllAccounts();
 
-        // If no accounts exist, create default ones
-        if (accountsData.length === 0) {
-          console.log('No accounts found, creating defaults...');
-          accountsData = await initializeDefaultAccounts();
-        }
-
-        setAccounts(accountsData);
-      } catch (err) {
-        console.error('Failed to load accounts:', err);
-        setError(err.message);
-        showDialog(
-          'Load Error',
-          'Failed to load accounts from database.',
-          [{ text: 'OK' }],
-        );
-      } finally {
-        setLoading(false);
+      // If no accounts exist and we should create defaults, create default ones
+      if (accountsData.length === 0 && createDefaultsIfEmpty) {
+        console.log('No accounts found, creating defaults...');
+        accountsData = await initializeDefaultAccounts();
       }
-    };
-    loadAccounts();
+
+      setAccounts(accountsData);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load accounts:', err);
+      setError(err.message);
+      showDialog(
+        'Load Error',
+        'Failed to load accounts from database.',
+        [{ text: 'OK' }],
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [initializeDefaultAccounts, showDialog]);
+
+  // Load accounts on mount
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  // Listen for DATABASE_RESET event to clear accounts state
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      console.log('AccountsDataContext: Database reset detected, clearing accounts');
+      setAccounts([]);
+      setError(null);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Listen for RELOAD_ALL event to reload accounts
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
+      console.log('AccountsDataContext: Reloading accounts due to RELOAD_ALL event');
+      loadAccounts();
+    });
+
+    return unsubscribe;
+  }, [loadAccounts]);
 
   // Filter accounts based on hidden status
   const visibleAccounts = useMemo(() => {
