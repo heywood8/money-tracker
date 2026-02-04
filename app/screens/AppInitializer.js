@@ -59,15 +59,18 @@ const AppInitializer = () => {
     }
   };
 
-  // If showing language selection or initializing, don't show main app yet
+  // Show loading spinner while initializing (must check before isFirstLaunch
+  // because setFirstLaunchComplete sets isFirstLaunch=false mid-initialization)
+  if (isInitializing) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Show language selection on first launch
   if (isFirstLaunch) {
-    if (isInitializing) {
-      return (
-        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-    }
     return <LanguageSelectionScreen onLanguageSelected={handleLanguageSelected} />;
   }
 
