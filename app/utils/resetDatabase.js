@@ -5,7 +5,7 @@
  * Useful for development and fixing database migration issues.
  */
 
-import { dropAllTables, getDatabase } from '../services/db';
+import { dropAllTables, getDatabase, closeDatabase } from '../services/db';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
@@ -17,6 +17,10 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
 export const resetDatabase = async () => {
   try {
     console.log('Starting database reset...');
+
+    // Close existing database connection first to ensure clean state
+    await closeDatabase();
+    console.log('Existing database connection closed');
 
     // Drop all tables
     await dropAllTables();
