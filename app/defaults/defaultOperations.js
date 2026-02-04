@@ -19,7 +19,7 @@ const getDefaultOperations = (accountId, toAccountId = null) => {
   const operations = [
     {
       type: 'income',
-      amount: '2500.00',
+      amount: '1000.00',
       accountId,
       categoryId: 'income-salary',
       date: today,
