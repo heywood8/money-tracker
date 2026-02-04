@@ -1,7 +1,7 @@
 const defaultAccounts = [
   {
     name: 'Checking',
-    balance: '1000',
+    balance: '0',
     currency: 'USD',
     hidden: 0,
   },
