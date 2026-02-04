@@ -243,11 +243,13 @@ export const OperationsActionsProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       console.log('Reloading operations due to RELOAD_ALL event');
-      reloadOperations();
+      // Use loadInitialOperations to load the current week's operations
+      // instead of reloadOperations which loads ALL operations
+      loadInitialOperations();
     });
 
     return unsubscribe;
-  }, [reloadOperations]);
+  }, [loadInitialOperations]);
 
   const addOperation = useCallback(async (operation) => {
     try {

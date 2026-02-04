@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import * as OperationsDB from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 
@@ -76,6 +75,22 @@ export const OperationsDataProvider = ({ children }) => {
     };
     loadFilters();
   }, [hasActiveFilters]);
+
+  // Listen for DATABASE_RESET event to clear operations state
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      console.log('OperationsDataContext: Database reset detected, clearing operations');
+      setOperations([]);
+      setDataLoaded(false);
+      setOldestLoadedDate(null);
+      setNewestLoadedDate(null);
+      setHasMoreOperations(true);
+      setHasNewerOperations(false);
+      setSaveError(null);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const value = useMemo(() => ({
     // Public data
