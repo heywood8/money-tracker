@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.4](https://github.com/heywood8/money-tracker/compare/penny-v0.39.3...penny-v0.39.4) (2026-02-04)
+
+
+### Bug Fixes
+
+* properly reload all screens after database reset ([#278](https://github.com/heywood8/money-tracker/issues/278)) ([f0025f9](https://github.com/heywood8/money-tracker/commit/f0025f99578b130d9a394db8a0673e893d715bd6))
+
 ## [0.39.3](https://github.com/heywood8/money-tracker/compare/penny-v0.39.2...penny-v0.39.3) (2026-02-03)
 
 
