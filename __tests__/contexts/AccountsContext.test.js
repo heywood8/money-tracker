@@ -68,12 +68,11 @@ describe('AccountsContext', () => {
     it('creates default accounts when none exist', async () => {
       // First call returns empty (triggers default creation)
       // Second call returns the created accounts (after operations init)
-      const createdAccounts = Array.from({ length: 16 }, (_, i) => ({
-        id: `acc-${i}`,
-        name: `Account ${i}`,
-        balance: '100',
-        currency: 'USD',
-      }));
+      const createdAccounts = [
+        { id: 'acc-0', name: 'Checking', balance: '1000', currency: 'USD' },
+        { id: 'acc-1', name: 'Savings', balance: '5000', currency: 'USD' },
+        { id: 'acc-2', name: 'Cash', balance: '100', currency: 'USD' },
+      ];
       AccountsDB.getAllAccounts
         .mockResolvedValueOnce([])  // First call - triggers default creation
         .mockResolvedValueOnce(createdAccounts);  // Second call - after operations init
@@ -85,8 +84,8 @@ describe('AccountsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(16);
-      expect(result.current.accounts).toHaveLength(16);
+      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(3);
+      expect(result.current.accounts).toHaveLength(3);
     });
 
     it('shows alert on load error', async () => {
