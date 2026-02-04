@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.40.0](https://github.com/heywood8/money-tracker/compare/penny-v0.39.4...penny-v0.40.0) (2026-02-04)
+
+
+### Features
+
+* seed default operations on database init and reset ([9ddf8c5](https://github.com/heywood8/money-tracker/commit/9ddf8c5309ebb668a463a9b2b53a03d59ca43cd1))
+
+
+### Code Refactoring
+
+* simplify default accounts to 3 generic USD accounts ([2d33e2e](https://github.com/heywood8/money-tracker/commit/2d33e2e904912e6142d1890fef838363f80beee3))
+
 ## [0.39.4](https://github.com/heywood8/money-tracker/compare/penny-v0.39.3...penny-v0.39.4) (2026-02-04)
 
 
