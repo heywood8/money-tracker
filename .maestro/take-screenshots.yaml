@@ -50,16 +50,14 @@ appId: com.heywood8.monkeep
 - tapOn:
     id: "theme-toggle-button"
 
-# Navigate to Operations tab to allow theme change to fully propagate
-- tapOn: "Operations"
-- waitForAnimationToEnd:
-    timeout: 3000
-
 # ============================================
 # DARK MODE SCREENSHOTS
 # ============================================
 
-# Screenshot: Operations screen in dark mode
+# Navigate to Operations tab (gives theme time to propagate)
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 3000
 - takeScreenshot: screenshots/01_operations_dark
 
 # Navigate to Graphs tab
@@ -78,4 +76,13 @@ appId: com.heywood8.monkeep
 - tapOn: "Categories"
 - waitForAnimationToEnd:
     timeout: 3000
+# Scroll slightly to force FlatList to re-render cells with dark theme
+- swipe:
+    start: 50%, 60%
+    end: 50%, 55%
+- swipe:
+    start: 50%, 55%
+    end: 50%, 60%
+- waitForAnimationToEnd:
+    timeout: 2000
 - takeScreenshot: screenshots/04_categories_dark
