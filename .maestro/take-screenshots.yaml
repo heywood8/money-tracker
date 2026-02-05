@@ -49,6 +49,9 @@ appId: com.heywood8.monkeep
 # Tap the theme toggle button (sun/moon icon in header)
 - tapOn:
     id: "theme-toggle-button"
+
+# Navigate to Operations tab to allow theme change to fully propagate
+- tapOn: "Operations"
 - waitForAnimationToEnd:
     timeout: 3000
 
@@ -56,14 +59,8 @@ appId: com.heywood8.monkeep
 # DARK MODE SCREENSHOTS
 # ============================================
 
-# We're still on Categories tab
-- takeScreenshot: screenshots/04_categories_dark
-
-# Navigate to Accounts tab
-- tapOn: "Accounts"
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: screenshots/03_accounts_dark
+# Screenshot: Operations screen in dark mode
+- takeScreenshot: screenshots/01_operations_dark
 
 # Navigate to Graphs tab
 - tapOn: "Graphs"
@@ -71,8 +68,14 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: screenshots/02_graphs_dark
 
-# Navigate to Operations tab
-- tapOn: "Operations"
+# Navigate to Accounts tab
+- tapOn: "Accounts"
 - waitForAnimationToEnd:
     timeout: 3000
-- takeScreenshot: screenshots/01_operations_dark
+- takeScreenshot: screenshots/03_accounts_dark
+
+# Navigate to Categories tab
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/04_categories_dark
