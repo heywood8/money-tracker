@@ -61,7 +61,6 @@ describe('Database Schema Integration', () => {
       expect(categoriesTable.type).toBeDefined();
       expect(categoriesTable.categoryType).toBeDefined();
       expect(categoriesTable.isShadow).toBeDefined();
-      expect(categoriesTable.excludeFromForecast).toBeDefined();
 
       // parentId has a self-reference
       expect(categoriesTable.parentId.columnType).toBe('SQLiteText');
@@ -243,7 +242,6 @@ describe('Database Schema Integration', () => {
       expect(schema.accounts.currency.default).toBe('USD');
       expect(schema.accounts.hidden.default).toBe(0);
       expect(schema.categories.isShadow.default).toBe(0);
-      expect(schema.categories.excludeFromForecast.default).toBe(0);
       expect(schema.budgets.isRecurring.default).toBe(1);
       expect(schema.budgets.rolloverEnabled.default).toBe(0);
     });

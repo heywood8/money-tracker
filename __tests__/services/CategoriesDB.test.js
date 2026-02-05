@@ -41,7 +41,6 @@ describe('CategoriesDB', () => {
         icon: 'food',
         color: '#FF5722',
         is_shadow: 0,
-        exclude_from_forecast: 1,
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-01T00:00:00.000Z',
       };
@@ -59,7 +58,6 @@ describe('CategoriesDB', () => {
         icon: 'food',
         color: '#FF5722',
         isShadow: false,
-        excludeFromForecast: true,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       });
@@ -70,7 +68,6 @@ describe('CategoriesDB', () => {
         id: 'cat-1',
         name: 'Shadow',
         is_shadow: 1,
-        exclude_from_forecast: 0,
       };
 
       mockDb.queryAll.mockResolvedValue([dbCategory]);
@@ -84,7 +81,6 @@ describe('CategoriesDB', () => {
         id: 'cat-1',
         name: 'Shadow',
         is_shadow: true,
-        exclude_from_forecast: false,
       };
 
       mockDb.queryAll.mockResolvedValue([dbCategory]);
@@ -343,7 +339,6 @@ describe('CategoriesDB', () => {
         icon: 'food',
         color: '#FF5722',
         isShadow: false,
-        excludeFromForecast: false,
       };
 
       mockDb.executeQuery.mockResolvedValue();
@@ -361,7 +356,6 @@ describe('CategoriesDB', () => {
       expect(params[5]).toBe('food');
       expect(params[6]).toBe('#FF5722');
       expect(params[7]).toBe(0); // is_shadow
-      expect(params[8]).toBe(0); // exclude_from_forecast
       expect(result.name).toBe('Food');
     });
 
@@ -429,8 +423,8 @@ describe('CategoriesDB', () => {
       const result = await CategoriesDB.createCategory(newCategory);
 
       const [query, params] = mockDb.executeQuery.mock.calls[0];
-      expect(params[9]).toBeDefined(); // created_at
-      expect(params[10]).toBeDefined(); // updated_at
+      expect(params[8]).toBeDefined(); // created_at
+      expect(params[9]).toBeDefined(); // updated_at
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();
     });
@@ -508,16 +502,6 @@ describe('CategoriesDB', () => {
       const [query, params] = mockDb.executeQuery.mock.calls[0];
       expect(query).toContain('parent_id = ?');
       expect(params).toContain(null);
-    });
-
-    it('converts excludeFromForecast boolean to integer', async () => {
-      mockDb.executeQuery.mockResolvedValue();
-
-      await CategoriesDB.updateCategory('cat-1', { excludeFromForecast: true });
-
-      const [query, params] = mockDb.executeQuery.mock.calls[0];
-      expect(query).toContain('exclude_from_forecast = ?');
-      expect(params).toContain(1);
     });
 
     it('always updates updated_at timestamp', async () => {

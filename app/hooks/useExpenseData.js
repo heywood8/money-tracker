@@ -89,18 +89,6 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
         }
       });
 
-      // Helper function to check if a category is excluded from forecast
-      const isCategoryExcludedFromForecast = (categoryId) => {
-        let current = categoryMap.get(categoryId);
-        while (current) {
-          if (current.excludeFromForecast) {
-            return true;
-          }
-          current = current.parentId ? categoryMap.get(current.parentId) : null;
-        }
-        return false;
-      };
-
       // Aggregate spending based on selected category
       let aggregatedSpending = {};
 
@@ -110,22 +98,15 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
           const rootParent = getRootParent(item.category_id);
           if (rootParent) {
             const rootId = rootParent.id;
-            const isExcluded = isCategoryExcludedFromForecast(item.category_id);
             const amount = parseFloat(item.total);
 
             if (!aggregatedSpending[rootId]) {
               aggregatedSpending[rootId] = {
                 category: rootParent,
                 total: 0,
-                forecastTotal: 0, // Total excluding excluded categories
               };
             }
             aggregatedSpending[rootId].total += amount;
-
-            // Only add to forecastTotal if not excluded
-            if (!isExcluded) {
-              aggregatedSpending[rootId].forecastTotal += amount;
-            }
           }
         });
       } else {
@@ -134,7 +115,6 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
           const category = categoryMap.get(item.category_id);
           if (!category) return;
 
-          const isExcluded = isCategoryExcludedFromForecast(item.category_id);
           const amount = parseFloat(item.total);
 
           // Check if this category is a direct child of the selected folder
@@ -143,13 +123,9 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
               aggregatedSpending[category.id] = {
                 category: category,
                 total: 0,
-                forecastTotal: 0,
               };
             }
             aggregatedSpending[category.id].total += amount;
-            if (!isExcluded) {
-              aggregatedSpending[category.id].forecastTotal += amount;
-            }
           } else {
             // Check if this category is a descendant of the selected folder
             // If so, aggregate it under its direct parent (immediate child of selected folder)
@@ -164,13 +140,9 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
                   aggregatedSpending[current.id] = {
                     category: current,
                     total: 0,
-                    forecastTotal: 0,
                   };
                 }
                 aggregatedSpending[current.id].total += amount;
-                if (!isExcluded) {
-                  aggregatedSpending[current.id].forecastTotal += amount;
-                }
                 break;
               }
               current = parent;
@@ -196,7 +168,6 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
           legendFontSize: 13,
           icon: item.category.icon || null,
           categoryId: item.category.id, // For clickable legend navigation
-          forecastAmount: item.forecastTotal !== undefined ? item.forecastTotal : item.total, // Amount to use for forecast (excluding excluded categories)
         };
       });
 
@@ -213,7 +184,6 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: null,
-          forecastAmount: shadowCategoryTotal, // Balance adjustments are included in forecast
         });
       }
 

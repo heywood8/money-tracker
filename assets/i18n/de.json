@@ -243,8 +243,6 @@
   "days_elapsed": "Vergangene Tage",
   "daily_average": "Tagesdurchschnitt",
   "no_prediction_data": "Nicht genügend Daten zur Vorhersage der Ausgaben",
-  "exclude_from_forecast": "Von Prognose ausschließen",
-  "exclude_from_forecast_hint": "Diese Kategorie nicht in Ausgabenprognosen einbeziehen",
   "monthly_target": "Monatliches Zielsaldo",
   "export_format": "Exportformat",
   "json_description": "Standardformat, kompatibel mit allen Versionen",

@@ -279,22 +279,9 @@ const GraphsScreen = () => {
     return items;
   }, [availableYears, availableMonths, t, monthKeys]);
 
-  // Calculate spending prediction (excluding categories marked as excluded from forecast)
+  // Calculate spending prediction
   const spendingPrediction = useMemo(() => {
-    // Filter out expenses from categories that are excluded from forecast
-    const categoryMap = new Map();
-    categories.forEach(cat => {
-      categoryMap.set(cat.id, cat);
-    });
-
-    // Calculate total expenses for forecast using forecastAmount (which excludes excluded categories)
-    const totalExpensesForForecast = chartData.reduce((sum, item) => {
-      // Use forecastAmount if available (which already has excluded categories removed),
-      // otherwise use amount (for items like balance adjustments that don't have forecastAmount)
-      return sum + (item.forecastAmount !== undefined ? item.forecastAmount : item.amount);
-    }, 0);
-
-    if (totalExpensesForForecast === 0) {
+    if (totalExpenses === 0) {
       return null; // No spending data yet
     }
 
@@ -330,7 +317,7 @@ const GraphsScreen = () => {
     }
 
     // Calculate daily average
-    const dailyAverage = totalExpensesForForecast / daysElapsed;
+    const dailyAverage = totalExpenses / daysElapsed;
 
     // Predict total spending by month end
     const predictedTotal = dailyAverage * daysInMonth;
@@ -339,15 +326,15 @@ const GraphsScreen = () => {
     const percentElapsed = (daysElapsed / daysInMonth) * 100;
 
     return {
-      currentSpending: totalExpensesForForecast,
+      currentSpending: totalExpenses,
       predictedTotal,
-      predictedRemaining: predictedTotal - totalExpensesForForecast,
+      predictedRemaining: predictedTotal - totalExpenses,
       dailyAverage,
       daysElapsed,
       daysInMonth,
       percentElapsed,
     };
-  }, [chartData, categories, selectedYear, selectedMonth]);
+  }, [totalExpenses, selectedYear, selectedMonth]);
 
   // Calculate if the selected period is the current month
   const isCurrentMonth = useMemo(() => {

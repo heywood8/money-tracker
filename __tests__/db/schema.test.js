@@ -109,7 +109,6 @@ describe('Database Schema', () => {
       expect(columns.icon).toBeDefined();
       expect(columns.color).toBeDefined();
       expect(columns.isShadow).toBeDefined();
-      expect(columns.excludeFromForecast).toBeDefined();
       expect(columns.createdAt).toBeDefined();
       expect(columns.updatedAt).toBeDefined();
     });
@@ -135,7 +134,6 @@ describe('Database Schema', () => {
 
     it('has correct default values for flags', () => {
       expect(schema.categories.isShadow.default).toBeDefined();
-      expect(schema.categories.excludeFromForecast.default).toBeDefined();
     });
   });
 
@@ -394,9 +392,6 @@ describe('Database Schema', () => {
     it('categories has correct defaults for flags', () => {
       // isShadow defaults to 0 (false)
       expect(schema.categories.isShadow.default).toBe(0);
-
-      // excludeFromForecast defaults to 0 (false)
-      expect(schema.categories.excludeFromForecast.default).toBe(0);
     });
 
     it('budgets has correct defaults for flags', () => {
@@ -458,7 +453,6 @@ describe('Database Schema', () => {
       expect(schema.categories.type).toBeDefined();
       expect(schema.categories.categoryType).toBeDefined();
       expect(schema.categories.isShadow).toBeDefined();
-      expect(schema.categories.excludeFromForecast).toBeDefined();
     });
 
     it('operations table has performance indexes', () => {
