@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.41.0](https://github.com/heywood8/money-tracker/compare/penny-v0.40.0...penny-v0.41.0) (2026-02-05)
+
+
+### Features
+
+* capture screenshots in both light and dark modes ([7097b3c](https://github.com/heywood8/money-tracker/commit/7097b3c899a6e6195ea5908ac11f4b77c74111b0))
+
+
+### Bug Fixes
+
+* add scroll to force FlatList re-render for dark mode categories ([27782d7](https://github.com/heywood8/money-tracker/commit/27782d7ff32c91db34e4ffa81ed4c40205acc3c0))
+* defaults ([f292039](https://github.com/heywood8/money-tracker/commit/f2920393e74580ee4251f6e46538a6e3274a8383))
+* navigate after theme toggle to allow dark mode to propagate ([14f2fce](https://github.com/heywood8/money-tracker/commit/14f2fce966723dfe5ecac204ccbe9fc1899b49a2))
+* update test to match default income amount of 1000.00 ([48997e5](https://github.com/heywood8/money-tracker/commit/48997e58950940888a90ce2b5cb2141b4220a376))
+
 ## [0.40.0](https://github.com/heywood8/money-tracker/compare/penny-v0.39.4...penny-v0.40.0) (2026-02-04)
 
 
