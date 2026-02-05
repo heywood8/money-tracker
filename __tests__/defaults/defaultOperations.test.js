@@ -117,11 +117,11 @@ describe('defaultOperations', () => {
     });
 
     describe('operation amounts', () => {
-      it('has income amount of 2500.00', () => {
+      it('has income amount of 1000.00', () => {
         const operations = getDefaultOperations(1);
         const income = operations.find(op => op.type === 'income');
 
-        expect(income.amount).toBe('2500.00');
+        expect(income.amount).toBe('1000.00');
       });
 
       it('has transfer amount of 100.00', () => {
