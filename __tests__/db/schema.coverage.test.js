@@ -121,7 +121,6 @@ describe('Database Schema Coverage', () => {
       expect(categories.icon).toBeDefined();
       expect(categories.color).toBeDefined();
       expect(categories.isShadow).toBeDefined(); // Indexed column
-      expect(categories.excludeFromForecast).toBeDefined(); // Indexed column
       expect(categories.createdAt).toBeDefined();
       expect(categories.updatedAt).toBeDefined();
 
@@ -131,8 +130,6 @@ describe('Database Schema Coverage', () => {
       expect(categories.color.columnType).toBe('SQLiteText');
       expect(categories.isShadow.columnType).toBe('SQLiteInteger');
       expect(categories.isShadow.default).toBe(0);
-      expect(categories.excludeFromForecast.columnType).toBe('SQLiteInteger');
-      expect(categories.excludeFromForecast.default).toBe(0);
     });
   });
 
@@ -304,7 +301,6 @@ describe('Database Schema Coverage', () => {
       expect(accounts.currency.default).toBeDefined();
       expect(accounts.hidden.default).toBeDefined();
       expect(categories.isShadow.default).toBeDefined();
-      expect(categories.excludeFromForecast.default).toBeDefined();
       expect(budgets.isRecurring.default).toBeDefined();
       expect(budgets.rolloverEnabled.default).toBeDefined();
 
@@ -324,13 +320,12 @@ describe('Database Schema Coverage', () => {
 
     it('executes categories table index callback', () => {
       expect(schema.categories).toBeDefined();
-      // Categories has parentIdx, typeIdx, categoryTypeIdx, shadowIdx, excludeFromForecastIdx
+      // Categories has parentIdx, typeIdx, categoryTypeIdx, shadowIdx
       const indexCalls = mockIndex.mock.calls.map(call => call[0]);
       expect(indexCalls).toContain('idx_categories_parent');
       expect(indexCalls).toContain('idx_categories_type');
       expect(indexCalls).toContain('idx_categories_category_type');
       expect(indexCalls).toContain('idx_categories_is_shadow');
-      expect(indexCalls).toContain('idx_categories_exclude_from_forecast');
     });
 
     it('executes operations table index callback', () => {

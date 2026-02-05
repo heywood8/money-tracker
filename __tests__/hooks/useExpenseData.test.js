@@ -29,7 +29,7 @@ describe('useExpenseData', () => {
     { id: 'cat-2', name: 'Groceries', parentId: 'cat-1', icon: 'cart', categoryType: 'expense', isShadow: false },
     { id: 'cat-3', name: 'Transport', parentId: null, icon: 'car', categoryType: 'expense', isShadow: false },
     { id: 'cat-4', name: 'Shadow', parentId: null, icon: 'ghost', categoryType: 'expense', isShadow: true },
-    { id: 'cat-5', name: 'Excluded', parentId: null, icon: 'excluded', categoryType: 'expense', isShadow: false, excludeFromForecast: true },
+    { id: 'cat-5', name: 'Other', parentId: null, icon: 'dots-horizontal', categoryType: 'expense', isShadow: false },
   ];
 
   beforeEach(() => {
@@ -228,37 +228,6 @@ describe('useExpenseData', () => {
       expect(balanceAdjustments).toBeUndefined();
     });
 
-    it('should exclude categories marked excludeFromForecast from forecastTotal', async () => {
-      const mockSpending = [
-        { category_id: 'cat-5', total: '200' }, // Excluded category
-        { category_id: 'cat-3', total: '300' }, // Normal category
-      ];
-
-      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
-
-      const { result } = renderHook(() =>
-        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
-      );
-
-      await act(async () => {
-        await result.current.loadExpenseData();
-      });
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      const excludedItem = result.current.chartData.find(item => item.name === 'Excluded');
-      expect(excludedItem).toBeDefined();
-      expect(excludedItem.amount).toBe(200);
-      expect(excludedItem.forecastAmount).toBe(0); // Excluded from forecast
-
-      const normalItem = result.current.chartData.find(item => item.name === 'Transport');
-      expect(normalItem).toBeDefined();
-      expect(normalItem.amount).toBe(300);
-      expect(normalItem.forecastAmount).toBe(300); // Included in forecast
-    });
-
     it('should sort chart data by amount descending', async () => {
       const mockSpending = [
         { category_id: 'cat-2', total: '100' },
@@ -403,36 +372,6 @@ describe('useExpenseData', () => {
       });
     });
 
-    it('should check parent chain for excludeFromForecast', async () => {
-      // Add a child category under excluded parent
-      const categoriesWithChild = [
-        ...mockCategories,
-        { id: 'cat-6', name: 'Child', parentId: 'cat-5', icon: 'child', categoryType: 'expense', isShadow: false },
-      ];
-
-      const mockSpending = [
-        { category_id: 'cat-6', total: '150' }, // Child of excluded category
-      ];
-
-      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
-
-      const { result } = renderHook(() =>
-        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', categoriesWithChild, mockColors, mockT),
-      );
-
-      await act(async () => {
-        await result.current.loadExpenseData();
-      });
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      const excludedItem = result.current.chartData.find(item => item.name === 'Excluded');
-      expect(excludedItem).toBeDefined();
-      // Should inherit excludeFromForecast from parent
-      expect(excludedItem.forecastAmount).toBe(0);
-    });
   });
 
   describe('Regression Tests', () => {

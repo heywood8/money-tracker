@@ -243,8 +243,6 @@
   "days_elapsed": "Jours écoulés",
   "daily_average": "Moyenne quotidienne",
   "no_prediction_data": "Pas assez de données pour prévoir les dépenses",
-  "exclude_from_forecast": "Exclure des prévisions",
-  "exclude_from_forecast_hint": "Ne pas inclure cette catégorie dans les prévisions de dépenses",
   "monthly_target": "Solde cible mensuel",
   "export_format": "Format d'exportation",
   "json_description": "Format standard, compatible avec toutes les versions",

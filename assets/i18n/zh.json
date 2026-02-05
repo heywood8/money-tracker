@@ -243,8 +243,6 @@
   "days_elapsed": "已过天数",
   "daily_average": "日均",
   "no_prediction_data": "数据不足，无法预测支出",
-  "exclude_from_forecast": "从预测中排除",
-  "exclude_from_forecast_hint": "不要在支出预测中包含此类别",
   "monthly_target": "每月目标余额",
   "export_format": "导出格式",
   "json_description": "标准格式，与所有版本兼容",

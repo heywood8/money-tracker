@@ -241,8 +241,6 @@
   "days_elapsed": "Прошло дней",
   "daily_average": "Среднее в день",
   "no_prediction_data": "Недостаточно данных для прогноза",
-  "exclude_from_forecast": "Исключить из прогноза",
-  "exclude_from_forecast_hint": "Не учитывать эту категорию в прогнозе расходов",
   "monthly_target": "Месячная целевая сумма",
   "export_format": "Формат экспорта",
   "json_description": "Стандартный формат, совместим со всеми версиями",

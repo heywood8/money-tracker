@@ -36,7 +36,6 @@ const mapCategoryFields = (dbCategory) => {
     icon: dbCategory.icon,
     color: dbCategory.color,
     isShadow: dbCategory.is_shadow === 1 || dbCategory.is_shadow === true,
-    excludeFromForecast: dbCategory.exclude_from_forecast === 1 || dbCategory.exclude_from_forecast === true,
     createdAt: dbCategory.created_at,
     updatedAt: dbCategory.updated_at,
   };
@@ -205,13 +204,12 @@ export const createCategory = async (category) => {
       icon: category.icon || null,
       color: category.color || null,
       is_shadow: category.isShadow || category.is_shadow ? 1 : 0,
-      exclude_from_forecast: category.excludeFromForecast || category.exclude_from_forecast ? 1 : 0,
       created_at: now,
       updated_at: now,
     };
 
     await executeQuery(
-      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, exclude_from_forecast, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         categoryData.id,
         categoryData.name,
@@ -221,7 +219,6 @@ export const createCategory = async (category) => {
         categoryData.icon,
         categoryData.color,
         categoryData.is_shadow,
-        categoryData.exclude_from_forecast,
         categoryData.created_at,
         categoryData.updated_at,
       ],
@@ -272,11 +269,6 @@ export const updateCategory = async (id, updates) => {
       fields.push('color = ?');
       values.push(updates.color || null);
     }
-    if (updates.excludeFromForecast !== undefined || updates.exclude_from_forecast !== undefined) {
-      fields.push('exclude_from_forecast = ?');
-      values.push((updates.excludeFromForecast || updates.exclude_from_forecast) ? 1 : 0);
-    }
-
     if (fields.length === 0) {
       return; // Nothing to update
     }
