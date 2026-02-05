@@ -243,8 +243,6 @@
   "days_elapsed": "Días transcurridos",
   "daily_average": "Promedio diario",
   "no_prediction_data": "No hay suficientes datos para predecir gastos",
-  "exclude_from_forecast": "Excluir de la previsión",
-  "exclude_from_forecast_hint": "No incluir esta categoría en las predicciones de gastos",
   "monthly_target": "Saldo objetivo mensual",
   "export_format": "Formato de exportación",
   "json_description": "Formato estándar, compatible con todas las versiones",

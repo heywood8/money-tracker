@@ -12,7 +12,7 @@
  * - Category type switching (expense/income)
  * - Folder vs entry type handling
  * - Parent category selection logic
- * - Exclude from forecast toggle
+ * - Category lifecycle
  */
 
 import React from 'react';
@@ -173,7 +173,6 @@ describe('CategoryModal', () => {
         category_type: 'expense',
         icon: 'food',
         parentId: null,
-        excludeFromForecast: true,
       };
 
       const { getByDisplayValue } = render(
@@ -241,19 +240,6 @@ describe('CategoryModal', () => {
       expect(closeButton).toBeTruthy();
     });
 
-    it('toggles exclude from forecast switch', () => {
-      const { UNSAFE_getByType } = render(
-        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
-      );
-
-      const Switch = require('react-native').Switch;
-      const excludeSwitch = UNSAFE_getByType(Switch);
-
-      expect(excludeSwitch.props.value).toBe(false);
-
-      fireEvent(excludeSwitch, 'onValueChange', true);
-      // Props don't update in test, but handler is called
-    });
   });
 
   describe('Type Selection', () => {
@@ -874,36 +860,5 @@ describe('CategoryModal', () => {
       expect(getByDisplayValue('Food')).toBeTruthy();
     });
 
-    it('handles exclude from forecast default value', () => {
-      const { UNSAFE_getByType } = render(
-        <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
-      );
-
-      const Switch = require('react-native').Switch;
-      const excludeSwitch = UNSAFE_getByType(Switch);
-
-      expect(excludeSwitch.props.value).toBe(false);
-    });
-
-    it('preserves exclude from forecast value when editing', () => {
-      const mockCategory = {
-        id: 'cat1',
-        name: 'Food',
-        type: 'folder',
-        category_type: 'expense',
-        icon: 'food',
-        parentId: null,
-        excludeFromForecast: true,
-      };
-
-      const { UNSAFE_getByType } = render(
-        <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
-      );
-
-      const Switch = require('react-native').Switch;
-      const excludeSwitch = UNSAFE_getByType(Switch);
-
-      expect(excludeSwitch.props.value).toBe(true);
-    });
   });
 });

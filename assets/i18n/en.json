@@ -243,8 +243,6 @@
   "days_elapsed": "Days Elapsed",
   "daily_average": "Daily Average",
   "no_prediction_data": "Not enough data to predict spending",
-  "exclude_from_forecast": "Exclude from Forecast",
-  "exclude_from_forecast_hint": "Don't include this category in spending predictions",
   "monthly_target": "Monthly Target Balance",
   "export_format": "Export Format",
   "json_description": "Standard format, compatible with all versions",
