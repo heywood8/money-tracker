@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.0](https://github.com/heywood8/money-tracker/compare/penny-v0.41.0...penny-v0.42.0) (2026-02-05)
+
+
+### Features
+
+* remove excludeFromForecast feature from categories ([#282](https://github.com/heywood8/money-tracker/issues/282)) ([fb8b043](https://github.com/heywood8/money-tracker/commit/fb8b043386d138a715908d4a2ddcc094e5200f92))
+
 ## [0.41.0](https://github.com/heywood8/money-tracker/compare/penny-v0.40.0...penny-v0.41.0) (2026-02-05)
 
 
