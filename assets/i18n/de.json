@@ -239,6 +239,7 @@
   "offline_rate_info": "Offline-Kurs von",
   "live_rate_info": "Live-Wechselkurs",
   "fetching_rate": "Wechselkurs wird abgerufen...",
+  "manual_rate_info": "Manueller Wechselkurs",
   "spending_prediction": "Ausgabenprognose",
   "current_spending": "Aktuelle Ausgaben",
   "predicted_spending": "Voraussichtlich verbleibend",

@@ -237,6 +237,7 @@
   "offline_rate_info": "Оффлайн курс от",
   "live_rate_info": "Актуальный курс",
   "fetching_rate": "Загрузка курса...",
+  "manual_rate_info": "Ручной курс обмена",
   "spending_prediction": "Прогноз расходов",
   "current_spending": "Текущие расходы",
   "predicted_spending": "Прогноз до конца месяца",

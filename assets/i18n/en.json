@@ -239,6 +239,7 @@
   "offline_rate_info": "Offline rate from",
   "live_rate_info": "Live exchange rate",
   "fetching_rate": "Fetching exchange rate...",
+  "manual_rate_info": "Manual exchange rate",
   "spending_prediction": "Spending Prediction",
   "current_spending": "Current Spending",
   "predicted_spending": "Predicted Remaining",

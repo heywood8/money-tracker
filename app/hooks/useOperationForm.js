@@ -468,6 +468,7 @@ const useOperationForm = ({
     destinationAccount,
     isMultiCurrencyTransfer,
     rateSource,
+    setRateSource,
 
     // Handlers
     handleSave,

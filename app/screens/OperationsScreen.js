@@ -458,12 +458,14 @@ const OperationsScreen = () => {
   const handleExchangeRateChange = useCallback((text) => {
     setQuickAddValues(v => ({ ...v, exchangeRate: text }));
     setLastEditedField('exchangeRate');
-  }, []);
+    setRateSource('manual');
+  }, [setRateSource]);
 
   const handleDestinationAmountChange = useCallback((text) => {
     setQuickAddValues(v => ({ ...v, destinationAmount: text }));
     setLastEditedField('destinationAmount');
-  }, []);
+    setRateSource('manual');
+  }, [setRateSource]);
 
   const handleAmountChange = useCallback((text) => {
     setQuickAddValues(v => ({ ...v, amount: text }));
