@@ -159,6 +159,13 @@ jobs:
               { file: '04_categories', desc: 'Categories' },
             ];
 
+            // Modal screens with light/dark variants
+            const modalScreens = [
+              { file: '05_settings_modal', desc: 'Settings' },
+              { file: '06_add_account_modal', desc: 'Add Account' },
+              { file: '07_add_category_modal', desc: 'Add Category' },
+            ];
+
             const lines = [
               '## App Screenshots',
               '',
@@ -172,7 +179,12 @@ jobs:
               fs.existsSync(`screenshots/${s.file}_light.png`) || fs.existsSync(`screenshots/${s.file}_dark.png`)
             );
 
-            if (hasWelcome || availableThemed.length > 0) {
+            // Check which modal screenshots exist
+            const availableModals = modalScreens.filter(s =>
+              fs.existsSync(`screenshots/${s.file}_light.png`) || fs.existsSync(`screenshots/${s.file}_dark.png`)
+            );
+
+            if (hasWelcome || availableThemed.length > 0 || availableModals.length > 0) {
               // Welcome screen section (single image, no light/dark)
               if (hasWelcome) {
                 const welcomeUrl = `${rawBase}/${welcomeScreen.file}.png`;
@@ -193,6 +205,26 @@ jobs:
                   '|--------|-------|------|',
                 );
                 for (const s of availableThemed) {
+                  const lightUrl = `${rawBase}/${s.file}_light.png`;
+                  const darkUrl = `${rawBase}/${s.file}_dark.png`;
+                  const hasLight = fs.existsSync(`screenshots/${s.file}_light.png`);
+                  const hasDark = fs.existsSync(`screenshots/${s.file}_dark.png`);
+                  const lightImg = hasLight ? `<img src="${lightUrl}" width="200" />` : '—';
+                  const darkImg = hasDark ? `<img src="${darkUrl}" width="200" />` : '—';
+                  lines.push(`| **${s.desc}** | ${lightImg} | ${darkImg} |`);
+                }
+              }
+
+              // Modal screens section
+              if (availableModals.length > 0) {
+                lines.push(
+                  '',
+                  '### Modals',
+                  '',
+                  '| Modal | Light | Dark |',
+                  '|-------|-------|------|',
+                );
+                for (const s of availableModals) {
                   const lightUrl = `${rawBase}/${s.file}_light.png`;
                   const darkUrl = `${rawBase}/${s.file}_dark.png`;
                   const hasLight = fs.existsSync(`screenshots/${s.file}_light.png`);

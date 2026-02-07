@@ -43,6 +43,50 @@ appId: com.heywood8.monkeep
 - takeScreenshot: screenshots/04_categories_light
 
 # ============================================
+# LIGHT MODE MODAL SCREENSHOTS
+# ============================================
+
+# Settings modal: tap the settings button in the header
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/05_settings_modal_light
+
+# Close settings modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Add Account modal: navigate to Accounts tab, tap the FAB
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Add Account"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/06_add_account_modal_light
+
+# Close add account modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Add Category modal: navigate to Categories tab, tap the FAB
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Add Category"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/07_add_category_modal_light
+
+# Close add category modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# ============================================
 # SWITCH TO DARK MODE
 # ============================================
 
@@ -87,3 +131,47 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/04_categories_dark
+
+# ============================================
+# DARK MODE MODAL SCREENSHOTS
+# ============================================
+
+# Settings modal
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/05_settings_modal_dark
+
+# Close settings modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Add Account modal
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Add Account"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/06_add_account_modal_dark
+
+# Close add account modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Add Category modal
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Add Category"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/07_add_category_modal_dark
+
+# Close add category modal
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 2000
