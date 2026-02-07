@@ -195,6 +195,8 @@ jest.mock('../../app/utils/calculatorUtils', () => ({
 
 jest.mock('../../app/services/currency', () => ({
   formatAmount: jest.fn((amount) => amount),
+  getExchangeRate: jest.fn(() => null),
+  convertAmount: jest.fn(() => null),
 }));
 
 jest.mock('../../app/components/Calculator', () => {
@@ -2190,6 +2192,214 @@ describe('OperationsScreen', () => {
 
       // Component should handle transfers between accounts with different currencies
       expect(() => render(<OperationsScreen />)).not.toThrow();
+    });
+  });
+
+  describe('Multi-Currency Auto-Calculation', () => {
+    let mockSetQuickAddValues;
+    let mockSetLastEditedField;
+    let Currency;
+    let useQuickAddFormMock;
+    let useMultiCurrencyTransferMock;
+    let useOperationsDataMock;
+    let useOperationsActionsMock;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockSetQuickAddValues = jest.fn();
+      mockSetLastEditedField = jest.fn();
+      Currency = require('../../app/services/currency');
+      useQuickAddFormMock = require('../../app/hooks/useQuickAddForm');
+      useMultiCurrencyTransferMock = require('../../app/hooks/useMultiCurrencyTransfer');
+      useOperationsDataMock = require('../../app/contexts/OperationsDataContext').useOperationsData;
+      useOperationsActionsMock = require('../../app/contexts/OperationsActionsContext').useOperationsActions;
+
+      useOperationsDataMock.mockReturnValue({
+        operations: [],
+        loading: false,
+        loadingMore: false,
+        hasMoreOperations: false,
+        activeFilters: {},
+        filtersActive: false,
+      });
+
+      useOperationsActionsMock.mockReturnValue({
+        deleteOperation: jest.fn(),
+        addOperation: jest.fn(),
+        validateOperation: jest.fn(() => null),
+        loadMoreOperations: jest.fn(),
+        jumpToDate: jest.fn(),
+        updateFilters: jest.fn(),
+        clearFilters: jest.fn(),
+        getActiveFilterCount: jest.fn(() => 0),
+      });
+    });
+
+    it('auto-populates exchange rate when multi-currency transfer has no rate', () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      useQuickAddFormMock.mockReturnValue({
+        quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '', categoryId: '' },
+        setQuickAddValues: mockSetQuickAddValues,
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      useMultiCurrencyTransferMock.mockReturnValue({
+        sourceAccount: { id: 'acc-1', currency: 'USD' },
+        destinationAccount: { id: 'acc-2', currency: 'EUR' },
+        isMultiCurrencyTransfer: true,
+        lastEditedField: null,
+        setLastEditedField: mockSetLastEditedField,
+      });
+
+      Currency.getExchangeRate.mockReturnValue('0.920000');
+
+      render(<OperationsScreen />);
+
+      expect(Currency.getExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
+      expect(mockSetQuickAddValues).toHaveBeenCalled();
+      expect(mockSetLastEditedField).toHaveBeenCalledWith('exchangeRate');
+    });
+
+    it('does not overwrite existing exchange rate', () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      useQuickAddFormMock.mockReturnValue({
+        quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.85', destinationAmount: '85', categoryId: '' },
+        setQuickAddValues: mockSetQuickAddValues,
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      useMultiCurrencyTransferMock.mockReturnValue({
+        sourceAccount: { id: 'acc-1', currency: 'USD' },
+        destinationAccount: { id: 'acc-2', currency: 'EUR' },
+        isMultiCurrencyTransfer: true,
+        lastEditedField: null,
+        setLastEditedField: mockSetLastEditedField,
+      });
+
+      render(<OperationsScreen />);
+
+      // Should not call getExchangeRate when rate already exists
+      expect(Currency.getExchangeRate).not.toHaveBeenCalled();
+    });
+
+    it('calculates destination amount when amount or exchange rate is edited', () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      useQuickAddFormMock.mockReturnValue({
+        quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '', categoryId: '' },
+        setQuickAddValues: mockSetQuickAddValues,
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      useMultiCurrencyTransferMock.mockReturnValue({
+        sourceAccount: { id: 'acc-1', currency: 'USD' },
+        destinationAccount: { id: 'acc-2', currency: 'EUR' },
+        isMultiCurrencyTransfer: true,
+        lastEditedField: 'amount',
+        setLastEditedField: mockSetLastEditedField,
+      });
+
+      Currency.convertAmount.mockReturnValue('92.00');
+
+      render(<OperationsScreen />);
+
+      expect(Currency.convertAmount).toHaveBeenCalledWith('100', 'USD', 'EUR', '0.92');
+      // setQuickAddValues should be called to set destinationAmount
+      expect(mockSetQuickAddValues).toHaveBeenCalled();
+    });
+
+    it('back-calculates exchange rate when destination amount is edited', () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      useQuickAddFormMock.mockReturnValue({
+        quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '', destinationAmount: '85', categoryId: '' },
+        setQuickAddValues: mockSetQuickAddValues,
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      useMultiCurrencyTransferMock.mockReturnValue({
+        sourceAccount: { id: 'acc-1', currency: 'USD' },
+        destinationAccount: { id: 'acc-2', currency: 'EUR' },
+        isMultiCurrencyTransfer: true,
+        lastEditedField: 'destinationAmount',
+        setLastEditedField: mockSetLastEditedField,
+      });
+
+      render(<OperationsScreen />);
+
+      // Should calculate rate = 85 / 100 = 0.850000
+      expect(mockSetQuickAddValues).toHaveBeenCalled();
+      const updater = mockSetQuickAddValues.mock.calls.find(call => {
+        if (typeof call[0] === 'function') {
+          const result = call[0]({ exchangeRate: '' });
+          return result.exchangeRate === '0.850000';
+        }
+        return false;
+      });
+      expect(updater).toBeTruthy();
+    });
+
+    it('clears exchange fields when switching to same-currency transfer', () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+
+      useQuickAddFormMock.mockReturnValue({
+        quickAddValues: { type: 'transfer', amount: '100', accountId: 'acc-1', toAccountId: 'acc-2', exchangeRate: '0.92', destinationAmount: '92', categoryId: '' },
+        setQuickAddValues: mockSetQuickAddValues,
+        getAccountName: jest.fn(() => 'Cash'),
+        getAccountBalance: jest.fn(() => '$1000.00'),
+        getCategoryInfo: jest.fn(() => ({ name: 'Food', icon: 'food' })),
+        getCategoryName: jest.fn(() => 'Food'),
+        filteredCategories: [],
+        topCategoriesForType: [],
+        resetForm: jest.fn(),
+      });
+
+      useMultiCurrencyTransferMock.mockReturnValue({
+        sourceAccount: { id: 'acc-1', currency: 'USD' },
+        destinationAccount: { id: 'acc-2', currency: 'USD' },
+        isMultiCurrencyTransfer: false,
+        lastEditedField: null,
+        setLastEditedField: mockSetLastEditedField,
+      });
+
+      render(<OperationsScreen />);
+
+      // Should clear exchangeRate and destinationAmount
+      expect(mockSetQuickAddValues).toHaveBeenCalled();
+      const clearCall = mockSetQuickAddValues.mock.calls.find(call => {
+        if (typeof call[0] === 'function') {
+          const result = call[0]({ exchangeRate: '0.92', destinationAmount: '92' });
+          return result.exchangeRate === '' && result.destinationAmount === '';
+        }
+        return false;
+      });
+      expect(clearCall).toBeTruthy();
     });
   });
 });

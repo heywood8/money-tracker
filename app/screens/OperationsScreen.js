@@ -153,6 +153,62 @@ const OperationsScreen = () => {
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
 
+  // Auto-populate exchange rate when multi-currency transfer accounts change
+  useEffect(() => {
+    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !quickAddValues.exchangeRate) {
+      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+      if (rate) {
+        setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
+        setLastEditedField('exchangeRate');
+      }
+    }
+  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
+
+  // Auto-calculate multi-currency fields based on which field was last edited
+  useEffect(() => {
+    if (!isMultiCurrencyTransfer) {
+      // Clear exchange rate fields for same-currency transfers
+      if (quickAddValues.exchangeRate || quickAddValues.destinationAmount) {
+        setQuickAddValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
+        setLastEditedField(null);
+      }
+      return;
+    }
+
+    if (!sourceAccount || !destinationAccount) return;
+
+    // If user edited destination amount, calculate the rate
+    if (lastEditedField === 'destinationAmount') {
+      if (quickAddValues.amount && quickAddValues.destinationAmount) {
+        const sourceAmount = parseFloat(quickAddValues.amount);
+        const destAmount = parseFloat(quickAddValues.destinationAmount);
+
+        if (!isNaN(sourceAmount) && !isNaN(destAmount) && sourceAmount > 0) {
+          const calculatedRate = (destAmount / sourceAmount).toFixed(6);
+          const currentRate = parseFloat(quickAddValues.exchangeRate || '0');
+          const newRate = parseFloat(calculatedRate);
+          if (Math.abs(currentRate - newRate) > 0.000001) {
+            setQuickAddValues(v => ({ ...v, exchangeRate: calculatedRate }));
+          }
+        }
+      }
+    }
+    // If user edited amount or rate, calculate destination amount
+    else if (lastEditedField === 'amount' || lastEditedField === 'exchangeRate') {
+      if (quickAddValues.amount && quickAddValues.exchangeRate) {
+        const converted = Currency.convertAmount(
+          quickAddValues.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          quickAddValues.exchangeRate,
+        );
+        if (converted && converted !== quickAddValues.destinationAmount) {
+          setQuickAddValues(v => ({ ...v, destinationAmount: converted }));
+        }
+      }
+    }
+  }, [isMultiCurrencyTransfer, quickAddValues.amount, quickAddValues.exchangeRate, quickAddValues.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
+
   // Auto-prefill "To Account" for transfers with same currency
   useEffect(() => {
     if (quickAddValues.type === 'transfer' && quickAddValues.accountId) {
