@@ -177,6 +177,7 @@ jest.mock('../../app/hooks/useMultiCurrencyTransfer', () => jest.fn(() => ({
   lastEditedField: null,
   setLastEditedField: jest.fn(),
   rateSource: 'offline',
+  setRateSource: jest.fn(),
 })));
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
@@ -1490,6 +1491,7 @@ describe('OperationsScreen', () => {
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       useOperationsData.mockReturnValue({
@@ -1548,6 +1550,7 @@ describe('OperationsScreen', () => {
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       useOperationsData.mockReturnValue({
@@ -2261,6 +2264,7 @@ describe('OperationsScreen', () => {
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.920000', source: 'live' });
@@ -2296,6 +2300,7 @@ describe('OperationsScreen', () => {
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       render(<OperationsScreen />);
@@ -2326,6 +2331,7 @@ describe('OperationsScreen', () => {
         lastEditedField: 'amount',
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       Currency.convertAmount.mockReturnValue('92.00');
@@ -2359,6 +2365,7 @@ describe('OperationsScreen', () => {
         lastEditedField: 'destinationAmount',
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       render(<OperationsScreen />);
@@ -2397,6 +2404,7 @@ describe('OperationsScreen', () => {
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
         rateSource: 'offline',
+        setRateSource: jest.fn(),
       });
 
       render(<OperationsScreen />);

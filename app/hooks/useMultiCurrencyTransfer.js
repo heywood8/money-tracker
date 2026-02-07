@@ -115,6 +115,7 @@ const useMultiCurrencyTransfer = (quickAddValues, accounts) => {
     lastEditedField,
     setLastEditedField,
     rateSource,
+    setRateSource,
     calculateMultiCurrency,
     getInitialExchangeRate,
   };

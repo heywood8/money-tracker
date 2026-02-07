@@ -96,6 +96,7 @@ const OperationsScreen = () => {
     lastEditedField,
     setLastEditedField,
     rateSource,
+    setRateSource,
   } = useMultiCurrencyTransfer(quickAddValues, accounts);
 
   // Scroll to date after operations are loaded
@@ -161,12 +162,16 @@ const OperationsScreen = () => {
     }
 
     let cancelled = false;
+    setRateSource('loading');
 
     Currency.fetchLiveExchangeRate(sourceAccount.currency, destinationAccount.currency)
-      .then(({ rate }) => {
-        if (cancelled || !rate) return;
-        setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
-        setLastEditedField('exchangeRate');
+      .then(({ rate, source }) => {
+        if (cancelled) return;
+        if (rate) {
+          setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
+          setLastEditedField('exchangeRate');
+        }
+        setRateSource(source === 'live' ? 'live' : 'offline');
       })
       .catch(() => {
         if (cancelled) return;
@@ -175,6 +180,7 @@ const OperationsScreen = () => {
           setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
           setLastEditedField('exchangeRate');
         }
+        setRateSource('offline');
       });
 
     return () => { cancelled = true; };
