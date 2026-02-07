@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.1](https://github.com/heywood8/money-tracker/compare/penny-v0.42.0...penny-v0.42.1) (2026-02-07)
+
+
+### Bug Fixes
+
+* maestro dark mode swipe ([#284](https://github.com/heywood8/money-tracker/issues/284)) ([e234c99](https://github.com/heywood8/money-tracker/commit/e234c99879694b3654e0a8e97f4fdd0d9197c254))
+
 ## [0.42.0](https://github.com/heywood8/money-tracker/compare/penny-v0.41.0...penny-v0.42.0) (2026-02-05)
 
 
