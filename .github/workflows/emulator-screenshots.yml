@@ -154,6 +154,7 @@ jobs:
             // Screens with light/dark variants
             const themedScreens = [
               { file: '01_operations', desc: 'Operations' },
+              { file: '05_transfer', desc: 'Multi-Currency Transfer' },
               { file: '02_graphs', desc: 'Graphs' },
               { file: '03_accounts', desc: 'Accounts' },
               { file: '04_categories', desc: 'Categories' },
