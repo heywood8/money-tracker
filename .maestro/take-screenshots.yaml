@@ -77,12 +77,13 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 3000
 # Scroll slightly to force FlatList to re-render cells with dark theme
+# Use larger swipe distance to avoid being interpreted as a tap on a category row
 - swipe:
-    start: 50%, 60%
-    end: 50%, 55%
+    start: 50%, 70%
+    end: 50%, 40%
 - swipe:
-    start: 50%, 55%
-    end: 50%, 60%
+    start: 50%, 40%
+    end: 50%, 70%
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/04_categories_dark
