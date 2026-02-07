@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
 
 // Mock all dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -176,6 +176,7 @@ jest.mock('../../app/hooks/useMultiCurrencyTransfer', () => jest.fn(() => ({
   isMultiCurrencyTransfer: false,
   lastEditedField: null,
   setLastEditedField: jest.fn(),
+  rateSource: 'offline',
 })));
 
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
@@ -197,6 +198,7 @@ jest.mock('../../app/services/currency', () => ({
   formatAmount: jest.fn((amount) => amount),
   getExchangeRate: jest.fn(() => null),
   convertAmount: jest.fn(() => null),
+  fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
 }));
 
 jest.mock('../../app/components/Calculator', () => {
@@ -1487,6 +1489,7 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: false,
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       useOperationsData.mockReturnValue({
@@ -1544,6 +1547,7 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: true,
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       useOperationsData.mockReturnValue({
@@ -2235,7 +2239,7 @@ describe('OperationsScreen', () => {
       });
     });
 
-    it('auto-populates exchange rate when multi-currency transfer has no rate', () => {
+    it('auto-populates exchange rate when multi-currency transfer has no rate', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       useQuickAddFormMock.mockReturnValue({
@@ -2256,15 +2260,18 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: true,
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
-      Currency.getExchangeRate.mockReturnValue('0.920000');
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.920000', source: 'live' });
 
       render(<OperationsScreen />);
 
-      expect(Currency.getExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
-      expect(mockSetQuickAddValues).toHaveBeenCalled();
-      expect(mockSetLastEditedField).toHaveBeenCalledWith('exchangeRate');
+      await waitFor(() => {
+        expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
+        expect(mockSetQuickAddValues).toHaveBeenCalled();
+        expect(mockSetLastEditedField).toHaveBeenCalledWith('exchangeRate');
+      });
     });
 
     it('does not overwrite existing exchange rate', () => {
@@ -2288,12 +2295,13 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: true,
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       render(<OperationsScreen />);
 
-      // Should not call getExchangeRate when rate already exists
-      expect(Currency.getExchangeRate).not.toHaveBeenCalled();
+      // Should not call fetchLiveExchangeRate when rate already exists
+      expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
     });
 
     it('calculates destination amount when amount or exchange rate is edited', () => {
@@ -2317,6 +2325,7 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: true,
         lastEditedField: 'amount',
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       Currency.convertAmount.mockReturnValue('92.00');
@@ -2349,6 +2358,7 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: true,
         lastEditedField: 'destinationAmount',
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       render(<OperationsScreen />);
@@ -2386,6 +2396,7 @@ describe('OperationsScreen', () => {
         isMultiCurrencyTransfer: false,
         lastEditedField: null,
         setLastEditedField: mockSetLastEditedField,
+        rateSource: 'offline',
       });
 
       render(<OperationsScreen />);

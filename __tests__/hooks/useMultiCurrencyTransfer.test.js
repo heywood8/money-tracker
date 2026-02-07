@@ -6,6 +6,7 @@ import * as Currency from '../../app/services/currency';
 jest.mock('../../app/services/currency', () => ({
   getExchangeRate: jest.fn(),
   convertAmount: jest.fn(),
+  fetchLiveExchangeRate: jest.fn(),
 }));
 
 describe('useMultiCurrencyTransfer', () => {
@@ -303,8 +304,8 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('getInitialExchangeRate', () => {
-    it('should return exchange rate for multi-currency transfer', () => {
-      Currency.getExchangeRate.mockReturnValue('0.85');
+    it('should return exchange rate for multi-currency transfer', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.85', source: 'live' });
 
       const quickAddValues = {
         type: 'transfer',
@@ -317,13 +318,16 @@ describe('useMultiCurrencyTransfer', () => {
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
-      const rate = result.current.getInitialExchangeRate();
+      let rate;
+      await act(async () => {
+        rate = await result.current.getInitialExchangeRate();
+      });
 
-      expect(Currency.getExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
+      expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
       expect(rate).toBe('0.85');
     });
 
-    it('should return empty string for same-currency transfer', () => {
+    it('should return empty string for same-currency transfer', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -335,13 +339,16 @@ describe('useMultiCurrencyTransfer', () => {
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
-      const rate = result.current.getInitialExchangeRate();
+      let rate;
+      await act(async () => {
+        rate = await result.current.getInitialExchangeRate();
+      });
 
       expect(rate).toBe('');
     });
 
-    it('should return empty string if no exchange rate available', () => {
-      Currency.getExchangeRate.mockReturnValue(null);
+    it('should return empty string if no exchange rate available', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
 
       const quickAddValues = {
         type: 'transfer',
@@ -354,9 +361,35 @@ describe('useMultiCurrencyTransfer', () => {
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
-      const rate = result.current.getInitialExchangeRate();
+      let rate;
+      await act(async () => {
+        rate = await result.current.getInitialExchangeRate();
+      });
 
       expect(rate).toBe('');
+    });
+
+    it('should fallback to offline rate on fetch error', async () => {
+      Currency.fetchLiveExchangeRate.mockRejectedValue(new Error('Network error'));
+      Currency.getExchangeRate.mockReturnValue('0.84');
+
+      const quickAddValues = {
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+      };
+
+      const { result } = renderHook(() =>
+        useMultiCurrencyTransfer(quickAddValues, mockAccounts),
+      );
+
+      let rate;
+      await act(async () => {
+        rate = await result.current.getInitialExchangeRate();
+      });
+
+      expect(rate).toBe('0.84');
     });
   });
 

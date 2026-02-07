@@ -506,3 +506,89 @@ export const isReasonableRate = (rate, fromCurrency, toCurrency) => {
 export const getExchangeRatesLastUpdated = () => {
   return exchangeRatesData.lastUpdated;
 };
+
+// In-memory cache for live exchange rates (1-hour TTL)
+const liveRateCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const FETCH_TIMEOUT_MS = 5000; // 5 seconds
+
+/**
+ * Clear the in-memory exchange rate cache (for testing)
+ */
+export const clearExchangeRateCache = () => {
+  liveRateCache.clear();
+};
+
+/**
+ * Fetch a live exchange rate between two currencies.
+ * Tries primary CDN, then fallback CDN, then falls back to offline rates.
+ *
+ * @param {string} fromCurrency - Source currency code (e.g., 'USD')
+ * @param {string} toCurrency - Destination currency code (e.g., 'EUR')
+ * @returns {Promise<{rate: string|null, source: 'live'|'offline'|'none'}>}
+ */
+export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
+  if (!fromCurrency || !toCurrency) {
+    return { rate: null, source: 'none' };
+  }
+
+  if (fromCurrency === toCurrency) {
+    return { rate: '1.0', source: 'live' };
+  }
+
+  const fromLower = fromCurrency.toLowerCase();
+  const toLower = toCurrency.toLowerCase();
+
+  // Check cache
+  const cached = liveRateCache.get(fromLower);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    const rate = cached.rates[toLower];
+    if (rate !== undefined) {
+      return { rate: rate.toString(), source: 'live' };
+    }
+  }
+
+  // Try fetching from APIs
+  const urls = [
+    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${fromLower}.min.json`,
+    `https://latest.currency-api.pages.dev/v1/currencies/${fromLower}.min.json`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const rates = data[fromLower];
+      if (rates && typeof rates === 'object') {
+        // Cache the full response
+        liveRateCache.set(fromLower, {
+          rates,
+          timestamp: Date.now(),
+        });
+
+        const rate = rates[toLower];
+        if (rate !== undefined) {
+          return { rate: rate.toString(), source: 'live' };
+        }
+      }
+    } catch {
+      // Network error or timeout, try next URL
+      continue;
+    }
+  }
+
+  // Fallback to offline rates
+  const offlineRate = getExchangeRate(fromCurrency, toCurrency);
+  if (offlineRate) {
+    return { rate: offlineRate, source: 'offline' };
+  }
+
+  return { rate: null, source: 'none' };
+};

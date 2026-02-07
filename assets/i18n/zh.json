@@ -237,6 +237,8 @@
   "exchange_rate": "汇率",
   "destination_amount": "目标金额",
   "offline_rate_info": "离线汇率来自",
+  "live_rate_info": "实时汇率",
+  "fetching_rate": "正在获取汇率...",
   "spending_prediction": "支出预测",
   "current_spending": "当前支出",
   "predicted_spending": "预测剩余",

@@ -237,6 +237,8 @@
   "exchange_rate": "Tipo de cambio",
   "destination_amount": "Cantidad de destino",
   "offline_rate_info": "Tasa offline de",
+  "live_rate_info": "Tasa de cambio en vivo",
+  "fetching_rate": "Obteniendo tasa de cambio...",
   "spending_prediction": "Predicción de gastos",
   "current_spending": "Gasto actual",
   "predicted_spending": "Restante previsto",

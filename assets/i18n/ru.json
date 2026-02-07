@@ -235,6 +235,8 @@
   "exchange_rate": "Курс обмена",
   "destination_amount": "Сумма получателя",
   "offline_rate_info": "Оффлайн курс от",
+  "live_rate_info": "Актуальный курс",
+  "fetching_rate": "Загрузка курса...",
   "spending_prediction": "Прогноз расходов",
   "current_spending": "Текущие расходы",
   "predicted_spending": "Прогноз до конца месяца",

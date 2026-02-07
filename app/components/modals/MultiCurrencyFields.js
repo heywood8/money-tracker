@@ -27,6 +27,7 @@ const MultiCurrencyFields = ({
   isShadowOperation,
   onExchangeRateChange,
   onDestinationAmountChange,
+  rateSource = 'offline',
 }) => {
   return (
     <>
@@ -87,7 +88,11 @@ const MultiCurrencyFields = ({
 
       {/* Exchange rate source info */}
       <Text style={[styles.rateInfo, { color: colors.mutedText }]}>
-        {t('offline_rate_info')} ({Currency.getExchangeRatesLastUpdated()})
+        {rateSource === 'loading'
+          ? t('fetching_rate')
+          : rateSource === 'live'
+            ? t('live_rate_info')
+            : `${t('offline_rate_info')} (${Currency.getExchangeRatesLastUpdated()})`}
       </Text>
     </>
   );
@@ -107,6 +112,7 @@ MultiCurrencyFields.propTypes = {
   isShadowOperation: PropTypes.bool,
   onExchangeRateChange: PropTypes.func.isRequired,
   onDestinationAmountChange: PropTypes.func.isRequired,
+  rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
 };
 
 const styles = StyleSheet.create({

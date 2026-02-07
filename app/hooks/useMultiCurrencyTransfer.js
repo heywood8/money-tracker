@@ -7,6 +7,7 @@ import * as Currency from '../services/currency';
  */
 const useMultiCurrencyTransfer = (quickAddValues, accounts) => {
   const [lastEditedField, setLastEditedField] = useState(null);
+  const [rateSource, setRateSource] = useState('offline');
 
   // Get source and destination accounts for multi-currency detection
   const sourceAccount = useMemo(() => {
@@ -87,11 +88,22 @@ const useMultiCurrencyTransfer = (quickAddValues, accounts) => {
     return result;
   };
 
-  // Get initial exchange rate when accounts change
-  const getInitialExchangeRate = () => {
+  // Get initial exchange rate when accounts change (async with live rate)
+  const getInitialExchangeRate = async () => {
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
-      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
-      return rate || '';
+      setRateSource('loading');
+      try {
+        const { rate, source } = await Currency.fetchLiveExchangeRate(
+          sourceAccount.currency,
+          destinationAccount.currency,
+        );
+        setRateSource(source === 'live' ? 'live' : 'offline');
+        return rate || '';
+      } catch {
+        const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+        setRateSource('offline');
+        return rate || '';
+      }
     }
     return '';
   };
@@ -102,6 +114,7 @@ const useMultiCurrencyTransfer = (quickAddValues, accounts) => {
     isMultiCurrencyTransfer,
     lastEditedField,
     setLastEditedField,
+    rateSource,
     calculateMultiCurrency,
     getInitialExchangeRate,
   };

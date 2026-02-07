@@ -95,6 +95,7 @@ const OperationsScreen = () => {
     isMultiCurrencyTransfer,
     lastEditedField,
     setLastEditedField,
+    rateSource,
   } = useMultiCurrencyTransfer(quickAddValues, accounts);
 
   // Scroll to date after operations are loaded
@@ -153,15 +154,30 @@ const OperationsScreen = () => {
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
 
-  // Auto-populate exchange rate when multi-currency transfer accounts change
+  // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
-    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !quickAddValues.exchangeRate) {
-      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
-      if (rate) {
+    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount || quickAddValues.exchangeRate) {
+      return;
+    }
+
+    let cancelled = false;
+
+    Currency.fetchLiveExchangeRate(sourceAccount.currency, destinationAccount.currency)
+      .then(({ rate }) => {
+        if (cancelled || !rate) return;
         setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
         setLastEditedField('exchangeRate');
-      }
-    }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+        if (rate) {
+          setQuickAddValues(v => ({ ...v, exchangeRate: rate }));
+          setLastEditedField('exchangeRate');
+        }
+      });
+
+    return () => { cancelled = true; };
   }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, quickAddValues.exchangeRate]);
 
   // Auto-calculate multi-currency fields based on which field was last edited
@@ -494,8 +510,9 @@ const OperationsScreen = () => {
       handleDestinationAmountChange={handleDestinationAmountChange}
       onAutoAddWithCategory={handleAutoAddWithCategory}
       TYPES={TYPES}
+      rateSource={rateSource}
     />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, TYPES]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, TYPES, rateSource]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {

@@ -82,6 +82,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     sourceAccount,
     destinationAccount,
     isMultiCurrencyTransfer,
+    rateSource,
     handleSave,
     handleClose,
     handleDelete,
@@ -427,6 +428,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     containerBackground={colors.card}
                     onExchangeRateChange={handleExchangeRateChange}
                     onDestinationAmountChange={handleDestinationAmountChange}
+                    rateSource={rateSource}
                   />
 
                   {/* Date Picker Button */}
