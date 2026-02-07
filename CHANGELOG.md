@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.42.2](https://github.com/heywood8/money-tracker/compare/penny-v0.42.1...penny-v0.42.2) (2026-02-07)
+
+
+### Bug Fixes
+
+* auto-calculate exchange rate and destination amount in QuickAdd form ([64bf934](https://github.com/heywood8/money-tracker/commit/64bf934b1131a4ef5332f3276889e6ac48c30818))
+
+
+### Documentation
+
+* remove old architecture review ([514e3d1](https://github.com/heywood8/money-tracker/commit/514e3d1d04fd15f55cf46c9d4b84514221315bc1))
+* remove old plan docs ([236ed0a](https://github.com/heywood8/money-tracker/commit/236ed0a01dab57b115294fe4c376b233111ffe33))
+
 ## [0.42.1](https://github.com/heywood8/money-tracker/compare/penny-v0.42.0...penny-v0.42.1) (2026-02-07)
 
 
