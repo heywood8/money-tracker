@@ -71,6 +71,7 @@ const OperationFormFields = memo(({
   onExchangeRateChange,
   onDestinationAmountChange,
   onAutoAddWithCategory,
+  rateSource,
 }) => {
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -363,6 +364,7 @@ const OperationFormFields = memo(({
           isShadowOperation={disabled}
           onExchangeRateChange={onExchangeRateChange}
           onDestinationAmountChange={onDestinationAmountChange}
+          rateSource={rateSource}
         />
       )}
       {renderCategoryPicker()}
@@ -405,6 +407,7 @@ OperationFormFields.propTypes = {
   onExchangeRateChange: PropTypes.func,
   onDestinationAmountChange: PropTypes.func,
   onAutoAddWithCategory: PropTypes.func,
+  rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
 };
 
 const styles = StyleSheet.create({

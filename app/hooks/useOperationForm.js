@@ -38,6 +38,7 @@ const useOperationForm = ({
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [lastEditedField, setLastEditedField] = useState(null);
+  const [rateSource, setRateSource] = useState('offline');
 
   // Track if form has been modified to prevent re-initialization from overwriting changes
   // This is needed because split operations trigger context updates (reloadAccounts)
@@ -78,15 +79,36 @@ const useOperationForm = ({
     return sourceAccount.currency !== destinationAccount.currency;
   }, [values.type, sourceAccount, destinationAccount]);
 
-  // Auto-populate exchange rate when accounts change
+  // Auto-populate exchange rate when accounts change (async with live rate)
   useEffect(() => {
-    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount && !values.exchangeRate) {
-      const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
-      if (rate) {
-        setValues(v => ({ ...v, exchangeRate: rate }));
-        setLastEditedField('exchangeRate');
-      }
+    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount || values.exchangeRate) {
+      return;
     }
+
+    let cancelled = false;
+    setRateSource('loading');
+
+    Currency.fetchLiveExchangeRate(sourceAccount.currency, destinationAccount.currency)
+      .then(({ rate, source }) => {
+        if (cancelled) return;
+        if (rate) {
+          setValues(v => ({ ...v, exchangeRate: rate }));
+          setLastEditedField('exchangeRate');
+        }
+        setRateSource(source === 'live' ? 'live' : 'offline');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fallback to offline
+        const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+        if (rate) {
+          setValues(v => ({ ...v, exchangeRate: rate }));
+          setLastEditedField('exchangeRate');
+        }
+        setRateSource('offline');
+      });
+
+    return () => { cancelled = true; };
   }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, values.exchangeRate]);
 
   // Auto-calculate based on which field was last edited
@@ -445,6 +467,8 @@ const useOperationForm = ({
     sourceAccount,
     destinationAccount,
     isMultiCurrencyTransfer,
+    rateSource,
+    setRateSource,
 
     // Handlers
     handleSave,

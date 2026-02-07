@@ -37,6 +37,7 @@ jest.mock('../../app/services/currency', () => ({
   getExchangeRate: jest.fn(),
   convertAmount: jest.fn(),
   formatAmount: jest.fn((amount) => String(amount)),
+  fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
 }));
 
 jest.mock('../../app/utils/categoryUtils', () => ({
@@ -96,6 +97,7 @@ describe('useOperationForm', () => {
     Currency.getExchangeRate.mockReturnValue('0.85');
     Currency.convertAmount.mockReturnValue('85.00');
     Currency.formatAmount.mockImplementation((amount) => String(amount));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.85', source: 'live' });
   });
 
   describe('Initialization', () => {

@@ -36,6 +36,7 @@ const QuickAddForm = memo(({
   handleDestinationAmountChange,
   onAutoAddWithCategory,
   TYPES,
+  rateSource,
 }) => {
   const containerThemed = React.useMemo(() => ({
     // Use altRow for outer background so QuickAdd area appears slightly gray
@@ -76,6 +77,7 @@ const QuickAddForm = memo(({
           onExchangeRateChange={handleExchangeRateChange}
           onDestinationAmountChange={handleDestinationAmountChange}
           onAutoAddWithCategory={onAutoAddWithCategory}
+          rateSource={rateSource}
         />
       </View>
     </View>
@@ -103,6 +105,7 @@ QuickAddForm.propTypes = {
   handleDestinationAmountChange: PropTypes.func.isRequired,
   onAutoAddWithCategory: PropTypes.func,
   TYPES: PropTypes.array.isRequired,
+  rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
 };
 
 const styles = StyleSheet.create({

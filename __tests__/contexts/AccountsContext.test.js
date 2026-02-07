@@ -72,6 +72,7 @@ describe('AccountsContext', () => {
         { id: 'acc-0', name: 'Checking', balance: '1000', currency: 'USD' },
         { id: 'acc-1', name: 'Savings', balance: '5000', currency: 'USD' },
         { id: 'acc-2', name: 'Cash', balance: '100', currency: 'USD' },
+        { id: 'acc-3', name: 'EUR Cash', balance: '100', currency: 'EUR' },
       ];
       AccountsDB.getAllAccounts
         .mockResolvedValueOnce([])  // First call - triggers default creation
@@ -84,8 +85,8 @@ describe('AccountsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(3);
-      expect(result.current.accounts).toHaveLength(3);
+      expect(AccountsDB.createAccount).toHaveBeenCalledTimes(4);
+      expect(result.current.accounts).toHaveLength(4);
     });
 
     it('shows alert on load error', async () => {
