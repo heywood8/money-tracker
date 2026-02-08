@@ -132,6 +132,7 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
       android_disableSound={true}
       accessibilityRole="button"
       accessibilityLabel={value}
+      testID={`calc-btn-${value}`}
     >
       {icon ? (
         <Icon name={icon} size={24} color={textStyle?.color || colors.text} />

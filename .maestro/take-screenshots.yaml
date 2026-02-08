@@ -35,9 +35,11 @@ appId: com.heywood8.monkeep
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
-# Type amount on calculator
-- tapOn: "1"
-- tapOn: "2"
+# Type amount on calculator using testID selectors
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_light
@@ -92,8 +94,10 @@ appId: com.heywood8.monkeep
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
-- tapOn: "1"
-- tapOn: "2"
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_dark
