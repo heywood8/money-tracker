@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.0](https://github.com/heywood8/money-tracker/compare/penny-v0.42.2...penny-v0.43.0) (2026-02-08)
+
+
+### Features
+
+* live exchange rates for multi-currency transfers ([#288](https://github.com/heywood8/money-tracker/issues/288)) ([7ac67ce](https://github.com/heywood8/money-tracker/commit/7ac67ce2dcdf4e8fb5572c32e2ccb5c64fc50a20))
+
 ## [0.42.2](https://github.com/heywood8/money-tracker/compare/penny-v0.42.1...penny-v0.42.2) (2026-02-08)
 
 
