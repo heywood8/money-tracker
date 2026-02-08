@@ -36,10 +36,8 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 # Type amount on calculator
-- tapOn:
-    accessibilityLabel: "1"
-- tapOn:
-    accessibilityLabel: "2"
+- tapOn: "1"
+- tapOn: "2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_light
@@ -94,10 +92,8 @@ appId: com.heywood8.monkeep
 - tapOn: "EUR Cash"
 - waitForAnimationToEnd:
     timeout: 2000
-- tapOn:
-    accessibilityLabel: "1"
-- tapOn:
-    accessibilityLabel: "2"
+- tapOn: "1"
+- tapOn: "2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_dark
