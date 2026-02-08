@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.42.2](https://github.com/heywood8/money-tracker/compare/penny-v0.42.1...penny-v0.42.2) (2026-02-08)
+
+
+### Bug Fixes
+
+* auto-calculate exchange rate and destination amount in QuickAdd form ([64bf934](https://github.com/heywood8/money-tracker/commit/64bf934b1131a4ef5332f3276889e6ac48c30818))
+* fetch more top categories to ensure 3 suggestions per type ([6e1eeb0](https://github.com/heywood8/money-tracker/commit/6e1eeb03893599043d55736f81e43cdaeb5cd182))
+* hide scroll indicator in OperationModal ([27e65fe](https://github.com/heywood8/money-tracker/commit/27e65fe25f84b831862687e7b9cc77fab3f8e97c))
+* place split and delete buttons on same row in OperationModal ([218234c](https://github.com/heywood8/money-tracker/commit/218234c9cef6e83f1cae0df3db390fe14c0903e2))
+* reduce spacing between account picker and calculator keypad ([7da8ebf](https://github.com/heywood8/money-tracker/commit/7da8ebf629ee4819d3a9498b5395c1718a04cade))
+* shorten split and delete button labels for inline layout ([8875822](https://github.com/heywood8/money-tracker/commit/8875822e6dc7cc9181c25a4978a3aa13c58dc8fc))
+* show suggested categories for operations created today ([98ec3cd](https://github.com/heywood8/money-tracker/commit/98ec3cd48c6af40d4b72596f903c7c264a552ad6))
+* use inline type selector in OperationModal to match QuickAdd form ([7139487](https://github.com/heywood8/money-tracker/commit/7139487d5b12e77195498d01ae1b1262ae63cb21))
+
+
+### Documentation
+
+* remove old architecture review ([514e3d1](https://github.com/heywood8/money-tracker/commit/514e3d1d04fd15f55cf46c9d4b84514221315bc1))
+* remove old plan docs ([236ed0a](https://github.com/heywood8/money-tracker/commit/236ed0a01dab57b115294fe4c376b233111ffe33))
+
 ## [0.42.1](https://github.com/heywood8/money-tracker/compare/penny-v0.42.0...penny-v0.42.1) (2026-02-07)
 
 
