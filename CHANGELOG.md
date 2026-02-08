@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1](https://github.com/heywood8/money-tracker/compare/penny-v0.43.0...penny-v0.43.1) (2026-02-08)
+
+
+### Miscellaneous Chores
+
+* switch emulator to Pixel 7 Pro with reduced hardware ([#290](https://github.com/heywood8/money-tracker/issues/290)) ([7465c46](https://github.com/heywood8/money-tracker/commit/7465c46990fe134b0d4b23eb3deeaa25c3bc59df))
+
 ## [0.43.0](https://github.com/heywood8/money-tracker/compare/penny-v0.42.2...penny-v0.43.0) (2026-02-08)
 
 
