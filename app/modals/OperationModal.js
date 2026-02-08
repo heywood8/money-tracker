@@ -164,13 +164,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
   }, [isShadowOperation, setValues]);
 
-  // Handler for opening type picker
-  const handleOpenTypePicker = useCallback(() => {
-    if (!isShadowOperation) {
-      openPicker('type', TYPES);
-    }
-  }, [isShadowOperation, openPicker]);
-
   // Handler for opening date picker
   const handleOpenDatePicker = useCallback(() => {
     if (!isShadowOperation) {
@@ -191,26 +184,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   // Empty handler for preventing event propagation
   const handleStopPropagation = useCallback(() => {}, []);
-
-  // Handler for type selection in picker
-  const handleTypeSelect = useCallback((selectedType) => {
-    setValues(v => {
-      // If switching to transfer, always clear categoryId
-      if (selectedType === 'transfer') {
-        return { ...v, type: selectedType, categoryId: '' };
-      }
-
-      // If switching between expense <-> income, clear categoryId
-      // to force user to pick a category appropriate for the new type.
-      if ((v.type === 'expense' && selectedType === 'income') || (v.type === 'income' && selectedType === 'expense')) {
-        return { ...v, type: selectedType, categoryId: '' };
-      }
-
-      // For other switches (e.g., same type), keep existing categoryId
-      return { ...v, type: selectedType, categoryId: v.categoryId };
-    });
-    closePicker();
-  }, [setValues, closePicker]);
 
   // Handler for account selection in picker
   const handleAccountSelect = useCallback((accountId) => {
@@ -276,31 +249,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   // FlatList key extractor
   const keyExtractor = useCallback((item) => {
-    if (pickerState.type === 'type') return item.key;
-    if (pickerState.type === 'account' || pickerState.type === 'toAccount') return item.id;
-    if (pickerState.type === 'category') return item.id;
     return item.id || item.key;
-  }, [pickerState.type]);
+  }, []);
 
   // FlatList render item
   const renderPickerItem = useCallback(({ item }) => {
-    if (pickerState.type === 'type') {
-      return (
-        <Pressable
-          onPress={() => handleTypeSelect(item.key)}
-          style={({ pressed }) => [
-            styles.pickerOption,
-            { borderColor: colors.border },
-            pressed && { backgroundColor: colors.selected },
-          ]}
-        >
-          <View style={styles.pickerOptionContent}>
-            <Icon name={item.icon} size={24} color={colors.text} />
-            <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.label}</Text>
-          </View>
-        </Pressable>
-      );
-    } else if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
+    if (pickerState.type === 'account' || pickerState.type === 'toAccount') {
       const handlePress = pickerState.type === 'account' ? handleAccountSelect : handleToAccountSelect;
       return (
         <Pressable
@@ -350,7 +304,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       );
     }
     return null;
-  }, [pickerState.type, colors, handleTypeSelect, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
+  }, [pickerState.type, colors, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -384,29 +338,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     </Text>
                   )}
 
-                  {/* Type Picker */}
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput,
-                    ]}
-                    onPress={handleOpenTypePicker}
-                    disabled={isShadowOperation}
-                  >
-                    <View style={styles.pickerButtonContent}>
-                      <Icon
-                        name={TYPES.find(tp => tp.key === values.type)?.icon || 'help-circle'}
-                        size={20}
-                        color={isShadowOperation ? colors.mutedText : colors.text}
-                      />
-                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                        {TYPES.find(tp => tp.key === values.type)?.label}
-                      </Text>
-                    </View>
-                  </Pressable>
-
-                  {/* Shared Form Fields: Amount, Account(s), Category, Multi-currency */}
+                  {/* Shared Form Fields: Type selector, Amount, Account(s), Category, Multi-currency */}
                   <OperationFormFields
                     colors={colors}
                     t={t}
@@ -419,7 +351,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     openPicker={openPicker}
                     onAmountChange={handleAmountChange}
                     TYPES={TYPES}
-                    showTypeSelector={false}
+                    showTypeSelector={true}
                     showAccountBalance={false}
                     showFieldIcons={false}
                     transferLayout="sideBySide"
@@ -781,11 +713,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 8,
     paddingVertical: 12,
-  },
-  pickerOptionContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
   },
   pickerOptionCurrency: {
     fontSize: 14,

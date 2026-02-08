@@ -116,12 +116,18 @@ const OperationFormFields = memo(({
               },
               disabledStyle,
             ]}
-            onPress={() => !disabled && setValues(v => ({
-              ...v,
-              type: type.key,
-              categoryId: type.key === 'transfer' ? '' : v.categoryId,
-              toAccountId: '',
-            }))}
+            onPress={() => !disabled && setValues(v => {
+              const switchingBetweenExpenseIncome =
+                (v.type === 'expense' && type.key === 'income') ||
+                (v.type === 'income' && type.key === 'expense');
+              const shouldClearCategory = type.key === 'transfer' || switchingBetweenExpenseIncome;
+              return {
+                ...v,
+                type: type.key,
+                categoryId: shouldClearCategory ? '' : v.categoryId,
+                toAccountId: '',
+              };
+            })}
             disabled={disabled}
           >
             <Icon
