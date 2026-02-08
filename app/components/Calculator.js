@@ -515,7 +515,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
     minHeight: 40,
-    paddingVertical: SPACING.sm,
     width: '100%',
   },
   displayButtonsContainer: {
