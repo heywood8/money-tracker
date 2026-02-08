@@ -84,14 +84,14 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return displayName || t('select_category');
   }, [categories, t]);
 
-  // Top 3 most used categories from last month
+  // Top most used categories from last 30 days (fetch extra to account for type filtering)
   const [topCategories, setTopCategories] = useState([]);
 
-  // Load top categories from last month
+  // Load top categories from last 30 days
   useEffect(() => {
     async function loadTopCategories() {
       try {
-        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(3);
+        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
         setTopCategories(topCats);
       } catch (error) {
         console.error('Failed to load top categories:', error);
