@@ -17,6 +17,12 @@ const defaultAccounts = [
     currency: 'USD',
     hidden: 0,
   },
+  {
+    name: 'EUR Cash',
+    balance: '100',
+    currency: 'EUR',
+    hidden: 0,
+  },
 ];
 
 export default defaultAccounts;

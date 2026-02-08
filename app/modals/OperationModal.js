@@ -82,6 +82,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     sourceAccount,
     destinationAccount,
     isMultiCurrencyTransfer,
+    rateSource,
+    setRateSource,
     handleSave,
     handleClose,
     handleDelete,
@@ -146,16 +148,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     if (!isShadowOperation) {
       setValues(v => ({ ...v, exchangeRate: text }));
       setLastEditedField('exchangeRate');
+      setRateSource('manual');
     }
-  }, [isShadowOperation, setValues, setLastEditedField]);
+  }, [isShadowOperation, setValues, setLastEditedField, setRateSource]);
 
   // Handler for destination amount changes
   const handleDestinationAmountChange = useCallback((text) => {
     if (!isShadowOperation) {
       setValues(v => ({ ...v, destinationAmount: text }));
       setLastEditedField('destinationAmount');
+      setRateSource('manual');
     }
-  }, [isShadowOperation, setValues, setLastEditedField]);
+  }, [isShadowOperation, setValues, setLastEditedField, setRateSource]);
 
   // Handler for description changes
   const handleDescriptionChange = useCallback((text) => {
@@ -360,6 +364,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     containerBackground={colors.card}
                     onExchangeRateChange={handleExchangeRateChange}
                     onDestinationAmountChange={handleDestinationAmountChange}
+                    rateSource={rateSource}
                   />
 
                   {/* Date Picker Button */}

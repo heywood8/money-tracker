@@ -24,6 +24,31 @@ appId: com.heywood8.monkeep
 # Screenshot 1: Operations screen (default first tab)
 - takeScreenshot: screenshots/01_operations_light
 
+# Screenshot 1b: Multi-currency transfer
+- tapOn: "Transfer"
+- waitForAnimationToEnd:
+    timeout: 2000
+# Tap destination account picker (right-side picker shows "To Account")
+- tapOn:
+    id: "to-account-picker"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 2000
+# Type amount on calculator using testID selectors
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/05_transfer_light
+# Switch back to expense type for the rest of the flow
+- tapOn: "Expense"
+- waitForAnimationToEnd:
+    timeout: 2000
+
 # Navigate to Graphs tab
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
@@ -59,6 +84,28 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: screenshots/01_operations_dark
+
+# Screenshot 5 dark: Multi-currency transfer
+- tapOn: "Transfer"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "to-account-picker"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/05_transfer_dark
+- tapOn: "Expense"
+- waitForAnimationToEnd:
+    timeout: 2000
 
 # Navigate to Graphs tab
 - tapOn: "Graphs"
