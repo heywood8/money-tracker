@@ -54,10 +54,14 @@ jobs:
       - name: Run emulator and capture screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
+          api-level: 34
           arch: x86_64
+          profile: pixel_7_pro
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -skin 640x1280
+          ram-size: 2048
+          heap-size: 512
+          disk-size: 4096M
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -cores 2 -memory 2048
           disable-animations: true
           emulator-boot-timeout: 300
           script: |
