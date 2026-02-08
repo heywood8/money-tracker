@@ -331,6 +331,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   style={styles.scrollView}
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
                 >
                   {isNew && (
                     <Text style={[styles.modalTitle, { color: colors.text }]}> 
