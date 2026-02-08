@@ -149,11 +149,13 @@ const OperationFormFields = memo(({
     label,
     iconName = 'wallet',
     style = styles.formInput,
+    testID,
   ) => (
     <Pressable
       style={[style, inputStyle, disabledStyle]}
       onPress={onPress}
       disabled={disabled}
+      testID={testID}
     >
       {showFieldIcons && (
         <Icon name={iconName} size={18} color={disabled ? colors.mutedText : colors.mutedText} />
@@ -204,6 +206,7 @@ const OperationFormFields = memo(({
             t('to_account'),
             'swap-horizontal',
             styles.formInputHalf,
+            'to-account-picker',
           )}
         </View>
       );
@@ -220,6 +223,9 @@ const OperationFormFields = memo(({
             values.toAccountId,
             () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
             `${t('to_account')}: ${values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}`,
+            'wallet',
+            styles.formInput,
+            'to-account-picker',
           )}
         </>
       );
