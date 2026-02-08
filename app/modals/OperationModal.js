@@ -431,57 +431,59 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   )}
                 </View>
 
-                {/* Split Button (only for editing expense/income, not transfers or shadow) */}
-                {canSplit && (
-                  <Pressable
-                    style={[
-                      styles.splitButtonContainer,
-                      { backgroundColor: colors.card, borderColor: colors.primary },
-                    ]}
-                    onPress={() => setShowSplitModal(true)}
-                    testID="split-button"
-                  >
-                    <Icon
-                      name="call-split"
-                      size={20}
-                      color={colors.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.splitButtonText,
-                        { color: colors.primary },
-                      ]}
-                    >
-                      {t('split_transaction')}
-                    </Text>
-                  </Pressable>
-                )}
-
-                {/* Delete Button (only for editing) */}
-                {!isNew && onDelete && (
-                  <Pressable
-                    style={[
-                      styles.deleteButtonContainer,
-                      { backgroundColor: colors.card },
-                      !canDeleteShadowOperation && styles.disabledButton,
-                    ]}
-                    onPress={handleDelete}
-                    disabled={!canDeleteShadowOperation}
-                  >
-                    <Icon
-                      name="delete-outline"
-                      size={20}
-                      color={canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText}
-                    />
-                    <Text
-                      style={[
-                        styles.deleteButtonText,
-                        { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText },
-                      ]}
-                    >
-                      {t('delete_operation')}
-                    </Text>
-                  </Pressable>
+                {/* Split & Delete Buttons Row */}
+                {(canSplit || (!isNew && onDelete)) && (
+                  <View style={styles.splitDeleteRow}>
+                    {canSplit && (
+                      <Pressable
+                        style={[
+                          styles.splitButtonContainer,
+                          { backgroundColor: colors.card },
+                        ]}
+                        onPress={() => setShowSplitModal(true)}
+                        testID="split-button"
+                      >
+                        <Icon
+                          name="call-split"
+                          size={18}
+                          color={colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.splitButtonText,
+                            { color: colors.primary },
+                          ]}
+                        >
+                          {t('split_transaction')}
+                        </Text>
+                      </Pressable>
+                    )}
+                    {!isNew && onDelete && (
+                      <Pressable
+                        style={[
+                          styles.deleteButtonContainer,
+                          { backgroundColor: colors.card },
+                          !canDeleteShadowOperation && styles.disabledButton,
+                        ]}
+                        onPress={handleDelete}
+                        disabled={!canDeleteShadowOperation}
+                      >
+                        <Icon
+                          name="delete-outline"
+                          size={18}
+                          color={canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText}
+                        />
+                        <Text
+                          style={[
+                            styles.deleteButtonText,
+                            { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText },
+                          ]}
+                        >
+                          {t('delete_operation')}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
                 )}
               </Pressable>
             </Pressable>
@@ -606,15 +608,15 @@ const styles = StyleSheet.create({
   },
   deleteButtonContainer: {
     alignItems: 'center',
+    flex: 1,
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     justifyContent: 'center',
-    marginTop: SPACING.sm,
-    minHeight: 48,
-    paddingVertical: SPACING.md,
+    minHeight: 44,
+    paddingVertical: SPACING.sm,
   },
   deleteButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
   descriptionInput: {
@@ -729,18 +731,20 @@ const styles = StyleSheet.create({
   },
   splitButtonContainer: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     justifyContent: 'center',
-    marginTop: SPACING.sm,
-    minHeight: 48,
-    paddingVertical: SPACING.md,
+    minHeight: 44,
+    paddingVertical: SPACING.sm,
   },
   splitButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
+  },
+  splitDeleteRow: {
+    flexDirection: 'row',
+    marginTop: SPACING.sm,
   },
 });
 
