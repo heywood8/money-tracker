@@ -1526,19 +1526,18 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
 };
 
 /**
- * Get top N most frequently used categories from last month
+ * Get top N most frequently used categories from the last 30 days
  * @param {number} limit - Number of top categories to return (default: 3)
  * @returns {Promise<Array<{categoryId: string, count: number}>>} Array of category IDs with usage count
  */
 export const getTopCategoriesFromLastMonth = async (limit = 3) => {
   try {
-    // Calculate date range for last month
+    // Calculate date range for last 30 days (includes today)
     const now = new Date();
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
 
-    const startDateStr = formatLocalDate(lastMonthStart);
-    const endDateStr = formatLocalDate(lastMonthEnd);
+    const startDateStr = formatLocalDate(thirtyDaysAgo);
+    const endDateStr = formatLocalDate(now);
 
     const results = await queryAll(
       `SELECT

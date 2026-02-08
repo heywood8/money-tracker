@@ -658,6 +658,38 @@ describe('OperationsDB Service', () => {
       expect(sql).toContain('category_id IS NOT NULL');
       expect(sql).toContain("type IN ('expense', 'income')");
     });
+
+    it('queries last 30 days including today, not just previous calendar month', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getTopCategoriesFromLastMonth(3);
+
+      const [, params] = queryAll.mock.calls[0];
+      const [startDateStr, endDateStr] = params;
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+
+      const expectedStart = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(thirtyDaysAgo.getDate()).padStart(2, '0')}`;
+      const expectedEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      expect(startDateStr).toBe(expectedStart);
+      expect(endDateStr).toBe(expectedEnd);
+    });
+
+    it('includes operations from today in top categories query', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getTopCategoriesFromLastMonth(3);
+
+      const [, params] = queryAll.mock.calls[0];
+      const endDateStr = params[1];
+
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      expect(endDateStr).toBe(todayStr);
+    });
   });
 
   describe('Utility Functions', () => {
