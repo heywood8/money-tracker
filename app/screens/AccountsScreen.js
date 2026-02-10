@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
   fab: {
     borderRadius: 28,
     borderWidth: 1,
-    bottom: 84,
+    bottom: 100,
     elevation: 8,
     margin: SPACING.lg,
     position: 'absolute',

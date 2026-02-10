@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
   filterFab: {
     borderRadius: 28,
     borderWidth: 1,
-    bottom: 84,
+    bottom: 100,
     elevation: 8,
     margin: SPACING.lg,
     position: 'absolute',
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     borderWidth: 1,
-    bottom: 84 + SPACING.lg,
+    bottom: 100 + SPACING.lg,
     elevation: 8,
     height: 40,
     justifyContent: 'center',
