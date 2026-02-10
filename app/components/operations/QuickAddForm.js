@@ -35,6 +35,8 @@ const QuickAddForm = memo(({
   handleExchangeRateChange,
   handleDestinationAmountChange,
   onAutoAddWithCategory,
+  topTransferAccounts,
+  onAutoAddWithAccount,
   TYPES,
   rateSource,
 }) => {
@@ -77,6 +79,8 @@ const QuickAddForm = memo(({
           onExchangeRateChange={handleExchangeRateChange}
           onDestinationAmountChange={handleDestinationAmountChange}
           onAutoAddWithCategory={onAutoAddWithCategory}
+          topTransferAccounts={topTransferAccounts}
+          onAutoAddWithAccount={onAutoAddWithAccount}
           rateSource={rateSource}
         />
       </View>
@@ -104,6 +108,8 @@ QuickAddForm.propTypes = {
   handleExchangeRateChange: PropTypes.func.isRequired,
   handleDestinationAmountChange: PropTypes.func.isRequired,
   onAutoAddWithCategory: PropTypes.func,
+  topTransferAccounts: PropTypes.array,
+  onAutoAddWithAccount: PropTypes.func,
   TYPES: PropTypes.array.isRequired,
   rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
 };

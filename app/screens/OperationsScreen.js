@@ -77,6 +77,7 @@ const OperationsScreen = () => {
     getCategoryName,
     filteredCategories,
     topCategoriesForType,
+    topTransferAccountsForForm,
     resetForm,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
 
@@ -303,7 +304,7 @@ const OperationsScreen = () => {
   }, [groupedOperations, jumpToDate]);
 
   // Quick add handlers
-  const handleQuickAdd = useCallback(async (overrideCategoryId) => {
+  const handleQuickAdd = useCallback(async (overrideCategoryId, overrideToAccountId) => {
     // Automatically evaluate any pending math operation before saving
     let finalAmount = quickAddValues.amount;
 
@@ -319,6 +320,8 @@ const OperationsScreen = () => {
       amount: finalAmount, // Use the evaluated amount
       // Use override categoryId if provided (for auto-add from category selection)
       categoryId: overrideCategoryId !== undefined ? overrideCategoryId : quickAddValues.categoryId,
+      // Use override toAccountId if provided (for auto-add from transfer target shortcuts)
+      toAccountId: overrideToAccountId !== undefined ? overrideToAccountId : quickAddValues.toAccountId,
       date: toDateString(new Date()),
     };
 
@@ -368,6 +371,14 @@ const OperationsScreen = () => {
     // Pass the selected categoryId directly to avoid race conditions
     await handleQuickAdd(categoryId);
   }, [resetForm, closePicker, handleQuickAdd]);
+
+  // Handler for auto-add with target account (from transfer target shortcuts)
+  const handleAutoAddWithAccount = useCallback(async (toAccountId) => {
+    resetForm();
+
+    // Pass undefined for categoryId override, pass toAccountId override
+    await handleQuickAdd(undefined, toAccountId);
+  }, [resetForm, handleQuickAdd]);
 
   // Calculate spending sums by currency for a group of operations
   const calculateSpendingSums = useCallback((operations) => {
@@ -517,10 +528,12 @@ const OperationsScreen = () => {
       handleExchangeRateChange={handleExchangeRateChange}
       handleDestinationAmountChange={handleDestinationAmountChange}
       onAutoAddWithCategory={handleAutoAddWithCategory}
+      topTransferAccounts={topTransferAccountsForForm}
+      onAutoAddWithAccount={handleAutoAddWithAccount}
       TYPES={TYPES}
       rateSource={rateSource}
     />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, TYPES, rateSource]);
+  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {

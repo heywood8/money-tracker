@@ -1532,6 +1532,36 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
  * @param {number} limitPerType - Number of top categories per type (default: 3)
  * @returns {Promise<Array<{categoryId: string, count: number}>>} Array of category IDs with usage count
  */
+export const getTopTransferTargetAccounts = async (limit = 3) => {
+  try {
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+
+    const startDateStr = formatLocalDate(ninetyDaysAgo);
+    const endDateStr = formatLocalDate(now);
+
+    const results = await queryAll(
+      `SELECT to_account_id, COUNT(*) as count
+       FROM operations
+       WHERE date >= ? AND date <= ?
+         AND type = 'transfer'
+         AND to_account_id IS NOT NULL
+       GROUP BY to_account_id
+       ORDER BY count DESC
+       LIMIT ?`,
+      [startDateStr, endDateStr, limit],
+    );
+
+    return (results || []).map(row => ({
+      accountId: row.to_account_id,
+      count: row.count,
+    }));
+  } catch (error) {
+    console.error('Failed to get top transfer target accounts:', error);
+    throw error;
+  }
+};
+
 export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
   try {
     // Calculate date range for last 90 days (includes today)

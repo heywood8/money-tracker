@@ -5,8 +5,10 @@ import * as Currency from '../../app/services/currency';
 
 // Mock OperationsDB
 const mockGetTopCategories = jest.fn().mockResolvedValue([]);
+const mockGetTopTransferTargets = jest.fn().mockResolvedValue([]);
 jest.mock('../../app/services/OperationsDB', () => ({
   getTopCategoriesFromLastMonth: (...args) => mockGetTopCategories(...args),
+  getTopTransferTargetAccounts: (...args) => mockGetTopTransferTargets(...args),
 }));
 
 // Mock dependencies
@@ -505,6 +507,137 @@ describe('useQuickAddForm', () => {
       const balance = result.current.getAccountBalance('acc-1');
       // Should use currency code if symbol not found
       expect(balance).toContain('100');
+    });
+  });
+
+  describe('topTransferAccountsForForm', () => {
+    it('should return empty array when type is not transfer', () => {
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      // Default type is expense
+      expect(result.current.topTransferAccountsForForm).toEqual([]);
+    });
+
+    it('should use history-based accounts when available', async () => {
+      mockGetTopTransferTargets.mockResolvedValue([
+        { accountId: 'acc-2', count: 5 },
+        { accountId: 'acc-3', count: 3 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      // Wait for async load
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      expect(result.current.topTransferAccountsForForm).toHaveLength(2);
+      expect(result.current.topTransferAccountsForForm[0].id).toBe('acc-2');
+      expect(result.current.topTransferAccountsForForm[1].id).toBe('acc-3');
+    });
+
+    it('should exclude current source account from results', async () => {
+      mockGetTopTransferTargets.mockResolvedValue([
+        { accountId: 'acc-1', count: 10 },
+        { accountId: 'acc-2', count: 5 },
+        { accountId: 'acc-3', count: 3 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      const ids = result.current.topTransferAccountsForForm.map(a => a.id);
+      expect(ids).not.toContain('acc-1');
+      expect(ids).toContain('acc-2');
+      expect(ids).toContain('acc-3');
+    });
+
+    it('should fall back to visible accounts when no history', async () => {
+      mockGetTopTransferTargets.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      // Should get first 3 accounts minus source
+      expect(result.current.topTransferAccountsForForm.length).toBeGreaterThan(0);
+      const ids = result.current.topTransferAccountsForForm.map(a => a.id);
+      expect(ids).not.toContain('acc-1');
+    });
+
+    it('should filter out accounts that no longer exist', async () => {
+      mockGetTopTransferTargets.mockResolvedValue([
+        { accountId: 'deleted-acc', count: 10 },
+        { accountId: 'acc-2', count: 5 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      const ids = result.current.topTransferAccountsForForm.map(a => a.id);
+      expect(ids).not.toContain('deleted-acc');
+      expect(ids).toContain('acc-2');
+    });
+
+    it('should limit to 3 accounts', async () => {
+      const manyAccounts = [
+        { id: 'acc-1', name: 'A1', currency: 'USD', balance: '100' },
+        { id: 'acc-2', name: 'A2', currency: 'USD', balance: '200' },
+        { id: 'acc-3', name: 'A3', currency: 'USD', balance: '300' },
+        { id: 'acc-4', name: 'A4', currency: 'USD', balance: '400' },
+        { id: 'acc-5', name: 'A5', currency: 'USD', balance: '500' },
+      ];
+
+      mockGetTopTransferTargets.mockResolvedValue([
+        { accountId: 'acc-2', count: 10 },
+        { accountId: 'acc-3', count: 8 },
+        { accountId: 'acc-4', count: 5 },
+        { accountId: 'acc-5', count: 3 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(manyAccounts, manyAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      expect(result.current.topTransferAccountsForForm).toHaveLength(3);
     });
   });
 
