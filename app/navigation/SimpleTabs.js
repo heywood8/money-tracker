@@ -22,6 +22,12 @@ import SettingsModal from '../modals/SettingsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Append alpha channel to a hex color (hex 00-FF)
+const withAlpha = (hex, alpha) => {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return hex + a;
+};
+
 const TAB_ICONS = {
   Operations: 'swap-horizontal',
   Graphs: 'chart-line',
@@ -242,32 +248,37 @@ export default function SimpleTabs() {
         </GestureDetector>
       </View>
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
-      <SafeAreaView edges={['bottom']} style={styles.floatingBarSafeArea}>
-        <View style={[
-          styles.floatingBar,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-        ]}>
-          {/* Animated pill behind active tab */}
-          <Animated.View
-            style={[
-              styles.activePill,
-              { backgroundColor: colors.primary + '1A' },
-              pillAnimatedStyle,
-            ]}
-          />
-          <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
-            {TABS.map(tab => (
-              <TabButton
-                key={tab.key}
-                tab={tab}
-                isActive={active === tab.key}
-                colors={colors}
-                onPress={handleTabPress}
-              />
-            ))}
+      {/* Floating bar overlays content so screen shows through behind it */}
+      <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
+        <View
+          pointerEvents="box-none"
+          style={styles.floatingBarPositioner}
+        >
+          <View style={[
+            styles.floatingBar,
+            {
+              backgroundColor: withAlpha(colors.surface, 0.82),
+              borderColor: withAlpha(colors.border, 0.5),
+            },
+          ]}>
+            <Animated.View
+              style={[
+                styles.activePill,
+                { backgroundColor: colors.primary + '1A' },
+                pillAnimatedStyle,
+              ]}
+            />
+            <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
+              {TABS.map(tab => (
+                <TabButton
+                  key={tab.key}
+                  tab={tab}
+                  isActive={active === tab.key}
+                  colors={colors}
+                  onPress={handleTabPress}
+                />
+              ))}
+            </View>
           </View>
         </View>
       </SafeAreaView>
@@ -307,8 +318,15 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  floatingBarSafeArea: {
-    position: 'relative',
+  floatingBarPositioner: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  floatingBarWrapper: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   screen: {
     height: '100%',
