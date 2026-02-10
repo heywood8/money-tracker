@@ -257,7 +257,7 @@ export default function SimpleTabs() {
           <View style={[
             styles.floatingBar,
             {
-              backgroundColor: withAlpha(colors.surface, 0.82),
+              backgroundColor: withAlpha(colors.surface, 0.87),
               borderColor: withAlpha(colors.border, 0.5),
             },
           ]}>
