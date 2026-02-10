@@ -29,6 +29,21 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_light
+
+# Screenshot 1c: Multi-currency transfer (select different-currency account, enter amount)
+- tapOn: "All accounts"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/06_multicurrency_transfer_light
 # Switch back to expense type for the rest of the flow
 - tapOn: "Expense"
 - waitForAnimationToEnd:
@@ -75,6 +90,21 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_dark
+
+# Screenshot 6 dark: Multi-currency transfer
+- tapOn: "All accounts"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/06_multicurrency_transfer_dark
 - tapOn: "Expense"
 - waitForAnimationToEnd:
     timeout: 2000
