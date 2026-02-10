@@ -24,23 +24,8 @@ appId: com.heywood8.monkeep
 # Screenshot 1: Operations screen (default first tab)
 - takeScreenshot: screenshots/01_operations_light
 
-# Screenshot 1b: Multi-currency transfer
+# Screenshot 1b: Transfer mode of QuickAdd (shows target account shortcuts below calculator)
 - tapOn: "Transfer"
-- waitForAnimationToEnd:
-    timeout: 2000
-# Tap destination account picker (right-side picker shows "To Account")
-- tapOn:
-    id: "to-account-picker"
-- waitForAnimationToEnd:
-    timeout: 2000
-- tapOn: "EUR Cash"
-- waitForAnimationToEnd:
-    timeout: 2000
-# Type amount on calculator using testID selectors
-- tapOn:
-    id: "calc-btn-1"
-- tapOn:
-    id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_light
@@ -85,21 +70,8 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: screenshots/01_operations_dark
 
-# Screenshot 5 dark: Multi-currency transfer
+# Screenshot 5 dark: Transfer mode of QuickAdd
 - tapOn: "Transfer"
-- waitForAnimationToEnd:
-    timeout: 2000
-- tapOn:
-    id: "to-account-picker"
-- waitForAnimationToEnd:
-    timeout: 2000
-- tapOn: "EUR Cash"
-- waitForAnimationToEnd:
-    timeout: 2000
-- tapOn:
-    id: "calc-btn-1"
-- tapOn:
-    id: "calc-btn-2"
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/05_transfer_dark
