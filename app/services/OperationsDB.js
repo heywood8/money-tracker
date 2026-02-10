@@ -1526,32 +1526,44 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
 };
 
 /**
- * Get top N most frequently used categories from the last 30 days
- * @param {number} limit - Number of top categories to return (default: 3)
+ * Get top N most frequently used categories per type from the last 3 months.
+ * Returns top categories for both expense and income types, ensuring
+ * each type is represented independently.
+ * @param {number} limitPerType - Number of top categories per type (default: 3)
  * @returns {Promise<Array<{categoryId: string, count: number}>>} Array of category IDs with usage count
  */
-export const getTopCategoriesFromLastMonth = async (limit = 3) => {
+export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
   try {
-    // Calculate date range for last 30 days (includes today)
+    // Calculate date range for last 90 days (includes today)
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
 
-    const startDateStr = formatLocalDate(thirtyDaysAgo);
+    const startDateStr = formatLocalDate(ninetyDaysAgo);
     const endDateStr = formatLocalDate(now);
 
+    // Fetch top categories per type using UNION ALL so both expense and
+    // income categories are represented independently
     const results = await queryAll(
-      `SELECT
-         category_id,
-         COUNT(*) as count
-       FROM operations
-       WHERE date >= ?
-         AND date <= ?
-         AND category_id IS NOT NULL
-         AND type IN ('expense', 'income')
-       GROUP BY category_id
-       ORDER BY count DESC
-       LIMIT ?`,
-      [startDateStr, endDateStr, limit],
+      `SELECT category_id, count FROM (
+         SELECT category_id, COUNT(*) as count
+         FROM operations
+         WHERE date >= ? AND date <= ?
+           AND category_id IS NOT NULL AND type = 'expense'
+         GROUP BY category_id
+         ORDER BY count DESC
+         LIMIT ?
+       )
+       UNION ALL
+       SELECT category_id, count FROM (
+         SELECT category_id, COUNT(*) as count
+         FROM operations
+         WHERE date >= ? AND date <= ?
+           AND category_id IS NOT NULL AND type = 'income'
+         GROUP BY category_id
+         ORDER BY count DESC
+         LIMIT ?
+       )`,
+      [startDateStr, endDateStr, limitPerType, startDateStr, endDateStr, limitPerType],
     );
 
     return (results || []).map(row => ({

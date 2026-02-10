@@ -604,7 +604,7 @@ describe('OperationsDB Service', () => {
       );
     });
 
-    it('gets top categories from last month', async () => {
+    it('gets top categories from last 3 months', async () => {
       const mockResults = [
         { category_id: 'cat1', count: 15 },
         { category_id: 'cat2', count: 10 },
@@ -624,7 +624,7 @@ describe('OperationsDB Service', () => {
       expect(result[2]).toEqual({ categoryId: 'cat3', count: 8 });
     });
 
-    it('returns empty array when no operations in last month', async () => {
+    it('returns empty array when no operations in last 3 months', async () => {
       queryAll.mockResolvedValue([]);
 
       const result = await OperationsDB.getTopCategoriesFromLastMonth(3);
@@ -632,7 +632,7 @@ describe('OperationsDB Service', () => {
       expect(result).toEqual([]);
     });
 
-    it('uses custom limit for top categories', async () => {
+    it('uses custom limit per type for top categories', async () => {
       const mockResults = [
         { category_id: 'cat1', count: 15 },
         { category_id: 'cat2', count: 10 },
@@ -651,15 +651,29 @@ describe('OperationsDB Service', () => {
       expect(result).toHaveLength(5);
     });
 
-    it('filters out null categories and includes only expense/income operations', async () => {
+    it('queries expense and income types separately using UNION ALL', async () => {
+      queryAll.mockResolvedValue([]);
       await OperationsDB.getTopCategoriesFromLastMonth(3);
 
       const sql = queryAll.mock.calls[0][0];
       expect(sql).toContain('category_id IS NOT NULL');
-      expect(sql).toContain("type IN ('expense', 'income')");
+      expect(sql).toContain("type = 'expense'");
+      expect(sql).toContain("type = 'income'");
+      expect(sql).toContain('UNION ALL');
     });
 
-    it('queries last 30 days including today, not just previous calendar month', async () => {
+    it('passes limit per type (duplicated for expense and income sub-queries)', async () => {
+      queryAll.mockResolvedValue([]);
+      await OperationsDB.getTopCategoriesFromLastMonth(4);
+
+      const [, params] = queryAll.mock.calls[0];
+      // params: [startDate, endDate, limitExpense, startDate, endDate, limitIncome]
+      expect(params).toHaveLength(6);
+      expect(params[2]).toBe(4);
+      expect(params[5]).toBe(4);
+    });
+
+    it('queries last 90 days including today', async () => {
       queryAll.mockResolvedValue([]);
 
       await OperationsDB.getTopCategoriesFromLastMonth(3);
@@ -668,9 +682,9 @@ describe('OperationsDB Service', () => {
       const [startDateStr, endDateStr] = params;
 
       const now = new Date();
-      const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
 
-      const expectedStart = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(thirtyDaysAgo.getDate()).padStart(2, '0')}`;
+      const expectedStart = `${ninetyDaysAgo.getFullYear()}-${String(ninetyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(ninetyDaysAgo.getDate()).padStart(2, '0')}`;
       const expectedEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       expect(startDateStr).toBe(expectedStart);

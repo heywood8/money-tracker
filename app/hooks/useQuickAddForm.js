@@ -87,11 +87,11 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   // Top most used categories from last 30 days (fetch extra to account for type filtering)
   const [topCategories, setTopCategories] = useState([]);
 
-  // Load top categories from last 30 days
+  // Load top categories from last 3 months (per type)
   useEffect(() => {
     async function loadTopCategories() {
       try {
-        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
+        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(5);
         setTopCategories(topCats);
       } catch (error) {
         console.error('Failed to load top categories:', error);
@@ -113,13 +113,21 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   }, [categories, quickAddValues.type]);
 
   // Get top 3 categories matching current operation type (expense/income)
+  // Falls back to first 3 leaf categories when no usage history exists
   const topCategoriesForType = useMemo(() => {
     if (quickAddValues.type === 'transfer') return [];
 
     // Filter top categories to match current type and exclude shadow categories
-    return topCategories
+    const fromHistory = topCategories
       .map(tc => categories.find(cat => cat.id === tc.categoryId))
       .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow)
+      .slice(0, 3);
+
+    if (fromHistory.length > 0) return fromHistory;
+
+    // Fallback: first 3 leaf categories (non-folder) of this type
+    return categories
+      .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && !cat.isFolder)
       .slice(0, 3);
   }, [topCategories, categories, quickAddValues.type]);
 
