@@ -3,6 +3,12 @@ import useQuickAddForm from '../../app/hooks/useQuickAddForm';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
 
+// Mock OperationsDB
+const mockGetTopCategories = jest.fn().mockResolvedValue([]);
+jest.mock('../../app/services/OperationsDB', () => ({
+  getTopCategoriesFromLastMonth: (...args) => mockGetTopCategories(...args),
+}));
+
 // Mock dependencies
 jest.mock('../../app/services/LastAccount', () => ({
   getLastAccessedAccount: jest.fn(),
@@ -283,6 +289,126 @@ describe('useQuickAddForm', () => {
 
       const filtered = result.current.filteredCategories;
       expect(filtered).toHaveLength(0);
+    });
+  });
+
+  describe('topCategoriesForType', () => {
+    const categoriesWithLeaves = [
+      { id: 'cat-e1', name: 'Food', categoryType: 'expense', isShadow: false, isFolder: false },
+      { id: 'cat-e2', name: 'Transport', categoryType: 'expense', isShadow: false, isFolder: false },
+      { id: 'cat-e3', name: 'Entertainment', categoryType: 'expense', isShadow: false, isFolder: false },
+      { id: 'cat-e4', name: 'Shopping', categoryType: 'expense', isShadow: false, isFolder: false },
+      { id: 'cat-i1', name: 'Salary', categoryType: 'income', isShadow: false, isFolder: false },
+      { id: 'cat-i2', name: 'Freelance', categoryType: 'income', isShadow: false, isFolder: false },
+      { id: 'cat-i3', name: 'Dividends', categoryType: 'income', isShadow: false, isFolder: false },
+      { id: 'cat-i4', name: 'Gifts', categoryType: 'income', isShadow: false, isFolder: false },
+      { id: 'cat-shadow', name: 'Shadow', categoryType: 'income', isShadow: true, isFolder: false },
+      { id: 'cat-folder', name: 'Folder', categoryType: 'income', isShadow: false, isFolder: true },
+    ];
+
+    it('should use history-based categories when available', async () => {
+      mockGetTopCategories.mockResolvedValue([
+        { categoryId: 'cat-e2', count: 10 },
+        { categoryId: 'cat-e4', count: 5 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.topCategoriesForType).toHaveLength(2);
+        expect(result.current.topCategoriesForType[0].id).toBe('cat-e2');
+        expect(result.current.topCategoriesForType[1].id).toBe('cat-e4');
+      });
+    });
+
+    it('should fall back to first 3 leaf categories when no history for expense', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.topCategoriesForType).toHaveLength(3);
+        expect(result.current.topCategoriesForType[0].id).toBe('cat-e1');
+        expect(result.current.topCategoriesForType[1].id).toBe('cat-e2');
+        expect(result.current.topCategoriesForType[2].id).toBe('cat-e3');
+      });
+    });
+
+    it('should fall back to first 3 leaf categories when no history for income', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
+      });
+
+      expect(result.current.topCategoriesForType).toHaveLength(3);
+      expect(result.current.topCategoriesForType[0].id).toBe('cat-i1');
+      expect(result.current.topCategoriesForType[1].id).toBe('cat-i2');
+      expect(result.current.topCategoriesForType[2].id).toBe('cat-i3');
+    });
+
+    it('should exclude shadow and folder categories from fallback', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
+      });
+
+      const ids = result.current.topCategoriesForType.map(c => c.id);
+      expect(ids).not.toContain('cat-shadow');
+      expect(ids).not.toContain('cat-folder');
+    });
+
+    it('should return empty array for transfer type even with fallback categories available', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer' }));
+      });
+
+      expect(result.current.topCategoriesForType).toEqual([]);
+    });
+
+    it('should prefer history over fallback when history has entries for current type', async () => {
+      // History has income categories but not expense
+      mockGetTopCategories.mockResolvedValue([
+        { categoryId: 'cat-i3', count: 8 },
+        { categoryId: 'cat-i1', count: 3 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      // Expense should use fallback (no expense history)
+      await waitFor(() => {
+        expect(result.current.topCategoriesForType[0].id).toBe('cat-e1');
+      });
+
+      // Switch to income — should use history
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
+      });
+
+      expect(result.current.topCategoriesForType).toHaveLength(2);
+      expect(result.current.topCategoriesForType[0].id).toBe('cat-i3');
+      expect(result.current.topCategoriesForType[1].id).toBe('cat-i1');
     });
   });
 
