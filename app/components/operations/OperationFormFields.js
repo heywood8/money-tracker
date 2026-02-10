@@ -71,6 +71,8 @@ const OperationFormFields = memo(({
   onExchangeRateChange,
   onDestinationAmountChange,
   onAutoAddWithCategory,
+  topTransferAccounts,
+  onAutoAddWithAccount,
   rateSource,
 }) => {
   // Memoize input styles
@@ -193,28 +195,11 @@ const OperationFormFields = memo(({
   // Render account pickers based on transfer layout
   const renderAccountPickers = () => {
     if (values.type === 'transfer' && transferLayout === 'sideBySide') {
-      // Side-by-side layout for QuickAdd
-      return (
-        <View style={styles.accountPickersRow}>
-          {renderAccountPicker(
-            values.accountId,
-            () => !disabled && openPicker('account', accounts),
-            t('select_account'),
-            'wallet',
-            styles.formInputHalf,
-          )}
-          <View style={styles.arrowContainer}>
-            <Icon name="arrow-right" size={20} color={colors.mutedText} />
-          </View>
-          {renderAccountPicker(
-            values.toAccountId,
-            () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
-            t('to_account'),
-            'swap-horizontal',
-            styles.formInputHalf,
-            'to-account-picker',
-          )}
-        </View>
+      // QuickAdd transfer: only source account on top, target is below calculator
+      return renderAccountPicker(
+        values.accountId,
+        () => !disabled && openPicker('account', accounts),
+        t('select_account'),
       );
     } else if (values.type === 'transfer' && transferLayout === 'stacked') {
       // Stacked layout for OperationModal
@@ -351,6 +336,95 @@ const OperationFormFields = memo(({
     );
   };
 
+  // Render transfer target account picker with shortcuts (below calculator)
+  const renderTransferTargetPicker = () => {
+    if (values.type !== 'transfer' || transferLayout !== 'sideBySide') return null;
+
+    if (topTransferAccounts && topTransferAccounts.length > 0) {
+      const handleTargetPress = (accountId) => {
+        if (disabled) return;
+        const hasValidAmount = values.amount && values.amount.trim() !== '';
+        if (hasValidAmount && onAutoAddWithAccount) {
+          onAutoAddWithAccount(accountId);
+        } else {
+          setValues(v => ({ ...v, toAccountId: accountId }));
+        }
+      };
+
+      return (
+        <View style={styles.categoryButtonsContainer}>
+          <Pressable
+            style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
+            onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+            disabled={disabled}
+          >
+            <Icon name="swap-horizontal" size={20} color={disabled ? colors.mutedText : colors.text} />
+            <Text
+              style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
+              numberOfLines={2}
+            >
+              {t('all_accounts')}
+            </Text>
+          </Pressable>
+
+          {topTransferAccounts.map((account) => {
+            const isSelected = values.toAccountId === account.id;
+            const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+            const balanceColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
+
+            return (
+              <Pressable
+                key={account.id}
+                style={[
+                  styles.categoryShortcutButton,
+                  {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.inputBorder,
+                  },
+                  disabledStyle,
+                ]}
+                onPress={() => handleTargetPress(account.id)}
+                disabled={disabled}
+              >
+                <Icon
+                  name="wallet"
+                  size={20}
+                  color={textColor}
+                />
+                <Text
+                  style={[styles.categoryShortcutText, { color: textColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {account.name}
+                </Text>
+                {getAccountBalance && (
+                  <Text
+                    style={[styles.categoryShortcutParent, { color: balanceColor }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {getAccountBalance(account.id)}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // Fallback: single full-width picker
+    return renderAccountPicker(
+      values.toAccountId,
+      () => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId)),
+      t('to_account'),
+      'swap-horizontal',
+      styles.formInput,
+      'to-account-picker',
+    );
+  };
+
   return (
     <>
       {showTypeSelector && renderTypeSelector()}
@@ -379,7 +453,7 @@ const OperationFormFields = memo(({
           rateSource={rateSource}
         />
       )}
-      {renderCategoryPicker()}
+      {values.type === 'transfer' ? renderTransferTargetPicker() : renderCategoryPicker()}
     </>
   );
 });
@@ -419,6 +493,8 @@ OperationFormFields.propTypes = {
   onExchangeRateChange: PropTypes.func,
   onDestinationAmountChange: PropTypes.func,
   onAutoAddWithCategory: PropTypes.func,
+  topTransferAccounts: PropTypes.array,
+  onAutoAddWithAccount: PropTypes.func,
   rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
 };
 
@@ -426,15 +502,6 @@ const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
     marginTop: 2,
-  },
-  accountPickersRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  arrowContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xs,
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
@@ -492,16 +559,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.md,
-    minHeight: 48,
-    padding: SPACING.md,
-  },
-  formInputHalf: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.sm,
     minHeight: 48,
     padding: SPACING.md,
   },

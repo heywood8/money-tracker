@@ -86,8 +86,10 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
 
   // Top most used categories from last 30 days (fetch extra to account for type filtering)
   const [topCategories, setTopCategories] = useState([]);
+  // Top transfer target accounts from last 90 days
+  const [topTransferTargets, setTopTransferTargets] = useState([]);
 
-  // Load top categories from last 3 months (per type)
+  // Load top categories and transfer targets from last 3 months
   useEffect(() => {
     async function loadTopCategories() {
       try {
@@ -98,7 +100,17 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
         setTopCategories([]);
       }
     }
+    async function loadTopTransferTargets() {
+      try {
+        const targets = await OperationsDB.getTopTransferTargetAccounts(3);
+        setTopTransferTargets(targets);
+      } catch (error) {
+        console.error('Failed to load top transfer targets:', error);
+        setTopTransferTargets([]);
+      }
+    }
     loadTopCategories();
+    loadTopTransferTargets();
   }, []);
 
   // Filtered categories for quick add form (excluding shadow categories)
@@ -131,6 +143,26 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
       .slice(0, 3);
   }, [topCategories, categories, quickAddValues.type]);
 
+  // Get top transfer target accounts, filtered to existing accounts excluding current source
+  const topTransferAccountsForForm = useMemo(() => {
+    if (quickAddValues.type !== 'transfer') return [];
+
+    const sourceId = quickAddValues.accountId;
+
+    // Filter history targets to accounts that still exist and aren't the source
+    const fromHistory = topTransferTargets
+      .map(tt => accounts.find(acc => acc.id === tt.accountId))
+      .filter(acc => acc && acc.id !== sourceId)
+      .slice(0, 3);
+
+    if (fromHistory.length > 0) return fromHistory;
+
+    // Fallback: first 3 visible accounts excluding current source
+    return visibleAccounts
+      .filter(acc => acc.id !== sourceId)
+      .slice(0, 3);
+  }, [topTransferTargets, accounts, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
+
   // Reset form but keep account and type
   const resetForm = useCallback(() => {
     setQuickAddValues(prev => ({
@@ -154,6 +186,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     getCategoryName,
     filteredCategories,
     topCategoriesForType,
+    topTransferAccountsForForm,
     resetForm,
   };
 };

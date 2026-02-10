@@ -2377,4 +2377,69 @@ describe('OperationsDB Service', () => {
       expect(balanceHistoryCall).toBeDefined();
     });
   });
+
+  describe('getTopTransferTargetAccounts', () => {
+    it('returns top transfer target accounts ordered by frequency', async () => {
+      queryAll.mockResolvedValue([
+        { to_account_id: 'acc-2', count: 5 },
+        { to_account_id: 'acc-3', count: 3 },
+      ]);
+
+      const result = await OperationsDB.getTopTransferTargetAccounts(3);
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining("type = 'transfer'"),
+        expect.arrayContaining([3]),
+      );
+      expect(result).toEqual([
+        { accountId: 'acc-2', count: 5 },
+        { accountId: 'acc-3', count: 3 },
+      ]);
+    });
+
+    it('returns empty array when no transfer history', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await OperationsDB.getTopTransferTargetAccounts(3);
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when queryAll returns null', async () => {
+      queryAll.mockResolvedValue(null);
+
+      const result = await OperationsDB.getTopTransferTargetAccounts(3);
+
+      expect(result).toEqual([]);
+    });
+
+    it('uses default limit of 3', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getTopTransferTargetAccounts();
+
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([3]),
+      );
+    });
+
+    it('queries last 90 days', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getTopTransferTargetAccounts(3);
+
+      const callArgs = queryAll.mock.calls[0];
+      const sql = callArgs[0];
+      expect(sql).toContain('date >= ?');
+      expect(sql).toContain('date <= ?');
+      expect(sql).toContain('to_account_id IS NOT NULL');
+    });
+
+    it('throws on database error', async () => {
+      queryAll.mockRejectedValue(new Error('DB error'));
+
+      await expect(OperationsDB.getTopTransferTargetAccounts(3)).rejects.toThrow('DB error');
+    });
+  });
 });
