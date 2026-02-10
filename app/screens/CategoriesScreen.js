@@ -210,7 +210,8 @@ const CategoriesScreen = () => {
       <FAB
         icon="plus"
         label={t('add_category')}
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
+        color={colors.text}
         onPress={handleAddCategory}
         accessibilityLabel={t('add_category')}
         accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
@@ -270,10 +271,17 @@ const styles = StyleSheet.create({
     width: 32,
   },
   fab: {
-    bottom: 0,
+    borderRadius: 28,
+    borderWidth: 1,
+    bottom: 100,
+    elevation: 8,
     margin: SPACING.lg,
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   loadingContainer: {
     alignItems: 'center',

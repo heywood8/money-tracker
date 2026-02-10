@@ -605,7 +605,8 @@ export default function AccountsScreen() {
       <FAB
         icon="plus"
         label={t('add_account') || 'Add Account'}
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
+        color={colors.text}
         onPress={addAccountHandler}
         accessibilityLabel={t('add_account') || 'Add Account'}
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
@@ -865,10 +866,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fab: {
-    bottom: 0,
+    borderRadius: 28,
+    borderWidth: 1,
+    bottom: 100,
+    elevation: 8,
     margin: SPACING.lg,
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   listContentContainer: {
     paddingBottom: SPACING.xl,

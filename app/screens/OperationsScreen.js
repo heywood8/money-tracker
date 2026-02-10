@@ -630,7 +630,10 @@ const OperationsScreen = () => {
             icon="filter-variant"
             style={[
               styles.filterFab,
-              { backgroundColor: filtersActive ? colors.primary : colors.surface },
+              {
+                backgroundColor: filtersActive ? colors.primary + 'DE' : colors.surface + 'DE',
+                borderColor: colors.border + '80',
+              },
             ]}
             color={filtersActive ? '#fff' : colors.text}
             onPress={handleOpenFilterModal}
@@ -641,7 +644,7 @@ const OperationsScreen = () => {
           {/* Reset Filters Button - only show when filters are active */}
           {filtersActive && (
             <TouchableOpacity
-              style={[styles.resetFilterButton, { backgroundColor: colors.surface }]}
+              style={[styles.resetFilterButton, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
               onPress={clearFilters}
               accessibilityRole="button"
               accessibilityLabel={t('clear_filters')}
@@ -691,10 +694,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filterFab: {
-    bottom: 0,
+    borderRadius: 28,
+    borderWidth: 1,
+    bottom: 100,
+    elevation: 8,
     margin: SPACING.lg,
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -706,17 +716,18 @@ const styles = StyleSheet.create({
   },
   resetFilterButton: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg + 8,
-    bottom: SPACING.lg,
-    elevation: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    bottom: 100 + SPACING.lg,
+    elevation: 8,
     height: 40,
     justifyContent: 'center',
     position: 'absolute',
     right: 80,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     width: 40,
   },
   scrollToTopButton: {
