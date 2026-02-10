@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.44.0](https://github.com/heywood8/money-tracker/compare/penny-v0.43.2...penny-v0.44.0) (2026-02-10)
+
+
+### Features
+
+* rework QuickAdd transfer layout with target account shortcuts ([#295](https://github.com/heywood8/money-tracker/issues/295)) ([ce14939](https://github.com/heywood8/money-tracker/commit/ce149397b41b904bf7b71c3fbe8965f69a170320))
+
+
+### Bug Fixes
+
+* remove resolution setting from pixel7-pro screenshots ci ([fef1802](https://github.com/heywood8/money-tracker/commit/fef1802ac60fec04fa45369e2bf48a8fc864440b))
+
 ## [0.43.2](https://github.com/heywood8/money-tracker/compare/penny-v0.43.1...penny-v0.43.2) (2026-02-10)
 
 
