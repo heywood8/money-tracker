@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.43.2](https://github.com/heywood8/money-tracker/compare/penny-v0.43.1...penny-v0.43.2) (2026-02-10)
+
+
+### Bug Fixes
+
+* show quick category shortcuts for income when no usage history ([4ae4484](https://github.com/heywood8/money-tracker/commit/4ae4484679c401e87b449cde7419d20d4f1436eb))
+
+
+### Tests
+
+* add tests for quick category fallback behavior ([2f3031d](https://github.com/heywood8/money-tracker/commit/2f3031d60e73525feae96814009907b601abd680))
+
 ## [0.43.1](https://github.com/heywood8/money-tracker/compare/penny-v0.43.0...penny-v0.43.1) (2026-02-08)
 
 
