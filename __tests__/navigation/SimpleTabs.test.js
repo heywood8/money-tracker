@@ -142,6 +142,24 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
+// Mock @expo/vector-icons
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  const PropTypes = require('prop-types');
+
+  function MaterialCommunityIcons({ name, size, color }) {
+    return React.createElement(Text, { testID: `icon-${name}` }, name);
+  }
+  MaterialCommunityIcons.propTypes = {
+    name: PropTypes.string,
+    size: PropTypes.number,
+    color: PropTypes.string,
+  };
+
+  return { MaterialCommunityIcons };
+});
+
 // Mock react-native-paper
 jest.mock('react-native-paper', () => {
   const React = require('react');
@@ -176,20 +194,9 @@ jest.mock('react-native-paper', () => {
     variant: PropTypes.string,
   };
 
-  function Surface({ children, style, elevation }) {
-    return React.createElement(View, { style }, children);
-  }
-
-  Surface.propTypes = {
-    children: PropTypes.node,
-    style: PropTypes.any,
-    elevation: PropTypes.number,
-  };
-
   return {
     TouchableRipple,
     Text,
-    Surface,
   };
 });
 

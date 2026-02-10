@@ -1,8 +1,8 @@
 import React, { useMemo, useCallback, memo, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TouchableRipple, Text, Surface } from 'react-native-paper';
+import { TouchableRipple, Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
@@ -21,28 +22,48 @@ import SettingsModal from '../modals/SettingsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Memoized tab button component to prevent unnecessary re-renders
-const TabButton = memo(({ tab, isActive, colors, onPress }) => {
-  const textStyle = useMemo(() => ({
-    fontWeight: isActive ? '700' : 'normal',
-    color: isActive ? colors.primary : colors.mutedText,
-  }), [isActive, colors.primary, colors.mutedText]);
+const TAB_ICONS = {
+  Operations: 'swap-horizontal',
+  Graphs: 'chart-line',
+  Accounts: 'wallet-outline',
+  Categories: 'shape-outline',
+};
 
+// Memoized tab button with icon + label, pill active state
+const TabButton = memo(({ tab, isActive, colors, onPress }) => {
   const handlePress = useCallback(() => {
     onPress(tab.key);
   }, [onPress, tab.key]);
+
+  const labelStyle = useMemo(() => [
+    styles.tabLabel,
+    {
+      color: isActive ? colors.primary : colors.mutedText,
+      fontWeight: isActive ? '700' : '500',
+    },
+  ], [isActive, colors.primary, colors.mutedText]);
 
   return (
     <TouchableRipple
       style={styles.tab}
       onPress={handlePress}
-      rippleColor="rgba(0, 0, 0, .12)"
+      rippleColor="rgba(0, 0, 0, .08)"
+      borderless
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={tab.label}
     >
       <View style={styles.tabContent}>
-        <Text variant="labelMedium" style={textStyle}>
+        <MaterialCommunityIcons
+          name={TAB_ICONS[tab.key] || 'circle-outline'}
+          size={22}
+          color={isActive ? colors.primary : colors.mutedText}
+        />
+        <Text
+          variant="labelSmall"
+          style={labelStyle}
+          numberOfLines={1}
+        >
           {tab.label}
         </Text>
       </View>
@@ -64,14 +85,12 @@ TabButton.propTypes = {
     mutedText: PropTypes.string,
   }).isRequired,
   onPress: PropTypes.func,
-}
-;
+};
+
 TabButton.defaultProps = {
   isActive: false,
   onPress: () => {},
-}
-
-;
+};
 
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
@@ -120,7 +139,6 @@ export default function SimpleTabs() {
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
     return Gesture.Pan()
-      // Only activate on horizontal movements, allow vertical scrolling
       .activeOffsetX([-10, 10])
       .failOffsetY([-10, 10])
       .onStart(() => {
@@ -132,8 +150,6 @@ export default function SimpleTabs() {
         const newTranslateX = startTranslateX.value + event.translationX;
         const maxTranslateX = 0;
         const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH;
-
-        // Clamp the translation to prevent over-scrolling
         translateX.value = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
       })
       .onEnd((event) => {
@@ -145,14 +161,12 @@ export default function SimpleTabs() {
         const currentIndex = activeIndex.value;
         let newIndex = currentIndex;
 
-        // Determine new index based on gesture
         if (gestureTranslationX < -SWIPE_THRESHOLD || velocityX < -VELOCITY_THRESHOLD) {
           newIndex = Math.min(currentIndex + 1, TABS.length - 1);
         } else if (gestureTranslationX > SWIPE_THRESHOLD || velocityX > VELOCITY_THRESHOLD) {
           newIndex = Math.max(currentIndex - 1, 0);
         }
 
-        // If index changed, update shared values on the UI thread and defer React state update
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
           const target = -newIndex * SCREEN_WIDTH;
@@ -161,12 +175,10 @@ export default function SimpleTabs() {
             stiffness: 150,
           }, (isFinished) => {
             if (isFinished) {
-              // Update React state on the JS thread after animation completes
               runOnJS(setActive)(TABS[newIndex].key);
             }
           });
         } else {
-          // Snap back to current position if threshold not met
           translateX.value = withSpring(-currentIndex * SCREEN_WIDTH, {
             damping: 40,
             stiffness: 150,
@@ -175,38 +187,31 @@ export default function SimpleTabs() {
       });
   }, [translateX, activeIndex, startTranslateX, TABS, setActive]);
 
-  // Animated style for the sliding container
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateX: translateX.value }],
     };
   });
 
-  // Handler for tab bar layout measurement
   const handleTabBarLayout = useCallback((event) => {
     const { width } = event.nativeEvent.layout;
     setTabBarWidth(width);
     tabBarWidthShared.value = width;
   }, [tabBarWidthShared]);
 
-  // Animated style for the tab indicator
-  const indicatorAnimatedStyle = useAnimatedStyle(() => {
-    // Calculate the current fractional index based on screen position
+  // Animated sliding pill indicator behind the active tab
+  const pillAnimatedStyle = useAnimatedStyle(() => {
     const currentIndex = -translateX.value / SCREEN_WIDTH;
-
-    // Calculate tab width in pixels using measured tab bar width
     const tabWidth = tabBarWidthShared.value / TABS.length;
-
-    // Position in pixels
-    const position = currentIndex * tabWidth;
+    const pillPadding = 6;
+    const position = currentIndex * tabWidth + pillPadding;
 
     return {
       transform: [{ translateX: position }],
-      width: tabWidth,
+      width: tabWidth - pillPadding * 2,
     };
   });
 
-  // Render all screens side-by-side for smooth transitions
   const renderScreens = useCallback(() => {
     return (
       <>
@@ -237,8 +242,22 @@ export default function SimpleTabs() {
         </GestureDetector>
       </View>
       <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
-      <Surface style={styles.tabBarSurface} elevation={3}>
-        <SafeAreaView style={styles.tabBar} edges={['bottom']}>
+      <SafeAreaView edges={['bottom']} style={styles.floatingBarSafeArea}>
+        <View style={[
+          styles.floatingBar,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}>
+          {/* Animated pill behind active tab */}
+          <Animated.View
+            style={[
+              styles.activePill,
+              { backgroundColor: colors.primary + '1A' },
+              pillAnimatedStyle,
+            ]}
+          />
           <View style={styles.tabsRow} onLayout={handleTabBarLayout}>
             {TABS.map(tab => (
               <TabButton
@@ -250,23 +269,46 @@ export default function SimpleTabs() {
               />
             ))}
           </View>
-          <Animated.View style={[styles.indicator, { backgroundColor: colors.primary }, indicatorAnimatedStyle]} />
-        </SafeAreaView>
-      </Surface>
+        </View>
+      </SafeAreaView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  activePill: {
+    borderRadius: 20,
+    height: '78%',
+    left: 0,
+    position: 'absolute',
+    top: '11%',
+  },
   container: { flex: 1 },
   content: {
     flex: 1,
     overflow: 'hidden',
   },
-  indicator: {
-    height: 3,
-    position: 'absolute',
-    top: 0,
+  floatingBar: {
+    borderRadius: 28,
+    borderWidth: 1,
+    marginBottom: 12,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    ...Platform.select({
+      android: {
+        elevation: 8,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+    }),
+  },
+  floatingBarSafeArea: {
+    position: 'relative',
   },
   screen: {
     height: '100%',
@@ -279,19 +321,18 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 56,
-  },
-  tabBar: {
-    position: 'relative',
-  },
-  tabBarSurface: {
-    elevation: 3,
+    minHeight: 60,
   },
   tabContent: {
     alignItems: 'center',
     flex: 1,
+    gap: 3,
     justifyContent: 'center',
-    position: 'relative',
+    paddingVertical: 8,
+  },
+  tabLabel: {
+    fontSize: 11,
+    letterSpacing: 0.2,
   },
   tabsRow: {
     flexDirection: 'row',
