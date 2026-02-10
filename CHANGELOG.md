@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.0](https://github.com/heywood8/money-tracker/compare/penny-v0.44.0...penny-v0.45.0) (2026-02-10)
+
+
+### Features
+
+* floating pill tab bar redesign ([#297](https://github.com/heywood8/money-tracker/issues/297)) ([#298](https://github.com/heywood8/money-tracker/issues/298)) ([1fe6942](https://github.com/heywood8/money-tracker/commit/1fe69422493932aa0f88555f91d57b58117e6b1d))
+
 ## [0.44.0](https://github.com/heywood8/money-tracker/compare/penny-v0.43.2...penny-v0.44.0) (2026-02-10)
 
 
