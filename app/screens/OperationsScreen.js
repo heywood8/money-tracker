@@ -325,18 +325,59 @@ const OperationsScreen = () => {
       date: toDateString(new Date()),
     };
 
+    // Determine multi-currency status using effective account IDs (including overrides)
+    const effectiveSourceAccount = accounts.find(acc => acc.id === operationData.accountId);
+    const effectiveDestAccount = accounts.find(acc => acc.id === operationData.toAccountId);
+    const effectiveIsMultiCurrency = operationData.type === 'transfer'
+      && effectiveSourceAccount
+      && effectiveDestAccount
+      && effectiveSourceAccount.currency !== effectiveDestAccount.currency;
+
     // Add currency information for multi-currency transfers
-    if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
-      operationData.sourceCurrency = sourceAccount.currency;
-      operationData.destinationCurrency = destinationAccount.currency;
+    if (effectiveIsMultiCurrency) {
+      operationData.sourceCurrency = effectiveSourceAccount.currency;
+      operationData.destinationCurrency = effectiveDestAccount.currency;
       // Format amounts based on currency decimal places
-      operationData.amount = Currency.formatAmount(operationData.amount, sourceAccount.currency);
-      if (operationData.destinationAmount) {
-        operationData.destinationAmount = Currency.formatAmount(operationData.destinationAmount, destinationAccount.currency);
+      operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
+
+      // If no exchange rate set (e.g., quick add via account button), fetch one
+      if (!operationData.exchangeRate) {
+        try {
+          const { rate } = await Currency.fetchLiveExchangeRate(
+            effectiveSourceAccount.currency,
+            effectiveDestAccount.currency,
+          );
+          if (rate) {
+            operationData.exchangeRate = rate;
+          }
+        } catch {
+          // Fallback to offline rate
+          const rate = Currency.getExchangeRate(effectiveSourceAccount.currency, effectiveDestAccount.currency);
+          if (rate) {
+            operationData.exchangeRate = rate;
+          }
+        }
       }
-    } else if (sourceAccount) {
+
+      // Calculate destination amount if we have a rate but no destination amount
+      if (operationData.exchangeRate && !operationData.destinationAmount) {
+        const converted = Currency.convertAmount(
+          operationData.amount,
+          effectiveSourceAccount.currency,
+          effectiveDestAccount.currency,
+          operationData.exchangeRate,
+        );
+        if (converted) {
+          operationData.destinationAmount = converted;
+        }
+      }
+
+      if (operationData.destinationAmount) {
+        operationData.destinationAmount = Currency.formatAmount(operationData.destinationAmount, effectiveDestAccount.currency);
+      }
+    } else if (effectiveSourceAccount) {
       // Format amount for same-currency operations
-      operationData.amount = Currency.formatAmount(operationData.amount, sourceAccount.currency);
+      operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
     }
 
     const error = validateOperation(operationData, t);
@@ -360,7 +401,7 @@ const OperationsScreen = () => {
     } catch (error) {
       // Error already shown in addOperation
     }
-  }, [quickAddValues, validateOperation, addOperation, t, showDialog, isMultiCurrencyTransfer, sourceAccount, destinationAccount, resetForm]);
+  }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
 
   // Handler for auto-add with category (from picker)
   const handleAutoAddWithCategory = useCallback(async (categoryId) => {
