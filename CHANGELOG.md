@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.1](https://github.com/heywood8/money-tracker/compare/penny-v0.46.0...penny-v0.46.1) (2026-02-11)
+
+
+### Code Refactoring
+
+* modernize settings modal UX ([#302](https://github.com/heywood8/money-tracker/issues/302)) ([dc3d80b](https://github.com/heywood8/money-tracker/commit/dc3d80b4b526790f5bf3405284f292dca36dd5ce))
+
 ## [0.46.0](https://github.com/heywood8/money-tracker/compare/penny-v0.45.0...penny-v0.46.0) (2026-02-11)
 
 
