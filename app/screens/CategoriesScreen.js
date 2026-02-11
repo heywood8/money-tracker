@@ -199,7 +199,7 @@ const CategoriesScreen = () => {
             <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
           </View>
         }
-        contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : null}
+        contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : styles.listContent}
         windowSize={10}
         maxToRenderPerBatch={10}
         initialNumToRender={15}
@@ -262,6 +262,9 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flex: 1,
+  },
+  listContent: {
+    paddingBottom: 180,
   },
   expandButton: {
     alignItems: 'center',

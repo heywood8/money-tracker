@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   draggableListContent: {
-    paddingBottom: SPACING.xs,
+    paddingBottom: 180,
   },
   error: {
     color: 'red',

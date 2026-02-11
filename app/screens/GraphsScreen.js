@@ -363,7 +363,7 @@ const GraphsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
           {/* Filters Row */}
           <View style={styles.filtersRow}>
@@ -507,6 +507,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     overflow: 'hidden',
+  },
+  scrollContent: {
+    paddingBottom: 180,
   },
   scrollView: {
     flex: 1,

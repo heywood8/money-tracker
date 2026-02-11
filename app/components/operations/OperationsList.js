@@ -193,7 +193,7 @@ const OperationsList = forwardRef(({
           </Text>
         </View>
       }
-      contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : null}
+      contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : styles.listContent}
       onScroll={onScroll}
       scrollEventThrottle={16}
       onEndReached={handleEndReached}
@@ -250,6 +250,9 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flex: 1,
+  },
+  listContent: {
+    paddingBottom: 180,
   },
   emptyText: {
     fontSize: 16,
