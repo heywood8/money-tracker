@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.2](https://github.com/heywood8/money-tracker/compare/penny-v0.46.1...penny-v0.46.2) (2026-02-11)
+
+
+### Bug Fixes
+
+* improve dark theme visual contrast ([#304](https://github.com/heywood8/money-tracker/issues/304)) ([0ba5b02](https://github.com/heywood8/money-tracker/commit/0ba5b02afea1dfec3b0b8c4fbc8f08ade99c8192))
+
 ## [0.46.1](https://github.com/heywood8/money-tracker/compare/penny-v0.46.0...penny-v0.46.1) (2026-02-11)
 
 
