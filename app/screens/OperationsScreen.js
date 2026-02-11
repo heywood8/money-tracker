@@ -416,10 +416,11 @@ const OperationsScreen = () => {
   // Handler for auto-add with target account (from transfer target shortcuts)
   const handleAutoAddWithAccount = useCallback(async (toAccountId) => {
     resetForm();
+    closePicker();
 
     // Pass undefined for categoryId override, pass toAccountId override
     await handleQuickAdd(undefined, toAccountId);
-  }, [resetForm, handleQuickAdd]);
+  }, [resetForm, closePicker, handleQuickAdd]);
 
   // Calculate spending sums by currency for a group of operations
   const calculateSpendingSums = useCallback((operations) => {
@@ -662,6 +663,7 @@ const OperationsScreen = () => {
         onNavigateIntoFolder={navigateIntoFolder}
         onSelectCategory={handleSelectCategory}
         onAutoAddWithCategory={handleAutoAddWithCategory}
+        onAutoAddWithAccount={handleAutoAddWithAccount}
       />
 
       {/* Scroll to Top Button - only show when scrolled down */}

@@ -35,6 +35,7 @@ const PickerModal = ({
   onNavigateIntoFolder,
   onSelectCategory,
   onAutoAddWithCategory,
+  onAutoAddWithAccount,
 }) => {
   return (
     <Modal
@@ -64,13 +65,21 @@ const PickerModal = ({
               if (pickerType === 'account' || pickerType === 'toAccount') {
                 return (
                   <Pressable
-                    onPress={() => {
+                    onPress={async () => {
                       if (pickerType === 'account') {
                         onSelectAccount(item.id);
+                        onClose();
                       } else {
-                        onSelectToAccount(item.id);
+                        // toAccount: auto-add if amount is set
+                        const hasValidAmount = quickAddValues?.amount &&
+                          quickAddValues.amount.trim() !== '';
+                        if (hasValidAmount && onAutoAddWithAccount) {
+                          await onAutoAddWithAccount(item.id);
+                        } else {
+                          onSelectToAccount(item.id);
+                          onClose();
+                        }
                       }
-                      onClose();
                     }}
                     style={({ pressed }) => [
                       styles.pickerOption,
@@ -234,6 +243,7 @@ PickerModal.propTypes = {
   onNavigateIntoFolder: PropTypes.func,
   onSelectCategory: PropTypes.func,
   onAutoAddWithCategory: PropTypes.func,
+  onAutoAddWithAccount: PropTypes.func,
 };
 
 export default PickerModal;
