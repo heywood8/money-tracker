@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Platform, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ScrollView } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import { Portal, Modal, Text, Button, Divider, TouchableRipple } from 'react-native-paper';
+import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import * as Updates from 'expo-updates';
-import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
@@ -15,13 +13,11 @@ import { exportBackup, importBackup } from '../services/BackupRestore';
 
 
 export default function SettingsModal({ visible, onClose }) {
-  const { theme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
-  const [localLang, setLocalLang] = useState(language);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
 
@@ -49,9 +45,9 @@ export default function SettingsModal({ visible, onClose }) {
   }, [slideAnim]);
 
   const handleLanguageSelect = useCallback((lng) => {
-    setLocalLang(lng);
+    setLanguage(lng);
     closeLanguageModal();
-  }, [closeLanguageModal]);
+  }, [setLanguage, closeLanguageModal]);
 
   // Map of language codes to their native display names
   const nativeLanguageNames = {
@@ -195,13 +191,12 @@ export default function SettingsModal({ visible, onClose }) {
 
   useEffect(() => {
     if (visible) {
-      setLocalLang(language);
       setLanguageModalVisible(false);
       setExportFormatModalVisible(false);
       slideAnim.setValue(0);
       exportFormatSlideAnim.setValue(0);
     }
-  }, [visible, language, slideAnim, exportFormatSlideAnim]);
+  }, [visible, slideAnim, exportFormatSlideAnim]);
 
   // Interpolate animation values for language modal
   const settingsTranslateX = slideAnim.interpolate({
@@ -251,74 +246,63 @@ export default function SettingsModal({ visible, onClose }) {
           },
           (languageModalVisible || exportFormatModalVisible) && styles.hidden,
         ]}>
-          <Text variant="headlineSmall" style={styles.title}>{t('settings')}</Text>
+          <View style={styles.header}>
+            <View style={styles.closeButton} />
+            <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={colors.mutedText} />
+            </TouchableOpacity>
+          </View>
 
-          <Text variant="titleMedium" style={styles.subtitle}>{t('language')}</Text>
-          <TouchableRipple
-            onPress={openLanguageModal}
-            style={[styles.languageSelector, { borderColor: colors.border, backgroundColor: colors.surface }]}
-            borderless={false}
-          >
-            <View style={styles.languageSelectorContent}>
-              <Text style={[styles.languageText, { color: colors.text }]}> 
-                {languageFlags[localLang] ? `${languageFlags[localLang]}  ${nativeLanguageNames[localLang] || localLang}` : (nativeLanguageNames[localLang] || localLang)}
-              </Text>
+          <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="language-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
+                  </Text>
+                </View>
+              </View>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
           </TouchableRipple>
 
           <Divider style={styles.divider} />
 
-          <Text variant="titleMedium" style={styles.subtitle}>{t('database') || 'Database'}</Text>
+          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
 
-          <View style={styles.buttonRow}>
-            <Button
-              mode="contained"
-              onPress={handleExportBackup}
-              style={styles.actionButton}
-              icon="export"
-            >
-              {t('export') || 'Export'}
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleImportBackup}
-              style={styles.actionButton}
-              icon="import"
-            >
-              {t('import') || 'Import'}
-            </Button>
-            <Button
-              mode="outlined"
-              textColor="#b33"
-              onPress={handleResetDatabase}
-              style={styles.resetButton}
-              icon="delete-forever"
-            >
-              {t('reset') || 'Reset'}
-            </Button>
-          </View>
+          <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
 
-          <View style={styles.modalButtonRow}>
-            <Button
-              mode="outlined"
-              onPress={onClose}
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              textColor="#888"
-            >
-              {t('cancel') || 'Cancel'}
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => {
-                setLanguage(localLang);
-                onClose();
-              }}
-              style={styles.modalButton}
-            >
-              {t('save') || 'Save'}
-            </Button>
-          </View>
+          <TouchableRipple onPress={handleImportBackup} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <View style={styles.resetSpacer} />
+
+          <TouchableRipple onPress={handleResetDatabase} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="trash-outline" size={22} color="#c44" />
+                <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
+              </View>
+            </View>
+          </TouchableRipple>
         </Animated.View>
 
         <Animated.View style={[
@@ -354,7 +338,7 @@ export default function SettingsModal({ visible, onClose }) {
                     <Text style={[styles.languageItemText, { color: colors.text }]}>
                       {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
                     </Text>
-                    {localLang === lng && (
+                    {language === lng && (
                       <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                     )}
                   </View>
@@ -453,29 +437,30 @@ export default function SettingsModal({ visible, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  actionButton: {
-    flex: 1,
-  },
   backButton: {
     alignItems: 'center',
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.sm,
+  closeButton: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   content: {
     borderRadius: BORDER_RADIUS.lg,
     margin: SPACING.xl,
     maxHeight: '90%',
-    padding: SPACING.xxl,
+    paddingBottom: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
+  destructiveText: {
+    color: '#c44',
   },
   divider: {
-    marginVertical: SPACING.md,
+    marginVertical: SPACING.xs,
   },
   formatDescription: {
     fontSize: 12,
@@ -490,6 +475,16 @@ const styles = StyleSheet.create({
   formatTextContainer: {
     flex: 1,
     flexShrink: 1,
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.md,
+  },
+  headerTitle: {
+    fontWeight: '600',
   },
   hidden: {
     opacity: 0,
@@ -509,11 +504,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   languageList: {
-    paddingVertical: 8,
+    paddingVertical: SPACING.sm,
   },
   languageModalContent: {
-    borderRadius: 12,
-    margin: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
     padding: 0,
   },
   languageModalHeader: {
@@ -521,50 +516,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 16,
+    paddingVertical: SPACING.lg,
   },
   languageModalTitle: {
     fontWeight: '600',
   },
-  languageSelector: {
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 8,
-    marginTop: 8,
-    overflow: 'hidden',
+  resetSpacer: {
+    height: SPACING.sm,
   },
-  languageSelectorContent: {
+  sectionLabel: {
+    letterSpacing: 0.5,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.sm,
+  },
+  settingsRow: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+  },
+  settingsRowContent: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
-  languageText: {
+  settingsRowLabel: {
     fontSize: 16,
   },
-  modalButton: {
+  settingsRowLeft: {
+    alignItems: 'center',
     flex: 1,
-  },
-  modalButtonCancel: {
-    borderColor: '#999',
-  },
-  modalButtonRow: {
     flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'space-between',
-    marginTop: 16,
+    gap: SPACING.md,
   },
-  resetButton: {
+  settingsRowText: {
     flex: 1,
+    flexShrink: 1,
   },
-  subtitle: {
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
+  settingsRowValue: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });
 
