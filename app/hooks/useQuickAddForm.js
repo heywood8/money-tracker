@@ -125,7 +125,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   }, [categories, quickAddValues.type]);
 
   // Get top 3 categories matching current operation type (expense/income)
-  // Falls back to first 3 leaf categories when no usage history exists
+  // Fills remaining slots with leaf categories by id order when history has fewer than 3
   const topCategoriesForType = useMemo(() => {
     if (quickAddValues.type === 'transfer') return [];
 
@@ -135,12 +135,15 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
       .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow)
       .slice(0, 3);
 
-    if (fromHistory.length > 0) return fromHistory;
+    if (fromHistory.length >= 3) return fromHistory;
 
-    // Fallback: first 3 leaf categories (non-folder) of this type
-    return categories
-      .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && !cat.isFolder)
-      .slice(0, 3);
+    // Fill remaining slots from leaf categories by id order, excluding already-selected
+    const historyIds = new Set(fromHistory.map(cat => cat.id));
+    const fillers = categories
+      .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && !cat.isFolder && !historyIds.has(cat.id))
+      .slice(0, 3 - fromHistory.length);
+
+    return [...fromHistory, ...fillers];
   }, [topCategories, categories, quickAddValues.type]);
 
   // Get top transfer target accounts, filtered to existing accounts excluding current source

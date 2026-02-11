@@ -319,9 +319,11 @@ describe('useQuickAddForm', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.topCategoriesForType).toHaveLength(2);
+        expect(result.current.topCategoriesForType).toHaveLength(3);
         expect(result.current.topCategoriesForType[0].id).toBe('cat-e2');
         expect(result.current.topCategoriesForType[1].id).toBe('cat-e4');
+        // Filled from remaining leaf categories by id order
+        expect(result.current.topCategoriesForType[2].id).toBe('cat-e1');
       });
     });
 
@@ -408,9 +410,11 @@ describe('useQuickAddForm', () => {
         result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
       });
 
-      expect(result.current.topCategoriesForType).toHaveLength(2);
+      expect(result.current.topCategoriesForType).toHaveLength(3);
       expect(result.current.topCategoriesForType[0].id).toBe('cat-i3');
       expect(result.current.topCategoriesForType[1].id).toBe('cat-i1');
+      // Filled from remaining leaf categories by id order
+      expect(result.current.topCategoriesForType[2].id).toBe('cat-i2');
     });
   });
 
