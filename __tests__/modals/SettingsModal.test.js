@@ -16,12 +16,6 @@ const mockCancelImport = jest.fn();
 const mockCompleteImport = jest.fn();
 
 // Mock all context dependencies
-jest.mock('../../app/contexts/ThemeConfigContext', () => ({
-  useThemeConfig: () => ({
-    theme: 'light',
-  }),
-}));
-
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
     colors: {
@@ -64,11 +58,6 @@ jest.mock('../../app/contexts/ImportProgressContext', () => ({
   }),
 }));
 
-// Mock expo-updates
-jest.mock('expo-updates', () => ({
-  reloadAsync: jest.fn(() => Promise.resolve()),
-}));
-
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
 const mockImportBackup = jest.fn(() => Promise.resolve());
@@ -106,16 +95,16 @@ describe('SettingsModal Component', () => {
       expect(getByText('settings')).toBeTruthy();
     });
 
-    it('renders language section', () => {
+    it('renders language row', () => {
       const { getAllByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      // "language" appears multiple times (title and modal)
+      // "language" appears as row label and in language submodal header
       expect(getAllByText('language').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders database section', () => {
+    it('renders database section label', () => {
       const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
@@ -123,43 +112,31 @@ describe('SettingsModal Component', () => {
       expect(getByText('database')).toBeTruthy();
     });
 
-    it('renders export button', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('renders export row', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-
-      // Should have at least 4 buttons: Export, Import, Reset, Cancel, Save
-      expect(buttons.length).toBeGreaterThanOrEqual(4);
+      expect(getByText('export')).toBeTruthy();
     });
 
-    it('renders import button', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('renders import row', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const importButton = buttons.find(b => b.props.icon === 'import');
-
-      expect(importButton).toBeTruthy();
+      expect(getByText('import')).toBeTruthy();
     });
 
-    it('renders reset button', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('renders reset database row', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const resetButton = buttons.find(b => b.props.icon === 'delete-forever');
-
-      expect(resetButton).toBeTruthy();
+      expect(getByText('reset_database')).toBeTruthy();
     });
 
-    it('renders English language selector', () => {
+    it('renders English language value', () => {
       const { getAllByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
@@ -169,75 +146,73 @@ describe('SettingsModal Component', () => {
   });
 
   describe('Language Selection', () => {
-    it('displays current language with flag', () => {
+    it('displays current language with flag in the row', () => {
       const { getAllByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      // English is the default language
       expect(getAllByText(/English/).length).toBeGreaterThanOrEqual(1);
     });
 
-    it('opens language modal when language selector is pressed', () => {
+    it('opens language modal when language row is pressed', () => {
       const { UNSAFE_getAllByType } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      // Find and press the language selector
       const TouchableRipple = require('react-native-paper').TouchableRipple;
       const touchables = UNSAFE_getAllByType(TouchableRipple);
 
-      // Press the language selector (first TouchableRipple)
+      // First TouchableRipple is the language row
       act(() => {
         fireEvent.press(touchables[0]);
       });
     });
+
+    it('applies language immediately on selection', () => {
+      const { UNSAFE_getAllByType, getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      const TouchableRipple = require('react-native-paper').TouchableRipple;
+      const touchables = UNSAFE_getAllByType(TouchableRipple);
+
+      // Open language modal (first TouchableRipple)
+      act(() => {
+        fireEvent.press(touchables[0]);
+      });
+
+      // Select Spanish
+      act(() => {
+        fireEvent.press(getByText(/Español/));
+      });
+
+      expect(mockSetLanguage).toHaveBeenCalledWith('es');
+    });
   });
 
-  describe('Save and Cancel', () => {
-    it('calls setLanguage and onClose when save is pressed', () => {
+  describe('Close Button', () => {
+    it('calls onClose when close button is pressed', () => {
       const { UNSAFE_getAllByType } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      // Save button is the last contained button
-      const saveButton = buttons.find(b => b.props.mode === 'contained' && !b.props.icon);
+      const TouchableOpacity = require('react-native').TouchableOpacity;
+      const touchables = UNSAFE_getAllByType(TouchableOpacity);
 
-      fireEvent.press(saveButton);
-
-      expect(mockSetLanguage).toHaveBeenCalledWith('en');
-      expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('calls onClose when cancel is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      // Cancel button is the outlined button without destructive text color
-      const cancelButton = buttons.find(b => b.props.mode === 'outlined' && b.props.textColor === '#888');
-
-      fireEvent.press(cancelButton);
+      // First TouchableOpacity is the close button in the header
+      fireEvent.press(touchables[0]);
 
       expect(mockOnClose).toHaveBeenCalled();
     });
   });
 
   describe('Database Operations', () => {
-    it('shows dialog when reset is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('shows dialog when reset row is pressed', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const resetButton = buttons.find(b => b.props.icon === 'delete-forever');
-
-      fireEvent.press(resetButton);
+      fireEvent.press(getByText('reset_database'));
 
       expect(mockShowDialog).toHaveBeenCalledWith(
         expect.any(String),
@@ -249,16 +224,12 @@ describe('SettingsModal Component', () => {
       );
     });
 
-    it('shows dialog when import is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('shows dialog when import row is pressed', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const importButton = buttons.find(b => b.props.icon === 'import');
-
-      fireEvent.press(importButton);
+      fireEvent.press(getByText('import'));
 
       expect(mockShowDialog).toHaveBeenCalledWith(
         expect.any(String),
@@ -271,56 +242,41 @@ describe('SettingsModal Component', () => {
     });
 
     it('performs import when confirmed', async () => {
-      const { UNSAFE_getAllByType } = render(
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const importButton = buttons.find(b => b.props.icon === 'import');
+      fireEvent.press(getByText('import'));
 
-      fireEvent.press(importButton);
-
-      // Get the dialog call and find the restore button handler
       const dialogCall = mockShowDialog.mock.calls[0];
       const dialogButtons = dialogCall[2];
       const restoreButton = dialogButtons.find(b => b.style === 'destructive');
 
-      // Verify the restore button handler exists and can be called
       expect(restoreButton.onPress).toBeDefined();
       expect(typeof restoreButton.onPress).toBe('function');
     });
 
     it('import dialog has destructive confirm button', () => {
-      const { UNSAFE_getAllByType } = render(
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const importButton = buttons.find(b => b.props.icon === 'import');
-
-      fireEvent.press(importButton);
+      fireEvent.press(getByText('import'));
 
       const dialogCall = mockShowDialog.mock.calls[0];
       const dialogButtons = dialogCall[2];
       const restoreButton = dialogButtons.find(b => b.style === 'destructive');
 
-      // Verify the confirm button has destructive style
       expect(restoreButton).toBeTruthy();
       expect(restoreButton.style).toBe('destructive');
     });
 
     it('performs reset when confirmed', async () => {
-      const { UNSAFE_getAllByType } = render(
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const resetButton = buttons.find(b => b.props.icon === 'delete-forever');
-
-      fireEvent.press(resetButton);
+      fireEvent.press(getByText('reset_database'));
 
       const dialogCall = mockShowDialog.mock.calls[0];
       const dialogButtons = dialogCall[2];
@@ -336,56 +292,39 @@ describe('SettingsModal Component', () => {
   });
 
   describe('Export Functionality', () => {
-    it('opens export format modal when export is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('opens export format modal when export row is pressed', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const exportButton = buttons.find(b => b.props.icon === 'export');
-
       act(() => {
-        fireEvent.press(exportButton);
+        fireEvent.press(getByText('export'));
       });
-
-      // The export format modal should become visible
     });
 
     it('shows export format options when export is pressed', async () => {
-      const { UNSAFE_getAllByType, getByText } = render(
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const exportButton = buttons.find(b => b.props.icon === 'export');
-
-      // Open export format modal
       act(() => {
-        fireEvent.press(exportButton);
+        fireEvent.press(getByText('export'));
       });
 
-      // Verify export format options are available
       expect(getByText('JSON')).toBeTruthy();
       expect(getByText('CSV')).toBeTruthy();
       expect(getByText('SQLite Database')).toBeTruthy();
     });
 
     it('renders export format descriptions', () => {
-      const { UNSAFE_getAllByType, getByText } = render(
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
-      const Button = require('react-native-paper').Button;
-      const buttons = UNSAFE_getAllByType(Button);
-      const exportButton = buttons.find(b => b.props.icon === 'export');
-
       act(() => {
-        fireEvent.press(exportButton);
+        fireEvent.press(getByText('export'));
       });
 
-      // Verify descriptions are shown
       expect(getByText('json_description')).toBeTruthy();
       expect(getByText('csv_description')).toBeTruthy();
       expect(getByText('sqlite_description')).toBeTruthy();
@@ -394,8 +333,6 @@ describe('SettingsModal Component', () => {
 
   describe('Modal Dismissal - Regression Tests', () => {
     it('modal can be dismissed by tapping outside', () => {
-      // This is a regression test for the bug where tapping outside
-      // the modal did not close it due to transparent background
       const { UNSAFE_getByType } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
@@ -403,17 +340,12 @@ describe('SettingsModal Component', () => {
       const Modal = require('react-native-paper').Modal;
       const modalInstance = UNSAFE_getByType(Modal);
 
-      // Verify that dismissable is explicitly set to true
       expect(modalInstance.props.dismissable).toBe(true);
-
-      // Verify onDismiss handler exists and works
       expect(modalInstance.props.onDismiss).toBeDefined();
       expect(typeof modalInstance.props.onDismiss).toBe('function');
 
-      // Simulate dismissal by calling onDismiss
       modalInstance.props.onDismiss();
 
-      // Should call onClose
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
@@ -425,12 +357,8 @@ describe('SettingsModal Component', () => {
       const Modal = require('react-native-paper').Modal;
       const modalInstance = UNSAFE_getByType(Modal);
 
-      // contentContainerStyle should not be set to a value that blocks tap events
-      // Previously, it had styles.modalWrapper with flex: 1 which blocked taps
       const containerStyle = modalInstance.props.contentContainerStyle;
 
-      // contentContainerStyle should be undefined (not set)
-      // If it's set, it should not have flex: 1 or backgroundColor: 'transparent'
       if (containerStyle) {
         expect(containerStyle).not.toEqual(
           expect.objectContaining({ flex: 1 }),
@@ -439,7 +367,6 @@ describe('SettingsModal Component', () => {
           expect.objectContaining({ backgroundColor: 'transparent' }),
         );
       } else {
-        // Ideally it should be undefined
         expect(containerStyle).toBeUndefined();
       }
     });
@@ -452,7 +379,6 @@ describe('SettingsModal Component', () => {
       const Modal = require('react-native-paper').Modal;
       const modalInstance = UNSAFE_getByType(Modal);
 
-      // When no sub-modals are open, onDismiss should call onClose directly
       modalInstance.props.onDismiss();
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -466,9 +392,7 @@ describe('SettingsModal Component', () => {
       const Modal = require('react-native-paper').Modal;
       const modalInstance = UNSAFE_queryByType(Modal);
 
-      // Modal should not render its children when visible is false
-      // Due to the mock, it returns null when visible is false
-      expect(modalInstance).toBeTruthy(); // Modal component exists
+      expect(modalInstance).toBeTruthy();
     });
 
     it('renders when visible is true', () => {

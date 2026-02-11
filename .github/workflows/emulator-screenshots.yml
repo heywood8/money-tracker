@@ -165,6 +165,7 @@ jobs:
               { file: '02_graphs', desc: 'Graphs' },
               { file: '03_accounts', desc: 'Accounts' },
               { file: '04_categories', desc: 'Categories' },
+              { file: '07_settings', desc: 'Settings' },
             ];
 
             const lines = [

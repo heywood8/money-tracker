@@ -67,6 +67,19 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: screenshots/04_categories_light
 
+# Open Settings modal
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/07_settings_light
+
+# Close Settings modal
+- tapOn:
+    id: "settings-close-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+
 # ============================================
 # SWITCH TO DARK MODE
 # ============================================
@@ -136,3 +149,16 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/04_categories_dark
+
+# Open Settings modal
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/07_settings_dark
+
+# Close Settings modal
+- tapOn:
+    id: "settings-close-button"
+- waitForAnimationToEnd:
+    timeout: 2000
