@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.46.0](https://github.com/heywood8/money-tracker/compare/penny-v0.45.0...penny-v0.46.0) (2026-02-11)
+
+
+### Features
+
+* auto-submit transfer when selecting from all accounts picker ([c69c065](https://github.com/heywood8/money-tracker/commit/c69c06509bb97b77734196689cbf48c74a76b492))
+
+
+### Bug Fixes
+
+* add bottom padding so floating tab bar and FAB don't cover last list items ([c91af23](https://github.com/heywood8/money-tracker/commit/c91af23ca42ef91790d3df7f166ca593f4eb232a))
+* alphabetize style properties after lint autofix ([bdc5291](https://github.com/heywood8/money-tracker/commit/bdc52918ef9c3d0b42317d92803675df43b3acca))
+* income categories height; always 4 items ([4779540](https://github.com/heywood8/money-tracker/commit/47795403899ccde7537c4dff941e7a3994160cbb))
+* multicurrency transfer rate not applied on quick account selection ([#300](https://github.com/heywood8/money-tracker/issues/300)) ([2bdfc95](https://github.com/heywood8/money-tracker/commit/2bdfc95ad783f9581103ac71ab715e3290f140fe))
+* remove transfer target account pre-selection ([b612776](https://github.com/heywood8/money-tracker/commit/b6127763d7b6507278a189473ba3c006bea1ddfb))
+
 ## [0.45.0](https://github.com/heywood8/money-tracker/compare/penny-v0.44.0...penny-v0.45.0) (2026-02-10)
 
 
