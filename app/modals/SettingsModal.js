@@ -249,7 +249,7 @@ export default function SettingsModal({ visible, onClose }) {
           <View style={styles.header}>
             <View style={styles.closeButton} />
             <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} testID="settings-close-button">
               <Ionicons name="close" size={24} color={colors.mutedText} />
             </TouchableOpacity>
           </View>
