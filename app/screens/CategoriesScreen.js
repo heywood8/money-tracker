@@ -263,9 +263,6 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
-  listContent: {
-    paddingBottom: 180,
-  },
   expandButton: {
     alignItems: 'center',
     height: 32,
@@ -285,6 +282,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  listContent: {
+    paddingBottom: 180,
   },
   loadingContainer: {
     alignItems: 'center',

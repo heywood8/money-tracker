@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
-  listContent: {
-    paddingBottom: 180,
-  },
   emptyText: {
     fontSize: 16,
     marginTop: SPACING.lg,
+  },
+  listContent: {
+    paddingBottom: 180,
   },
   loadingMoreContainer: {
     alignItems: 'center',
