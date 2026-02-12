@@ -5,6 +5,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
+import { FONT_SIZE } from '../../styles/designTokens';
 
 /**
  * OperationFormFields Component
@@ -255,7 +256,7 @@ const OperationFormFields = memo(({
             onPress={() => !disabled && openPicker('category', categories)}
             disabled={disabled}
           >
-            <Icon name="view-grid" size={20} color={disabled ? colors.mutedText : colors.text} />
+            <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
             <Text
               style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
               numberOfLines={2}
@@ -285,11 +286,7 @@ const OperationFormFields = memo(({
                 onPress={() => handleCategoryPress(category.id)}
                 disabled={disabled}
               >
-                <Icon
-                  name={categoryInfo.icon}
-                  size={20}
-                  color={textColor}
-                />
+                <Icon name={categoryInfo.icon} size={18} color={textColor} />
                 <Text
                   style={[
                     styles.categoryShortcutText,
@@ -300,18 +297,6 @@ const OperationFormFields = memo(({
                 >
                   {categoryInfo.name}
                 </Text>
-                {categoryInfo.parentName && (
-                  <Text
-                    style={[
-                      styles.categoryShortcutParent,
-                      { color: parentColor },
-                    ]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {categoryInfo.parentName}
-                  </Text>
-                )}
               </Pressable>
             );
           })}
@@ -358,7 +343,7 @@ const OperationFormFields = memo(({
             onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
             disabled={disabled}
           >
-            <Icon name="swap-horizontal" size={20} color={disabled ? colors.mutedText : colors.text} />
+            <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
             <Text
               style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
               numberOfLines={2}
@@ -386,26 +371,37 @@ const OperationFormFields = memo(({
                 onPress={() => handleTargetPress(account.id)}
                 disabled={disabled}
               >
-                <Icon
-                  name="wallet"
-                  size={20}
-                  color={textColor}
-                />
-                <Text
-                  style={[styles.categoryShortcutText, { color: textColor }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {account.name}
-                </Text>
-                {getAccountBalance && (
-                  <Text
-                    style={[styles.categoryShortcutParent, { color: balanceColor }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {getAccountBalance(account.id)}
-                  </Text>
+                {getAccountBalance ? (
+                  <>
+                    <Text
+                      style={[styles.categoryShortcutText, { color: textColor }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {account.name}
+                    </Text>
+                    <View style={styles.categoryParentRow}>
+                      <Icon name="wallet" size={14} color={balanceColor} />
+                      <Text
+                        style={[styles.categoryShortcutParent, { color: balanceColor }]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {getAccountBalance(account.id)}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="wallet" size={18} color={textColor} />
+                    <Text
+                      style={[styles.categoryShortcutText, { color: textColor }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {account.name}
+                    </Text>
+                  </>
                 )}
               </Pressable>
             );
@@ -505,8 +501,14 @@ const styles = StyleSheet.create({
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     marginBottom: SPACING.md,
+  },
+  categoryParentRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+    marginTop: 1,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -515,12 +517,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     justifyContent: 'center',
-    minHeight: 66,
+    minHeight: 44,
     paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   categoryPickerText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '500',
     marginTop: 2,
     textAlign: 'center',
@@ -532,16 +534,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     justifyContent: 'center',
-    minHeight: 66,
+    minHeight: 44,
     paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   categoryShortcutParent: {
-    fontSize: 10,
+    fontSize: 9,
     textAlign: 'center',
   },
   categoryShortcutText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '500',
     marginTop: 2,
     textAlign: 'center',
