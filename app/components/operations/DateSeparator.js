@@ -30,7 +30,7 @@ const DateSeparator = ({ date, spendingSums, formatDate, colors, t, onPress }) =
         </Text>
         {hasSpending && (
           <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}>
-            {t('spent_amount')}: {Object.entries(spendingSums)
+            {Object.entries(spendingSums)
               .map(([currency, amount]) => {
                 const symbol = getCurrencySymbol(currency);
                 const currencyInfo = currencies[currency];
@@ -59,28 +59,28 @@ const styles = StyleSheet.create({
   dateSeparator: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
-    marginVertical: 12,
+    gap: 8,
+    marginVertical: 6,
     paddingHorizontal: 16,
   },
   dateSeparatorContent: {
     alignItems: 'center',
     borderRadius: 8,
-    flexDirection: 'column',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   dateSeparatorLine: {
     flex: 1,
     height: 1,
   },
   dateSeparatorSpent: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
   },
   dateSeparatorText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   pressed: {

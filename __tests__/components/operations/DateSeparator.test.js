@@ -131,7 +131,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: $123.45')).toBeTruthy();
+      expect(getByText('$123.45')).toBeTruthy();
     });
 
     it('shows spending for multiple currencies', () => {
@@ -140,7 +140,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: $100.00, €85.50')).toBeTruthy();
+      expect(getByText('$100.00, €85.50')).toBeTruthy();
     });
 
     it('respects decimal_digits from currency config', () => {
@@ -150,7 +150,7 @@ describe('DateSeparator', () => {
       );
 
       // JPY has 0 decimal digits, USD has 2
-      expect(getByText('spent_amount: ¥1000, $50.50')).toBeTruthy();
+      expect(getByText('¥1000, $50.50')).toBeTruthy();
     });
 
     it('handles currency with many decimal places (BTC)', () => {
@@ -159,7 +159,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: ₿0.00012345')).toBeTruthy();
+      expect(getByText('₿0.00012345')).toBeTruthy();
     });
 
     it('applies expense color to spending text', () => {
@@ -176,13 +176,13 @@ describe('DateSeparator', () => {
         />,
       );
 
-      const spentText = getByText(/spent_amount/);
+      const spentText = getByText('$50.00');
       expect(spentText.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#E53935' })]),
       );
     });
 
-    it('uses translation function for spent_amount label', () => {
+    it('does not use spent_amount translation (label removed)', () => {
       const customT = jest.fn((key) => `Translated: ${key}`);
       const spendingSums = { USD: 25 };
       const { getByText } = render(
@@ -193,8 +193,8 @@ describe('DateSeparator', () => {
         />,
       );
 
-      expect(customT).toHaveBeenCalledWith('spent_amount');
-      expect(getByText('Translated: spent_amount: $25.00')).toBeTruthy();
+      expect(customT).not.toHaveBeenCalledWith('spent_amount');
+      expect(getByText('$25.00')).toBeTruthy();
     });
   });
 
@@ -205,7 +205,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: £75.25')).toBeTruthy();
+      expect(getByText('£75.25')).toBeTruthy();
     });
 
     it('uses RUB symbol correctly', () => {
@@ -214,7 +214,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: ₽1500.50')).toBeTruthy();
+      expect(getByText('₽1500.50')).toBeTruthy();
     });
 
     it('falls back to currency code for unknown currencies', () => {
@@ -225,7 +225,7 @@ describe('DateSeparator', () => {
       );
 
       // Unknown currency code should be used as symbol, defaults to 2 decimals
-      expect(getByText('spent_amount: XYZ100.00')).toBeTruthy();
+      expect(getByText('XYZ100.00')).toBeTruthy();
     });
 
     it('handles empty currency code gracefully', () => {
@@ -236,7 +236,7 @@ describe('DateSeparator', () => {
       );
 
       // Empty currency code returns empty string for symbol
-      expect(getByText('spent_amount: 50.00')).toBeTruthy();
+      expect(getByText('50.00')).toBeTruthy();
     });
   });
 
@@ -328,7 +328,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: $999999999.99')).toBeTruthy();
+      expect(getByText('$999999999.99')).toBeTruthy();
     });
 
     it('handles zero amount', () => {
@@ -337,7 +337,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: $0.00')).toBeTruthy();
+      expect(getByText('$0.00')).toBeTruthy();
     });
 
     it('handles negative amounts', () => {
@@ -346,7 +346,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('spent_amount: $-50.25')).toBeTruthy();
+      expect(getByText('$-50.25')).toBeTruthy();
     });
 
     it('handles many currencies at once', () => {
@@ -361,7 +361,7 @@ describe('DateSeparator', () => {
       );
 
       expect(
-        getByText('spent_amount: $100.00, €85.00, £70.00, ¥10000'),
+        getByText('$100.00, €85.00, £70.00, ¥10000'),
       ).toBeTruthy();
     });
 
@@ -391,7 +391,7 @@ describe('DateSeparator', () => {
       );
 
       // ABC123.46 because toFixed(2) rounds
-      expect(getByText('spent_amount: ABC123.46')).toBeTruthy();
+      expect(getByText('ABC123.46')).toBeTruthy();
     });
   });
 });
