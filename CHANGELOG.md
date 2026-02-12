@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.5](https://github.com/heywood8/money-tracker/compare/penny-v0.46.4...penny-v0.46.5) (2026-02-12)
+
+
+### Continuous Integration
+
+* add dependency caching to screenshot workflow ([#308](https://github.com/heywood8/money-tracker/issues/308)) ([3294d02](https://github.com/heywood8/money-tracker/commit/3294d02758111db878bbd5cd76f81f71eda85869))
+
 ## [0.46.4](https://github.com/heywood8/money-tracker/compare/penny-v0.46.3...penny-v0.46.4) (2026-02-12)
 
 
