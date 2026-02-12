@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.46.3](https://github.com/heywood8/money-tracker/compare/penny-v0.46.2...penny-v0.46.3) (2026-02-12)
+
+
+### Code Refactoring
+
+* compact account picker with icon and balance ([#306](https://github.com/heywood8/money-tracker/issues/306)) ([3532a29](https://github.com/heywood8/money-tracker/commit/3532a29b40797514a70558350a781206451295cf))
+* compact category and transfer shortcut buttons ([e1a33c0](https://github.com/heywood8/money-tracker/commit/e1a33c03a39659dcfc9593ee83cc78b595c646f2))
+* compact date separators to single line and even spacing ([4db529b](https://github.com/heywood8/money-tracker/commit/4db529b23e71ff98938d96dafd3a8e9740f281d8))
+
 ## [0.46.2](https://github.com/heywood8/money-tracker/compare/penny-v0.46.1...penny-v0.46.2) (2026-02-11)
 
 
