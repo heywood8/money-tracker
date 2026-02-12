@@ -249,9 +249,6 @@ export const AccountsActionsProvider = ({ children }) => {
       // Reload accounts to reflect balance changes from operations
       await reloadAccounts();
 
-      // Emit RELOAD_ALL to refresh operations screen
-      appEvents.emit(EVENTS.RELOAD_ALL);
-
       showDialog(
         'Success',
         'Database has been reset successfully.',

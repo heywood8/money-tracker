@@ -159,7 +159,7 @@ describe('Design Tokens', () => {
     });
 
     it('has correct values', () => {
-      expect(FONT_SIZE.xs).toBe(11);
+      expect(FONT_SIZE.xs).toBe(10);
       expect(FONT_SIZE.sm).toBe(12);
       expect(FONT_SIZE.md).toBe(14);
       expect(FONT_SIZE.base).toBe(16);
