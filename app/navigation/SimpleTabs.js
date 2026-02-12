@@ -124,8 +124,8 @@ export default function SimpleTabs() {
     if (index !== -1) {
       activeIndex.value = index;
       translateX.value = withSpring(-index * SCREEN_WIDTH, {
-        damping: 40,
-        stiffness: 150,
+        damping: 200,
+        stiffness: 400,
       });
     }
   }, [active, TABS, activeIndex, translateX]);
