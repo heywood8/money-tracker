@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.46.4](https://github.com/heywood8/money-tracker/compare/penny-v0.46.3...penny-v0.46.4) (2026-02-12)
+
+
+### Bug Fixes
+
+* categories not translated after database reset and language selection ([3f31f00](https://github.com/heywood8/money-tracker/commit/3f31f00b14d7d067642d853d6420591ece4f93fc))
+* quick add buttons showing parent categories instead of leaf categories ([1cd436f](https://github.com/heywood8/money-tracker/commit/1cd436fa0d8acd298bc6ed0d4e5d8e97bf194bf5))
+* update FONT_SIZE.xs test assertion to match new value ([827b97a](https://github.com/heywood8/money-tracker/commit/827b97a86507647370767b7fab5911721edf4559))
+
+
+### Code Refactoring
+
+* faster spring animation for tab transitions ([13b2efa](https://github.com/heywood8/money-tracker/commit/13b2efa9c08b8bae9ff2efdf48b52b7483fbfeb3))
+* taller category shortcut buttons with 2-line text support ([55540f8](https://github.com/heywood8/money-tracker/commit/55540f85ddc60ad92815bd416bcf8a7db2d0124a))
+
 ## [0.46.3](https://github.com/heywood8/money-tracker/compare/penny-v0.46.2...penny-v0.46.3) (2026-02-12)
 
 
