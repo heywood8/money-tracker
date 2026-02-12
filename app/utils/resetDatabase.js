@@ -30,9 +30,11 @@ export const resetDatabase = async () => {
     await getDatabase();
     console.log('Database reinitialized');
 
-    // Emit event to reload all contexts
+    // Emit event to notify all contexts of the reset
+    // Note: Do NOT emit RELOAD_ALL here - contexts clear their state on DATABASE_RESET
+    // and will reload naturally when the user completes language selection (isFirstLaunch -> false)
+    // Emitting RELOAD_ALL prematurely would initialize categories in English before the user picks a language
     appEvents.emit(EVENTS.DATABASE_RESET);
-    appEvents.emit(EVENTS.RELOAD_ALL);
 
     console.log('Database reset complete');
   } catch (error) {

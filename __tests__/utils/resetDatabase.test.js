@@ -41,8 +41,8 @@ describe('resetDatabase', () => {
       expect(db.dropAllTables).toHaveBeenCalledTimes(1);
       expect(db.getDatabase).toHaveBeenCalledTimes(1);
       expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.DATABASE_RESET);
-      expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
-      expect(appEvents.emit).toHaveBeenCalledTimes(2);
+      expect(appEvents.emit).not.toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+      expect(appEvents.emit).toHaveBeenCalledTimes(1);
     });
 
     it('should log progress messages during reset', async () => {
@@ -105,7 +105,6 @@ describe('resetDatabase', () => {
         'dropAllTables',
         'getDatabase',
         'DATABASE_RESET',
-        'RELOAD_ALL',
       ]);
     });
   });
@@ -249,7 +248,7 @@ describe('resetDatabase', () => {
       await Promise.all([promise1, promise2]);
 
       expect(db.dropAllTables).toHaveBeenCalledTimes(2);
-      expect(appEvents.emit).toHaveBeenCalledTimes(4); // 2 calls × 2 events
+      expect(appEvents.emit).toHaveBeenCalledTimes(2); // 2 calls × 1 event each
     });
 
     it('should handle empty database during version check', async () => {
@@ -266,15 +265,17 @@ describe('resetDatabase', () => {
   });
 
   describe('Regression Tests', () => {
-    it('should emit both DATABASE_RESET and RELOAD_ALL events', async () => {
-      // Regression: Ensure both events are emitted to properly refresh all contexts
+    it('should only emit DATABASE_RESET and not RELOAD_ALL to avoid premature category initialization', async () => {
+      // Regression: RELOAD_ALL after reset causes categories to initialize in English
+      // before the user picks a language. Only DATABASE_RESET should fire.
       db.dropAllTables.mockResolvedValue();
       db.getDatabase.mockResolvedValue({ raw: {} });
 
       await resetDatabase();
 
       expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.DATABASE_RESET);
-      expect(appEvents.emit).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+      expect(appEvents.emit).not.toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
+      expect(appEvents.emit).toHaveBeenCalledTimes(1);
     });
 
     it('should not emit events if reset fails', async () => {
