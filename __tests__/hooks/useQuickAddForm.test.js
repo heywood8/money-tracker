@@ -296,16 +296,16 @@ describe('useQuickAddForm', () => {
 
   describe('topCategoriesForType', () => {
     const categoriesWithLeaves = [
-      { id: 'cat-e1', name: 'Food', categoryType: 'expense', isShadow: false, isFolder: false },
-      { id: 'cat-e2', name: 'Transport', categoryType: 'expense', isShadow: false, isFolder: false },
-      { id: 'cat-e3', name: 'Entertainment', categoryType: 'expense', isShadow: false, isFolder: false },
-      { id: 'cat-e4', name: 'Shopping', categoryType: 'expense', isShadow: false, isFolder: false },
-      { id: 'cat-i1', name: 'Salary', categoryType: 'income', isShadow: false, isFolder: false },
-      { id: 'cat-i2', name: 'Freelance', categoryType: 'income', isShadow: false, isFolder: false },
-      { id: 'cat-i3', name: 'Dividends', categoryType: 'income', isShadow: false, isFolder: false },
-      { id: 'cat-i4', name: 'Gifts', categoryType: 'income', isShadow: false, isFolder: false },
-      { id: 'cat-shadow', name: 'Shadow', categoryType: 'income', isShadow: true, isFolder: false },
-      { id: 'cat-folder', name: 'Folder', categoryType: 'income', isShadow: false, isFolder: true },
+      { id: 'cat-e1', name: 'Food', type: 'entry', categoryType: 'expense', isShadow: false },
+      { id: 'cat-e2', name: 'Transport', type: 'entry', categoryType: 'expense', isShadow: false },
+      { id: 'cat-e3', name: 'Entertainment', type: 'entry', categoryType: 'expense', isShadow: false },
+      { id: 'cat-e4', name: 'Shopping', type: 'entry', categoryType: 'expense', isShadow: false },
+      { id: 'cat-i1', name: 'Salary', type: 'entry', categoryType: 'income', isShadow: false },
+      { id: 'cat-i2', name: 'Freelance', type: 'entry', categoryType: 'income', isShadow: false },
+      { id: 'cat-i3', name: 'Dividends', type: 'entry', categoryType: 'income', isShadow: false },
+      { id: 'cat-i4', name: 'Gifts', type: 'entry', categoryType: 'income', isShadow: false },
+      { id: 'cat-shadow', name: 'Shadow', type: 'entry', categoryType: 'income', isShadow: true },
+      { id: 'cat-folder', name: 'Folder', type: 'folder', categoryType: 'income', isShadow: false },
     ];
 
     it('should use history-based categories when available', async () => {
@@ -373,6 +373,28 @@ describe('useQuickAddForm', () => {
       const ids = result.current.topCategoriesForType.map(c => c.id);
       expect(ids).not.toContain('cat-shadow');
       expect(ids).not.toContain('cat-folder');
+    });
+
+    it('should exclude folder categories from history-based results', async () => {
+      mockGetTopCategories.mockResolvedValue([
+        { categoryId: 'cat-folder', count: 20 },
+        { categoryId: 'cat-i1', count: 10 },
+        { categoryId: 'cat-i2', count: 5 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
+      );
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
+      });
+
+      const ids = result.current.topCategoriesForType.map(c => c.id);
+      expect(ids).not.toContain('cat-folder');
+      expect(result.current.topCategoriesForType).toHaveLength(3);
+      expect(result.current.topCategoriesForType[0].id).toBe('cat-i1');
+      expect(result.current.topCategoriesForType[1].id).toBe('cat-i2');
     });
 
     it('should return empty array for transfer type even with fallback categories available', async () => {

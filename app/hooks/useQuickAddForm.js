@@ -132,7 +132,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     // Filter top categories to match current type and exclude shadow categories
     const fromHistory = topCategories
       .map(tc => categories.find(cat => cat.id === tc.categoryId))
-      .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow)
+      .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow && cat.type !== 'folder')
       .slice(0, 3);
 
     if (fromHistory.length >= 3) return fromHistory;
@@ -140,7 +140,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     // Fill remaining slots from leaf categories by id order, excluding already-selected
     const historyIds = new Set(fromHistory.map(cat => cat.id));
     const fillers = categories
-      .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && !cat.isFolder && !historyIds.has(cat.id))
+      .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && cat.type !== 'folder' && !historyIds.has(cat.id))
       .slice(0, 3 - fromHistory.length);
 
     return [...fromHistory, ...fillers];
