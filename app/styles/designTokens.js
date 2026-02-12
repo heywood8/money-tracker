@@ -56,7 +56,7 @@ export const HEIGHTS = {
  * Prefer using React Native Paper's Text variants when possible
  */
 export const FONT_SIZE = {
-  xs: 11,    // Very small labels, metadata
+  xs: 10,    // Very small labels, metadata
   sm: 12,    // Small labels, secondary text
   md: 14,    // Body text, form labels
   base: 16,  // Default body text
