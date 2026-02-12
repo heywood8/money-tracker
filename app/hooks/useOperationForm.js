@@ -5,6 +5,13 @@ import { getLastAccessedAccount, setLastAccessedAccount } from '../services/Last
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import * as Currency from '../services/currency';
+import currencies from '../../assets/currencies.json';
+
+const getCurrencySymbol = (currencyCode) => {
+  if (!currencyCode) return '';
+  const currency = currencies[currencyCode];
+  return currency ? currency.symbol : currencyCode;
+};
 
 /**
  * Custom hook for managing operation modal form state and logic
@@ -366,6 +373,14 @@ const useOperationForm = ({
     return account ? account.name : t('select_account');
   }, [accounts, t]);
 
+  // Helper: Get account balance with currency symbol
+  const getAccountBalance = useCallback((accountId) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return '';
+    const symbol = getCurrencySymbol(account.currency);
+    return `${symbol}${Currency.formatAmount(account.balance, account.currency)}`;
+  }, [accounts]);
+
   // Helper: Get category name for display
   const getCategoryName = useCallback((categoryId) => {
     if (!categoryId) return t('select_category');
@@ -478,6 +493,7 @@ const useOperationForm = ({
 
     // Helpers
     getAccountName,
+    getAccountBalance,
     getCategoryName,
     formatDateForDisplay,
     validateFields,

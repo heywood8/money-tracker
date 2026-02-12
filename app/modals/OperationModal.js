@@ -89,6 +89,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     handleDelete,
     handleSplit,
     getAccountName,
+    getAccountBalance,
     getCategoryName,
     formatDateForDisplay,
   } = useOperationForm({
@@ -352,13 +353,14 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     accounts={accounts}
                     categories={filteredCategories}
                     getAccountName={getAccountName}
+                    getAccountBalance={getAccountBalance}
                     getCategoryName={getCategoryName}
                     openPicker={openPicker}
                     onAmountChange={handleAmountChange}
                     TYPES={TYPES}
                     showTypeSelector={true}
-                    showAccountBalance={false}
-                    showFieldIcons={false}
+                    showAccountBalance={true}
+                    showFieldIcons={true}
                     transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
