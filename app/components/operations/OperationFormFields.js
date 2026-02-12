@@ -169,25 +169,15 @@ const OperationFormFields = memo(({
       {showFieldIcons && (
         <Icon name={iconName} size={18} color={disabled ? colors.mutedText : colors.mutedText} />
       )}
-      {showFieldIcons || showAccountBalance ? (
-        <View style={styles.flex1}>
-          <Text
-            style={[styles.formInputText, { color: disabled ? colors.mutedText : colors.text }]}
-            numberOfLines={1}
-          >
-            {accountId ? getAccountName(accountId) : label}
-          </Text>
-          {showAccountBalance && accountId && (
-            <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-              {getAccountBalance(accountId)}
-            </Text>
-          )}
-        </View>
-      ) : (
-        <Text
-          style={[styles.formInputText, { color: disabled ? colors.mutedText : colors.text }]}
-        >
-          {accountId ? getAccountName(accountId) : label}
+      <Text
+        style={[styles.formInputText, showAccountBalance && styles.flex1, { color: disabled ? colors.mutedText : colors.text }]}
+        numberOfLines={1}
+      >
+        {accountId ? getAccountName(accountId) : label}
+      </Text>
+      {showAccountBalance && accountId && (
+        <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+          {getAccountBalance(accountId)}
         </Text>
       )}
     </Pressable>
@@ -497,7 +487,6 @@ OperationFormFields.propTypes = {
 const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
-    marginTop: 2,
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
@@ -561,8 +550,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.md,
-    minHeight: 48,
-    padding: SPACING.md,
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
   },
   formInputText: {
     fontSize: 14,

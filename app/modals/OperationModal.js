@@ -89,6 +89,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     handleDelete,
     handleSplit,
     getAccountName,
+    getAccountBalance,
     getCategoryName,
     formatDateForDisplay,
   } = useOperationForm({
@@ -270,8 +271,8 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           ]}
         >
           <View style={styles.accountOption}>
-            <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-            <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]}>
+            <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[styles.pickerOptionCurrency, { color: colors.mutedText }]} numberOfLines={1}>
               {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
             </Text>
           </View>
@@ -352,13 +353,14 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     accounts={accounts}
                     categories={filteredCategories}
                     getAccountName={getAccountName}
+                    getAccountBalance={getAccountBalance}
                     getCategoryName={getCategoryName}
                     openPicker={openPicker}
                     onAmountChange={handleAmountChange}
                     TYPES={TYPES}
                     showTypeSelector={true}
-                    showAccountBalance={false}
-                    showFieldIcons={false}
+                    showAccountBalance={true}
+                    showFieldIcons={true}
                     transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
@@ -564,6 +566,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 }
 
 const styles = StyleSheet.create({
+  accountName: {
+    flex: 1,
+    marginRight: SPACING.sm,
+  },
   accountOption: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -718,9 +724,9 @@ const styles = StyleSheet.create({
   pickerOption: {
     borderBottomWidth: 1,
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 44,
     paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   pickerOptionCurrency: {
     fontSize: 14,
