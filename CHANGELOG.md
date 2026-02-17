@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.6](https://github.com/heywood8/money-tracker/compare/penny-v0.46.5...penny-v0.46.6) (2026-02-17)
+
+
+### Build System
+
+* **deps:** bump actions/cache from 4 to 5 ([#312](https://github.com/heywood8/money-tracker/issues/312)) ([f2dc626](https://github.com/heywood8/money-tracker/commit/f2dc626b144d255439469118ba5cf7f158548feb))
+
 ## [0.46.5](https://github.com/heywood8/money-tracker/compare/penny-v0.46.4...penny-v0.46.5) (2026-02-12)
 
 
