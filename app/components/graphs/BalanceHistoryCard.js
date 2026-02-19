@@ -338,10 +338,19 @@ const BalanceHistoryCard = ({
             if (spendingPrediction && isCurrentMonth) {
               actualDailyAvg = -spendingPrediction.dailyAverage;
             } else if (actualValues.length > 1) {
-              // For past months, calculate from start to end
-              const startBalance = actualValues[0];
-              const endBalance = actualValues[actualValues.length - 1];
-              actualDailyAvg = (endBalance - startBalance) / (daysInMonth - 1);
+              // For past months, calculate from first to last actual recorded data point.
+              // Use balanceHistoryData.actual (which carries day numbers) so the span
+              // matches the real days between observations, not the full month length.
+              const actualDataPoints = balanceHistoryData.actual || [];
+              if (actualDataPoints.length >= 2) {
+                const firstPoint = actualDataPoints[0];
+                const lastPoint = actualDataPoints[actualDataPoints.length - 1];
+                const daySpan = lastPoint.x - firstPoint.x;
+                actualDailyAvg = daySpan > 0 ? (lastPoint.y - firstPoint.y) / daySpan : 0;
+              } else {
+                // Only one actual data point recorded – no change to measure
+                actualDailyAvg = 0;
+              }
             }
 
             // Plain avg row values

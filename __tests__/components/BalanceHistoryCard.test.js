@@ -866,6 +866,132 @@ describe('BalanceHistoryCard', () => {
     });
   });
 
+  describe('Daily Average Calculation for Previous Month', () => {
+    afterEach(() => {
+      if (global.Date.mockRestore) {
+        global.Date.mockRestore();
+      }
+    });
+
+    it('uses actual day span when data starts mid-month (regression: was dividing by daysInMonth-1)', () => {
+      // Bug: when data starts on day 5 (not day 1), the old code divided by (daysInMonth - 1)
+      // instead of the real interval between the first and last recorded data points.
+      // Data: day 5 = 1000, day 28 = 500 in a 31-day month
+      // Correct: (500 - 1000) / (28 - 5) = -500 / 23 ≈ -21.74
+      // Buggy:   (500 - 1000) / (31 - 1) = -500 / 30 ≈ -16.67
+
+      const mockDate = new Date(2026, 1, 19); // Feb 19, 2026 – well past Dec 2023
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const midMonthStartData = {
+        labels: [5, 28, 31], // last label = daysInMonth = 31
+        actual: [{ x: 5, y: 1000 }, { x: 28, y: 500 }],
+        actualForChart: [1000, 500, 500], // forward-filled: [day5=1000, day28=500, day31=500]
+        burndown: [],
+        prevMonth: [],
+      };
+
+      const { getByText, queryByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={midMonthStartData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={11} // December 2023 – past month
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      // Correct: -500 / 23 = -21.74 (actual span between day 5 and day 28)
+      expect(getByText('-21.74')).toBeTruthy();
+      // Incorrect old value: -500 / 30 = -16.67 (full month length)
+      expect(queryByText('-16.67')).toBeNull();
+    });
+
+    it('gives the same result when data spans from day 1 to the last day', () => {
+      // When data starts on day 1 and ends on the last day, the span equals daysInMonth-1
+      // so old and new code agree – this is a sanity-check to avoid regressions.
+      // Data: day 1 = 1000, day 30 = 700 in a 30-day month
+      // Expected: (700 - 1000) / (30 - 1) = -300 / 29 ≈ -10.34
+
+      const mockDate = new Date(2026, 1, 19);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const fullSpanData = {
+        labels: [1, 30], // 30-day month
+        actual: [{ x: 1, y: 1000 }, { x: 30, y: 700 }],
+        actualForChart: [1000, 700],
+        burndown: [],
+        prevMonth: [],
+      };
+
+      const { getByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={fullSpanData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={10} // November 2023 – 30-day past month
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      // (700 - 1000) / (30 - 1) = -300 / 29 ≈ -10.34
+      expect(getByText('-10.34')).toBeTruthy();
+    });
+
+    it('shows 0 for daily avg when only one actual data point exists', () => {
+      // With a single recorded balance, there is no change to average – daily avg should be 0.
+
+      const mockDate = new Date(2026, 1, 19);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const singlePointData = {
+        labels: [1, 15, 31],
+        actual: [{ x: 1, y: 1000 }],
+        actualForChart: [1000, 1000, 1000], // forward-filled from the single point
+        burndown: [],
+        prevMonth: [],
+      };
+
+      const { getAllByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={singlePointData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={11}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      // Daily avg for the actual row should be 0.00 when no change is measurable
+      const zeroValues = getAllByText('0.00');
+      expect(zeroValues.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe('Regression Tests', () => {
     it('filters undefined values from actualForChart', () => {
       const dataWithUndefined = {
