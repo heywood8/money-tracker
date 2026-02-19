@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.7](https://github.com/heywood8/money-tracker/compare/penny-v0.46.6...penny-v0.46.7) (2026-02-19)
+
+
+### Bug Fixes
+
+* correct daily avg calculation for previous month in balance history chart ([#314](https://github.com/heywood8/money-tracker/issues/314)) ([3d57a7f](https://github.com/heywood8/money-tracker/commit/3d57a7fb70da7e209235bbe3ed83500adb9d6bc7))
+
 ## [0.46.6](https://github.com/heywood8/money-tracker/compare/penny-v0.46.5...penny-v0.46.6) (2026-02-17)
 
 
