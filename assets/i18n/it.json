@@ -75,5 +75,15 @@
   "daily_avg": "Media giorn.",
   "tap_for_details": "Tocca per i dettagli",
   "all_categories": "Tutte le categorie",
-  "all_accounts": "Tutti i conti"
+  "all_accounts": "Tutti i conti",
+  "developer": "Sviluppatore",
+  "logs": "Registri",
+  "no_logs": "Nessun registro ancora",
+  "share_logs": "Condividi registri",
+  "clear_logs": "Cancella registri",
+  "log_level_all": "Tutto",
+  "log_level_error": "Errore",
+  "log_level_warn": "Avviso",
+  "log_level_info": "Info",
+  "log_level_debug": "Debug"
 }

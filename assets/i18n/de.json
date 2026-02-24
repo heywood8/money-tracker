@@ -316,5 +316,15 @@
   "daily_avg": "Täglicher Ø",
   "tap_for_details": "Tippen für Details",
   "all_categories": "Alle Kategorien",
-  "all_accounts": "Alle Konten"
+  "all_accounts": "Alle Konten",
+  "developer": "Entwickler",
+  "logs": "Protokolle",
+  "no_logs": "Noch keine Protokolle",
+  "share_logs": "Protokolle teilen",
+  "clear_logs": "Protokolle löschen",
+  "log_level_all": "Alle",
+  "log_level_error": "Fehler",
+  "log_level_warn": "Warnung",
+  "log_level_info": "Info",
+  "log_level_debug": "Debug"
 }

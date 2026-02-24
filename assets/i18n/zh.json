@@ -316,5 +316,15 @@
   "daily_avg": "日均",
   "tap_for_details": "点击查看详情",
   "all_categories": "所有类别",
-  "all_accounts": "所有账户"
+  "all_accounts": "所有账户",
+  "developer": "开发者",
+  "logs": "日志",
+  "no_logs": "暂无日志",
+  "share_logs": "分享日志",
+  "clear_logs": "清除日志",
+  "log_level_all": "全部",
+  "log_level_error": "错误",
+  "log_level_warn": "警告",
+  "log_level_info": "信息",
+  "log_level_debug": "调试"
 }

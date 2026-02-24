@@ -1,3 +1,5 @@
+import { logService } from './app/services/LogService';
+logService.install();
 import React from 'react';
 import AppInitializer from './app/screens/AppInitializer';
 import { ThemeConfigProvider } from './app/contexts/ThemeConfigContext';

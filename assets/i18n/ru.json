@@ -314,5 +314,15 @@
   "daily_avg": "Дн. средн.",
   "tap_for_details": "Нажмите для деталей",
   "all_categories": "Все категории",
-  "all_accounts": "Все счета"
+  "all_accounts": "Все счета",
+  "developer": "Разработчик",
+  "logs": "Логи",
+  "no_logs": "Логов пока нет",
+  "share_logs": "Поделиться логами",
+  "clear_logs": "Очистить логи",
+  "log_level_all": "Все",
+  "log_level_error": "Ошибки",
+  "log_level_warn": "Предупр.",
+  "log_level_info": "Инфо",
+  "log_level_debug": "Отладка"
 }

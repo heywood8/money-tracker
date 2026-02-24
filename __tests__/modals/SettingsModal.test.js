@@ -66,6 +66,28 @@ jest.mock('../../app/services/BackupRestore', () => ({
   importBackup: mockImportBackup,
 }));
 
+// Mock useLogEntries hook
+const mockClearLogs = jest.fn();
+const mockGetExportText = jest.fn(() => 'log text');
+jest.mock('../../app/hooks/useLogEntries', () => ({
+  useLogEntries: () => ({
+    entries: [],
+    clearLogs: mockClearLogs,
+    getExportText: mockGetExportText,
+  }),
+}));
+
+// Mock expo-file-system
+jest.mock('expo-file-system', () => ({
+  cacheDirectory: '/tmp/cache/',
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock expo-sharing
+jest.mock('expo-sharing', () => ({
+  shareAsync: jest.fn(() => Promise.resolve()),
+}));
+
 // Mock Ionicons
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
@@ -328,6 +350,33 @@ describe('SettingsModal Component', () => {
       expect(getByText('json_description')).toBeTruthy();
       expect(getByText('csv_description')).toBeTruthy();
       expect(getByText('sqlite_description')).toBeTruthy();
+    });
+  });
+
+  describe('Developer Section', () => {
+    it('renders developer section label', () => {
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      expect(getByText('developer')).toBeTruthy();
+    });
+
+    it('renders logs row', () => {
+      const { getByTestId } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      expect(getByTestId('logs-row')).toBeTruthy();
+    });
+
+    it('renders logs label text', () => {
+      const { getAllByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      // "logs" appears in the settings row and in the logs sub-modal header
+      expect(getAllByText('logs').length).toBeGreaterThanOrEqual(1);
     });
   });
 
