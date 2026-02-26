@@ -4,6 +4,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import { performDailyBackupIfNeeded } from '../services/DailyBackupService';
 
 /**
  * AppInitializer handles first-time setup and app initialization
@@ -13,6 +14,13 @@ const AppInitializer = () => {
   const { isFirstLaunch, setFirstLaunchComplete, language } = useLocalization();
   const { colors } = useThemeColors();
   const [isInitializing, setIsInitializing] = useState(false);
+
+  // Run once on every app open (after first launch is complete)
+  useEffect(() => {
+    if (!isFirstLaunch) {
+      performDailyBackupIfNeeded();
+    }
+  }, [isFirstLaunch]);
 
   const handleLanguageSelected = async (selectedLanguage) => {
     try {
