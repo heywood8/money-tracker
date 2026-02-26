@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,18 @@ import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup } from '../services/BackupRestore';
+import { useLogEntries } from '../hooks/useLogEntries';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
+const LOG_LEVEL_COLORS = {
+  error: '#e53935',
+  warn: '#fb8c00',
+  info: '#1e88e5',
+  debug: '#757575',
+};
+
+const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 export default function SettingsModal({ visible, onClose }) {
   const { colors } = useThemeColors();
@@ -20,10 +31,16 @@ export default function SettingsModal({ visible, onClose }) {
   const { startImport, cancelImport, completeImport } = useImportProgress();
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
+  const [logsModalVisible, setLogsModalVisible] = useState(false);
+  const [logFilter, setLogFilter] = useState('all');
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
   const exportFormatSlideAnim = useRef(new Animated.Value(0)).current;
+  const logsSlideAnim = useRef(new Animated.Value(0)).current;
+  const logsFlatListRef = useRef(null);
+
+  const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
 
   const openLanguageModal = useCallback(() => {
     setLanguageModalVisible(true);
@@ -98,6 +115,25 @@ export default function SettingsModal({ visible, onClose }) {
       setExportFormatModalVisible(false);
     });
   }, [exportFormatSlideAnim]);
+
+  const openLogsModal = useCallback(() => {
+    setLogsModalVisible(true);
+    Animated.timing(logsSlideAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [logsSlideAnim]);
+
+  const closeLogsModal = useCallback(() => {
+    Animated.timing(logsSlideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setLogsModalVisible(false);
+    });
+  }, [logsSlideAnim]);
 
   const handleExportFormatSelect = useCallback(async (format) => {
     closeExportFormatModal();
@@ -189,14 +225,31 @@ export default function SettingsModal({ visible, onClose }) {
     );
   };
 
+  const handleShareLogs = useCallback(async () => {
+    try {
+      const text = getExportText();
+      const path = FileSystem.cacheDirectory + 'penny-logs.txt';
+      await FileSystem.writeAsStringAsync(path, text);
+      await Sharing.shareAsync(path, { mimeType: 'text/plain' });
+    } catch (error) {
+      console.error('Share logs error:', error);
+    }
+  }, [getExportText]);
+
+  const handleClearLogs = useCallback(() => {
+    clearLogs();
+  }, [clearLogs]);
+
   useEffect(() => {
     if (visible) {
       setLanguageModalVisible(false);
       setExportFormatModalVisible(false);
+      setLogsModalVisible(false);
       slideAnim.setValue(0);
       exportFormatSlideAnim.setValue(0);
+      logsSlideAnim.setValue(0);
     }
-  }, [visible, slideAnim, exportFormatSlideAnim]);
+  }, [visible, slideAnim, exportFormatSlideAnim, logsSlideAnim]);
 
   // Interpolate animation values for language modal
   const settingsTranslateX = slideAnim.interpolate({
@@ -230,11 +283,40 @@ export default function SettingsModal({ visible, onClose }) {
     outputRange: [0, 1],
   });
 
+  // Interpolate animation values for logs modal
+  const logsTranslateX = logsSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  const logsOpacity = logsSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const anySubModalOpen = languageModalVisible || exportFormatModalVisible || logsModalVisible;
+
+  const renderLogEntry = useCallback(({ item }) => (
+    <View style={styles.logEntry}>
+      <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
+        {item.timestamp.substring(11, 19)}
+      </Text>
+      <Text style={[styles.logLevel, { color: LOG_LEVEL_COLORS[item.level] }]}>
+        {item.level.toUpperCase()}
+      </Text>
+      <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={3}>
+        {item.message}
+      </Text>
+    </View>
+  ), [colors]);
+
+  const logKeyExtractor = useCallback((item) => String(item.id), []);
+
   return (
     <Portal>
       <Modal
         visible={visible}
-        onDismiss={exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)}
+        onDismiss={logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose))}
         dismissable={true}
       >
         <Animated.View style={[
@@ -244,7 +326,7 @@ export default function SettingsModal({ visible, onClose }) {
             transform: [{ translateX: settingsTranslateX }],
             opacity: settingsOpacity,
           },
-          (languageModalVisible || exportFormatModalVisible) && styles.hidden,
+          anySubModalOpen && styles.hidden,
         ]}>
           <View style={styles.header}>
             <View style={styles.closeButton} />
@@ -288,6 +370,20 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <Divider style={styles.divider} />
+
+          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
+
+          <TouchableRipple onPress={openLogsModal} style={styles.settingsRow} testID="logs-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="terminal-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
@@ -431,6 +527,84 @@ export default function SettingsModal({ visible, onClose }) {
             </TouchableRipple>
           </ScrollView>
         </Animated.View>
+
+        <Animated.View style={[
+          styles.logsModalContent,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: logsTranslateX }],
+            opacity: logsOpacity,
+          },
+          !logsModalVisible && styles.hidden,
+        ]}>
+          <View style={styles.languageModalHeader}>
+            <TouchableOpacity onPress={closeLogsModal} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+              {t('logs') || 'Logs'}
+            </Text>
+            <View style={styles.backButton} />
+          </View>
+
+          <Divider />
+
+          <View style={styles.filterRow}>
+            {LOG_FILTERS.map(f => {
+              const isSelected = f === logFilter;
+              const filterLabelKey = `log_level_${f}`;
+              return (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setLogFilter(f)}
+                  style={[
+                    styles.filterChip,
+                    { borderColor: colors.border },
+                    isSelected && { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    isSelected ? styles.filterChipTextSelected : { color: colors.text },
+                  ]}>
+                    {t(filterLabelKey) || f}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <FlatList
+            ref={logsFlatListRef}
+            data={entries}
+            keyExtractor={logKeyExtractor}
+            renderItem={renderLogEntry}
+            style={styles.logsList}
+            contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
+            ListEmptyComponent={
+              <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                {t('no_logs') || 'No logs yet'}
+              </Text>
+            }
+          />
+
+          <Divider />
+
+          <View style={styles.logsActionBar}>
+            <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
+              <Ionicons name="share-outline" size={20} color={colors.primary} />
+              <Text style={[styles.logsActionText, { color: colors.primary }]}>
+                {t('share_logs') || 'Share Logs'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
+              <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
+              <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                {t('clear_logs') || 'Clear Logs'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </Modal>
     </Portal>
   );
@@ -442,6 +616,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
+  },
+  clearLogsText: {
+    color: '#e53935',
   },
   closeButton: {
     alignItems: 'center',
@@ -461,6 +638,25 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: SPACING.xs,
+  },
+  filterChip: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterChipTextSelected: {
+    color: '#fff',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.sm,
   },
   formatDescription: {
     fontSize: 12,
@@ -520,6 +716,58 @@ const styles = StyleSheet.create({
   },
   languageModalTitle: {
     fontWeight: '600',
+  },
+  logEntry: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: 4,
+  },
+  logLevel: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    width: 42,
+  },
+  logMessage: {
+    flex: 1,
+    fontFamily: 'monospace',
+    fontSize: 11,
+  },
+  logTimestamp: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+  },
+  logsActionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: SPACING.md,
+  },
+  logsActionButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  logsActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  logsEmptyContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logsEmptyText: {
+    fontSize: 14,
+  },
+  logsList: {
+    maxHeight: 350,
+  },
+  logsModalContent: {
+    borderRadius: BORDER_RADIUS.lg,
+    margin: SPACING.xl,
+    maxHeight: '85%',
+    padding: 0,
   },
   resetSpacer: {
     height: SPACING.sm,

@@ -316,5 +316,15 @@
   "daily_avg": "Moy. quotid.",
   "tap_for_details": "Appuyez pour les détails",
   "all_categories": "Toutes les catégories",
-  "all_accounts": "Tous les comptes"
+  "all_accounts": "Tous les comptes",
+  "developer": "Développeur",
+  "logs": "Journaux",
+  "no_logs": "Pas encore de journaux",
+  "share_logs": "Partager les journaux",
+  "clear_logs": "Effacer les journaux",
+  "log_level_all": "Tout",
+  "log_level_error": "Erreur",
+  "log_level_warn": "Avertir",
+  "log_level_info": "Info",
+  "log_level_debug": "Débogage"
 }

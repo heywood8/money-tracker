@@ -316,5 +316,15 @@
   "daily_avg": "Daily Avg",
   "tap_for_details": "Tap for details",
   "all_categories": "All categories",
-  "all_accounts": "All accounts"
+  "all_accounts": "All accounts",
+  "developer": "Developer",
+  "logs": "Logs",
+  "no_logs": "No logs yet",
+  "share_logs": "Share Logs",
+  "clear_logs": "Clear Logs",
+  "log_level_all": "All",
+  "log_level_error": "Error",
+  "log_level_warn": "Warn",
+  "log_level_info": "Info",
+  "log_level_debug": "Debug"
 }

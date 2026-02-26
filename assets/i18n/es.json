@@ -316,5 +316,15 @@
   "daily_avg": "Prom. diario",
   "tap_for_details": "Toca para detalles",
   "all_categories": "Todas las categorías",
-  "all_accounts": "Todas las cuentas"
+  "all_accounts": "Todas las cuentas",
+  "developer": "Desarrollador",
+  "logs": "Registros",
+  "no_logs": "Sin registros aún",
+  "share_logs": "Compartir registros",
+  "clear_logs": "Borrar registros",
+  "log_level_all": "Todo",
+  "log_level_error": "Error",
+  "log_level_warn": "Aviso",
+  "log_level_info": "Info",
+  "log_level_debug": "Depurar"
 }
