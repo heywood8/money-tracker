@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.0](https://github.com/heywood8/money-tracker/compare/penny-v0.46.7...penny-v0.47.0) (2026-02-26)
+
+
+### Features
+
+* add in-app log viewer in settings ([#316](https://github.com/heywood8/money-tracker/issues/316)) ([ceb5102](https://github.com/heywood8/money-tracker/commit/ceb51023147e0385f05ac7860e2d556754ac1f52))
+
 ## [0.46.7](https://github.com/heywood8/money-tracker/compare/penny-v0.46.6...penny-v0.46.7) (2026-02-19)
 
 
