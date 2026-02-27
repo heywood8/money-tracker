@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.0](https://github.com/heywood8/money-tracker/compare/penny-v0.47.0...penny-v0.48.0) (2026-02-26)
+
+
+### Features
+
+* daily automatic backup service with retention policy ([#318](https://github.com/heywood8/money-tracker/issues/318)) ([7ffe1de](https://github.com/heywood8/money-tracker/commit/7ffe1de8573ff32a2a0a03acae2c9c5da1ef0ca5))
+
 ## [0.47.0](https://github.com/heywood8/money-tracker/compare/penny-v0.46.7...penny-v0.47.0) (2026-02-26)
 
 
