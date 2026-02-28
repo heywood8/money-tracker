@@ -141,16 +141,15 @@ export default function PlannedOperationsScreen() {
     const currencySymbol = getCurrencySymbol(accountCurrency);
     const typeColor = colors[TYPE_COLORS[item.type]] || colors.text;
 
+    const itemStyle = {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      opacity: executed ? 0.6 : 1,
+    };
+
     return (
       <Pressable
-        style={[
-          styles.itemContainer,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            opacity: executed ? 0.6 : 1,
-          },
-        ]}
+        style={[styles.itemContainer, itemStyle]}
         onPress={() => handleEdit(item)}
         onLongPress={() => handleLongPress(item)}
       >
@@ -221,18 +220,21 @@ export default function PlannedOperationsScreen() {
     );
   }, [loading, colors, t]);
 
+  const recurringTabStyle = {
+    backgroundColor: activeTab === 'recurring' ? colors.primary + '1A' : 'transparent',
+    borderColor: activeTab === 'recurring' ? colors.primary : colors.border,
+  };
+  const oneTimeTabStyle = {
+    backgroundColor: activeTab === 'one_time' ? colors.primary + '1A' : 'transparent',
+    borderColor: activeTab === 'one_time' ? colors.primary : colors.border,
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Tab Selector */}
       <View style={styles.tabRow}>
         <Pressable
-          style={[
-            styles.tab,
-            {
-              backgroundColor: activeTab === 'recurring' ? colors.primary + '1A' : 'transparent',
-              borderColor: activeTab === 'recurring' ? colors.primary : colors.border,
-            },
-          ]}
+          style={[styles.tab, recurringTabStyle]}
           onPress={() => setActiveTab('recurring')}
         >
           <Icon
@@ -245,13 +247,7 @@ export default function PlannedOperationsScreen() {
           </Text>
         </Pressable>
         <Pressable
-          style={[
-            styles.tab,
-            {
-              backgroundColor: activeTab === 'one_time' ? colors.primary + '1A' : 'transparent',
-              borderColor: activeTab === 'one_time' ? colors.primary : colors.border,
-            },
-          ]}
+          style={[styles.tab, oneTimeTabStyle]}
           onPress={() => setActiveTab('one_time')}
         >
           <Icon
@@ -300,7 +296,7 @@ export default function PlannedOperationsScreen() {
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={2000}
-        style={{ marginBottom: 100 }}
+        style={styles.snackbar}
       >
         {snackbarMessage}
       </Snackbar>
@@ -388,6 +384,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 180,
+  },
+  snackbar: {
+    marginBottom: 100,
   },
   tab: {
     alignItems: 'center',
