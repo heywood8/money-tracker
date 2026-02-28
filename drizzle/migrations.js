@@ -6,6 +6,7 @@ import m0001 from './0001_modern_lester.js';
 import m0002 from './0002_illegal_apocalypse.js';
 import m0003, { postMigration as m0003PostMigration } from './0003_slow_grandmaster.js';
 import m0004 from './0004_remove_exclude_from_forecast.js';
+import m0005 from './0005_planned_operations.js';
 
 export default {
   journal,
@@ -15,6 +16,7 @@ export default {
     m0002,
     m0003,
     m0004,
+    m0005,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

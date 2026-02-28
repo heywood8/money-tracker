@@ -326,5 +326,19 @@
   "log_level_error": "错误",
   "log_level_warn": "警告",
   "log_level_info": "信息",
-  "log_level_debug": "调试"
+  "log_level_debug": "调试",
+  "planned": "计划",
+  "planned_operations": "计划操作",
+  "add_planned_operation": "添加计划",
+  "edit_planned_operation": "编辑计划",
+  "delete_planned_operation": "删除计划",
+  "delete_planned_confirm": "确定要删除此计划操作吗？",
+  "planned_name": "名称",
+  "planned_name_required": "名称为必填项",
+  "one_time": "一次性",
+  "no_planned_operations": "暂无计划操作。",
+  "already_executed": "本月已添加",
+  "add_to_operations": "添加到操作",
+  "added_to_operations": "已添加到操作",
+  "planned_operation_name_hint": "例如：房租、Netflix、杂货"
 }

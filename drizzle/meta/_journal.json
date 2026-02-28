@@ -36,6 +36,13 @@
       "when": 1765900000000,
       "tag": "0004_remove_exclude_from_forecast",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1766000000000,
+      "tag": "0005_planned_operations",
+      "breakpoints": true
     }
   ]
 }

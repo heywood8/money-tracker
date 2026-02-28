@@ -32,6 +32,7 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
         graphs: 'Graphs',
         accounts: 'Accounts',
         categories: 'Categories',
+        planned: 'Planned',
       };
       return translations[key] || key;
     },
@@ -72,6 +73,15 @@ jest.mock('../../app/screens/GraphsScreen', () => {
   return function GraphsScreen() {
     return React.createElement(View, { testID: 'graphs-screen' },
       React.createElement(Text, {}, 'Graphs Screen'));
+  };
+});
+
+jest.mock('../../app/screens/PlannedOperationsScreen', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  return function PlannedOperationsScreen() {
+    return React.createElement(View, { testID: 'planned-screen' },
+      React.createElement(Text, {}, 'Planned Screen'));
   };
 });
 
@@ -275,22 +285,24 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('header')).toBeTruthy();
   });
 
-  it('renders all four tab labels', () => {
+  it('renders all five tab labels', () => {
     const { getByText } = render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
     expect(getByText('Accounts')).toBeTruthy();
     expect(getByText('Categories')).toBeTruthy();
+    expect(getByText('Planned')).toBeTruthy();
   });
 
-  it('renders all four screens', () => {
+  it('renders all five screens', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
     expect(getByTestId('graphs-screen')).toBeTruthy();
     expect(getByTestId('accounts-screen')).toBeTruthy();
     expect(getByTestId('categories-screen')).toBeTruthy();
+    expect(getByTestId('planned-screen')).toBeTruthy();
   });
 
   it('switches active tab when tab is pressed', async () => {

@@ -312,5 +312,19 @@
   "tap_for_details": "Սեղմեք մանրամասների համար",
   "all_categories": "Բոլոր կատեգորիաները",
   "manual_rate_info": "Ձեռակի փոխարժեք",
-  "all_accounts": "Բոլոր հաշվեր"
+  "all_accounts": "Բոլոր հաշվեր",
+  "planned": "Պլանավորված",
+  "planned_operations": "Պլանավորված գործարկներ",
+  "add_planned_operation": "Ավելացնել պլանավորված",
+  "edit_planned_operation": "Խմբագրել պլանավորվածը",
+  "delete_planned_operation": "Ջնջել պլանավորվածը",
+  "delete_planned_confirm": "Վստահ եք, որ ցանկանում եք ջնջել այս պլանավորված գործարկը։",
+  "planned_name": "Անուն",
+  "planned_name_required": "Անունը պարտադիր է",
+  "one_time": "Միանգամյա",
+  "no_planned_operations": "Պլանավորված գործարկներ չկան։",
+  "already_executed": "Արդեն ավելացվել է այս ամիս",
+  "add_to_operations": "Ավելացնել գործարկներին",
+  "added_to_operations": "Ավելացվել է գործարկներին",
+  "planned_operation_name_hint": "օր. Վարձակալություն, Netflix, Մսերքներ"
 }

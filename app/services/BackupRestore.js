@@ -22,13 +22,14 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
       queryAll('SELECT * FROM budgets ORDER BY created_at ASC'),
       queryAll('SELECT * FROM app_metadata'),
       queryAll('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
+      queryAll('SELECT * FROM planned_operations ORDER BY created_at ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -43,6 +44,7 @@ export const createBackup = async () => {
         budgets: budgets || [],
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
+        planned_operations: plannedOperations || [],
       },
     };
 
@@ -52,6 +54,7 @@ export const createBackup = async () => {
       operations: backup.data.operations.length,
       budgets: backup.data.budgets.length,
       balance_history: backup.data.balance_history.length,
+      planned_operations: backup.data.planned_operations.length,
     });
 
     return backup;
@@ -112,6 +115,7 @@ export const exportBackupCSV = async () => {
       'budgets.csv': convertToCSV(backup.data.budgets),
       'app_metadata.csv': convertToCSV(backup.data.app_metadata),
       'balance_history.csv': convertToCSV(backup.data.balance_history),
+      'planned_operations.csv': convertToCSV(backup.data.planned_operations),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
@@ -125,7 +129,8 @@ export const exportBackupCSV = async () => {
     combinedCSV += `[OPERATIONS]\n${csvFiles['operations.csv']}\n\n`;
     combinedCSV += `[BUDGETS]\n${csvFiles['budgets.csv']}\n\n`;
     combinedCSV += `[APP_METADATA]\n${csvFiles['app_metadata.csv']}\n\n`;
-    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n`;
+    combinedCSV += `[BALANCE_HISTORY]\n${csvFiles['balance_history.csv']}\n\n`;
+    combinedCSV += `[PLANNED_OPERATIONS]\n${csvFiles['planned_operations.csv']}\n`;
 
     const filename = `money_tracker_backup_${timestamp}.csv`;
     const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -308,6 +313,7 @@ export const restoreBackup = async (backup) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'in_progress' });
 
       // Clear existing data (in reverse order due to foreign keys)
+      await db.runAsync('DELETE FROM planned_operations').catch(() => {});
       await db.runAsync('DELETE FROM budgets');
       await db.runAsync('DELETE FROM accounts_balance_history');
       await db.runAsync('DELETE FROM operations');
@@ -600,6 +606,52 @@ export const restoreBackup = async (backup) => {
         });
       }
 
+      // Restore planned operations
+      if (backup.data.planned_operations && backup.data.planned_operations.length > 0) {
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'planned_operations',
+          status: 'in_progress',
+          data: backup.data.planned_operations.length,
+        });
+        for (const planned of backup.data.planned_operations) {
+          if (!planned.id || !planned.name) {
+            console.error('Skipping planned operation with missing id or name:', planned);
+            continue;
+          }
+
+          const mappedAccountId = accountIdMapping.get(planned.account_id) ?? planned.account_id;
+          let mappedToAccountId = null;
+          if (planned.to_account_id != null) {
+            mappedToAccountId = accountIdMapping.get(planned.to_account_id) ?? planned.to_account_id;
+          }
+
+          await db.runAsync(
+            'INSERT INTO planned_operations (id, name, type, amount, account_id, category_id, to_account_id, description, is_recurring, last_executed_month, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              planned.id,
+              planned.name,
+              planned.type || 'expense',
+              planned.amount || '0',
+              mappedAccountId,
+              planned.category_id || null,
+              mappedToAccountId,
+              planned.description || null,
+              planned.is_recurring ?? 1,
+              planned.last_executed_month || null,
+              planned.display_order ?? null,
+              planned.created_at || new Date().toISOString(),
+              planned.updated_at || new Date().toISOString(),
+            ],
+          );
+        }
+        console.log(`Restored ${backup.data.planned_operations.length} planned operations`);
+        appEvents.emit(IMPORT_PROGRESS_EVENT, {
+          stepId: 'planned_operations',
+          status: 'completed',
+          data: backup.data.planned_operations.length,
+        });
+      }
+
       // Post-restore upgrades: Ensure shadow categories exist
       console.log('Performing post-restore database upgrades...');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'upgrades', status: 'in_progress' });
@@ -743,6 +795,7 @@ const importBackupCSV = async (fileUri) => {
     budgets: [],
     app_metadata: [],
     balance_history: [],
+    planned_operations: [],
   };
 
   // Split by section markers
@@ -752,6 +805,7 @@ const importBackupCSV = async (fileUri) => {
   const budgetsMatch = fileContent.match(/\[BUDGETS\]\n([\s\S]*?)(?=\n\[|$)/);
   const metadataMatch = fileContent.match(/\[APP_METADATA\]\n([\s\S]*?)(?=\n\[|$)/);
   const balanceHistoryMatch = fileContent.match(/\[BALANCE_HISTORY\]\n([\s\S]*?)(?=\n\[|$)/);
+  const plannedOpsMatch = fileContent.match(/\[PLANNED_OPERATIONS\]\n([\s\S]*?)(?=\n\[|$)/);
 
   if (accountsMatch) sections.accounts = parseCSV(accountsMatch[1]);
   if (categoriesMatch) sections.categories = parseCSV(categoriesMatch[1]);
@@ -759,6 +813,7 @@ const importBackupCSV = async (fileUri) => {
   if (budgetsMatch) sections.budgets = parseCSV(budgetsMatch[1]);
   if (metadataMatch) sections.app_metadata = parseCSV(metadataMatch[1]);
   if (balanceHistoryMatch) sections.balance_history = parseCSV(balanceHistoryMatch[1]);
+  if (plannedOpsMatch) sections.planned_operations = parseCSV(plannedOpsMatch[1]);
 
   // Extract version from header
   const versionMatch = fileContent.match(/# Version: (\d+)/);
@@ -859,6 +914,14 @@ const importBackupSQLite = async (fileUri) => {
       tempDb.getAllAsync('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
     ]);
 
+    // Planned operations table may not exist in older backups
+    let plannedOperations = [];
+    try {
+      plannedOperations = await tempDb.getAllAsync('SELECT * FROM planned_operations ORDER BY created_at ASC');
+    } catch (e) {
+      console.log('No planned_operations table in imported database (older format)');
+    }
+
     // Create backup object
     const backup = {
       version: BACKUP_VERSION,
@@ -871,6 +934,7 @@ const importBackupSQLite = async (fileUri) => {
         budgets: budgets || [],
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
+        planned_operations: plannedOperations || [],
       },
     };
 
