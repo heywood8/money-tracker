@@ -184,6 +184,7 @@ jobs:
               { file: '02_graphs', desc: 'Graphs' },
               { file: '03_accounts', desc: 'Accounts' },
               { file: '04_categories', desc: 'Categories' },
+              { file: '08_planned', desc: 'Planned Operations' },
               { file: '07_settings', desc: 'Settings' },
             ];
 

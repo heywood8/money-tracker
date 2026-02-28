@@ -251,6 +251,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
                 <View style={styles.typeRow}>
                   {TYPE_OPTIONS.map(opt => {
                     const isActive = values.type === opt.key;
+                    const typeLabelStyle = { color: isActive ? '#fff' : colors.mutedText };
                     return (
                       <Pressable
                         key={opt.key}
@@ -264,7 +265,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
                         onPress={() => setValues(v => ({ ...v, type: opt.key, categoryId: null }))}
                       >
                         <Icon name={opt.icon} size={18} color={isActive ? '#fff' : colors.mutedText} />
-                        <Text style={[styles.typeLabel, { color: isActive ? '#fff' : colors.mutedText }]}>
+                        <Text style={[styles.typeLabel, typeLabelStyle]}>
                           {t(`${opt.key}_label`) || t(opt.key)}
                         </Text>
                       </Pressable>
@@ -340,7 +341,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
 
               {/* Recurring Toggle */}
               <View style={[styles.inputContainer, styles.switchRow]}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText, marginBottom: 0 }]}>
+                <Text style={[styles.inputLabel, styles.inputLabelNoMargin, { color: colors.mutedText }]}>
                   {t('recurring')}
                 </Text>
                 <Switch
@@ -466,6 +467,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
     marginBottom: SPACING.xs,
+  },
+  inputLabelNoMargin: {
+    marginBottom: 0,
   },
   modalContent: {
     borderTopLeftRadius: BORDER_RADIUS.lg,

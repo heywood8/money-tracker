@@ -67,6 +67,12 @@ appId: com.heywood8.monkeep
     timeout: 3000
 - takeScreenshot: screenshots/04_categories_light
 
+# Navigate to Planned tab
+- tapOn: "Planned"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/08_planned_light
+
 # Open Settings modal
 - tapOn:
     id: "settings-button"
@@ -149,6 +155,12 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: screenshots/04_categories_dark
+
+# Navigate to Planned tab
+- tapOn: "Planned"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/08_planned_dark
 
 # Open Settings modal
 - tapOn:
