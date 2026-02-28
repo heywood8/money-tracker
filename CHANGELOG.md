@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.1](https://github.com/heywood8/money-tracker/compare/penny-v0.48.0...penny-v0.48.1) (2026-02-28)
+
+
+### Continuous Integration
+
+* enable auto-merge for release-please PRs when checks pass ([#320](https://github.com/heywood8/money-tracker/issues/320)) ([c4ac5fd](https://github.com/heywood8/money-tracker/commit/c4ac5fdd0b25846d71d40e23a9fbbded2194fca4))
+
 ## [0.48.0](https://github.com/heywood8/money-tracker/compare/penny-v0.47.0...penny-v0.48.0) (2026-02-26)
 
 
