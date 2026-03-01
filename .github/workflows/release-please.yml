@@ -24,4 +24,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ fromJSON(steps.release-please.outputs.pr).number }}
+          PR_NUMBER: ${{ fromJSON(steps.release-please.outputs.pr || '{"number":0}').number }}
