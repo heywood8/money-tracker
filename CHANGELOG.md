@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.0](https://github.com/heywood8/money-tracker/compare/penny-v0.48.1...penny-v0.49.0) (2026-03-01)
+
+
+### Features
+
+* add planned operations feature for monthly budget planning ([#322](https://github.com/heywood8/money-tracker/issues/322)) ([5538431](https://github.com/heywood8/money-tracker/commit/5538431a7352f4bb29dff274c8d4a1c4165a70db))
+
 ## [0.48.1](https://github.com/heywood8/money-tracker/compare/penny-v0.48.0...penny-v0.48.1) (2026-02-28)
 
 
