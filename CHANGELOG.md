@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.3](https://github.com/heywood8/money-tracker/compare/penny-v0.49.2...penny-v0.49.3) (2026-03-01)
+
+
+### Build System
+
+* **deps:** bump actions/upload-artifact from 6 to 7 ([#327](https://github.com/heywood8/money-tracker/issues/327)) ([3c5a34a](https://github.com/heywood8/money-tracker/commit/3c5a34adedd9506b3c93433e75d81e9f9a0cdf9d))
+
 ## [0.49.2](https://github.com/heywood8/money-tracker/compare/penny-v0.49.1...penny-v0.49.2) (2026-03-01)
 
 
