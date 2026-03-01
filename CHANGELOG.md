@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.2](https://github.com/heywood8/money-tracker/compare/penny-v0.49.1...penny-v0.49.2) (2026-03-01)
+
+
+### Bug Fixes
+
+* migrate share logs from deprecated expo-file-system API to new File/Paths classes ([4f7b7b6](https://github.com/heywood8/money-tracker/commit/4f7b7b6e7f83db9559c3bd35939650268b1a83df))
+
 ## [0.49.1](https://github.com/heywood8/money-tracker/compare/penny-v0.49.0...penny-v0.49.1) (2026-03-01)
 
 
