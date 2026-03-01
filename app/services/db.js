@@ -154,6 +154,46 @@ const initializeDatabase = async (rawDb, db) => {
     // Run Drizzle migrations
     await migrate(db, migrations);
 
+    // Defensive: ensure planned_operations table exists after migrations.
+    // The beta Drizzle migrator can silently fail to apply a migration (transaction
+    // rolls back, hash not recorded), so we create the table directly as a fallback.
+    const plannedOpsTable = await rawDb.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='planned_operations'",
+    ) || [];
+    if (plannedOpsTable.length === 0) {
+      console.warn('planned_operations table missing after migrations — creating it directly');
+      await rawDb.runAsync(
+        `CREATE TABLE IF NOT EXISTS \`planned_operations\` (
+          \`id\` text PRIMARY KEY NOT NULL,
+          \`name\` text NOT NULL,
+          \`type\` text NOT NULL,
+          \`amount\` text NOT NULL,
+          \`account_id\` integer NOT NULL,
+          \`category_id\` text,
+          \`to_account_id\` integer,
+          \`description\` text,
+          \`is_recurring\` integer NOT NULL DEFAULT 1,
+          \`last_executed_month\` text,
+          \`display_order\` integer,
+          \`created_at\` text NOT NULL,
+          \`updated_at\` text NOT NULL,
+          FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade,
+          FOREIGN KEY (\`category_id\`) REFERENCES \`categories\`(\`id\`) ON UPDATE no action ON DELETE set null,
+          FOREIGN KEY (\`to_account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade
+        )`,
+      );
+      await rawDb.runAsync(
+        'CREATE INDEX IF NOT EXISTS `idx_planned_ops_account` ON `planned_operations` (`account_id`)',
+      );
+      await rawDb.runAsync(
+        'CREATE INDEX IF NOT EXISTS `idx_planned_ops_type` ON `planned_operations` (`type`)',
+      );
+      await rawDb.runAsync(
+        'CREATE INDEX IF NOT EXISTS `idx_planned_ops_recurring` ON `planned_operations` (`is_recurring`)',
+      );
+      console.log('planned_operations table created via fallback');
+    }
+
     // Enable foreign keys and WAL mode after migrations
     await rawDb.runAsync('PRAGMA foreign_keys = ON');
     await rawDb.runAsync('PRAGMA journal_mode = WAL');
@@ -217,7 +257,7 @@ export const executeQuery = async (sqlStr, params = []) => {
   try {
     return await raw.runAsync(sqlStr, params);
   } catch (error) {
-    console.error('Query execution failed:', error);
+    console.error('Query execution failed:', error.message, error);
     throw error;
   }
 };
