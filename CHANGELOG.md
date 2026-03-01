@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.1](https://github.com/heywood8/money-tracker/compare/penny-v0.49.0...penny-v0.49.1) (2026-03-01)
+
+
+### Documentation
+
+* move dev content to DEVELOPMENT.md, rewrite README for end users ([d9fe6fc](https://github.com/heywood8/money-tracker/commit/d9fe6fcd3051d581cc2cdf51153c97775cbac766))
+
 ## [0.49.0](https://github.com/heywood8/money-tracker/compare/penny-v0.48.1...penny-v0.49.0) (2026-03-01)
 
 

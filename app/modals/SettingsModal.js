@@ -11,7 +11,7 @@ import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup } from '../services/BackupRestore';
 import { useLogEntries } from '../hooks/useLogEntries';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const LOG_LEVEL_COLORS = {
@@ -228,9 +228,10 @@ export default function SettingsModal({ visible, onClose }) {
   const handleShareLogs = useCallback(async () => {
     try {
       const text = getExportText();
-      const path = FileSystem.cacheDirectory + 'penny-logs.txt';
-      await FileSystem.writeAsStringAsync(path, text);
-      await Sharing.shareAsync(path, { mimeType: 'text/plain' });
+      const date = new Date().toISOString().slice(0, 10);
+      const file = new File(Paths.cache, `penny-logs-${date}.txt`);
+      file.write(text);
+      await Sharing.shareAsync(file.uri, { mimeType: 'text/plain' });
     } catch (error) {
       console.error('Share logs error:', error);
     }

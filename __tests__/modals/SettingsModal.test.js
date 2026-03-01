@@ -78,9 +78,13 @@ jest.mock('../../app/hooks/useLogEntries', () => ({
 }));
 
 // Mock expo-file-system
+const mockFileWrite = jest.fn();
 jest.mock('expo-file-system', () => ({
-  cacheDirectory: '/tmp/cache/',
-  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+  File: jest.fn().mockImplementation(() => ({
+    uri: '/tmp/cache/penny-logs.txt',
+    write: mockFileWrite,
+  })),
+  Paths: { cache: '/tmp/cache/' },
 }));
 
 // Mock expo-sharing
