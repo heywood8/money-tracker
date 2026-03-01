@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.0](https://github.com/heywood8/money-tracker/compare/penny-v0.49.3...penny-v0.50.0) (2026-03-01)
+
+
+### Features
+
+* use hierarchical category picker in planned operations modal ([4eff456](https://github.com/heywood8/money-tracker/commit/4eff45659738dae152de5a27d45e6a1dca9304cc))
+
 ## [0.49.3](https://github.com/heywood8/money-tracker/compare/penny-v0.49.2...penny-v0.49.3) (2026-03-01)
 
 
