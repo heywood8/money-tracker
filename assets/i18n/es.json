@@ -326,5 +326,19 @@
   "log_level_error": "Error",
   "log_level_warn": "Aviso",
   "log_level_info": "Info",
-  "log_level_debug": "Depurar"
+  "log_level_debug": "Depurar",
+  "planned": "Planificados",
+  "planned_operations": "Operaciones Planificadas",
+  "add_planned_operation": "Agregar Planificada",
+  "edit_planned_operation": "Editar Planificada",
+  "delete_planned_operation": "Eliminar Planificada",
+  "delete_planned_confirm": "¿Estás seguro de que quieres eliminar esta operación planificada?",
+  "planned_name": "Nombre",
+  "planned_name_required": "El nombre es obligatorio",
+  "one_time": "Única vez",
+  "no_planned_operations": "No hay operaciones planificadas.",
+  "already_executed": "Ya agregada este mes",
+  "add_to_operations": "Agregar a Operaciones",
+  "added_to_operations": "Agregada a operaciones",
+  "planned_operation_name_hint": "ej. Alquiler, Netflix, Compras"
 }

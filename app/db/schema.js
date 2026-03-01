@@ -96,6 +96,30 @@ export const budgets = sqliteTable('budgets', {
 }));
 
 /**
+ * Planned Operations table
+ * Templates for recurring or one-time planned expenses/income/transfers
+ */
+export const plannedOperations = sqliteTable('planned_operations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['expense', 'income', 'transfer'] }).notNull(),
+  amount: text('amount').notNull(),
+  accountId: integer('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  toAccountId: integer('to_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+  description: text('description'),
+  isRecurring: integer('is_recurring').notNull().default(1),
+  lastExecutedMonth: text('last_executed_month'),
+  displayOrder: integer('display_order'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => ({
+  accountIdx: index('idx_planned_ops_account').on(table.accountId),
+  typeIdx: index('idx_planned_ops_type').on(table.type),
+  recurringIdx: index('idx_planned_ops_recurring').on(table.isRecurring),
+}));
+
+/**
  * Accounts Balance History table
  * Tracks daily end-of-day balances for accounts
  */

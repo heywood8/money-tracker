@@ -324,5 +324,19 @@
   "log_level_error": "Ошибки",
   "log_level_warn": "Предупр.",
   "log_level_info": "Инфо",
-  "log_level_debug": "Отладка"
+  "log_level_debug": "Отладка",
+  "planned": "Планы",
+  "planned_operations": "Запланированные операции",
+  "add_planned_operation": "Добавить план",
+  "edit_planned_operation": "Изменить план",
+  "delete_planned_operation": "Удалить план",
+  "delete_planned_confirm": "Вы уверены, что хотите удалить эту запланированную операцию?",
+  "planned_name": "Название",
+  "planned_name_required": "Название обязательно",
+  "one_time": "Разовая",
+  "no_planned_operations": "Нет запланированных операций.",
+  "already_executed": "Уже добавлено в этом месяце",
+  "add_to_operations": "Добавить в операции",
+  "added_to_operations": "Добавлено в операции",
+  "planned_operation_name_hint": "напр. Аренда, Netflix, Продукты"
 }

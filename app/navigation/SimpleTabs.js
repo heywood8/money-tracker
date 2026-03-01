@@ -15,6 +15,7 @@ import OperationsScreen from '../screens/OperationsScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
+import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import Header from '../components/Header';
@@ -33,6 +34,7 @@ const TAB_ICONS = {
   Graphs: 'chart-line',
   Accounts: 'wallet-outline',
   Categories: 'shape-outline',
+  Planned: 'calendar-clock',
 };
 
 // Memoized tab button with icon + label, pill active state
@@ -110,6 +112,7 @@ export default function SimpleTabs() {
     { key: 'Graphs', label: t('graphs') || 'Graphs' },
     { key: 'Accounts', label: t('accounts') || 'Accounts' },
     { key: 'Categories', label: t('categories') || 'Categories' },
+    { key: 'Planned', label: t('planned') || 'Planned' },
   ], [t]);
 
   // Animation shared values
@@ -233,6 +236,9 @@ export default function SimpleTabs() {
         <View style={styles.screen}>
           <CategoriesScreen />
         </View>
+        <View style={styles.screen}>
+          <PlannedOperationsScreen />
+        </View>
       </>
     );
   }, []);
@@ -335,7 +341,7 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 4,
+    width: SCREEN_WIDTH * 5,
   },
   tab: {
     flex: 1,

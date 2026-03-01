@@ -10,6 +10,7 @@ import { CategoriesProvider } from './app/contexts/CategoriesContext';
 import { OperationsDataProvider } from './app/contexts/OperationsDataContext';
 import { OperationsActionsProvider } from './app/contexts/OperationsActionsContext';
 import { BudgetsProvider } from './app/contexts/BudgetsContext';
+import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsContext';
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
@@ -67,7 +68,9 @@ export default function App() {
                           <OperationsDataProvider>
                             <OperationsActionsProvider>
                               <BudgetsProvider>
-                                <AppContent />
+                                <PlannedOperationsProvider>
+                                  <AppContent />
+                                </PlannedOperationsProvider>
                               </BudgetsProvider>
                             </OperationsActionsProvider>
                           </OperationsDataProvider>
