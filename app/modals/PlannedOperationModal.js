@@ -21,6 +21,8 @@ import { useDialog } from '../contexts/DialogContext';
 import { usePlannedOperations } from '../contexts/PlannedOperationsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
+import useOperationPicker from '../hooks/useOperationPicker';
+import PickerModal from '../components/operations/PickerModal';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../styles/designTokens';
 
 const TYPE_OPTIONS = [
@@ -51,14 +53,23 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   const [errors, setErrors] = useState({});
   const [accountPickerVisible, setAccountPickerVisible] = useState(false);
   const [toAccountPickerVisible, setToAccountPickerVisible] = useState(false);
-  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
-  // Filtered categories based on operation type
+  // Hierarchical category picker via useOperationPicker
+  const {
+    pickerState: categoryPickerState,
+    categoryNavigation,
+    openPicker: openCategoryPicker,
+    closePicker: closeCategoryPicker,
+    navigateIntoFolder,
+    navigateBack,
+  } = useOperationPicker(t);
+
+  // Filtered categories based on operation type (include folders for hierarchy)
   const filteredCategories = useMemo(() => {
     if (values.type === 'transfer') return [];
     const categoryType = values.type === 'expense' ? 'expense' : 'income';
     return (categories || []).filter(
-      c => c.categoryType === categoryType && c.type === 'entry' && !c.isShadow,
+      c => c.categoryType === categoryType && !c.isShadow,
     );
   }, [categories, values.type]);
 
@@ -311,7 +322,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
                   <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_category')}</Text>
                   <Pressable
                     style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.categoryId ? colors.error : colors.inputBorder }]}
-                    onPress={() => setCategoryPickerVisible(true)}
+                    onPress={() => openCategoryPicker('category', filteredCategories)}
                   >
                     <Text style={[styles.pickerButtonText, { color: values.categoryId ? colors.text : colors.mutedText }]}>
                       {values.categoryId ? getCategoryName(values.categoryId) : t('select_category')}
@@ -403,14 +414,20 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
         t('to_account'),
       )}
 
-      {/* Category Picker Modal */}
-      {renderPickerModal(
-        categoryPickerVisible,
-        setCategoryPickerVisible,
-        filteredCategories.map(c => ({ id: c.id, name: c.name, icon: c.icon })),
-        (id) => setValues(v => ({ ...v, categoryId: id })),
-        t('select_category'),
-      )}
+      {/* Category Picker Modal (hierarchical) */}
+      <PickerModal
+        visible={categoryPickerState.visible}
+        pickerType={categoryPickerState.type}
+        pickerData={categoryPickerState.data}
+        colors={colors}
+        t={t}
+        onClose={closeCategoryPicker}
+        categoryNavigation={categoryNavigation}
+        quickAddValues={{ ...values, amount: '' }}
+        onNavigateBack={navigateBack}
+        onNavigateIntoFolder={navigateIntoFolder}
+        onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
+      />
     </Modal>
   );
 }
