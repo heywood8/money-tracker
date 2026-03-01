@@ -5,7 +5,7 @@
  * quickly converted to real operations with one tap.
  */
 
-const sql = `CREATE TABLE \`planned_operations\` (
+const sql = `CREATE TABLE IF NOT EXISTS \`planned_operations\` (
 	\`id\` text PRIMARY KEY NOT NULL,
 	\`name\` text NOT NULL,
 	\`type\` text NOT NULL,
@@ -23,8 +23,8 @@ const sql = `CREATE TABLE \`planned_operations\` (
 	FOREIGN KEY (\`category_id\`) REFERENCES \`categories\`(\`id\`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (\`to_account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade
 );--> statement-breakpoint
-CREATE INDEX \`idx_planned_ops_account\` ON \`planned_operations\` (\`account_id\`);--> statement-breakpoint
-CREATE INDEX \`idx_planned_ops_type\` ON \`planned_operations\` (\`type\`);--> statement-breakpoint
-CREATE INDEX \`idx_planned_ops_recurring\` ON \`planned_operations\` (\`is_recurring\`)`;
+CREATE INDEX IF NOT EXISTS \`idx_planned_ops_account\` ON \`planned_operations\` (\`account_id\`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS \`idx_planned_ops_type\` ON \`planned_operations\` (\`type\`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS \`idx_planned_ops_recurring\` ON \`planned_operations\` (\`is_recurring\`)`;
 
 export default sql;
