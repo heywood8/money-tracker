@@ -216,7 +216,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
             <Text style={[styles.headerTitle, { color: colors.text }]}>
               {t('filter_operations')}
             </Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity testID="close-filter-modal" onPress={onClose}>
               <Icon name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>

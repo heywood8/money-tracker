@@ -49,6 +49,19 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 2000
 
+# Screenshot: Filter modal
+- tapOn:
+    id: "filter-fab"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/09_filter_modal_light
+
+# Close filter modal
+- tapOn:
+    id: "close-filter-modal"
+- waitForAnimationToEnd:
+    timeout: 1000
+
 # Navigate to Graphs tab
 - tapOn: "Graphs"
 - waitForAnimationToEnd:
@@ -103,6 +116,19 @@ appId: com.heywood8.monkeep
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: screenshots/01_operations_dark
+
+# Screenshot: Filter modal (dark)
+- tapOn:
+    id: "filter-fab"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: screenshots/09_filter_modal_dark
+
+# Close filter modal
+- tapOn:
+    id: "close-filter-modal"
+- waitForAnimationToEnd:
+    timeout: 1000
 
 # Screenshot 5 dark: Transfer mode of QuickAdd
 - tapOn: "Transfer"

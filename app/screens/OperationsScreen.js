@@ -669,6 +669,7 @@ const OperationsScreen = () => {
         <>
           <FAB
             icon="filter-variant"
+            testID="filter-fab"
             style={[
               styles.filterFab,
               {
