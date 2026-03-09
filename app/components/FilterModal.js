@@ -216,7 +216,7 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
             <Text style={[styles.headerTitle, { color: colors.text }]}>
               {t('filter_operations')}
             </Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity testID="close-filter-modal" onPress={onClose}>
               <Icon name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -661,8 +661,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
     gap: 8,
-    padding: HORIZONTAL_PADDING,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
