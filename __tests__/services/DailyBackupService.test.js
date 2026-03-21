@@ -76,6 +76,8 @@ const mockPrefs = ({ daily = null, weekly = null } = {}) => {
 
 describe('DailyBackupService', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(`${TODAY}T10:00:00.000Z`));
     jest.clearAllMocks();
 
     mockFileSystem.getInfoAsync.mockResolvedValue({ exists: true });
@@ -88,6 +90,10 @@ describe('DailyBackupService', () => {
 
     // Default: no prior backups
     mockPrefs();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   // ── getTodayDateString ─────────────────────────────────────────────────────
