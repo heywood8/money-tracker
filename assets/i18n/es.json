@@ -340,5 +340,13 @@
   "already_executed": "Ya agregada este mes",
   "add_to_operations": "Agregar a Operaciones",
   "added_to_operations": "Agregada a operaciones",
-  "planned_operation_name_hint": "ej. Alquiler, Netflix, Compras"
+  "planned_operation_name_hint": "ej. Alquiler, Netflix, Compras",
+  "check_updates": "Check for updates",
+  "update_check_failed": "Could not check updates right now. Please try again later.",
+  "up_to_date": "You already have the latest version installed.",
+  "update_available_title": "Update available",
+  "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
+  "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",
+  "update_now": "Update now",
+  "later": "Later"
 }

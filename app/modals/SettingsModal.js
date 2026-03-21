@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList, Linking } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,8 @@ import { exportBackup, importBackup } from '../services/BackupRestore';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { checkForAppUpdate } from '../services/AppUpdateService';
+import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -241,6 +243,57 @@ export default function SettingsModal({ visible, onClose }) {
     clearLogs();
   }, [clearLogs]);
 
+  const handleCheckForUpdates = useCallback(async () => {
+    try {
+      const result = await checkForAppUpdate();
+      await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
+
+      if (!result.success) {
+        showDialog(
+          t('check_updates') || 'Check for updates',
+          t('update_check_failed') || 'Could not check updates right now. Please try again later.',
+          [{ text: t('ok') || 'OK' }],
+        );
+        return;
+      }
+
+      if (!result.isUpdateAvailable) {
+        showDialog(
+          t('check_updates') || 'Check for updates',
+          t('up_to_date') || 'You already have the latest version installed.',
+          [{ text: t('ok') || 'OK' }],
+        );
+        return;
+      }
+
+      showDialog(
+        t('update_available_title') || 'Update available',
+        `${(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
+          .replace('{latestVersion}', result.latestVersion)}\n\n${
+          t('update_install_hint')
+          || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'
+        }`,
+        [
+          { text: t('later') || 'Later' },
+          {
+            text: t('update_now') || 'Update now',
+            onPress: async () => {
+              await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
+              await Linking.openURL(result.downloadUrl);
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      console.error('Manual update check failed:', error);
+      showDialog(
+        t('check_updates') || 'Check for updates',
+        t('update_check_failed') || 'Could not check updates right now. Please try again later.',
+        [{ text: t('ok') || 'OK' }],
+      );
+    }
+  }, [showDialog, t]);
+
   useEffect(() => {
     if (visible) {
       setLanguageModalVisible(false);
@@ -385,6 +438,18 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="terminal-outline" size={22} color={colors.text} />
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="download-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                  {t('check_updates') || 'Check for updates'}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
