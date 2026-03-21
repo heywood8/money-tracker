@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.51.0](https://github.com/heywood8/money-tracker/compare/penny-v0.50.4...penny-v0.51.0) (2026-03-21)
+
+
+### Features
+
+* add GitHub release APK update checks ([#341](https://github.com/heywood8/money-tracker/issues/341)) ([28d0442](https://github.com/heywood8/money-tracker/commit/28d0442bcc1636613856ab85643ae105c310d986))
+
 ## [0.50.4](https://github.com/heywood8/money-tracker/compare/penny-v0.50.3...penny-v0.50.4) (2026-03-21)
 
 
