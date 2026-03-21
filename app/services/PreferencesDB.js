@@ -6,6 +6,9 @@ export const PREF_KEYS = {
   LANGUAGE: 'app_language',
   LAST_ACCOUNT: 'last_accessed_account_id',
   OPERATIONS_FILTERS: 'operations_active_filters',
+  UPDATE_LAST_CHECK_AT: 'update_last_check_at',
+  UPDATE_LAST_PROMPTED_VERSION: 'update_last_prompted_version',
+  UPDATE_SKIP_UNTIL: 'update_skip_until',
 };
 
 /**
