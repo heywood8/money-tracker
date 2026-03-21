@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.50.1](https://github.com/heywood8/money-tracker/compare/penny-v0.50.0...penny-v0.50.1) (2026-03-09)
+
+
+### Bug Fixes
+
+* add flexDirection row to search input in FilterModal ([#333](https://github.com/heywood8/money-tracker/issues/333)) ([d87564c](https://github.com/heywood8/money-tracker/commit/d87564cecb29788444f6e87f50d10f1a1da57519))
+
+## [0.50.0](https://github.com/heywood8/money-tracker/compare/penny-v0.49.3...penny-v0.50.0) (2026-03-01)
+
+
+### Features
+
+* use hierarchical category picker in planned operations modal ([4eff456](https://github.com/heywood8/money-tracker/commit/4eff45659738dae152de5a27d45e6a1dca9304cc))
+
 ## [0.49.3](https://github.com/heywood8/money-tracker/compare/penny-v0.49.2...penny-v0.49.3) (2026-03-01)
 
 

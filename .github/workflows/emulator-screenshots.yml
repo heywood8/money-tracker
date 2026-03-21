@@ -180,6 +180,7 @@ jobs:
             // Screens with light/dark variants
             const themedScreens = [
               { file: '01_operations', desc: 'Operations' },
+              { file: '09_filter_modal', desc: 'Filter Modal' },
               { file: '05_transfer', desc: 'Multi-Currency Transfer' },
               { file: '02_graphs', desc: 'Graphs' },
               { file: '03_accounts', desc: 'Accounts' },
@@ -242,7 +243,7 @@ jobs:
 
             core.setOutput('message', lines.join('\n'));
 
-      - uses: marocchino/sticky-pull-request-comment@v2.9.4
+      - uses: marocchino/sticky-pull-request-comment@v3.0.2
         if: github.event_name == 'pull_request' && always()
         with:
           header: "App Screenshots"
