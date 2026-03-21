@@ -102,7 +102,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     }
     async function loadTopTransferTargets() {
       try {
-        const targets = await OperationsDB.getTopTransferTargetAccounts(3);
+        const targets = await OperationsDB.getTopTransferTargetAccounts(5);
         setTopTransferTargets(targets);
       } catch (error) {
         console.error('Failed to load top transfer targets:', error);
