@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.4](https://github.com/heywood8/money-tracker/compare/penny-v0.50.3...penny-v0.50.4) (2026-03-21)
+
+
+### Bug Fixes
+
+* stabilize DailyBackupService week-sensitive tests ([#339](https://github.com/heywood8/money-tracker/issues/339)) ([e6d17ec](https://github.com/heywood8/money-tracker/commit/e6d17ec3e529113746a15b6c0973587b0a6b69a2))
+
 ## [0.50.3](https://github.com/heywood8/money-tracker/compare/penny-v0.50.2...penny-v0.50.3) (2026-03-21)
 
 
