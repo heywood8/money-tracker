@@ -9,6 +9,29 @@ import { render, waitFor } from '@testing-library/react-native';
 import AppInitializer from '../../app/screens/AppInitializer';
 import { LocalizationProvider, useLocalization } from '../../app/contexts/LocalizationContext';
 
+jest.mock('../../app/contexts/DialogContext', () => ({
+  useDialog: jest.fn(() => ({
+    showDialog: jest.fn(),
+  })),
+}));
+
+jest.mock('../../app/services/AppUpdateService', () => ({
+  checkForAppUpdate: jest.fn(async () => ({
+    success: true,
+    isUpdateAvailable: false,
+  })),
+}));
+
+jest.mock('../../app/services/PreferencesDB', () => ({
+  PREF_KEYS: {
+    UPDATE_LAST_CHECK_AT: 'update_last_check_at',
+    UPDATE_LAST_PROMPTED_VERSION: 'update_last_prompted_version',
+    UPDATE_SKIP_UNTIL: 'update_skip_until',
+  },
+  getPreference: jest.fn(async () => null),
+  setPreference: jest.fn(async () => undefined),
+}));
+
 // Mock the navigation components
 jest.mock('../../app/screens/LanguageSelectionScreen', () => {
   const React = require('react');

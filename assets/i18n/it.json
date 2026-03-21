@@ -99,5 +99,13 @@
   "already_executed": "Già aggiunta questo mese",
   "add_to_operations": "Aggiungi alle Operazioni",
   "added_to_operations": "Aggiunta alle operazioni",
-  "planned_operation_name_hint": "es. Affitto, Netflix, Spesa"
+  "planned_operation_name_hint": "es. Affitto, Netflix, Spesa",
+  "check_updates": "Check for updates",
+  "update_check_failed": "Could not check updates right now. Please try again later.",
+  "up_to_date": "You already have the latest version installed.",
+  "update_available_title": "Update available",
+  "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
+  "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",
+  "update_now": "Update now",
+  "later": "Later"
 }

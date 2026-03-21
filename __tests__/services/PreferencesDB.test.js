@@ -61,6 +61,9 @@ describe('PreferencesDB', () => {
         'LANGUAGE',
         'LAST_ACCOUNT',
         'OPERATIONS_FILTERS',
+        'UPDATE_LAST_CHECK_AT',
+        'UPDATE_LAST_PROMPTED_VERSION',
+        'UPDATE_SKIP_UNTIL',
       ]);
     });
   });
