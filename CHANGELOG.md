@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.2](https://github.com/heywood8/money-tracker/compare/penny-v0.50.1...penny-v0.50.2) (2026-03-21)
+
+
+### Build System
+
+* **deps:** bump marocchino/sticky-pull-request-comment from 2.9.4 to 3.0.2 ([#335](https://github.com/heywood8/money-tracker/issues/335)) ([77a85d1](https://github.com/heywood8/money-tracker/commit/77a85d1a4a26e36ee0e3d62715381dcb8fd9d229))
+
 ## [0.50.1](https://github.com/heywood8/money-tracker/compare/penny-v0.50.0...penny-v0.50.1) (2026-03-09)
 
 
