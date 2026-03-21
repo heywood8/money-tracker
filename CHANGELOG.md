@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.3](https://github.com/heywood8/money-tracker/compare/penny-v0.50.2...penny-v0.50.3) (2026-03-21)
+
+
+### Bug Fixes
+
+* increase transfer quick-target fetch buffer ([#337](https://github.com/heywood8/money-tracker/issues/337)) ([d0ab249](https://github.com/heywood8/money-tracker/commit/d0ab249d748e1da1b965b0fc23ed5a762ef99cb5))
+
 ## [0.50.2](https://github.com/heywood8/money-tracker/compare/penny-v0.50.1...penny-v0.50.2) (2026-03-21)
 
 
