@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   screenshots:
+    if: "!startsWith(github.head_ref, 'release')"
     name: Capture App Screenshots
     runs-on: ubuntu-latest
     timeout-minutes: 45
