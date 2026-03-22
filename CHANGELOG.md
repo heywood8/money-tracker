@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.2](https://github.com/heywood8/money-tracker/compare/penny-v0.54.1...penny-v0.54.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* replace sharing with intenrLauncher for APK installation ([2ce3b5d](https://github.com/heywood8/money-tracker/commit/2ce3b5de4b3b6a26957b9feb1636796f66627839))
+
 ## [0.54.1](https://github.com/heywood8/money-tracker/compare/penny-v0.54.0...penny-v0.54.1) (2026-03-22)
 
 
