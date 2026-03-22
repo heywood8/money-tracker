@@ -371,6 +371,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     showTypeSelector={true}
                     showAccountBalance={true}
                     showFieldIcons={true}
+                    hideCategoryPicker={!isNew}
                     transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
@@ -379,26 +380,67 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     rateSource={rateSource}
                   />
 
-                  {/* Date Picker Button */}
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                      isShadowOperation && styles.disabledInput,
-                    ]}
-                    onPress={handleOpenDatePicker}
-                    disabled={isShadowOperation}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('select_date')}
-                    testID="date-input" // Added testID for date input
-                  >
-                    <View style={styles.pickerButtonContent}>
-                      <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                        {formatDateForDisplay(values.date)}
-                      </Text>
+                  {/* Date (and Category when editing) Picker */}
+                  {!isNew && values.type !== 'transfer' ? (
+                    <View style={styles.categoryDateRow}>
+                      <Pressable
+                        style={[
+                          styles.pickerButtonHalf,
+                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                          isShadowOperation && styles.disabledInput,
+                        ]}
+                        onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
+                        disabled={isShadowOperation}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('select_category')}
+                      >
+                        <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                        <Text
+                          style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {getCategoryName(values.categoryId)}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.pickerButtonHalf,
+                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                          isShadowOperation && styles.disabledInput,
+                        ]}
+                        onPress={handleOpenDatePicker}
+                        disabled={isShadowOperation}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('select_date')}
+                        testID="date-input"
+                      >
+                        <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                        <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
+                          {formatDateForDisplay(values.date)}
+                        </Text>
+                      </Pressable>
                     </View>
-                  </Pressable>
+                  ) : (
+                    <Pressable
+                      style={[
+                        styles.pickerButton,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                        isShadowOperation && styles.disabledInput,
+                      ]}
+                      onPress={handleOpenDatePicker}
+                      disabled={isShadowOperation}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('select_date')}
+                      testID="date-input"
+                    >
+                      <View style={styles.pickerButtonContent}>
+                        <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                        <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
+                          {formatDateForDisplay(values.date)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )}
 
                   {/* Description Input with autocomplete suggestions */}
                   <DescriptionAutocomplete
@@ -681,6 +723,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  categoryDateRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
   pickerButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -689,6 +736,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.md,
     minHeight: 48,
+    padding: SPACING.md,
+  },
+  pickerButtonHalf: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    minHeight: 48,
+    overflow: 'hidden',
     padding: SPACING.md,
   },
   pickerButtonContent: {

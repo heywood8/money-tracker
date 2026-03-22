@@ -66,6 +66,7 @@ const OperationFormFields = memo(({
   showTypeSelector = true,
   showAccountBalance = false,
   showFieldIcons = true,
+  hideCategoryPicker = false,
   transferLayout = 'stacked',
   disabled = false,
   containerBackground,
@@ -223,6 +224,7 @@ const OperationFormFields = memo(({
 
   // Render category picker with shortcuts
   const renderCategoryPicker = () => {
+    if (hideCategoryPicker) return null;
     if (values.type === 'transfer') return null;
 
     // If showing shortcuts (topCategoriesForType is available), render button layout
@@ -473,6 +475,7 @@ OperationFormFields.propTypes = {
   showTypeSelector: PropTypes.bool,
   showAccountBalance: PropTypes.bool,
   showFieldIcons: PropTypes.bool,
+  hideCategoryPicker: PropTypes.bool,
   transferLayout: PropTypes.oneOf(['sideBySide', 'stacked']),
   disabled: PropTypes.bool,
   containerBackground: PropTypes.string,
