@@ -1,3 +1,6 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
 const APP_VERSION = require('../../package.json').version;
 
 const DEFAULT_GITHUB_OWNER = 'heywood8';
@@ -155,3 +158,28 @@ export const checkForAppUpdate = async ({
   }
 };
 
+export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
+  const filename = (downloadUrl.split('/').pop().split('?')[0]) || 'penny-update.apk';
+  const localUri = `${FileSystem.cacheDirectory}${filename}`;
+
+  const downloadResumable = FileSystem.createDownloadResumable(
+    downloadUrl,
+    localUri,
+    {},
+    ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+      if (onProgress && totalBytesExpectedToWrite > 0) {
+        onProgress(totalBytesWritten / totalBytesExpectedToWrite);
+      }
+    },
+  );
+
+  const result = await downloadResumable.downloadAsync();
+  if (!result?.uri) {
+    throw new Error('Download failed');
+  }
+
+  await Sharing.shareAsync(result.uri, {
+    mimeType: 'application/vnd.android.package-archive',
+    dialogTitle: 'Install Update',
+  });
+};
