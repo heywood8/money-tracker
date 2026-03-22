@@ -337,7 +337,7 @@ const BalanceHistoryCard = ({
             let actualDailyAvg = null;
             if (spendingPrediction && isCurrentMonth) {
               actualDailyAvg = -spendingPrediction.dailyAverage;
-            } else if (actualValues.length > 1) {
+            } else if (actualValues.length >= 1) {
               // For past months, calculate from first to last actual recorded data point.
               // Use balanceHistoryData.actual (which carries day numbers) so the span
               // matches the real days between observations, not the full month length.
@@ -373,15 +373,41 @@ const BalanceHistoryCard = ({
             let prevMonthMax = null;
             let prevMonthCurrent = null;
             let prevMonthEnd = null;
+            let prevMonthDailyAvg = null;
             if (hasPrevMonthData) {
-              const prevMonthActualValues = balanceHistoryData.prevMonth.filter(v => v !== undefined);
+              const prevMonthAllValues = balanceHistoryData.prevMonth || [];
+              const prevMonthActualValues = prevMonthAllValues.filter(v => v !== undefined);
               prevMonthMax = prevMonthActualValues.length > 0 ? Math.max(...prevMonthActualValues) : null;
-              prevMonthCurrent = displayDay && balanceHistoryData.prevMonth[displayDay - 1] !== undefined
-                ? balanceHistoryData.prevMonth[displayDay - 1]
-                : null;
-              prevMonthEnd = balanceHistoryData.prevMonth[daysInMonth - 1] !== undefined
-                ? balanceHistoryData.prevMonth[daysInMonth - 1]
-                : null;
+
+              // Helper: find prev month value at or before a given 1-based day
+              // Falls back to last available value when day exceeds prev month's length
+              const prevMonthAtDay = (day) => {
+                if (!day) return null;
+                const idx = Math.min(day - 1, prevMonthAllValues.length - 1);
+                for (let i = idx; i >= 0; i--) {
+                  if (prevMonthAllValues[i] !== undefined) return prevMonthAllValues[i];
+                }
+                return null;
+              };
+
+              prevMonthCurrent = prevMonthAtDay(displayDay);
+              // End = last defined value in prev month (handles months shorter than current)
+              prevMonthEnd = prevMonthAtDay(prevMonthAllValues.length);
+
+              // Calculate daily avg from first to last defined index
+              let firstIdx = -1;
+              let lastIdx = -1;
+              prevMonthAllValues.forEach((v, i) => {
+                if (v !== undefined) {
+                  if (firstIdx === -1) firstIdx = i;
+                  lastIdx = i;
+                }
+              });
+              if (firstIdx !== -1 && lastIdx > firstIdx) {
+                prevMonthDailyAvg = (prevMonthAllValues[lastIdx] - prevMonthAllValues[firstIdx]) / (lastIdx - firstIdx);
+              } else if (firstIdx !== -1) {
+                prevMonthDailyAvg = 0;
+              }
             }
 
             return (
@@ -416,7 +442,7 @@ const BalanceHistoryCard = ({
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(maxBalance, currency)}</Text>
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(plainAvgCurrent, currency)}</Text>
                   <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(plainAvgDaily, currency)}</Text>
-                  <Text style={[styles.legendTableValue, { color: colors.text }]}>0</Text>
+                  <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(0, currency)}</Text>
                 </View>
 
                 {/* Prev month row */}
@@ -428,7 +454,7 @@ const BalanceHistoryCard = ({
                     </View>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthMax, currency)}</Text>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthCurrent, currency)}</Text>
-                    <Text style={[styles.legendTableValue, { color: colors.text }]}>-</Text>
+                    <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthDailyAvg, currency)}</Text>
                     <Text style={[styles.legendTableValue, { color: colors.text }]}>{formatCompact(prevMonthEnd, currency)}</Text>
                   </View>
                 )}

@@ -1090,6 +1090,142 @@ describe('BalanceHistoryCard', () => {
     });
   });
 
+  describe('Prev Month Legend Calculations', () => {
+    afterEach(() => {
+      if (global.Date.mockRestore) {
+        global.Date.mockRestore();
+      }
+    });
+
+    it('shows prev month end value when prev month is shorter than current month (regression)', () => {
+      // Bug: prevMonth[daysInMonth - 1] used current month's last label as an array index.
+      // When current month has 31 days but prev month has 28, index 30 is out of bounds → null → '-'.
+      // Fix: find the last non-undefined entry in the prevMonth array.
+
+      const mockDate = new Date(2026, 2, 15); // March 15, 2026
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      // Simulate March (31 days) with prevMonth = February data (28 days).
+      // prevMonth array has 31 elements; indices 28-30 are undefined (Feb has no days 29-31).
+      const prevMonthData = new Array(31).fill(undefined);
+      prevMonthData[0] = 5000; // Feb 1
+      for (let i = 1; i < 28; i++) prevMonthData[i] = 5000 - i * 50; // forward-filled-ish
+      // indices 28-30 remain undefined (Feb 29-31 don't exist)
+
+      const { getByText, queryByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={{
+            labels: [1, 10, 20, 31],
+            actual: [{ x: 1, y: 6000 }, { x: 15, y: 5500 }],
+            actualForChart: [6000, 5500, 5500, 5500],
+            burndown: [],
+            prevMonth: prevMonthData,
+          }}
+          onChartPress={jest.fn()}
+          selectedYear={2026}
+          selectedMonth={2} // March
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={null}
+        />,
+      );
+
+      // Prev Month row should be shown
+      expect(getByText('Prev Month')).toBeTruthy();
+      // End should NOT be '-' (the bug showed '-' because Feb has no day 31)
+      // The last valid Feb value is at index 27 (Feb 28)
+      const feb28Value = prevMonthData[27];
+      expect(feb28Value).toBeDefined();
+      // The formatted value should appear somewhere in the table
+      expect(queryByText('-')).toBeNull(); // no '-' in end column due to the fix
+
+      global.Date.mockRestore();
+    });
+
+    it('calculates prev month daily avg instead of showing hardcoded dash', () => {
+      const mockDate = new Date(2026, 2, 15); // March 15, 2026
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      // Simple prev month: day 1 = 1000, day 6 = 750 (5 index steps → avg = -50/step)
+      const prevMonthData = [1000, undefined, undefined, undefined, undefined, 750, undefined];
+
+      const { queryAllByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={{
+            labels: [1, 5, 7],
+            actual: [{ x: 1, y: 2000 }, { x: 7, y: 1800 }],
+            actualForChart: [2000, 1800, 1800],
+            burndown: [],
+            prevMonth: prevMonthData,
+          }}
+          onChartPress={jest.fn()}
+          selectedYear={2026}
+          selectedMonth={2}
+          accounts={mockAccounts}
+          isCurrentMonth={true}
+          spendingPrediction={null}
+        />,
+      );
+
+      // prevMonthDailyAvg = (750 - 1000) / (5 - 0) = -50 → shows '-50.00'
+      const dashValues = queryAllByText('-');
+      // No cell should show a plain '-' since avg is now calculated
+      expect(dashValues.length).toBe(0);
+
+      global.Date.mockRestore();
+    });
+
+    it('shows 0 for actual daily avg when only one value in actualForChart (single-entry month)', () => {
+      // Bug: actualValues.length <= 1 kept actualDailyAvg as null (showed '-').
+      // Fix: change > 1 to >= 1 so the else branch sets it to 0.
+
+      const mockDate = new Date(2026, 2, 5); // March 5, 2026
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { getAllByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={{
+            labels: [5, 31],
+            actual: [{ x: 5, y: 3000 }],
+            actualForChart: [3000], // single value → length 1
+            burndown: [],
+            prevMonth: [],
+          }}
+          onChartPress={jest.fn()}
+          selectedYear={2026}
+          selectedMonth={2}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      // Daily avg should show 0.00, not '-'
+      const zeroValues = getAllByText('0.00');
+      expect(zeroValues.length).toBeGreaterThanOrEqual(1);
+
+      global.Date.mockRestore();
+    });
+  });
+
   describe('Date-sensitive actual data rendering', () => {
     const fullMonthData = {
       labels: [1, 5, 10, 15, 20, 25, 31],
