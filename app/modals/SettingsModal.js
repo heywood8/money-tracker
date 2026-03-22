@@ -17,7 +17,6 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
-import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -537,389 +536,386 @@ export default function SettingsModal({ visible, onClose }) {
   const logKeyExtractor = useCallback((item) => String(item.id), []);
 
   return (
-    <>
-      {visible && <ModalBlurOverlay />}
-      <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={backupsModalVisible ? closeBackupsModal : (logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)))}
-        dismissable={true}
-      >
-        <Animated.View style={[
-          styles.content,
-          { backgroundColor: colors.card },
-          {
-            transform: [{ translateX: settingsTranslateX }],
-            opacity: settingsOpacity,
-          },
-          anySubModalOpen && styles.hidden,
-        ]}>
-          <View style={styles.header}>
-            <View style={styles.closeButton} />
-            <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton} testID="settings-close-button">
-              <Ionicons name="close" size={24} color={colors.mutedText} />
-            </TouchableOpacity>
-          </View>
+    <Portal>
+        <Modal
+          visible={visible}
+          onDismiss={backupsModalVisible ? closeBackupsModal : (logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)))}
+          dismissable={true}
+        >
+          <Animated.View style={[
+            styles.content,
+            { backgroundColor: colors.card },
+            {
+              transform: [{ translateX: settingsTranslateX }],
+              opacity: settingsOpacity,
+            },
+            anySubModalOpen && styles.hidden,
+          ]}>
+            <View style={styles.header}>
+              <View style={styles.closeButton} />
+              <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton} testID="settings-close-button">
+                <Ionicons name="close" size={24} color={colors.mutedText} />
+              </TouchableOpacity>
+            </View>
 
-          <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow}>
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="language-outline" size={22} color={colors.text} />
-                <View style={styles.settingsRowText}>
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
-                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                    {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
+            <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow}>
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="language-outline" size={22} color={colors.text} />
+                  <View style={styles.settingsRowText}>
+                    <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
+                    <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                      {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <Divider style={styles.divider} />
+
+            <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
+
+            <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow}>
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple onPress={handleImportBackup} style={styles.settingsRow}>
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow}>
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="archive-outline" size={22} color={colors.text} />
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('local_backups') || 'Local Backups'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <Divider style={styles.divider} />
+
+            <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
+
+            <TouchableRipple onPress={openLogsModal} style={styles.settingsRow} testID="logs-row">
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="terminal-outline" size={22} color={colors.text} />
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="download-outline" size={22} color={colors.text} />
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                    {t('check_updates') || 'Check for updates'}
                   </Text>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-            </View>
-          </TouchableRipple>
+            </TouchableRipple>
 
-          <Divider style={styles.divider} />
+            <View style={styles.resetSpacer} />
 
-          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
-
-          <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow}>
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
+            <TouchableRipple onPress={handleResetDatabase} style={styles.settingsRow}>
+              <View style={styles.settingsRowContent}>
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="trash-outline" size={22} color="#c44" />
+                  <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </TouchableRipple>
+          </Animated.View>
+
+          <Animated.View style={[
+            styles.languageModalContent,
+            { backgroundColor: colors.card },
+            {
+              transform: [{ translateX: languageTranslateX }],
+              opacity: languageOpacity,
+            },
+            !languageModalVisible && styles.hidden,
+          ]}>
+            <View style={styles.languageModalHeader}>
+              <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {t('language')}
+              </Text>
+              <View style={styles.backButton} />
             </View>
-          </TouchableRipple>
 
-          <TouchableRipple onPress={handleImportBackup} style={styles.settingsRow}>
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            <Divider />
+
+            <ScrollView style={styles.languageList}>
+              {availableLanguages.map(lng => {
+                return (
+                  <TouchableRipple
+                    key={lng}
+                    onPress={() => handleLanguageSelect(lng)}
+                    style={styles.languageItem}
+                  >
+                    <View style={styles.languageItemContent}>
+                      <Text style={[styles.languageItemText, { color: colors.text }]}>
+                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
+                      </Text>
+                      {language === lng && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      )}
+                    </View>
+                  </TouchableRipple>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+
+          <Animated.View style={[
+            styles.languageModalContent,
+            { backgroundColor: colors.card },
+            {
+              transform: [{ translateX: exportFormatTranslateX }],
+              opacity: exportFormatOpacity,
+            },
+            !exportFormatModalVisible && styles.hidden,
+          ]}>
+            <View style={styles.languageModalHeader}>
+              <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {t('export_format') || 'Export Format'}
+              </Text>
+              <View style={styles.backButton} />
             </View>
-          </TouchableRipple>
 
-          <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow}>
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="archive-outline" size={22} color={colors.text} />
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('local_backups') || 'Local Backups'}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-            </View>
-          </TouchableRipple>
+            <Divider />
 
-          <Divider style={styles.divider} />
-
-          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
-
-          <TouchableRipple onPress={openLogsModal} style={styles.settingsRow} testID="logs-row">
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="terminal-outline" size={22} color={colors.text} />
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-            </View>
-          </TouchableRipple>
-
-          <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="download-outline" size={22} color={colors.text} />
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                  {t('check_updates') || 'Check for updates'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-            </View>
-          </TouchableRipple>
-
-          <View style={styles.resetSpacer} />
-
-          <TouchableRipple onPress={handleResetDatabase} style={styles.settingsRow}>
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="trash-outline" size={22} color="#c44" />
-                <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
-              </View>
-            </View>
-          </TouchableRipple>
-        </Animated.View>
-
-        <Animated.View style={[
-          styles.languageModalContent,
-          { backgroundColor: colors.card },
-          {
-            transform: [{ translateX: languageTranslateX }],
-            opacity: languageOpacity,
-          },
-          !languageModalVisible && styles.hidden,
-        ]}>
-          <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-              {t('language')}
-            </Text>
-            <View style={styles.backButton} />
-          </View>
-
-          <Divider />
-
-          <ScrollView style={styles.languageList}>
-            {availableLanguages.map(lng => {
-              return (
-                <TouchableRipple
-                  key={lng}
-                  onPress={() => handleLanguageSelect(lng)}
-                  style={styles.languageItem}
-                >
-                  <View style={styles.languageItemContent}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
-                    </Text>
-                    {language === lng && (
-                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                    )}
-                  </View>
-                </TouchableRipple>
-              );
-            })}
-          </ScrollView>
-        </Animated.View>
-
-        <Animated.View style={[
-          styles.languageModalContent,
-          { backgroundColor: colors.card },
-          {
-            transform: [{ translateX: exportFormatTranslateX }],
-            opacity: exportFormatOpacity,
-          },
-          !exportFormatModalVisible && styles.hidden,
-        ]}>
-          <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-              {t('export_format') || 'Export Format'}
-            </Text>
-            <View style={styles.backButton} />
-          </View>
-
-          <Divider />
-
-          <ScrollView style={styles.languageList}>
-            <TouchableRipple
-              onPress={() => handleExportFormatSelect('json')}
-              style={styles.languageItem}
-            >
-              <View style={styles.languageItemContent}>
-                <View style={styles.formatItemRow}>
-                  <Ionicons name="code-outline" size={24} color={colors.text} />
-                  <View style={styles.formatTextContainer}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+            <ScrollView style={styles.languageList}>
+              <TouchableRipple
+                onPress={() => handleExportFormatSelect('json')}
+                style={styles.languageItem}
+              >
+                <View style={styles.languageItemContent}>
+                  <View style={styles.formatItemRow}>
+                    <Ionicons name="code-outline" size={24} color={colors.text} />
+                    <View style={styles.formatTextContainer}>
+                      <Text style={[styles.languageItemText, { color: colors.text }]}>
                       JSON
-                    </Text>
-                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                      {t('json_description') || 'Standard format, compatible with all versions'}
-                    </Text>
+                      </Text>
+                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                        {t('json_description') || 'Standard format, compatible with all versions'}
+                      </Text>
+                    </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
+              </TouchableRipple>
 
-            <TouchableRipple
-              onPress={() => handleExportFormatSelect('csv')}
-              style={styles.languageItem}
-            >
-              <View style={styles.languageItemContent}>
-                <View style={styles.formatItemRow}>
-                  <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                  <View style={styles.formatTextContainer}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+              <TouchableRipple
+                onPress={() => handleExportFormatSelect('csv')}
+                style={styles.languageItem}
+              >
+                <View style={styles.languageItemContent}>
+                  <View style={styles.formatItemRow}>
+                    <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                    <View style={styles.formatTextContainer}>
+                      <Text style={[styles.languageItemText, { color: colors.text }]}>
                       CSV
-                    </Text>
-                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                      {t('csv_description') || 'Plain text format, easy to edit'}
-                    </Text>
+                      </Text>
+                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                        {t('csv_description') || 'Plain text format, easy to edit'}
+                      </Text>
+                    </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
+              </TouchableRipple>
 
-            <TouchableRipple
-              onPress={() => handleExportFormatSelect('sqlite')}
-              style={styles.languageItem}
-            >
-              <View style={styles.languageItemContent}>
-                <View style={styles.formatItemRow}>
-                  <Ionicons name="server-outline" size={24} color={colors.text} />
-                  <View style={styles.formatTextContainer}>
-                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+              <TouchableRipple
+                onPress={() => handleExportFormatSelect('sqlite')}
+                style={styles.languageItem}
+              >
+                <View style={styles.languageItemContent}>
+                  <View style={styles.formatItemRow}>
+                    <Ionicons name="server-outline" size={24} color={colors.text} />
+                    <View style={styles.formatTextContainer}>
+                      <Text style={[styles.languageItemText, { color: colors.text }]}>
                       SQLite Database
-                    </Text>
-                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                      {t('sqlite_description') || 'Raw database file, complete backup'}
-                    </Text>
+                      </Text>
+                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                        {t('sqlite_description') || 'Raw database file, complete backup'}
+                      </Text>
+                    </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-          </ScrollView>
-        </Animated.View>
+              </TouchableRipple>
+            </ScrollView>
+          </Animated.View>
 
-        <Animated.View style={[
-          styles.logsModalContent,
-          { backgroundColor: colors.card },
-          {
-            transform: [{ translateX: logsTranslateX }],
-            opacity: logsOpacity,
-          },
-          !logsModalVisible && styles.hidden,
-        ]}>
-          <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeLogsModal} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-              {t('logs') || 'Logs'}
-            </Text>
-            <View style={styles.backButton} />
-          </View>
-
-          <Divider />
-
-          <View style={styles.filterRow}>
-            {LOG_FILTERS.map(f => {
-              const isSelected = f === logFilter;
-              const filterLabelKey = `log_level_${f}`;
-              return (
-                <TouchableOpacity
-                  key={f}
-                  onPress={() => setLogFilter(f)}
-                  style={[
-                    styles.filterChip,
-                    { borderColor: colors.border },
-                    isSelected && { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                  ]}>
-                    {t(filterLabelKey) || f}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <FlatList
-            ref={logsFlatListRef}
-            data={entries}
-            keyExtractor={logKeyExtractor}
-            renderItem={renderLogEntry}
-            style={styles.logsList}
-            contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
-            ListEmptyComponent={
-              <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                {t('no_logs') || 'No logs yet'}
+          <Animated.View style={[
+            styles.logsModalContent,
+            { backgroundColor: colors.card },
+            {
+              transform: [{ translateX: logsTranslateX }],
+              opacity: logsOpacity,
+            },
+            !logsModalVisible && styles.hidden,
+          ]}>
+            <View style={styles.languageModalHeader}>
+              <TouchableOpacity onPress={closeLogsModal} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {t('logs') || 'Logs'}
               </Text>
-            }
-          />
-
-          <Divider />
-
-          <View style={styles.logsActionBar}>
-            <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-              <Ionicons name="share-outline" size={20} color={colors.primary} />
-              <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                {t('share_logs') || 'Share Logs'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-              <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-              <Text style={[styles.logsActionText, styles.clearLogsText]}>
-                {t('clear_logs') || 'Clear Logs'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[
-          styles.logsModalContent,
-          { backgroundColor: colors.card },
-          {
-            transform: [{ translateX: backupsTranslateX }],
-            opacity: backupsOpacity,
-          },
-          !backupsModalVisible && styles.hidden,
-        ]}>
-          <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-              {t('local_backups') || 'Local Backups'}
-            </Text>
-            <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
-              <Ionicons name="refresh-outline" size={22} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <Divider />
-
-          {backupsLoading ? (
-            <View style={styles.logsEmptyContainer}>
-              <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                {'Loading...'}
-              </Text>
+              <View style={styles.backButton} />
             </View>
-          ) : (
+
+            <Divider />
+
+            <View style={styles.filterRow}>
+              {LOG_FILTERS.map(f => {
+                const isSelected = f === logFilter;
+                const filterLabelKey = `log_level_${f}`;
+                return (
+                  <TouchableOpacity
+                    key={f}
+                    onPress={() => setLogFilter(f)}
+                    style={[
+                      styles.filterChip,
+                      { borderColor: colors.border },
+                      isSelected && { backgroundColor: colors.primary },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      isSelected ? styles.filterChipTextSelected : { color: colors.text },
+                    ]}>
+                      {t(filterLabelKey) || f}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <FlatList
-              data={storedBackups}
-              keyExtractor={(item) => item.uri}
-              renderItem={renderBackupItem}
+              ref={logsFlatListRef}
+              data={entries}
+              keyExtractor={logKeyExtractor}
+              renderItem={renderLogEntry}
               style={styles.logsList}
-              contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+              contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
               ListEmptyComponent={
                 <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                  {t('local_backups_empty') || 'No local backups yet'}
+                  {t('no_logs') || 'No logs yet'}
                 </Text>
               }
             />
-          )}
-        </Animated.View>
-      </Modal>
-      {apkDownloadProgress !== null && (
-        <Modal
-          visible
-          dismissable={false}
-          contentContainerStyle={[styles.downloadModal, { backgroundColor: colors.card }]}
-        >
-          <Text variant="bodyLarge" style={[styles.downloadTitle, { color: colors.text }]}>
-            {t('downloading_update') || 'Downloading update...'}
-          </Text>
-          <ProgressBar
-            progress={apkDownloadProgress}
-            color={colors.primary}
-            style={styles.downloadProgressBar}
-          />
-          <Text variant="bodySmall" style={[styles.downloadPercent, { color: colors.mutedText }]}>
-            {`${Math.round(apkDownloadProgress * 100)}%`}
-          </Text>
+
+            <Divider />
+
+            <View style={styles.logsActionBar}>
+              <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
+                <Ionicons name="share-outline" size={20} color={colors.primary} />
+                <Text style={[styles.logsActionText, { color: colors.primary }]}>
+                  {t('share_logs') || 'Share Logs'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
+                <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
+                <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                  {t('clear_logs') || 'Clear Logs'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
+          <Animated.View style={[
+            styles.logsModalContent,
+            { backgroundColor: colors.card },
+            {
+              transform: [{ translateX: backupsTranslateX }],
+              opacity: backupsOpacity,
+            },
+            !backupsModalVisible && styles.hidden,
+          ]}>
+            <View style={styles.languageModalHeader}>
+              <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {t('local_backups') || 'Local Backups'}
+              </Text>
+              <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+                <Ionicons name="refresh-outline" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Divider />
+
+            {backupsLoading ? (
+              <View style={styles.logsEmptyContainer}>
+                <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                  {'Loading...'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={storedBackups}
+                keyExtractor={(item) => item.uri}
+                renderItem={renderBackupItem}
+                style={styles.logsList}
+                contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+                ListEmptyComponent={
+                  <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                    {t('local_backups_empty') || 'No local backups yet'}
+                  </Text>
+                }
+              />
+            )}
+          </Animated.View>
         </Modal>
-      )}
+        {apkDownloadProgress !== null && (
+          <Modal
+            visible
+            dismissable={false}
+            contentContainerStyle={[styles.downloadModal, { backgroundColor: colors.card }]}
+          >
+            <Text variant="bodyLarge" style={[styles.downloadTitle, { color: colors.text }]}>
+              {t('downloading_update') || 'Downloading update...'}
+            </Text>
+            <ProgressBar
+              progress={apkDownloadProgress}
+              color={colors.primary}
+              style={styles.downloadProgressBar}
+            />
+            <Text variant="bodySmall" style={[styles.downloadPercent, { color: colors.mutedText }]}>
+              {`${Math.round(apkDownloadProgress * 100)}%`}
+            </Text>
+          </Modal>
+        )}
     </Portal>
-    </>
   );
 }
 

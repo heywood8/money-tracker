@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 export default function ImportProgressModal() {
   const { colors } = useThemeColors();
@@ -121,80 +120,77 @@ export default function ImportProgressModal() {
   };
 
   return (
-    <>
-      {isImporting && <ModalBlurOverlay />}
-      <Portal>
+    <Portal>
       <Modal
         visible={isImporting}
-        dismissable={false}
-        contentContainerStyle={[
-          styles.modalContainer,
-          { backgroundColor: colors.card },
-        ]}
-      >
-        <View style={styles.header}>
-          <Ionicons
-            name="cloud-download"
-            size={32}
-            color={colors.primary}
-          />
-          <Text
-            variant="headlineSmall"
-            style={[styles.title, { color: colors.text }]}
-          >
-            Importing Database
-          </Text>
-          <Text
-            variant="bodyMedium"
-            style={[styles.subtitle, { color: colors.mutedText }]}
-          >
-            Please wait while your data is being restored...
-          </Text>
-        </View>
-
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.stepsContainer}
-          contentContainerStyle={styles.stepsContent}
+          dismissable={false}
+          contentContainerStyle={[
+            styles.modalContainer,
+            { backgroundColor: colors.card },
+          ]}
         >
-          {steps.map((step, index) => (
-            <View
-              key={step.id}
-              onLayout={(event) => handleStepLayout(step.id, event)}
-              style={[
-                styles.stepRow,
-                { borderBottomColor: colors.border },
-                index === steps.length - 1 && styles.lastStepRow,
-              ]}
+          <View style={styles.header}>
+            <Ionicons
+              name="cloud-download"
+              size={32}
+              color={colors.primary}
+            />
+            <Text
+              variant="headlineSmall"
+              style={[styles.title, { color: colors.text }]}
             >
-              {renderStepIcon(step)}
-              <Text
-                variant="bodyLarge"
+            Importing Database
+            </Text>
+            <Text
+              variant="bodyMedium"
+              style={[styles.subtitle, { color: colors.mutedText }]}
+            >
+            Please wait while your data is being restored...
+            </Text>
+          </View>
+
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.stepsContainer}
+            contentContainerStyle={styles.stepsContent}
+          >
+            {steps.map((step, index) => (
+              <View
+                key={step.id}
+                onLayout={(event) => handleStepLayout(step.id, event)}
                 style={[
-                  styles.stepLabel,
-                  { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                  step.status === 'in_progress' && styles.stepLabelActive,
+                  styles.stepRow,
+                  { borderBottomColor: colors.border },
+                  index === steps.length - 1 && styles.lastStepRow,
                 ]}
               >
-                {getStepLabel(step)}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
+                {renderStepIcon(step)}
+                <Text
+                  variant="bodyLarge"
+                  style={[
+                    styles.stepLabel,
+                    { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                    step.status === 'in_progress' && styles.stepLabelActive,
+                  ]}
+                >
+                  {getStepLabel(step)}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
 
-        <View style={styles.footer}>
-          <Button
-            mode="contained"
-            onPress={handleOkPress}
-            disabled={!isComplete}
-            style={styles.okButton}
-          >
-            <Text>OK</Text>
-          </Button>
-        </View>
+          <View style={styles.footer}>
+            <Button
+              mode="contained"
+              onPress={handleOkPress}
+              disabled={!isComplete}
+              style={styles.okButton}
+            >
+              <Text>OK</Text>
+            </Button>
+          </View>
       </Modal>
     </Portal>
-    </>
   );
 }
 
