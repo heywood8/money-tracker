@@ -374,6 +374,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     showAccountBalance={true}
                     showFieldIcons={true}
                     hideCategoryPicker={!isNew}
+                    hideTransferTargetPicker={true}
                     transferLayout="sideBySide"
                     disabled={isShadowOperation}
                     containerBackground={colors.card}
@@ -382,9 +383,30 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     rateSource={rateSource}
                   />
 
-                  {/* Date (and Category when editing) Picker */}
-                  {!isNew && values.type !== 'transfer' ? (
-                    <View style={styles.categoryDateRow}>
+                  {/* Date + Category (or To Account for transfer) row */}
+                  <View style={styles.categoryDateRow}>
+                    {values.type === 'transfer' ? (
+                      <Pressable
+                        style={[
+                          styles.pickerButtonHalf,
+                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                          isShadowOperation && styles.disabledInput,
+                        ]}
+                        onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+                        disabled={isShadowOperation}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('to_account')}
+                        testID="to-account-picker"
+                      >
+                        <Icon name="swap-horizontal" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                        <Text
+                          style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {values.toAccountId ? getAccountName(values.toAccountId) : t('to_account')}
+                        </Text>
+                      </Pressable>
+                    ) : (
                       <Pressable
                         style={[
                           styles.pickerButtonHalf,
@@ -404,28 +426,10 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                           {getCategoryName(values.categoryId)}
                         </Text>
                       </Pressable>
-                      <Pressable
-                        style={[
-                          styles.pickerButtonHalf,
-                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                          isShadowOperation && styles.disabledInput,
-                        ]}
-                        onPress={handleOpenDatePicker}
-                        disabled={isShadowOperation}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('select_date')}
-                        testID="date-input"
-                      >
-                        <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                        <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                          {formatDateForDisplay(values.date)}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  ) : (
+                    )}
                     <Pressable
                       style={[
-                        styles.pickerButton,
+                        styles.pickerButtonHalf,
                         { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                         isShadowOperation && styles.disabledInput,
                       ]}
@@ -435,14 +439,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                       accessibilityLabel={t('select_date')}
                       testID="date-input"
                     >
-                      <View style={styles.pickerButtonContent}>
-                        <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                        <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                          {formatDateForDisplay(values.date)}
-                        </Text>
-                      </View>
+                      <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
+                        {formatDateForDisplay(values.date)}
+                      </Text>
                     </Pressable>
-                  )}
+                  </View>
 
                   {/* Description Input with autocomplete suggestions */}
                   <DescriptionAutocomplete
@@ -729,21 +731,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  pickerButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-    minHeight: 48,
-    padding: SPACING.md,
-  },
-  pickerButtonContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
   pickerButtonHalf: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -756,7 +743,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   pickerButtonText: {
-    fontSize: 16,
+    fontSize: 13,
   },
   pickerEmptyText: {
     padding: 20,

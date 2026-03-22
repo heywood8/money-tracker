@@ -106,54 +106,56 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 }));
 
 // Mock custom hooks
-jest.mock('../../app/hooks/useOperationForm', () => {
-  return jest.fn(() => ({
-    values: {
-      type: 'expense',
-      amount: '',
-      accountId: 'acc1',
-      categoryId: '',
-      date: '2024-01-15',
-      description: '',
-      toAccountId: '',
-      exchangeRate: '',
-      destinationAmount: '',
+const makeDefaultFormValues = () => ({
+  values: {
+    type: 'expense',
+    amount: '',
+    accountId: 'acc1',
+    categoryId: '',
+    date: '2024-01-15',
+    description: '',
+    toAccountId: '',
+    exchangeRate: '',
+    destinationAmount: '',
+  },
+  setValues: jest.fn(),
+  errors: {},
+  showDatePicker: false,
+  setShowDatePicker: jest.fn(),
+  lastEditedField: null,
+  setLastEditedField: jest.fn(),
+  isShadowOperation: false,
+  canDeleteShadowOperation: true,
+  filteredCategories: [
+    {
+      id: 'cat1',
+      name: 'Food',
+      type: 'folder',
+      category_type: 'expense',
+      icon: 'food',
     },
-    setValues: jest.fn(),
-    errors: {},
-    showDatePicker: false,
-    setShowDatePicker: jest.fn(),
-    lastEditedField: null,
-    setLastEditedField: jest.fn(),
-    isShadowOperation: false,
-    canDeleteShadowOperation: true,
-    filteredCategories: [
-      {
-        id: 'cat1',
-        name: 'Food',
-        type: 'folder',
-        category_type: 'expense',
-        icon: 'food',
-      },
-      {
-        id: 'cat2',
-        name: 'Groceries',
-        type: 'entry',
-        category_type: 'expense',
-        parentId: 'cat1',
-        icon: 'cart',
-      },
-    ],
-    sourceAccount: { id: 'acc1', name: 'Checking', currency: 'USD' },
-    destinationAccount: null,
-    isMultiCurrencyTransfer: false,
-    handleSave: jest.fn(),
-    handleClose: jest.fn(),
-    handleDelete: jest.fn(),
-    getAccountName: (id) => id === 'acc1' ? 'Checking' : 'Savings',
-    getCategoryName: (id) => id === 'cat2' ? 'Groceries' : 'Food',
-    formatDateForDisplay: (date) => new Date(date).toLocaleDateString(),
-  }));
+    {
+      id: 'cat2',
+      name: 'Groceries',
+      type: 'entry',
+      category_type: 'expense',
+      parentId: 'cat1',
+      icon: 'cart',
+    },
+  ],
+  sourceAccount: { id: 'acc1', name: 'Checking', currency: 'USD' },
+  destinationAccount: null,
+  isMultiCurrencyTransfer: false,
+  handleSave: jest.fn(),
+  handleClose: jest.fn(),
+  handleDelete: jest.fn(),
+  getAccountName: (id) => id === 'acc1' ? 'Checking' : 'Savings',
+  getCategoryName: (id) => !id ? 'select_category' : id === 'cat2' ? 'Groceries' : 'Food',
+  formatDateForDisplay: (date) => new Date(date).toLocaleDateString(),
+});
+
+jest.mock('../../app/hooks/useOperationForm', () => {
+  return jest.fn();
 });
 
 jest.mock('../../app/hooks/useOperationPicker', () => {
@@ -216,6 +218,9 @@ describe('OperationModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Re-apply default implementation each test to prevent mockReturnValue leakage
+    const useOperationForm = require('../../app/hooks/useOperationForm');
+    useOperationForm.mockImplementation(makeDefaultFormValues);
   });
 
   describe('Rendering', () => {
