@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.52.0](https://github.com/heywood8/money-tracker/compare/penny-v0.51.0...penny-v0.52.0) (2026-03-22)
+
+
+### Features
+
+* add description autocomplete to operation form ([#343](https://github.com/heywood8/money-tracker/issues/343)) ([a1837c1](https://github.com/heywood8/money-tracker/commit/a1837c1e0ea30c92fdf6d30b8358a6670a1167de))
+
 ## [0.51.0](https://github.com/heywood8/money-tracker/compare/penny-v0.50.4...penny-v0.51.0) (2026-03-21)
 
 
