@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.1](https://github.com/heywood8/money-tracker/compare/penny-v0.54.0...penny-v0.54.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* correct prev month avg and end in burndown legend ([#350](https://github.com/heywood8/money-tracker/issues/350)) ([5ebeec6](https://github.com/heywood8/money-tracker/commit/5ebeec6c17c43fe100a5fb8a90ede1eae111102c))
+
 ## [0.54.0](https://github.com/heywood8/money-tracker/compare/penny-v0.53.0...penny-v0.54.0) (2026-03-22)
 
 
