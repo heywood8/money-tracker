@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.53.0](https://github.com/heywood8/money-tracker/compare/penny-v0.52.0...penny-v0.53.0) (2026-03-22)
+
+
+### Features
+
+* add in-app local backup viewer to Settings ([#347](https://github.com/heywood8/money-tracker/issues/347)) ([872f4a7](https://github.com/heywood8/money-tracker/commit/872f4a72a4d54f046054aa5a0a9531f5762d8450))
+
+
+### Bug Fixes
+
+* download APK in-app to fix 99% hang on Android ([#345](https://github.com/heywood8/money-tracker/issues/345)) ([803abfd](https://github.com/heywood8/money-tracker/commit/803abfd6e925f1151f0f368462154b9d968538f7))
+
 ## [0.52.0](https://github.com/heywood8/money-tracker/compare/penny-v0.51.0...penny-v0.52.0) (2026-03-22)
 
 
