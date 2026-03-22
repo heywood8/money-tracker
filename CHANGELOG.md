@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.0](https://github.com/heywood8/money-tracker/compare/penny-v0.53.0...penny-v0.54.0) (2026-03-22)
+
+
+### Features
+
+* show category and date pickers side-by-side when editing operation ([#348](https://github.com/heywood8/money-tracker/issues/348)) ([225f1b4](https://github.com/heywood8/money-tracker/commit/225f1b412a5005282cfd8976700550374b785b88))
+
 ## [0.53.0](https://github.com/heywood8/money-tracker/compare/penny-v0.52.0...penny-v0.53.0) (2026-03-22)
 
 
