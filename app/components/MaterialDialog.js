@@ -60,47 +60,47 @@ export default function MaterialDialog({
           onPress={onDismiss}
         >
           <Pressable
-          testID="material-dialog-content"
-          style={[styles.dialog, { backgroundColor: colors.card }]}
-          onPress={() => {}}
-        >
-          {/* Title */}
-          {title && (
-            <Text style={[styles.title, { color: colors.text }]}>
-              {title}
-            </Text>
-          )}
+            testID="material-dialog-content"
+            style={[styles.dialog, { backgroundColor: colors.card }]}
+            onPress={() => {}}
+          >
+            {/* Title */}
+            {title && (
+              <Text style={[styles.title, { color: colors.text }]}>
+                {title}
+              </Text>
+            )}
 
-          {/* Message */}
-          {message && (
-            <Text style={[styles.message, { color: colors.text }]}>
-              {message}
-            </Text>
-          )}
+            {/* Message */}
+            {message && (
+              <Text style={[styles.message, { color: colors.text }]}>
+                {message}
+              </Text>
+            )}
 
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            {buttons.map((button, index) => (
-              <Pressable
-                key={index}
-                style={({ pressed }) => [
-                  styles.button,
-                  pressed && { backgroundColor: colors.selected },
-                ]}
-                onPress={() => handleButtonPress(button)}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    getButtonStyle(button.style),
-                    button.style === 'destructive' && styles.boldText,
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              {buttons.map((button, index) => (
+                <Pressable
+                  key={index}
+                  style={({ pressed }) => [
+                    styles.button,
+                    pressed && { backgroundColor: colors.selected },
                   ]}
+                  onPress={() => handleButtonPress(button)}
                 >
-                  {button.text}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      getButtonStyle(button.style),
+                      button.style === 'destructive' && styles.boldText,
+                    ]}
+                  >
+                    {button.text}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

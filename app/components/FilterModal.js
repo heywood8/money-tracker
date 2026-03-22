@@ -214,309 +214,309 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
         <Pressable style={styles.modalOverlay} onPress={onClose}>
           <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {t('filter_operations')}
-            </Text>
-            <TouchableOpacity testID="close-filter-modal" onPress={onClose}>
-              <Icon name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Content */}
-          <ScrollView style={styles.content}>
-            {/* Search Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('search')}
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>
+                {t('filter_operations')}
               </Text>
-              <View style={[styles.searchInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                <Icon name="magnify" size={20} color={colors.mutedText} />
-                <TextInput
-                  style={[styles.searchTextInput, { color: colors.text }]}
-                  value={searchInput}
-                  onChangeText={setSearchInput}
-                  placeholder={t('search_operations_placeholder')}
-                  placeholderTextColor={colors.mutedText}
-                />
-                {searchInput && searchInput.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchInput('')}>
-                    <Icon name="close-circle" size={20} color={colors.mutedText} />
+              <TouchableOpacity testID="close-filter-modal" onPress={onClose}>
+                <Icon name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Content */}
+            <ScrollView style={styles.content}>
+              {/* Search Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('search')}
+                </Text>
+                <View style={[styles.searchInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+                  <Icon name="magnify" size={20} color={colors.mutedText} />
+                  <TextInput
+                    style={[styles.searchTextInput, { color: colors.text }]}
+                    value={searchInput}
+                    onChangeText={setSearchInput}
+                    placeholder={t('search_operations_placeholder')}
+                    placeholderTextColor={colors.mutedText}
+                  />
+                  {searchInput && searchInput.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchInput('')}>
+                      <Icon name="close-circle" size={20} color={colors.mutedText} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={[styles.helperText, { color: colors.mutedText }]}>
+                  {t('search_helper_text')}
+                </Text>
+              </View>
+
+              {/* Date Range Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('date_range')}
+                </Text>
+                <View style={styles.dateRangeContainer}>
+                  <TouchableOpacity
+                    style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <Icon name="calendar" size={20} color={colors.mutedText} />
+                    <Text style={[styles.dateInputText, { color: localFilters.dateRange && localFilters.dateRange.startDate ? colors.text : colors.mutedText }]}>
+                      {localFilters.dateRange && localFilters.dateRange.startDate ? formatDate(localFilters.dateRange.startDate) : t('from_date')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                    onPress={() => setShowEndDatePicker(true)}
+                  >
+                    <Icon name="calendar" size={20} color={colors.mutedText} />
+                    <Text style={[styles.dateInputText, { color: localFilters.dateRange && localFilters.dateRange.endDate ? colors.text : colors.mutedText }]}>
+                      {localFilters.dateRange && localFilters.dateRange.endDate ? formatDate(localFilters.dateRange.endDate) : t('to_date')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {localFilters.dateRange && (localFilters.dateRange.startDate || localFilters.dateRange.endDate) && (
+                  <TouchableOpacity
+                    style={styles.clearDateButton}
+                    onPress={() => setLocalFilters(f => ({ ...f, dateRange: { startDate: null, endDate: null } }))}
+                  >
+                    <Text style={[styles.clearDateButtonText, { color: colors.primary }]}>
+                      {t('clear')}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <Text style={[styles.helperText, { color: colors.mutedText }]}>
-                {t('search_helper_text')}
-              </Text>
-            </View>
 
-            {/* Date Range Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('date_range')}
-              </Text>
-              <View style={styles.dateRangeContainer}>
-                <TouchableOpacity
-                  style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                  onPress={() => setShowStartDatePicker(true)}
-                >
-                  <Icon name="calendar" size={20} color={colors.mutedText} />
-                  <Text style={[styles.dateInputText, { color: localFilters.dateRange && localFilters.dateRange.startDate ? colors.text : colors.mutedText }]}>
-                    {localFilters.dateRange && localFilters.dateRange.startDate ? formatDate(localFilters.dateRange.startDate) : t('from_date')}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.dateInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                  onPress={() => setShowEndDatePicker(true)}
-                >
-                  <Icon name="calendar" size={20} color={colors.mutedText} />
-                  <Text style={[styles.dateInputText, { color: localFilters.dateRange && localFilters.dateRange.endDate ? colors.text : colors.mutedText }]}>
-                    {localFilters.dateRange && localFilters.dateRange.endDate ? formatDate(localFilters.dateRange.endDate) : t('to_date')}
-                  </Text>
-                </TouchableOpacity>
+              {/* Amount Range Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('amount_range')}
+                </Text>
+                <View style={styles.amountRangeContainer}>
+                  <TextInput
+                    style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
+                    value={localFilters.amountRange && localFilters.amountRange.min !== null ? String(localFilters.amountRange.min) : ''}
+                    onChangeText={(text) => {
+                      const value = text === '' ? null : parseFloat(text);
+                      setLocalFilters(f => ({ ...f, amountRange: { ...(f.amountRange || {}), min: value } }));
+                    }}
+                    placeholder={t('min_amount')}
+                    placeholderTextColor={colors.mutedText}
+                    keyboardType="numeric"
+                  />
+                  <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
+                  <TextInput
+                    style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
+                    value={localFilters.amountRange && localFilters.amountRange.max !== null ? String(localFilters.amountRange.max) : ''}
+                    onChangeText={(text) => {
+                      const value = text === '' ? null : parseFloat(text);
+                      setLocalFilters(f => ({ ...f, amountRange: { ...(f.amountRange || {}), max: value } }));
+                    }}
+                    placeholder={t('max_amount')}
+                    placeholderTextColor={colors.mutedText}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
-              {localFilters.dateRange && (localFilters.dateRange.startDate || localFilters.dateRange.endDate) && (
-                <TouchableOpacity
-                  style={styles.clearDateButton}
-                  onPress={() => setLocalFilters(f => ({ ...f, dateRange: { startDate: null, endDate: null } }))}
-                >
-                  <Text style={[styles.clearDateButtonText, { color: colors.primary }]}>
-                    {t('clear')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
 
-            {/* Amount Range Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('amount_range')}
-              </Text>
-              <View style={styles.amountRangeContainer}>
-                <TextInput
-                  style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-                  value={localFilters.amountRange && localFilters.amountRange.min !== null ? String(localFilters.amountRange.min) : ''}
-                  onChangeText={(text) => {
-                    const value = text === '' ? null : parseFloat(text);
-                    setLocalFilters(f => ({ ...f, amountRange: { ...(f.amountRange || {}), min: value } }));
-                  }}
-                  placeholder={t('min_amount')}
-                  placeholderTextColor={colors.mutedText}
-                  keyboardType="numeric"
-                />
-                <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
-                <TextInput
-                  style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-                  value={localFilters.amountRange && localFilters.amountRange.max !== null ? String(localFilters.amountRange.max) : ''}
-                  onChangeText={(text) => {
-                    const value = text === '' ? null : parseFloat(text);
-                    setLocalFilters(f => ({ ...f, amountRange: { ...(f.amountRange || {}), max: value } }));
-                  }}
-                  placeholder={t('max_amount')}
-                  placeholderTextColor={colors.mutedText}
-                  keyboardType="numeric"
-                />
+              {/* Type Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('operation_type')}
+                </Text>
+                <View style={styles.chipContainer}>
+                  {['expense', 'income', 'transfer'].map(type => {
+                    const isSelected = localFilters.types && localFilters.types.includes(type);
+                    return (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                        onPress={() => toggleType(type)}
+                      >
+                        <Icon
+                          name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
+                          size={18}
+                          color={isSelected ? ICON_SELECTED_COLOR : colors.text}
+                        />
+                        <Text style={[styles.chipText, isSelected ? styles.chipTextSelected : { color: colors.text }]}> 
+                          {t(type)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
 
-            {/* Type Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('operation_type')}
-              </Text>
-              <View style={styles.chipContainer}>
-                {['expense', 'income', 'transfer'].map(type => {
-                  const isSelected = localFilters.types && localFilters.types.includes(type);
+              {/* Accounts Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('accounts')}
+                </Text>
+                {accounts.map(account => {
+                  const isSelected = localFilters.accountIds && localFilters.accountIds.includes(account.id);
                   return (
                     <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                      onPress={() => toggleType(type)}
+                      key={account.id}
+                      style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
+                      onPress={() => toggleAccount(account.id)}
                     >
-                      <Icon
-                        name={type === 'expense' ? 'minus-circle' : type === 'income' ? 'plus-circle' : 'swap-horizontal'}
-                        size={18}
-                        color={isSelected ? ICON_SELECTED_COLOR : colors.text}
-                      />
-                      <Text style={[styles.chipText, isSelected ? styles.chipTextSelected : { color: colors.text }]}> 
-                        {t(type)}
-                      </Text>
+                      <View style={styles.checkboxLeft}>
+                        <Icon
+                          name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                          size={24}
+                          color={isSelected ? colors.primary : colors.mutedText}
+                        />
+                        <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+                          {account.name}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </View>
 
-            {/* Accounts Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('accounts')}
-              </Text>
-              {accounts.map(account => {
-                const isSelected = localFilters.accountIds && localFilters.accountIds.includes(account.id);
-                return (
-                  <TouchableOpacity
-                    key={account.id}
-                    style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                    onPress={() => toggleAccount(account.id)}
-                  >
-                    <View style={styles.checkboxLeft}>
-                      <Icon
-                        name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                        size={24}
-                        color={isSelected ? colors.primary : colors.mutedText}
-                      />
-                      <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                        {account.name}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+              {/* Categories Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('categories')}
+                </Text>
 
-            {/* Categories Section */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('categories')}
-              </Text>
+                {flattenedCategories.map(category => {
+                  const isFolder = category.type === 'folder';
+                  const isSelected = localFilters.categoryIds && localFilters.categoryIds.includes(category.id);
+                  const isExpanded = expandedIds.has(category.id);
+                  const hasChildren = visibleCategories.some(cat => cat.parentId === category.id);
+                  const indentWidth = category.depth * 20;
 
-              {flattenedCategories.map(category => {
-                const isFolder = category.type === 'folder';
-                const isSelected = localFilters.categoryIds && localFilters.categoryIds.includes(category.id);
-                const isExpanded = expandedIds.has(category.id);
-                const hasChildren = visibleCategories.some(cat => cat.parentId === category.id);
-                const indentWidth = category.depth * 20;
+                  // For folders, determine checkbox state
+                  const allDescendantsSelected = isFolder ? areAllDescendantsSelected(category.id) : false;
+                  const someDescendantsSelected = isFolder ? areSomeDescendantsSelected(category.id) : false;
 
-                // For folders, determine checkbox state
-                const allDescendantsSelected = isFolder ? areAllDescendantsSelected(category.id) : false;
-                const someDescendantsSelected = isFolder ? areSomeDescendantsSelected(category.id) : false;
-
-                // Determine checkbox icon
-                let checkboxIcon, checkboxColor;
-                if (isFolder) {
-                  if (allDescendantsSelected) {
-                    checkboxIcon = 'checkbox-marked';
-                    checkboxColor = colors.primary;
-                  } else if (someDescendantsSelected) {
-                    checkboxIcon = 'minus-box';
-                    checkboxColor = colors.primary;
+                  // Determine checkbox icon
+                  let checkboxIcon, checkboxColor;
+                  if (isFolder) {
+                    if (allDescendantsSelected) {
+                      checkboxIcon = 'checkbox-marked';
+                      checkboxColor = colors.primary;
+                    } else if (someDescendantsSelected) {
+                      checkboxIcon = 'minus-box';
+                      checkboxColor = colors.primary;
+                    } else {
+                      checkboxIcon = 'checkbox-blank-outline';
+                      checkboxColor = colors.mutedText;
+                    }
                   } else {
-                    checkboxIcon = 'checkbox-blank-outline';
-                    checkboxColor = colors.mutedText;
+                    checkboxIcon = isSelected ? 'checkbox-marked' : 'checkbox-blank-outline';
+                    checkboxColor = isSelected ? colors.primary : colors.mutedText;
                   }
-                } else {
-                  checkboxIcon = isSelected ? 'checkbox-marked' : 'checkbox-blank-outline';
-                  checkboxColor = isSelected ? colors.primary : colors.mutedText;
-                }
 
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[styles.checkboxItem, { borderBottomColor: colors.border, paddingLeft: 12 + indentWidth }]}
-                    onPress={() => {
-                      toggleCategory(category.id, isFolder);
-                    }}
-                  >
-                    <View style={styles.checkboxLeft}>
-                      {/* Expand/Collapse Icon for folders */}
-                      {(isFolder || hasChildren) ? (
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            toggleExpanded(category.id);
-                          }}
-                          style={styles.expandButton}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <Icon
-                            name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                            size={18}
-                            color={colors.mutedText}
-                          />
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={styles.expandButton} />
-                      )}
+                  return (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={[styles.checkboxItem, { borderBottomColor: colors.border, paddingLeft: 12 + indentWidth }]}
+                      onPress={() => {
+                        toggleCategory(category.id, isFolder);
+                      }}
+                    >
+                      <View style={styles.checkboxLeft}>
+                        {/* Expand/Collapse Icon for folders */}
+                        {(isFolder || hasChildren) ? (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              toggleExpanded(category.id);
+                            }}
+                            style={styles.expandButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Icon
+                              name={isExpanded ? 'chevron-down' : 'chevron-right'}
+                              size={18}
+                              color={colors.mutedText}
+                            />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={styles.expandButton} />
+                        )}
 
-                      {/* Checkbox for all categories */}
-                      <Icon
-                        name={checkboxIcon}
-                        size={24}
-                        color={checkboxColor}
-                      />
+                        {/* Checkbox for all categories */}
+                        <Icon
+                          name={checkboxIcon}
+                          size={24}
+                          color={checkboxColor}
+                        />
 
-                      {/* Category Icon and Name */}
-                      <View style={styles.categoryInfo}>
-                        <Icon name={category.icon || 'tag'} size={20} color={colors.text} />
-                        <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                          {category.nameKey ? t(category.nameKey) : category.name}
-                        </Text>
+                        {/* Category Icon and Name */}
+                        <View style={styles.categoryInfo}>
+                          <Icon name={category.icon || 'tag'} size={20} color={colors.text} />
+                          <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+                            {category.nameKey ? t(category.nameKey) : category.name}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Actions */}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.clearButton, { borderColor: colors.border }]}
+                onPress={handleClearAll}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                  {t('clear_all')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton, { backgroundColor: colors.primary }]}
+                onPress={handleApply}
+              >
+                <Text style={[styles.actionButtonText, styles.applyButtonText]}> 
+                  {t('apply_filters')}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.clearButton, { borderColor: colors.border }]}
-              onPress={handleClearAll}
-            >
-              <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                {t('clear_all')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.applyButton, { backgroundColor: colors.primary }]}
-              onPress={handleApply}
-            >
-              <Text style={[styles.actionButtonText, styles.applyButtonText]}> 
-                {t('apply_filters')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Date Pickers */}
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={localFilters.dateRange.startDate ? new Date(localFilters.dateRange.startDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowStartDatePicker(false);
-                if (selectedDate) {
-                  const dateStr = formatDate(selectedDate);
-                  setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, startDate: dateStr } }));
-                }
-              }}
-            />
-          )}
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={localFilters.dateRange.endDate ? new Date(localFilters.dateRange.endDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowEndDatePicker(false);
-                if (selectedDate) {
-                  const dateStr = formatDate(selectedDate);
-                  setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, endDate: dateStr } }));
-                }
-              }}
-            />
-          )}
+            {/* Date Pickers */}
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={localFilters.dateRange.startDate ? new Date(localFilters.dateRange.startDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowStartDatePicker(false);
+                  if (selectedDate) {
+                    const dateStr = formatDate(selectedDate);
+                    setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, startDate: dateStr } }));
+                  }
+                }}
+              />
+            )}
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={localFilters.dateRange.endDate ? new Date(localFilters.dateRange.endDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowEndDatePicker(false);
+                  if (selectedDate) {
+                    const dateStr = formatDate(selectedDate);
+                    setLocalFilters(f => ({ ...f, dateRange: { ...f.dateRange, endDate: dateStr } }));
+                  }
+                }}
+              />
+            )}
           </Pressable>
         </Pressable>
       </Modal>

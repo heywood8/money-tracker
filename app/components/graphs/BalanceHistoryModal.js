@@ -34,107 +34,107 @@ const BalanceHistoryModal = ({
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-          {/* Header */}
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <View style={styles.modalHeaderLeft}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {t('balance_history_details') || 'Balance History Details'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-            >
-              <Icon name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Table */}
-          <ScrollView style={styles.modalScrollView}>
-            <View style={styles.balanceTable}>
-              {/* Table Header */}
-              <View style={[styles.balanceTableHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
-                  {t('date') || 'Date'}
-                </Text>
-                <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
-                  {t('balance') || 'Balance'}
-                </Text>
-                <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
-                  {t('actions') || 'Actions'}
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.modalHeaderLeft}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {t('balance_history_details') || 'Balance History Details'}
                 </Text>
               </View>
-
-              {/* Table Rows */}
-              {balanceHistoryTableData.map((row, index) => (
-                <View
-                  key={row.date}
-                  style={[
-                    styles.balanceTableRow,
-                    index % 2 === 0 && { backgroundColor: colors.altRow },
-                    { borderBottomColor: colors.border },
-                  ]}
-                >
-                  <Text style={[styles.balanceTableCell, { color: colors.text }]}>
-                    {row.displayDate}
-                  </Text>
-
-                  {editingBalanceRow === row.date ? (
-                    <>
-                      <TextInput
-                        style={[
-                          styles.balanceTableInput,
-                          { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                        ]}
-                        value={editingBalanceValue}
-                        onChangeText={onEditingBalanceValueChange}
-                        keyboardType="decimal-pad"
-                        autoFocus
-                      />
-                      <View style={styles.balanceTableActions}>
-                        <TouchableOpacity
-                          style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
-                          onPress={() => onSaveBalance(row.date)}
-                        >
-                          <Icon name="check" size={16} color="#fff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.balanceActionButton, { backgroundColor: colors.mutedText }]}
-                          onPress={onCancelEdit}
-                        >
-                          <Icon name="close" size={16} color="#fff" />
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={[styles.balanceTableCell, { color: row.balance ? colors.text : colors.mutedText }]}>
-                        {row.balance || '-'}
-                      </Text>
-                      <View style={styles.balanceTableActions}>
-                        <TouchableOpacity
-                          style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
-                          onPress={() => onEditBalance(row.date, row.balance)}
-                        >
-                          <Icon name="pencil" size={16} color="#fff" />
-                        </TouchableOpacity>
-                        {row.balance && (
-                          <TouchableOpacity
-                            style={[styles.balanceActionButton, styles.deleteActionButtonBackground]}
-                            onPress={() => onDeleteBalance(row.date)}
-                          >
-                            <Icon name="delete" size={16} color="#fff" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </View>
-              ))}
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+              >
+                <Icon name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
             </View>
-          </ScrollView>
+
+            {/* Table */}
+            <ScrollView style={styles.modalScrollView}>
+              <View style={styles.balanceTable}>
+                {/* Table Header */}
+                <View style={[styles.balanceTableHeader, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('date') || 'Date'}
+                  </Text>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('balance') || 'Balance'}
+                  </Text>
+                  <Text style={[styles.balanceTableHeaderText, { color: colors.text }]}>
+                    {t('actions') || 'Actions'}
+                  </Text>
+                </View>
+
+                {/* Table Rows */}
+                {balanceHistoryTableData.map((row, index) => (
+                  <View
+                    key={row.date}
+                    style={[
+                      styles.balanceTableRow,
+                      index % 2 === 0 && { backgroundColor: colors.altRow },
+                      { borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[styles.balanceTableCell, { color: colors.text }]}>
+                      {row.displayDate}
+                    </Text>
+
+                    {editingBalanceRow === row.date ? (
+                      <>
+                        <TextInput
+                          style={[
+                            styles.balanceTableInput,
+                            { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
+                          ]}
+                          value={editingBalanceValue}
+                          onChangeText={onEditingBalanceValueChange}
+                          keyboardType="decimal-pad"
+                          autoFocus
+                        />
+                        <View style={styles.balanceTableActions}>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
+                            onPress={() => onSaveBalance(row.date)}
+                          >
+                            <Icon name="check" size={16} color="#fff" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.mutedText }]}
+                            onPress={onCancelEdit}
+                          >
+                            <Icon name="close" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.balanceTableCell, { color: row.balance ? colors.text : colors.mutedText }]}>
+                          {row.balance || '-'}
+                        </Text>
+                        <View style={styles.balanceTableActions}>
+                          <TouchableOpacity
+                            style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
+                            onPress={() => onEditBalance(row.date, row.balance)}
+                          >
+                            <Icon name="pencil" size={16} color="#fff" />
+                          </TouchableOpacity>
+                          {row.balance && (
+                            <TouchableOpacity
+                              style={[styles.balanceActionButton, styles.deleteActionButtonBackground]}
+                              onPress={() => onDeleteBalance(row.date)}
+                            >
+                              <Icon name="delete" size={16} color="#fff" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
         </View>
-      </View>
       </Modal>
     </>
   );

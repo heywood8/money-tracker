@@ -149,261 +149,261 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
         >
           <Pressable style={styles.modalOverlay} onPress={handleClose}>
             <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {isNew ? t('add_category') : t('edit_category')}
-              </Text>
-
-              {/* Name Input */}
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.inputThemed,
-                  { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                ]}
-                value={values.name}
-                onChangeText={text => setValues(v => ({ ...v, name: text }))}
-                placeholder={t('category_name')}
-                placeholderTextColor={colors.mutedText}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-              />
-
-              {/* Type Picker (Folder/Entry) */}
-              <Pressable
-                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                onPress={() => setTypePickerVisible(true)}
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
               >
-                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
-                  {t('select_type')}
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isNew ? t('add_category') : t('edit_category')}
                 </Text>
-                <View style={styles.pickerRow}>
-                  <Text style={[styles.pickerValue, { color: colors.text }]}>
-                    {TYPE_OPTIONS.find(to => to.key === values.type)?.label}
-                  </Text>
-                </View>
-              </Pressable>
 
-              {/* Category Type Picker (Income/Expense) */}
-              <Pressable
-                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                onPress={() => setCategoryTypePickerVisible(true)}
-              >
-                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
-                  {t('category_type')}
-                </Text>
-                <View style={styles.pickerRow}>
-                  <Text style={[styles.pickerValue, { color: colors.text }]}>
-                    {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
-                  </Text>
-                </View>
-              </Pressable>
+                {/* Name Input */}
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.inputThemed,
+                    { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                  ]}
+                  value={values.name}
+                  onChangeText={text => setValues(v => ({ ...v, name: text }))}
+                  placeholder={t('category_name')}
+                  placeholderTextColor={colors.mutedText}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                />
 
-              {/* Parent Picker */}
-              <Pressable
-                style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                onPress={() => setParentPickerVisible(true)}
-              >
-                <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
-                  {t('parent_category')}
-                </Text>
-                <View style={styles.pickerRow}>
-                  <Text style={[styles.pickerValue, { color: colors.text }]}>
-                    {getParentName(values.parentId)}
-                  </Text>
-                </View>
-              </Pressable>
-
-              {/* Icon Picker */}
-              <Pressable
-                style={[styles.iconPickerButton, styles.iconPickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                onPress={() => setIconPickerVisible(true)}
-              >
-                <Icon name={values.icon || 'folder'} size={32} color={colors.text} />
-                <Text style={[styles.iconPickerText, { color: colors.mutedText }]}> 
-                  {t('select_icon')}
-                </Text>
-              </Pressable>
-
-              {errors.general && <Text style={styles.error}>{errors.general}</Text>}
-
-              {/* Delete Button (only for existing categories) */}
-              {!isNew && (
+                {/* Type Picker (Folder/Entry) */}
                 <Pressable
-                  style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
-                  onPress={handleDelete}
+                  style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={() => setTypePickerVisible(true)}
                 >
-                  <Icon name="delete-outline" size={20} color={colors.delete} />
-                  <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
-                    {t('delete_category')}
+                  <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
+                    {t('select_type')}
+                  </Text>
+                  <View style={styles.pickerRow}>
+                    <Text style={[styles.pickerValue, { color: colors.text }]}>
+                      {TYPE_OPTIONS.find(to => to.key === values.type)?.label}
+                    </Text>
+                  </View>
+                </Pressable>
+
+                {/* Category Type Picker (Income/Expense) */}
+                <Pressable
+                  style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={() => setCategoryTypePickerVisible(true)}
+                >
+                  <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
+                    {t('category_type')}
+                  </Text>
+                  <View style={styles.pickerRow}>
+                    <Text style={[styles.pickerValue, { color: colors.text }]}>
+                      {CATEGORY_TYPES.find(ct => ct.key === values.category_type)?.label}
+                    </Text>
+                  </View>
+                </Pressable>
+
+                {/* Parent Picker */}
+                <Pressable
+                  style={[styles.pickerButton, styles.pickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={() => setParentPickerVisible(true)}
+                >
+                  <Text style={[styles.pickerLabel, { color: colors.mutedText }]}>
+                    {t('parent_category')}
+                  </Text>
+                  <View style={styles.pickerRow}>
+                    <Text style={[styles.pickerValue, { color: colors.text }]}>
+                      {getParentName(values.parentId)}
+                    </Text>
+                  </View>
+                </Pressable>
+
+                {/* Icon Picker */}
+                <Pressable
+                  style={[styles.iconPickerButton, styles.iconPickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                  onPress={() => setIconPickerVisible(true)}
+                >
+                  <Icon name={values.icon || 'folder'} size={32} color={colors.text} />
+                  <Text style={[styles.iconPickerText, { color: colors.mutedText }]}> 
+                    {t('select_icon')}
                   </Text>
                 </Pressable>
-              )}
-            </ScrollView>
 
-            {/* Action Buttons */}
-            <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: colors.secondary }]}
-                onPress={handleClose}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>
-                  {t('cancel')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={handleSave}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>
-                  {t('save')}
-                </Text>
-              </Pressable>
-            </View>
+                {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+
+                {/* Delete Button (only for existing categories) */}
+                {!isNew && (
+                  <Pressable
+                    style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
+                    onPress={handleDelete}
+                  >
+                    <Icon name="delete-outline" size={20} color={colors.delete} />
+                    <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
+                      {t('delete_category')}
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+
+              {/* Action Buttons */}
+              <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                  onPress={handleClose}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>
+                    {t('cancel')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                  onPress={handleSave}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>
+                    {t('save')}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
 
-      {/* Icon Picker Modal */}
-      <IconPicker
-        visible={iconPickerVisible}
-        onClose={() => setIconPickerVisible(false)}
-        onSelect={(icon) => setValues(v => ({ ...v, icon }))}
-        selectedIcon={values.icon}
-      />
+        {/* Icon Picker Modal */}
+        <IconPicker
+          visible={iconPickerVisible}
+          onClose={() => setIconPickerVisible(false)}
+          onSelect={(icon) => setValues(v => ({ ...v, icon }))}
+          selectedIcon={values.icon}
+        />
 
-      {/* Type Picker Modal (Folder/Entry) */}
-      <Modal
-        visible={typePickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setTypePickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setTypePickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <FlatList
-              data={TYPE_OPTIONS}
-              keyExtractor={item => item.key}
-              renderItem={({ item }) => {
+        {/* Type Picker Modal (Folder/Entry) */}
+        <Modal
+          visible={typePickerVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setTypePickerVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setTypePickerVisible(false)}>
+            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <FlatList
+                data={TYPE_OPTIONS}
+                keyExtractor={item => item.key}
+                renderItem={({ item }) => {
                 // Disable changing to 'entry' if category has children
-                const isDisabled = !isNew && hasChildren && item.key === 'entry';
+                  const isDisabled = !isNew && hasChildren && item.key === 'entry';
 
-                return (
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        if (isDisabled) {
+                          showDialog(
+                            t('error'),
+                            t('cannot_change_to_entry_with_children') || 'Cannot change to entry type while category has subcategories',
+                            [{ text: t('ok') }],
+                          );
+                          return;
+                        }
+                        setValues(v => ({ ...v, type: item.key }));
+                        setTypePickerVisible(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && !isDisabled && { backgroundColor: colors.selected },
+                        isDisabled && { opacity: 0.5 },
+                      ]}
+                      disabled={isDisabled}
+                    >
+                      <Text style={[themed.pickerItemText, isDisabled && { color: colors.mutedText }]}>
+                        {item.label}
+                        {isDisabled && ' ⚠️'}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+              <Pressable style={styles.closeButton} onPress={() => setTypePickerVisible(false)}>
+                <Text style={themed.closeText}>{t('close')}</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Category Type Picker Modal */}
+        <Modal
+          visible={categoryTypePickerVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setCategoryTypePickerVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setCategoryTypePickerVisible(false)}>
+            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <FlatList
+                data={CATEGORY_TYPES}
+                keyExtractor={item => item.key}
+                renderItem={({ item }) => (
                   <Pressable
                     onPress={() => {
-                      if (isDisabled) {
-                        showDialog(
-                          t('error'),
-                          t('cannot_change_to_entry_with_children') || 'Cannot change to entry type while category has subcategories',
-                          [{ text: t('ok') }],
-                        );
-                        return;
-                      }
-                      setValues(v => ({ ...v, type: item.key }));
-                      setTypePickerVisible(false);
+                      setValues(v => ({ ...v, category_type: item.key }));
+                      setCategoryTypePickerVisible(false);
                     }}
                     style={({ pressed }) => [
                       styles.pickerOption,
                       { borderColor: colors.border },
-                      pressed && !isDisabled && { backgroundColor: colors.selected },
-                      isDisabled && { opacity: 0.5 },
+                      pressed && { backgroundColor: colors.selected },
                     ]}
-                    disabled={isDisabled}
                   >
-                    <Text style={[themed.pickerItemText, isDisabled && { color: colors.mutedText }]}>
-                      {item.label}
-                      {isDisabled && ' ⚠️'}
-                    </Text>
+                    <Text style={themed.pickerItemText}>{item.label}</Text>
                   </Pressable>
-                );
-              }}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setTypePickerVisible(false)}>
-              <Text style={themed.closeText}>{t('close')}</Text>
+                )}
+              />
+              <Pressable style={styles.closeButton} onPress={() => setCategoryTypePickerVisible(false)}>
+                <Text style={themed.closeText}>{t('close')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-      {/* Category Type Picker Modal */}
-      <Modal
-        visible={categoryTypePickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCategoryTypePickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setCategoryTypePickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <FlatList
-              data={CATEGORY_TYPES}
-              keyExtractor={item => item.key}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setValues(v => ({ ...v, category_type: item.key }));
-                    setCategoryTypePickerVisible(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                  ]}
-                >
-                  <Text style={themed.pickerItemText}>{item.label}</Text>
-                </Pressable>
-              )}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setCategoryTypePickerVisible(false)}>
-              <Text style={themed.closeText}>{t('close')}</Text>
+        {/* Parent Picker Modal */}
+        <Modal
+          visible={parentPickerVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setParentPickerVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setParentPickerVisible(false)}>
+            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <FlatList
+                data={[{ id: null, name: t('none'), icon: 'folder-outline' }, ...potentialParents]}
+                keyExtractor={item => item.id || 'none'}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => {
+                      setValues(v => ({ ...v, parentId: item.id }));
+                      setParentPickerVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && { backgroundColor: colors.selected },
+                    ]}
+                  >
+                    <View style={styles.parentOption}>
+                      <Icon name={item.icon} size={24} color={colors.text} />
+                      <Text style={themed.parentText}>
+                        {item.nameKey ? t(item.nameKey) : item.name}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+              <Pressable style={styles.closeButton} onPress={() => setParentPickerVisible(false)}>
+                <Text style={themed.closeText}>{t('close')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Parent Picker Modal */}
-      <Modal
-        visible={parentPickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setParentPickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setParentPickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <FlatList
-              data={[{ id: null, name: t('none'), icon: 'folder-outline' }, ...potentialParents]}
-              keyExtractor={item => item.id || 'none'}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setValues(v => ({ ...v, parentId: item.id }));
-                    setParentPickerVisible(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                  ]}
-                >
-                  <View style={styles.parentOption}>
-                    <Icon name={item.icon} size={24} color={colors.text} />
-                    <Text style={themed.parentText}>
-                      {item.nameKey ? t(item.nameKey) : item.name}
-                    </Text>
-                  </View>
-                </Pressable>
-              )}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setParentPickerVisible(false)}>
-              <Text style={themed.closeText}>{t('close')}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
       </Modal>
     </>
   );

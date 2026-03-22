@@ -65,26 +65,26 @@ export default function App() {
             <ThemeConfigProvider>
               <ThemeColorsProvider>
                 <AppBlurProvider>
-                <DialogProvider>
-                  <ImportProgressProvider>
-                    <AccountsDataProvider>
-                      <AccountsActionsProvider>
-                        <CategoriesProvider>
-                          <OperationsDataProvider>
-                            <OperationsActionsProvider>
-                              <BudgetsProvider>
-                                <PlannedOperationsProvider>
-                                  <AppContent />
-                                </PlannedOperationsProvider>
-                              </BudgetsProvider>
-                            </OperationsActionsProvider>
-                          </OperationsDataProvider>
-                        </CategoriesProvider>
-                      </AccountsActionsProvider>
-                    </AccountsDataProvider>
-                  </ImportProgressProvider>
-                </DialogProvider>
-              </AppBlurProvider>
+                  <DialogProvider>
+                    <ImportProgressProvider>
+                      <AccountsDataProvider>
+                        <AccountsActionsProvider>
+                          <CategoriesProvider>
+                            <OperationsDataProvider>
+                              <OperationsActionsProvider>
+                                <BudgetsProvider>
+                                  <PlannedOperationsProvider>
+                                    <AppContent />
+                                  </PlannedOperationsProvider>
+                                </BudgetsProvider>
+                              </OperationsActionsProvider>
+                            </OperationsDataProvider>
+                          </CategoriesProvider>
+                        </AccountsActionsProvider>
+                      </AccountsDataProvider>
+                    </ImportProgressProvider>
+                  </DialogProvider>
+                </AppBlurProvider>
               </ThemeColorsProvider>
             </ThemeConfigProvider>
           </LocalizationProvider>
@@ -95,10 +95,10 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   blurred: {
     filter: [{ blur: 10 }],
+  },
+  container: {
+    flex: 1,
   },
 });
