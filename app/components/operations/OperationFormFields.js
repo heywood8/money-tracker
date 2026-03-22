@@ -67,6 +67,7 @@ const OperationFormFields = memo(({
   showAccountBalance = false,
   showFieldIcons = true,
   hideCategoryPicker = false,
+  hideTransferTargetPicker = false,
   transferLayout = 'stacked',
   disabled = false,
   containerBackground,
@@ -441,7 +442,7 @@ const OperationFormFields = memo(({
           rateSource={rateSource}
         />
       )}
-      {values.type === 'transfer' ? renderTransferTargetPicker() : renderCategoryPicker()}
+      {values.type === 'transfer' ? (hideTransferTargetPicker ? null : renderTransferTargetPicker()) : renderCategoryPicker()}
     </>
   );
 });
@@ -476,6 +477,7 @@ OperationFormFields.propTypes = {
   showAccountBalance: PropTypes.bool,
   showFieldIcons: PropTypes.bool,
   hideCategoryPicker: PropTypes.bool,
+  hideTransferTargetPicker: PropTypes.bool,
   transferLayout: PropTypes.oneOf(['sideBySide', 'stacked']),
   disabled: PropTypes.bool,
   containerBackground: PropTypes.string,
