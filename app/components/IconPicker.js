@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, useWindowD
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import ModalBlurOverlay from './ModalBlurOverlay';
 
 export const COMMON_ICONS = [
   // Money & Finance
@@ -62,53 +63,56 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { backgroundColor: colors.surface }]}>
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {t('select_icon')}
-            </Text>
-            <TouchableOpacity onPress={onClose} testID="close-button">
-              <Icon name="close" size={24} color={colors.text} testID="icon-close" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.iconsGrid}>
-              {COMMON_ICONS.map((iconName) => (
-                <TouchableOpacity
-                  key={iconName}
-                  style={[
-                    styles.iconButton,
-                    {
-                      backgroundColor: colors.background,
-                      width: iconSize,
-                      height: iconSize,
-                    },
-                    selectedIcon === iconName && styles.selectedIconOverlay,
-                  ]}
-                  onPress={() => handleSelect(iconName)}
-                  accessibilityLabel={iconName}
-                  accessibilityRole="button"
-                >
-                  <Icon
-                    name={iconName}
-                    size={28}
-                    color={selectedIcon === iconName ? colors.primary : colors.text}
-                  />
-                </TouchableOpacity>
-              ))}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.container, { backgroundColor: colors.surface }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {t('select_icon')}
+              </Text>
+              <TouchableOpacity onPress={onClose} testID="close-button">
+                <Icon name="close" size={24} color={colors.text} testID="icon-close" />
+              </TouchableOpacity>
             </View>
-          </ScrollView>
+
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              <View style={styles.iconsGrid}>
+                {COMMON_ICONS.map((iconName) => (
+                  <TouchableOpacity
+                    key={iconName}
+                    style={[
+                      styles.iconButton,
+                      {
+                        backgroundColor: colors.background,
+                        width: iconSize,
+                        height: iconSize,
+                      },
+                      selectedIcon === iconName && styles.selectedIconOverlay,
+                    ]}
+                    onPress={() => handleSelect(iconName)}
+                    accessibilityLabel={iconName}
+                    accessibilityRole="button"
+                  >
+                    <Icon
+                      name={iconName}
+                      size={28}
+                      color={selectedIcon === iconName ? colors.primary : colors.text}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -136,7 +140,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },

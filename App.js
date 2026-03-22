@@ -14,9 +14,10 @@ import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsConte
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
+import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
-import { StatusBar, Platform, StyleSheet } from 'react-native';
+import { StatusBar, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
@@ -42,13 +43,16 @@ function ThemedStatusBar() {
 
 function AppContent() {
   const paperTheme = useMaterialTheme();
+  const { blurCount } = useAppBlur();
 
   return (
-    <PaperProvider theme={paperTheme}>
-      <ThemedStatusBar />
-      <AppInitializer />
-      <ImportProgressModal />
-    </PaperProvider>
+    <View style={[styles.container, blurCount > 0 && styles.blurred]}>
+      <PaperProvider theme={paperTheme}>
+        <ThemedStatusBar />
+        <AppInitializer />
+        <ImportProgressModal />
+      </PaperProvider>
+    </View>
   );
 }
 
@@ -60,25 +64,27 @@ export default function App() {
           <LocalizationProvider>
             <ThemeConfigProvider>
               <ThemeColorsProvider>
-                <DialogProvider>
-                  <ImportProgressProvider>
-                    <AccountsDataProvider>
-                      <AccountsActionsProvider>
-                        <CategoriesProvider>
-                          <OperationsDataProvider>
-                            <OperationsActionsProvider>
-                              <BudgetsProvider>
-                                <PlannedOperationsProvider>
-                                  <AppContent />
-                                </PlannedOperationsProvider>
-                              </BudgetsProvider>
-                            </OperationsActionsProvider>
-                          </OperationsDataProvider>
-                        </CategoriesProvider>
-                      </AccountsActionsProvider>
-                    </AccountsDataProvider>
-                  </ImportProgressProvider>
-                </DialogProvider>
+                <AppBlurProvider>
+                  <DialogProvider>
+                    <ImportProgressProvider>
+                      <AccountsDataProvider>
+                        <AccountsActionsProvider>
+                          <CategoriesProvider>
+                            <OperationsDataProvider>
+                              <OperationsActionsProvider>
+                                <BudgetsProvider>
+                                  <PlannedOperationsProvider>
+                                    <AppContent />
+                                  </PlannedOperationsProvider>
+                                </BudgetsProvider>
+                              </OperationsActionsProvider>
+                            </OperationsDataProvider>
+                          </CategoriesProvider>
+                        </AccountsActionsProvider>
+                      </AccountsDataProvider>
+                    </ImportProgressProvider>
+                  </DialogProvider>
+                </AppBlurProvider>
               </ThemeColorsProvider>
             </ThemeConfigProvider>
           </LocalizationProvider>
@@ -89,6 +95,9 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  blurred: {
+    filter: [{ blur: 10 }],
+  },
   container: {
     flex: 1,
   },

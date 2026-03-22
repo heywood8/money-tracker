@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../styles/designTokens';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 const TYPE_OPTIONS = [
   { key: 'expense', icon: 'arrow-up', colorKey: 'expense' },
@@ -232,203 +233,206 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   ), [colors, t]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {isNew ? t('add_planned_operation') : t('edit_planned_operation')}
-              </Text>
-
-              {/* Name Input */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('planned_name')}</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.name ? colors.error : colors.inputBorder }]}
-                  value={values.name}
-                  onChangeText={text => setValues(v => ({ ...v, name: text }))}
-                  placeholder={t('planned_operation_name_hint')}
-                  placeholderTextColor={colors.mutedText}
-                  returnKeyType="next"
-                />
-                {errors.name && <Text style={[styles.error, { color: colors.error }]}>{errors.name}</Text>}
-              </View>
-
-              {/* Type Selector */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('operation_type')}</Text>
-                <View style={styles.typeRow}>
-                  {TYPE_OPTIONS.map(opt => {
-                    const isActive = values.type === opt.key;
-                    const typeLabelStyle = { color: isActive ? '#fff' : colors.mutedText };
-                    return (
-                      <Pressable
-                        key={opt.key}
-                        style={[
-                          styles.typeButton,
-                          {
-                            backgroundColor: isActive ? colors[opt.colorKey] : colors.inputBackground,
-                            borderColor: isActive ? colors[opt.colorKey] : colors.inputBorder,
-                          },
-                        ]}
-                        onPress={() => setValues(v => ({ ...v, type: opt.key, categoryId: null }))}
-                      >
-                        <Icon name={opt.icon} size={18} color={isActive ? '#fff' : colors.mutedText} />
-                        <Text style={[styles.typeLabel, typeLabelStyle]}>
-                          {t(`${opt.key}_label`) || t(opt.key)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Amount Input */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('amount')}</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.amount ? colors.error : colors.inputBorder }]}
-                  value={values.amount}
-                  onChangeText={text => setValues(v => ({ ...v, amount: text }))}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.mutedText}
-                  keyboardType="decimal-pad"
-                  returnKeyType="done"
-                  onSubmitEditing={Keyboard.dismiss}
-                />
-                {errors.amount && <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>}
-              </View>
-
-              {/* Account Picker */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_account')}</Text>
-                <Pressable
-                  style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.accountId ? colors.error : colors.inputBorder }]}
-                  onPress={() => setAccountPickerVisible(true)}
-                >
-                  <Text style={[styles.pickerButtonText, { color: values.accountId ? colors.text : colors.mutedText }]}>
-                    {values.accountId ? getAccountName(values.accountId) : t('select_account')}
-                  </Text>
-                  <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                </Pressable>
-                {errors.accountId && <Text style={[styles.error, { color: colors.error }]}>{errors.accountId}</Text>}
-              </View>
-
-              {/* Category Picker (for expense/income) */}
-              {values.type !== 'transfer' && (
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_category')}</Text>
-                  <Pressable
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.categoryId ? colors.error : colors.inputBorder }]}
-                    onPress={() => openCategoryPicker('category', filteredCategories)}
-                  >
-                    <Text style={[styles.pickerButtonText, { color: values.categoryId ? colors.text : colors.mutedText }]}>
-                      {values.categoryId ? getCategoryName(values.categoryId) : t('select_category')}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                  </Pressable>
-                  {errors.categoryId && <Text style={[styles.error, { color: colors.error }]}>{errors.categoryId}</Text>}
-                </View>
-              )}
-
-              {/* To Account Picker (for transfers) */}
-              {values.type === 'transfer' && (
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('to_account')}</Text>
-                  <Pressable
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.toAccountId ? colors.error : colors.inputBorder }]}
-                    onPress={() => setToAccountPickerVisible(true)}
-                  >
-                    <Text style={[styles.pickerButtonText, { color: values.toAccountId ? colors.text : colors.mutedText }]}>
-                      {values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                  </Pressable>
-                  {errors.toAccountId && <Text style={[styles.error, { color: colors.error }]}>{errors.toAccountId}</Text>}
-                </View>
-              )}
-
-              {/* Recurring Toggle */}
-              <View style={[styles.inputContainer, styles.switchRow]}>
-                <Text style={[styles.inputLabel, styles.inputLabelNoMargin, { color: colors.mutedText }]}>
-                  {t('recurring')}
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isNew ? t('add_planned_operation') : t('edit_planned_operation')}
                 </Text>
-                <Switch
-                  value={values.isRecurring}
-                  onValueChange={val => setValues(v => ({ ...v, isRecurring: val }))}
-                  trackColor={{ false: colors.border, true: colors.primary + '66' }}
-                  thumbColor={values.isRecurring ? colors.primary : colors.mutedText}
-                />
-              </View>
 
-              {/* Description */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('description')}</Text>
-                <TextInput
-                  style={[styles.input, styles.multilineInput, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                  value={values.description}
-                  onChangeText={text => setValues(v => ({ ...v, description: text }))}
-                  placeholder={t('description')}
-                  placeholderTextColor={colors.mutedText}
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
+                {/* Name Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('planned_name')}</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.name ? colors.error : colors.inputBorder }]}
+                    value={values.name}
+                    onChangeText={text => setValues(v => ({ ...v, name: text }))}
+                    placeholder={t('planned_operation_name_hint')}
+                    placeholderTextColor={colors.mutedText}
+                    returnKeyType="next"
+                  />
+                  {errors.name && <Text style={[styles.error, { color: colors.error }]}>{errors.name}</Text>}
+                </View>
 
-              {/* Action Buttons */}
-              <View style={styles.buttonRow}>
-                {!isNew && (
-                  <Pressable style={[styles.button, { backgroundColor: colors.danger || colors.delete }]} onPress={handleDelete}>
-                    <Text style={styles.buttonText}>{t('delete')}</Text>
+                {/* Type Selector */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('operation_type')}</Text>
+                  <View style={styles.typeRow}>
+                    {TYPE_OPTIONS.map(opt => {
+                      const isActive = values.type === opt.key;
+                      const typeLabelStyle = { color: isActive ? '#fff' : colors.mutedText };
+                      return (
+                        <Pressable
+                          key={opt.key}
+                          style={[
+                            styles.typeButton,
+                            {
+                              backgroundColor: isActive ? colors[opt.colorKey] : colors.inputBackground,
+                              borderColor: isActive ? colors[opt.colorKey] : colors.inputBorder,
+                            },
+                          ]}
+                          onPress={() => setValues(v => ({ ...v, type: opt.key, categoryId: null }))}
+                        >
+                          <Icon name={opt.icon} size={18} color={isActive ? '#fff' : colors.mutedText} />
+                          <Text style={[styles.typeLabel, typeLabelStyle]}>
+                            {t(`${opt.key}_label`) || t(opt.key)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Amount Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('amount')}</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.amount ? colors.error : colors.inputBorder }]}
+                    value={values.amount}
+                    onChangeText={text => setValues(v => ({ ...v, amount: text }))}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.mutedText}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={Keyboard.dismiss}
+                  />
+                  {errors.amount && <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>}
+                </View>
+
+                {/* Account Picker */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_account')}</Text>
+                  <Pressable
+                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.accountId ? colors.error : colors.inputBorder }]}
+                    onPress={() => setAccountPickerVisible(true)}
+                  >
+                    <Text style={[styles.pickerButtonText, { color: values.accountId ? colors.text : colors.mutedText }]}>
+                      {values.accountId ? getAccountName(values.accountId) : t('select_account')}
+                    </Text>
+                    <Icon name="chevron-down" size={20} color={colors.mutedText} />
                   </Pressable>
+                  {errors.accountId && <Text style={[styles.error, { color: colors.error }]}>{errors.accountId}</Text>}
+                </View>
+
+                {/* Category Picker (for expense/income) */}
+                {values.type !== 'transfer' && (
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_category')}</Text>
+                    <Pressable
+                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.categoryId ? colors.error : colors.inputBorder }]}
+                      onPress={() => openCategoryPicker('category', filteredCategories)}
+                    >
+                      <Text style={[styles.pickerButtonText, { color: values.categoryId ? colors.text : colors.mutedText }]}>
+                        {values.categoryId ? getCategoryName(values.categoryId) : t('select_category')}
+                      </Text>
+                      <Icon name="chevron-down" size={20} color={colors.mutedText} />
+                    </Pressable>
+                    {errors.categoryId && <Text style={[styles.error, { color: colors.error }]}>{errors.categoryId}</Text>}
+                  </View>
                 )}
-                <Pressable style={[styles.button, { backgroundColor: colors.border }]} onPress={handleClose}>
-                  <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
-                </Pressable>
-                <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSave}>
-                  <Text style={styles.buttonText}>{t('save')}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+
+                {/* To Account Picker (for transfers) */}
+                {values.type === 'transfer' && (
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('to_account')}</Text>
+                    <Pressable
+                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.toAccountId ? colors.error : colors.inputBorder }]}
+                      onPress={() => setToAccountPickerVisible(true)}
+                    >
+                      <Text style={[styles.pickerButtonText, { color: values.toAccountId ? colors.text : colors.mutedText }]}>
+                        {values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}
+                      </Text>
+                      <Icon name="chevron-down" size={20} color={colors.mutedText} />
+                    </Pressable>
+                    {errors.toAccountId && <Text style={[styles.error, { color: colors.error }]}>{errors.toAccountId}</Text>}
+                  </View>
+                )}
+
+                {/* Recurring Toggle */}
+                <View style={[styles.inputContainer, styles.switchRow]}>
+                  <Text style={[styles.inputLabel, styles.inputLabelNoMargin, { color: colors.mutedText }]}>
+                    {t('recurring')}
+                  </Text>
+                  <Switch
+                    value={values.isRecurring}
+                    onValueChange={val => setValues(v => ({ ...v, isRecurring: val }))}
+                    trackColor={{ false: colors.border, true: colors.primary + '66' }}
+                    thumbColor={values.isRecurring ? colors.primary : colors.mutedText}
+                  />
+                </View>
+
+                {/* Description */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('description')}</Text>
+                  <TextInput
+                    style={[styles.input, styles.multilineInput, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+                    value={values.description}
+                    onChangeText={text => setValues(v => ({ ...v, description: text }))}
+                    placeholder={t('description')}
+                    placeholderTextColor={colors.mutedText}
+                    multiline
+                    numberOfLines={2}
+                  />
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.buttonRow}>
+                  {!isNew && (
+                    <Pressable style={[styles.button, { backgroundColor: colors.danger || colors.delete }]} onPress={handleDelete}>
+                      <Text style={styles.buttonText}>{t('delete')}</Text>
+                    </Pressable>
+                  )}
+                  <Pressable style={[styles.button, { backgroundColor: colors.border }]} onPress={handleClose}>
+                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
+                  </Pressable>
+                  <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSave}>
+                    <Text style={styles.buttonText}>{t('save')}</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
 
-      {/* Account Picker Modal */}
-      {renderPickerModal(
-        accountPickerVisible,
-        setAccountPickerVisible,
-        accounts.map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
-        (id) => setValues(v => ({ ...v, accountId: id })),
-        t('select_account'),
-      )}
+        {/* Account Picker Modal */}
+        {renderPickerModal(
+          accountPickerVisible,
+          setAccountPickerVisible,
+          accounts.map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
+          (id) => setValues(v => ({ ...v, accountId: id })),
+          t('select_account'),
+        )}
 
-      {/* To Account Picker Modal */}
-      {renderPickerModal(
-        toAccountPickerVisible,
-        setToAccountPickerVisible,
-        accounts.filter(a => a.id !== values.accountId).map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
-        (id) => setValues(v => ({ ...v, toAccountId: id })),
-        t('to_account'),
-      )}
+        {/* To Account Picker Modal */}
+        {renderPickerModal(
+          toAccountPickerVisible,
+          setToAccountPickerVisible,
+          accounts.filter(a => a.id !== values.accountId).map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
+          (id) => setValues(v => ({ ...v, toAccountId: id })),
+          t('to_account'),
+        )}
 
-      {/* Category Picker Modal (hierarchical) */}
-      <PickerModal
-        visible={categoryPickerState.visible}
-        pickerType={categoryPickerState.type}
-        pickerData={categoryPickerState.data}
-        colors={colors}
-        t={t}
-        onClose={closeCategoryPicker}
-        categoryNavigation={categoryNavigation}
-        quickAddValues={{ ...values, amount: '' }}
-        onNavigateBack={navigateBack}
-        onNavigateIntoFolder={navigateIntoFolder}
-        onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
-      />
-    </Modal>
+        {/* Category Picker Modal (hierarchical) */}
+        <PickerModal
+          visible={categoryPickerState.visible}
+          pickerType={categoryPickerState.type}
+          pickerData={categoryPickerState.data}
+          colors={colors}
+          t={t}
+          onClose={closeCategoryPicker}
+          categoryNavigation={categoryNavigation}
+          quickAddValues={{ ...values, amount: '' }}
+          onNavigateBack={navigateBack}
+          onNavigateIntoFolder={navigateIntoFolder}
+          onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
+        />
+      </Modal>
+    </>
   );
 }
 
@@ -498,7 +502,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -559,7 +562,6 @@ const styles = StyleSheet.create({
     maxHeight: 300,
   },
   pickerOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },

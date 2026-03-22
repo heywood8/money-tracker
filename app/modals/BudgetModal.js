@@ -23,6 +23,7 @@ import { useBudgets } from '../contexts/BudgetsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
   const { colors } = useThemeColors();
@@ -219,332 +220,335 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
   }, [t]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex1}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleClose}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {isNew ? t('set_budget') : t('edit_budget')}
-              </Text>
-
-              <Text style={[styles.categoryLabel, { color: colors.mutedText }]}>
-                {t('budget_for_category')}: {categoryName}
-              </Text>
-
-              {/* Amount Input */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                  {t('budget_amount')}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flex1}
+        >
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isNew ? t('set_budget') : t('edit_budget')}
                 </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      color: colors.text,
-                      backgroundColor: colors.inputBackground,
-                      borderColor: errors.amount ? colors.error : colors.inputBorder,
-                    },
-                  ]}
-                  value={values.amount}
-                  onChangeText={text => setValues(v => ({ ...v, amount: text }))}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.mutedText}
-                  keyboardType="decimal-pad"
-                  returnKeyType="done"
-                  onSubmitEditing={Keyboard.dismiss}
-                />
-                {errors.amount && (
-                  <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>
-                )}
-              </View>
 
-              {/* Currency Picker */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                  {t('currency')}
+                <Text style={[styles.categoryLabel, { color: colors.mutedText }]}>
+                  {t('budget_for_category')}: {categoryName}
                 </Text>
-                <Pressable
-                  style={[
-                    styles.pickerButton,
-                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                  ]}
-                  onPress={() => setCurrencyPickerVisible(true)}
-                >
-                  <View style={styles.pickerValue}>
-                    <Text style={[styles.text16, { color: colors.text }]}> 
-                      {values.currency} {currencies[values.currency]?.symbol || ''}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color={colors.text} />
-                  </View>
-                </Pressable>
-              </View>
 
-              {/* Period Type Picker */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                  {t('period_type')}
-                </Text>
-                <Pressable
-                  style={[
-                    styles.pickerButton,
-                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                  ]}
-                  onPress={() => setPeriodPickerVisible(true)}
-                >
-                  <View style={styles.pickerValue}>
-                    <Text style={[styles.text16, { color: colors.text }]}> 
-                      {PERIOD_TYPES.find(p => p.key === values.periodType)?.label}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color={colors.text} />
-                  </View>
-                </Pressable>
-              </View>
+                {/* Amount Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                    {t('budget_amount')}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.text,
+                        backgroundColor: colors.inputBackground,
+                        borderColor: errors.amount ? colors.error : colors.inputBorder,
+                      },
+                    ]}
+                    value={values.amount}
+                    onChangeText={text => setValues(v => ({ ...v, amount: text }))}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.mutedText}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={Keyboard.dismiss}
+                  />
+                  {errors.amount && (
+                    <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>
+                  )}
+                </View>
 
-              {/* Start Date Picker */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                  {t('start_date')}
-                </Text>
-                <Pressable
-                  style={[
-                    styles.pickerButton,
-                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                  ]}
-                  onPress={() => setShowStartDatePicker(true)}
-                >
-                  <View style={styles.pickerValue}>
-                    <Text style={[styles.text16, { color: colors.text }]}> 
-                      {formatDate(values.startDate)}
-                    </Text>
-                    <Icon name="calendar" size={20} color={colors.text} />
-                  </View>
-                </Pressable>
-              </View>
-
-              {/* End Date Picker */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                  {t('end_date')}
-                </Text>
-                <View style={styles.dateRow}>
+                {/* Currency Picker */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                    {t('currency')}
+                  </Text>
                   <Pressable
                     style={[
                       styles.pickerButton,
-                      styles.flex1,
-                      {
-                        backgroundColor: colors.inputBackground,
-                        borderColor: colors.inputBorder,
-                      },
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                     ]}
-                    onPress={() => setShowEndDatePicker(true)}
+                    onPress={() => setCurrencyPickerVisible(true)}
                   >
                     <View style={styles.pickerValue}>
                       <Text style={[styles.text16, { color: colors.text }]}> 
-                        {formatDate(values.endDate)}
+                        {values.currency} {currencies[values.currency]?.symbol || ''}
+                      </Text>
+                      <Icon name="chevron-down" size={20} color={colors.text} />
+                    </View>
+                  </Pressable>
+                </View>
+
+                {/* Period Type Picker */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                    {t('period_type')}
+                  </Text>
+                  <Pressable
+                    style={[
+                      styles.pickerButton,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                    ]}
+                    onPress={() => setPeriodPickerVisible(true)}
+                  >
+                    <View style={styles.pickerValue}>
+                      <Text style={[styles.text16, { color: colors.text }]}> 
+                        {PERIOD_TYPES.find(p => p.key === values.periodType)?.label}
+                      </Text>
+                      <Icon name="chevron-down" size={20} color={colors.text} />
+                    </View>
+                  </Pressable>
+                </View>
+
+                {/* Start Date Picker */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                    {t('start_date')}
+                  </Text>
+                  <Pressable
+                    style={[
+                      styles.pickerButton,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                    ]}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <View style={styles.pickerValue}>
+                      <Text style={[styles.text16, { color: colors.text }]}> 
+                        {formatDate(values.startDate)}
                       </Text>
                       <Icon name="calendar" size={20} color={colors.text} />
                     </View>
                   </Pressable>
-                  {values.endDate && (
+                </View>
+
+                {/* End Date Picker */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                    {t('end_date')}
+                  </Text>
+                  <View style={styles.dateRow}>
                     <Pressable
-                      style={[styles.clearButton, { backgroundColor: colors.secondary }]}
-                      onPress={() => setValues(v => ({ ...v, endDate: null }))}
+                      style={[
+                        styles.pickerButton,
+                        styles.flex1,
+                        {
+                          backgroundColor: colors.inputBackground,
+                          borderColor: colors.inputBorder,
+                        },
+                      ]}
+                      onPress={() => setShowEndDatePicker(true)}
                     >
-                      <Icon name="close" size={20} color={colors.text} />
+                      <View style={styles.pickerValue}>
+                        <Text style={[styles.text16, { color: colors.text }]}> 
+                          {formatDate(values.endDate)}
+                        </Text>
+                        <Icon name="calendar" size={20} color={colors.text} />
+                      </View>
                     </Pressable>
-                  )}
-                </View>
-              </View>
-
-              {/* Recurring Switch */}
-              <View style={styles.switchContainer}>
-                <View style={styles.switchLabel}>
-                  <Icon name="sync" size={20} color={colors.text} style={styles.iconMarginRight} />
-                  <Text style={[styles.text16, { color: colors.text }]}>{t('recurring')}</Text>
-                </View>
-                <Switch
-                  value={values.isRecurring}
-                  onValueChange={(value) => setValues(v => ({ ...v, isRecurring: value }))}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={colors.card}
-                />
-              </View>
-
-              {/* Rollover Switch */}
-              <View style={styles.switchContainer}>
-                <View style={styles.switchLabel}>
-                  <Icon name="arrow-right-thick" size={20} color={colors.text} style={styles.iconMarginRight} />
-                  <View style={styles.flex1}>
-                    <Text style={[styles.text16, { color: colors.text }]}>{t('rollover')}</Text>
-                    <Text style={[styles.text12, styles.smallTop, { color: colors.mutedText }]}> 
-                      Carry unused amount to next period
-                    </Text>
+                    {values.endDate && (
+                      <Pressable
+                        style={[styles.clearButton, { backgroundColor: colors.secondary }]}
+                        onPress={() => setValues(v => ({ ...v, endDate: null }))}
+                      >
+                        <Icon name="close" size={20} color={colors.text} />
+                      </Pressable>
+                    )}
                   </View>
                 </View>
-                <Switch
-                  value={values.rolloverEnabled}
-                  onValueChange={(value) => setValues(v => ({ ...v, rolloverEnabled: value }))}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={colors.card}
-                />
-              </View>
 
-              {errors.general && (
-                <Text style={[styles.error, { color: colors.error }]}>{errors.general}</Text>
-              )}
+                {/* Recurring Switch */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.switchLabel}>
+                    <Icon name="sync" size={20} color={colors.text} style={styles.iconMarginRight} />
+                    <Text style={[styles.text16, { color: colors.text }]}>{t('recurring')}</Text>
+                  </View>
+                  <Switch
+                    value={values.isRecurring}
+                    onValueChange={(value) => setValues(v => ({ ...v, isRecurring: value }))}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={colors.card}
+                  />
+                </View>
 
-              {/* Delete Button (only for existing budgets) */}
-              {!isNew && (
+                {/* Rollover Switch */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.switchLabel}>
+                    <Icon name="arrow-right-thick" size={20} color={colors.text} style={styles.iconMarginRight} />
+                    <View style={styles.flex1}>
+                      <Text style={[styles.text16, { color: colors.text }]}>{t('rollover')}</Text>
+                      <Text style={[styles.text12, styles.smallTop, { color: colors.mutedText }]}> 
+                      Carry unused amount to next period
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={values.rolloverEnabled}
+                    onValueChange={(value) => setValues(v => ({ ...v, rolloverEnabled: value }))}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={colors.card}
+                  />
+                </View>
+
+                {errors.general && (
+                  <Text style={[styles.error, { color: colors.error }]}>{errors.general}</Text>
+                )}
+
+                {/* Delete Button (only for existing budgets) */}
+                {!isNew && (
+                  <Pressable
+                    style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
+                    onPress={handleDelete}
+                  >
+                    <Icon name="delete-outline" size={20} color={colors.delete} />
+                    <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
+                      {t('delete_budget')}
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+
+              {/* Action Buttons */}
+              <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
                 <Pressable
-                  style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
-                  onPress={handleDelete}
+                  style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                  onPress={handleClose}
                 >
-                  <Icon name="delete-outline" size={20} color={colors.delete} />
-                  <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
-                    {t('delete_budget')}
+                  <Text style={[styles.buttonText, { color: colors.text }]}>
+                    {t('cancel')}
                   </Text>
                 </Pressable>
-              )}
-            </ScrollView>
-
-            {/* Action Buttons */}
-            <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: colors.secondary }]}
-                onPress={handleClose}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>
-                  {t('cancel')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={handleSave}
-              >
-                <Text style={[styles.buttonText, { color: colors.text }]}>
-                  {t('save')}
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-
-      {/* Start Date Picker */}
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={values.startDate ? new Date(values.startDate + 'T00:00:00') : new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleStartDateChange}
-        />
-      )}
-
-      {/* End Date Picker */}
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={values.endDate ? new Date(values.endDate + 'T00:00:00') : new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleEndDateChange}
-          minimumDate={values.startDate ? new Date(values.startDate + 'T00:00:00') : undefined}
-        />
-      )}
-
-      {/* Currency Picker Modal */}
-      <Modal
-        visible={currencyPickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCurrencyPickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setCurrencyPickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('select_currency')}</Text>
-            <FlatList
-              data={availableCurrencies}
-              keyExtractor={item => item.code}
-              renderItem={({ item }) => (
                 <Pressable
-                  onPress={() => {
-                    setValues(v => ({ ...v, currency: item.code }));
-                    setCurrencyPickerVisible(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                    values.currency === item.code && { backgroundColor: colors.selected },
-                  ]}
+                  style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                  onPress={handleSave}
                 >
-                  <View style={styles.currencyOption}>
-                    <Text style={[styles.text18bold, { color: colors.text }]}> 
-                      {item.code}
-                    </Text>
-                    <Text style={[styles.text14muted, { color: colors.mutedText }]}> 
-                      {item.symbol} - {item.name}
-                    </Text>
-                  </View>
+                  <Text style={[styles.buttonText, { color: colors.text }]}>
+                    {t('save')}
+                  </Text>
                 </Pressable>
-              )}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setCurrencyPickerVisible(false)}>
-              <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
+              </View>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </KeyboardAvoidingView>
 
-      {/* Period Type Picker Modal */}
-      <Modal
-        visible={periodPickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setPeriodPickerVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setPeriodPickerVisible(false)}>
-          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('period_type')}</Text>
-            <FlatList
-              data={PERIOD_TYPES}
-              keyExtractor={item => item.key}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setValues(v => ({ ...v, periodType: item.key }));
-                    setPeriodPickerVisible(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerOption,
-                    { borderColor: colors.border },
-                    pressed && { backgroundColor: colors.selected },
-                    values.periodType === item.key && { backgroundColor: colors.selected },
-                  ]}
-                >
-                  <Text style={[styles.text18, { color: colors.text }]}>{item.label}</Text>
-                </Pressable>
-              )}
-            />
-            <Pressable style={styles.closeButton} onPress={() => setPeriodPickerVisible(false)}>
-              <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
+        {/* Start Date Picker */}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={values.startDate ? new Date(values.startDate + 'T00:00:00') : new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleStartDateChange}
+          />
+        )}
+
+        {/* End Date Picker */}
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={values.endDate ? new Date(values.endDate + 'T00:00:00') : new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleEndDateChange}
+            minimumDate={values.startDate ? new Date(values.startDate + 'T00:00:00') : undefined}
+          />
+        )}
+
+        {/* Currency Picker Modal */}
+        <Modal
+          visible={currencyPickerVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setCurrencyPickerVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setCurrencyPickerVisible(false)}>
+            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('select_currency')}</Text>
+              <FlatList
+                data={availableCurrencies}
+                keyExtractor={item => item.code}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => {
+                      setValues(v => ({ ...v, currency: item.code }));
+                      setCurrencyPickerVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && { backgroundColor: colors.selected },
+                      values.currency === item.code && { backgroundColor: colors.selected },
+                    ]}
+                  >
+                    <View style={styles.currencyOption}>
+                      <Text style={[styles.text18bold, { color: colors.text }]}> 
+                        {item.code}
+                      </Text>
+                      <Text style={[styles.text14muted, { color: colors.mutedText }]}> 
+                        {item.symbol} - {item.name}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+              <Pressable style={styles.closeButton} onPress={() => setCurrencyPickerVisible(false)}>
+                <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </Modal>
+
+        {/* Period Type Picker Modal */}
+        <Modal
+          visible={periodPickerVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setPeriodPickerVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setPeriodPickerVisible(false)}>
+            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('period_type')}</Text>
+              <FlatList
+                data={PERIOD_TYPES}
+                keyExtractor={item => item.key}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => {
+                      setValues(v => ({ ...v, periodType: item.key }));
+                      setPeriodPickerVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.pickerOption,
+                      { borderColor: colors.border },
+                      pressed && { backgroundColor: colors.selected },
+                      values.periodType === item.key && { backgroundColor: colors.selected },
+                    ]}
+                  >
+                    <Text style={[styles.text18, { color: colors.text }]}>{item.label}</Text>
+                  </Pressable>
+                )}
+              />
+              <Pressable style={styles.closeButton} onPress={() => setPeriodPickerVisible(false)}>
+                <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </Modal>
-    </Modal>
+    </>
   );
 }
 
@@ -666,7 +670,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
     flex: 1,
     justifyContent: 'center',
   },

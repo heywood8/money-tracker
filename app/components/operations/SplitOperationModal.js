@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../../styles/designTokens';
+import ModalBlurOverlay from '../ModalBlurOverlay';
 
 /**
  * SplitOperationModal Component
@@ -143,6 +144,7 @@ export default function SplitOperationModal({
 
   return (
     <>
+      {visible && <ModalBlurOverlay />}
       <Modal
         visible={visible}
         animationType="fade"
@@ -363,7 +365,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
     flex: 1,
     justifyContent: 'center',
   },

@@ -32,6 +32,7 @@ import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import useOperationPicker from '../hooks/useOperationPicker';
 
 /**
@@ -329,6 +330,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   return (
     <>
+      {visible && <ModalBlurOverlay />}
       <Modal
         visible={visible}
         animationType="slide"
@@ -718,7 +720,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
     flex: 1,
     justifyContent: 'center',
   },

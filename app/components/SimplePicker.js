@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
 import { HORIZONTAL_PADDING } from '../styles/layout';
+import ModalBlurOverlay from './ModalBlurOverlay';
 
 /**
  * SimplePicker - A picker component for Android
@@ -73,6 +74,8 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
         </Text>
       </TouchableOpacity>
 
+
+      {modalVisible && <ModalBlurOverlay />}
       <Modal
         visible={modalVisible}
         transparent={true}
@@ -143,7 +146,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'center',
   },

@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import ModalBlurOverlay from './ModalBlurOverlay';
 
 /**
  * Material Design Dialog Component
@@ -45,62 +46,65 @@ export default function MaterialDialog({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}
-    >
-      <Pressable
-        testID="material-dialog-overlay"
-        style={styles.overlay}
-        onPress={onDismiss}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onDismiss}
       >
         <Pressable
-          testID="material-dialog-content"
-          style={[styles.dialog, { backgroundColor: colors.card }]}
-          onPress={() => {}}
+          testID="material-dialog-overlay"
+          style={styles.overlay}
+          onPress={onDismiss}
         >
-          {/* Title */}
-          {title && (
-            <Text style={[styles.title, { color: colors.text }]}>
-              {title}
-            </Text>
-          )}
+          <Pressable
+            testID="material-dialog-content"
+            style={[styles.dialog, { backgroundColor: colors.card }]}
+            onPress={() => {}}
+          >
+            {/* Title */}
+            {title && (
+              <Text style={[styles.title, { color: colors.text }]}>
+                {title}
+              </Text>
+            )}
 
-          {/* Message */}
-          {message && (
-            <Text style={[styles.message, { color: colors.text }]}>
-              {message}
-            </Text>
-          )}
+            {/* Message */}
+            {message && (
+              <Text style={[styles.message, { color: colors.text }]}>
+                {message}
+              </Text>
+            )}
 
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            {buttons.map((button, index) => (
-              <Pressable
-                key={index}
-                style={({ pressed }) => [
-                  styles.button,
-                  pressed && { backgroundColor: colors.selected },
-                ]}
-                onPress={() => handleButtonPress(button)}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    getButtonStyle(button.style),
-                    button.style === 'destructive' && styles.boldText,
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              {buttons.map((button, index) => (
+                <Pressable
+                  key={index}
+                  style={({ pressed }) => [
+                    styles.button,
+                    pressed && { backgroundColor: colors.selected },
                   ]}
+                  onPress={() => handleButtonPress(button)}
                 >
-                  {button.text}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      getButtonStyle(button.style),
+                      button.style === 'destructive' && styles.boldText,
+                    ]}
+                  >
+                    {button.text}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -164,7 +168,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     flex: 1,
     justifyContent: 'center',
   },
