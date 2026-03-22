@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.0](https://github.com/heywood8/money-tracker/compare/penny-v0.54.2...penny-v0.55.0) (2026-03-22)
+
+
+### Features
+
+* add glassmorphism blur effect when modals are open ([#354](https://github.com/heywood8/money-tracker/issues/354)) ([8806a37](https://github.com/heywood8/money-tracker/commit/8806a37ecdb085efffc2ec22bdf546ec8539c408))
+
 ## [0.54.2](https://github.com/heywood8/money-tracker/compare/penny-v0.54.1...penny-v0.54.2) (2026-03-22)
 
 
