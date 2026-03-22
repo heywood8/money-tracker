@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -178,8 +178,10 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
     throw new Error('Download failed');
   }
 
-  await Sharing.shareAsync(result.uri, {
-    mimeType: 'application/vnd.android.package-archive',
-    dialogTitle: 'Install Update',
+  const contentUri = await FileSystem.getContentUriAsync(result.uri);
+  await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+    data: contentUri,
+    flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+    type: 'application/vnd.android.package-archive',
   });
 };
