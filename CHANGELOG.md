@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.56.0](https://github.com/heywood8/money-tracker/compare/penny-v0.55.0...penny-v0.56.0) (2026-03-22)
+
+
+### Features
+
+* show category/to-account and date side-by-side for all operation types ([#356](https://github.com/heywood8/money-tracker/issues/356)) ([8bcdab1](https://github.com/heywood8/money-tracker/commit/8bcdab1bfcc12ae8375949132111e4e14219fc3b))
+
 ## [0.55.0](https://github.com/heywood8/money-tracker/compare/penny-v0.54.2...penny-v0.55.0) (2026-03-22)
 
 
