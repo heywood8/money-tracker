@@ -636,6 +636,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  categoryDateRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
   categoryLabel: {
     flex: 1,
     marginLeft: SPACING.md,
@@ -723,11 +728,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  categoryDateRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
   pickerButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -737,6 +737,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     minHeight: 48,
     padding: SPACING.md,
+  },
+  pickerButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   pickerButtonHalf: {
     alignItems: 'center',
@@ -748,11 +753,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
     overflow: 'hidden',
     padding: SPACING.md,
-  },
-  pickerButtonContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
   },
   pickerButtonText: {
     fontSize: 16,
