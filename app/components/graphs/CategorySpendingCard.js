@@ -6,6 +6,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
+import ModalBlurOverlay from '../ModalBlurOverlay';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -150,6 +151,7 @@ const CategorySpendingCard = ({
       </View>
 
       {/* Custom Category Picker Modal */}
+      {pickerVisible && <ModalBlurOverlay />}
       <Modal
         visible={pickerVisible}
         transparent={true}
@@ -373,7 +375,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'center',
   },

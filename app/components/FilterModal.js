@@ -13,6 +13,7 @@ import {
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import ModalBlurOverlay from './ModalBlurOverlay';
 import { formatDate } from '../services/BalanceHistoryDB';
 
 const ICON_SELECTED_COLOR = '#fff';
@@ -208,9 +209,11 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
   })();
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <Pressable style={styles.modalOverlay} onPress={onClose}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -514,9 +517,10 @@ const FilterModal = ({ visible, onClose, filters, onApplyFilters, accounts, cate
               }}
             />
           )}
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
@@ -653,7 +657,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'center',
   },

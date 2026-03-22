@@ -19,6 +19,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import IconPicker from '../components/IconPicker';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import PropTypes from 'prop-types';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
@@ -134,18 +135,20 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
   }, [category, categories]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior="height"
-        style={styles.keyboardAvoid}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleClose}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+        <KeyboardAvoidingView
+          behavior="height"
+          style={styles.keyboardAvoid}
+        >
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
@@ -401,7 +404,8 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
           </Pressable>
         </Pressable>
       </Modal>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -486,7 +490,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
     flex: 1,
     justifyContent: 'center',
   },

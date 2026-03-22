@@ -24,6 +24,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../styles/designTokens';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 const TYPE_OPTIONS = [
   { key: 'expense', icon: 'arrow-up', colorKey: 'expense' },
@@ -232,10 +233,12 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   ), [colors, t]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
               <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -428,7 +431,8 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
         onNavigateIntoFolder={navigateIntoFolder}
         onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
       />
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -498,7 +502,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -559,7 +562,6 @@ const styles = StyleSheet.create({
     maxHeight: 300,
   },
   pickerOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },

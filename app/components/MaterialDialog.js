@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import ModalBlurOverlay from './ModalBlurOverlay';
 
 /**
  * Material Design Dialog Component
@@ -45,18 +46,20 @@ export default function MaterialDialog({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}
-    >
-      <Pressable
-        testID="material-dialog-overlay"
-        style={styles.overlay}
-        onPress={onDismiss}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onDismiss}
       >
         <Pressable
+          testID="material-dialog-overlay"
+          style={styles.overlay}
+          onPress={onDismiss}
+        >
+          <Pressable
           testID="material-dialog-content"
           style={[styles.dialog, { backgroundColor: colors.card }]}
           onPress={() => {}}
@@ -98,9 +101,10 @@ export default function MaterialDialog({
               </Pressable>
             ))}
           </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -164,7 +168,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     flex: 1,
     justifyContent: 'center',
   },

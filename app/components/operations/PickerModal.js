@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import * as Currency from '../../services/currency';
 import currencies from '../../../assets/currencies.json';
+import ModalBlurOverlay from '../ModalBlurOverlay';
 
 /**
  * Get currency symbol from currency code
@@ -38,14 +39,16 @@ const PickerModal = ({
   onAutoAddWithAccount,
 }) => {
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <Pressable style={styles.modalOverlay} onPress={onClose}>
+          <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
           {/* Breadcrumb navigation for categories */}
           {pickerType === 'category' && categoryNavigation.breadcrumb.length > 0 && (
             <View style={[styles.breadcrumbContainer, { borderBottomColor: colors.border }]}>
@@ -154,7 +157,8 @@ const PickerModal = ({
           )}
         </Pressable>
       </Pressable>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
@@ -200,7 +204,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'flex-end',
   },

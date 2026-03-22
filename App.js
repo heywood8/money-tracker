@@ -14,9 +14,10 @@ import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsConte
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
+import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
-import { StatusBar, Platform, StyleSheet } from 'react-native';
+import { StatusBar, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
@@ -42,13 +43,16 @@ function ThemedStatusBar() {
 
 function AppContent() {
   const paperTheme = useMaterialTheme();
+  const { blurCount } = useAppBlur();
 
   return (
-    <PaperProvider theme={paperTheme}>
-      <ThemedStatusBar />
-      <AppInitializer />
-      <ImportProgressModal />
-    </PaperProvider>
+    <View style={[styles.container, blurCount > 0 && styles.blurred]}>
+      <PaperProvider theme={paperTheme}>
+        <ThemedStatusBar />
+        <AppInitializer />
+        <ImportProgressModal />
+      </PaperProvider>
+    </View>
   );
 }
 
@@ -60,6 +64,7 @@ export default function App() {
           <LocalizationProvider>
             <ThemeConfigProvider>
               <ThemeColorsProvider>
+                <AppBlurProvider>
                 <DialogProvider>
                   <ImportProgressProvider>
                     <AccountsDataProvider>
@@ -79,6 +84,7 @@ export default function App() {
                     </AccountsDataProvider>
                   </ImportProgressProvider>
                 </DialogProvider>
+              </AppBlurProvider>
               </ThemeColorsProvider>
             </ThemeConfigProvider>
           </LocalizationProvider>
@@ -91,5 +97,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  blurred: {
+    filter: [{ blur: 10 }],
   },
 });

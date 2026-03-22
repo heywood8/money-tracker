@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, TextInput 
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
+import ModalBlurOverlay from '../ModalBlurOverlay';
 
 /**
  * Modal component for displaying and editing balance history table
@@ -23,14 +24,16 @@ const BalanceHistoryModal = ({
   onDeleteBalance,
 }) => {
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
           {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <View style={styles.modalHeaderLeft}>
@@ -132,7 +135,8 @@ const BalanceHistoryModal = ({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
@@ -216,7 +220,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'center',
     padding: 16,

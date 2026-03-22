@@ -6,6 +6,7 @@ import { HORIZONTAL_PADDING } from '../../styles/layout';
 import SimplePicker from '../SimplePicker';
 import ExpensePieChart from './ExpensePieChart';
 import IncomePieChart from './IncomePieChart';
+import ModalBlurOverlay from '../ModalBlurOverlay';
 
 /**
  * Modal component for displaying expense or income charts with category navigation
@@ -80,15 +81,17 @@ const ChartModal = ({
   ).current;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose} testID="modal-overlay">
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => {}} testID="modal-content-wrapper">
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <TouchableWithoutFeedback onPress={onClose} testID="modal-overlay">
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}} testID="modal-content-wrapper">
             <View style={[styles.modalContent, { backgroundColor: colors.surface }]} {...panResponder.panHandlers}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderLeft}>
@@ -178,8 +181,9 @@ const ChartModal = ({
             </View>
           </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </>
   );
 };
 
@@ -218,7 +222,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: 'center',
     padding: 16,

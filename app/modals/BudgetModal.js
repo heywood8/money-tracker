@@ -23,6 +23,7 @@ import { useBudgets } from '../contexts/BudgetsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
   const { colors } = useThemeColors();
@@ -219,18 +220,20 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
   }, [t]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex1}
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleClose}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flex1}
+        >
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
@@ -544,7 +547,8 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
           </Pressable>
         </Pressable>
       </Modal>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -666,7 +670,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
     flex: 1,
     justifyContent: 'center',
   },
