@@ -376,12 +376,13 @@ describe('OperationModal', () => {
       expect(getByDisplayValue('Test description')).toBeTruthy();
     });
 
-    it('does not show description field for new operations', () => {
+    it('shows description field for new operations', () => {
       const { queryByPlaceholderText } = render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      expect(queryByPlaceholderText('description')).toBeFalsy();
+      // Description autocomplete is shown for both new and existing operations
+      expect(queryByPlaceholderText('description')).toBeTruthy();
     });
   });
 

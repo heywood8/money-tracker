@@ -1605,3 +1605,27 @@ export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
     throw error;
   }
 };
+
+/**
+ * Get distinct operation descriptions ordered by usage frequency (most used first).
+ * Used for autocomplete suggestions in the operation form.
+ * @param {number} limit - Maximum number of descriptions to return
+ * @returns {Promise<string[]>} Array of description strings, most used first
+ */
+export const getDistinctDescriptions = async (limit = 100) => {
+  try {
+    const results = await queryAll(
+      `SELECT description
+       FROM operations
+       WHERE description IS NOT NULL AND description != ''
+       GROUP BY description
+       ORDER BY COUNT(*) DESC, description ASC
+       LIMIT ?`,
+      [limit],
+    );
+    return (results || []).map(row => row.description);
+  } catch (error) {
+    console.error('Failed to get distinct descriptions:', error);
+    throw error;
+  }
+};
