@@ -2442,4 +2442,54 @@ describe('OperationsDB Service', () => {
       await expect(OperationsDB.getTopTransferTargetAccounts(3)).rejects.toThrow('DB error');
     });
   });
+
+  describe('getDistinctDescriptions', () => {
+    it('returns descriptions ordered by frequency', async () => {
+      queryAll.mockResolvedValue([
+        { description: 'Coffee' },
+        { description: 'Groceries' },
+        { description: 'Rent' },
+      ]);
+
+      const result = await OperationsDB.getDistinctDescriptions();
+
+      expect(result).toEqual(['Coffee', 'Groceries', 'Rent']);
+    });
+
+    it('returns empty array when no descriptions exist', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const result = await OperationsDB.getDistinctDescriptions();
+
+      expect(result).toEqual([]);
+    });
+
+    it('queries with GROUP BY, ORDER BY COUNT and applies limit', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getDistinctDescriptions(50);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('GROUP BY description');
+      expect(sql).toContain('COUNT(*)');
+      expect(sql).toContain('LIMIT ?');
+      expect(sql).toContain("description IS NOT NULL AND description != ''");
+      expect(params).toEqual([50]);
+    });
+
+    it('uses default limit of 100', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getDistinctDescriptions();
+
+      const [, params] = queryAll.mock.calls[0];
+      expect(params).toEqual([100]);
+    });
+
+    it('throws on database error', async () => {
+      queryAll.mockRejectedValue(new Error('DB error'));
+
+      await expect(OperationsDB.getDistinctDescriptions()).rejects.toThrow('DB error');
+    });
+  });
 });

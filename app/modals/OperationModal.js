@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -11,7 +11,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -23,8 +22,10 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
+import DescriptionAutocomplete from '../components/DescriptionAutocomplete';
 import OperationFormFields from '../components/operations/OperationFormFields';
 import SplitOperationModal from '../components/operations/SplitOperationModal';
+import { getDistinctDescriptions } from '../services/OperationsDB';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -44,7 +45,7 @@ import useOperationPicker from '../hooks/useOperationPicker';
  * Additional modal-specific fields:
  * - Type picker (opens modal picker)
  * - Date picker
- * - Description field (only when editing)
+ * - Description field with autocomplete suggestions (shown for both new and existing operations)
  * - Multi-currency fields (for cross-currency transfers)
  */
 
@@ -119,6 +120,15 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   // State for split modal
   const [showSplitModal, setShowSplitModal] = useState(false);
+
+  // Autocomplete suggestions for description field
+  const [descriptionSuggestions, setDescriptionSuggestions] = useState([]);
+
+  useEffect(() => {
+    if (visible) {
+      getDistinctDescriptions().then(setDescriptionSuggestions).catch(() => {});
+    }
+  }, [visible]);
 
   // Determine if split button should be shown
   // Only for editing expense/income (not transfers, not shadow operations, not new)
@@ -390,27 +400,15 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     </View>
                   </Pressable>
 
-                  {/* Description Input - Only show when editing existing operations */}
-                  {!isNew && (
-                    <TextInput
-                      style={[
-                        styles.input,
-                        styles.descriptionInput,
-                        { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                        isShadowOperation && styles.disabledInput,
-                      ]}
-                      value={values.description}
-                      onChangeText={handleDescriptionChange}
-                      placeholder={t('description')}
-                      placeholderTextColor={colors.mutedText}
-                      multiline
-                      numberOfLines={3}
-                      textAlignVertical="top"
-                      returnKeyType="done"
-                      onSubmitEditing={Keyboard.dismiss}
-                      editable={!isShadowOperation}
-                    />
-                  )}
+                  {/* Description Input with autocomplete suggestions */}
+                  <DescriptionAutocomplete
+                    value={values.description || ''}
+                    onChangeText={handleDescriptionChange}
+                    suggestions={descriptionSuggestions}
+                    placeholder={t('description')}
+                    editable={!isShadowOperation}
+                    colors={colors}
+                  />
 
                   {errors.general && <Text style={styles.error}>{errors.general}</Text>}
                 </ScrollView>
@@ -631,9 +629,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  descriptionInput: {
-    minHeight: 80,
-  },
   disabledButton: {
     opacity: 0.5,
   },
@@ -647,13 +642,6 @@ const styles = StyleSheet.create({
   },
   fullFlex: {
     flex: 1,
-  },
-  input: {
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    fontSize: 16,
-    marginBottom: SPACING.md,
-    padding: SPACING.md,
   },
   modalButton: {
     alignItems: 'center',
