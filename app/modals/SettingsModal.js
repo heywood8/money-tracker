@@ -17,6 +17,7 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -536,7 +537,9 @@ export default function SettingsModal({ visible, onClose }) {
   const logKeyExtractor = useCallback((item) => String(item.id), []);
 
   return (
-    <Portal>
+    <>
+      {visible && <ModalBlurOverlay />}
+      <Portal>
       <Modal
         visible={visible}
         onDismiss={backupsModalVisible ? closeBackupsModal : (logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)))}
@@ -916,6 +919,7 @@ export default function SettingsModal({ visible, onClose }) {
         </Modal>
       )}
     </Portal>
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 
 export default function ImportProgressModal() {
   const { colors } = useThemeColors();
@@ -120,7 +121,9 @@ export default function ImportProgressModal() {
   };
 
   return (
-    <Portal>
+    <>
+      {isImporting && <ModalBlurOverlay />}
+      <Portal>
       <Modal
         visible={isImporting}
         dismissable={false}
@@ -191,6 +194,7 @@ export default function ImportProgressModal() {
         </View>
       </Modal>
     </Portal>
+    </>
   );
 }
 
