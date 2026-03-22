@@ -348,5 +348,9 @@
   "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
   "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",
   "update_now": "Update now",
-  "later": "Later"
+  "later": "Later",
+  "local_backups": "Lokale Backups",
+  "local_backups_empty": "Noch keine lokalen Backups",
+  "delete_backup": "Backup löschen",
+  "delete_backup_confirm": "Dieses Backup löschen? Dies kann nicht rückgängig gemacht werden."
 }

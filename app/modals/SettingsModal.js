@@ -9,9 +9,11 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, importBackup } from '../services/BackupRestore';
+import { exportBackup, importBackup, restoreBackup } from '../services/BackupRestore';
+import { getStoredBackups } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
@@ -34,13 +36,17 @@ export default function SettingsModal({ visible, onClose }) {
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
   const [logsModalVisible, setLogsModalVisible] = useState(false);
+  const [backupsModalVisible, setBackupsModalVisible] = useState(false);
   const [logFilter, setLogFilter] = useState('all');
   const [apkDownloadProgress, setApkDownloadProgress] = useState(null);
+  const [storedBackups, setStoredBackups] = useState([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
   const exportFormatSlideAnim = useRef(new Animated.Value(0)).current;
   const logsSlideAnim = useRef(new Animated.Value(0)).current;
+  const backupsSlideAnim = useRef(new Animated.Value(0)).current;
   const logsFlatListRef = useRef(null);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
@@ -244,6 +250,100 @@ export default function SettingsModal({ visible, onClose }) {
     clearLogs();
   }, [clearLogs]);
 
+  const loadStoredBackups = useCallback(async () => {
+    setBackupsLoading(true);
+    try {
+      const uris = await getStoredBackups();
+      const infos = await Promise.all(
+        uris.map(async (uri) => {
+          const filename = uri.split('/').pop();
+          const info = await LegacyFileSystem.getInfoAsync(uri);
+          return { uri, filename, size: info.size || 0 };
+        }),
+      );
+      setStoredBackups(infos.reverse());
+    } catch (error) {
+      console.error('Failed to load stored backups:', error);
+      setStoredBackups([]);
+    } finally {
+      setBackupsLoading(false);
+    }
+  }, []);
+
+  const openBackupsModal = useCallback(() => {
+    setBackupsModalVisible(true);
+    loadStoredBackups();
+    Animated.timing(backupsSlideAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [backupsSlideAnim, loadStoredBackups]);
+
+  const closeBackupsModal = useCallback(() => {
+    Animated.timing(backupsSlideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setBackupsModalVisible(false);
+    });
+  }, [backupsSlideAnim]);
+
+  const handleRestoreLocalBackup = useCallback((uri) => {
+    showDialog(
+      t('restore_database') || 'Restore Database',
+      t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.',
+      [
+        { text: t('cancel') || 'Cancel', style: 'cancel' },
+        {
+          text: t('restore_database') || 'Restore',
+          style: 'destructive',
+          onPress: async () => {
+            onClose();
+            startImport();
+            try {
+              const content = await LegacyFileSystem.readAsStringAsync(uri);
+              const backup = JSON.parse(content);
+              await restoreBackup(backup);
+              completeImport();
+            } catch (error) {
+              console.error('Local backup restore error:', error);
+              cancelImport();
+              showDialog(
+                t('error') || 'Error',
+                error.message || t('restore_error') || 'Failed to restore backup',
+                [{ text: 'OK' }],
+              );
+            }
+          },
+        },
+      ],
+    );
+  }, [showDialog, t, onClose, startImport, completeImport, cancelImport]);
+
+  const handleDeleteLocalBackup = useCallback((uri) => {
+    showDialog(
+      t('delete_backup') || 'Delete Backup',
+      t('delete_backup_confirm') || 'Delete this backup? This cannot be undone.',
+      [
+        { text: t('cancel') || 'Cancel', style: 'cancel' },
+        {
+          text: t('delete') || 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
+              setStoredBackups(prev => prev.filter(b => b.uri !== uri));
+            } catch (error) {
+              console.error('Failed to delete backup:', error);
+            }
+          },
+        },
+      ],
+    );
+  }, [showDialog, t]);
+
   const handleCheckForUpdates = useCallback(async () => {
     try {
       const result = await checkForAppUpdate();
@@ -311,11 +411,13 @@ export default function SettingsModal({ visible, onClose }) {
       setLanguageModalVisible(false);
       setExportFormatModalVisible(false);
       setLogsModalVisible(false);
+      setBackupsModalVisible(false);
       slideAnim.setValue(0);
       exportFormatSlideAnim.setValue(0);
       logsSlideAnim.setValue(0);
+      backupsSlideAnim.setValue(0);
     }
-  }, [visible, slideAnim, exportFormatSlideAnim, logsSlideAnim]);
+  }, [visible, slideAnim, exportFormatSlideAnim, logsSlideAnim, backupsSlideAnim]);
 
   // Interpolate animation values for language modal
   const settingsTranslateX = slideAnim.interpolate({
@@ -360,7 +462,62 @@ export default function SettingsModal({ visible, onClose }) {
     outputRange: [0, 1],
   });
 
-  const anySubModalOpen = languageModalVisible || exportFormatModalVisible || logsModalVisible;
+  // Interpolate animation values for backups modal
+  const backupsTranslateX = backupsSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  const backupsOpacity = backupsSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const anySubModalOpen = languageModalVisible || exportFormatModalVisible || logsModalVisible || backupsModalVisible;
+
+  const formatBackupLabel = useCallback((filename) => {
+    if (filename.startsWith('daily_')) {
+      const dateStr = filename.replace('daily_', '').replace('.json', '');
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+      });
+    }
+    if (filename.startsWith('weekly_')) {
+      const weekStr = filename.replace('weekly_', '').replace('.json', '');
+      const [year, weekPart] = weekStr.split('-');
+      return `${t('weekly') || 'Weekly'} ${weekPart}, ${year}`;
+    }
+    return filename;
+  }, [t]);
+
+  const renderBackupItem = useCallback(({ item }) => {
+    const isDaily = item.filename.startsWith('daily_');
+    const label = formatBackupLabel(item.filename);
+    const typeLabel = isDaily ? 'Daily' : (t('weekly') || 'Weekly');
+    const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
+    return (
+      <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
+        <View style={styles.backupItemLeft}>
+          <Ionicons name={isDaily ? 'calendar-outline' : 'calendar-number-outline'} size={22} color={colors.text} />
+          <View style={styles.backupItemText}>
+            <Text style={[styles.backupItemLabel, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
+              {typeLabel}{sizeKB ? ` · ${sizeKB}` : ''}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.backupItemActions}>
+          <TouchableOpacity onPress={() => handleRestoreLocalBackup(item.uri)} style={styles.backupActionButton}>
+            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
+            <Ionicons name="trash-outline" size={18} color="#c44" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [colors, t, formatBackupLabel, handleRestoreLocalBackup, handleDeleteLocalBackup]);
 
   const renderLogEntry = useCallback(({ item }) => (
     <View style={styles.logEntry}>
@@ -382,7 +539,7 @@ export default function SettingsModal({ visible, onClose }) {
     <Portal>
       <Modal
         visible={visible}
-        onDismiss={logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose))}
+        onDismiss={backupsModalVisible ? closeBackupsModal : (logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)))}
         dismissable={true}
       >
         <Animated.View style={[
@@ -436,6 +593,16 @@ export default function SettingsModal({ visible, onClose }) {
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="archive-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('local_backups') || 'Local Backups'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
@@ -683,6 +850,51 @@ export default function SettingsModal({ visible, onClose }) {
             </TouchableOpacity>
           </View>
         </Animated.View>
+
+        <Animated.View style={[
+          styles.logsModalContent,
+          { backgroundColor: colors.card },
+          {
+            transform: [{ translateX: backupsTranslateX }],
+            opacity: backupsOpacity,
+          },
+          !backupsModalVisible && styles.hidden,
+        ]}>
+          <View style={styles.languageModalHeader}>
+            <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+              {t('local_backups') || 'Local Backups'}
+            </Text>
+            <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+              <Ionicons name="refresh-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <Divider />
+
+          {backupsLoading ? (
+            <View style={styles.logsEmptyContainer}>
+              <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                {'Loading...'}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={storedBackups}
+              keyExtractor={(item) => item.uri}
+              renderItem={renderBackupItem}
+              style={styles.logsList}
+              contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+              ListEmptyComponent={
+                <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                  {t('local_backups_empty') || 'No local backups yet'}
+                </Text>
+              }
+            />
+          )}
+        </Animated.View>
       </Modal>
       {apkDownloadProgress !== null && (
         <Modal
@@ -713,6 +925,38 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
+  },
+  backupActionButton: {
+    padding: 6,
+  },
+  backupItem: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.md,
+  },
+  backupItemActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  backupItemLabel: {
+    fontSize: 15,
+  },
+  backupItemLeft: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  backupItemMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  backupItemText: {
+    flex: 1,
   },
   clearLogsText: {
     color: '#e53935',
