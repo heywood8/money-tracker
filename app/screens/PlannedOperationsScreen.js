@@ -48,11 +48,16 @@ export default function PlannedOperationsScreen() {
 
   // Filter planned operations by tab
   const filteredOps = useMemo(() => {
-    if (activeTab === 'recurring') {
-      return plannedOperations.filter(op => op.isRecurring);
-    }
-    return plannedOperations.filter(op => !op.isRecurring);
-  }, [plannedOperations, activeTab]);
+    const ops = plannedOperations.filter(op =>
+      activeTab === 'recurring' ? op.isRecurring : !op.isRecurring,
+    );
+    return [...ops].sort((a, b) => {
+      const aEx = isExecutedThisMonth(a);
+      const bEx = isExecutedThisMonth(b);
+      if (aEx === bEx) return 0;
+      return aEx ? 1 : -1;
+    });
+  }, [plannedOperations, activeTab, isExecutedThisMonth]);
 
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(a => a.id === accountId);
@@ -143,8 +148,7 @@ export default function PlannedOperationsScreen() {
 
     const itemStyle = {
       backgroundColor: colors.card,
-      borderColor: colors.border,
-      opacity: executed ? 0.6 : 1,
+      borderColor: executed ? colors.mutedText + '60' : colors.border,
     };
 
     return (
@@ -187,8 +191,7 @@ export default function PlannedOperationsScreen() {
                 backgroundColor: executed ? colors.income + '1A' : colors.primary + '1A',
               },
             ]}
-            onPress={() => !executed && handleExecute(item)}
-            disabled={executed}
+            onPress={() => handleExecute(item)}
             hitSlop={8}
           >
             <Icon
