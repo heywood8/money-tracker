@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.57.0](https://github.com/heywood8/money-tracker/compare/penny-v0.56.0...penny-v0.57.0) (2026-03-23)
+
+
+### Features
+
+* add blur overlay to SettingsModal and ImportProgressModal ([#358](https://github.com/heywood8/money-tracker/issues/358)) ([7053cf0](https://github.com/heywood8/money-tracker/commit/7053cf085d03070bf7b2e7e8a02b04216568e4b5))
+
 ## [0.56.0](https://github.com/heywood8/money-tracker/compare/penny-v0.55.0...penny-v0.56.0) (2026-03-22)
 
 
