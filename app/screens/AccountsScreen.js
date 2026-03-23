@@ -628,88 +628,88 @@ export default function AccountsScreen() {
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={styles.listContentContainer}
               >
-              <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
-              <PaperTextInput
-                mode="outlined"
-                label={t('account_name') || 'Account Name'}
-                value={editValues.name}
-                onChangeText={handleNameChange}
-                error={!!errors.name}
-                autoFocus={editingId === 'new'}
-                returnKeyType="next"
-                onSubmitEditing={() => balanceInputRef.current?.focus()}
-                blurOnSubmit={false}
-                style={styles.textInput}
-              />
-              {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
-              <PaperTextInput
-                ref={balanceInputRef}
-                mode="outlined"
-                label={t('balance') || 'Balance'}
-                value={editValues.balance}
-                onChangeText={handleBalanceChange}
-                error={!!errors.balance}
-                keyboardType="numeric"
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-                style={styles.textInput}
-              />
-              {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
-              {editingId !== 'new' && (
+                <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
+                <PaperTextInput
+                  mode="outlined"
+                  label={t('account_name') || 'Account Name'}
+                  value={editValues.name}
+                  onChangeText={handleNameChange}
+                  error={!!errors.name}
+                  autoFocus={editingId === 'new'}
+                  returnKeyType="next"
+                  onSubmitEditing={() => balanceInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                  style={styles.textInput}
+                />
+                {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+                <PaperTextInput
+                  ref={balanceInputRef}
+                  mode="outlined"
+                  label={t('balance') || 'Balance'}
+                  value={editValues.balance}
+                  onChangeText={handleBalanceChange}
+                  error={!!errors.balance}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  style={styles.textInput}
+                />
+                {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+                {editingId !== 'new' && (
+                  <View style={styles.switchContainer}>
+                    <View style={styles.switchLabelContainer}>
+                      <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
+                      <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
+                        {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={createAdjustmentOperation}
+                      onValueChange={handleToggleAdjustmentSwitch}
+                      color={colors.primary}
+                    />
+                  </View>
+                )}
                 <View style={styles.switchContainer}>
                   <View style={styles.switchLabelContainer}>
-                    <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
+                    <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
                     <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                      {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+                      {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
                     </Text>
                   </View>
                   <Switch
-                    value={createAdjustmentOperation}
-                    onValueChange={handleToggleAdjustmentSwitch}
+                    value={!!editValues.hidden}
+                    onValueChange={handleToggleHiddenSwitch}
                     color={colors.primary}
                   />
                 </View>
-              )}
-              <View style={styles.switchContainer}>
-                <View style={styles.switchLabelContainer}>
-                  <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
-                  <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                    {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
-                  </Text>
-                </View>
-                <Switch
-                  value={!!editValues.hidden}
-                  onValueChange={handleToggleHiddenSwitch}
-                  color={colors.primary}
-                />
-              </View>
-              <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
-                <View style={styles.pickerDisplay}>
-                  <Text variant="bodyLarge">
-                    {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
-                  </Text>
-                </View>
-              </TouchableRipple>
-              {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
-            </ScrollView>
-            <View style={styles.modalButtonRow}>
-              <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
-                {t('cancel') || 'Cancel'}
-              </Button>
-              {editingId !== 'new' && (
-                <Button
-                  mode="contained"
-                  buttonColor={colors.delete}
-                  onPress={handleDeleteEditingAccount}
-                  style={styles.modalButton}
-                >
-                  {t('delete') || 'Delete'}
+                <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
+                  <View style={styles.pickerDisplay}>
+                    <Text variant="bodyLarge">
+                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
+                    </Text>
+                  </View>
+                </TouchableRipple>
+                {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+              </ScrollView>
+              <View style={styles.modalButtonRow}>
+                <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
+                  {t('cancel') || 'Cancel'}
                 </Button>
-              )}
-              <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
-                {t('save') || 'Save'}
-              </Button>
-            </View>
+                {editingId !== 'new' && (
+                  <Button
+                    mode="contained"
+                    buttonColor={colors.delete}
+                    onPress={handleDeleteEditingAccount}
+                    style={styles.modalButton}
+                  >
+                    {t('delete') || 'Delete'}
+                  </Button>
+                )}
+                <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
+                  {t('save') || 'Save'}
+                </Button>
+              </View>
             </KeyboardAvoidingView>
           </View>
         </View>

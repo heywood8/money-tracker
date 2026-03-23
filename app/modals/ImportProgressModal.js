@@ -123,72 +123,72 @@ export default function ImportProgressModal() {
     <Portal>
       <Modal
         visible={isImporting}
-          dismissable={false}
-          contentContainerStyle={[
-            styles.modalContainer,
-            { backgroundColor: colors.card },
-          ]}
-        >
-          <View style={styles.header}>
-            <Ionicons
-              name="cloud-download"
-              size={32}
-              color={colors.primary}
-            />
-            <Text
-              variant="headlineSmall"
-              style={[styles.title, { color: colors.text }]}
-            >
-            Importing Database
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={[styles.subtitle, { color: colors.mutedText }]}
-            >
-            Please wait while your data is being restored...
-            </Text>
-          </View>
-
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.stepsContainer}
-            contentContainerStyle={styles.stepsContent}
+        dismissable={false}
+        contentContainerStyle={[
+          styles.modalContainer,
+          { backgroundColor: colors.card },
+        ]}
+      >
+        <View style={styles.header}>
+          <Ionicons
+            name="cloud-download"
+            size={32}
+            color={colors.primary}
+          />
+          <Text
+            variant="headlineSmall"
+            style={[styles.title, { color: colors.text }]}
           >
-            {steps.map((step, index) => (
-              <View
-                key={step.id}
-                onLayout={(event) => handleStepLayout(step.id, event)}
+            Importing Database
+          </Text>
+          <Text
+            variant="bodyMedium"
+            style={[styles.subtitle, { color: colors.mutedText }]}
+          >
+            Please wait while your data is being restored...
+          </Text>
+        </View>
+
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.stepsContainer}
+          contentContainerStyle={styles.stepsContent}
+        >
+          {steps.map((step, index) => (
+            <View
+              key={step.id}
+              onLayout={(event) => handleStepLayout(step.id, event)}
+              style={[
+                styles.stepRow,
+                { borderBottomColor: colors.border },
+                index === steps.length - 1 && styles.lastStepRow,
+              ]}
+            >
+              {renderStepIcon(step)}
+              <Text
+                variant="bodyLarge"
                 style={[
-                  styles.stepRow,
-                  { borderBottomColor: colors.border },
-                  index === steps.length - 1 && styles.lastStepRow,
+                  styles.stepLabel,
+                  { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                  step.status === 'in_progress' && styles.stepLabelActive,
                 ]}
               >
-                {renderStepIcon(step)}
-                <Text
-                  variant="bodyLarge"
-                  style={[
-                    styles.stepLabel,
-                    { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                    step.status === 'in_progress' && styles.stepLabelActive,
-                  ]}
-                >
-                  {getStepLabel(step)}
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
+                {getStepLabel(step)}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
 
-          <View style={styles.footer}>
-            <Button
-              mode="contained"
-              onPress={handleOkPress}
-              disabled={!isComplete}
-              style={styles.okButton}
-            >
-              <Text>OK</Text>
-            </Button>
-          </View>
+        <View style={styles.footer}>
+          <Button
+            mode="contained"
+            onPress={handleOkPress}
+            disabled={!isComplete}
+            style={styles.okButton}
+          >
+            <Text>OK</Text>
+          </Button>
+        </View>
       </Modal>
     </Portal>
   );
