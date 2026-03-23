@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.58.0](https://github.com/heywood8/money-tracker/compare/penny-v0.57.0...penny-v0.58.0) (2026-03-23)
+
+
+### Features
+
+* keep executed recurring ops enabled, sort to bottom ([#360](https://github.com/heywood8/money-tracker/issues/360)) ([55c04ab](https://github.com/heywood8/money-tracker/commit/55c04aba330e062a7e7b77409b5b0881de284068))
+
 ## [0.57.0](https://github.com/heywood8/money-tracker/compare/penny-v0.56.0...penny-v0.57.0) (2026-03-23)
 
 
