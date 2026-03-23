@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity, Modal as RNModal } from 'react-native';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -611,19 +612,22 @@ export default function AccountsScreen() {
         accessibilityLabel={t('add_account') || 'Add Account'}
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
       />
-      <Portal>
-        <Modal
-          visible={!!editingId}
-          onDismiss={handleCloseModal}
-          contentContainerStyle={[styles.modalContent, { backgroundColor: colors.card }]}
-        >
-          <KeyboardAvoidingView
-            behavior="height"
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.listContentContainer}
+      {!!editingId && <ModalBlurOverlay />}
+      <RNModal
+        visible={!!editingId}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <KeyboardAvoidingView
+              behavior="height"
             >
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.listContentContainer}
+              >
               <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
               <PaperTextInput
                 mode="outlined"
@@ -706,9 +710,10 @@ export default function AccountsScreen() {
                 {t('save') || 'Save'}
               </Button>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </Portal>
+            </KeyboardAvoidingView>
+          </View>
+        </View>
+      </RNModal>
       <CurrencyPickerModal
         visible={pickerVisible}
         onClose={handleClosePicker}
@@ -905,6 +910,10 @@ const styles = StyleSheet.create({
     margin: SPACING.xl,
     maxHeight: '90%',
     padding: SPACING.xl,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
   },
   modalTitle: {
     marginBottom: SPACING.lg,
