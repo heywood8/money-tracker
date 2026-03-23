@@ -234,7 +234,7 @@ describe('PlannedOperationsContext', () => {
       expect(result.current.plannedOperations).toHaveLength(0);
     });
 
-    it('shows dialog when already executed this month', async () => {
+    it('allows re-execution when already executed this month', async () => {
       const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       const plannedOp = {
         id: '1',
@@ -253,11 +253,10 @@ describe('PlannedOperationsContext', () => {
 
       await act(async () => {
         const returned = await result.current.executePlannedOperation(plannedOp);
-        expect(returned).toBeNull();
+        expect(returned).not.toBeNull();
       });
 
-      expect(mockShowDialog).toHaveBeenCalled();
-      expect(mockAddOperation).not.toHaveBeenCalled();
+      expect(mockAddOperation).toHaveBeenCalled();
     });
   });
 

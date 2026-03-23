@@ -141,12 +141,6 @@ export const PlannedOperationsProvider = ({ children }) => {
     try {
       const currentMonth = getCurrentMonth();
 
-      // Check if already executed this month
-      if (plannedOp.lastExecutedMonth === currentMonth) {
-        showDialog(t('error'), t('already_executed'), [{ text: t('ok') }]);
-        return null;
-      }
-
       // Build operation data from planned operation template
       const operationData = {
         type: plannedOp.type,
