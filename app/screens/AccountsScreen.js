@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity, Modal as RNModal } from 'react-native';
+import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -611,104 +612,108 @@ export default function AccountsScreen() {
         accessibilityLabel={t('add_account') || 'Add Account'}
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
       />
-      <Portal>
-        <Modal
-          visible={!!editingId}
-          onDismiss={handleCloseModal}
-          contentContainerStyle={[styles.modalContent, { backgroundColor: colors.card }]}
-        >
-          <KeyboardAvoidingView
-            behavior="height"
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.listContentContainer}
+      {!!editingId && <ModalBlurOverlay />}
+      <RNModal
+        visible={!!editingId}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <KeyboardAvoidingView
+              behavior="height"
             >
-              <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
-              <PaperTextInput
-                mode="outlined"
-                label={t('account_name') || 'Account Name'}
-                value={editValues.name}
-                onChangeText={handleNameChange}
-                error={!!errors.name}
-                autoFocus={editingId === 'new'}
-                returnKeyType="next"
-                onSubmitEditing={() => balanceInputRef.current?.focus()}
-                blurOnSubmit={false}
-                style={styles.textInput}
-              />
-              {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
-              <PaperTextInput
-                ref={balanceInputRef}
-                mode="outlined"
-                label={t('balance') || 'Balance'}
-                value={editValues.balance}
-                onChangeText={handleBalanceChange}
-                error={!!errors.balance}
-                keyboardType="numeric"
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-                style={styles.textInput}
-              />
-              {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
-              {editingId !== 'new' && (
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.listContentContainer}
+              >
+                <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
+                <PaperTextInput
+                  mode="outlined"
+                  label={t('account_name') || 'Account Name'}
+                  value={editValues.name}
+                  onChangeText={handleNameChange}
+                  error={!!errors.name}
+                  autoFocus={editingId === 'new'}
+                  returnKeyType="next"
+                  onSubmitEditing={() => balanceInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                  style={styles.textInput}
+                />
+                {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+                <PaperTextInput
+                  ref={balanceInputRef}
+                  mode="outlined"
+                  label={t('balance') || 'Balance'}
+                  value={editValues.balance}
+                  onChangeText={handleBalanceChange}
+                  error={!!errors.balance}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  style={styles.textInput}
+                />
+                {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+                {editingId !== 'new' && (
+                  <View style={styles.switchContainer}>
+                    <View style={styles.switchLabelContainer}>
+                      <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
+                      <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
+                        {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={createAdjustmentOperation}
+                      onValueChange={handleToggleAdjustmentSwitch}
+                      color={colors.primary}
+                    />
+                  </View>
+                )}
                 <View style={styles.switchContainer}>
                   <View style={styles.switchLabelContainer}>
-                    <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
+                    <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
                     <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                      {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+                      {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
                     </Text>
                   </View>
                   <Switch
-                    value={createAdjustmentOperation}
-                    onValueChange={handleToggleAdjustmentSwitch}
+                    value={!!editValues.hidden}
+                    onValueChange={handleToggleHiddenSwitch}
                     color={colors.primary}
                   />
                 </View>
-              )}
-              <View style={styles.switchContainer}>
-                <View style={styles.switchLabelContainer}>
-                  <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
-                  <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                    {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
-                  </Text>
-                </View>
-                <Switch
-                  value={!!editValues.hidden}
-                  onValueChange={handleToggleHiddenSwitch}
-                  color={colors.primary}
-                />
-              </View>
-              <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
-                <View style={styles.pickerDisplay}>
-                  <Text variant="bodyLarge">
-                    {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
-                  </Text>
-                </View>
-              </TouchableRipple>
-              {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
-            </ScrollView>
-            <View style={styles.modalButtonRow}>
-              <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
-                {t('cancel') || 'Cancel'}
-              </Button>
-              {editingId !== 'new' && (
-                <Button
-                  mode="contained"
-                  buttonColor={colors.delete}
-                  onPress={handleDeleteEditingAccount}
-                  style={styles.modalButton}
-                >
-                  {t('delete') || 'Delete'}
+                <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
+                  <View style={styles.pickerDisplay}>
+                    <Text variant="bodyLarge">
+                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
+                    </Text>
+                  </View>
+                </TouchableRipple>
+                {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+              </ScrollView>
+              <View style={styles.modalButtonRow}>
+                <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
+                  {t('cancel') || 'Cancel'}
                 </Button>
-              )}
-              <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
-                {t('save') || 'Save'}
-              </Button>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </Portal>
+                {editingId !== 'new' && (
+                  <Button
+                    mode="contained"
+                    buttonColor={colors.delete}
+                    onPress={handleDeleteEditingAccount}
+                    style={styles.modalButton}
+                  >
+                    {t('delete') || 'Delete'}
+                  </Button>
+                )}
+                <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
+                  {t('save') || 'Save'}
+                </Button>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </View>
+      </RNModal>
       <CurrencyPickerModal
         visible={pickerVisible}
         onClose={handleClosePicker}
@@ -905,6 +910,10 @@ const styles = StyleSheet.create({
     margin: SPACING.xl,
     maxHeight: '90%',
     padding: SPACING.xl,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
   },
   modalTitle: {
     marginBottom: SPACING.lg,
