@@ -504,18 +504,6 @@ const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
   },
-  hiddenBalance: {
-    backgroundColor: 'rgba(120, 120, 120, 0.25)',
-    borderRadius: 4,
-    height: 12,
-    width: 64,
-  },
-  hiddenBalanceSmall: {
-    backgroundColor: 'rgba(120, 120, 120, 0.25)',
-    borderRadius: 3,
-    height: 8,
-    width: 40,
-  },
   categoryButtonsContainer: {
     flexDirection: 'row',
     gap: SPACING.xs,
@@ -585,6 +573,18 @@ const styles = StyleSheet.create({
   formInputText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  hiddenBalance: {
+    backgroundColor: 'rgba(120, 120, 120, 0.25)',
+    borderRadius: 4,
+    height: 12,
+    width: 64,
+  },
+  hiddenBalanceSmall: {
+    backgroundColor: 'rgba(120, 120, 120, 0.25)',
+    borderRadius: 3,
+    height: 8,
+    width: 40,
   },
   typeButton: {
     alignItems: 'center',

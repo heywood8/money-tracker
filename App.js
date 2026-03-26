@@ -65,29 +65,29 @@ export default function App() {
           <LocalizationProvider>
             <ThemeConfigProvider>
               <DisplaySettingsProvider>
-              <ThemeColorsProvider>
-                <AppBlurProvider>
-                  <DialogProvider>
-                    <ImportProgressProvider>
-                      <AccountsDataProvider>
-                        <AccountsActionsProvider>
-                          <CategoriesProvider>
-                            <OperationsDataProvider>
-                              <OperationsActionsProvider>
-                                <BudgetsProvider>
-                                  <PlannedOperationsProvider>
-                                    <AppContent />
-                                  </PlannedOperationsProvider>
-                                </BudgetsProvider>
-                              </OperationsActionsProvider>
-                            </OperationsDataProvider>
-                          </CategoriesProvider>
-                        </AccountsActionsProvider>
-                      </AccountsDataProvider>
-                    </ImportProgressProvider>
-                  </DialogProvider>
-                </AppBlurProvider>
-              </ThemeColorsProvider>
+                <ThemeColorsProvider>
+                  <AppBlurProvider>
+                    <DialogProvider>
+                      <ImportProgressProvider>
+                        <AccountsDataProvider>
+                          <AccountsActionsProvider>
+                            <CategoriesProvider>
+                              <OperationsDataProvider>
+                                <OperationsActionsProvider>
+                                  <BudgetsProvider>
+                                    <PlannedOperationsProvider>
+                                      <AppContent />
+                                    </PlannedOperationsProvider>
+                                  </BudgetsProvider>
+                                </OperationsActionsProvider>
+                              </OperationsDataProvider>
+                            </CategoriesProvider>
+                          </AccountsActionsProvider>
+                        </AccountsDataProvider>
+                      </ImportProgressProvider>
+                    </DialogProvider>
+                  </AppBlurProvider>
+                </ThemeColorsProvider>
               </DisplaySettingsProvider>
             </ThemeConfigProvider>
           </LocalizationProvider>

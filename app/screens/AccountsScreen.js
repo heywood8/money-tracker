@@ -799,16 +799,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  hiddenBalance: {
-    backgroundColor: 'rgba(120, 120, 120, 0.25)',
-    borderRadius: 6,
-    height: 16,
-    width: 80,
-  },
-  hiddenBalancePicker: {
-    marginTop: 4,
-    width: 70,
-  },
   accountNameWrapper: {
     flex: 7,
     justifyContent: 'center',
@@ -908,6 +898,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  hiddenBalance: {
+    backgroundColor: 'rgba(120, 120, 120, 0.25)',
+    borderRadius: 6,
+    height: 16,
+    width: 80,
+  },
+  hiddenBalancePicker: {
+    marginTop: 4,
+    width: 70,
   },
   listContentContainer: {
     paddingBottom: SPACING.xl,
