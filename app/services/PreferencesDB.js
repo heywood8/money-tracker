@@ -9,6 +9,7 @@ export const PREF_KEYS = {
   UPDATE_LAST_CHECK_AT: 'update_last_check_at',
   UPDATE_LAST_PROMPTED_VERSION: 'update_last_prompted_version',
   UPDATE_SKIP_UNTIL: 'update_skip_until',
+  HIDE_BALANCES: 'hide_balances',
 };
 
 /**

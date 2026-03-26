@@ -17,6 +17,7 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -30,6 +31,7 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 export default function SettingsModal({ visible, onClose }) {
   const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
+  const { hideBalances, setHideBalances } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
@@ -571,6 +573,25 @@ export default function SettingsModal({ visible, onClose }) {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={() => setHideBalances(!hideBalances)} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="eye-off-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('hide_balances') || 'Hide balances'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {t('hide_balances_hint') || 'Mask account balances for privacy'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name={hideBalances ? 'toggle' : 'toggle-outline'}
+                size={32}
+                color={hideBalances ? colors.primary : colors.mutedText}
+              />
             </View>
           </TouchableRipple>
 

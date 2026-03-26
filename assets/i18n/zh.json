@@ -6,6 +6,8 @@
   "settings": "设置",
   "language": "语言",
   "theme": "主题",
+  "hide_balances": "隐藏余额",
+  "hide_balances_hint": "为隐私起见遮蔽账户余额",
   "cancel": "取消",
   "save": "保存",
   "add": "添加",

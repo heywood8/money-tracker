@@ -15,6 +15,7 @@ import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
+import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
 import { StatusBar, Platform, StyleSheet, View } from 'react-native';
@@ -63,6 +64,7 @@ export default function App() {
         <SafeAreaProvider>
           <LocalizationProvider>
             <ThemeConfigProvider>
+              <DisplaySettingsProvider>
               <ThemeColorsProvider>
                 <AppBlurProvider>
                   <DialogProvider>
@@ -86,6 +88,7 @@ export default function App() {
                   </DialogProvider>
                 </AppBlurProvider>
               </ThemeColorsProvider>
+              </DisplaySettingsProvider>
             </ThemeConfigProvider>
           </LocalizationProvider>
         </SafeAreaProvider>

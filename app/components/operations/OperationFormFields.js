@@ -1,6 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
@@ -78,6 +79,8 @@ const OperationFormFields = memo(({
   onAutoAddWithAccount,
   rateSource,
 }) => {
+  const { hideBalances } = useDisplaySettings();
+
   // Memoize input styles
   const inputStyle = useMemo(() => ({
     backgroundColor: colors.inputBackground,
@@ -178,9 +181,13 @@ const OperationFormFields = memo(({
         {accountId ? getAccountName(accountId) : label}
       </Text>
       {showAccountBalance && accountId && (
-        <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
-          {getAccountBalance(accountId)}
-        </Text>
+        hideBalances ? (
+          <View style={styles.hiddenBalance} />
+        ) : (
+          <Text style={[styles.accountBalanceText, { color: colors.mutedText }]} numberOfLines={1}>
+            {getAccountBalance(accountId)}
+          </Text>
+        )
       )}
     </Pressable>
   );
@@ -375,13 +382,17 @@ const OperationFormFields = memo(({
                     </Text>
                     <View style={styles.categoryParentRow}>
                       <Icon name="wallet" size={14} color={balanceColor} />
-                      <Text
-                        style={[styles.categoryShortcutParent, { color: balanceColor }]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {getAccountBalance(account.id)}
-                      </Text>
+                      {hideBalances ? (
+                        <View style={styles.hiddenBalanceSmall} />
+                      ) : (
+                        <Text
+                          style={[styles.categoryShortcutParent, { color: balanceColor }]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {getAccountBalance(account.id)}
+                        </Text>
+                      )}
                     </View>
                   </>
                 ) : (
@@ -492,6 +503,18 @@ OperationFormFields.propTypes = {
 const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
+  },
+  hiddenBalance: {
+    backgroundColor: 'rgba(120, 120, 120, 0.25)',
+    borderRadius: 4,
+    height: 12,
+    width: 64,
+  },
+  hiddenBalanceSmall: {
+    backgroundColor: 'rgba(120, 120, 120, 0.25)',
+    borderRadius: 3,
+    height: 8,
+    width: 40,
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
