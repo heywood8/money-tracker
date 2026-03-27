@@ -100,6 +100,12 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   })),
 }));
 
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 // Helper functions to create complete mocks for split contexts
 const createAccountsDataMock = (overrides = {}) => ({
   accounts: [],

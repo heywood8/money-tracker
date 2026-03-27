@@ -6,6 +6,12 @@ import OperationFormFields from '../../app/components/operations/OperationFormFi
 jest.mock('../../app/components/Calculator', () => 'Calculator');
 jest.mock('../../app/components/modals/MultiCurrencyFields', () => 'MultiCurrencyFields');
 
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: () => ({
+    hideBalances: false,
+  }),
+}));
+
 describe('OperationFormFields', () => {
   const mockColors = {
     text: '#000',

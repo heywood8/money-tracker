@@ -58,6 +58,13 @@ jest.mock('../../app/contexts/ImportProgressContext', () => ({
   }),
 }));
 
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: () => ({
+    hideBalances: false,
+    setHideBalances: jest.fn(),
+  }),
+}));
+
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
 const mockImportBackup = jest.fn(() => Promise.resolve());

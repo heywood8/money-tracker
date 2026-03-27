@@ -6,6 +6,8 @@
   "settings": "Paramètres",
   "language": "Langue",
   "theme": "Thème",
+  "hide_balances": "Masquer les soldes",
+  "hide_balances_hint": "Masquer les soldes des comptes pour la confidentialité",
   "cancel": "Annuler",
   "save": "Enregistrer",
   "add": "Ajouter",

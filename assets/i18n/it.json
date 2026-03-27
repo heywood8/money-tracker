@@ -6,6 +6,8 @@
   "settings": "Settings",
   "language": "Language",
   "theme": "Theme",
+  "hide_balances": "Nascondi saldi",
+  "hide_balances_hint": "Maschera i saldi dei conti per la privacy",
   "cancel": "Cancel",
   "save": "Save",
   "add": "Add",

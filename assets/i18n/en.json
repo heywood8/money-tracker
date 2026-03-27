@@ -6,6 +6,8 @@
   "settings": "Settings",
   "language": "Language",
   "theme": "Theme",
+  "hide_balances": "Hide balances",
+  "hide_balances_hint": "Mask account balances for privacy",
   "cancel": "Cancel",
   "save": "Save",
   "add": "Add",
