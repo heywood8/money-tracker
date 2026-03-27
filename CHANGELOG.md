@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.59.0](https://github.com/heywood8/money-tracker/compare/penny-v0.58.0...penny-v0.59.0) (2026-03-27)
+
+
+### Features
+
+* add hide account balances privacy setting ([#362](https://github.com/heywood8/money-tracker/issues/362)) ([03d9365](https://github.com/heywood8/money-tracker/commit/03d9365836ab1b5e407884481a8e6cbc8e38f1d6))
+
 ## [0.58.0](https://github.com/heywood8/money-tracker/compare/penny-v0.57.0...penny-v0.58.0) (2026-03-23)
 
 
