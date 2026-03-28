@@ -189,10 +189,11 @@ describe('ExpenseSummaryCard', () => {
     });
 
     it('does not show loading indicator even when loading is true', () => {
-      const { queryByText } = render(
+      const { getByText, queryByText } = render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
+      expect(getByText('••••')).toBeTruthy();
       expect(queryByText(/\.\.\./)).toBeNull();
     });
   });

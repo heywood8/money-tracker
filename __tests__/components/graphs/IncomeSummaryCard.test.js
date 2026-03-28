@@ -181,10 +181,11 @@ describe('IncomeSummaryCard', () => {
     });
 
     it('does not show loading indicator even when loadingIncome is true', () => {
-      const { queryByText } = render(
+      const { getByText, queryByText } = render(
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
+      expect(getByText('••••')).toBeTruthy();
       expect(queryByText(/\.\.\./)).toBeNull();
     });
   });
