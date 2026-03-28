@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.3](https://github.com/heywood8/money-tracker/compare/penny-v0.61.2...penny-v0.61.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* description hints visibility ([6814575](https://github.com/heywood8/money-tracker/commit/68145758bfe5408d41c086e70ebd40fefc862c12))
+
 ## [0.61.2](https://github.com/heywood8/money-tracker/compare/penny-v0.61.1...penny-v0.61.2) (2026-03-28)
 
 
