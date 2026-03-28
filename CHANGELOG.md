@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.0](https://github.com/heywood8/money-tracker/compare/penny-v0.60.0...penny-v0.61.0) (2026-03-28)
+
+
+### Features
+
+* animated sliding switch for hide balances toggle ([#367](https://github.com/heywood8/money-tracker/issues/367)) ([7666294](https://github.com/heywood8/money-tracker/commit/7666294171860e895a9f206f67313084ba32c852))
+
 ## [0.60.0](https://github.com/heywood8/money-tracker/compare/penny-v0.59.0...penny-v0.60.0) (2026-03-28)
 
 

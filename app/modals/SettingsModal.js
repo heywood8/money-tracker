@@ -50,6 +50,15 @@ export default function SettingsModal({ visible, onClose }) {
   const logsSlideAnim = useRef(new Animated.Value(0)).current;
   const backupsSlideAnim = useRef(new Animated.Value(0)).current;
   const logsFlatListRef = useRef(null);
+  const toggleAnim = useRef(new Animated.Value(hideBalances ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.spring(toggleAnim, {
+      toValue: hideBalances ? 1 : 0,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 4,
+    }).start();
+  }, [hideBalances, toggleAnim]);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
 
@@ -587,11 +596,11 @@ export default function SettingsModal({ visible, onClose }) {
                   </Text>
                 </View>
               </View>
-              <Ionicons
-                name={hideBalances ? 'toggle' : 'toggle-outline'}
-                size={32}
-                color={hideBalances ? colors.primary : colors.mutedText}
-              />
+              <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
+                <Animated.View style={[styles.switchThumb, {
+                  transform: [{ translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
+                }]} />
+              </View>
             </View>
           </TouchableRipple>
 
@@ -1183,6 +1192,19 @@ const styles = StyleSheet.create({
   settingsRowValue: {
     fontSize: 13,
     marginTop: 2,
+  },
+  switchThumb: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    height: 20,
+    width: 20,
+  },
+  switchTrack: {
+    borderRadius: 12,
+    height: 24,
+    justifyContent: 'center',
+    width: 44,
   },
 });
 
