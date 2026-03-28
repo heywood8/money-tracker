@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.62.0](https://github.com/heywood8/money-tracker/compare/penny-v0.61.3...penny-v0.62.0) (2026-03-28)
+
+
+### Features
+
+* add blur overlay to SettingsModal and ImportProgressModal ([#358](https://github.com/heywood8/money-tracker/issues/358)) ([7053cf0](https://github.com/heywood8/money-tracker/commit/7053cf085d03070bf7b2e7e8a02b04216568e4b5))
+* add glassmorphism blur effect when modals are open ([#354](https://github.com/heywood8/money-tracker/issues/354)) ([8806a37](https://github.com/heywood8/money-tracker/commit/8806a37ecdb085efffc2ec22bdf546ec8539c408))
+* add hide account balances privacy setting ([#362](https://github.com/heywood8/money-tracker/issues/362)) ([03d9365](https://github.com/heywood8/money-tracker/commit/03d9365836ab1b5e407884481a8e6cbc8e38f1d6))
+* add in-app local backup viewer to Settings ([#347](https://github.com/heywood8/money-tracker/issues/347)) ([872f4a7](https://github.com/heywood8/money-tracker/commit/872f4a72a4d54f046054aa5a0a9531f5762d8450))
+* animated sliding switch for hide balances toggle ([#367](https://github.com/heywood8/money-tracker/issues/367)) ([7666294](https://github.com/heywood8/money-tracker/commit/7666294171860e895a9f206f67313084ba32c852))
+* extend hideBalances to graphs page and refactor to context-direct pattern ([#365](https://github.com/heywood8/money-tracker/issues/365)) ([666d0de](https://github.com/heywood8/money-tracker/commit/666d0deb0129ded02b97fb0a28b0969b36d0a9c6))
+* keep executed recurring ops enabled, sort to bottom ([#360](https://github.com/heywood8/money-tracker/issues/360)) ([55c04ab](https://github.com/heywood8/money-tracker/commit/55c04aba330e062a7e7b77409b5b0881de284068))
+* show category and date pickers side-by-side when editing operation ([#348](https://github.com/heywood8/money-tracker/issues/348)) ([225f1b4](https://github.com/heywood8/money-tracker/commit/225f1b412a5005282cfd8976700550374b785b88))
+* show category/to-account and date side-by-side for all operation types ([#356](https://github.com/heywood8/money-tracker/issues/356)) ([8bcdab1](https://github.com/heywood8/money-tracker/commit/8bcdab1bfcc12ae8375949132111e4e14219fc3b))
+
+
+### Bug Fixes
+
+* apk install intent missing permission and activity flag ([#371](https://github.com/heywood8/money-tracker/issues/371)) ([b7f1926](https://github.com/heywood8/money-tracker/commit/b7f1926f87a35b18512948e10d5de75d6c80f4f1))
+* correct prev month avg and end in burndown legend ([#350](https://github.com/heywood8/money-tracker/issues/350)) ([5ebeec6](https://github.com/heywood8/money-tracker/commit/5ebeec6c17c43fe100a5fb8a90ede1eae111102c))
+* description hints visibility ([6814575](https://github.com/heywood8/money-tracker/commit/68145758bfe5408d41c086e70ebd40fefc862c12))
+* download APK in-app to fix 99% hang on Android ([#345](https://github.com/heywood8/money-tracker/issues/345)) ([803abfd](https://github.com/heywood8/money-tracker/commit/803abfd6e925f1151f0f368462154b9d968538f7))
+* replace sharing with intenrLauncher for APK installation ([2ce3b5d](https://github.com/heywood8/money-tracker/commit/2ce3b5de4b3b6a26957b9feb1636796f66627839))
+* show description input above keyboard when editing transactions ([#369](https://github.com/heywood8/money-tracker/issues/369)) ([2018668](https://github.com/heywood8/money-tracker/commit/20186685b708cf625d3f3028616ed140ed1afb61))
+
+
+### Miscellaneous Chores
+
+* **main:** release penny 0.52.0 ([#344](https://github.com/heywood8/money-tracker/issues/344)) ([eaa3b5a](https://github.com/heywood8/money-tracker/commit/eaa3b5afacca8d55ed42ffb07489d9e1836322dd))
+* **main:** release penny 0.53.0 ([#346](https://github.com/heywood8/money-tracker/issues/346)) ([e6baaab](https://github.com/heywood8/money-tracker/commit/e6baaabb92d3044eae4e76eced988630517172ad))
+* **main:** release penny 0.54.0 ([#349](https://github.com/heywood8/money-tracker/issues/349)) ([1ccfb9b](https://github.com/heywood8/money-tracker/commit/1ccfb9bee9480d1d5d4cf190bcce045f6502b061))
+* **main:** release penny 0.54.1 ([#351](https://github.com/heywood8/money-tracker/issues/351)) ([38982ed](https://github.com/heywood8/money-tracker/commit/38982eddbff1119af3d4049eef02119c3b4f51a7))
+* **main:** release penny 0.54.2 ([#353](https://github.com/heywood8/money-tracker/issues/353)) ([a7f8051](https://github.com/heywood8/money-tracker/commit/a7f80517edf14ef6d0561cbddab4298137fda2d7))
+* **main:** release penny 0.55.0 ([#355](https://github.com/heywood8/money-tracker/issues/355)) ([83ace14](https://github.com/heywood8/money-tracker/commit/83ace14736617c97f09402b7ec08dd1ea5ee7396))
+* **main:** release penny 0.56.0 ([#357](https://github.com/heywood8/money-tracker/issues/357)) ([0bbd653](https://github.com/heywood8/money-tracker/commit/0bbd653edb9f1b596b7de1fd50fc8c9b7dbeba40))
+* **main:** release penny 0.57.0 ([#359](https://github.com/heywood8/money-tracker/issues/359)) ([52f8127](https://github.com/heywood8/money-tracker/commit/52f8127e3fe6eb738b1945f4b5f090c73cc739bc))
+* **main:** release penny 0.58.0 ([#361](https://github.com/heywood8/money-tracker/issues/361)) ([a655ed8](https://github.com/heywood8/money-tracker/commit/a655ed8ddd6cdda2a223786391ad75579971f5ba))
+* **main:** release penny 0.59.0 ([#363](https://github.com/heywood8/money-tracker/issues/363)) ([1269a12](https://github.com/heywood8/money-tracker/commit/1269a12017e6fe70287b8adb9ea24dd7ecfb8e1c))
+* **main:** release penny 0.60.0 ([#366](https://github.com/heywood8/money-tracker/issues/366)) ([e3e32d6](https://github.com/heywood8/money-tracker/commit/e3e32d63398c1f3711a2a4e8c704cd0399efdfbe))
+* **main:** release penny 0.61.0 ([#368](https://github.com/heywood8/money-tracker/issues/368)) ([00158b3](https://github.com/heywood8/money-tracker/commit/00158b3c321970186f6049ced20d58ef0e331fb4))
+* **main:** release penny 0.61.1 ([#370](https://github.com/heywood8/money-tracker/issues/370)) ([107846b](https://github.com/heywood8/money-tracker/commit/107846b6acbc2beefd2ba5a99e304f5ecf80ed82))
+* **main:** release penny 0.61.2 ([#372](https://github.com/heywood8/money-tracker/issues/372)) ([bc0830e](https://github.com/heywood8/money-tracker/commit/bc0830e209dad48e0485205568e03483734ee506))
+* **main:** release penny 0.61.3 ([#374](https://github.com/heywood8/money-tracker/issues/374)) ([39777e5](https://github.com/heywood8/money-tracker/commit/39777e5d0e327cc9b07229b7bc6071947e43f38f))
+
 ## [0.61.3](https://github.com/heywood8/money-tracker/compare/penny-v0.61.2...penny-v0.61.3) (2026-03-28)
 
 
