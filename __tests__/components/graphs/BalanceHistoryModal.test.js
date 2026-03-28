@@ -50,6 +50,8 @@ describe('BalanceHistoryModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+    useDisplaySettings.mockReturnValue({ hideBalances: false });
   });
 
   describe('Modal Visibility', () => {
@@ -453,7 +455,7 @@ describe('BalanceHistoryModal', () => {
     it('shows "••••" for rows with a balance', () => {
       const { getAllByText, queryByText } = render(<BalanceHistoryModal {...defaultProps} />);
 
-      expect(getAllByText('••••').length).toBeGreaterThan(0);
+      expect(getAllByText('••••').length).toBe(2);
       expect(queryByText('1500.00')).toBeNull();
       expect(queryByText('1400.00')).toBeNull();
     });
