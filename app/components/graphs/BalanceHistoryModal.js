@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 /**
  * Modal component for displaying and editing balance history table
@@ -23,6 +24,7 @@ const BalanceHistoryModal = ({
   onSaveBalance,
   onDeleteBalance,
 }) => {
+  const { hideBalances } = useDisplaySettings();
   return (
     <>
       {visible && <ModalBlurOverlay />}
@@ -109,7 +111,7 @@ const BalanceHistoryModal = ({
                     ) : (
                       <>
                         <Text style={[styles.balanceTableCell, { color: row.balance ? colors.text : colors.mutedText }]}>
-                          {row.balance || '-'}
+                          {hideBalances ? (row.balance ? '••••' : '-') : (row.balance || '-')}
                         </Text>
                         <View style={styles.balanceTableActions}>
                           <TouchableOpacity
