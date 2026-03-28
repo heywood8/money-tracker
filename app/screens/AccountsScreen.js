@@ -74,7 +74,8 @@ CurrencyPickerModal.defaultProps = {
 };
 
 // Memoized transfer account picker modal component
-const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, accountCurrency, operationCount, colors, t, onSelect, currencies, hideBalances }) => {
+const TransferAccountPickerModal = memo(({ visible, onClose, accounts, accountToDelete, accountCurrency, operationCount, colors, t, onSelect, currencies }) => {
+  const { hideBalances } = useDisplaySettings();
   const availableAccounts = useMemo(() => {
     return accounts.filter(a => a.id !== accountToDelete && a.currency === accountCurrency);
   }, [accounts, accountToDelete, accountCurrency]);
@@ -147,7 +148,6 @@ TransferAccountPickerModal.propTypes = {
   t: PropTypes.func,
   onSelect: PropTypes.func,
   currencies: PropTypes.object,
-  hideBalances: PropTypes.bool,
 };
 
 TransferAccountPickerModal.defaultProps = {
@@ -161,7 +161,6 @@ TransferAccountPickerModal.defaultProps = {
   t: (k) => k,
   onSelect: () => {},
   currencies,
-  hideBalances: false,
 };
 
 // Memoized confirmation dialog component
@@ -231,7 +230,8 @@ ConfirmationDialog.defaultProps = {
 };
 
 // Memoized account row component
-const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive, hideBalances }) => {
+const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
+  const { hideBalances } = useDisplaySettings();
   const isEven = index % 2 === 0;
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
   const formattedBalance = parseFloat(item.balance).toFixed(decimals);
@@ -290,7 +290,6 @@ AccountRow.propTypes = {
   t: PropTypes.func,
   drag: PropTypes.func,
   isActive: PropTypes.bool,
-  hideBalances: PropTypes.bool,
 };
 
 AccountRow.defaultProps = {
@@ -300,7 +299,6 @@ AccountRow.defaultProps = {
   t: (k) => k,
   drag: () => {},
   isActive: false,
-  hideBalances: false,
 };
 
 export default function AccountsScreen() {
@@ -325,7 +323,6 @@ export default function AccountsScreen() {
 
   const { colorScheme } = useThemeConfig();
   const { colors } = useThemeColors();
-  const { hideBalances } = useDisplaySettings();
   const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
   const { t } = useLocalization();
@@ -548,9 +545,8 @@ export default function AccountsScreen() {
       t={t}
       drag={drag}
       isActive={isActive}
-      hideBalances={hideBalances}
     />
-  ), [colors, startEdit, t, hideBalances]);
+  ), [colors, startEdit, t]);
 
   const handleDragEnd = useCallback(({ data }) => {
     reorderAccounts(data);
@@ -748,7 +744,6 @@ export default function AccountsScreen() {
         colors={colors}
         t={t}
         onSelect={handleTransferAndDelete}
-        hideBalances={hideBalances}
       />
 
       {/* Simple delete confirmation */}
