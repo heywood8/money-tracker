@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.60.0](https://github.com/heywood8/money-tracker/compare/penny-v0.59.0...penny-v0.60.0) (2026-03-28)
+
+
+### Features
+
+* extend hideBalances to graphs page and refactor to context-direct pattern ([#365](https://github.com/heywood8/money-tracker/issues/365)) ([666d0de](https://github.com/heywood8/money-tracker/commit/666d0deb0129ded02b97fb0a28b0969b36d0a9c6))
+
 ## [0.59.0](https://github.com/heywood8/money-tracker/compare/penny-v0.58.0...penny-v0.59.0) (2026-03-27)
 
 
