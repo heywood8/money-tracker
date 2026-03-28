@@ -1465,7 +1465,7 @@ describe('BalanceHistoryCard', () => {
 
   describe('when hideBalances is true', () => {
     const mockBalanceHistoryData = {
-      labels: [1, 5, 10, 15, 20, 25, 28],
+      labels: [1, 28],
       actual: [
         { x: 1, y: 1000 },
         { x: 28, y: 1200 },
