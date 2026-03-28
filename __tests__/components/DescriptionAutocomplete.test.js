@@ -194,4 +194,22 @@ describe('DescriptionAutocomplete', () => {
       expect(input.props.editable).toBe(false);
     });
   });
+
+  describe('onFocus prop', () => {
+    it('calls onFocus callback when the input is focused', () => {
+      const onFocus = jest.fn();
+      const { getByTestId } = renderComponent({ onFocus });
+
+      fireEvent(getByTestId('description-input'), 'focus');
+
+      expect(onFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw when onFocus is not provided', () => {
+      const { getByTestId } = renderComponent(); // no onFocus prop
+      expect(() => {
+        fireEvent(getByTestId('description-input'), 'focus');
+      }).not.toThrow();
+    });
+  });
 });
