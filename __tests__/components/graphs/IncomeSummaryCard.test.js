@@ -157,6 +157,38 @@ describe('IncomeSummaryCard', () => {
     });
   });
 
+  describe('when hideBalances is true', () => {
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+
+    beforeEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    afterEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('renders \'••••\' instead of the formatted currency amount', () => {
+      const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
+
+      expect(getByText('••••')).toBeTruthy();
+    });
+
+    it('does not render the formatted currency amount', () => {
+      const { queryByText } = render(<IncomeSummaryCard {...defaultProps} />);
+
+      expect(queryByText(/\$3\.5K/)).toBeNull();
+    });
+
+    it('does not show loading indicator even when loadingIncome is true', () => {
+      const { queryByText } = render(
+        <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
+      );
+
+      expect(queryByText(/\.\.\./)).toBeNull();
+    });
+  });
+
   describe('Theming', () => {
     it('applies text color', () => {
       const customColors = {

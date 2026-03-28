@@ -165,6 +165,38 @@ describe('ExpenseSummaryCard', () => {
     });
   });
 
+  describe('when hideBalances is true', () => {
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+
+    beforeEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    afterEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('renders \'••••\' instead of the formatted currency amount', () => {
+      const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
+
+      expect(getByText('••••')).toBeTruthy();
+    });
+
+    it('does not render the formatted currency amount', () => {
+      const { queryByText } = render(<ExpenseSummaryCard {...defaultProps} />);
+
+      expect(queryByText(/\$1\.5K/)).toBeNull();
+    });
+
+    it('does not show loading indicator even when loading is true', () => {
+      const { queryByText } = render(
+        <ExpenseSummaryCard {...defaultProps} loading={true} />,
+      );
+
+      expect(queryByText(/\.\.\./)).toBeNull();
+    });
+  });
+
   describe('Theming', () => {
     it('applies text color', () => {
       const customColors = {
