@@ -26,6 +26,7 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       package: 'com.heywood8.monkeep',
+      permissions: ['android.permission.REQUEST_INSTALL_PACKAGES'],
     },
     extra: {
       eas: {
