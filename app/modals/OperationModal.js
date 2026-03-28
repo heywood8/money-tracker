@@ -183,6 +183,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     }
   }, [isShadowOperation, setValues]);
 
+  // Handler for description focus (auto-scroll to end)
+  const handleDescriptionFocus = useCallback(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
   // Handler for opening date picker
   const handleOpenDatePicker = useCallback(() => {
     if (!isShadowOperation) {
@@ -458,7 +463,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     placeholder={t('description')}
                     editable={!isShadowOperation}
                     colors={colors}
-                    onFocus={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+                    onFocus={handleDescriptionFocus}
                   />
 
                   {errors.general && <Text style={styles.error}>{errors.general}</Text>}
