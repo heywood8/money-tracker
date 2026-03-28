@@ -28,6 +28,7 @@ const MAX_CHIPS = 8;
  *   editable       - whether the input is editable (default true)
  *   colors         - theme colors object from ThemeColorsContext
  *   containerStyle - optional style override for the outer container
+ *   onFocus        - optional callback fired when the input receives focus
  */
 const DescriptionAutocomplete = ({
   value,
