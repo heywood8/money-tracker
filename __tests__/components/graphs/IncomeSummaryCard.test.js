@@ -9,6 +9,13 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import IncomeSummaryCard from '../../../app/components/graphs/IncomeSummaryCard';
 
+// Mock DisplaySettingsContext
+jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 // Mock currencies.json
 jest.mock('../../../assets/currencies.json', () => ({
   USD: { symbol: '$', name: 'US Dollar', decimal_digits: 2 },
@@ -147,6 +154,39 @@ describe('IncomeSummaryCard', () => {
       const { getByLabelText } = render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByLabelText('income_by_category')).toBeTruthy();
+    });
+  });
+
+  describe('when hideBalances is true', () => {
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+
+    beforeEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    afterEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('renders \'••••\' instead of the formatted currency amount', () => {
+      const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
+
+      expect(getByText('••••')).toBeTruthy();
+    });
+
+    it('does not render the formatted currency amount', () => {
+      const { queryByText } = render(<IncomeSummaryCard {...defaultProps} />);
+
+      expect(queryByText(/\$3\.5K/)).toBeNull();
+    });
+
+    it('does not show loading indicator even when loadingIncome is true', () => {
+      const { getByText, queryByText } = render(
+        <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
+      );
+
+      expect(getByText('••••')).toBeTruthy();
+      expect(queryByText(/\.\.\./)).toBeNull();
     });
   });
 

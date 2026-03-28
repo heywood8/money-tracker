@@ -14,6 +14,11 @@ jest.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: 'Icon',
 }));
 
+// Mock DisplaySettingsContext
+jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({ hideBalances: false })),
+}));
+
 describe('BalanceHistoryModal', () => {
   // Default test props
   const defaultProps = {
@@ -45,6 +50,8 @@ describe('BalanceHistoryModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+    useDisplaySettings.mockReturnValue({ hideBalances: false });
   });
 
   describe('Modal Visibility', () => {
@@ -436,6 +443,27 @@ describe('BalanceHistoryModal', () => {
       // Should render first and last rows
       expect(getByText('Jan 1, 2024')).toBeTruthy();
       expect(getByText('Jan 30, 2024')).toBeTruthy();
+    });
+  });
+
+  describe('when hideBalances is true', () => {
+    beforeEach(() => {
+      const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    it('shows "••••" for rows with a balance', () => {
+      const { getAllByText, queryByText } = render(<BalanceHistoryModal {...defaultProps} />);
+
+      expect(getAllByText('••••').length).toBe(2);
+      expect(queryByText('1500.00')).toBeNull();
+      expect(queryByText('1400.00')).toBeNull();
+    });
+
+    it('still shows "-" for empty rows', () => {
+      const { getByText } = render(<BalanceHistoryModal {...defaultProps} />);
+
+      expect(getByText('-')).toBeTruthy();
     });
   });
 });

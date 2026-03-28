@@ -7,6 +7,13 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import BalanceHistoryCard from '../../app/components/graphs/BalanceHistoryCard';
 
+// Mock DisplaySettingsContext
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 // Mock LineChart from react-native-chart-kit
 jest.mock('react-native-chart-kit', () => ({
   LineChart: 'LineChart',
@@ -1453,6 +1460,118 @@ describe('BalanceHistoryCard', () => {
       expect(actualDataset.data.length).toBeGreaterThan(4);
       // First 4 values should be the actual data
       expect(actualDataset.data.slice(0, 4)).toEqual([500, 600, 700, 800]);
+    });
+  });
+
+  describe('when hideBalances is true', () => {
+    const mockBalanceHistoryData = {
+      labels: [1, 28],
+      actual: [
+        { x: 1, y: 1000 },
+        { x: 28, y: 1200 },
+      ],
+      actualForChart: [1000, 1200],
+      burndown: [],
+      prevMonth: [],
+    };
+
+    beforeEach(() => {
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    afterEach(() => {
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('does not render the legend table', () => {
+      const mockDate = new Date(2026, 1, 19);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { queryByText } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={11}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      expect(queryByText('Actual')).toBeNull();
+      expect(queryByText('Plain avg')).toBeNull();
+      expect(queryByText('Max')).toBeNull();
+      expect(queryByText('Current')).toBeNull();
+      expect(queryByText('Daily Avg')).toBeNull();
+      expect(queryByText('End')).toBeNull();
+
+      global.Date.mockRestore();
+    });
+
+    it('still renders the chart (line curves remain visible)', () => {
+      const mockDate = new Date(2026, 1, 19);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={11}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      expect(UNSAFE_getByType('LineChart')).toBeTruthy();
+
+      global.Date.mockRestore();
+    });
+
+    it('formatYLabel returns empty string for all values', () => {
+      const mockDate = new Date(2026, 1, 19);
+      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+
+      const { UNSAFE_getByType } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          onChartPress={jest.fn()}
+          selectedYear={2023}
+          selectedMonth={11}
+          accounts={mockAccounts}
+          isCurrentMonth={false}
+          spendingPrediction={null}
+        />,
+      );
+
+      const lineChart = UNSAFE_getByType('LineChart');
+      expect(lineChart.props.formatYLabel('1000')).toBe('');
+      expect(lineChart.props.formatYLabel('1000000')).toBe('');
+      expect(lineChart.props.formatYLabel('0')).toBe('');
+
+      global.Date.mockRestore();
     });
   });
 });

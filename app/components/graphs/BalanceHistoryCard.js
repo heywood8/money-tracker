@@ -6,6 +6,7 @@ import { Line, Text as SvgText, G } from 'react-native-svg';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -90,6 +91,7 @@ const BalanceHistoryCard = ({
   spendingPrediction,
   isCurrentMonth,
 }) => {
+  const { hideBalances } = useDisplaySettings();
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
@@ -215,8 +217,7 @@ const BalanceHistoryCard = ({
                   yAxisInterval={niceInterval}
                   segments={4}
                   fromZero={true}
-                  formatYLabel={(value) => {
-                    // Format Y-axis labels to show nice rounded values
+                  formatYLabel={hideBalances ? () => '' : (value) => {
                     const numValue = parseFloat(value);
                     if (numValue >= 1000000) {
                       return `${(numValue / 1000000).toFixed(0)}M`;
@@ -303,7 +304,7 @@ const BalanceHistoryCard = ({
           </TouchableOpacity>
 
           {/* Compact Table Legend */}
-          {(() => {
+          {!hideBalances && (() => {
             const now = new Date();
             const isCurrentMonthLocal = selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
             const displayDay = isCurrentMonthLocal

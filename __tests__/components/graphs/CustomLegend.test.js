@@ -5,6 +5,12 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import CustomLegend from '../../../app/components/graphs/CustomLegend';
+import { useDisplaySettings } from '../../../app/contexts/DisplaySettingsContext';
+
+// Mock DisplaySettingsContext
+jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({ hideBalances: false })),
+}));
 
 // Mock MaterialCommunityIcons
 jest.mock('@expo/vector-icons', () => {
@@ -48,6 +54,7 @@ describe('CustomLegend', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    useDisplaySettings.mockReturnValue({ hideBalances: false });
   });
 
   describe('Rendering', () => {
@@ -285,6 +292,25 @@ describe('CustomLegend', () => {
         return styleArray.some(style => style && style.borderBottomColor === '#00FF00');
       });
       expect(hasExpectedBorder).toBe(true);
+    });
+  });
+
+  describe('when hideBalances is true', () => {
+    beforeEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    it('shows •••• instead of the formatted amount', () => {
+      const { getAllByText, queryByText } = render(<CustomLegend {...defaultProps} />);
+      expect(getAllByText('••••').length).toBe(2);
+      expect(queryByText('100.00 USD')).toBeNull();
+      expect(queryByText('50.00 USD')).toBeNull();
+    });
+
+    it('still shows the percentage', () => {
+      const { getByText } = render(<CustomLegend {...defaultProps} />);
+      expect(getByText('66.7%')).toBeTruthy();
+      expect(getByText('33.3%')).toBeTruthy();
     });
   });
 
