@@ -90,3 +90,6 @@ android/
 # Local files
 local/
 *.apk
+
+# Superpowers docs (plans, specs)
+docs/superpowers/
