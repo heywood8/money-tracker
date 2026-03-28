@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
