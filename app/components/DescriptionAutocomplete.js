@@ -28,6 +28,7 @@ const MAX_CHIPS = 8;
  *   editable       - whether the input is editable (default true)
  *   colors         - theme colors object from ThemeColorsContext
  *   containerStyle - optional style override for the outer container
+ *   onFocus        - optional callback fired when the input receives focus
  */
 const DescriptionAutocomplete = ({
   value,
@@ -37,6 +38,7 @@ const DescriptionAutocomplete = ({
   editable,
   colors,
   containerStyle,
+  onFocus,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [renderChips, setRenderChips] = useState(false);
@@ -94,7 +96,8 @@ const DescriptionAutocomplete = ({
       blurTimerRef.current = null;
     }
     setIsFocused(true);
-  }, []);
+    if (onFocus) onFocus();
+  }, [onFocus]);
 
   const handleBlur = useCallback(() => {
     // Delay so a chip tap can fire before we hide the suggestions
@@ -188,6 +191,7 @@ DescriptionAutocomplete.propTypes = {
   editable: PropTypes.bool,
   colors: PropTypes.object.isRequired,
   containerStyle: PropTypes.object,
+  onFocus: PropTypes.func,
 };
 
 DescriptionAutocomplete.defaultProps = {
@@ -196,6 +200,7 @@ DescriptionAutocomplete.defaultProps = {
   placeholder: '',
   editable: true,
   containerStyle: undefined,
+  onFocus: undefined,
 };
 
 const styles = StyleSheet.create({
