@@ -20,6 +20,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import OperationModal from '../../app/modals/OperationModal';
+import DescriptionAutocomplete from '../../app/components/DescriptionAutocomplete';
 
 // Mock dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -1574,6 +1575,29 @@ describe('OperationModal', () => {
       fireEvent.press(backIcon.parent);
 
       expect(mockNavigateBack).toHaveBeenCalled();
+    });
+  });
+
+  describe('Description field keyboard integration', () => {
+    it('passes an onFocus function prop to DescriptionAutocomplete when editing', () => {
+      const { UNSAFE_getByType } = render(
+        <OperationModal
+          visible={true}
+          isNew={false}
+          onClose={jest.fn()}
+          operation={{
+            id: 'op1',
+            type: 'expense',
+            amount: '10',
+            accountId: 'acc1',
+            categoryId: 'cat1',
+            date: '2026-01-01',
+            description: '',
+          }}
+        />,
+      );
+      const descInput = UNSAFE_getByType(DescriptionAutocomplete);
+      expect(typeof descInput.props.onFocus).toBe('function');
     });
   });
 });

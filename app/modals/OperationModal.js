@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -121,6 +121,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   // State for split modal
   const [showSplitModal, setShowSplitModal] = useState(false);
+
+  // Scroll ref for auto-scrolling to description field on keyboard focus
+  const scrollViewRef = useRef(null);
 
   // Autocomplete suggestions for description field
   const [descriptionSuggestions, setDescriptionSuggestions] = useState([]);
@@ -339,12 +342,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       >
         <SafeAreaView style={styles.fullFlex} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
-            behavior="height"
+            behavior="padding"
             style={styles.fullFlex}
           >
             <Pressable style={styles.modalOverlay} onPress={handleClose}>
               <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
                 <ScrollView
+                  ref={scrollViewRef}
                   style={styles.scrollView}
                   contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
@@ -454,6 +458,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                     placeholder={t('description')}
                     editable={!isShadowOperation}
                     colors={colors}
+                    onFocus={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
                   />
 
                   {errors.general && <Text style={styles.error}>{errors.general}</Text>}
