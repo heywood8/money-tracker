@@ -9,6 +9,13 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import IncomeSummaryCard from '../../../app/components/graphs/IncomeSummaryCard';
 
+// Mock DisplaySettingsContext
+jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 // Mock currencies.json
 jest.mock('../../../assets/currencies.json', () => ({
   USD: { symbol: '$', name: 'US Dollar', decimal_digits: 2 },

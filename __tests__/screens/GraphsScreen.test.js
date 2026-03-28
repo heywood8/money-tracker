@@ -39,6 +39,12 @@ jest.mock('../../app/contexts/AccountsDataContext', () => ({
   })),
 }));
 
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 jest.mock('../../app/services/OperationsDB', () => ({
   getSpendingByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),
   getIncomeByCategoryAndCurrency: jest.fn(() => Promise.resolve([])),

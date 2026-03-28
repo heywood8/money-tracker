@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -25,6 +26,7 @@ const IncomeSummaryCard = ({
   selectedCurrency,
   onPress,
 }) => {
+  const { hideBalances } = useDisplaySettings();
   return (
     <TouchableOpacity
       style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
@@ -34,7 +36,7 @@ const IncomeSummaryCard = ({
       accessibilityLabel={t('income_by_category')}
     >
       <Text style={styles.summaryText}>
-        {loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency)}
+        {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
       </Text>
     </TouchableOpacity>
   );
