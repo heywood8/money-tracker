@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.1](https://github.com/heywood8/money-tracker/compare/penny-v0.61.0...penny-v0.61.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* show description input above keyboard when editing transactions ([#369](https://github.com/heywood8/money-tracker/issues/369)) ([2018668](https://github.com/heywood8/money-tracker/commit/20186685b708cf625d3f3028616ed140ed1afb61))
+
 ## [0.61.0](https://github.com/heywood8/money-tracker/compare/penny-v0.60.0...penny-v0.61.0) (2026-03-28)
 
 
