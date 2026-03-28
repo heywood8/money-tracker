@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.2](https://github.com/heywood8/money-tracker/compare/penny-v0.61.1...penny-v0.61.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* apk install intent missing permission and activity flag ([#371](https://github.com/heywood8/money-tracker/issues/371)) ([b7f1926](https://github.com/heywood8/money-tracker/commit/b7f1926f87a35b18512948e10d5de75d6c80f4f1))
+
 ## [0.61.1](https://github.com/heywood8/money-tracker/compare/penny-v0.61.0...penny-v0.61.1) (2026-03-28)
 
 
