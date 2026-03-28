@@ -6,6 +6,13 @@ import useCategoryMonthlySpending from '../../../app/hooks/useCategoryMonthlySpe
 // Mock the hook
 jest.mock('../../../app/hooks/useCategoryMonthlySpending');
 
+// Mock DisplaySettingsContext
+jest.mock('../../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({
+    hideBalances: false,
+  })),
+}));
+
 // Mock vector icons
 jest.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: 'Icon',
@@ -383,6 +390,35 @@ describe('CategorySpendingCard', () => {
       );
 
       expect(getByText('last_12_months_total')).toBeTruthy();
+    });
+  });
+
+  describe('when hideBalances is true', () => {
+    const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+
+    beforeEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+    });
+
+    afterEach(() => {
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('does not render the 12-month total row', () => {
+      const { queryByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      expect(queryByText('last_12_months_total')).toBeFalsy();
+      expect(queryByText('1550.00 USD')).toBeFalsy();
+    });
+
+    it('still renders the LineChart', () => {
+      const { UNSAFE_getByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      expect(UNSAFE_getByType('LineChart')).toBeTruthy();
     });
   });
 

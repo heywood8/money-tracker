@@ -7,6 +7,7 @@ import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -100,6 +101,8 @@ const CategorySpendingCard = ({
     loading,
     totalYearlySpending,
   } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
+
+  const { hideBalances } = useDisplaySettings();
 
   // Two-letter month abbreviations
   const monthAbbreviations = ['Ja', 'Fe', 'Mr', 'Ap', 'My', 'Jn', 'Jl', 'Au', 'Se', 'Oc', 'No', 'De'];
@@ -250,7 +253,7 @@ const CategorySpendingCard = ({
               yAxisSuffix=""
               fromZero={true}
               withInnerLines={true}
-              formatYLabel={formatYLabel}
+              formatYLabel={hideBalances ? () => '' : formatYLabel}
               chartConfig={{
                 backgroundColor: colors.altRow,
                 backgroundGradientFrom: colors.altRow,
@@ -281,14 +284,16 @@ const CategorySpendingCard = ({
           </View>
 
           {/* 12-Month Total */}
-          <View style={styles.totalContainer}>
-            <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
-              {t('last_12_months_total')}
-            </Text>
-            <Text style={[styles.totalValue, { color: colors.expense || '#ff4444' }]}>
-              {formatCurrency(totalYearlySpending, selectedCurrency)}
-            </Text>
-          </View>
+          {!hideBalances && (
+            <View style={styles.totalContainer}>
+              <Text style={[styles.totalLabel, { color: colors.mutedText }]}>
+                {t('last_12_months_total')}
+              </Text>
+              <Text style={[styles.totalValue, { color: colors.expense || '#ff4444' }]}>
+                {formatCurrency(totalYearlySpending, selectedCurrency)}
+              </Text>
+            </View>
+          )}
         </>
       )}
     </View>
