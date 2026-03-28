@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import currencies from '../../../assets/currencies.json';
+import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
@@ -11,6 +12,7 @@ const formatCurrency = (amount, currency) => {
 };
 
 const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
+  const { hideBalances } = useDisplaySettings();
   const total = data.reduce((sum, item) => sum + item.amount, 0);
 
   return (
@@ -63,7 +65,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             {/* Amount column (fixed width) */}
             <View style={styles.amountColumn}>
               <Text style={[styles.legendAmount, { color: colors.text }]} numberOfLines={1}>
-                {formatCurrency(item.amount, currency)}
+                {hideBalances ? '••••' : formatCurrency(item.amount, currency)}
               </Text>
             </View>
 
