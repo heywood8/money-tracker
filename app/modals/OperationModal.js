@@ -184,8 +184,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   }, [isShadowOperation, setValues]);
 
   // Handler for description focus (auto-scroll to end)
+  // We scroll twice: immediately for initial positioning, then again after the
+  // suggestion chips have animated in (150ms fade-in), so chips are visible.
   const handleDescriptionFocus = useCallback(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 200);
   }, []);
 
   // Handler for opening date picker
