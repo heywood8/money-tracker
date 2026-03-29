@@ -391,11 +391,15 @@ const BalanceHistoryCard = ({
                 return null;
               };
 
-              prevMonthCurrent = prevMonthAtDay(displayDay);
-              // End = last defined value in prev month (handles months shorter than current)
-              prevMonthEnd = prevMonthAtDay(prevMonthAllValues.length);
+              // Number of days in the previous month (e.g. 28 for February)
+              const prevMonthDaysCount = new Date(selectedYear, selectedMonth, 0).getDate();
 
-              // Calculate daily avg from first to last defined index
+              prevMonthCurrent = prevMonthAtDay(displayDay);
+              // End = balance on the actual last day of the previous month
+              prevMonthEnd = prevMonthAtDay(prevMonthDaysCount);
+
+              // Calculate daily avg: change from first to last recorded balance,
+              // divided by the full month's day span so sparse data doesn't skew the result
               let firstIdx = -1;
               let lastIdx = -1;
               prevMonthAllValues.forEach((v, i) => {
@@ -404,8 +408,8 @@ const BalanceHistoryCard = ({
                   lastIdx = i;
                 }
               });
-              if (firstIdx !== -1 && lastIdx > firstIdx) {
-                prevMonthDailyAvg = (prevMonthAllValues[lastIdx] - prevMonthAllValues[firstIdx]) / (lastIdx - firstIdx);
+              if (firstIdx !== -1 && lastIdx > firstIdx && prevMonthDaysCount > 1) {
+                prevMonthDailyAvg = (prevMonthAllValues[lastIdx] - prevMonthAllValues[firstIdx]) / (prevMonthDaysCount - 1);
               } else if (firstIdx !== -1) {
                 prevMonthDailyAvg = 0;
               }
