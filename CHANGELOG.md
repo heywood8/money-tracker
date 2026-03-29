@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.62.1](https://github.com/heywood8/money-tracker/compare/penny-v0.62.0...penny-v0.62.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* **graphs:** correct prev month legend daily avg and end calculations ([#376](https://github.com/heywood8/money-tracker/issues/376)) ([1305fca](https://github.com/heywood8/money-tracker/commit/1305fcaa2dea8239a007ab12b0f5dba67fcf583e))
+
 ## [0.62.0](https://github.com/heywood8/money-tracker/compare/penny-v0.61.3...penny-v0.62.0) (2026-03-28)
 
 
