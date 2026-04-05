@@ -73,7 +73,7 @@ jobs:
             core.setOutput('message', comment);
             core.setOutput('has_errors', errorCount > 0 ? 'true' : 'false');
 
-      - uses: marocchino/sticky-pull-request-comment@v3.0.2
+      - uses: marocchino/sticky-pull-request-comment@v3.0.3
         if: always()
         with:
           header: "Lint Results"
@@ -164,7 +164,7 @@ jobs:
             // set comment in the output so that the next stage makes this comment sticky (non-repeatable)
             core.setOutput('message', comment);
 
-      - uses: marocchino/sticky-pull-request-comment@v3.0.2
+      - uses: marocchino/sticky-pull-request-comment@v3.0.3
         id: sticky-comment
         with:
           header: "Test Results"
