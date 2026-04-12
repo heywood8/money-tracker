@@ -88,7 +88,7 @@ jobs:
 
       - name: 📤 Upload APK to Release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ${{ steps.find_apk.outputs.apk_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
