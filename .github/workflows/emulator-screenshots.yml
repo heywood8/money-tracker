@@ -244,7 +244,7 @@ jobs:
 
             core.setOutput('message', lines.join('\n'));
 
-      - uses: marocchino/sticky-pull-request-comment@v3.0.2
+      - uses: marocchino/sticky-pull-request-comment@v3.0.4
         if: github.event_name == 'pull_request' && always()
         with:
           header: "App Screenshots"
