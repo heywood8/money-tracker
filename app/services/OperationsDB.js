@@ -1621,7 +1621,7 @@ export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
 export const getDistinctDescriptions = async (limit = 100, categoryId = null, amount = null) => {
   try {
     let results;
-    const baseWhere = `description IS NOT NULL AND description != '' AND description NOT LIKE '[MoneyOK]%'`;
+    const baseWhere = 'description IS NOT NULL AND description != \'\' AND description NOT LIKE \'[MoneyOK]%\'';
     if (categoryId && amount !== null) {
       results = await queryAll(
         `SELECT description
