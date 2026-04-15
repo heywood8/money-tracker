@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.62.2](https://github.com/heywood8/money-tracker/compare/penny-v0.62.1...penny-v0.62.2) (2026-04-15)
+
+
+### Build System
+
+* **deps:** bump actions/github-script from 8 to 9 ([#379](https://github.com/heywood8/money-tracker/issues/379)) ([40e6f6f](https://github.com/heywood8/money-tracker/commit/40e6f6f6c2efb920bdea83d18ac16e9cddb15351))
+* **deps:** bump marocchino/sticky-pull-request-comment from 3.0.2 to 3.0.4 ([#381](https://github.com/heywood8/money-tracker/issues/381)) ([39f76ce](https://github.com/heywood8/money-tracker/commit/39f76ceb79c20ec921aaff389200fdf836bd201d))
+* **deps:** bump softprops/action-gh-release from 2 to 3 ([#380](https://github.com/heywood8/money-tracker/issues/380)) ([464edec](https://github.com/heywood8/money-tracker/commit/464edec810ad64c4e1de93a9fb8cca00d328bfae))
+
 ## [0.62.1](https://github.com/heywood8/money-tracker/compare/penny-v0.62.0...penny-v0.62.1) (2026-03-29)
 
 
