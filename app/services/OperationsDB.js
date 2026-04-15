@@ -1621,11 +1621,12 @@ export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
 export const getDistinctDescriptions = async (limit = 100, categoryId = null, amount = null) => {
   try {
     let results;
+    const baseWhere = `description IS NOT NULL AND description != '' AND description NOT LIKE '[MoneyOK]%'`;
     if (categoryId && amount !== null) {
       results = await queryAll(
         `SELECT description
          FROM operations
-         WHERE description IS NOT NULL AND description != ''
+         WHERE ${baseWhere}
          GROUP BY description
          ORDER BY MAX(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC,
                   MIN(CASE WHEN category_id = ? THEN ABS(CAST(amount AS REAL) - ?) ELSE NULL END) ASC,
@@ -1638,7 +1639,7 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
       results = await queryAll(
         `SELECT description
          FROM operations
-         WHERE description IS NOT NULL AND description != ''
+         WHERE ${baseWhere}
          GROUP BY description
          ORDER BY MAX(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC,
                   COUNT(*) DESC,
@@ -1650,7 +1651,7 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
       results = await queryAll(
         `SELECT description
          FROM operations
-         WHERE description IS NOT NULL AND description != ''
+         WHERE ${baseWhere}
          GROUP BY description
          ORDER BY COUNT(*) DESC, description ASC
          LIMIT ?`,

@@ -2474,6 +2474,7 @@ describe('OperationsDB Service', () => {
       expect(sql).toContain('COUNT(*)');
       expect(sql).toContain('LIMIT ?');
       expect(sql).toContain("description IS NOT NULL AND description != ''");
+      expect(sql).toContain("description NOT LIKE '[MoneyOK]%'");
       expect(params).toEqual([50]);
     });
 
