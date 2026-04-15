@@ -1608,21 +1608,56 @@ export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
 
 /**
  * Get distinct operation descriptions ordered by usage frequency (most used first).
+ * When categoryId is provided, descriptions used in that category are listed first.
+ * When amount is also provided, same-category descriptions are further sorted by
+ * closest historical amount (ascending absolute difference) before frequency.
  * Used for autocomplete suggestions in the operation form.
  * @param {number} limit - Maximum number of descriptions to return
- * @returns {Promise<string[]>} Array of description strings, most used first
+ * @param {string|null} categoryId - If provided, descriptions from this category appear first
+ * @param {number|null} amount - If provided alongside categoryId, same-category descriptions
+ *   are sorted by closest amount match first
+ * @returns {Promise<string[]>} Array of description strings
  */
-export const getDistinctDescriptions = async (limit = 100) => {
+export const getDistinctDescriptions = async (limit = 100, categoryId = null, amount = null) => {
   try {
-    const results = await queryAll(
-      `SELECT description
-       FROM operations
-       WHERE description IS NOT NULL AND description != ''
-       GROUP BY description
-       ORDER BY COUNT(*) DESC, description ASC
-       LIMIT ?`,
-      [limit],
-    );
+    let results;
+    const baseWhere = 'description IS NOT NULL AND description != \'\' AND description NOT LIKE \'[MoneyOK]%\'';
+    if (categoryId && amount !== null) {
+      results = await queryAll(
+        `SELECT description
+         FROM operations
+         WHERE ${baseWhere}
+         GROUP BY description
+         ORDER BY MAX(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC,
+                  MIN(CASE WHEN category_id = ? THEN ABS(CAST(amount AS REAL) - ?) ELSE NULL END) ASC,
+                  COUNT(*) DESC,
+                  description ASC
+         LIMIT ?`,
+        [categoryId, categoryId, amount, limit],
+      );
+    } else if (categoryId) {
+      results = await queryAll(
+        `SELECT description
+         FROM operations
+         WHERE ${baseWhere}
+         GROUP BY description
+         ORDER BY MAX(CASE WHEN category_id = ? THEN 1 ELSE 0 END) DESC,
+                  COUNT(*) DESC,
+                  description ASC
+         LIMIT ?`,
+        [categoryId, limit],
+      );
+    } else {
+      results = await queryAll(
+        `SELECT description
+         FROM operations
+         WHERE ${baseWhere}
+         GROUP BY description
+         ORDER BY COUNT(*) DESC, description ASC
+         LIMIT ?`,
+        [limit],
+      );
+    }
     return (results || []).map(row => row.description);
   } catch (error) {
     console.error('Failed to get distinct descriptions:', error);

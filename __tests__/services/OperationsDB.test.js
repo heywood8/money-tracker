@@ -2474,6 +2474,7 @@ describe('OperationsDB Service', () => {
       expect(sql).toContain('COUNT(*)');
       expect(sql).toContain('LIMIT ?');
       expect(sql).toContain("description IS NOT NULL AND description != ''");
+      expect(sql).toContain("description NOT LIKE '[MoneyOK]%'");
       expect(params).toEqual([50]);
     });
 
@@ -2490,6 +2491,54 @@ describe('OperationsDB Service', () => {
       queryAll.mockRejectedValue(new Error('DB error'));
 
       await expect(OperationsDB.getDistinctDescriptions()).rejects.toThrow('DB error');
+    });
+
+    it('prioritises same-category descriptions when categoryId is provided', async () => {
+      queryAll.mockResolvedValue([
+        { description: 'Coffee' },
+        { description: 'Groceries' },
+      ]);
+
+      const result = await OperationsDB.getDistinctDescriptions(100, 'cat-1');
+
+      expect(result).toEqual(['Coffee', 'Groceries']);
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('CASE WHEN category_id = ?');
+      expect(params).toEqual(['cat-1', 100]);
+    });
+
+    it('sorts same-category descriptions by closest amount when both categoryId and amount are provided', async () => {
+      queryAll.mockResolvedValue([
+        { description: 'Coffee' },
+        { description: 'Groceries' },
+      ]);
+
+      const result = await OperationsDB.getDistinctDescriptions(100, 'cat-1', 25.5);
+
+      expect(result).toEqual(['Coffee', 'Groceries']);
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).toContain('ABS(CAST(amount AS REAL) - ?)');
+      expect(params).toEqual(['cat-1', 'cat-1', 25.5, 100]);
+    });
+
+    it('skips amount sort when amount is null even if categoryId is set', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getDistinctDescriptions(100, 'cat-1', null);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).not.toContain('ABS(CAST(amount AS REAL)');
+      expect(params).toEqual(['cat-1', 100]);
+    });
+
+    it('uses frequency-only ordering when no categoryId is provided', async () => {
+      queryAll.mockResolvedValue([]);
+
+      await OperationsDB.getDistinctDescriptions(100, null);
+
+      const [sql, params] = queryAll.mock.calls[0];
+      expect(sql).not.toContain('CASE WHEN');
+      expect(params).toEqual([100]);
     });
   });
 });
