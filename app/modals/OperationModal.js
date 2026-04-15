@@ -130,9 +130,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
 
   useEffect(() => {
     if (visible) {
-      getDistinctDescriptions().then(setDescriptionSuggestions).catch(() => {});
+      getDistinctDescriptions(100, values.categoryId || null)
+        .then(setDescriptionSuggestions)
+        .catch(() => {});
     }
-  }, [visible]);
+  }, [visible, values.categoryId]);
 
   // Determine if split button should be shown
   // Only for editing expense/income (not transfers, not shadow operations, not new)
