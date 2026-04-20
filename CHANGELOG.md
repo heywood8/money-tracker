@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.63.0](https://github.com/heywood8/money-tracker/compare/penny-v0.62.2...penny-v0.63.0) (2026-04-20)
+
+
+### Features
+
+* **categories:** add grid view with list/grid toggle ([#385](https://github.com/heywood8/money-tracker/issues/385)) ([859ef45](https://github.com/heywood8/money-tracker/commit/859ef45570010af3111f30cac2d27276c7f77073))
+
 ## [0.62.2](https://github.com/heywood8/money-tracker/compare/penny-v0.62.1...penny-v0.62.2) (2026-04-15)
 
 
