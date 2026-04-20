@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.64.0](https://github.com/heywood8/money-tracker/compare/penny-v0.63.0...penny-v0.64.0) (2026-04-20)
+
+
+### Features
+
+* **accounts:** enhance net worth display and number formatting ([#387](https://github.com/heywood8/money-tracker/issues/387)) ([7826522](https://github.com/heywood8/money-tracker/commit/7826522559bac75dfc3c223782ce4e581a2f2e63))
+
 ## [0.63.0](https://github.com/heywood8/money-tracker/compare/penny-v0.62.2...penny-v0.63.0) (2026-04-20)
 
 
