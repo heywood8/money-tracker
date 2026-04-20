@@ -113,5 +113,7 @@
   "local_backups": "Backup locali",
   "local_backups_empty": "Nessun backup locale ancora",
   "delete_backup": "Elimina backup",
-  "delete_backup_confirm": "Eliminare questo backup? Questa azione non può essere annullata."
+  "delete_backup_confirm": "Eliminare questo backup? Questa azione non può essere annullata.",
+  "net_worth": "Patrimonio Netto",
+  "this_month": "questo mese"
 }

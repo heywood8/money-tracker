@@ -354,5 +354,7 @@
   "local_backups": "Local Backups",
   "local_backups_empty": "No local backups yet",
   "delete_backup": "Delete Backup",
-  "delete_backup_confirm": "Delete this backup? This cannot be undone."
+  "delete_backup_confirm": "Delete this backup? This cannot be undone.",
+  "net_worth": "Net Worth",
+  "this_month": "this month"
 }

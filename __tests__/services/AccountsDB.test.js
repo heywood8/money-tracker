@@ -639,12 +639,19 @@ describe('AccountsDB', () => {
 
   describe('reorderAccounts', () => {
     it('reorders accounts with new display orders', async () => {
-      const mockDb = {
-        runAsync: jest.fn().mockResolvedValue(undefined),
+      const mockUpdate = jest.fn().mockReturnThis();
+      const mockSet = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockResolvedValue(undefined);
+
+      const mockDrizzle = {
+        update: mockUpdate.mockReturnValue({
+          set: mockSet.mockReturnValue({
+            where: mockWhere,
+          }),
+        }),
       };
-      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
-        await callback(mockDb);
-      });
+
+      jest.spyOn(db, 'getDrizzle').mockResolvedValue(mockDrizzle);
 
       const orderedAccounts = [
         { id: 'acc-1', display_order: 0 },
@@ -654,35 +661,63 @@ describe('AccountsDB', () => {
 
       await AccountsDB.reorderAccounts(orderedAccounts);
 
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(3);
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
-        [0, expect.any(String), 'acc-1'],
-      );
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
-        [1, expect.any(String), 'acc-2'],
-      );
+      expect(mockUpdate).toHaveBeenCalledTimes(3);
+      expect(mockSet).toHaveBeenCalledTimes(3);
+      expect(mockWhere).toHaveBeenCalledTimes(3);
+      expect(mockSet).toHaveBeenCalledWith({
+        displayOrder: 0,
+        updatedAt: expect.any(String),
+      });
     });
 
     it('handles empty array', async () => {
-      const mockDb = {
-        runAsync: jest.fn().mockResolvedValue(undefined),
+      const mockDrizzle = {
+        update: jest.fn(),
       };
-      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
-        await callback(mockDb);
-      });
+
+      jest.spyOn(db, 'getDrizzle').mockResolvedValue(mockDrizzle);
 
       await AccountsDB.reorderAccounts([]);
 
-      expect(mockDb.runAsync).not.toHaveBeenCalled();
+      expect(mockDrizzle.update).not.toHaveBeenCalled();
     });
 
     it('throws error when reorder fails', async () => {
-      jest.spyOn(db, 'executeTransaction').mockRejectedValue(new Error('Reorder failed'));
+      jest.spyOn(db, 'getDrizzle').mockRejectedValue(new Error('Reorder failed'));
 
       await expect(AccountsDB.reorderAccounts([{ id: '1', display_order: 0 }]))
         .rejects.toThrow('Reorder failed');
+    });
+
+    it('throws error for duplicate account IDs', async () => {
+      const mockDrizzle = {
+        update: jest.fn(),
+      };
+
+      jest.spyOn(db, 'getDrizzle').mockResolvedValue(mockDrizzle);
+
+      const orderedAccounts = [
+        { id: 'acc-1', display_order: 0 },
+        { id: 'acc-1', display_order: 1 }, // duplicate
+      ];
+
+      await expect(AccountsDB.reorderAccounts(orderedAccounts))
+        .rejects.toThrow('Duplicate account ID in reorder: acc-1');
+    });
+
+    it('throws error for missing account ID', async () => {
+      const mockDrizzle = {
+        update: jest.fn(),
+      };
+
+      jest.spyOn(db, 'getDrizzle').mockResolvedValue(mockDrizzle);
+
+      const orderedAccounts = [
+        { display_order: 0 }, // missing id
+      ];
+
+      await expect(AccountsDB.reorderAccounts(orderedAccounts))
+        .rejects.toThrow('Invalid account data: missing id');
     });
   });
 
