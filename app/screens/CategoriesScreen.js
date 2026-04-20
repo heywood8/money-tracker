@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -124,19 +124,14 @@ const CategoriesScreen = () => {
 
     return (
       <TouchableOpacity
-        style={[styles.gridCell, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[styles.gridCell, { backgroundColor: iconColor + '22', borderColor: colors.border }]}
         onPress={() => handleGridCellPress(category)}
         onLongPress={() => handleCategoryLongPress(category)}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${name} category`}
       >
-        <View style={[styles.gridIconBubble, { backgroundColor: iconColor + '22' }]}>
-          <Icon name={category.icon} size={22} color={iconColor} accessible={false} />
-        </View>
-        {hasChildren && (
-          <Icon name="chevron-right" size={10} color={colors.mutedText} style={styles.gridFolderChevron} accessible={false} />
-        )}
+        <Icon name={category.icon} size={28} color={iconColor} accessible={false} />
         <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
           {name}
         </Text>
@@ -287,6 +282,7 @@ const CategoriesScreen = () => {
           renderItem={renderGridCell}
           keyExtractor={item => item.id}
           numColumns={3}
+          columnWrapperStyle={styles.gridRow}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
@@ -318,7 +314,6 @@ const CategoriesScreen = () => {
 
       <FAB
         icon="plus"
-        label={t('add_category')}
         style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
         color={colors.text}
         onPress={handleAddCategory}
@@ -405,10 +400,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    flex: 1,
     gap: SPACING.sm,
     margin: SPACING.xs,
     padding: SPACING.md,
+    width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
   },
   gridCellName: {
     fontSize: 12,
@@ -419,17 +414,8 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
     paddingBottom: 180,
   },
-  gridFolderChevron: {
-    position: 'absolute',
-    right: SPACING.sm,
-    top: SPACING.sm,
-  },
-  gridIconBubble: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
+  gridRow: {
+    justifyContent: 'flex-start',
   },
   listContent: {
     paddingBottom: 180,
