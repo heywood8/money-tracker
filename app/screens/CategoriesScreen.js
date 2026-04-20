@@ -28,7 +28,7 @@ const CategoriesScreen = () => {
   const [budgetCategory, setBudgetCategory] = useState(null);
   const [isBudgetNew, setIsBudgetNew] = useState(false);
 
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('grid');
   const [gridParentId, setGridParentId] = useState(null);
 
   const handleAddCategory = () => {
