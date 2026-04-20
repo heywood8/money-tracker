@@ -131,7 +131,7 @@ const CategoriesScreen = () => {
         accessibilityRole="button"
         accessibilityLabel={`${name} category`}
       >
-        <Icon name={category.icon} size={28} color={iconColor} accessible={false} />
+        <Icon name={category.icon} size={28} color={colors.text} accessible={false} />
         <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
           {name}
         </Text>
