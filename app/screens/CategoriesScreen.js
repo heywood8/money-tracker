@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text, FAB, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -27,6 +27,9 @@ const CategoriesScreen = () => {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [budgetCategory, setBudgetCategory] = useState(null);
   const [isBudgetNew, setIsBudgetNew] = useState(false);
+
+  const [viewMode, setViewMode] = useState('list');
+  const [gridParentId, setGridParentId] = useState(null);
 
   const handleAddCategory = () => {
     setEditingCategory(null);
@@ -93,6 +96,53 @@ const CategoriesScreen = () => {
     return flattened;
   }, [categories, expandedIds]);
 
+
+  const gridCategories = useMemo(() => {
+    const visible = categories.filter(c => !c.isShadow);
+    return visible.filter(c => (gridParentId === null ? !c.parentId : c.parentId === gridParentId));
+  }, [categories, gridParentId]);
+
+  const gridParentCategory = useMemo(() => {
+    if (gridParentId === null) return null;
+    return categories.find(c => c.id === gridParentId) || null;
+  }, [categories, gridParentId]);
+
+  const handleGridCellPress = useCallback((category) => {
+    const hasChildren = getChildren(category.id).filter(c => !c.isShadow).length > 0;
+    if (hasChildren) {
+      setGridParentId(category.id);
+    } else {
+      handleEditCategory(category);
+    }
+  }, [getChildren, handleEditCategory]);
+
+  const renderGridCell = useCallback(({ item: category }) => {
+    const categoryType = category.category_type || category.categoryType || 'expense';
+    const iconColor = categoryType === 'income' ? colors.income : colors.expense;
+    const name = category.nameKey ? t(category.nameKey) : category.name;
+    const hasChildren = getChildren(category.id).filter(c => !c.isShadow).length > 0;
+
+    return (
+      <TouchableOpacity
+        style={[styles.gridCell, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => handleGridCellPress(category)}
+        onLongPress={() => handleCategoryLongPress(category)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${name} category`}
+      >
+        <View style={[styles.gridIconBubble, { backgroundColor: iconColor + '22' }]}>
+          <Icon name={category.icon} size={22} color={iconColor} accessible={false} />
+        </View>
+        {hasChildren && (
+          <Icon name="chevron-right" size={10} color={colors.mutedText} style={styles.gridFolderChevron} accessible={false} />
+        )}
+        <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
+          {name}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress]);
 
   const renderCategory = useCallback(({ item }) => {
     const category = item;
@@ -190,22 +240,81 @@ const CategoriesScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={flattenedCategories}
-        renderItem={renderCategory}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
-          </View>
-        }
-        contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : styles.listContent}
-        windowSize={10}
-        maxToRenderPerBatch={10}
-        initialNumToRender={15}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
-      />
+      {/* Toggle bar */}
+      <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
+        {viewMode === 'grid' && gridParentId !== null ? (
+          <TouchableOpacity
+            onPress={() => setGridParentId(null)}
+            style={styles.backButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back to all categories"
+          >
+            <Icon name="chevron-left" size={18} color={colors.primary} />
+            <Text style={[styles.backLabel, { color: colors.primary }]}>
+              {gridParentCategory?.nameKey ? t(gridParentCategory.nameKey) : gridParentCategory?.name}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View />
+        )}
+        <View style={styles.toggleButtons}>
+          <TouchableOpacity
+            onPress={() => setViewMode('list')}
+            style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: colors.selected }]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel="List view"
+          >
+            <Icon name="format-list-bulleted" size={18} color={viewMode === 'list' ? colors.primary : colors.mutedText} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setViewMode('grid'); setGridParentId(null); }}
+            style={[styles.toggleBtn, viewMode === 'grid' && { backgroundColor: colors.selected }]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel="Grid view"
+          >
+            <Icon name="view-grid" size={18} color={viewMode === 'grid' ? colors.primary : colors.mutedText} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {viewMode === 'grid' ? (
+        <FlatList
+          key="grid"
+          data={gridCategories}
+          renderItem={renderGridCell}
+          keyExtractor={item => item.id}
+          numColumns={3}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
+            </View>
+          }
+          contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
+          windowSize={10}
+          removeClippedSubviews={true}
+        />
+      ) : (
+        <FlatList
+          key="list"
+          data={flattenedCategories}
+          renderItem={renderCategory}
+          keyExtractor={item => item.id}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
+            </View>
+          }
+          contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : styles.listContent}
+          windowSize={10}
+          maxToRenderPerBatch={10}
+          initialNumToRender={15}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+        />
+      )}
 
       <FAB
         icon="plus"
@@ -237,6 +346,15 @@ const CategoriesScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 2,
+  },
+  backLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   budgetIcon: {
     marginLeft: SPACING.sm,
   },
@@ -283,6 +401,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  gridCell: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    flex: 1,
+    gap: SPACING.sm,
+    margin: SPACING.xs,
+    padding: SPACING.md,
+  },
+  gridCellName: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  gridContent: {
+    padding: SPACING.sm,
+    paddingBottom: 180,
+  },
+  gridFolderChevron: {
+    position: 'absolute',
+    right: SPACING.sm,
+    top: SPACING.sm,
+  },
+  gridIconBubble: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
   listContent: {
     paddingBottom: 180,
   },
@@ -297,6 +445,22 @@ const styles = StyleSheet.create({
   },
   sectionMarginTop: {
     marginTop: SPACING.md,
+  },
+  toggleBar: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.sm,
+  },
+  toggleBtn: {
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.xs,
+  },
+  toggleButtons: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
   },
 });
 
