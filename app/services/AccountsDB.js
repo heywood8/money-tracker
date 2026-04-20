@@ -353,16 +353,30 @@ export const accountExists = async (id) => {
  */
 export const reorderAccounts = async (orderedAccounts) => {
   try {
-    await executeTransaction(async (db) => {
-      const now = new Date().toISOString();
-
-      for (const { id, display_order } of orderedAccounts) {
-        await db.runAsync(
-          'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
-          [display_order, now, id],
-        );
+    // Validate input to prevent duplicate IDs or invalid data
+    const seenIds = new Set();
+    for (const item of orderedAccounts) {
+      if (!item.id) {
+        throw new Error('Invalid account data: missing id');
       }
-    });
+      if (seenIds.has(item.id)) {
+        throw new Error(`Duplicate account ID in reorder: ${item.id}`);
+      }
+      seenIds.add(item.id);
+    }
+
+    const db = await getDrizzle();
+    const now = new Date().toISOString();
+
+    // Use Drizzle for updates instead of raw SQL in transaction
+    for (const { id, display_order } of orderedAccounts) {
+      await db.update(accounts)
+        .set({
+          displayOrder: display_order,
+          updatedAt: now,
+        })
+        .where(eq(accounts.id, id));
+    }
   } catch (error) {
     console.error('Failed to reorder accounts:', error);
     throw error;

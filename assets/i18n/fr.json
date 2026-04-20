@@ -354,5 +354,7 @@
   "local_backups": "Sauvegardes locales",
   "local_backups_empty": "Aucune sauvegarde locale pour l'instant",
   "delete_backup": "Supprimer la sauvegarde",
-  "delete_backup_confirm": "Supprimer cette sauvegarde ? Cette action est irréversible."
+  "delete_backup_confirm": "Supprimer cette sauvegarde ? Cette action est irréversible.",
+  "net_worth": "Valeur Nette",
+  "this_month": "ce mois-ci"
 }

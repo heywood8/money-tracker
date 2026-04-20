@@ -354,5 +354,7 @@
   "local_backups": "本地备份",
   "local_backups_empty": "暂无本地备份",
   "delete_backup": "删除备份",
-  "delete_backup_confirm": "删除此备份？此操作无法撤销。"
+  "delete_backup_confirm": "删除此备份？此操作无法撤销。",
+  "net_worth": "净资产",
+  "this_month": "本月"
 }

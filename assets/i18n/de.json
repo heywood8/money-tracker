@@ -354,5 +354,7 @@
   "local_backups": "Lokale Backups",
   "local_backups_empty": "Noch keine lokalen Backups",
   "delete_backup": "Backup löschen",
-  "delete_backup_confirm": "Dieses Backup löschen? Dies kann nicht rückgängig gemacht werden."
+  "delete_backup_confirm": "Dieses Backup löschen? Dies kann nicht rückgängig gemacht werden.",
+  "net_worth": "Nettovermögen",
+  "this_month": "diesen Monat"
 }

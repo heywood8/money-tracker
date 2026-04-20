@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Keyboard, FlatList, TouchableOpacity, Modal as RNModal } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Modal as RNModal } from 'react-native';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
-import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, Card, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
+import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -12,9 +12,9 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
+import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import currencies from '../../assets/currencies.json';
-import ListCard from '../components/ListCard';
 
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
@@ -229,54 +229,174 @@ ConfirmationDialog.defaultProps = {
   confirmColor: null,
 };
 
-// Memoized account row component
-const AccountRow = memo(({ item, index, colors, onPress, t, drag, isActive }) => {
+// Net worth summary card
+const NetWorthCard = memo(({ accounts, operations, colors, t }) => {
   const { hideBalances } = useDisplaySettings();
-  const isEven = index % 2 === 0;
+
+  // Determine display currency from first account (or default to USD)
+  const displayCurrency = useMemo(() => {
+    if (accounts.length > 0) {
+      return accounts[0].currency || 'USD';
+    }
+    return 'USD';
+  }, [accounts]);
+
+  const currencyData = currencies[displayCurrency] || currencies['USD'];
+  const decimals = currencyData?.decimal_digits ?? 2;
+  const currencySymbol = currencyData?.symbol || displayCurrency;
+
+  // Filter accounts to only those matching display currency
+  const sameCurrencyAccounts = useMemo(() => {
+    return accounts.filter(acc => acc.currency === displayCurrency);
+  }, [accounts, displayCurrency]);
+
+  // Create account ID set for quick lookup
+  const sameCurrencyAccountIds = useMemo(() => {
+    return new Set(sameCurrencyAccounts.map(acc => acc.id));
+  }, [sameCurrencyAccounts]);
+
+  const totalBalance = useMemo(() => {
+    return sameCurrencyAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0);
+  }, [sameCurrencyAccounts]);
+
+  // Calculate this month's change (only for accounts with matching currency)
+  const monthlyChange = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    return operations.reduce((sum, op) => {
+      // Only count operations from accounts with matching currency
+      if (!sameCurrencyAccountIds.has(op.accountId)) {
+        return sum;
+      }
+
+      const opDate = new Date(op.date);
+      if (opDate.getMonth() === currentMonth && opDate.getFullYear() === currentYear) {
+        const amount = parseFloat(op.amount || '0');
+        if (op.type === 'income') {
+          return sum + amount;
+        } else if (op.type === 'expense') {
+          return sum - amount;
+        }
+        // transfers don't affect net worth
+      }
+      return sum;
+    }, 0);
+  }, [operations, sameCurrencyAccountIds]);
+
+  const isNegative = totalBalance < 0;
+  const abs = Math.abs(totalBalance);
+  const [intPart, decPart] = abs.toFixed(decimals).split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formatted = decPart ? `${formattedInt}.${decPart}` : formattedInt;
+
+  const changeIsPositive = monthlyChange >= 0;
+  const absChange = Math.abs(monthlyChange);
+  const [changeIntPart, changeDecPart] = absChange.toFixed(decimals).split('.');
+  const formattedChangeInt = changeIntPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formattedChange = changeDecPart ? `${formattedChangeInt}.${changeDecPart}` : formattedChangeInt;
+
+  return (
+    <View style={[styles.netWorthCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.netWorthLabel, { color: colors.mutedText }]}>
+        {(t('net_worth') || 'NET WORTH').toUpperCase()}
+      </Text>
+      {hideBalances ? (
+        <View style={[styles.hiddenBalance, styles.hiddenBalanceLarge]} />
+      ) : (
+        <>
+          <Text style={[styles.netWorthAmount, { color: isNegative ? colors.expense : colors.text }]}>
+            {isNegative ? '-' : ''}{currencySymbol}{formatted}
+          </Text>
+          {monthlyChange !== 0 && (
+            <View style={styles.monthlyChangeRow}>
+              <Text style={[styles.monthlyChangeText, { color: changeIsPositive ? colors.income : colors.expense }]}>
+                {changeIsPositive ? '↗' : '↘'} {changeIsPositive ? '+' : '-'}{currencySymbol}{formattedChange} {t('this_month') || 'this month'}
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+});
+
+NetWorthCard.displayName = 'NetWorthCard';
+
+NetWorthCard.propTypes = {
+  accounts: PropTypes.array,
+  operations: PropTypes.array,
+  colors: PropTypes.object,
+  t: PropTypes.func,
+};
+
+NetWorthCard.defaultProps = {
+  accounts: [],
+  operations: [],
+  colors: {},
+  t: (k) => k,
+};
+
+// Memoized account row component
+const AccountRow = memo(({ item, colors, onPress, t, drag, isActive }) => {
+  const { hideBalances } = useDisplaySettings();
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
-  const formattedBalance = parseFloat(item.balance).toFixed(decimals);
+  const balance = parseFloat(item.balance);
+  const isNegative = balance < 0;
+
+  // Format balance with thousands separators
+  const absBalance = Math.abs(balance);
+  const [intPart, decPart] = absBalance.toFixed(decimals).split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formattedBalance = decPart ? `${formattedInt}.${decPart}` : formattedInt;
 
   const handlePress = useCallback(() => {
     onPress(item.id);
   }, [onPress, item.id]);
 
   return (
-    <ListCard
-      variant="default"
-      alternateBackground={!isEven}
-      onPress={handlePress}
-      style={isActive && [{ backgroundColor: colors.selected }, styles.activeAccountOpacity]}
-      accessibilityLabel={t('edit_account') || 'Edit Account'}
-      rightAction={
-        <TouchableOpacity
-          onLongPress={drag}
-          style={styles.dragHandle}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel={t('drag_to_reorder') || 'Long press to reorder'}
-          accessibilityRole="button"
-        >
-          <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
-        </TouchableOpacity>
-      }
-    >
-      <View style={styles.rowAlignCenter}>
-        <View style={styles.accountNameWrapper}>
-          <Text style={styles.accountNameText} numberOfLines={1} ellipsizeMode="tail">
-            {item.name}
-          </Text>
-        </View>
-        <View style={styles.verticalDivider} />
-        <View style={styles.accountValueWrapper}>
+    <View style={[styles.accountRow, isActive && { backgroundColor: colors.selected }]}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.7}
+        style={styles.accountTouchableArea}
+        accessibilityRole="button"
+        accessibilityLabel={t('edit_account') || 'Edit Account'}
+      >
+        <View style={styles.accountRowInner}>
+          <View style={styles.accountInfo}>
+            <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+              {item.name}
+            </Text>
+            <Text style={[styles.accountCurrencyLabel, { color: colors.mutedText }]}>
+              {item.currency}
+            </Text>
+          </View>
           {hideBalances ? (
             <View style={styles.hiddenBalance} />
           ) : (
-            <Text style={styles.accountValueText} numberOfLines={1} ellipsizeMode="tail">
-              {formattedBalance} {item.currencySymbol}
+            <Text
+              style={[styles.accountBalance, { color: isNegative ? colors.expense : colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {isNegative ? '-' : ''}{item.currencySymbol}{formattedBalance}
             </Text>
           )}
         </View>
-      </View>
-    </ListCard>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onLongPress={drag}
+        delayLongPress={0}
+        style={styles.dragHandle}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel={t('drag_to_reorder') || 'Drag to reorder'}
+        accessibilityRole="button"
+      >
+        <Icon name="drag-horizontal-variant" size={24} color={colors.mutedText} />
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -284,7 +404,6 @@ AccountRow.displayName = 'AccountRow';
 
 AccountRow.propTypes = {
   item: PropTypes.object.isRequired,
-  index: PropTypes.number,
   colors: PropTypes.object,
   onPress: PropTypes.func,
   t: PropTypes.func,
@@ -293,7 +412,6 @@ AccountRow.propTypes = {
 };
 
 AccountRow.defaultProps = {
-  index: 0,
   colors: {},
   onPress: () => {},
   t: (k) => k,
@@ -325,6 +443,7 @@ export default function AccountsScreen() {
   const { colors } = useThemeColors();
   const { accounts, displayedAccounts, hiddenAccounts, showHiddenAccounts, loading, error } = useAccountsData();
   const { toggleShowHiddenAccounts, addAccount, updateAccount, deleteAccount, reorderAccounts, validateAccount, getOperationCount } = useAccountsActions();
+  const { operations } = useOperationsData();
   const { t } = useLocalization();
 
   const balanceInputRef = useRef(null);
@@ -536,10 +655,9 @@ export default function AccountsScreen() {
     return `${t('confirm_delete_and_transfer_message') || `This will permanently delete "${sourceAccount.name}" and irreversibly move ${operationCount} transaction(s) to "${destAccount.name}".\n\nThis action cannot be undone.`}`;
   }, [accountToDelete, transferConfirmDestinationId, accounts, operationCount, t]);
 
-  const renderItem = useCallback(({ item, index, drag, isActive }) => (
+  const renderItem = useCallback(({ item, drag, isActive }) => (
     <AccountRow
       item={item}
-      index={index}
       colors={colors}
       onPress={startEdit}
       t={t}
@@ -554,29 +672,9 @@ export default function AccountsScreen() {
 
   const keyExtractor = useCallback((item) => item.id, []);
 
-  const renderFooter = useCallback(() => {
-    if (hiddenAccounts.length === 0) return null;
-
-    return (
-      <TouchableRipple
-        onPress={toggleShowHiddenAccounts}
-        style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      >
-        <View style={styles.showHiddenContent}>
-          <Icon
-            name={showHiddenAccounts ? 'eye-off' : 'eye'}
-            size={24}
-            color={colors.primary}
-          />
-          <Text style={[styles.showHiddenText, { color: colors.text }]}>
-            {showHiddenAccounts
-              ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
-              : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
-          </Text>
-        </View>
-      </TouchableRipple>
-    );
-  }, [hiddenAccounts.length, showHiddenAccounts, toggleShowHiddenAccounts, colors, t]);
+  const renderItemSeparator = useCallback(() => (
+    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+  ), [colors.border]);
 
   if (loading) {
     return (
@@ -601,28 +699,66 @@ export default function AccountsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header is rendered globally by app/Header; per-screen header removed */}
-      <DraggableFlatList
-        contentInsetAdjustmentBehavior="automatic"
-        data={enhancedAccounts}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        onDragEnd={handleDragEnd}
-        activationDistance={20}
-        ListEmptyComponent={<Text style={[styles.listEmptyText, { color: colors.mutedText }]}>{t('no_accounts') || 'No accounts yet.'}</Text>}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={styles.draggableListContent}
-      />
-      {/* Footer is rendered as ListFooterComponent to stay with the list content */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ backgroundColor: colors.background }}
+      >
+        {/* Net Worth Summary Card */}
+        <NetWorthCard accounts={accounts} operations={operations} colors={colors} t={t} />
+
+        {/* Accounts Grouped Card */}
+        <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {enhancedAccounts.length === 0 ? (
+            <Text style={[styles.listEmptyText, { color: colors.mutedText }]}>
+              {t('no_accounts') || 'No accounts yet.'}
+            </Text>
+          ) : (
+            <DraggableFlatList
+              data={enhancedAccounts}
+              renderItem={renderItem}
+              keyExtractor={keyExtractor}
+              onDragEnd={handleDragEnd}
+              activationDistance={20}
+              scrollEnabled={false}
+              ItemSeparatorComponent={renderItemSeparator}
+            />
+          )}
+        </View>
+
+        {/* Show/hide hidden accounts */}
+        {hiddenAccounts.length > 0 && (
+          <Pressable
+            onPress={toggleShowHiddenAccounts}
+            android_ripple={{ color: 'rgba(0, 0, 0, .08)', borderless: false }}
+            style={[styles.showHiddenButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <View style={styles.showHiddenContent}>
+              <Icon
+                name={showHiddenAccounts ? 'eye-off' : 'eye'}
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={[styles.showHiddenText, { color: colors.text }]}>
+                {showHiddenAccounts
+                  ? (t('hide_hidden_accounts') || 'Hide hidden accounts')
+                  : (t('show_hidden_accounts') || `Show ${hiddenAccounts.length} hidden account${hiddenAccounts.length !== 1 ? 's' : ''}`)}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+      </ScrollView>
+
       <FAB
         icon="plus"
-        label={t('add_account') || 'Add Account'}
-        style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
-        color={colors.text}
+        style={[styles.fab, { backgroundColor: colors.text }]}
+        color={colors.background}
         onPress={addAccountHandler}
         accessibilityLabel={t('add_account') || 'Add Account'}
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
       />
+
       {!!editingId && <ModalBlurOverlay />}
       <RNModal
         visible={!!editingId}
@@ -772,7 +908,7 @@ export default function AccountsScreen() {
         confirmColor={colors.delete}
       />
 
-      {/* Error/info dialog (no currency match, errors, etc.) */}
+      {/* Error/info dialog */}
       <ConfirmationDialog
         visible={noCurrencyMatchVisible}
         onClose={handleCloseNoCurrencyMatch}
@@ -783,35 +919,56 @@ export default function AccountsScreen() {
         onConfirm={handleCloseNoCurrencyMatch}
         colors={colors}
       />
-
-      {/* Settings modal is managed at the top-level Header in SimpleTabs */}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  accountNameText: {
+  accountBalance: {
+    flexShrink: 1,
     fontSize: 15,
-    fontWeight: '500',
-  },
-  accountNameWrapper: {
-    flex: 7,
-    justifyContent: 'center',
-    paddingRight: SPACING.sm,
-  },
-  accountValueText: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    marginLeft: SPACING.sm,
     textAlign: 'right',
   },
-  accountValueWrapper: {
-    alignItems: 'flex-end',
-    flex: 4,
-    justifyContent: 'center',
-    paddingLeft: SPACING.sm,
+  accountCurrencyLabel: {
+    fontSize: 12,
+    letterSpacing: 0.2,
+    marginTop: 2,
   },
-  activeAccountOpacity: {
-    opacity: 0.9,
+  accountInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  accountName: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  accountRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 14,
+  },
+  accountRowInner: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+  },
+  accountTouchableArea: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+  },
+  accountsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
   },
   bodySmallMutedMarginTop: {
     marginTop: SPACING.xs,
@@ -862,15 +1019,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  dragHandle: {
-    alignItems: 'center',
-    height: 32,
-    justifyContent: 'center',
-    marginRight: SPACING.xs,
-    width: 32,
+  divider: {
+    height: 1,
+    marginHorizontal: SPACING.lg,
   },
-  draggableListContent: {
-    paddingBottom: 180,
+  dragHandle: {
+    paddingLeft: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   error: {
     color: 'red',
@@ -883,22 +1038,22 @@ const styles = StyleSheet.create({
   },
   fab: {
     borderRadius: 28,
-    borderWidth: 1,
     bottom: 100,
-    elevation: 8,
+    elevation: 4,
     margin: SPACING.lg,
     position: 'absolute',
     right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   hiddenBalance: {
     backgroundColor: 'rgba(120, 120, 120, 0.25)',
     borderRadius: 6,
     height: 16,
     width: 80,
+  },
+  hiddenBalanceLarge: {
+    height: 36,
+    marginTop: SPACING.xs,
+    width: 160,
   },
   hiddenBalancePicker: {
     marginTop: 4,
@@ -908,7 +1063,8 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xl,
   },
   listEmptyText: {
-    // color set dynamically
+    padding: SPACING.xl,
+    textAlign: 'center',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -940,6 +1096,34 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     textAlign: 'center',
   },
+  monthlyChangeRow: {
+    marginTop: SPACING.sm,
+  },
+  monthlyChangeText: {
+    fontSize: 14,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '500',
+    letterSpacing: -0.1,
+  },
+  netWorthAmount: {
+    fontSize: 32,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginTop: SPACING.xs,
+  },
+  netWorthCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    padding: SPACING.xl,
+  },
+  netWorthLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+  },
   pickerAccountBalance: {
     fontSize: 14,
     marginTop: SPACING.xs,
@@ -965,6 +1149,7 @@ const styles = StyleSheet.create({
   },
   pickerOption: {
     paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.md,
   },
   pickerOptionText: {
     fontSize: 16,
@@ -977,16 +1162,15 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
   },
-  rowAlignCenter: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
+  scrollContent: {
+    paddingBottom: 180,
   },
   showHiddenButton: {
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: 12,
     borderWidth: 1,
-    marginHorizontal: SPACING.sm,
-    marginTop: SPACING.xs,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
   },
   showHiddenContent: {
     alignItems: 'center',
@@ -997,7 +1181,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   showHiddenText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
   switchContainer: {
@@ -1014,15 +1198,4 @@ const styles = StyleSheet.create({
   textInput: {
     marginBottom: SPACING.sm,
   },
-  verticalDivider: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(120,120,120,0.13)',
-    height: '70%',
-    marginHorizontal: 2,
-    width: 1,
-  },
 });
-
-// Refactored for consistent and performant styles using StyleSheet.create
-// Consider using styled-components or tailwind-rn for dynamic styling if needed
-// Responsive design can be further improved with Dimensions, PixelRatio, or react-native-size-matters
