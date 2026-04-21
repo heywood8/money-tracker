@@ -5,13 +5,10 @@ import PropTypes from 'prop-types';
 import DateSeparator from './DateSeparator';
 import OperationListItem from './OperationListItem';
 import currencies from '../../../assets/currencies.json';
-import * as Currency from '../../services/currency';
-import { SPACING } from '../../styles/layout';
+import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
 /**
  * Get currency symbol from currency code
- * @param {string} currencyCode - Currency code like 'USD', 'EUR', etc.
- * @returns {string} Currency symbol or code if not found
  */
 const getCurrencySymbol = (currencyCode) => {
   if (!currencyCode) return '';
@@ -22,10 +19,8 @@ const getCurrencySymbol = (currencyCode) => {
 /**
  * OperationsList Component
  *
- * Displays a list of financial operations (already grouped by date) with
- * lazy loading and scroll functionality.
- *
- * @component
+ * Displays a list of financial operations grouped by date. Each date group
+ * renders as a single card containing all operations for that day.
  */
 const OperationsList = forwardRef(({
   groupedOperations,
@@ -44,7 +39,7 @@ const OperationsList = forwardRef(({
   headerComponent,
 }, ref) => {
 
-  // Format date (memoized)
+  // Format date label for the separator header
   const formatDate = useCallback((dateString) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -61,14 +56,14 @@ const OperationsList = forwardRef(({
       return t('yesterday');
     } else {
       return date.toLocaleDateString(undefined, {
-        year: 'numeric',
+        weekday: 'short',
         month: 'short',
         day: 'numeric',
       });
     }
   }, [t]);
 
-  // Format amount with currency (memoized)
+  // Format amount with currency symbol
   const formatCurrency = useCallback((accountId, amount) => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) return amount;
@@ -76,37 +71,33 @@ const OperationsList = forwardRef(({
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) return amount;
 
-    // Get currency-specific decimal places
     const currency = currencies[account.currency];
     const decimals = currency?.decimal_digits ?? 2;
 
-    // Always use symbol instead of Intl.NumberFormat to ensure consistent symbol display
     const symbol = getCurrencySymbol(account.currency || 'USD');
     return `${symbol}${numAmount.toFixed(decimals)}`;
   }, [accounts]);
 
-  // Get category info
+  // Get category info (icon + name)
   const getCategoryInfo = useCallback((categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return { name: t('unknown_category'), icon: 'help-circle' };
 
-    // Import getCategoryDisplayName utility
-    const getCategoryDisplayName = (categoryId, categories, t) => {
-      const category = categories.find(cat => cat.id === categoryId);
-      if (!category) return null;
+    const getCategoryDisplayName = (catId, cats, translate) => {
+      const cat = cats.find(c => c.id === catId);
+      if (!cat) return null;
 
-      const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+      const name = cat.nameKey ? translate(cat.nameKey) : cat.name;
 
-      // If category has parent, build full path
-      if (category.parentId) {
-        const parent = categories.find(cat => cat.id === category.parentId);
+      if (cat.parentId) {
+        const parent = cats.find(c => c.id === cat.parentId);
         if (parent) {
-          const parentName = parent.nameKey ? t(parent.nameKey) : parent.name;
-          return `${parentName} / ${categoryName}`;
+          const parentName = parent.nameKey ? translate(parent.nameKey) : parent.name;
+          return `${parentName} / ${name}`;
         }
       }
 
-      return categoryName;
+      return name;
     };
 
     const categoryName = getCategoryDisplayName(categoryId, categories, t);
@@ -143,35 +134,42 @@ const OperationsList = forwardRef(({
     );
   }, [loadingMore, colors, t]);
 
-  // Render individual list items (separators and operations)
+  // Render a full date group (header + card with operations)
   const renderItem = useCallback(({ item }) => {
-    // Render date separator
-    if (item.type === 'separator') {
-      return (
+    return (
+      <View style={styles.groupContainer}>
         <DateSeparator
           date={item.date}
           spendingSums={item.spendingSums}
           formatDate={formatDate}
           colors={colors}
-          t={t}
           onPress={() => onDateSeparatorPress(item.date)}
         />
-      );
-    }
-
-    // Render operation
-    return (
-      <OperationListItem
-        operation={item}
-        colors={colors}
-        t={t}
-        categories={categories}
-        getCategoryInfo={getCategoryInfo}
-        getAccountName={getAccountName}
-        formatCurrency={formatCurrency}
-        formatDate={formatDate}
-        onPress={() => onEditOperation(item)}
-      />
+        <View
+          style={[
+            styles.operationsCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          {item.operations.map((operation, index) => (
+            <OperationListItem
+              key={operation.id}
+              operation={operation}
+              colors={colors}
+              t={t}
+              categories={categories}
+              getCategoryInfo={getCategoryInfo}
+              getAccountName={getAccountName}
+              formatCurrency={formatCurrency}
+              isLast={index === item.operations.length - 1}
+              onPress={() => onEditOperation(operation)}
+            />
+          ))}
+        </View>
+      </View>
     );
   }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, onEditOperation, onDateSeparatorPress]);
 
@@ -205,8 +203,8 @@ const OperationsList = forwardRef(({
         autoscrollToTopThreshold: 10,
       }}
       windowSize={10}
-      maxToRenderPerBatch={10}
-      initialNumToRender={15}
+      maxToRenderPerBatch={5}
+      initialNumToRender={10}
       updateCellsBatchingPeriod={50}
       removeClippedSubviews={true}
     />
@@ -255,6 +253,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: SPACING.lg,
   },
+  groupContainer: {
+    marginBottom: SPACING.sm,
+  },
   listContent: {
     paddingBottom: 180,
   },
@@ -266,6 +267,12 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     fontSize: 14,
     marginTop: SPACING.sm,
+  },
+  operationsCard: {
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    marginHorizontal: SPACING.lg,
+    overflow: 'hidden',
   },
 });
 

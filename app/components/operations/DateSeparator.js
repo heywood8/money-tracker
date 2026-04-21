@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
+import { SPACING, FONT_SIZE, FONT_WEIGHT } from '../../styles/designTokens';
 
 const getCurrencySymbol = (currencyCode) => {
   if (!currencyCode) return '';
@@ -9,40 +10,33 @@ const getCurrencySymbol = (currencyCode) => {
   return currency ? currency.symbol : currencyCode;
 };
 
-const DateSeparator = ({ date, spendingSums, formatDate, colors, t, onPress }) => {
+const DateSeparator = ({ date, spendingSums, formatDate, colors, onPress }) => {
   const hasSpending = spendingSums && Object.keys(spendingSums).length > 0;
 
   return (
-    <View style={[styles.dateSeparator, { backgroundColor: colors.background }]}>
-      <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-      <Pressable
-        style={({ pressed }) => [
-          styles.dateSeparatorContent,
-          pressed && styles.pressed,
-        ]}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={`${formatDate(date)}, press to select date`}
-        accessibilityHint="Opens date picker to jump to a specific date"
-      >
-        <Text style={[styles.dateSeparatorText, { color: colors.mutedText }]}>
-          {formatDate(date)}
+    <Pressable
+      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${formatDate(date)}, press to select date`}
+      accessibilityHint="Opens date picker to jump to a specific date"
+    >
+      <Text style={[styles.dateText, { color: colors.mutedText }]}>
+        {formatDate(date).toUpperCase()}
+      </Text>
+      {hasSpending && (
+        <Text style={[styles.totalText, { color: colors.mutedText }]}>
+          {Object.entries(spendingSums)
+            .map(([currency, amount]) => {
+              const symbol = getCurrencySymbol(currency);
+              const currencyInfo = currencies[currency];
+              const decimals = currencyInfo?.decimal_digits ?? 2;
+              return `-${symbol}${amount.toFixed(decimals)}`;
+            })
+            .join(', ')}
         </Text>
-        {hasSpending && (
-          <Text style={[styles.dateSeparatorSpent, { color: colors.expense }]}>
-            {Object.entries(spendingSums)
-              .map(([currency, amount]) => {
-                const symbol = getCurrencySymbol(currency);
-                const currencyInfo = currencies[currency];
-                const decimals = currencyInfo?.decimal_digits ?? 2;
-                return `${symbol}${amount.toFixed(decimals)}`;
-              })
-              .join(', ')}
-          </Text>
-        )}
-      </Pressable>
-      <View style={[styles.dateSeparatorLine, { backgroundColor: colors.border }]} />
-    </View>
+      )}
+    </Pressable>
   );
 };
 
@@ -51,40 +45,29 @@ DateSeparator.propTypes = {
   spendingSums: PropTypes.object,
   formatDate: PropTypes.func.isRequired,
   colors: PropTypes.object.isRequired,
-  t: PropTypes.func.isRequired,
   onPress: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
-  dateSeparator: {
+  container: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginVertical: 6,
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    paddingBottom: SPACING.xs,
+    paddingHorizontal: SPACING.lg + SPACING.sm,
+    paddingTop: SPACING.lg,
   },
-  dateSeparatorContent: {
-    alignItems: 'center',
-    borderRadius: 8,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  dateSeparatorLine: {
-    flex: 1,
-    height: 1,
-  },
-  dateSeparatorSpent: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  dateSeparatorText: {
-    fontSize: 12,
-    fontWeight: '600',
+  dateText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    letterSpacing: 0.6,
   },
   pressed: {
     opacity: 0.6,
+  },
+  totalText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.medium,
   },
 });
 

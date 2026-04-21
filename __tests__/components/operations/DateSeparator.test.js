@@ -1,7 +1,7 @@
 /**
  * DateSeparator Component Tests
  *
- * Tests for the DateSeparator component which displays date dividers
+ * Tests for the DateSeparator component which displays date headers
  * in the operations list with optional spending sums.
  */
 
@@ -30,7 +30,6 @@ describe('DateSeparator', () => {
       mutedText: '#888888',
       expense: '#FF0000',
     },
-    t: (key) => key,
     onPress: jest.fn(),
   };
 
@@ -39,10 +38,10 @@ describe('DateSeparator', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders formatted date', () => {
+    it('renders formatted date uppercased', () => {
       const { getByText } = render(<DateSeparator {...defaultProps} />);
 
-      expect(getByText('Formatted: 2024-01-15')).toBeTruthy();
+      expect(getByText('FORMATTED: 2024-01-15')).toBeTruthy();
     });
 
     it('renders with custom formatDate function', () => {
@@ -52,44 +51,7 @@ describe('DateSeparator', () => {
       );
 
       expect(customFormatDate).toHaveBeenCalledWith('2024-01-15');
-      expect(getByText('Date: 2024-01-15')).toBeTruthy();
-    });
-
-    it('applies background color from colors prop', () => {
-      const customColors = {
-        ...defaultProps.colors,
-        background: '#F0F0F0',
-      };
-      const { toJSON } = render(
-        <DateSeparator {...defaultProps} colors={customColors} />,
-      );
-
-      const json = toJSON();
-      // Root view should have the background color
-      expect(json.props.style).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ backgroundColor: '#F0F0F0' }),
-        ]),
-      );
-    });
-
-    it('applies border color to separator lines', () => {
-      const customColors = {
-        ...defaultProps.colors,
-        border: '#DDDDDD',
-      };
-      const { toJSON } = render(
-        <DateSeparator {...defaultProps} colors={customColors} />,
-      );
-
-      const json = toJSON();
-      // Find the line views (first and last children with height: 1)
-      const lineViews = json.children.filter(
-        (child) =>
-          child.type === 'View' &&
-          child.props.style?.some?.((s) => s.height === 1),
-      );
-      expect(lineViews.length).toBe(2);
+      expect(getByText('DATE: 2024-01-15')).toBeTruthy();
     });
 
     it('applies mutedText color to date text', () => {
@@ -101,7 +63,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} colors={customColors} />,
       );
 
-      const dateText = getByText('Formatted: 2024-01-15');
+      const dateText = getByText('FORMATTED: 2024-01-15');
       expect(dateText.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ color: '#999999' })]),
       );
@@ -125,22 +87,22 @@ describe('DateSeparator', () => {
       expect(queryByText(/spent_amount/)).toBeNull();
     });
 
-    it('shows spending for single currency', () => {
+    it('shows spending for single currency with minus prefix', () => {
       const spendingSums = { USD: 123.45 };
       const { getByText } = render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('$123.45')).toBeTruthy();
+      expect(getByText('-$123.45')).toBeTruthy();
     });
 
-    it('shows spending for multiple currencies', () => {
+    it('shows spending for multiple currencies each with minus prefix', () => {
       const spendingSums = { USD: 100.00, EUR: 85.50 };
       const { getByText } = render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('$100.00, €85.50')).toBeTruthy();
+      expect(getByText('-$100.00, -€85.50')).toBeTruthy();
     });
 
     it('respects decimal_digits from currency config', () => {
@@ -150,7 +112,7 @@ describe('DateSeparator', () => {
       );
 
       // JPY has 0 decimal digits, USD has 2
-      expect(getByText('¥1000, $50.50')).toBeTruthy();
+      expect(getByText('-¥1000, -$50.50')).toBeTruthy();
     });
 
     it('handles currency with many decimal places (BTC)', () => {
@@ -159,13 +121,13 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('₿0.00012345')).toBeTruthy();
+      expect(getByText('-₿0.00012345')).toBeTruthy();
     });
 
-    it('applies expense color to spending text', () => {
+    it('applies mutedText color to spending text', () => {
       const customColors = {
         ...defaultProps.colors,
-        expense: '#E53935',
+        mutedText: '#777777',
       };
       const spendingSums = { USD: 50 };
       const { getByText } = render(
@@ -176,25 +138,10 @@ describe('DateSeparator', () => {
         />,
       );
 
-      const spentText = getByText('$50.00');
+      const spentText = getByText('-$50.00');
       expect(spentText.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ color: '#E53935' })]),
+        expect.arrayContaining([expect.objectContaining({ color: '#777777' })]),
       );
-    });
-
-    it('does not use spent_amount translation (label removed)', () => {
-      const customT = jest.fn((key) => `Translated: ${key}`);
-      const spendingSums = { USD: 25 };
-      const { getByText } = render(
-        <DateSeparator
-          {...defaultProps}
-          t={customT}
-          spendingSums={spendingSums}
-        />,
-      );
-
-      expect(customT).not.toHaveBeenCalledWith('spent_amount');
-      expect(getByText('$25.00')).toBeTruthy();
     });
   });
 
@@ -205,7 +152,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('£75.25')).toBeTruthy();
+      expect(getByText('-£75.25')).toBeTruthy();
     });
 
     it('uses RUB symbol correctly', () => {
@@ -214,7 +161,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('₽1500.50')).toBeTruthy();
+      expect(getByText('-₽1500.50')).toBeTruthy();
     });
 
     it('falls back to currency code for unknown currencies', () => {
@@ -225,7 +172,7 @@ describe('DateSeparator', () => {
       );
 
       // Unknown currency code should be used as symbol, defaults to 2 decimals
-      expect(getByText('XYZ100.00')).toBeTruthy();
+      expect(getByText('-XYZ100.00')).toBeTruthy();
     });
 
     it('handles empty currency code gracefully', () => {
@@ -236,7 +183,7 @@ describe('DateSeparator', () => {
       );
 
       // Empty currency code returns empty string for symbol
-      expect(getByText('50.00')).toBeTruthy();
+      expect(getByText('-50.00')).toBeTruthy();
     });
   });
 
@@ -288,7 +235,7 @@ describe('DateSeparator', () => {
       expect(getByRole('button')).toBeTruthy();
     });
 
-    it('has accessibility label with formatted date', () => {
+    it('has accessibility label with formatted date (non-uppercased in label)', () => {
       const { getByLabelText } = render(<DateSeparator {...defaultProps} />);
 
       expect(
@@ -328,7 +275,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('$999999999.99')).toBeTruthy();
+      expect(getByText('-$999999999.99')).toBeTruthy();
     });
 
     it('handles zero amount', () => {
@@ -337,16 +284,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      expect(getByText('$0.00')).toBeTruthy();
-    });
-
-    it('handles negative amounts', () => {
-      const spendingSums = { USD: -50.25 };
-      const { getByText } = render(
-        <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
-      );
-
-      expect(getByText('$-50.25')).toBeTruthy();
+      expect(getByText('-$0.00')).toBeTruthy();
     });
 
     it('handles many currencies at once', () => {
@@ -361,7 +299,7 @@ describe('DateSeparator', () => {
       );
 
       expect(
-        getByText('$100.00, €85.00, £70.00, ¥10000'),
+        getByText('-$100.00, -€85.00, -£70.00, -¥10000'),
       ).toBeTruthy();
     });
 
@@ -377,7 +315,7 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} date="Today" />,
       );
 
-      expect(getByText('Formatted: Today')).toBeTruthy();
+      expect(getByText('FORMATTED: TODAY')).toBeTruthy();
     });
   });
 
@@ -390,8 +328,8 @@ describe('DateSeparator', () => {
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
-      // ABC123.46 because toFixed(2) rounds
-      expect(getByText('ABC123.46')).toBeTruthy();
+      // -ABC123.46 because toFixed(2) rounds
+      expect(getByText('-ABC123.46')).toBeTruthy();
     });
   });
 });
