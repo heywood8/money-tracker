@@ -104,7 +104,7 @@ const OperationsScreen = () => {
   useEffect(() => {
     if (scrollToDateString && !operationsLoading && groupedOperations.length > 0) {
       const separatorIndex = groupedOperations.findIndex(
-        item => item.type === 'separator' && item.date === scrollToDateString,
+        item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
 
       if (separatorIndex !== -1) {
@@ -123,7 +123,7 @@ const OperationsScreen = () => {
   const handleContentSizeChange = useCallback((width, height) => {
     if (pendingScroll && scrollToDateString && !operationsLoading) {
       const separatorIndex = groupedOperations.findIndex(
-        item => item.type === 'separator' && item.date === scrollToDateString,
+        item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
 
       if (separatorIndex !== -1) {
@@ -268,7 +268,7 @@ const OperationsScreen = () => {
 
       // Find the index of the date separator for this date in current list
       const separatorIndex = groupedOperations.findIndex(
-        item => item.type === 'separator' && item.date === dateString,
+        item => item.type === 'dateGroup' && item.date === dateString,
       );
 
       if (separatorIndex !== -1) {
@@ -407,84 +407,41 @@ const OperationsScreen = () => {
     await handleQuickAdd(undefined, toAccountId);
   }, [resetForm, closePicker, handleQuickAdd]);
 
-  // Calculate spending sums by currency for a group of operations
-  const calculateSpendingSums = useCallback((operations) => {
-    const sumsByCurrency = {};
+  // Group operations by date into date-group objects for the list
+  const groupedOperations = useMemo(() => {
+    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const groups = [];
+    let currentGroup = null;
 
-    operations.forEach((operation) => {
+    sorted.forEach((operation) => {
+      if (!currentGroup || operation.date !== currentGroup.date) {
+        currentGroup = {
+          type: 'dateGroup',
+          id: `group-${operation.date}`,
+          date: operation.date,
+          spendingSums: {},
+          operations: [],
+        };
+        groups.push(currentGroup);
+      }
+
+      currentGroup.operations.push(operation);
+
+      // Accumulate spending sums for expenses
       if (operation.type === 'expense') {
         const account = accounts.find(acc => acc.id === operation.accountId);
         if (account) {
           const currency = account.currency || 'USD';
           const amount = parseFloat(operation.amount);
           if (!isNaN(amount)) {
-            if (!sumsByCurrency[currency]) {
-              sumsByCurrency[currency] = 0;
-            }
-            sumsByCurrency[currency] += amount;
+            currentGroup.spendingSums[currency] = (currentGroup.spendingSums[currency] || 0) + amount;
           }
         }
       }
     });
 
-    return sumsByCurrency;
-  }, [accounts]);
-
-  // Group operations by date and create flat list with separators
-  const groupedOperations = useMemo(() => {
-    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
-    const grouped = [];
-    let currentDate = null;
-    let currentDateOperations = [];
-
-    sorted.forEach((operation, index) => {
-      if (operation.date !== currentDate) {
-        // If we have accumulated operations for previous date, calculate sums
-        if (currentDate !== null && currentDateOperations.length > 0) {
-          const spendingSums = calculateSpendingSums(currentDateOperations);
-          // Update the separator that was already added with the spending sums
-          const separatorIndex = grouped.findIndex(
-            item => item.type === 'separator' && item.date === currentDate,
-          );
-          if (separatorIndex !== -1) {
-            grouped[separatorIndex].spendingSums = spendingSums;
-          }
-        }
-
-        // Start new date group
-        currentDate = operation.date;
-        currentDateOperations = [operation];
-
-        // Add date separator (sums will be added later)
-        grouped.push({
-          type: 'separator',
-          date: operation.date,
-          id: `separator-${operation.date}`,
-        });
-      } else {
-        currentDateOperations.push(operation);
-      }
-
-      // Add operation
-      grouped.push({
-        type: 'operation',
-        ...operation,
-      });
-
-      // Handle last date group
-      if (index === sorted.length - 1 && currentDateOperations.length > 0) {
-        const spendingSums = calculateSpendingSums(currentDateOperations);
-        const separatorIndex = grouped.findIndex(
-          item => item.type === 'separator' && item.date === currentDate,
-        );
-        if (separatorIndex !== -1) {
-          grouped[separatorIndex].spendingSums = spendingSums;
-        }
-      }
-    });
-
-    return grouped;
-  }, [operations, calculateSpendingSums]);
+    return groups;
+  }, [operations, accounts]);
 
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },

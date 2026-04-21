@@ -1,8 +1,10 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { TouchableRipple } from 'react-native-paper';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import ListCard from '../ListCard';
 import { getCategoryNames } from '../../utils/categoryUtils';
+import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 
 const OperationListItem = ({
   operation,
@@ -12,102 +14,105 @@ const OperationListItem = ({
   getCategoryInfo,
   getAccountName,
   formatCurrency,
-  formatDate,
+  isLast,
   onPress,
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
   const isTransfer = operation.type === 'transfer';
 
-  // Check if this is a multi-currency transfer
   const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
 
-  // For transfers, use transfer icon and localized name instead of category
   const categoryInfo = isTransfer
     ? { icon: 'swap-horizontal' }
     : getCategoryInfo(operation.categoryId);
 
-  // Get category and parent names separately
   const { categoryName, parentName } = isTransfer
     ? { categoryName: t('transfer'), parentName: null }
     : getCategoryNames(operation.categoryId, categories, t);
 
   const accountName = getAccountName(operation.accountId);
 
-  // Build comprehensive accessibility label
-  const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
-  let accessibilityLabel = `${typeLabel}, ${categoryName}`;
+  // Title: user's description if set, otherwise the category name
+  const title = (operation.description && operation.description.trim())
+    ? operation.description.trim()
+    : categoryName;
 
-  if (parentName) {
-    accessibilityLabel += `, ${parentName}`;
-  }
-
-  accessibilityLabel += `, ${formatCurrency(operation.accountId, operation.amount)}, ${accountName}`;
-
-  if (isTransfer && operation.toAccountId) {
+  // Subtitle: "Category · Account" when description is the title, else "ParentCat · Account"
+  let subtitle;
+  if (isTransfer) {
     const toAccountName = getAccountName(operation.toAccountId);
-    accessibilityLabel = `${typeLabel} from ${accountName} to ${toAccountName}, ${formatCurrency(operation.accountId, operation.amount)}`;
-
-    if (isMultiCurrencyTransfer) {
-      accessibilityLabel += `, exchange rate ${operation.exchangeRate}`;
-    }
+    subtitle = `${accountName} → ${toAccountName}`;
+  } else if (operation.description && operation.description.trim()) {
+    subtitle = parentName
+      ? `${parentName} / ${categoryName} · ${accountName}`
+      : `${categoryName} · ${accountName}`;
+  } else if (parentName) {
+    subtitle = `${parentName} · ${accountName}`;
+  } else {
+    subtitle = accountName;
   }
 
+  const formattedAmount = formatCurrency(operation.accountId, operation.amount);
+  const displayAmount = formattedAmount;
+
+  const amountColor = isExpense
+    ? colors.expense
+    : isIncome
+      ? colors.income
+      : colors.transfer;
+
+  // Build accessibility label
+  const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
+  let accessibilityLabel = `${typeLabel}, ${title}, ${displayAmount}`;
   if (operation.description) {
     accessibilityLabel += `, note: ${operation.description}`;
   }
 
   return (
-    <ListCard
-      variant={operation.type}
-      onPress={onPress}
-      leftIcon={categoryInfo.icon}
-      leftIconBackground={true}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={t('edit_operation_hint')}
-    >
-      <View style={styles.operationContent}>
-        {/* Category & Parent Category */}
-        <View style={styles.operationInfo}>
-          <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-            {categoryName}
-          </Text>
-          {parentName && (
-            <Text style={[styles.parentName, { color: colors.mutedText }]} numberOfLines={1}>
-              {parentName}
-            </Text>
-          )}
-        </View>
+    <>
+      <TouchableRipple
+        onPress={onPress}
+        rippleColor="rgba(0, 0, 0, .08)"
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={t('edit_operation_hint')}
+      >
+        <View style={styles.row}>
+          {/* Icon */}
+          <View style={styles.iconContainer}>
+            <Icon name={categoryInfo.icon} size={ICON_SIZE.md} color={amountColor} />
+          </View>
 
-        {/* Amount & Account */}
-        <View style={styles.operationRight}>
-          <Text
-            style={[
-              styles.amount,
-              {
-                color: isExpense
-                  ? colors.expense
-                  : isIncome
-                    ? colors.income
-                    : colors.text,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {formatCurrency(operation.accountId, operation.amount)}
-            {isMultiCurrencyTransfer && operation.toAccountId && (
-              <Text style={styles.destinationAmount}>
-                {' → '}{formatCurrency(operation.toAccountId, operation.destinationAmount)}
-              </Text>
-            )}
-          </Text>
-          <Text style={[styles.accountName, { color: colors.mutedText }]} numberOfLines={1}>
-            {accountName}
-            {isTransfer && operation.toAccountId && ` → ${getAccountName(operation.toAccountId)}`}
-          </Text>
+          {/* Text */}
+          <View style={styles.textContainer}>
+            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </View>
+
+          {/* Amount */}
+          <View style={styles.amountContainer}>
+            <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
+              {displayAmount}
+              {isMultiCurrencyTransfer && operation.toAccountId && (
+                <Text style={[styles.destinationAmount, { color: colors.mutedText }]}>
+                  {' → '}{formatCurrency(operation.toAccountId, operation.destinationAmount)}
+                </Text>
+              )}
+            </Text>
+          </View>
         </View>
-      </View>
-    </ListCard>
+      </TouchableRipple>
+
+      {/* Separator line between items (not after the last one) */}
+      {!isLast && (
+        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+      )}
+    </>
   );
 };
 
@@ -129,53 +134,59 @@ OperationListItem.propTypes = {
   getCategoryInfo: PropTypes.func.isRequired,
   getAccountName: PropTypes.func.isRequired,
   formatCurrency: PropTypes.func.isRequired,
-  formatDate: PropTypes.func.isRequired,
+  isLast: PropTypes.bool,
   onPress: PropTypes.func.isRequired,
 };
 
+OperationListItem.defaultProps = {
+  isLast: false,
+};
+
 const styles = StyleSheet.create({
-  accountName: {
-    fontSize: 13,
-    includeFontPadding: false,
-    marginTop: 2,
-    textAlign: 'right',
-    textAlignVertical: 'center',
-  },
   amount: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
     includeFontPadding: false,
     textAlign: 'right',
-    textAlignVertical: 'center',
   },
-  categoryName: {
-    fontSize: 15,
-    fontWeight: '500',
+  amountContainer: {
+    alignItems: 'flex-end',
+    marginLeft: SPACING.md,
   },
   destinationAmount: {
-    includeFontPadding: false,
-    textAlign: 'right',
-    textAlignVertical: 'center',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.regular,
   },
-  operationContent: {
+  iconContainer: {
     alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
+    marginRight: SPACING.md,
+    width: 32,
   },
-  operationInfo: {
+  row: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: HEIGHTS.listItem,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  separator: {
+    height: 1,
+    marginLeft: SPACING.lg + 32 + SPACING.md,
+  },
+  subtitle: {
+    fontSize: FONT_SIZE.sm,
+    includeFontPadding: false,
+    marginTop: 2,
+  },
+  textContainer: {
     flex: 1,
     justifyContent: 'center',
     minWidth: 0,
   },
-  operationRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  parentName: {
-    fontSize: 13,
-    marginTop: 2,
+  title: {
+    fontSize: FONT_SIZE.md + 1,
+    fontWeight: FONT_WEIGHT.medium,
+    includeFontPadding: false,
   },
 });
 
