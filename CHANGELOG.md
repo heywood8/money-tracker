@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.65.0](https://github.com/heywood8/money-tracker/compare/penny-v0.64.0...penny-v0.65.0) (2026-04-21)
+
+
+### Features
+
+* **operations:** redesign operations list with grouped date cards ([#389](https://github.com/heywood8/money-tracker/issues/389)) ([52372c8](https://github.com/heywood8/money-tracker/commit/52372c8fa3af26e167b358ab56b2779811c315db))
+
 ## [0.64.0](https://github.com/heywood8/money-tracker/compare/penny-v0.63.0...penny-v0.64.0) (2026-04-20)
 
 
