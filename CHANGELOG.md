@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.68.1](https://github.com/heywood8/money-tracker/compare/penny-v0.68.0...penny-v0.68.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* settings modal layout and header styling ([#398](https://github.com/heywood8/money-tracker/issues/398)) ([1440346](https://github.com/heywood8/money-tracker/commit/14403465476db005a2e39d062dfe102e61a2599f))
+
 ## [0.68.0](https://github.com/heywood8/money-tracker/compare/penny-v0.67.0...penny-v0.68.0) (2026-04-23)
 
 
