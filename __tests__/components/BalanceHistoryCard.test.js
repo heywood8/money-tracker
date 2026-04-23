@@ -123,7 +123,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(getByText('Balance')).toBeTruthy();
+      expect(getByText('BALANCE')).toBeTruthy();
     });
 
     it('renders account picker with correct props', () => {
