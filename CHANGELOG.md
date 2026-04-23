@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.66.0](https://github.com/heywood8/money-tracker/compare/penny-v0.65.0...penny-v0.66.0) (2026-04-23)
+
+
+### Features
+
+* **graphs:** redesign filter chips and summary cards ([#392](https://github.com/heywood8/money-tracker/issues/392)) ([7844186](https://github.com/heywood8/money-tracker/commit/7844186797e389e8405286fc55bd68e932c6528f))
+
 ## [0.65.0](https://github.com/heywood8/money-tracker/compare/penny-v0.64.0...penny-v0.65.0) (2026-04-21)
 
 
