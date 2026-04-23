@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
@@ -29,15 +30,21 @@ const IncomeSummaryCard = ({
   const { hideBalances } = useDisplaySettings();
   return (
     <TouchableOpacity
-      style={[styles.summaryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+      style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={t('income_by_category')}
     >
-      <Text style={styles.summaryText}>
-        {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
-      </Text>
+      <View style={styles.iconBadge}>
+        <Icon name="arrow-bottom-left" size={16} color={colors.income} />
+      </View>
+      <View style={styles.textContent}>
+        <Text style={[styles.label, { color: colors.mutedText }]}>{t('income').toUpperCase()}</Text>
+        <Text style={[styles.amount, { color: colors.text }]}>
+          {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -52,17 +59,35 @@ IncomeSummaryCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  amount: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginTop: 1,
+  },
+  iconBadge: {
+    alignItems: 'center',
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
   summaryCard: {
-    borderRadius: 8,
+    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
     flex: 1,
+    flexDirection: 'row',
+    gap: 8,
     padding: 10,
   },
-  summaryText: {
-    color: '#81C784',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+  textContent: {
+    flex: 1,
+    minWidth: 0,
   },
 });
 
