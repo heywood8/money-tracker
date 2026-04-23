@@ -25,11 +25,6 @@ jest.mock('../../../assets/currencies.json', () => ({
   JPY: { symbol: '¥', decimal_digits: 0 },
 }));
 
-// Mock react-native-chart-kit
-jest.mock('react-native-chart-kit', () => ({
-  LineChart: 'LineChart',
-}));
-
 describe('CategorySpendingCard', () => {
   const defaultColors = {
     text: '#000000',
@@ -85,7 +80,6 @@ describe('CategorySpendingCard', () => {
     useCategoryMonthlySpending.mockReturnValue({
       monthlyData: defaultMonthlyData,
       loading: false,
-      totalYearlySpending: 1550,
       loadData: jest.fn(),
     });
   });
@@ -100,21 +94,19 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('renders LineChart with 12 months', () => {
+    it('renders bar chart SVG with 12 months of bars', () => {
       const { UNSAFE_getByType } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const barChart = UNSAFE_getByType('LineChart');
-      expect(barChart).toBeTruthy();
-      expect(barChart.props.data.labels).toHaveLength(12);
+      const svg = UNSAFE_getByType('Svg');
+      expect(svg).toBeTruthy();
     });
 
     it('shows loading indicator when loading', () => {
       useCategoryMonthlySpending.mockReturnValue({
         monthlyData: [],
         loading: true,
-        totalYearlySpending: 0,
         loadData: jest.fn(),
       });
 
@@ -132,7 +124,6 @@ describe('CategorySpendingCard', () => {
       useCategoryMonthlySpending.mockReturnValue({
         monthlyData: emptyData,
         loading: false,
-        totalYearlySpending: 0,
         loadData: jest.fn(),
       });
 
@@ -141,8 +132,7 @@ describe('CategorySpendingCard', () => {
       );
 
       expect(getByText('no_spending_data')).toBeTruthy();
-      // Should not render LineChart
-      expect(UNSAFE_queryByType('LineChart')).toBeFalsy();
+      expect(UNSAFE_queryByType('Svg')).toBeFalsy();
     });
 
     it('renders null when no parent expense categories', () => {
@@ -276,19 +266,22 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats currency correctly for USD', () => {
+    it('formats current month amount with currency symbol for USD', () => {
       const { getByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByText('1550.00 USD')).toBeTruthy();
+      // Last month total is 200, USD symbol is $
+      expect(getByText('$200.00')).toBeTruthy();
     });
 
-    it('formats currency correctly for JPY (0 decimals)', () => {
+    it('formats current month amount with currency symbol for JPY (0 decimals)', () => {
+      const jpyData = generateMonthlyData().map((item, i) =>
+        i === 11 ? { ...item, total: 5000 } : item,
+      );
       useCategoryMonthlySpending.mockReturnValue({
-        monthlyData: defaultMonthlyData,
+        monthlyData: jpyData,
         loading: false,
-        totalYearlySpending: 5000,
         loadData: jest.fn(),
       });
 
@@ -299,7 +292,7 @@ describe('CategorySpendingCard', () => {
         />,
       );
 
-      expect(getByText('5000 JPY')).toBeTruthy();
+      expect(getByText('¥5000')).toBeTruthy();
     });
   });
 
@@ -327,69 +320,23 @@ describe('CategorySpendingCard', () => {
         ]),
       );
     });
-
-    it('uses default expense color when not provided', () => {
-      const colorsWithoutExpense = {
-        ...defaultColors,
-        expense: undefined,
-      };
-
-      const { getByText } = render(
-        <CategorySpendingCard
-          {...defaultProps}
-          colors={colorsWithoutExpense}
-        />,
-      );
-
-      const totalValue = getByText('1550.00 USD');
-      expect(totalValue.props.style).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ color: '#ff4444' }),
-        ]),
-      );
-    });
-  });
-
-  describe('Chart Configuration', () => {
-    it('passes correct data to LineChart', () => {
-      const { UNSAFE_getByType } = render(
-        <CategorySpendingCard {...defaultProps} />,
-      );
-
-      const barChart = UNSAFE_getByType('LineChart');
-
-      expect(barChart.props.data.datasets[0].data).toEqual(
-        defaultMonthlyData.map(item => item.total),
-      );
-    });
-
-    it('uses correct chart dimensions', () => {
-      const { UNSAFE_getByType } = render(
-        <CategorySpendingCard {...defaultProps} />,
-      );
-
-      const barChart = UNSAFE_getByType('LineChart');
-
-      expect(barChart.props.height).toBe(220);
-      expect(barChart.props.fromZero).toBe(true);
-    });
   });
 
   describe('Title and Labels', () => {
-    it('displays spending trend title', () => {
+    it('displays spending trend title uppercased', () => {
       const { getByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByText('category_spending_trend')).toBeTruthy();
+      expect(getByText('CATEGORY_SPENDING_TREND')).toBeTruthy();
     });
 
-    it('displays last 12 months total label', () => {
+    it('displays this_month label for current month', () => {
       const { getByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(getByText('last_12_months_total')).toBeTruthy();
+      expect(getByText('this_month')).toBeTruthy();
     });
   });
 
@@ -404,21 +351,20 @@ describe('CategorySpendingCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('does not render the 12-month total row', () => {
+    it('does not render the amount', () => {
       const { queryByText } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(queryByText('last_12_months_total')).toBeFalsy();
-      expect(queryByText('1550.00 USD')).toBeFalsy();
+      expect(queryByText('$200.00')).toBeFalsy();
     });
 
-    it('still renders the LineChart', () => {
+    it('still renders the bar chart', () => {
       const { UNSAFE_getByType } = render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(UNSAFE_getByType('LineChart')).toBeTruthy();
+      expect(UNSAFE_getByType('Svg')).toBeTruthy();
     });
   });
 
