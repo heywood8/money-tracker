@@ -364,8 +364,11 @@ jest.mock('react-native-chart-kit', () => ({
 
 // Mock react-native-svg
 jest.mock('react-native-svg', () => ({
+  __esModule: true,
+  default: 'Svg',
   Svg: 'Svg',
   Circle: 'Circle',
+  Line: 'Line',
   Rect: 'Rect',
   Path: 'Path',
   G: 'G',
