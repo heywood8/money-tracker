@@ -55,7 +55,7 @@ export default function Header({ onOpenSettings }) {
       style={[
         styles.container,
         {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.background,
           borderBottomColor: colors.border,
         },
       ]}
@@ -121,11 +121,9 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: 'center',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 10,
   },
   icon: {
     height: 50,

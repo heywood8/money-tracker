@@ -7,7 +7,7 @@ const ThemeColorsContext = createContext();
 const lightTheme = {
   mode: 'light',
   colors: {
-    background: '#ffffff',
+    background: '#f8f8f8',
     surface: '#ffffff',
     primary: '#007AFF',
     secondary: '#e0e0e0',
@@ -22,7 +22,7 @@ const lightTheme = {
     danger: 'red',
     delete: '#d9534f',
     selected: '#c0e0ff',
-    altRow: '#f8f8f8', // Added for alternating rows
+    altRow: '#ffffff', // Added for alternating rows
     expense: '#5a3030',
     income: '#4a8a4a',
     transfer: '#5575aa',
