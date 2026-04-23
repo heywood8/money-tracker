@@ -368,22 +368,24 @@ const GraphsScreen = () => {
           {/* Filters Row */}
           <View style={styles.filtersRow}>
             {/* Currency Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <SimplePicker
                 value={selectedCurrency}
                 onValueChange={setSelectedCurrency}
                 items={currencyItems}
                 colors={colors}
+                leftIcon="currency-usd"
               />
             </View>
 
             {/* Period Picker (Combined Month + Year) */}
-            <View style={[styles.periodPickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+            <View style={[styles.periodPickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <SimplePicker
                 value={selectedPeriod}
                 onValueChange={setSelectedPeriod}
                 items={periodItems}
                 colors={colors}
+                leftIcon="calendar-month"
               />
             </View>
           </View>
@@ -495,17 +497,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   periodPickerWrapper: {
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flex: 1,
-    height: 40,
+    height: 44,
     overflow: 'hidden',
   },
   pickerWrapper: {
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    flex: 1,
-    height: 40,
+    height: 44,
+    minWidth: 110,
     overflow: 'hidden',
   },
   scrollContent: {

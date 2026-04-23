@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import ModalBlurOverlay from './ModalBlurOverlay';
 
@@ -8,7 +9,7 @@ import ModalBlurOverlay from './ModalBlurOverlay';
  * SimplePicker - A picker component for Android
  * Uses native HTML select on web, custom modal picker on Android
  */
-const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors }) => {
+const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   // Defensive check for undefined items with warning
@@ -64,15 +65,29 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors })
   // Android: Use custom modal picker for better control
   return (
     <>
-      <TouchableOpacity
-        style={[styles.androidButton, style]}
-        onPress={() => setModalVisible(true)}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.androidButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
-          {selectedLabel}
-        </Text>
-      </TouchableOpacity>
+      {leftIcon ? (
+        <TouchableOpacity
+          style={[styles.chipButton, style]}
+          onPress={() => setModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Icon name={leftIcon} size={16} color={safeColors.mutedText ?? '#666666'} />
+          <Text style={[styles.chipButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
+            {selectedLabel}
+          </Text>
+          <Icon name="chevron-down" size={16} color={safeColors.mutedText ?? '#666666'} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.androidButton, style]}
+          onPress={() => setModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.androidButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
+            {selectedLabel}
+          </Text>
+        </TouchableOpacity>
+      )}
 
 
       {modalVisible && <ModalBlurOverlay />}
@@ -129,6 +144,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  // Chip-style button with left icon and right chevron
+  chipButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    height: 44,
+    paddingHorizontal: 14,
+    width: '100%',
+  },
+  chipButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
   // Modal styles
   modalContent: {
     borderRadius: 8,
@@ -181,7 +210,9 @@ SimplePicker.propTypes = {
     surface: PropTypes.string,
     border: PropTypes.string,
     selected: PropTypes.string,
+    mutedText: PropTypes.string,
   }),
+  leftIcon: PropTypes.string,
 };
 
 SimplePicker.defaultProps = {

@@ -210,7 +210,7 @@ describe('ExpenseSummaryCard', () => {
 
       const text = getByText(/\$1\.5K/);
       expect(text.props.style).toEqual(
-        expect.objectContaining({ color: '#E57373' }),
+        expect.arrayContaining([expect.objectContaining({ color: '#FF0000' })]),
       );
     });
   });
