@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.67.0](https://github.com/heywood8/money-tracker/compare/penny-v0.66.0...penny-v0.67.0) (2026-04-23)
+
+
+### Features
+
+* **graphs:** redesign category spending card with interactive bar chart ([#394](https://github.com/heywood8/money-tracker/issues/394)) ([ea5bbd6](https://github.com/heywood8/money-tracker/commit/ea5bbd619538203dbf76aa0d585ed88ddd60796c))
+
 ## [0.66.0](https://github.com/heywood8/money-tracker/compare/penny-v0.65.0...penny-v0.66.0) (2026-04-23)
 
 
