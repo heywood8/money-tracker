@@ -999,8 +999,8 @@ const styles = StyleSheet.create({
   },
   content: {
     borderRadius: BORDER_RADIUS.lg,
-    margin: SPACING.xl,
-    maxHeight: '90%',
+    margin: SPACING.md,
+    maxHeight: '95%',
     paddingBottom: SPACING.lg,
     paddingTop: SPACING.sm,
   },
@@ -1013,7 +1013,7 @@ const styles = StyleSheet.create({
   downloadModal: {
     alignItems: 'center',
     borderRadius: 12,
-    margin: 40,
+    margin: 32,
     padding: 24,
   },
   downloadPercent: {
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
   },
   languageModalContent: {
     borderRadius: BORDER_RADIUS.lg,
-    margin: SPACING.xl,
+    margin: SPACING.md,
     padding: 0,
   },
   languageModalHeader: {
@@ -1155,8 +1155,8 @@ const styles = StyleSheet.create({
   },
   logsModalContent: {
     borderRadius: BORDER_RADIUS.lg,
-    margin: SPACING.xl,
-    maxHeight: '85%',
+    margin: SPACING.md,
+    maxHeight: '90%',
     padding: 0,
   },
   resetSpacer: {
