@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions
 import PropTypes from 'prop-types';
 import { LineChart } from 'react-native-chart-kit';
 import { Line, Text as SvgText, G } from 'react-native-svg';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
@@ -66,6 +65,24 @@ const calculateNiceScale = (maxValue) => {
   return { max: niceMax, interval: niceInterval };
 };
 
+// Format balance for card header: symbol-prefixed, compact (e.g. ֏322.6K, $11.5M)
+const formatBalanceCompact = (amount, currency) => {
+  const currencyInfo = currencies[currency];
+  const symbol = currencyInfo?.symbol ?? currency;
+  const absValue = Math.abs(amount);
+  let formatted;
+  if (absValue >= 1_000_000_000) {
+    formatted = (amount / 1_000_000_000).toFixed(1) + 'B';
+  } else if (absValue >= 1_000_000) {
+    formatted = (amount / 1_000_000).toFixed(1) + 'M';
+  } else if (absValue >= 1_000) {
+    formatted = (amount / 1_000).toFixed(1) + 'K';
+  } else {
+    formatted = Math.round(amount).toString();
+  }
+  return `${symbol}${formatted}`;
+};
+
 // Helper to convert hex color to rgba
 const hexToRgba = (hex, alpha) => {
   // Remove # if present
@@ -92,22 +109,46 @@ const BalanceHistoryCard = ({
   isCurrentMonth,
 }) => {
   const { hideBalances } = useDisplaySettings();
+
+  const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
+  const currency = selectedAccountData?.currency || 'USD';
+  const currentBalance = balanceHistoryData.actual && balanceHistoryData.actual.length > 0
+    ? balanceHistoryData.actual[balanceHistoryData.actual.length - 1].y
+    : null;
+  const headerDayNum = new Date().getDate();
+  const headerDaysInMonth = selectedMonth !== null
+    ? new Date(selectedYear, selectedMonth + 1, 0).getDate()
+    : null;
+
   return (
-    <View style={[styles.balanceHistoryCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+    <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
         <View style={styles.balanceHistoryTitleContainer}>
-          <Icon name="chart-line" size={24} color={colors.primary} />
-          <Text style={[styles.balanceHistoryTitle, { color: colors.text }]}>
-            {t('balance') || 'Balance'}
+          <Text style={[styles.balanceHistoryLabel, { color: colors.mutedText }]}>
+            {(t('balance') || 'Balance').toUpperCase()}
           </Text>
+          {currentBalance !== null && (
+            <View style={styles.balanceAmountRow}>
+              <Text style={[styles.balanceAmount, { color: colors.text }]} numberOfLines={1}>
+                {hideBalances ? '••••' : formatBalanceCompact(currentBalance, currency)}
+              </Text>
+              {isCurrentMonth && headerDaysInMonth !== null && (
+                <Text style={[styles.balanceDayContext, { color: colors.mutedText }]}>
+                  {`day ${headerDayNum}/${headerDaysInMonth}`}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
-        {/* Account Picker */}
-        <View style={[styles.accountPickerWrapper, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+        {/* Account Pill Picker */}
+        <View style={[styles.accountPickerWrapper, { backgroundColor: colors.card }]}>
           <SimplePicker
             value={selectedAccount}
             onValueChange={onAccountChange}
             items={accountItems}
             colors={colors}
+            leftIcon="bank"
+            style={styles.accountPickerInner}
           />
         </View>
       </View>
@@ -509,10 +550,29 @@ BalanceHistoryCard.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  accountPickerInner: {
+    height: 32,
+    paddingHorizontal: 10,
+  },
   accountPickerWrapper: {
-    borderRadius: 4,
-    borderWidth: 1,
-    minWidth: 120,
+    borderRadius: 16,
+    flexShrink: 0,
+    width: 150,
+  },
+  balanceAmount: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
+  balanceAmountRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  balanceDayContext: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   balanceHistoryCard: {
     borderRadius: 8,
@@ -529,6 +589,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
+  balanceHistoryLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
   balanceHistoryLoading: {
     alignItems: 'center',
     height: 220,
@@ -544,14 +609,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  balanceHistoryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   balanceHistoryTitleContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+    flex: 1,
+    marginRight: 8,
+    overflow: 'hidden',
   },
   legendDot: {
     borderRadius: 6,
