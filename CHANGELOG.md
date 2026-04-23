@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.68.0](https://github.com/heywood8/money-tracker/compare/penny-v0.67.0...penny-v0.68.0) (2026-04-23)
+
+
+### Features
+
+* **graphs:** redesign BalanceHistoryCard header ([#396](https://github.com/heywood8/money-tracker/issues/396)) ([a22ed93](https://github.com/heywood8/money-tracker/commit/a22ed93cbf8d5cfa8a3a3b0deeaaed263ea5964a))
+
 ## [0.67.0](https://github.com/heywood8/money-tracker/compare/penny-v0.66.0...penny-v0.67.0) (2026-04-23)
 
 
