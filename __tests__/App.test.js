@@ -68,6 +68,10 @@ jest.mock('../app/contexts/ImportProgressContext', () => ({
   ImportProgressProvider: ({ children }) => children,
 }));
 
+jest.mock('../app/contexts/UpdateDownloadContext', () => ({
+  UpdateDownloadProvider: ({ children }) => children,
+}));
+
 // Mock ErrorBoundary
 jest.mock('../app/components/ErrorBoundary', () => {
   const React = require('react');

@@ -65,6 +65,14 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   }),
 }));
 
+jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+  useUpdateDownload: () => ({
+    isDownloading: false,
+    downloadProgress: null,
+    startDownload: jest.fn(),
+  }),
+}));
+
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
 const mockImportBackup = jest.fn(() => Promise.resolve());
