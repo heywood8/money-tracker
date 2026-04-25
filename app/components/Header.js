@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
@@ -9,6 +9,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { getDatabaseVersion } from '../services/db';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
+import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -16,6 +17,7 @@ export default function Header({ onOpenSettings }) {
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
+  const { isDownloading, downloadProgress } = useUpdateDownload();
   const [dbVersion, setDbVersion] = useState(null);
 
   const fetchDbVersion = useCallback(async () => {
@@ -74,6 +76,19 @@ export default function Header({ onOpenSettings }) {
         </View>
       </View>
       <View style={styles.buttonContainer}>
+        {isDownloading && (
+          <View
+            style={styles.downloadIndicator}
+            accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+            accessibilityRole="progressbar"
+            testID="download-indicator"
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+              {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
           onPress={toggleTheme}
           testID="theme-toggle-button"
@@ -124,6 +139,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
+  },
+  downloadIndicator: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  downloadPercent: {
+    fontSize: 9,
+    fontVariant: ['tabular-nums'],
   },
   icon: {
     height: 50,

@@ -14,6 +14,7 @@ import { PlannedOperationsProvider } from './app/contexts/PlannedOperationsConte
 import { LocalizationProvider } from './app/contexts/LocalizationContext';
 import { DialogProvider } from './app/contexts/DialogContext';
 import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
+import { UpdateDownloadProvider } from './app/contexts/UpdateDownloadContext';
 import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
@@ -68,6 +69,7 @@ export default function App() {
                 <ThemeColorsProvider>
                   <AppBlurProvider>
                     <DialogProvider>
+                      <UpdateDownloadProvider>
                       <ImportProgressProvider>
                         <AccountsDataProvider>
                           <AccountsActionsProvider>
@@ -85,6 +87,7 @@ export default function App() {
                           </AccountsActionsProvider>
                         </AccountsDataProvider>
                       </ImportProgressProvider>
+                      </UpdateDownloadProvider>
                     </DialogProvider>
                   </AppBlurProvider>
                 </ThemeColorsProvider>

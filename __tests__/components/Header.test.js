@@ -72,12 +72,25 @@ jest.mock('../../app/styles/layout', () => ({
   HORIZONTAL_PADDING: 16,
 }));
 
+// Mock UpdateDownloadContext
+let mockIsDownloading = false;
+let mockDownloadProgress = null;
+jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+  useUpdateDownload: () => ({
+    isDownloading: mockIsDownloading,
+    downloadProgress: mockDownloadProgress,
+    startDownload: jest.fn(),
+  }),
+}));
+
 describe('Header', () => {
   const mockOnOpenSettings = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     getDatabaseVersion.mockResolvedValue(5);
+    mockIsDownloading = false;
+    mockDownloadProgress = null;
   });
 
   describe('Rendering', () => {
@@ -267,6 +280,28 @@ describe('Header', () => {
 
       // Should not have been called again
       expect(getDatabaseVersion).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Download indicator', () => {
+    it('does not show download indicator when not downloading', () => {
+      mockIsDownloading = false;
+      const { queryByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      expect(queryByTestId('download-indicator')).toBeNull();
+    });
+
+    it('shows download indicator when downloading', () => {
+      mockIsDownloading = true;
+      mockDownloadProgress = 0.42;
+      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      expect(getByTestId('download-indicator')).toBeTruthy();
+    });
+
+    it('shows correct percentage when downloading', () => {
+      mockIsDownloading = true;
+      mockDownloadProgress = 0.75;
+      const { getByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      expect(getByText('75%')).toBeTruthy();
     });
   });
 

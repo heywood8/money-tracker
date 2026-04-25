@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import { Portal, Modal, Text, Divider, TouchableRipple, ProgressBar } from 'react-native-paper';
+import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -15,9 +15,10 @@ import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
+import { checkForAppUpdate } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
+import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -35,12 +36,12 @@ export default function SettingsModal({ visible, onClose }) {
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
+  const { startDownload } = useUpdateDownload();
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
   const [logsModalVisible, setLogsModalVisible] = useState(false);
   const [backupsModalVisible, setBackupsModalVisible] = useState(false);
   const [logFilter, setLogFilter] = useState('all');
-  const [apkDownloadProgress, setApkDownloadProgress] = useState(null);
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
 
@@ -391,18 +392,16 @@ export default function SettingsModal({ visible, onClose }) {
             text: t('update_now') || 'Update now',
             onPress: async () => {
               await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
-              setApkDownloadProgress(0);
-              try {
-                await downloadAndInstallApk(result.downloadUrl, setApkDownloadProgress);
-              } catch (e) {
-                showDialog(
-                  t('error') || 'Error',
-                  t('update_download_failed') || 'Could not download the update. Please try again.',
-                  [{ text: t('ok') || 'OK' }],
-                );
-              } finally {
-                setApkDownloadProgress(null);
-              }
+              onClose();
+              startDownload(result.downloadUrl, {
+                onError: () => {
+                  showDialog(
+                    t('error') || 'Error',
+                    t('update_download_failed') || 'Could not download the update. Please try again.',
+                    [{ text: t('ok') || 'OK' }],
+                  );
+                },
+              });
             },
           },
         ],
@@ -415,7 +414,7 @@ export default function SettingsModal({ visible, onClose }) {
         [{ text: t('ok') || 'OK' }],
       );
     }
-  }, [showDialog, t]);
+  }, [showDialog, t, startDownload, onClose]);
 
   useEffect(() => {
     if (visible) {
@@ -926,25 +925,6 @@ export default function SettingsModal({ visible, onClose }) {
           )}
         </Animated.View>
       </Modal>
-      {apkDownloadProgress !== null && (
-        <Modal
-          visible
-          dismissable={false}
-          contentContainerStyle={[styles.downloadModal, { backgroundColor: colors.card }]}
-        >
-          <Text variant="bodyLarge" style={[styles.downloadTitle, { color: colors.text }]}>
-            {t('downloading_update') || 'Downloading update...'}
-          </Text>
-          <ProgressBar
-            progress={apkDownloadProgress}
-            color={colors.primary}
-            style={styles.downloadProgressBar}
-          />
-          <Text variant="bodySmall" style={[styles.downloadPercent, { color: colors.mutedText }]}>
-            {`${Math.round(apkDownloadProgress * 100)}%`}
-          </Text>
-        </Modal>
-      )}
     </Portal>
   );
 }
@@ -1009,25 +989,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: SPACING.xs,
-  },
-  downloadModal: {
-    alignItems: 'center',
-    borderRadius: 12,
-    margin: 32,
-    padding: 24,
-  },
-  downloadPercent: {
-    marginTop: 8,
-  },
-  downloadProgressBar: {
-    borderRadius: 4,
-    height: 8,
-    marginTop: 16,
-    width: '100%',
-  },
-  downloadTitle: {
-    marginBottom: 4,
-    textAlign: 'center',
   },
   filterChip: {
     borderRadius: 16,
