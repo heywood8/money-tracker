@@ -70,23 +70,23 @@ export default function App() {
                   <AppBlurProvider>
                     <DialogProvider>
                       <UpdateDownloadProvider>
-                      <ImportProgressProvider>
-                        <AccountsDataProvider>
-                          <AccountsActionsProvider>
-                            <CategoriesProvider>
-                              <OperationsDataProvider>
-                                <OperationsActionsProvider>
-                                  <BudgetsProvider>
-                                    <PlannedOperationsProvider>
-                                      <AppContent />
-                                    </PlannedOperationsProvider>
-                                  </BudgetsProvider>
-                                </OperationsActionsProvider>
-                              </OperationsDataProvider>
-                            </CategoriesProvider>
-                          </AccountsActionsProvider>
-                        </AccountsDataProvider>
-                      </ImportProgressProvider>
+                        <ImportProgressProvider>
+                          <AccountsDataProvider>
+                            <AccountsActionsProvider>
+                              <CategoriesProvider>
+                                <OperationsDataProvider>
+                                  <OperationsActionsProvider>
+                                    <BudgetsProvider>
+                                      <PlannedOperationsProvider>
+                                        <AppContent />
+                                      </PlannedOperationsProvider>
+                                    </BudgetsProvider>
+                                  </OperationsActionsProvider>
+                                </OperationsDataProvider>
+                              </CategoriesProvider>
+                            </AccountsActionsProvider>
+                          </AccountsDataProvider>
+                        </ImportProgressProvider>
                       </UpdateDownloadProvider>
                     </DialogProvider>
                   </AppBlurProvider>

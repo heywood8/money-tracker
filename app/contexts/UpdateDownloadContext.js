@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { downloadAndInstallApk } from '../services/AppUpdateService';
 
 const UpdateDownloadContext = createContext(null);
@@ -29,6 +30,10 @@ export function UpdateDownloadProvider({ children }) {
     </UpdateDownloadContext.Provider>
   );
 }
+
+UpdateDownloadProvider.propTypes = {
+  children: PropTypes.node,
+};
 
 export function useUpdateDownload() {
   const ctx = useContext(UpdateDownloadContext);
