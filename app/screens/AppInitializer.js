@@ -6,9 +6,9 @@ import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { performDailyBackupIfNeeded } from '../services/DailyBackupService';
 import { useDialog } from '../contexts/DialogContext';
-import { checkForAppUpdate, downloadAndInstallApk } from '../services/AppUpdateService';
+import { checkForAppUpdate } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
-import { Portal, Modal, ProgressBar, Text } from 'react-native-paper';
+import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 
 const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPDATE_REMINDER_DELAY_DAYS = 3;
@@ -21,8 +21,8 @@ const AppInitializer = () => {
   const { isFirstLaunch, setFirstLaunchComplete, t } = useLocalization();
   const { colors } = useThemeColors();
   const { showDialog } = useDialog();
+  const { startDownload } = useUpdateDownload();
   const [isInitializing, setIsInitializing] = useState(false);
-  const [apkDownloadProgress, setApkDownloadProgress] = useState(null);
 
   // Run once on every app open (after first launch is complete)
   useEffect(() => {
@@ -74,18 +74,15 @@ const AppInitializer = () => {
                 text: t('update_now') || 'Update now',
                 onPress: async () => {
                   await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
-                  setApkDownloadProgress(0);
-                  try {
-                    await downloadAndInstallApk(result.downloadUrl, setApkDownloadProgress);
-                  } catch (e) {
-                    showDialog(
-                      t('error') || 'Error',
-                      t('update_download_failed') || 'Could not download the update. Please try again.',
-                      [{ text: t('ok') || 'OK' }],
-                    );
-                  } finally {
-                    setApkDownloadProgress(null);
-                  }
+                  startDownload(result.downloadUrl, {
+                    onError: () => {
+                      showDialog(
+                        t('error') || 'Error',
+                        t('update_download_failed') || 'Could not download the update. Please try again.',
+                        [{ text: t('ok') || 'OK' }],
+                      );
+                    },
+                  });
                 },
               },
             ],
@@ -97,7 +94,7 @@ const AppInitializer = () => {
 
       runUpdateCheck();
     }
-  }, [isFirstLaunch, showDialog, t]);
+  }, [isFirstLaunch, showDialog, t, startDownload]);
 
   const handleLanguageSelected = async (selectedLanguage) => {
     try {
@@ -128,54 +125,10 @@ const AppInitializer = () => {
   }
 
   // Normal app flow - not first launch
-  return (
-    <>
-      <SimpleTabs />
-      {apkDownloadProgress !== null && (
-        <Portal>
-          <Modal
-            visible
-            dismissable={false}
-            contentContainerStyle={[styles.downloadModal, { backgroundColor: colors.card }]}
-          >
-            <Text variant="bodyLarge" style={[styles.downloadTitle, { color: colors.text }]}>
-              {t('downloading_update') || 'Downloading update...'}
-            </Text>
-            <ProgressBar
-              progress={apkDownloadProgress}
-              color={colors.primary}
-              style={styles.downloadProgressBar}
-            />
-            <Text variant="bodySmall" style={[styles.downloadPercent, { color: colors.mutedText }]}>
-              {`${Math.round(apkDownloadProgress * 100)}%`}
-            </Text>
-          </Modal>
-        </Portal>
-      )}
-    </>
-  );
+  return <SimpleTabs />;
 };
 
 const styles = StyleSheet.create({
-  downloadModal: {
-    alignItems: 'center',
-    borderRadius: 12,
-    margin: 40,
-    padding: 24,
-  },
-  downloadPercent: {
-    marginTop: 8,
-  },
-  downloadProgressBar: {
-    borderRadius: 4,
-    height: 8,
-    marginTop: 16,
-    width: '100%',
-  },
-  downloadTitle: {
-    marginBottom: 4,
-    textAlign: 'center',
-  },
   loadingContainer: {
     alignItems: 'center',
     flex: 1,

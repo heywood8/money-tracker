@@ -15,6 +15,14 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   })),
 }));
 
+jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+  useUpdateDownload: jest.fn(() => ({
+    isDownloading: false,
+    downloadProgress: null,
+    startDownload: jest.fn(),
+  })),
+}));
+
 jest.mock('../../app/services/AppUpdateService', () => ({
   checkForAppUpdate: jest.fn(async () => ({
     success: true,
