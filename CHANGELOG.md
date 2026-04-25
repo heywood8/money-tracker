@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.68.3](https://github.com/heywood8/money-tracker/compare/penny-v0.68.2...penny-v0.68.3) (2026-04-25)
+
+
+### Bug Fixes
+
+* spending trend visibility ([91d4359](https://github.com/heywood8/money-tracker/commit/91d435938c9ad83940503d5f9bb6457daa96f197))
+
 ## [0.68.2](https://github.com/heywood8/money-tracker/compare/penny-v0.68.1...penny-v0.68.2) (2026-04-25)
 
 
