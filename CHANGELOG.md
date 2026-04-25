@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.68.2](https://github.com/heywood8/money-tracker/compare/penny-v0.68.1...penny-v0.68.2) (2026-04-25)
+
+
+### Miscellaneous Chores
+
+* adding agent skills ([#400](https://github.com/heywood8/money-tracker/issues/400)) ([fe34cdd](https://github.com/heywood8/money-tracker/commit/fe34cddccedb9766c64bc4dff3c364a94c314cdd))
+
 ## [0.68.1](https://github.com/heywood8/money-tracker/compare/penny-v0.68.0...penny-v0.68.1) (2026-04-23)
 
 
