@@ -73,7 +73,7 @@ describe('ThemeContext', () => {
 
       expect(result.current.theme).toBe('light');
       expect(result.current.colorScheme).toBe('light');
-      expect(result.current.colors.background).toBe('#ffffff'); // Light background
+      expect(result.current.colors.background).toBe('#f8f8f8'); // Light background
     });
 
     it('switches to dark theme', async () => {
@@ -185,7 +185,7 @@ describe('ThemeContext', () => {
         await result.current.setTheme('light');
       });
 
-      expect(result.current.colors.background).toBe('#ffffff');
+      expect(result.current.colors.background).toBe('#f8f8f8');
       expect(result.current.colors.text).toBe('#111111');
       expect(result.current.colors.primary).toBe('#007AFF');
     });
