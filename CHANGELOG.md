@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.69.0](https://github.com/heywood8/money-tracker/compare/penny-v0.68.3...penny-v0.69.0) (2026-04-25)
+
+
+### Features
+
+* non-blocking APK update download with header progress indicator ([#404](https://github.com/heywood8/money-tracker/issues/404)) ([a2b6dc0](https://github.com/heywood8/money-tracker/commit/a2b6dc0e31579c110b95837861b366b29231eb22))
+
 ## [0.68.3](https://github.com/heywood8/money-tracker/compare/penny-v0.68.2...penny-v0.68.3) (2026-04-25)
 
 
