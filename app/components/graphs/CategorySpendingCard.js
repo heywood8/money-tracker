@@ -87,9 +87,9 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
             x2={width}
             y2={lineY}
             stroke={colors.primary}
-            strokeWidth={1}
-            strokeDasharray="3,3"
-            opacity={0.5}
+            strokeWidth={2}
+            strokeDasharray="5,3"
+            opacity={0.9}
           />
         );
       })()}
@@ -117,9 +117,8 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
               width={barW}
               height={h}
               rx={3}
-              fill={isSelected ? colors.primary : colors.surface}
-              stroke={isSelected ? 'none' : colors.border}
-              strokeWidth={1}
+              fill={isSelected ? colors.primary : colors.mutedText}
+              fillOpacity={isSelected ? 1 : 0.3}
               onPress={() => onBarPress(i)}
             />
             <SvgText
