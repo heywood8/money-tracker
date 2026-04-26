@@ -158,6 +158,32 @@ export const checkForAppUpdate = async ({
   }
 };
 
+const APK_KEEP_COUNT = 3;
+
+export const cleanupOldApks = async (cacheDir = FileSystem.cacheDirectory, keep = APK_KEEP_COUNT) => {
+  const files = await FileSystem.readDirectoryAsync(cacheDir);
+  const apkFiles = files.filter((f) => f.toLowerCase().endsWith('.apk'));
+
+  if (apkFiles.length <= keep) {
+    console.log(`[AppUpdate] apk cleanup: ${apkFiles.length} apk(s) found, none deleted (limit: ${keep})`);
+    return;
+  }
+
+  const withInfo = await Promise.all(
+    apkFiles.map(async (name) => {
+      const uri = `${cacheDir}${name}`;
+      const info = await FileSystem.getInfoAsync(uri);
+      return { uri, modificationTime: info.modificationTime || 0 };
+    }),
+  );
+
+  withInfo.sort((a, b) => b.modificationTime - a.modificationTime);
+
+  const toDelete = withInfo.slice(keep);
+  await Promise.all(toDelete.map(({ uri }) => FileSystem.deleteAsync(uri, { idempotent: true })));
+  console.log(`[AppUpdate] apk cleanup: ${apkFiles.length} apk(s) found, ${toDelete.length} deleted (limit: ${keep})`);
+};
+
 export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
   const filename = (downloadUrl.split('/').pop().split('?')[0]) || 'penny-update.apk';
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
@@ -177,6 +203,8 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
   if (!result?.uri) {
     throw new Error('Download failed');
   }
+
+  await cleanupOldApks();
 
   const contentUri = await FileSystem.getContentUriAsync(result.uri);
   await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
