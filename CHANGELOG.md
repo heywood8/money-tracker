@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.71.0](https://github.com/heywood8/money-tracker/compare/penny-v0.70.0...penny-v0.71.0) (2026-04-26)
+
+
+### Features
+
+* clean up old APKs after in-app update download ([#411](https://github.com/heywood8/money-tracker/issues/411)) ([ac5d589](https://github.com/heywood8/money-tracker/commit/ac5d589a97676f93fd53c36e1f0ffa70dc00b571))
+
 ## [0.70.0](https://github.com/heywood8/money-tracker/compare/penny-v0.69.1...penny-v0.70.0) (2026-04-26)
 
 
