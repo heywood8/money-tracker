@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.70.0](https://github.com/heywood8/money-tracker/compare/penny-v0.69.1...penny-v0.70.0) (2026-04-26)
+
+
+### Features
+
+* local Maestro screenshot flow (all 26 screens, light + dark) ([#409](https://github.com/heywood8/money-tracker/issues/409)) ([c148891](https://github.com/heywood8/money-tracker/commit/c148891703a31fd84d8e670f68c550cbafdd2e56))
+
+
+### Build System
+
+* **deps:** bump googleapis/release-please-action from 4 to 5 ([#408](https://github.com/heywood8/money-tracker/issues/408)) ([fae472c](https://github.com/heywood8/money-tracker/commit/fae472c3bbcde81fdf5e269c926de28933a51e83))
+
 ## [0.69.1](https://github.com/heywood8/money-tracker/compare/penny-v0.69.0...penny-v0.69.1) (2026-04-26)
 
 
