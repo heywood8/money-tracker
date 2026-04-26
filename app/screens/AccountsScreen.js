@@ -358,7 +358,7 @@ const AccountRow = memo(({ item, colors, onPress, t, drag, isActive }) => {
   return (
     <View style={[styles.accountRow, isActive && { backgroundColor: colors.selected }]}>
       <TouchableOpacity
-        testID={`account-row-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+        testID={`account-row-${(item.name ?? '').toLowerCase().replace(/\s+/g, '-')}`}
         onPress={handlePress}
         activeOpacity={0.7}
         style={styles.accountTouchableArea}

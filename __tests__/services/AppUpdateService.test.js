@@ -3,9 +3,108 @@ import {
   compareVersions,
   extractApkAsset,
   checkForAppUpdate,
+  cleanupOldApks,
 } from '../../app/services/AppUpdateService';
 
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  readDirectoryAsync: jest.fn(),
+  getInfoAsync: jest.fn(),
+  deleteAsync: jest.fn(),
+  createDownloadResumable: jest.fn(),
+  getContentUriAsync: jest.fn(),
+}));
+
+const FileSystem = require('expo-file-system/legacy');
+
 describe('AppUpdateService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('cleanupOldApks', () => {
+    beforeEach(() => {
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      console.log.mockRestore();
+    });
+
+    it('does nothing when apk count is at or below keep limit', async () => {
+      FileSystem.readDirectoryAsync.mockResolvedValue(['penny-v1.apk', 'penny-v2.apk', 'penny-v3.apk']);
+      FileSystem.getInfoAsync.mockResolvedValue({ modificationTime: 1000 });
+
+      await cleanupOldApks('file:///cache/', 3);
+
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith('[AppUpdate] apk cleanup: 3 apk(s) found, none deleted (limit: 3)');
+    });
+
+    it('deletes oldest apks keeping only the 3 newest', async () => {
+      FileSystem.readDirectoryAsync.mockResolvedValue([
+        'penny-v1.apk',
+        'penny-v2.apk',
+        'penny-v3.apk',
+        'penny-v4.apk',
+        'penny-v5.apk',
+      ]);
+      FileSystem.getInfoAsync.mockImplementation((uri) => {
+        const times = {
+          'file:///cache/penny-v1.apk': 1000,
+          'file:///cache/penny-v2.apk': 2000,
+          'file:///cache/penny-v3.apk': 3000,
+          'file:///cache/penny-v4.apk': 4000,
+          'file:///cache/penny-v5.apk': 5000,
+        };
+        return Promise.resolve({ modificationTime: times[uri] || 0 });
+      });
+      FileSystem.deleteAsync.mockResolvedValue();
+
+      await cleanupOldApks('file:///cache/', 3);
+
+      expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(2);
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith('file:///cache/penny-v1.apk', { idempotent: true });
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith('file:///cache/penny-v2.apk', { idempotent: true });
+      expect(console.log).toHaveBeenCalledWith('[AppUpdate] apk cleanup: 5 apk(s) found, 2 deleted (limit: 3)');
+    });
+
+    it('ignores non-apk files', async () => {
+      FileSystem.readDirectoryAsync.mockResolvedValue([
+        'penny-v1.apk',
+        'penny-v2.apk',
+        'some-log.txt',
+        'penny-v3.apk',
+        'penny-v4.apk',
+      ]);
+      FileSystem.getInfoAsync.mockImplementation((uri) => {
+        const times = {
+          'file:///cache/penny-v1.apk': 1000,
+          'file:///cache/penny-v2.apk': 2000,
+          'file:///cache/penny-v3.apk': 3000,
+          'file:///cache/penny-v4.apk': 4000,
+        };
+        return Promise.resolve({ modificationTime: times[uri] || 0 });
+      });
+      FileSystem.deleteAsync.mockResolvedValue();
+
+      await cleanupOldApks('file:///cache/', 3);
+
+      expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(1);
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith('file:///cache/penny-v1.apk', { idempotent: true });
+    });
+
+    it('handles missing modificationTime gracefully', async () => {
+      FileSystem.readDirectoryAsync.mockResolvedValue(['penny-v1.apk', 'penny-v2.apk', 'penny-v3.apk', 'penny-v4.apk']);
+      FileSystem.getInfoAsync.mockResolvedValue({});
+      FileSystem.deleteAsync.mockResolvedValue();
+
+      await cleanupOldApks('file:///cache/', 3);
+
+      expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('parseVersionFromRelease', () => {
     it('parses plain semver tag', () => {
       expect(parseVersionFromRelease({ tag_name: 'v1.2.3' })).toBe('1.2.3');
