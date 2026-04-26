@@ -358,6 +358,7 @@ const AccountRow = memo(({ item, colors, onPress, t, drag, isActive }) => {
   return (
     <View style={[styles.accountRow, isActive && { backgroundColor: colors.selected }]}>
       <TouchableOpacity
+        testID={`account-row-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
         onPress={handlePress}
         activeOpacity={0.7}
         style={styles.accountTouchableArea}
@@ -751,6 +752,7 @@ export default function AccountsScreen() {
       </ScrollView>
 
       <FAB
+        testID="accounts-add-fab"
         icon="plus"
         style={[styles.fab, { backgroundColor: colors.text }]}
         color={colors.background}
@@ -845,6 +847,7 @@ export default function AccountsScreen() {
                 </Button>
                 {editingId !== 'new' && (
                   <Button
+                    testID="account-delete-button"
                     mode="contained"
                     buttonColor={colors.delete}
                     onPress={handleDeleteEditingAccount}

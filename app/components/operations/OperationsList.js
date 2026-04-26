@@ -157,6 +157,7 @@ const OperationsList = forwardRef(({
           {item.operations.map((operation, index) => (
             <OperationListItem
               key={operation.id}
+              testID={`operation-item-${index}`}
               operation={operation}
               colors={colors}
               t={t}

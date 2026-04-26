@@ -569,7 +569,7 @@ export default function SettingsModal({ visible, onClose }) {
             </TouchableOpacity>
           </View>
 
-          <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow}>
+          <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow} testID="settings-language-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="language-outline" size={22} color={colors.text} />
@@ -607,7 +607,7 @@ export default function SettingsModal({ visible, onClose }) {
 
           <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
 
-          <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow}>
+          <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow} testID="settings-export-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
@@ -627,7 +627,7 @@ export default function SettingsModal({ visible, onClose }) {
             </View>
           </TouchableRipple>
 
-          <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow}>
+          <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow} testID="settings-backups-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="archive-outline" size={22} color={colors.text} />
@@ -685,7 +685,7 @@ export default function SettingsModal({ visible, onClose }) {
           !languageModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton}>
+            <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton} testID="settings-language-back">
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
@@ -728,7 +728,7 @@ export default function SettingsModal({ visible, onClose }) {
           !exportFormatModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton}>
+            <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton} testID="settings-export-back">
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
@@ -812,7 +812,7 @@ export default function SettingsModal({ visible, onClose }) {
           !logsModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeLogsModal} style={styles.backButton}>
+            <TouchableOpacity onPress={closeLogsModal} style={styles.backButton} testID="settings-logs-back">
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
@@ -890,7 +890,7 @@ export default function SettingsModal({ visible, onClose }) {
           !backupsModalVisible && styles.hidden,
         ]}>
           <View style={styles.languageModalHeader}>
-            <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton}>
+            <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton} testID="settings-backups-back">
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>

@@ -278,6 +278,7 @@ export default function PlannedOperationsScreen() {
 
       {/* FAB */}
       <FAB
+        testID="planned-add-fab"
         icon="plus"
         label={t('add_planned_operation')}
         style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}

@@ -1,0 +1,636 @@
+appId: com.heywood8.monkeep.dev
+---
+# Extended local screenshot flow — covers all 26 screens in light + dark.
+# Run via: bash scripts/screenshot.sh
+# Prerequisites: emulator running, app installed.
+
+
+# ============================================================
+# SEED: Create one expense operation so edit modal is reachable
+# ============================================================
+# Dismiss any system ANR dialog before interacting with the app
+- runFlow:
+    when:
+      visible: "isn't responding"
+    commands:
+      - tapOn: "Wait"
+      - waitForAnimationToEnd:
+          timeout: 250
+
+- runFlow:
+    when:
+      visible: "Welcome to Penny"
+    commands:
+      - takeScreenshot: local/screenshots/00_language_selection
+      - tapOn: "English"
+      - tapOn: "Continue"
+      - runFlow:
+          when:
+            visible: "Update available"
+          commands:
+            - tapOn: "LATER"
+            - waitForAnimationToEnd:
+                timeout: 250
+      - extendedWaitUntil:
+          visible: "Operations"
+          timeout: 15000
+
+- waitForAnimationToEnd:
+    timeout: 250
+
+# Dismiss update dialog if present
+- runFlow:
+    when:
+      visible: "Update available"
+    commands:
+      - tapOn: "LATER"
+      - waitForAnimationToEnd:
+          timeout: 250
+
+# Ensure we start on Operations tab in light mode
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 250
+- runFlow:
+    when:
+      visible: "Switch to light theme"
+    commands:
+      - tapOn:
+          id: "theme-toggle-button"
+      - waitForAnimationToEnd:
+          timeout: 500
+
+# Create a Groceries expense (amount 5, tap shortcut → auto-saves)
+- tapOn: "Expense"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "calc-btn-5"
+- tapOn:
+    id: "category-shortcut-0"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# ============================================================
+# LIGHT MODE
+# ============================================================
+
+# 01: Operations
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/01_operations_light
+
+# 05: Transfer
+- tapOn: "Transfer"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/05_transfer_light
+
+# 06: Multi-currency transfer
+- tapOn: "All accounts"
+- extendedWaitUntil:
+    visible: "EUR Cash"
+    timeout: 2500
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/06_multicurrency_transfer_light
+- tapOn: "Expense"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 07: Operation edit modal
+- tapOn:
+    id: "operation-item-0"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/07_operation_modal_light
+
+# 08: Split modal
+- tapOn:
+    id: "split-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/08_split_modal_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 09: Filter modal
+- tapOn:
+    id: "filter-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/09_filter_modal_light
+- tapOn:
+    id: "close-filter-modal"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 02: Graphs
+- tapOn: "Graphs"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/02_graphs_light
+
+# 14: Expense chart modal
+- tapOn:
+    id: "expense-summary-card"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/14_chart_modal_expense_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 15: Income chart modal
+- tapOn:
+    id: "income-summary-card"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/15_chart_modal_income_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 16+17: Balance history (only if chart is visible)
+- runFlow:
+    when:
+      visible:
+        id: "balance-history-chart"
+    commands:
+      - tapOn:
+          id: "balance-history-chart"
+      - waitForAnimationToEnd:
+          timeout: 250
+      - takeScreenshot: local/screenshots/16_balance_history_modal_light
+      - runFlow:
+          when:
+            visible:
+              id: "balance-history-edit-0"
+          commands:
+            - tapOn:
+                id: "balance-history-edit-0"
+            - waitForAnimationToEnd:
+                timeout: 250
+            - takeScreenshot: local/screenshots/17_balance_history_modal_edit_light
+      - tapOn:
+          id: "balance-history-close"
+      - waitForAnimationToEnd:
+          timeout: 250
+
+# 03: Accounts
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/03_accounts_light
+
+# 23: Account edit modal
+- tapOn:
+    id: "account-row-checking"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/23_account_edit_modal_light
+
+# 24: Delete confirmation
+- tapOn:
+    id: "account-delete-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/24_confirmation_dialog_light
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 04: Categories (grid)
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/04_categories_light
+
+# 18: Category modal
+- tapOn:
+    id: "categories-add-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/18_category_modal_light
+
+# 19: Icon picker
+- tapOn:
+    id: "category-icon-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/19_icon_picker_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 25: Material dialog (long-press category)
+- tapOn: "List view"
+- waitForAnimationToEnd:
+    timeout: 250
+- longPressOn: "Food"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/25_material_dialog_light
+
+# 26: Budget modal
+- tapOn: "SET BUDGET"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/26_budget_modal_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 08: Planned tab
+- tapOn: "Planned"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/08_planned_light
+
+# 20: Planned operation modal
+- tapOn:
+    id: "planned-add-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/20_planned_operation_modal_light
+
+# 21: Account picker
+- tapOn:
+    id: "planned-account-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/21_picker_modal_account_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 22: Category picker
+- tapOn:
+    id: "planned-category-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/22_picker_modal_category_light
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+# Settings screenshots
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/07_settings_light
+
+# 10: Language
+- tapOn:
+    id: "settings-language-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/10_settings_language_light
+- tapOn:
+    id: "settings-language-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 11: Export
+- tapOn:
+    id: "settings-export-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/11_settings_export_light
+- tapOn:
+    id: "settings-export-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 12: Backups
+- tapOn:
+    id: "settings-backups-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/12_settings_backups_light
+- tapOn:
+    id: "settings-backups-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# 13: Logs
+- tapOn:
+    id: "logs-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/13_settings_logs_light
+- tapOn:
+    id: "settings-logs-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "settings-close-button"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# ============================================================
+# SWITCH TO DARK MODE
+# ============================================================
+- tapOn:
+    id: "theme-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# ============================================================
+# DARK MODE (same sequence)
+# ============================================================
+
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/01_operations_dark
+
+- tapOn: "Transfer"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/05_transfer_dark
+
+- tapOn: "All accounts"
+- extendedWaitUntil:
+    visible: "EUR Cash"
+    timeout: 2500
+- tapOn: "EUR Cash"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "calc-btn-1"
+- tapOn:
+    id: "calc-btn-2"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/06_multicurrency_transfer_dark
+- tapOn: "Expense"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "category-shortcut-0"
+- waitForAnimationToEnd:
+    timeout: 500
+
+- tapOn:
+    id: "operation-item-0"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/07_operation_modal_dark
+
+- tapOn:
+    id: "split-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/08_split_modal_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "filter-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/09_filter_modal_dark
+- tapOn:
+    id: "close-filter-modal"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn: "Graphs"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/02_graphs_dark
+
+- tapOn:
+    id: "expense-summary-card"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/14_chart_modal_expense_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "income-summary-card"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/15_chart_modal_income_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- runFlow:
+    when:
+      visible:
+        id: "balance-history-chart"
+    commands:
+      - tapOn:
+          id: "balance-history-chart"
+      - waitForAnimationToEnd:
+          timeout: 250
+      - takeScreenshot: local/screenshots/16_balance_history_modal_dark
+      - runFlow:
+          when:
+            visible:
+              id: "balance-history-edit-0"
+          commands:
+            - tapOn:
+                id: "balance-history-edit-0"
+            - waitForAnimationToEnd:
+                timeout: 250
+            - takeScreenshot: local/screenshots/17_balance_history_modal_edit_dark
+      - tapOn:
+          id: "balance-history-close"
+      - waitForAnimationToEnd:
+          timeout: 250
+
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/03_accounts_dark
+
+- tapOn:
+    id: "account-row-checking"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/23_account_edit_modal_dark
+
+- tapOn:
+    id: "account-delete-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/24_confirmation_dialog_dark
+- tapOn: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn: "Categories"
+- waitForAnimationToEnd:
+    timeout: 1500
+- swipe:
+    start: 50%, 70%
+    end: 50%, 40%
+- swipe:
+    start: 50%, 40%
+    end: 50%, 70%
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/04_categories_dark
+
+- tapOn:
+    id: "categories-add-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/18_category_modal_dark
+
+- tapOn:
+    id: "category-icon-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/19_icon_picker_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn: "List view"
+- waitForAnimationToEnd:
+    timeout: 250
+- longPressOn: "Food"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/25_material_dialog_dark
+- tapOn: "SET BUDGET"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/26_budget_modal_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn: "Planned"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: local/screenshots/08_planned_dark
+
+- tapOn:
+    id: "planned-add-fab"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/20_planned_operation_modal_dark
+
+- tapOn:
+    id: "planned-account-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/21_picker_modal_account_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "planned-category-picker"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/22_picker_modal_category_dark
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+- pressKey: Back
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn: "Operations"
+- waitForAnimationToEnd:
+    timeout: 250
+- tapOn:
+    id: "settings-button"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/07_settings_dark
+
+- tapOn:
+    id: "settings-language-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/10_settings_language_dark
+- tapOn:
+    id: "settings-language-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "settings-export-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/11_settings_export_dark
+- tapOn:
+    id: "settings-export-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "settings-backups-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/12_settings_backups_dark
+- tapOn:
+    id: "settings-backups-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "logs-row"
+- waitForAnimationToEnd:
+    timeout: 250
+- takeScreenshot: local/screenshots/13_settings_logs_dark
+- tapOn:
+    id: "settings-logs-back"
+- waitForAnimationToEnd:
+    timeout: 250
+
+- tapOn:
+    id: "settings-close-button"
+- waitForAnimationToEnd:
+    timeout: 250
+
+# Restore light theme
+- tapOn:
+    id: "theme-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 250

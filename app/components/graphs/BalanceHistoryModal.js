@@ -43,6 +43,7 @@ const BalanceHistoryModal = ({
                 </Text>
               </View>
               <TouchableOpacity
+                testID="balance-history-close"
                 style={styles.closeButton}
                 onPress={onClose}
               >
@@ -114,6 +115,7 @@ const BalanceHistoryModal = ({
                         </Text>
                         <View style={styles.balanceTableActions}>
                           <TouchableOpacity
+                            testID={`balance-history-edit-${index}`}
                             style={[styles.balanceActionButton, { backgroundColor: colors.primary }]}
                             onPress={() => onEditBalance(row.date, row.balance)}
                           >
