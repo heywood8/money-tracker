@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.69.1](https://github.com/heywood8/money-tracker/compare/penny-v0.69.0...penny-v0.69.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* calculate previous month daily average from total expenses ([33f4091](https://github.com/heywood8/money-tracker/commit/33f4091ede5896771756a8e3170b25847c1cba9a))
+
 ## [0.69.0](https://github.com/heywood8/money-tracker/compare/penny-v0.68.3...penny-v0.69.0) (2026-04-25)
 
 
