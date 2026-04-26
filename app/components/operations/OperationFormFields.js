@@ -266,7 +266,7 @@ const OperationFormFields = memo(({
           </Pressable>
 
           {/* Top 3 category shortcut buttons */}
-          {topCategoriesForType.map((category) => {
+          {topCategoriesForType.map((category, index) => {
             const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
             const isSelected = values.categoryId === category.id;
             const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
@@ -275,6 +275,7 @@ const OperationFormFields = memo(({
             return (
               <Pressable
                 key={category.id}
+                testID={`category-shortcut-${index}`}
                 style={[
                   styles.categoryShortcutButton,
                   {

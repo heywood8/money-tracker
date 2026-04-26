@@ -160,6 +160,7 @@ const BalanceHistoryCard = ({
       ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
         <>
           <TouchableOpacity
+            testID="balance-history-chart"
             style={styles.balanceHistoryChartContainer}
             onPress={onChartPress}
             activeOpacity={0.7}

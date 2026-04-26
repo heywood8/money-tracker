@@ -313,6 +313,7 @@ const CategoriesScreen = () => {
       )}
 
       <FAB
+        testID="categories-add-fab"
         icon="plus"
         style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
         color={colors.text}

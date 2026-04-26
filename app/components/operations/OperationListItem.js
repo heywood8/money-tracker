@@ -16,6 +16,7 @@ const OperationListItem = ({
   formatCurrency,
   isLast,
   onPress,
+  testID,
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
@@ -72,6 +73,7 @@ const OperationListItem = ({
   return (
     <>
       <TouchableRipple
+        testID={testID}
         onPress={onPress}
         rippleColor="rgba(0, 0, 0, .08)"
         accessibilityRole="button"
@@ -136,10 +138,12 @@ OperationListItem.propTypes = {
   formatCurrency: PropTypes.func.isRequired,
   isLast: PropTypes.bool,
   onPress: PropTypes.func.isRequired,
+  testID: PropTypes.string,
 };
 
 OperationListItem.defaultProps = {
   isLast: false,
+  testID: undefined,
 };
 
 const styles = StyleSheet.create({

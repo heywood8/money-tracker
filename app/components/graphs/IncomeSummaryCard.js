@@ -30,6 +30,7 @@ const IncomeSummaryCard = ({
   const { hideBalances } = useDisplaySettings();
   return (
     <TouchableOpacity
+      testID="income-summary-card"
       style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}

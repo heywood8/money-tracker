@@ -221,6 +221,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
 
                 {/* Icon Picker */}
                 <Pressable
+                  testID="category-icon-picker"
                   style={[styles.iconPickerButton, styles.iconPickerButtonThemed, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                   onPress={() => setIconPickerVisible(true)}
                 >

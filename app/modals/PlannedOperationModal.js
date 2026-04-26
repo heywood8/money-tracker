@@ -308,6 +308,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
                 <View style={styles.inputContainer}>
                   <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_account')}</Text>
                   <Pressable
+                    testID="planned-account-picker"
                     style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.accountId ? colors.error : colors.inputBorder }]}
                     onPress={() => setAccountPickerVisible(true)}
                   >
@@ -324,6 +325,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
                   <View style={styles.inputContainer}>
                     <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_category')}</Text>
                     <Pressable
+                      testID="planned-category-picker"
                       style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.categoryId ? colors.error : colors.inputBorder }]}
                       onPress={() => openCategoryPicker('category', filteredCategories)}
                     >

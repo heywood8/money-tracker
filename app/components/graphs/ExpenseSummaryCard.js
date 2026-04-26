@@ -30,6 +30,7 @@ const ExpenseSummaryCard = ({
   const { hideBalances } = useDisplaySettings();
   return (
     <TouchableOpacity
+      testID="expense-summary-card"
       style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
