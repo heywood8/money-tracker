@@ -433,26 +433,16 @@ const BalanceHistoryCard = ({
               };
 
               // Number of days in the previous month (e.g. 28 for February)
-              const prevMonthDaysCount = new Date(selectedYear, selectedMonth, 0).getDate();
+              const prevMonthDaysCount = balanceHistoryData.prevMonthDaysCount || new Date(selectedYear, selectedMonth, 0).getDate();
 
               prevMonthCurrent = prevMonthAtDay(displayDay);
               // End = balance on the actual last day of the previous month
               prevMonthEnd = prevMonthAtDay(prevMonthDaysCount);
 
-              // Calculate daily avg: change from first to last recorded balance,
-              // divided by the full month's day span so sparse data doesn't skew the result
-              let firstIdx = -1;
-              let lastIdx = -1;
-              prevMonthAllValues.forEach((v, i) => {
-                if (v !== undefined) {
-                  if (firstIdx === -1) firstIdx = i;
-                  lastIdx = i;
-                }
-              });
-              if (firstIdx !== -1 && lastIdx > firstIdx && prevMonthDaysCount > 1) {
-                prevMonthDailyAvg = (prevMonthAllValues[lastIdx] - prevMonthAllValues[firstIdx]) / (prevMonthDaysCount - 1);
-              } else if (firstIdx !== -1) {
-                prevMonthDailyAvg = 0;
+              // Daily avg = total expenses / days in month (negated: spending reduces balance)
+              const prevTotalExpenses = balanceHistoryData.prevMonthTotalExpenses;
+              if (prevTotalExpenses != null && prevMonthDaysCount > 0) {
+                prevMonthDailyAvg = -prevTotalExpenses / prevMonthDaysCount;
               }
             }
 
@@ -532,6 +522,8 @@ BalanceHistoryCard.propTypes = {
     actualForChart: PropTypes.array,
     burndown: PropTypes.array,
     prevMonth: PropTypes.array,
+    prevMonthTotalExpenses: PropTypes.number,
+    prevMonthDaysCount: PropTypes.number,
   }).isRequired,
   onChartPress: PropTypes.func.isRequired,
   selectedYear: PropTypes.number.isRequired,
