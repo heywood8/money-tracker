@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useBalanceHistory from '../../app/hooks/useBalanceHistory';
 import * as BalanceHistoryDB from '../../app/services/BalanceHistoryDB';
+import * as OperationsDB from '../../app/services/OperationsDB';
 
 // Mock the BalanceHistoryDB service
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
@@ -15,6 +16,11 @@ jest.mock('../../app/services/BalanceHistoryDB', () => ({
   }),
 }));
 
+// Mock the OperationsDB service
+jest.mock('../../app/services/OperationsDB', () => ({
+  getTotalExpenses: jest.fn(),
+}));
+
 describe('useBalanceHistory', () => {
   const mockAccountId = 'account-1';
   const mockYear = 2024;
@@ -22,6 +28,8 @@ describe('useBalanceHistory', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: no expenses in previous month
+    OperationsDB.getTotalExpenses.mockResolvedValue(0);
     // Mock console.error to suppress error logs in tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -98,6 +106,8 @@ describe('useBalanceHistory', () => {
       expect(result.current.balanceHistoryData).toHaveProperty('trend');
       expect(result.current.balanceHistoryData).toHaveProperty('burndown');
       expect(result.current.balanceHistoryData).toHaveProperty('prevMonth');
+      expect(result.current.balanceHistoryData).toHaveProperty('prevMonthTotalExpenses');
+      expect(result.current.balanceHistoryData).toHaveProperty('prevMonthDaysCount');
       expect(result.current.balanceHistoryData.labels.length).toBe(31); // January has 31 days
     });
 
@@ -442,6 +452,25 @@ describe('useBalanceHistory', () => {
         expect(result.current.balanceHistoryData.prevMonth).toBeDefined();
         // Day 6 should have the balance from day 5 (forward-filled)
         expect(result.current.balanceHistoryData.prevMonth[5]).toBe(1000);
+      });
+    });
+
+    it('should include prevMonthTotalExpenses and prevMonthDaysCount in balance history data', async () => {
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      OperationsDB.getTotalExpenses.mockResolvedValue(620);
+
+      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.balanceHistoryData.prevMonthTotalExpenses).toBe(620);
+        // January is month index 0, previous month is December (31 days)
+        expect(result.current.balanceHistoryData.prevMonthDaysCount).toBe(31);
       });
     });
   });

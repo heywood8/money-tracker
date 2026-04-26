@@ -1133,6 +1133,8 @@ describe('BalanceHistoryCard', () => {
             actualForChart: [6000, 5500, 5500, 5500],
             burndown: [],
             prevMonth: prevMonthData,
+            prevMonthTotalExpenses: 1400,
+            prevMonthDaysCount: 28,
           }}
           onChartPress={jest.fn()}
           selectedYear={2026}
@@ -1176,6 +1178,8 @@ describe('BalanceHistoryCard', () => {
             actualForChart: [2000, 1800, 1800],
             burndown: [],
             prevMonth: prevMonthData,
+            prevMonthTotalExpenses: 350,
+            prevMonthDaysCount: 7,
           }}
           onChartPress={jest.fn()}
           selectedYear={2026}
@@ -1186,7 +1190,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      // prevMonthDailyAvg = (750 - 1000) / (5 - 0) = -50 → shows '-50.00'
+      // prevMonthDailyAvg = -350 / 7 = -50 → shows a formatted number, not '-'
       const dashValues = queryAllByText('-');
       // No cell should show a plain '-' since avg is now calculated
       expect(dashValues.length).toBe(0);

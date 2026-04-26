@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getBalanceHistory, upsertBalanceHistory, deleteBalanceHistory, formatDate } from '../services/BalanceHistoryDB';
+import { getTotalExpenses } from '../services/OperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
 /**
@@ -60,8 +61,9 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const prevStartDateStr = formatDate(prevMonthStart);
       const prevEndDateStr = formatDate(prevMonthEnd);
 
-      // Get previous month's balance history
+      // Get previous month's balance history and total expenses
       const prevHistory = await getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr);
+      const prevMonthTotalExpenses = await getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr);
 
       // Transform history data for chart
       const dataPoints = history.map(item => ({
@@ -184,6 +186,8 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         trend: trendData,
         burndown: burndownData,
         prevMonth: prevMonthData,
+        prevMonthTotalExpenses,
+        prevMonthDaysCount: prevMonthDays,
         labels: allDays,
       });
     } catch (error) {
