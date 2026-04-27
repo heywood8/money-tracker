@@ -331,8 +331,7 @@ const BalanceHistoryCard = ({
                           fill={colors.mutedText}
                           textAnchor="end"
                         >
-                          {/* eslint-disable-next-line react-native/no-raw-text */}
-                          {'0'}
+                          {String('0')}
                         </SvgText>,
                       );
                     }
