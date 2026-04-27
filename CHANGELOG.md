@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.71.1](https://github.com/heywood8/money-tracker/compare/penny-v0.71.0...penny-v0.71.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* account picker balance inline and bottom-sheet style ([#413](https://github.com/heywood8/money-tracker/issues/413)) ([2281f12](https://github.com/heywood8/money-tracker/commit/2281f1292c98d05b4c0bbb7509603c63f2d41836))
+
 ## [0.71.0](https://github.com/heywood8/money-tracker/compare/penny-v0.70.0...penny-v0.71.0) (2026-04-26)
 
 
