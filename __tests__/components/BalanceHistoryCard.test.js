@@ -352,8 +352,8 @@ describe('BalanceHistoryCard', () => {
 
       const lineChart = UNSAFE_getByType('LineChart');
       expect(lineChart.props.data.labels).toEqual(['1', '5', '10', '15', '20', '25', '28']);
-      // Should have 3 datasets: actual + plain avg + prevMonth (no forecast when not current month)
-      expect(lineChart.props.data.datasets).toHaveLength(3);
+      // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
+      expect(lineChart.props.data.datasets).toHaveLength(4);
     });
 
     it('includes actual dataset with correct styling', () => {
@@ -440,8 +440,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      // Should have 3 datasets: combined actual+forecast + plain avg + prevMonth
-      expect(lineChart.props.data.datasets).toHaveLength(3);
+      // Should have 4 datasets: combined actual+forecast + plain avg + prevMonth + zero baseline
+      expect(lineChart.props.data.datasets).toHaveLength(4);
 
       global.Date.mockRestore();
     });
@@ -466,8 +466,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      // Should have 3 datasets: actual + plain avg + prevMonth (no forecast)
-      expect(lineChart.props.data.datasets).toHaveLength(3);
+      // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast)
+      expect(lineChart.props.data.datasets).toHaveLength(4);
       const prevMonthDataset = lineChart.props.data.datasets[2];
       expect(prevMonthDataset.withDots).toBe(false);
     });
@@ -495,8 +495,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      // Should have 2 datasets: actual + plain avg (no prevMonth)
-      expect(lineChart.props.data.datasets).toHaveLength(2);
+      // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth)
+      expect(lineChart.props.data.datasets).toHaveLength(3);
     });
 
     it('excludes prevMonth dataset when all values are undefined', () => {
@@ -522,8 +522,8 @@ describe('BalanceHistoryCard', () => {
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
-      // Should have 2 datasets: actual + plain avg (no prevMonth since all undefined)
-      expect(lineChart.props.data.datasets).toHaveLength(2);
+      // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth since all undefined)
+      expect(lineChart.props.data.datasets).toHaveLength(3);
     });
 
     it('accepts onChartPress prop', () => {
