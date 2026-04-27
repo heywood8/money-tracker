@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.71.2](https://github.com/heywood8/money-tracker/compare/penny-v0.71.1...penny-v0.71.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* show balance graph below 0 ([#415](https://github.com/heywood8/money-tracker/issues/415)) ([810cfe4](https://github.com/heywood8/money-tracker/commit/810cfe45b7a97d9fef6776d2e9ec4d62ace7f401))
+
 ## [0.71.1](https://github.com/heywood8/money-tracker/compare/penny-v0.71.0...penny-v0.71.1) (2026-04-27)
 
 
