@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.72.0](https://github.com/heywood8/money-tracker/compare/penny-v0.71.2...penny-v0.72.0) (2026-04-27)
+
+
+### Features
+
+* **logs:** persist app logs to daily files ([#417](https://github.com/heywood8/money-tracker/issues/417)) ([7cf917b](https://github.com/heywood8/money-tracker/commit/7cf917bd74a6adb6e2fe89dc2739046f0d90afea))
+
 ## [0.71.2](https://github.com/heywood8/money-tracker/compare/penny-v0.71.1...penny-v0.71.2) (2026-04-27)
 
 
