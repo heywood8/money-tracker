@@ -595,7 +595,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         transparent
         onRequestClose={closePicker}
       >
-        <Pressable style={styles.modalOverlay} onPress={closePicker}>
+        <Pressable style={styles.pickerOverlay} onPress={closePicker}>
           <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
             {/* Breadcrumb navigation for categories */}
             {pickerState.type === 'category' && categoryNavigation.breadcrumb.length > 0 && (
@@ -773,10 +773,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pickerModalContent: {
-    borderRadius: BORDER_RADIUS.lg,
+    borderTopLeftRadius: BORDER_RADIUS.lg,
+    borderTopRightRadius: BORDER_RADIUS.lg,
     maxHeight: '70%',
     padding: SPACING.md,
-    width: '90%',
+    width: '100%',
   },
   pickerOption: {
     borderBottomWidth: 1,
@@ -789,7 +790,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   pickerOptionText: {
-    fontSize: 18,
+    fontSize: 16,
+  },
+  pickerOverlay: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   scrollContent: {
     paddingBottom: SPACING.xl,
