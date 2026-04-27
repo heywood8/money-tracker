@@ -362,7 +362,7 @@ const OperationFormFields = memo(({
               <Pressable
                 key={account.id}
                 style={[
-                  styles.categoryShortcutButton,
+                  styles.accountShortcutButton,
                   {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
                     borderColor: colors.inputBorder,
@@ -372,41 +372,24 @@ const OperationFormFields = memo(({
                 onPress={() => handleTargetPress(account.id)}
                 disabled={disabled}
               >
-                {getAccountBalance ? (
-                  <>
+                <Text
+                  style={[styles.accountShortcutName, { color: textColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {account.name}
+                </Text>
+                {getAccountBalance && (
+                  hideBalances ? (
+                    <View style={styles.hiddenBalanceSmall} />
+                  ) : (
                     <Text
-                      style={[styles.categoryShortcutText, { color: textColor }]}
+                      style={[styles.accountShortcutBalance, { color: balanceColor }]}
                       numberOfLines={1}
-                      ellipsizeMode="tail"
                     >
-                      {account.name}
+                      {getAccountBalance(account.id)}
                     </Text>
-                    <View style={styles.categoryParentRow}>
-                      <Icon name="wallet" size={14} color={balanceColor} />
-                      {hideBalances ? (
-                        <View style={styles.hiddenBalanceSmall} />
-                      ) : (
-                        <Text
-                          style={[styles.categoryShortcutParent, { color: balanceColor }]}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {getAccountBalance(account.id)}
-                        </Text>
-                      )}
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="wallet" size={18} color={textColor} />
-                    <Text
-                      style={[styles.categoryShortcutText, { color: textColor }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {account.name}
-                    </Text>
-                  </>
+                  )
                 )}
               </Pressable>
             );
@@ -505,16 +488,31 @@ const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
   },
+  accountShortcutBalance: {
+    flexShrink: 1,
+    fontSize: 10,
+  },
+  accountShortcutButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  accountShortcutName: {
+    flex: 1,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+  },
   categoryButtonsContainer: {
     flexDirection: 'row',
     gap: SPACING.xs,
     marginBottom: SPACING.md,
-  },
-  categoryParentRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 3,
-    marginTop: 1,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -543,10 +541,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.xs,
-  },
-  categoryShortcutParent: {
-    fontSize: 9,
-    textAlign: 'center',
   },
   categoryShortcutText: {
     fontSize: FONT_SIZE.xs,

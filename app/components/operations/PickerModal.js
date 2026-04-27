@@ -91,8 +91,8 @@ const PickerModal = ({
                       ]}
                     >
                       <View style={styles.accountOption}>
-                        <Text style={[styles.pickerOptionText, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]}>
+                        <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
                           {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
                         </Text>
                       </View>
@@ -163,10 +163,15 @@ const PickerModal = ({
 };
 
 const styles = StyleSheet.create({
-  accountOption: {
-    alignItems: 'flex-start',
+  accountName: {
     flex: 1,
-    justifyContent: 'center',
+    marginRight: 4,
+  },
+  accountOption: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   backButton: {
     marginRight: 8,
@@ -227,7 +232,7 @@ const styles = StyleSheet.create({
   },
   pickerSmallText: {
     fontSize: 14,
-    marginTop: 4,
+    marginLeft: 8,
   },
 });
 
