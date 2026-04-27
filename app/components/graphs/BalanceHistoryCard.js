@@ -270,10 +270,15 @@ const BalanceHistoryCard = ({
                   fromZero={!hasNegativeValues}
                   formatYLabel={hideBalances ? () => '' : (value) => {
                     const numValue = parseFloat(value);
-                    if (numValue >= 1000000) {
-                      return `${(numValue / 1000000).toFixed(0)}M`;
-                    } else if (numValue >= 1000) {
-                      return `${(numValue / 1000).toFixed(0)}K`;
+                    const absValue = Math.abs(numValue);
+                    const isNegative = numValue < 0;
+                    
+                    if (absValue >= 1000000) {
+                      const result = `${(absValue / 1000000).toFixed(0)}M`;
+                      return isNegative ? `-${result}` : result;
+                    } else if (absValue >= 1000) {
+                      const result = `${(absValue / 1000).toFixed(0)}K`;
+                      return isNegative ? `-${result}` : result;
                     }
                     return numValue.toFixed(0);
                   }}
@@ -325,9 +330,9 @@ const BalanceHistoryCard = ({
                       elements.push(
                         <SvgText
                           key="zero-label"
-                          x={paddingLeft - 4}
-                          y={yZero + 4}
-                          fontSize={10}
+                          x={paddingLeft - 10}
+                          y={yZero - 4}
+                          fontSize={12}
                           fill={colors.mutedText}
                           textAnchor="end"
                         >
