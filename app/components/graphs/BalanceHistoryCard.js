@@ -178,7 +178,7 @@ const BalanceHistoryCard = ({
                 const predictions = [];
                 for (let day = currentDay; day <= spendingPrediction.daysInMonth; day++) {
                   const daysFromNow = day - currentDay;
-                  const predictedBalance = Math.max(0, lastActualPoint.y - (spendingPrediction.dailyAverage * daysFromNow));
+                  const predictedBalance = lastActualPoint.y - (spendingPrediction.dailyAverage * daysFromNow);
                   predictions.push({ x: day, y: predictedBalance });
                 }
                 return predictions;
@@ -213,12 +213,14 @@ const BalanceHistoryCard = ({
                 maxBalance * (1 - (day - 1) / (daysInMonth - 1)),
               );
 
-              // Calculate max value from all datasets to determine Y-axis scale
+              // Calculate max/min value from all datasets to determine Y-axis scale
               const forecastValues = combinedActualForecast.filter(v => v !== undefined);
               const prevMonthValues = (balanceHistoryData.prevMonth || []).filter(v => v !== undefined);
 
               const allValues = [...actualValues, ...forecastValues, ...prevMonthValues, ...plainAvgData];
               const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
+              const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
+              const hasNegativeValues = minValue < 0;
 
               // Calculate nice scale for Y-axis
               const { max: niceMax, interval: niceInterval } = calculateNiceScale(maxValue);
@@ -250,6 +252,13 @@ const BalanceHistoryCard = ({
                         strokeWidth: 2,
                         withDots: false,
                       }] : []),
+                      // Zero baseline (always drawn so the 0 line is always visible)
+                      {
+                        data: balanceHistoryData.labels.map(() => 0),
+                        color: () => 'rgba(128, 128, 128, 0.5)',
+                        strokeWidth: 1,
+                        withDots: false,
+                      },
                     ],
                   }}
                   width={screenWidth - 64}
@@ -258,7 +267,7 @@ const BalanceHistoryCard = ({
                   yAxisSuffix=""
                   yAxisInterval={niceInterval}
                   segments={4}
-                  fromZero={true}
+                  fromZero={!hasNegativeValues}
                   formatYLabel={hideBalances ? () => '' : (value) => {
                     const numValue = parseFloat(value);
                     if (numValue >= 1000000) {
@@ -297,30 +306,54 @@ const BalanceHistoryCard = ({
                       strokeDasharray: '0',
                     },
                   }}
-                  decorator={isCurrentMonth ? () => {
-                    // Draw vertical line at current day to show today
+                  decorator={() => {
                     const chartWidth = screenWidth - 64;
-                    const paddingLeft = 64; // Y-axis label space
+                    const paddingLeft = 64;
                     const paddingRight = 16;
-                    const dataLength = balanceHistoryData.labels.length;
                     const usableWidth = chartWidth - paddingLeft - paddingRight;
+                    const dataLength = balanceHistoryData.labels.length;
                     const xStep = usableWidth / (dataLength - 1);
-                    const todayIndex = currentDay - 1; // 0-indexed
-                    const xPosition = paddingLeft + (todayIndex * xStep);
+                    const chartTop = 12;
+                    const chartBottom = 181;
+                    const chartAreaHeight = chartBottom - chartTop;
 
-                    return (
-                      <G>
+                    const elements = [];
+
+                    // Zero axis label — only needed when negatives exist; chart's own "0" handles the positive-only case
+                    if (hasNegativeValues && maxValue !== minValue) {
+                      const yZero = chartTop + (maxValue / (maxValue - minValue)) * chartAreaHeight;
+                      elements.push(
+                        <SvgText
+                          key="zero-label"
+                          x={paddingLeft - 4}
+                          y={yZero + 4}
+                          fontSize={10}
+                          fill={colors.mutedText}
+                          textAnchor="end"
+                        >
+                          {/* eslint-disable-next-line react-native/no-raw-text */}
+                          {'0'}
+                        </SvgText>,
+                      );
+                    }
+
+                    if (isCurrentMonth) {
+                      const todayIndex = currentDay - 1;
+                      const xPosition = paddingLeft + (todayIndex * xStep);
+                      elements.push(
                         <Line
+                          key="today-line"
                           x1={xPosition}
-                          y1={12}
+                          y1={chartTop}
                           x2={xPosition}
-                          y2={181}
+                          y2={chartBottom}
                           stroke={colors.primary}
                           strokeWidth={1}
                           strokeDasharray="4,4"
                           opacity={0.6}
-                        />
+                        />,
                         <SvgText
+                          key="today-label"
                           x={xPosition}
                           y={10}
                           fontSize={10}
@@ -329,10 +362,12 @@ const BalanceHistoryCard = ({
                           fontWeight="bold"
                         >
                           {currentDay}
-                        </SvgText>
-                      </G>
-                    );
-                  } : undefined}
+                        </SvgText>,
+                      );
+                    }
+
+                    return elements.length > 0 ? <G>{elements}</G> : null;
+                  }}
                   bezier
                   withInnerLines={true}
                   withOuterLines={true}
@@ -407,7 +442,7 @@ const BalanceHistoryCard = ({
             const hasForecastData = spendingPrediction && isCurrentMonth;
             if (hasForecastData && actualCurrent !== undefined) {
               const daysRemaining = spendingPrediction.daysInMonth - now.getDate();
-              forecastEnd = Math.max(0, actualCurrent - (spendingPrediction.dailyAverage * daysRemaining));
+              forecastEnd = actualCurrent - (spendingPrediction.dailyAverage * daysRemaining);
               forecastDailyAvg = -spendingPrediction.dailyAverage;
             }
 

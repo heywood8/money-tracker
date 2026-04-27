@@ -108,7 +108,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
           // Extend trend line to end of month
           trendData = allDays.map(day => ({
             x: day,
-            y: Math.max(0, trend.intercept + trend.slope * (day - 1)),
+            y: trend.intercept + trend.slope * (day - 1),
           }));
         }
       }
