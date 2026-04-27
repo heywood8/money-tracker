@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal, FlatList, Platform } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import ModalBlurOverlay from './ModalBlurOverlay';
@@ -9,7 +9,7 @@ import ModalBlurOverlay from './ModalBlurOverlay';
  * SimplePicker - A picker component for Android
  * Uses native HTML select on web, custom modal picker on Android
  */
-const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon }) => {
+const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon, closeLabel }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   // Defensive check for undefined items with warning
@@ -94,38 +94,45 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, l
       <Modal
         visible={modalVisible}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
-          activeOpacity={1}
           onPress={() => setModalVisible(false)}
         >
-          <View style={[styles.modalContent, { backgroundColor: safeColors.surface }]}>
+          <Pressable style={[styles.modalContent, { backgroundColor: safeColors.card ?? safeColors.surface }]} onPress={() => {}}>
             <FlatList
               data={safeItems}
               keyExtractor={(item) => String(item.value)}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
+                <Pressable
+                  style={({ pressed }) => [
                     styles.modalItem,
-                    { borderBottomColor: safeColors.border },
-                    item.value === value && { backgroundColor: safeColors.selected },
+                    { borderColor: safeColors.border },
+                    pressed && { backgroundColor: safeColors.selected },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
                     setModalVisible(false);
                   }}
                 >
-                  <Text style={[styles.modalItemText, { color: safeColors.text }]}>
+                  <Text style={[styles.modalItemText, { color: safeColors.text }]} numberOfLines={1}>
                     {item.label}
                   </Text>
-                </TouchableOpacity>
+                  {item.subLabel ? (
+                    <Text style={[styles.modalItemSubText, { color: safeColors.mutedText }]} numberOfLines={1}>
+                      {item.subLabel}
+                    </Text>
+                  ) : null}
+                </Pressable>
               )}
             />
-          </View>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              <Text style={[styles.closeButtonText, { color: safeColors.primary }]}>{closeLabel}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
     </>
   );
@@ -158,25 +165,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  // Close button
+  closeButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   // Modal styles
   modalContent: {
-    borderRadius: 8,
-    maxHeight: '60%',
-    overflow: 'hidden',
-    width: '80%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    width: '100%',
   },
   modalItem: {
+    alignItems: 'center',
     borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 16,
+    paddingVertical: 12,
+  },
+  modalItemSubText: {
+    fontSize: 14,
+    marginLeft: 8,
   },
   modalItemText: {
+    flex: 1,
     fontSize: 16,
+    marginRight: 4,
   },
   modalOverlay: {
     alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
 });
 
@@ -201,6 +226,7 @@ SimplePicker.propTypes = {
   onValueChange: PropTypes.func,
   items: PropTypes.arrayOf(PropTypes.shape({
     label: PropTypes.string,
+    subLabel: PropTypes.string,
     value: PropTypes.any,
   })),
   style: PropTypes.oneOfType([PropTypes.object, PropTypes.array, PropTypes.number]),
@@ -213,10 +239,12 @@ SimplePicker.propTypes = {
     mutedText: PropTypes.string,
   }),
   leftIcon: PropTypes.string,
+  closeLabel: PropTypes.string,
 };
 
 SimplePicker.defaultProps = {
   items: [],
+  closeLabel: 'Close',
   colors: {
     text: '#000',
     surface: '#fff',

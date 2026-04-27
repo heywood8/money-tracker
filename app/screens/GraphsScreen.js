@@ -7,6 +7,8 @@ import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
 import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import { formatAmount } from '../services/currency';
+import currenciesJson from '../../assets/currencies.json';
 import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
@@ -118,12 +120,13 @@ const GraphsScreen = () => {
     }
   }, [accounts, selectedCurrency]);
 
-  // Initialize default account (display_order=0)
+  // Initialize default account (display_order=0, non-hidden)
   useEffect(() => {
-    if (accounts.length > 0 && !selectedAccount) {
-      const defaultAccount = accounts.find(acc => acc.displayOrder === 0) || accounts[0];
+    const visibleAccounts = accounts.filter(acc => !acc.hidden);
+    if (visibleAccounts.length > 0 && !selectedAccount) {
+      const defaultAccount = visibleAccounts.find(acc => acc.displayOrder === 0) || visibleAccounts[0];
       setSelectedAccount(defaultAccount.id);
-    } else if (accounts.length === 0 && selectedAccount) {
+    } else if (visibleAccounts.length === 0 && selectedAccount) {
       setSelectedAccount(null);
     }
   }, [accounts, selectedAccount]);
@@ -244,7 +247,17 @@ const GraphsScreen = () => {
   );
 
   const accountItems = useMemo(() =>
-    accounts.map(acc => ({ label: acc.name, value: acc.id })),
+    accounts
+      .filter(acc => !acc.hidden)
+      .map(acc => {
+        const currencyInfo = currenciesJson[acc.currency];
+        const symbol = currencyInfo ? currencyInfo.symbol : acc.currency;
+        return {
+          label: acc.name,
+          value: acc.id,
+          subLabel: `${symbol}${formatAmount(acc.balance, acc.currency)}`,
+        };
+      }),
   [accounts],
   );
 
@@ -426,6 +439,7 @@ const GraphsScreen = () => {
               accounts={accounts}
               spendingPrediction={spendingPrediction}
               isCurrentMonth={isCurrentMonth}
+              closeLabel={t('close')}
             />
           )}
 

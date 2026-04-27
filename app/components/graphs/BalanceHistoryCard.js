@@ -107,6 +107,7 @@ const BalanceHistoryCard = ({
   accounts,
   spendingPrediction,
   isCurrentMonth,
+  closeLabel,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
@@ -149,6 +150,7 @@ const BalanceHistoryCard = ({
             colors={colors}
             leftIcon="bank"
             style={styles.accountPickerInner}
+            closeLabel={closeLabel}
           />
         </View>
       </View>
@@ -579,6 +581,7 @@ BalanceHistoryCard.propTypes = {
     percentElapsed: PropTypes.number,
   }),
   isCurrentMonth: PropTypes.bool,
+  closeLabel: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
