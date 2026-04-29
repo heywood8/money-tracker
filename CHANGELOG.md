@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.0](https://github.com/heywood8/money-tracker/compare/penny-v0.72.0...penny-v0.73.0) (2026-04-29)
+
+
+### Features
+
+* **graphs:** show account picker as bottom sheet with balance ([#419](https://github.com/heywood8/money-tracker/issues/419)) ([631d634](https://github.com/heywood8/money-tracker/commit/631d634cf5a0b417254742893123cbb078345fda))
+
 ## [0.72.0](https://github.com/heywood8/money-tracker/compare/penny-v0.71.2...penny-v0.72.0) (2026-04-27)
 
 
