@@ -140,15 +140,6 @@ describe('CategoriesScreen', () => {
       expect(useCategories).toHaveBeenCalled();
     });
 
-    it('uses BudgetsContext for budget data', () => {
-      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
-      const { useBudgets } = require('../../app/contexts/BudgetsContext');
-
-      render(<CategoriesScreen />);
-
-      expect(useBudgets).toHaveBeenCalled();
-    });
-
     it('uses DialogContext for dialogs', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useDialog } = require('../../app/contexts/DialogContext');

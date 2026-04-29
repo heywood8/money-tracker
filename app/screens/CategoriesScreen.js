@@ -7,10 +7,7 @@ import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from 
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
-import { useBudgets } from '../contexts/BudgetsContext';
 import CategoryModal from '../modals/CategoryModal';
-import BudgetModal from '../modals/BudgetModal';
-import BudgetProgressBar from '../components/BudgetProgressBar';
 import ListCard from '../components/ListCard';
 
 const CategoriesScreen = () => {
@@ -18,15 +15,10 @@ const CategoriesScreen = () => {
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();
-  const { hasActiveBudget, getBudgetForCategory } = useBudgets();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isNew, setIsNew] = useState(false);
-
-  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
-  const [budgetCategory, setBudgetCategory] = useState(null);
-  const [isBudgetNew, setIsBudgetNew] = useState(false);
 
   const [viewMode, setViewMode] = useState('grid');
   const [gridParentId, setGridParentId] = useState(null);
@@ -43,17 +35,7 @@ const CategoriesScreen = () => {
     setModalVisible(true);
   };
 
-  const handleSetBudget = useCallback((category) => {
-    const hasBudget = hasActiveBudget(category.id);
-    const existingBudget = hasBudget ? getBudgetForCategory(category.id) : null;
-
-    setBudgetCategory(category);
-    setIsBudgetNew(!existingBudget);
-    setBudgetModalVisible(true);
-  }, [hasActiveBudget, getBudgetForCategory]);
-
   const handleCategoryLongPress = useCallback((category) => {
-    const hasBudget = hasActiveBudget(category.id);
     const categoryName = category.nameKey ? t(category.nameKey) : category.name;
 
     showDialog(
@@ -65,16 +47,12 @@ const CategoriesScreen = () => {
           onPress: () => handleEditCategory(category),
         },
         {
-          text: hasBudget ? t('edit_budget') : t('set_budget'),
-          onPress: () => handleSetBudget(category),
-        },
-        {
           text: t('cancel'),
           style: 'cancel',
         },
       ],
     );
-  }, [t, handleEditCategory, handleSetBudget, hasActiveBudget, showDialog]);
+  }, [t, handleEditCategory, showDialog]);
 
   // Flatten the category tree based on expanded state (excluding shadow categories)
   const flattenedCategories = useMemo(() => {
@@ -147,8 +125,6 @@ const CategoriesScreen = () => {
     const isExpanded = expandedIds.has(category.id);
     const indentWidth = depth * 20;
     const categoryType = category.category_type || category.categoryType || 'expense';
-    const hasBudget = hasActiveBudget(category.id);
-    const budget = hasBudget ? getBudgetForCategory(category.id) : null;
 
     return (
       <View>
@@ -199,28 +175,11 @@ const CategoriesScreen = () => {
               {category.nameKey ? t(category.nameKey) : category.name}
             </Text>
 
-            {/* Budget Indicator */}
-            {hasBudget && (
-              <Icon
-                name="cash-clock"
-                size={18}
-                color={colors.primary}
-                style={styles.budgetIcon}
-                accessible={false}
-              />
-            )}
           </View>
         </ListCard>
-
-        {/* Budget Progress Bar */}
-        {budget && (
-          <View style={[styles.progressBarContainer, { paddingLeft: HORIZONTAL_PADDING + indentWidth }]}>
-            <BudgetProgressBar budgetId={budget.id} compact={false} showDetails={true} />
-          </View>
-        )}
       </View>
     );
-  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleCategoryLongPress, hasActiveBudget, getBudgetForCategory]);
+  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleCategoryLongPress]);
 
   if (loading) {
     return (
@@ -328,15 +287,6 @@ const CategoriesScreen = () => {
         category={editingCategory}
         isNew={isNew}
       />
-
-      <BudgetModal
-        visible={budgetModalVisible}
-        onClose={() => setBudgetModalVisible(false)}
-        budget={isBudgetNew ? null : getBudgetForCategory(budgetCategory?.id)}
-        categoryId={budgetCategory?.id}
-        categoryName={budgetCategory?.nameKey ? t(budgetCategory.nameKey) : budgetCategory?.name}
-        isNew={isBudgetNew}
-      />
     </View>
   );
 };
@@ -350,9 +300,6 @@ const styles = StyleSheet.create({
   backLabel: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  budgetIcon: {
-    marginLeft: SPACING.sm,
   },
   categoryContent: {
     alignItems: 'center',
@@ -424,11 +371,6 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  progressBarContainer: {
-    paddingBottom: SPACING.md,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.sm,
   },
   sectionMarginTop: {
     marginTop: SPACING.md,
