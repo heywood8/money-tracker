@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.1](https://github.com/heywood8/money-tracker/compare/penny-v0.73.0...penny-v0.73.1) (2026-04-29)
+
+
+### Code Refactoring
+
+* extract AddFAB into reusable component with consistent styling ([#422](https://github.com/heywood8/money-tracker/issues/422)) ([a418a9b](https://github.com/heywood8/money-tracker/commit/a418a9baafc105e42e963c280b97a8856833ca10))
+
 ## [0.73.0](https://github.com/heywood8/money-tracker/compare/penny-v0.72.0...penny-v0.73.0) (2026-04-29)
 
 
