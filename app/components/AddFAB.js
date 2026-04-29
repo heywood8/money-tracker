@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { FAB } from 'react-native-paper';
+import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { SPACING } from '../styles/layout';
 
@@ -24,6 +25,13 @@ const AddFAB = ({ onPress, testID, accessibilityLabel, accessibilityHint }) => {
       accessibilityHint={accessibilityHint}
     />
   );
+};
+
+AddFAB.propTypes = {
+  onPress: PropTypes.func.isRequired,
+  testID: PropTypes.string,
+  accessibilityLabel: PropTypes.string,
+  accessibilityHint: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
