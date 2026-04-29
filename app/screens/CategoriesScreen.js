@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, FAB, ActivityIndicator } from 'react-native-paper';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import AddFAB from '../components/AddFAB';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -271,11 +272,8 @@ const CategoriesScreen = () => {
         />
       )}
 
-      <FAB
+      <AddFAB
         testID="categories-add-fab"
-        icon="plus"
-        style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
-        color={colors.text}
         onPress={handleAddCategory}
         accessibilityLabel={t('add_category')}
         accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
@@ -330,19 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: SPACING.xs,
     width: 32,
-  },
-  fab: {
-    borderRadius: 28,
-    borderWidth: 1,
-    bottom: 100,
-    elevation: 8,
-    margin: SPACING.lg,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   gridCell: {
     alignItems: 'center',

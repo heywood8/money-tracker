@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Modal as RNModal } from 'react-native';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
-import { Text, TextInput as PaperTextInput, Button, FAB, Portal, Modal, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
+import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
+import AddFAB from '../components/AddFAB';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -751,11 +752,8 @@ export default function AccountsScreen() {
         )}
       </ScrollView>
 
-      <FAB
+      <AddFAB
         testID="accounts-add-fab"
-        icon="plus"
-        style={[styles.fab, { backgroundColor: colors.text }]}
-        color={colors.background}
         onPress={addAccountHandler}
         accessibilityLabel={t('add_account') || 'Add Account'}
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
@@ -1038,14 +1036,6 @@ const styles = StyleSheet.create({
   errorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fab: {
-    borderRadius: 28,
-    bottom: 100,
-    elevation: 4,
-    margin: SPACING.lg,
-    position: 'absolute',
-    right: 0,
   },
   hiddenBalance: {
     backgroundColor: 'rgba(120, 120, 120, 0.25)',
