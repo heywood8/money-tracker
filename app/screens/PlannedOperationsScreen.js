@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Pressable } from 'react-native';
-import { Text, FAB, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Text, ActivityIndicator, Snackbar } from 'react-native-paper';
+import AddFAB from '../components/AddFAB';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
@@ -276,13 +277,8 @@ export default function PlannedOperationsScreen() {
         removeClippedSubviews={true}
       />
 
-      {/* FAB */}
-      <FAB
+      <AddFAB
         testID="planned-add-fab"
-        icon="plus"
-        label={t('add_planned_operation')}
-        style={[styles.fab, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
-        color={colors.text}
         onPress={handleAdd}
         accessibilityLabel={t('add_planned_operation')}
       />
@@ -332,19 +328,6 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     width: 36,
-  },
-  fab: {
-    borderRadius: 28,
-    borderWidth: 1,
-    bottom: 100,
-    elevation: 8,
-    margin: SPACING.lg,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   iconContainer: {
     alignItems: 'center',
