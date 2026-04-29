@@ -1,6 +1,6 @@
 appId: com.heywood8.monkeep.dev
 ---
-# Extended local screenshot flow — covers all 26 screens in light + dark.
+# Extended local screenshot flow — covers all 24 screens in light + dark.
 # Run via: bash scripts/screenshot.sh
 # Prerequisites: emulator running, app installed.
 
@@ -249,13 +249,7 @@ appId: com.heywood8.monkeep.dev
 - waitForAnimationToEnd:
     timeout: 250
 - takeScreenshot: local/screenshots/25_material_dialog_light
-
-# 26: Budget modal
-- tapOn: "SET BUDGET"
-- waitForAnimationToEnd:
-    timeout: 250
-- takeScreenshot: local/screenshots/26_budget_modal_light
-- pressKey: Back
+- tapOn: "CANCEL"
 - waitForAnimationToEnd:
     timeout: 250
 
@@ -535,11 +529,7 @@ appId: com.heywood8.monkeep.dev
 - waitForAnimationToEnd:
     timeout: 250
 - takeScreenshot: local/screenshots/25_material_dialog_dark
-- tapOn: "SET BUDGET"
-- waitForAnimationToEnd:
-    timeout: 250
-- takeScreenshot: local/screenshots/26_budget_modal_dark
-- pressKey: Back
+- tapOn: "CANCEL"
 - waitForAnimationToEnd:
     timeout: 250
 
