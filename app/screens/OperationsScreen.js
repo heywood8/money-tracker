@@ -14,6 +14,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
+import { getDistinctDescriptions } from '../services/OperationsDB';
 import OperationModal from '../modals/OperationModal';
 import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
@@ -45,6 +46,7 @@ const OperationsScreen = () => {
   const {
     deleteOperation,
     addOperation,
+    updateOperation,
     validateOperation,
     loadMoreOperations,
     jumpToDate,
@@ -64,6 +66,8 @@ const OperationsScreen = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [scrollToDateString, setScrollToDateString] = useState(null);
   const [pendingScroll, setPendingScroll] = useState(false);
+  const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
+  const [pendingSuggestions, setPendingSuggestions] = useState([]);
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -373,7 +377,11 @@ const OperationsScreen = () => {
     }
 
     try {
-      await addOperation(operationData);
+      // Clear any previous suggestion before saving
+      setPendingSuggestionId(null);
+      setPendingSuggestions([]);
+
+      const createdOperation = await addOperation(operationData);
 
       // Save last accessed account
       if (quickAddValues.accountId) {
@@ -384,8 +392,19 @@ const OperationsScreen = () => {
       resetForm();
 
       Keyboard.dismiss();
+
+      // Check for matching description suggestions for this category
+      const effectiveCategoryId = operationData.categoryId;
+      if (effectiveCategoryId && createdOperation?.id) {
+        const suggestions = await getDistinctDescriptions(3, effectiveCategoryId);
+        if (suggestions.length > 0) {
+          setPendingSuggestionId(createdOperation.id);
+          setPendingSuggestions(suggestions);
+        }
+      }
     } catch (error) {
-      // Error already shown in addOperation
+      // Errors from addOperation are already shown via dialog.
+      // Errors from getDistinctDescriptions are non-critical — suggestion row simply won't appear.
     }
   }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
 
@@ -407,6 +426,22 @@ const OperationsScreen = () => {
     // Pass undefined for categoryId override, pass toAccountId override
     await handleQuickAdd(undefined, toAccountId);
   }, [resetForm, closePicker, handleQuickAdd]);
+
+  const handleApplySuggestion = useCallback(async (description) => {
+    if (!pendingSuggestionId) return;
+    const idToUpdate = pendingSuggestionId;
+    // Clear state optimistically before the await — if updateOperation fails,
+    // the dialog from OperationsActionsContext will show the error, but the
+    // suggestion row stays dismissed (intentional: avoids a broken retry loop).
+    setPendingSuggestionId(null);
+    setPendingSuggestions([]);
+    await updateOperation(idToUpdate, { description });
+  }, [pendingSuggestionId, updateOperation]);
+
+  const handleDismissSuggestion = useCallback(() => {
+    setPendingSuggestionId(null);
+    setPendingSuggestions([]);
+  }, []);
 
   // Group operations by date into date-group objects for the list
   const groupedOperations = useMemo(() => {
@@ -581,6 +616,10 @@ const OperationsScreen = () => {
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onContentSizeChange={handleContentSizeChange}
         headerComponent={quickAddFormComponent}
+        pendingSuggestionId={pendingSuggestionId}
+        pendingSuggestions={pendingSuggestions}
+        onApplySuggestion={handleApplySuggestion}
+        onDismissSuggestion={handleDismissSuggestion}
       />
 
       {/* Picker Modal for Account/Category selection */}
