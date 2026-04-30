@@ -403,7 +403,8 @@ const OperationsScreen = () => {
         }
       }
     } catch (error) {
-      // Error already shown in addOperation
+      // Errors from addOperation are already shown via dialog.
+      // Errors from getDistinctDescriptions are non-critical — suggestion row simply won't appear.
     }
   }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
 
@@ -429,6 +430,9 @@ const OperationsScreen = () => {
   const handleApplySuggestion = useCallback(async (description) => {
     if (!pendingSuggestionId) return;
     const idToUpdate = pendingSuggestionId;
+    // Clear state optimistically before the await — if updateOperation fails,
+    // the dialog from OperationsActionsContext will show the error, but the
+    // suggestion row stays dismissed (intentional: avoids a broken retry loop).
     setPendingSuggestionId(null);
     setPendingSuggestions([]);
     await updateOperation(idToUpdate, { description });
