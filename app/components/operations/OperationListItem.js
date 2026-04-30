@@ -4,6 +4,7 @@ import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
+import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 
 const OperationListItem = ({
@@ -17,6 +18,9 @@ const OperationListItem = ({
   isLast,
   onPress,
   testID,
+  suggestionChips,
+  onApplySuggestion,
+  onDismissSuggestion,
 }) => {
   const isExpense = operation.type === 'expense';
   const isIncome = operation.type === 'income';
@@ -110,6 +114,15 @@ const OperationListItem = ({
         </View>
       </TouchableRipple>
 
+      {suggestionChips && suggestionChips.length > 0 && (
+        <DescriptionSuggestionRow
+          chips={suggestionChips}
+          colors={colors}
+          onApply={onApplySuggestion}
+          onDismiss={onDismissSuggestion}
+        />
+      )}
+
       {/* Separator line between items (not after the last one) */}
       {!isLast && (
         <View style={[styles.separator, { backgroundColor: colors.border }]} />
@@ -139,11 +152,17 @@ OperationListItem.propTypes = {
   isLast: PropTypes.bool,
   onPress: PropTypes.func.isRequired,
   testID: PropTypes.string,
+  suggestionChips: PropTypes.arrayOf(PropTypes.string),
+  onApplySuggestion: PropTypes.func,
+  onDismissSuggestion: PropTypes.func,
 };
 
 OperationListItem.defaultProps = {
   isLast: false,
   testID: undefined,
+  suggestionChips: null,
+  onApplySuggestion: () => {},
+  onDismissSuggestion: () => {},
 };
 
 const styles = StyleSheet.create({
