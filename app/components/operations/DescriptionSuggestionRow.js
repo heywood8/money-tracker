@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
-import { SPACING, FONT_SIZE, BORDER_RADIUS } from '../../styles/designTokens';
+import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/designTokens';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -9,10 +9,10 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 200,
+      duration: DURATION.fast,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
+  }, []);
 
   return (
     <Animated.View
@@ -93,4 +93,4 @@ DescriptionSuggestionRow.propTypes = {
   onDismiss: PropTypes.func.isRequired,
 };
 
-export default DescriptionSuggestionRow;
+export default memo(DescriptionSuggestionRow);
