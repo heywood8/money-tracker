@@ -33,6 +33,7 @@ import currencies from '../../assets/currencies.json';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useOperationForm from '../hooks/useOperationForm';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
+import ModalHeader from '../components/ModalHeader';
 import useOperationPicker from '../hooks/useOperationPicker';
 
 /**
@@ -372,11 +373,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
                 >
-                  {isNew && (
-                    <Text style={[styles.modalTitle, { color: colors.text }]}> 
-                      {t('add_operation')}
-                    </Text>
-                  )}
+                  {isNew && <ModalHeader title={t('add_operation')} />}
 
                   {/* Shared Form Fields: Type selector, Amount, Account(s), Category, Multi-currency */}
                   <OperationFormFields
@@ -747,12 +744,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
   },
   pickerButtonHalf: {
     alignItems: 'center',

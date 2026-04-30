@@ -2,8 +2,10 @@ import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Modal as RNModal } from 'react-native';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
-import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, ActivityIndicator, Switch } from 'react-native-paper';
+import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, Switch } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
+import LoadingView from '../components/LoadingView';
+import EmptyState from '../components/EmptyState';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
@@ -679,14 +681,7 @@ export default function AccountsScreen() {
   ), [colors.border]);
 
   if (loading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" />
-        <Text variant="bodyLarge" style={[styles.loadingText, { color: colors.mutedText }]}>
-          {t('loading_accounts') || 'Loading accounts...'}
-        </Text>
-      </View>
-    );
+    return <LoadingView message={t('loading_accounts') || 'Loading accounts...'} />;
   }
 
   if (error) {
@@ -713,9 +708,7 @@ export default function AccountsScreen() {
         {/* Accounts Grouped Card */}
         <View style={[styles.accountsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {enhancedAccounts.length === 0 ? (
-            <Text style={[styles.listEmptyText, { color: colors.mutedText }]}>
-              {t('no_accounts') || 'No accounts yet.'}
-            </Text>
+            <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
           ) : (
             <DraggableFlatList
               data={enhancedAccounts}
@@ -1054,17 +1047,6 @@ const styles = StyleSheet.create({
   },
   listContentContainer: {
     paddingBottom: SPACING.xl,
-  },
-  listEmptyText: {
-    padding: SPACING.xl,
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: SPACING.md,
   },
   modalButton: {
     flex: 1,

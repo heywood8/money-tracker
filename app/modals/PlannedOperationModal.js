@@ -25,6 +25,7 @@ import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
 import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../styles/designTokens';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
+import ModalHeader from '../components/ModalHeader';
 
 const TYPE_OPTIONS = [
   { key: 'expense', icon: 'arrow-up', colorKey: 'expense' },
@@ -241,9 +242,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
             <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
               <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {isNew ? t('add_planned_operation') : t('edit_planned_operation')}
-                </Text>
+                <ModalHeader title={isNew ? t('add_planned_operation') : t('edit_planned_operation')} />
 
                 {/* Name Input */}
                 <View style={styles.inputContainer}>
@@ -506,12 +505,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-  },
-  modalTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
   },
   multilineInput: {
     height: 70,

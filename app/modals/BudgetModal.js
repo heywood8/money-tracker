@@ -24,6 +24,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import currencies from '../../assets/currencies.json';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
+import ModalHeader from '../components/ModalHeader';
 
 export default function BudgetModal({ visible, onClose, budget, categoryId, categoryName, isNew }) {
   const { colors } = useThemeColors();
@@ -239,9 +240,7 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
               >
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {isNew ? t('set_budget') : t('edit_budget')}
-                </Text>
+                <ModalHeader title={isNew ? t('set_budget') : t('edit_budget')} />
 
                 <Text style={[styles.categoryLabel, { color: colors.mutedText }]}>
                   {t('budget_for_category')}: {categoryName}
@@ -672,12 +671,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   pickerButton: {
     borderRadius: 4,
