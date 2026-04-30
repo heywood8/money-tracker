@@ -30,6 +30,7 @@ EmptyState.propTypes = {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    flexGrow: 1,
     gap: SPACING.md,
     justifyContent: 'center',
     paddingVertical: SPACING.xxl,

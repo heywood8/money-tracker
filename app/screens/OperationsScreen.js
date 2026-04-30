@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
 import LoadingView from '../components/LoadingView';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
