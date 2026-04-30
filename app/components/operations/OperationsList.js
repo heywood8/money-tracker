@@ -37,6 +37,10 @@ const OperationsList = forwardRef(({
   onScrollToIndexFailed,
   onContentSizeChange,
   headerComponent,
+  pendingSuggestionId,
+  pendingSuggestions,
+  onApplySuggestion,
+  onDismissSuggestion,
 }, ref) => {
 
   // Format date label for the separator header
@@ -167,12 +171,15 @@ const OperationsList = forwardRef(({
               formatCurrency={formatCurrency}
               isLast={index === item.operations.length - 1}
               onPress={() => onEditOperation(operation)}
+              suggestionChips={operation.id === pendingSuggestionId ? pendingSuggestions : null}
+              onApplySuggestion={onApplySuggestion}
+              onDismissSuggestion={onDismissSuggestion}
             />
           ))}
         </View>
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, onEditOperation, onDateSeparatorPress]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, onEditOperation, onDateSeparatorPress, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
 
   return (
     <FlatList
@@ -181,7 +188,7 @@ const OperationsList = forwardRef(({
       data={groupedOperations}
       renderItem={renderItem}
       keyExtractor={item => item.id}
-      extraData={[accounts, categories]}
+      extraData={[accounts, categories, pendingSuggestionId]}
       ListHeaderComponent={headerComponent}
       ListFooterComponent={renderFooter}
       ListEmptyComponent={
@@ -229,6 +236,10 @@ OperationsList.propTypes = {
   onScrollToIndexFailed: PropTypes.func,
   onContentSizeChange: PropTypes.func,
   headerComponent: PropTypes.element,
+  pendingSuggestionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  pendingSuggestions: PropTypes.arrayOf(PropTypes.string),
+  onApplySuggestion: PropTypes.func,
+  onDismissSuggestion: PropTypes.func,
 };
 
 OperationsList.defaultProps = {
@@ -238,6 +249,10 @@ OperationsList.defaultProps = {
   onScrollToIndexFailed: () => {},
   onContentSizeChange: () => {},
   headerComponent: null,
+  pendingSuggestionId: null,
+  pendingSuggestions: [],
+  onApplySuggestion: () => {},
+  onDismissSuggestion: () => {},
 };
 
 const styles = StyleSheet.create({
