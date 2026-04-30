@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import LoadingView from '../components/LoadingView';
 import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -559,14 +560,7 @@ const OperationsScreen = () => {
   }, []);
 
   if (operationsLoading || accountsLoading || categoriesLoading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.mutedText }]}> 
-          {t('loading_operations')}
-        </Text>
-      </View>
-    );
+    return <LoadingView message={t('loading_operations')} />;
   }
 
   return (
@@ -704,14 +698,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    marginTop: SPACING.md,
   },
   resetFilterButton: {
     alignItems: 'center',

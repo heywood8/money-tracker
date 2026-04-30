@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { Text } from 'react-native-paper';
+import LoadingView from '../components/LoadingView';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import AddFAB from '../components/AddFAB';
+import EmptyState from '../components/EmptyState';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
@@ -183,14 +185,7 @@ const CategoriesScreen = () => {
   }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleCategoryLongPress]);
 
   if (loading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" />
-        <Text variant="bodyLarge" style={[styles.sectionMarginTop, { color: colors.mutedText }]}> 
-          {t('loading_categories') || 'Loading categories...'}
-        </Text>
-      </View>
-    );
+    return <LoadingView message={t('loading_categories') || 'Loading categories...'} />;
   }
 
   return (
@@ -244,9 +239,7 @@ const CategoriesScreen = () => {
           numColumns={3}
           columnWrapperStyle={styles.gridRow}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
-            </View>
+            <EmptyState icon="shape-outline" message={t('no_categories')} />
           }
           contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
           windowSize={10}
@@ -259,9 +252,7 @@ const CategoriesScreen = () => {
           renderItem={renderCategory}
           keyExtractor={item => item.id}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={{ color: colors.mutedText }}>{t('no_categories')}</Text>
-            </View>
+            <EmptyState icon="shape-outline" message={t('no_categories')} />
           }
           contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : styles.listContent}
           windowSize={10}
@@ -313,12 +304,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingTop: TOP_CONTENT_SPACING,
-  },
   emptyList: {
     flex: 1,
   },
@@ -352,13 +337,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 180,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionMarginTop: {
-    marginTop: SPACING.md,
   },
   toggleBar: {
     alignItems: 'center',

@@ -20,6 +20,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import IconPicker from '../components/IconPicker';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
+import ModalHeader from '../components/ModalHeader';
 import PropTypes from 'prop-types';
 
 export default function CategoryModal({ visible, onClose, category, isNew }) {
@@ -154,9 +155,7 @@ export default function CategoryModal({ visible, onClose, category, isNew }) {
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
               >
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {isNew ? t('add_category') : t('edit_category')}
-                </Text>
+                <ModalHeader title={isNew ? t('add_category') : t('edit_category')} />
 
                 {/* Name Input */}
                 <TextInput
@@ -493,12 +492,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
   },
   parentOption: {
     alignItems: 'center',

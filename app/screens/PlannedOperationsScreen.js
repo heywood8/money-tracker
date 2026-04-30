@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Pressable } from 'react-native';
-import { Text, ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
+import LoadingView from '../components/LoadingView';
+import EmptyState from '../components/EmptyState';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING } from '../styles/layout';
@@ -208,21 +210,12 @@ export default function PlannedOperationsScreen() {
 
   const renderEmpty = useCallback(() => {
     if (loading) {
-      return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
+      return <LoadingView />;
     }
     return (
-      <View style={styles.emptyContainer}>
-        <Icon name="calendar-blank-outline" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          {t('no_planned_operations')}
-        </Text>
-      </View>
+      <EmptyState icon="calendar-blank-outline" message={t('no_planned_operations')} />
     );
-  }, [loading, colors, t]);
+  }, [loading, t]);
 
   const recurringTabStyle = {
     backgroundColor: activeTab === 'recurring' ? colors.primary + '1A' : 'transparent',
@@ -310,17 +303,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    gap: SPACING.md,
-    justifyContent: 'center',
-    paddingTop: 80,
-  },
   emptyList: {
     flexGrow: 1,
-  },
-  emptyText: {
-    fontSize: FONT_SIZE.md,
   },
   executeButton: {
     alignItems: 'center',
