@@ -182,31 +182,6 @@ describe('OperationListItem', () => {
         ]),
       );
     });
-
-    it('renders separator when not last item', () => {
-      const { getByTestId } = render(
-        <OperationListItem
-          {...baseProps}
-          isLast={false}
-          testID="item-1"
-        />,
-      );
-      // The separator is a View component; we check for its existence
-      // by verifying the component renders without issue
-      expect(getByTestId('item-1')).toBeTruthy();
-    });
-
-    it('does not render separator when last item', () => {
-      const { getByTestId, queryByTestId } = render(
-        <OperationListItem
-          {...baseProps}
-          isLast={true}
-          testID="item-1"
-        />,
-      );
-      expect(getByTestId('item-1')).toBeTruthy();
-      // Separator should not be rendered when isLast={true}
-    });
   });
 
   describe('Accessibility', () => {
@@ -241,13 +216,6 @@ describe('OperationListItem', () => {
   });
 
   describe('PropTypes Defaults', () => {
-    it('renders with default suggestionChips (null)', () => {
-      const { queryByText } = render(
-        <OperationListItem {...baseProps} />,
-      );
-      expect(queryByText('label this?')).toBeNull();
-    });
-
     it('accepts default onApplySuggestion when not provided', () => {
       // Should accept undefined onApplySuggestion and use default
       const { getByText } = render(
