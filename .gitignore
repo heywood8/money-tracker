@@ -93,3 +93,4 @@ local/
 
 # Superpowers docs (plans, specs)
 docs/superpowers/
+.superpowers/
