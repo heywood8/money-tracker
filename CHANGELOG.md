@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.2](https://github.com/heywood8/money-tracker/compare/penny-v0.73.1...penny-v0.73.2) (2026-04-30)
+
+
+### Code Refactoring
+
+* extract LoadingView, EmptyState, and ModalHeader shared components ([d562cfb](https://github.com/heywood8/money-tracker/commit/d562cfbe1467ca3e3fca05ec4279f90fdcce9729))
+
 ## [0.73.1](https://github.com/heywood8/money-tracker/compare/penny-v0.73.0...penny-v0.73.1) (2026-04-29)
 
 
