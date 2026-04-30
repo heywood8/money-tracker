@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.3](https://github.com/heywood8/money-tracker/compare/penny-v0.73.2...penny-v0.73.3) (2026-04-30)
+
+
+### Miscellaneous Chores
+
+* add .superpowers/ to .gitignore ([#426](https://github.com/heywood8/money-tracker/issues/426)) ([7fb6038](https://github.com/heywood8/money-tracker/commit/7fb6038ab1ad21a4b59ed2d36af57be340f5a952))
+
 ## [0.73.2](https://github.com/heywood8/money-tracker/compare/penny-v0.73.1...penny-v0.73.2) (2026-04-30)
 
 
