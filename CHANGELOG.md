@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.0](https://github.com/heywood8/money-tracker/compare/penny-v0.73.3...penny-v0.74.0) (2026-04-30)
+
+
+### Features
+
+* inline description suggestion after QuickAdd save ([#428](https://github.com/heywood8/money-tracker/issues/428)) ([64a7ea4](https://github.com/heywood8/money-tracker/commit/64a7ea4199abb1a40648ad5eab4a04b5d67ce6b4))
+
 ## [0.73.3](https://github.com/heywood8/money-tracker/compare/penny-v0.73.2...penny-v0.73.3) (2026-04-30)
 
 
