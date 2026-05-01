@@ -16,30 +16,32 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
 
   return (
     <Animated.View
-      style={[styles.container, { opacity: fadeAnim, borderTopColor: colors.border }]}
+      style={[styles.container, { opacity: fadeAnim }]}
     >
-      <View style={styles.hintRow}>
-        <Text style={[styles.hint, { color: colors.primary }]}>label this?</Text>
-        <TouchableOpacity
-          onPress={onDismiss}
-          accessibilityRole="button"
-          accessibilityLabel="skip suggestion"
-        >
-          <Text style={[styles.skip, { color: colors.mutedText }]}>skip</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.chipRow}>
-        {chips.map((chip) => (
+      <View style={styles.row}>
+        <View style={styles.xSlot}>
           <TouchableOpacity
-            key={chip}
-            onPress={() => onApply(chip)}
-            style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+            onPress={onDismiss}
+            style={[styles.chip, styles.dismissChip, { borderColor: colors.border, backgroundColor: colors.surface }]}
             accessibilityRole="button"
-            accessibilityLabel={`label: ${chip}`}
+            accessibilityLabel="dismiss suggestion"
           >
-            <Text style={[styles.chipText, { color: colors.primary }]}>{chip}</Text>
+            <Text style={[styles.chipText, { color: colors.mutedText }]}>✕</Text>
           </TouchableOpacity>
-        ))}
+        </View>
+        <View style={styles.chipRow}>
+          {chips.map((chip) => (
+            <TouchableOpacity
+              key={chip}
+              onPress={() => onApply(chip)}
+              style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={`label: ${chip}`}
+            >
+              <Text style={[styles.chipText, { color: colors.primary }]}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     </Animated.View>
   );
@@ -53,6 +55,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   chipRow: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.xs,
@@ -62,22 +65,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   container: {
-    borderTopWidth: 1,
     paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
   },
-  hint: {
-    fontSize: FONT_SIZE.sm,
+  dismissChip: {
+    paddingHorizontal: SPACING.sm,
   },
-  hintRow: {
+  row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
+    paddingLeft: SPACING.lg,
+    paddingRight: SPACING.lg,
   },
-  skip: {
-    fontSize: FONT_SIZE.sm,
+  xSlot: {
+    alignItems: 'flex-start',
+    marginRight: SPACING.md,
+    width: 32,
   },
 });
 

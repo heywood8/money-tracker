@@ -443,6 +443,16 @@ const OperationsScreen = () => {
     setPendingSuggestions([]);
   }, []);
 
+  // Auto-dismiss suggestion if the pending operation gets a description (e.g. via edit modal)
+  useEffect(() => {
+    if (!pendingSuggestionId) return;
+    const op = operations.find(o => o.id === pendingSuggestionId);
+    if (op?.description) {
+      setPendingSuggestionId(null);
+      setPendingSuggestions([]);
+    }
+  }, [operations, pendingSuggestionId]);
+
   // Group operations by date into date-group objects for the list
   const groupedOperations = useMemo(() => {
     const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
