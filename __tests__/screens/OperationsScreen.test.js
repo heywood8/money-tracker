@@ -44,6 +44,15 @@ jest.mock('../../app/contexts/OperationsDataContext', () => ({
     operations: [],
     loading: false,
     hasMoreOperations: false,
+    searchState: {
+      text: '',
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    },
+    getSearchFilterCount: jest.fn(() => 0),
   })),
 }));
 

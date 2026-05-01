@@ -8,7 +8,6 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
@@ -19,30 +18,30 @@ import { useOperationsActions } from '../../contexts/OperationsActionsContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useCategories } from '../../contexts/CategoriesContext';
 
-const SearchOverlay = ({ onClose, colors, t }) => {
-  console.log('[SearchOverlay] Component rendered');
+const SearchOverlay = ({ onClose, colors, t, visible }) => {
+  console.log('[SearchOverlay] Component rendered, visible:', visible);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   // Initialize localSearchText from searchState so it persists across remounts
-  const [localSearchText, setLocalSearchText] = useState(searchState.text);
+  const [localSearchText, setLocalSearchText] = useState(searchState?.text || '');
   const { setSearchText, updateSearchFilters, clearAllSearch } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
   const { categories } = useCategories();
 
-  const slideAnim = useSharedValue(-100);
+  const slideAnim = useSharedValue(visible ? 0 : -100);
   const overlayOpacity = useSharedValue(0);
 
+  // Animate in/out when visibility changes
   useEffect(() => {
-    console.log('[SearchOverlay] Mounted');
-    // Slide in animation on mount
-    slideAnim.value = withSpring(0, { damping: 20, stiffness: 300 });
-
-    return () => {
-      console.log('[SearchOverlay] Unmounting');
-    };
-  }, []);
+    console.log('[SearchOverlay] Visibility changed to:', visible);
+    if (visible) {
+      slideAnim.value = withTiming(0, { duration: 200 });
+    } else {
+      slideAnim.value = withTiming(-100, { duration: 200 });
+    }
+  }, [visible]);
 
   useEffect(() => {
     console.log('[SearchOverlay] localSearchText changed to:', localSearchText);
@@ -118,7 +117,11 @@ const SearchOverlay = ({ onClose, colors, t }) => {
     updateSearchFilters(partialFilters);
   }, [updateSearchFilters]);
 
-  const filterCount = getSearchFilterCount();
+  const filterCount = getSearchFilterCount ? getSearchFilterCount() : 0;
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <>
@@ -166,6 +169,7 @@ SearchOverlay.propTypes = {
     surface: PropTypes.string.isRequired,
   }).isRequired,
   t: PropTypes.func.isRequired,
+  visible: PropTypes.bool.isRequired,
 };
 
 const styles = StyleSheet.create({

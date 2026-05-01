@@ -694,14 +694,13 @@ const OperationsScreen = () => {
         />
       )}
 
-      {/* Search Overlay */}
-      {searchOverlayVisible && (
-        <SearchOverlay
-          onClose={handleCloseSearch}
-          colors={colors}
-          t={t}
-        />
-      )}
+      {/* Search Overlay - always rendered to prevent remount animations */}
+      <SearchOverlay
+        visible={searchOverlayVisible}
+        onClose={handleCloseSearch}
+        colors={colors}
+        t={t}
+      />
     </View>
   );
 };

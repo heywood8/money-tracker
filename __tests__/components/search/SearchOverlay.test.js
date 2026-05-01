@@ -62,6 +62,7 @@ describe('SearchOverlay', () => {
     onClose: jest.fn(),
     colors: mockColors,
     t: mockT,
+    visible: true,
   };
 
   const mockOperationsData = {

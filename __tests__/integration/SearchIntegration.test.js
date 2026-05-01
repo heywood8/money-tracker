@@ -89,7 +89,7 @@ describe('Search Integration', () => {
     it('complete search workflow: open -> type -> filter', async () => {
       const onClose = jest.fn();
       const { getByPlaceholderText, getByText, getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Step 1: Type text search
@@ -134,7 +134,7 @@ describe('Search Integration', () => {
 
       const onClose = jest.fn();
       const { getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       const closeButton = getByTestId('close-search-button');
@@ -152,7 +152,7 @@ describe('Search Integration', () => {
     it('closes without alert when no active filters', () => {
       const onClose = jest.fn();
       const { getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       const closeButton = getByTestId('close-search-button');
@@ -166,7 +166,7 @@ describe('Search Integration', () => {
     it('collapses filters when backdrop is pressed', async () => {
       const onClose = jest.fn();
       const { getByTestId, queryByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Open filters
@@ -188,7 +188,7 @@ describe('Search Integration', () => {
 
       const onClose = jest.fn();
       const { getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Filter count badge should be visible
@@ -200,7 +200,7 @@ describe('Search Integration', () => {
     it('clears search text when clear button is pressed', async () => {
       const onClose = jest.fn();
       const { getByPlaceholderText, getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Type search text
@@ -223,7 +223,7 @@ describe('Search Integration', () => {
     it('allows multiple filter types to be selected', async () => {
       const onClose = jest.fn();
       const { getByTestId, getByText } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Open filters
@@ -252,7 +252,7 @@ describe('Search Integration', () => {
     it('renders all filter sections when expanded', async () => {
       const onClose = jest.fn();
       const { getByTestId, getByText } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Open filters
@@ -272,7 +272,7 @@ describe('Search Integration', () => {
     it('toggles account filters', async () => {
       const onClose = jest.fn();
       const { getByTestId, getByText } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Open filters
@@ -292,7 +292,7 @@ describe('Search Integration', () => {
     it('toggles category filters', async () => {
       const onClose = jest.fn();
       const { getByTestId, getByText } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       // Open filters
@@ -320,7 +320,7 @@ describe('Search Integration', () => {
 
       const onClose = jest.fn();
       const { getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       fireEvent.press(getByTestId('close-search-button'));
@@ -351,7 +351,7 @@ describe('Search Integration', () => {
 
       const onClose = jest.fn();
       const { getByTestId } = render(
-        <SearchOverlay onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
       );
 
       fireEvent.press(getByTestId('close-search-button'));
