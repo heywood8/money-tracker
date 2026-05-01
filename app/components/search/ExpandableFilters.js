@@ -17,7 +17,6 @@ const ExpandableFilters = ({
 }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [expandedIds, setExpandedIds] = useState(new Set());
 
   if (!isExpanded) {
     return null;
@@ -74,7 +73,7 @@ const ExpandableFilters = ({
     <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.surface }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('operation_type')}
           </Text>
@@ -107,7 +106,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Date Range Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('date_range')}
           </Text>
@@ -145,7 +144,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Amount Range Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('amount_range')}
           </Text>
@@ -177,7 +176,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Accounts Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('accounts')}
           </Text>
@@ -203,7 +202,7 @@ const ExpandableFilters = ({
         </View>
 
         {/* Categories Section */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {t('categories')}
           </Text>
@@ -361,7 +360,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    borderBottomColor: '#f0f0f0',
     borderBottomWidth: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 14,

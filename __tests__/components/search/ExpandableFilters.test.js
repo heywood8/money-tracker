@@ -29,8 +29,9 @@ describe('ExpandableFilters', () => {
   ];
 
   const mockCategories = [
-    { id: 'cat-1', name: 'Food', type: 'entry', icon: 'food' },
-    { id: 'cat-2', name: 'Transport', type: 'entry', icon: 'car' },
+    { id: 'cat-1', name: 'Food', type: 'entry', icon: 'food', isShadow: false },
+    { id: 'cat-2', name: 'Transport', type: 'entry', icon: 'car', isShadow: false },
+    { id: 'cat-3', name: 'Shadow Category', type: 'entry', icon: 'tag', isShadow: true },
   ];
 
   const defaultProps = {
@@ -90,5 +91,12 @@ describe('ExpandableFilters', () => {
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
       accountIds: ['acc-1'],
     });
+  });
+
+  it('filters out categories with isShadow=true from rendered list', () => {
+    const { getByText, queryByText } = render(<ExpandableFilters {...defaultProps} />);
+    expect(getByText('Food')).toBeTruthy();
+    expect(getByText('Transport')).toBeTruthy();
+    expect(queryByText('Shadow Category')).toBeNull();
   });
 });
