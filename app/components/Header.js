@@ -10,14 +10,17 @@ import { getDatabaseVersion } from '../services/db';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { useSearch } from '../contexts/SearchContext';
+import FilterBadge from './search/FilterBadge';
 
 const APP_VERSION = require('../../package.json').version;
 
-export default function Header({ onOpenSettings, rightContent, activeScreen }) {
+export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
+  const { openSearch } = useSearch();
   const [dbVersion, setDbVersion] = useState(null);
 
   const fetchDbVersion = useCallback(async () => {
@@ -91,6 +94,26 @@ export default function Header({ onOpenSettings, rightContent, activeScreen }) {
                 </Text>
               </View>
             )}
+            {activeScreen === 'Operations' && (
+              <View style={styles.searchButtonContainer}>
+                <TouchableOpacity
+                  onPress={openSearch}
+                  testID="search-button"
+                  accessibilityLabel="Search operations"
+                  accessibilityRole="button"
+                  style={styles.searchButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="search-outline" size={24} color={colors.text} />
+                </TouchableOpacity>
+                {operationsData?.hasActiveSearch && (
+                  <FilterBadge
+                    count={operationsData.getSearchFilterCount()}
+                    colors={colors}
+                  />
+                )}
+              </View>
+            )}
             <TouchableOpacity
               onPress={toggleTheme}
               testID="theme-toggle-button"
@@ -128,12 +151,14 @@ Header.propTypes = {
   onOpenSettings: PropTypes.func,
   rightContent: PropTypes.node,
   activeScreen: PropTypes.string,
+  operationsData: PropTypes.object,
 };
 
 Header.defaultProps = {
   onOpenSettings: () => {},
   rightContent: null,
   activeScreen: null,
+  operationsData: null,
 };
 
 const styles = StyleSheet.create({
@@ -160,6 +185,12 @@ const styles = StyleSheet.create({
     height: 50,
     marginRight: 4,
     width: 50,
+  },
+  searchButton: {
+    padding: 8,
+  },
+  searchButtonContainer: {
+    position: 'relative',
   },
   settingsButton: {
     padding: 8,

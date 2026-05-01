@@ -70,6 +70,13 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
   })),
 }));
 
+jest.mock('../../app/contexts/SearchContext', () => ({
+  useSearch: jest.fn(() => ({
+    registerSearchHandler: jest.fn(),
+    openSearch: jest.fn(),
+  })),
+}));
+
 jest.mock('../../app/services/LastAccount', () => ({
   getLastAccessedAccount: jest.fn(() => Promise.resolve(null)),
   setLastAccessedAccount: jest.fn(() => Promise.resolve()),

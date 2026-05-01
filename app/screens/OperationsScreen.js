@@ -28,14 +28,16 @@ import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
 import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
+import { useSearch } from '../contexts/SearchContext';
 
 // Note: dynamic createStyles removed to keep linting stable.
 
 const OperationsScreen = () => {
   const { colors } = useThemeColors();
-  
+
   const { t } = useLocalization();
   const { showDialog } = useDialog();
+  const { registerSearchHandler } = useSearch();
   const {
     operations,
     loading: operationsLoading,
@@ -162,6 +164,12 @@ const OperationsScreen = () => {
       }
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
+
+  // Register search handler with SearchContext
+  useEffect(() => {
+    registerSearchHandler(handleOpenSearch);
+    return () => registerSearchHandler(null);
+  }, [handleOpenSearch, registerSearchHandler]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {

@@ -28,6 +28,10 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   useUpdateDownload: () => ({ isDownloading: false, downloadProgress: 0 }),
 }));
 
+jest.mock('../../app/contexts/SearchContext', () => ({
+  useSearch: () => ({ openSearch: jest.fn(), registerSearchHandler: jest.fn() }),
+}));
+
 jest.mock('../../app/services/db', () => ({
   getDatabaseVersion: jest.fn().mockResolvedValue(1),
 }));
