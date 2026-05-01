@@ -134,13 +134,21 @@ export const OperationsDataProvider = ({ children }) => {
   const filteredOperations = useMemo(() => {
     let result = operations;
 
-    // text search - match description, account name, category name, amount
+    // text search - match description, account name, category name, amount, type
     if (searchState.text) {
       const searchLower = searchState.text.toLowerCase();
       result = result.filter(op => {
         // match description
         if (op.description && op.description.toLowerCase().includes(searchLower)) {
           return true;
+        }
+
+        // match type (localized)
+        if (op.type) {
+          const typeName = t(op.type);
+          if (typeName.toLowerCase().includes(searchLower)) {
+            return true;
+          }
         }
 
         // match account name
