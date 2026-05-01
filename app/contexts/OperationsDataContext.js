@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { useAccountsData } from './AccountsDataContext';
+import { useCategoriesData } from './CategoriesContext';
+import { useLocalization } from './LocalizationContext';
 
 /**
  * OperationsDataContext manages operations data state.
@@ -21,6 +24,11 @@ export const useOperationsData = () => {
 };
 
 export const OperationsDataProvider = ({ children }) => {
+  // Dependencies from other contexts
+  const { accounts } = useAccountsData();
+  const { categories } = useCategoriesData();
+  const { t } = useLocalization();
+
   // Core data state
   const [operations, setOperations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,6 +112,103 @@ export const OperationsDataProvider = ({ children }) => {
     );
   }, [searchState]);
 
+  // Filtered operations based on search state
+  const filteredOperations = useMemo(() => {
+    let result = operations;
+
+    // text search - match description, account name, category name, amount
+    if (searchState.text) {
+      const searchLower = searchState.text.toLowerCase();
+      result = result.filter(op => {
+        // match description
+        if (op.description && op.description.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+
+        // match account name
+        const account = accounts.find(acc => acc.id === op.accountId);
+        if (account && account.name.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+
+        // match category name
+        const category = categories.find(cat => cat.id === op.categoryId);
+        if (category) {
+          const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+          if (categoryName.toLowerCase().includes(searchLower)) {
+            return true;
+          }
+        }
+
+        // match amount (as string)
+        if (op.amount && String(op.amount).includes(searchLower)) {
+          return true;
+        }
+
+        return false;
+      });
+    }
+
+    // type filter
+    if (searchState.types.length > 0) {
+      result = result.filter(op => searchState.types.includes(op.type));
+    }
+
+    // account filter
+    if (searchState.accountIds.length > 0) {
+      result = result.filter(op => searchState.accountIds.includes(op.accountId));
+    }
+
+    // category filter
+    if (searchState.categoryIds.length > 0) {
+      result = result.filter(op => searchState.categoryIds.includes(op.categoryId));
+    }
+
+    // date range filter
+    if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
+      result = result.filter(op => {
+        const opDate = new Date(op.date);
+        if (searchState.dateRange.startDate) {
+          const startDate = new Date(searchState.dateRange.startDate);
+          if (opDate < startDate) return false;
+        }
+        if (searchState.dateRange.endDate) {
+          const endDate = new Date(searchState.dateRange.endDate);
+          // swap if start > end
+          if (searchState.dateRange.startDate) {
+            const startDate = new Date(searchState.dateRange.startDate);
+            if (startDate > endDate) {
+              if (opDate < endDate || opDate > startDate) return false;
+            } else {
+              if (opDate > endDate) return false;
+            }
+          } else {
+            if (opDate > endDate) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    // amount range filter
+    if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) {
+      result = result.filter(op => {
+        const amount = parseFloat(op.amount);
+        if (isNaN(amount)) return false;
+
+        if (searchState.amountRange.min !== null && amount < searchState.amountRange.min) {
+          return false;
+        }
+        if (searchState.amountRange.max !== null && amount > searchState.amountRange.max) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [operations, searchState, accounts, categories, t]);
+
   // Count active filter groups (excluding text search)
   const getSearchFilterCount = useCallback(() => {
     let count = 0;
@@ -149,7 +254,7 @@ export const OperationsDataProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     // Public data
-    operations,
+    operations: filteredOperations,
     loading,
     loadingMore,
     loadingNewer,
@@ -185,7 +290,7 @@ export const OperationsDataProvider = ({ children }) => {
     _newestLoadedDate: newestLoadedDate,
     _dataLoaded: dataLoaded,
   }), [
-    operations,
+    filteredOperations,
     loading,
     loadingMore,
     loadingNewer,

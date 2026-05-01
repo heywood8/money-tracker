@@ -38,6 +38,22 @@ jest.mock('../../app/contexts/AccountsDataContext', () => ({
     loading: false,
   }),
 }));
+jest.mock('../../app/contexts/CategoriesContext', () => ({
+  CategoriesProvider: ({ children }) => children,
+  useCategoriesData: () => ({
+    categories: [],
+    loading: false,
+  }),
+}));
+
+jest.mock('../../app/contexts/LocalizationContext', () => ({
+  LocalizationProvider: ({ children }) => children,
+  useLocalization: () => ({
+    t: (key) => key,
+    currentLanguage: 'en',
+  }),
+}));
+
 jest.mock('../../app/contexts/DialogContext', () => ({
   useDialog: () => ({
     showDialog: jest.fn(),

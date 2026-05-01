@@ -28,11 +28,39 @@ jest.mock('../../app/services/eventEmitter', () => ({
   },
 }));
 
+// Mock AccountsDataContext
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  AccountsDataProvider: ({ children }) => children,
+  useAccountsData: () => ({
+    accounts: [],
+    loading: false,
+  }),
+}));
+
 // Mock AccountsActionsContext
 const mockReloadAccounts = jest.fn();
 jest.mock('../../app/contexts/AccountsActionsContext', () => ({
+  AccountsActionsProvider: ({ children }) => children,
   useAccountsActions: () => ({
     reloadAccounts: mockReloadAccounts,
+  }),
+}));
+
+// Mock CategoriesContext
+jest.mock('../../app/contexts/CategoriesContext', () => ({
+  CategoriesProvider: ({ children }) => children,
+  useCategoriesData: () => ({
+    categories: [],
+    loading: false,
+  }),
+}));
+
+// Mock LocalizationContext
+jest.mock('../../app/contexts/LocalizationContext', () => ({
+  LocalizationProvider: ({ children }) => children,
+  useLocalization: () => ({
+    t: (key) => key,
+    currentLanguage: 'en',
   }),
 }));
 
