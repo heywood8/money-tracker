@@ -40,7 +40,7 @@ jest.mock('../../app/contexts/AccountsDataContext', () => ({
 }));
 jest.mock('../../app/contexts/CategoriesContext', () => ({
   CategoriesProvider: ({ children }) => children,
-  useCategoriesData: () => ({
+  useCategories: () => ({
     categories: [],
     loading: false,
   }),

@@ -44,7 +44,7 @@ jest.mock('../../app/contexts/AccountsActionsContext', () => ({
 // Mock CategoriesContext
 jest.mock('../../app/contexts/CategoriesContext', () => ({
   CategoriesProvider: ({ children }) => children,
-  useCategoriesData: () => ({
+  useCategories: () => ({
     categories: [],
     loading: false,
   }),

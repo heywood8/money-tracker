@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useAccountsData } from './AccountsDataContext';
-import { useCategoriesData } from './CategoriesContext';
+import { useCategories } from './CategoriesContext';
 import { useLocalization } from './LocalizationContext';
 
 /**
@@ -26,7 +26,7 @@ export const useOperationsData = () => {
 export const OperationsDataProvider = ({ children }) => {
   // Dependencies from other contexts
   const { accounts } = useAccountsData();
-  const { categories } = useCategoriesData();
+  const { categories } = useCategories();
   const { t } = useLocalization();
 
   // Core data state
