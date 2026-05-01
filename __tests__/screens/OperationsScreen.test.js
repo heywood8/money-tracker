@@ -905,75 +905,6 @@ describe('OperationsScreen', () => {
       expect(mockShowDialog).toHaveBeenCalled();
     });
 
-    it('handleOpenFilterModal sets filter modal visible', () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
-      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-
-      useOperationsData.mockReturnValue({
-        operations: [],
-        loading: false,
-        loadingMore: false,
-        hasMoreOperations: false,
-        activeFilters: {},
-        filtersActive: false,
-      });
-
-      useOperationsActions.mockReturnValue({
-        deleteOperation: jest.fn(),
-        addOperation: jest.fn(),
-        validateOperation: jest.fn(() => null),
-        loadMoreOperations: jest.fn(),
-        jumpToDate: jest.fn(),
-        updateFilters: jest.fn(),
-        clearFilters: jest.fn(),
-        getActiveFilterCount: jest.fn(() => 0),
-      });
-
-      const { getByTestId } = render(<OperationsScreen />);
-
-      // FilterModal should be rendered
-      const filterModal = getByTestId('filter-modal');
-      expect(filterModal).toBeTruthy();
-    });
-
-    it('handleCloseFilterModal sets filter modal not visible', () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
-      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-
-      useOperationsData.mockReturnValue({
-        operations: [],
-        loading: false,
-        loadingMore: false,
-        hasMoreOperations: false,
-        activeFilters: {},
-        filtersActive: false,
-      });
-
-      useOperationsActions.mockReturnValue({
-        deleteOperation: jest.fn(),
-        addOperation: jest.fn(),
-        validateOperation: jest.fn(() => null),
-        loadMoreOperations: jest.fn(),
-        jumpToDate: jest.fn(),
-        updateFilters: jest.fn(),
-        clearFilters: jest.fn(),
-        getActiveFilterCount: jest.fn(() => 0),
-      });
-
-      const { getByTestId } = render(<OperationsScreen />);
-      const filterModal = getByTestId('filter-modal');
-
-      // Invoke onClose handler
-      act(() => {
-        filterModal.props.onClose();
-      });
-
-      // Modal should still be rendered (just not visible)
-      expect(getByTestId('filter-modal')).toBeTruthy();
-    });
-
     it('handleCloseOperationModal sets operation modal not visible', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
@@ -1009,40 +940,6 @@ describe('OperationsScreen', () => {
 
       // Modal should be closed (not visible)
       expect(getByTestId('operation-modal').props.visible).toBe(false);
-    });
-
-    it('renders reset filter button when filters are active', () => {
-      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
-      const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
-      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-
-      const mockClearFilters = jest.fn();
-
-      useOperationsData.mockReturnValue({
-        operations: [],
-        loading: false,
-        loadingMore: false,
-        hasMoreOperations: false,
-        activeFilters: { types: ['expense'] },
-        filtersActive: true,
-      });
-
-      useOperationsActions.mockReturnValue({
-        deleteOperation: jest.fn(),
-        addOperation: jest.fn(),
-        validateOperation: jest.fn(() => null),
-        loadMoreOperations: jest.fn(),
-        jumpToDate: jest.fn(),
-        updateFilters: jest.fn(),
-        clearFilters: mockClearFilters,
-        getActiveFilterCount: jest.fn(() => 1),
-      });
-
-      const { getByText } = render(<OperationsScreen />);
-
-      // When filtersActive is true, the filter-off icon should be rendered
-      expect(getByText('filter-off')).toBeTruthy();
-      expect(useOperationsActions).toHaveBeenCalled();
     });
 
     it('handleSelectAccount updates account selection', () => {

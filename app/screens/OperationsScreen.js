@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
 import LoadingView from '../components/LoadingView';
-import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -16,7 +15,6 @@ import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctDescriptions } from '../services/OperationsDB';
 import OperationModal from '../modals/OperationModal';
-import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
@@ -43,8 +41,6 @@ const OperationsScreen = () => {
     loading: operationsLoading,
     loadingMore,
     hasMoreOperations,
-    activeFilters,
-    filtersActive,
   } = useOperationsData();
   const {
     deleteOperation,
@@ -53,9 +49,6 @@ const OperationsScreen = () => {
     validateOperation,
     loadMoreOperations,
     jumpToDate,
-    updateFilters,
-    clearFilters,
-    getActiveFilterCount,
   } = useOperationsActions();
   const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -63,7 +56,6 @@ const OperationsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -527,14 +519,6 @@ const OperationsScreen = () => {
   }, []);
 
   // Handlers for modal visibility
-  const handleOpenFilterModal = useCallback(() => {
-    setFilterModalVisible(true);
-  }, []);
-
-  const handleCloseFilterModal = useCallback(() => {
-    setFilterModalVisible(false);
-  }, []);
-
   const handleCloseOperationModal = useCallback(() => {
     setModalVisible(false);
   }, []);
@@ -672,52 +656,6 @@ const OperationsScreen = () => {
         </TouchableOpacity>
       )}
 
-      {/* Filter FAB */}
-      {!operationsLoading && (
-        <>
-          <FAB
-            icon="filter-variant"
-            testID="filter-fab"
-            style={[
-              styles.filterFab,
-              {
-                backgroundColor: filtersActive ? colors.primary + 'DE' : colors.surface + 'DE',
-                borderColor: colors.border + '80',
-              },
-            ]}
-            color={filtersActive ? '#fff' : colors.text}
-            onPress={handleOpenFilterModal}
-            label={filtersActive ? String(getActiveFilterCount()) : undefined}
-            small={false}
-          />
-
-          {/* Reset Filters Button - only show when filters are active */}
-          {filtersActive && (
-            <TouchableOpacity
-              style={[styles.resetFilterButton, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
-              onPress={clearFilters}
-              accessibilityRole="button"
-              accessibilityLabel={t('clear_filters')}
-              accessibilityHint={t('clear_filters')}
-            >
-              <Icon name="filter-off" size={20} color={colors.text} />
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-
-      {/* Filter Modal */}
-      <FilterModal
-        visible={filterModalVisible}
-        onClose={handleCloseFilterModal}
-        filters={activeFilters}
-        onApplyFilters={updateFilters}
-        accounts={visibleAccounts}
-        categories={categories}
-        t={t}
-        colors={colors}
-      />
-
       <OperationModal
         visible={modalVisible}
         onClose={handleCloseOperationModal}
@@ -751,35 +689,6 @@ const OperationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  filterFab: {
-    borderRadius: 28,
-    borderWidth: 1,
-    bottom: 100,
-    elevation: 8,
-    margin: SPACING.lg,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  resetFilterButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    bottom: 100 + SPACING.lg,
-    elevation: 8,
-    height: 40,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 80,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: 40,
   },
   scrollToTopButton: {
     alignItems: 'center',
