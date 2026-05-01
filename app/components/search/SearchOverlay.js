@@ -34,7 +34,7 @@ const SearchOverlay = ({ onClose, colors, t }) => {
   useEffect(() => {
     // Slide in animation on mount
     slideAnim.value = withSpring(0, { damping: 20, stiffness: 300 });
-  }, [slideAnim]);
+  }, []);
 
   useEffect(() => {
     // Debounce search text input
