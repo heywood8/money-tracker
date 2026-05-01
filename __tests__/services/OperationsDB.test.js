@@ -1107,10 +1107,10 @@ describe('OperationsDB Service', () => {
       await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
 
       const sqlCall = queryAll.mock.calls[0][0];
-      expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
-      expect(sqlCall).toContain('a.name LIKE ? COLLATE NOCASE');
-      expect(sqlCall).toContain('to_a.name LIKE ? COLLATE NOCASE');
-      expect(sqlCall).toContain('c.name LIKE ? COLLATE NOCASE');
+      expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
+      expect(sqlCall).toContain('LOWER(a.name) LIKE ?');
+      expect(sqlCall).toContain('LOWER(to_a.name) LIKE ?');
+      expect(sqlCall).toContain('LOWER(c.name) LIKE ?');
     });
 
     it('trims search text before searching', async () => {
@@ -1121,6 +1121,17 @@ describe('OperationsDB Service', () => {
 
       const params = queryAll.mock.calls[0][1];
       expect(params).toContain('%coffee%');
+    });
+
+    it('lowercases search text for case-insensitive matching', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: 'GROCERY' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const params = queryAll.mock.calls[0][1];
+      expect(params).toContain('%grocery%');
+      expect(params).not.toContain('%GROCERY%');
     });
 
     it('combines all filters correctly', async () => {
@@ -1142,7 +1153,7 @@ describe('OperationsDB Service', () => {
       expect(sqlCall).toContain('o.category_id IN');
       expect(sqlCall).toContain('CAST(o.amount AS REAL) >=');
       expect(sqlCall).toContain('CAST(o.amount AS REAL) <=');
-      expect(sqlCall).toContain('o.description LIKE');
+      expect(sqlCall).toContain('LOWER(o.description) LIKE');
     });
 
     it('handles null result from query', async () => {
@@ -1329,7 +1340,7 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
 
         const sqlCall = queryFirst.mock.calls[0][0];
-        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
       });
 
       it('throws error on query failure', async () => {
@@ -1415,7 +1426,7 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
 
         const sqlCall = queryAll.mock.calls[0][0];
-        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
       });
 
       it('returns empty array when no operations match', async () => {
@@ -1721,7 +1732,7 @@ describe('OperationsDB Service', () => {
       await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
 
       const sqlCall = queryFirst.mock.calls[0][0];
-      expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+      expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
     });
 
     it('applies category filters to getNextOldestFilteredOperation', async () => {
@@ -1839,10 +1850,10 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
 
         const sqlCall = queryAll.mock.calls[0][0];
-        expect(sqlCall).toContain('o.description LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
         expect(sqlCall).toContain('o.amount LIKE ?');
-        expect(sqlCall).toContain('a.name LIKE ? COLLATE NOCASE');
-        expect(sqlCall).toContain('c.name LIKE ? COLLATE NOCASE');
+        expect(sqlCall).toContain('LOWER(a.name) LIKE ?');
+        expect(sqlCall).toContain('LOWER(c.name) LIKE ?');
       });
 
       it('filters by amount range (min and max)', async () => {
@@ -1892,7 +1903,7 @@ describe('OperationsDB Service', () => {
         const sqlCall = queryAll.mock.calls[0][0];
         expect(sqlCall).toContain('o.type IN (?)');
         expect(sqlCall).toContain('o.account_id IN (?)');
-        expect(sqlCall).toContain('o.description LIKE ?');
+        expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
         expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
         expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
       });
@@ -1914,7 +1925,7 @@ describe('OperationsDB Service', () => {
 
         // Should use parameterized query, not string interpolation
         const params = queryAll.mock.calls[0][1];
-        expect(params).toContain("%'; DROP TABLE operations; --%");
+        expect(params).toContain("%'; drop table operations; --%");
       });
 
       it('uses DISTINCT to avoid duplicates from JOINs', async () => {
@@ -1981,7 +1992,7 @@ describe('OperationsDB Service', () => {
         const sqlCall = queryFirst.mock.calls[0][0];
         expect(sqlCall).toContain('o.type IN (?)');
         expect(sqlCall).toContain('o.account_id IN (?)');
-        expect(sqlCall).toContain('o.description LIKE ?');
+        expect(sqlCall).toContain('LOWER(o.description) LIKE ?');
       });
     });
 
