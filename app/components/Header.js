@@ -13,7 +13,7 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 
 const APP_VERSION = require('../../package.json').version;
 
-export default function Header({ onOpenSettings, rightContent }) {
+export default function Header({ onOpenSettings, rightContent, activeScreen }) {
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -127,11 +127,13 @@ export default function Header({ onOpenSettings, rightContent }) {
 Header.propTypes = {
   onOpenSettings: PropTypes.func,
   rightContent: PropTypes.node,
+  activeScreen: PropTypes.string,
 };
 
 Header.defaultProps = {
   onOpenSettings: () => {},
   rightContent: null,
+  activeScreen: null,
 };
 
 const styles = StyleSheet.create({
