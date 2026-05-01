@@ -245,7 +245,7 @@ export default function SimpleTabs() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-      <Header onOpenSettings={handleOpenSettings} />
+      <Header onOpenSettings={handleOpenSettings} activeScreen={active} />
       <View style={styles.content}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.screensContainer, animatedStyle]}>
