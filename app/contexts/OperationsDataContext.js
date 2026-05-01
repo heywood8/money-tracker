@@ -43,18 +43,7 @@ export const OperationsDataProvider = ({ children }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingNewer, setLoadingNewer] = useState(false);
 
-  // Filter state
-  const [activeFilters, setActiveFilters] = useState({
-    types: [],
-    accountIds: [],
-    categoryIds: [],
-    searchText: '',
-    dateRange: { startDate: null, endDate: null },
-    amountRange: { min: null, max: null },
-  });
-  const [filtersActive, setFiltersActive] = useState(false);
-
-  // Search state (new unified API)
+  // Search state (unified API - single source of truth)
   const [searchState, setSearchState] = useState({
     text: '',
     types: [],
@@ -63,6 +52,20 @@ export const OperationsDataProvider = ({ children }) => {
     dateRange: { startDate: null, endDate: null },
     amountRange: { min: null, max: null },
   });
+
+  // Legacy filter state tracking (for backwards compatibility)
+  const [filtersActive, setFiltersActive] = useState(false);
+
+  // activeFilters is now a computed property (alias) pointing to searchState
+  // maintains backwards compatibility while having single source of truth
+  const activeFilters = useMemo(() => ({
+    types: searchState.types,
+    accountIds: searchState.accountIds,
+    categoryIds: searchState.categoryIds,
+    searchText: searchState.text,
+    dateRange: searchState.dateRange,
+    amountRange: searchState.amountRange,
+  }), [searchState]);
 
   // Helper to check if any filters are active
   const hasActiveFilters = useCallback((filters) => {
@@ -168,24 +171,29 @@ export const OperationsDataProvider = ({ children }) => {
     if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
       result = result.filter(op => {
         const opDate = new Date(op.date);
-        if (searchState.dateRange.startDate) {
+
+        // handle case when both dates are present
+        if (searchState.dateRange.startDate && searchState.dateRange.endDate) {
+          let start = new Date(searchState.dateRange.startDate);
+          let end = new Date(searchState.dateRange.endDate);
+
+          // swap if start > end
+          if (start > end) {
+            [start, end] = [end, start];
+          }
+
+          // filter to include operations within range
+          if (opDate < start || opDate > end) return false;
+        } else if (searchState.dateRange.startDate) {
+          // only start date
           const startDate = new Date(searchState.dateRange.startDate);
           if (opDate < startDate) return false;
-        }
-        if (searchState.dateRange.endDate) {
+        } else if (searchState.dateRange.endDate) {
+          // only end date
           const endDate = new Date(searchState.dateRange.endDate);
-          // swap if start > end
-          if (searchState.dateRange.startDate) {
-            const startDate = new Date(searchState.dateRange.startDate);
-            if (startDate > endDate) {
-              if (opDate < endDate || opDate > startDate) return false;
-            } else {
-              if (opDate > endDate) return false;
-            }
-          } else {
-            if (opDate > endDate) return false;
-          }
+          if (opDate > endDate) return false;
         }
+
         return true;
       });
     }
@@ -226,7 +234,15 @@ export const OperationsDataProvider = ({ children }) => {
       try {
         const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
         if (filters) {
-          setActiveFilters(filters);
+          // convert legacy activeFilters format to searchState format
+          setSearchState({
+            text: filters.searchText || '',
+            types: filters.types || [],
+            accountIds: filters.accountIds || [],
+            categoryIds: filters.categoryIds || [],
+            dateRange: filters.dateRange || { startDate: null, endDate: null },
+            amountRange: filters.amountRange || { min: null, max: null },
+          });
           setFiltersActive(hasActiveFilters(filters));
         }
       } catch (error) {
@@ -279,7 +295,6 @@ export const OperationsDataProvider = ({ children }) => {
     _setHasNewerOperations: setHasNewerOperations,
     _setLoadingMore: setLoadingMore,
     _setLoadingNewer: setLoadingNewer,
-    _setActiveFilters: setActiveFilters,
     _setFiltersActive: setFiltersActive,
     _setSearchState: setSearchState,
     _setSearchText: setSearchText,
@@ -296,7 +311,6 @@ export const OperationsDataProvider = ({ children }) => {
     loadingNewer,
     hasMoreOperations,
     hasNewerOperations,
-    activeFilters,
     filtersActive,
     searchState,
     hasActiveSearch,
@@ -308,6 +322,7 @@ export const OperationsDataProvider = ({ children }) => {
     setSearchText,
     updateSearchFilters,
     clearAllSearch,
+    activeFilters,
   ]);
 
   return (
