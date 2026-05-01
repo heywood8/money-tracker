@@ -22,10 +22,11 @@ import { useCategories } from '../../contexts/CategoriesContext';
 const SearchOverlay = ({ onClose, colors, t }) => {
   console.log('[SearchOverlay] Component rendered');
 
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [localSearchText, setLocalSearchText] = useState('');
-
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
+
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  // Initialize localSearchText from searchState so it persists across remounts
+  const [localSearchText, setLocalSearchText] = useState(searchState.text);
   const { setSearchText, updateSearchFilters, clearAllSearch } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
   const { categories } = useCategories();
