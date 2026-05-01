@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.75.1](https://github.com/heywood8/money-tracker/compare/penny-v0.75.0...penny-v0.75.1) (2026-05-01)
+
+
+### Documentation
+
+* add emulator verification skill ([#433](https://github.com/heywood8/money-tracker/issues/433)) ([6102476](https://github.com/heywood8/money-tracker/commit/61024768f39745056931f4d66a06fdde39e1c336))
+
 ## [0.75.0](https://github.com/heywood8/money-tracker/compare/penny-v0.74.0...penny-v0.75.0) (2026-05-01)
 
 
