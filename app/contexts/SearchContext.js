@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 const SearchContext = createContext(null);
@@ -6,18 +6,23 @@ const SearchContext = createContext(null);
 export const SearchProvider = ({ children }) => {
   const [searchHandler, setSearchHandler] = useState(null);
 
-  const registerSearchHandler = (handler) => {
+  const registerSearchHandler = useCallback((handler) => {
     setSearchHandler(() => handler);
-  };
+  }, []);
 
-  const openSearch = () => {
+  const openSearch = useCallback(() => {
     if (searchHandler) {
       searchHandler();
     }
-  };
+  }, [searchHandler]);
+
+  const value = useMemo(
+    () => ({ registerSearchHandler, openSearch }),
+    [registerSearchHandler, openSearch],
+  );
 
   return (
-    <SearchContext.Provider value={{ registerSearchHandler, openSearch }}>
+    <SearchContext.Provider value={value}>
       {children}
     </SearchContext.Provider>
   );

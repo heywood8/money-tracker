@@ -161,7 +161,7 @@ const OperationsScreen = () => {
   useEffect(() => {
     registerSearchHandler(handleOpenSearch);
     return () => registerSearchHandler(null);
-  }, [handleOpenSearch, registerSearchHandler]);
+  }, [handleOpenSearch]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
