@@ -46,6 +46,16 @@ export const OperationsDataProvider = ({ children }) => {
   });
   const [filtersActive, setFiltersActive] = useState(false);
 
+  // Search state (new unified API)
+  const [searchState, setSearchState] = useState({
+    text: '',
+    types: [],
+    accountIds: [],
+    categoryIds: [],
+    dateRange: { startDate: null, endDate: null },
+    amountRange: { min: null, max: null },
+  });
+
   // Helper to check if any filters are active
   const hasActiveFilters = useCallback((filters) => {
     return (
@@ -59,6 +69,51 @@ export const OperationsDataProvider = ({ children }) => {
       filters.amountRange.max !== null
     );
   }, []);
+
+  // Search state action functions
+  const setSearchText = useCallback((text) => {
+    setSearchState(prev => ({ ...prev, text }));
+  }, []);
+
+  const updateSearchFilters = useCallback((partialFilters) => {
+    setSearchState(prev => ({ ...prev, ...partialFilters }));
+  }, []);
+
+  const clearAllSearch = useCallback(() => {
+    setSearchState({
+      text: '',
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    });
+  }, []);
+
+  // Computed property: check if any search is active
+  const hasActiveSearch = useMemo(() => {
+    return (
+      searchState.text !== '' ||
+      searchState.types.length > 0 ||
+      searchState.accountIds.length > 0 ||
+      searchState.categoryIds.length > 0 ||
+      searchState.dateRange.startDate !== null ||
+      searchState.dateRange.endDate !== null ||
+      searchState.amountRange.min !== null ||
+      searchState.amountRange.max !== null
+    );
+  }, [searchState]);
+
+  // Count active filter groups (excluding text search)
+  const getSearchFilterCount = useCallback(() => {
+    let count = 0;
+    if (searchState.types.length > 0) count++;
+    if (searchState.accountIds.length > 0) count++;
+    if (searchState.categoryIds.length > 0) count++;
+    if (searchState.dateRange.startDate !== null || searchState.dateRange.endDate !== null) count++;
+    if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) count++;
+    return count;
+  }, [searchState]);
 
   // Load filters from PreferencesDB on mount
   useEffect(() => {
@@ -103,6 +158,11 @@ export const OperationsDataProvider = ({ children }) => {
     activeFilters,
     filtersActive,
 
+    // New search state API
+    searchState,
+    hasActiveSearch,
+    getSearchFilterCount,
+
     // Internal setters for actions context (prefixed with _)
     _setOperations: setOperations,
     _setLoading: setLoading,
@@ -116,6 +176,10 @@ export const OperationsDataProvider = ({ children }) => {
     _setLoadingNewer: setLoadingNewer,
     _setActiveFilters: setActiveFilters,
     _setFiltersActive: setFiltersActive,
+    _setSearchState: setSearchState,
+    _setSearchText: setSearchText,
+    _updateSearchFilters: updateSearchFilters,
+    _clearAllSearch: clearAllSearch,
     _hasActiveFilters: hasActiveFilters,
     _oldestLoadedDate: oldestLoadedDate,
     _newestLoadedDate: newestLoadedDate,
@@ -129,10 +193,16 @@ export const OperationsDataProvider = ({ children }) => {
     hasNewerOperations,
     activeFilters,
     filtersActive,
+    searchState,
+    hasActiveSearch,
     oldestLoadedDate,
     newestLoadedDate,
     dataLoaded,
     hasActiveFilters,
+    getSearchFilterCount,
+    setSearchText,
+    updateSearchFilters,
+    clearAllSearch,
   ]);
 
   return (

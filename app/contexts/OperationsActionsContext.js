@@ -27,6 +27,9 @@ export const useOperationsActions = () => {
   return context;
 };
 
+// Re-export the OperationsDataContext hook for testing convenience
+export { useOperationsData } from './OperationsDataContext';
+
 export const OperationsActionsProvider = ({ children }) => {
   const { showDialog } = useDialog();
   const { reloadAccounts } = useAccountsActions();
@@ -45,6 +48,9 @@ export const OperationsActionsProvider = ({ children }) => {
     _setLoadingNewer,
     _setActiveFilters,
     _setFiltersActive,
+    _setSearchText,
+    _updateSearchFilters,
+    _clearAllSearch,
     _hasActiveFilters,
     _oldestLoadedDate,
     _newestLoadedDate,
@@ -521,6 +527,10 @@ export const OperationsActionsProvider = ({ children }) => {
     updateFilters,
     clearFilters,
     getActiveFilterCount,
+    // New search API
+    setSearchText: _setSearchText,
+    updateSearchFilters: _updateSearchFilters,
+    clearAllSearch: _clearAllSearch,
   }), [
     addOperation,
     updateOperation,
@@ -537,6 +547,9 @@ export const OperationsActionsProvider = ({ children }) => {
     updateFilters,
     clearFilters,
     getActiveFilterCount,
+    _setSearchText,
+    _updateSearchFilters,
+    _clearAllSearch,
   ]);
 
   return (
