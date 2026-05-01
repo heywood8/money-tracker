@@ -16,11 +16,13 @@ import FilterBadge from './search/FilterBadge';
 const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
+  console.log('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
   const { openSearch } = useSearch();
+  console.log('[Header] openSearch exists:', !!openSearch);
   const [dbVersion, setDbVersion] = useState(null);
 
   const fetchDbVersion = useCallback(async () => {
@@ -97,7 +99,10 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
             {activeScreen === 'Operations' && (
               <View style={styles.searchButtonContainer}>
                 <TouchableOpacity
-                  onPress={openSearch}
+                  onPress={() => {
+                    console.log('[Header] Search button pressed!');
+                    openSearch();
+                  }}
                   testID="search-button"
                   accessibilityLabel="Search operations"
                   accessibilityRole="button"
