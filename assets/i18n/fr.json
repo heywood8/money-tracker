@@ -276,7 +276,7 @@
   "full_year": "Année complète",
   "filter_operations": "Filtrer les opérations",
   "search": "Rechercher",
-  "search_operations_placeholder": "Rechercher description, montant, compte...",
+  "search_operations_placeholder": "Rechercher des opérations...",
   "search_helper_text": "Rechercher dans la description, le montant, le nom du compte et la catégorie",
   "operation_type": "Type",
   "date_range": "Plage de dates",
@@ -356,5 +356,7 @@
   "delete_backup": "Supprimer la sauvegarde",
   "delete_backup_confirm": "Supprimer cette sauvegarde ? Cette action est irréversible.",
   "net_worth": "Valeur Nette",
-  "this_month": "ce mois-ci"
+  "this_month": "ce mois-ci",
+  "keep_filters_active": "Conserver les filtres actifs?",
+  "keep_filters": "Conserver les Filtres"
 }

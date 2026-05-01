@@ -247,6 +247,36 @@ jest.mock('./app/contexts/AccountsActionsContext', () => {
   };
 });
 
+jest.mock('./app/contexts/CategoriesContext', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+
+  const CategoriesContext = React.createContext();
+
+  function CategoriesProvider({ children }) {
+    const value = {
+      categories: [],
+      expandedIds: new Set(),
+      loading: false,
+      dataLoaded: false,
+      saveError: null,
+    };
+    return React.createElement(CategoriesContext.Provider, { value }, children);
+  }
+  CategoriesProvider.propTypes = { children: PropTypes.node };
+
+  return {
+    CategoriesProvider,
+    useCategories: jest.fn(() => ({
+      categories: [],
+      expandedIds: new Set(),
+      loading: false,
+      dataLoaded: false,
+      saveError: null,
+    })),
+  };
+});
+
 jest.mock('./app/contexts/OperationsDataContext', () => {
   const React = require('react');
   const PropTypes = require('prop-types');
@@ -270,6 +300,16 @@ jest.mock('./app/contexts/OperationsDataContext', () => {
         amountRange: { min: null, max: null },
       },
       filtersActive: false,
+      searchState: {
+        text: '',
+        types: [],
+        accountIds: [],
+        categoryIds: [],
+        dateRange: { startDate: null, endDate: null },
+        amountRange: { min: null, max: null },
+      },
+      hasActiveSearch: false,
+      getSearchFilterCount: jest.fn(() => 0),
     };
     return React.createElement(OperationsDataContext.Provider, { value }, children);
   }
@@ -293,6 +333,16 @@ jest.mock('./app/contexts/OperationsDataContext', () => {
         amountRange: { min: null, max: null },
       },
       filtersActive: false,
+      searchState: {
+        text: '',
+        types: [],
+        accountIds: [],
+        categoryIds: [],
+        dateRange: { startDate: null, endDate: null },
+        amountRange: { min: null, max: null },
+      },
+      hasActiveSearch: false,
+      getSearchFilterCount: jest.fn(() => 0),
     })),
   };
 });
@@ -320,6 +370,9 @@ jest.mock('./app/contexts/OperationsActionsContext', () => {
       updateFilters: jest.fn(),
       clearFilters: jest.fn(),
       getActiveFilterCount: jest.fn(() => 0),
+      setSearchText: jest.fn(),
+      updateSearchFilters: jest.fn(),
+      clearAllSearch: jest.fn(),
     };
     return React.createElement(OperationsActionsContext.Provider, { value }, children);
   }
@@ -343,6 +396,9 @@ jest.mock('./app/contexts/OperationsActionsContext', () => {
       updateFilters: jest.fn(),
       clearFilters: jest.fn(),
       getActiveFilterCount: jest.fn(() => 0),
+      setSearchText: jest.fn(),
+      updateSearchFilters: jest.fn(),
+      clearAllSearch: jest.fn(),
     })),
   };
 });

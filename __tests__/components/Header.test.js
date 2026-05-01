@@ -83,6 +83,14 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
+// Mock SearchContext
+jest.mock('../../app/contexts/SearchContext', () => ({
+  useSearch: () => ({
+    openSearch: jest.fn(),
+    registerSearchHandler: jest.fn(),
+  }),
+}));
+
 describe('Header', () => {
   const mockOnOpenSettings = jest.fn();
 

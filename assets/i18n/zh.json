@@ -276,7 +276,7 @@
   "full_year": "全年",
   "filter_operations": "筛选操作",
   "search": "搜索",
-  "search_operations_placeholder": "搜索描述、金额、账户...",
+  "search_operations_placeholder": "搜索操作...",
   "search_helper_text": "在描述、金额、账户名称和类别中搜索",
   "operation_type": "类型",
   "date_range": "日期范围",
@@ -356,5 +356,7 @@
   "delete_backup": "删除备份",
   "delete_backup_confirm": "删除此备份？此操作无法撤销。",
   "net_worth": "净资产",
-  "this_month": "本月"
+  "this_month": "本月",
+  "keep_filters_active": "保持筛选器活动状态？",
+  "keep_filters": "保持筛选器"
 }

@@ -27,12 +27,16 @@ export const useOperationsActions = () => {
   return context;
 };
 
+// Re-export the OperationsDataContext hook for testing convenience
+export { useOperationsData } from './OperationsDataContext';
+
 export const OperationsActionsProvider = ({ children }) => {
   const { showDialog } = useDialog();
   const { reloadAccounts } = useAccountsActions();
   const {
     operations,
     activeFilters,
+    searchState,
     _setOperations,
     _setLoading,
     _setDataLoaded,
@@ -43,8 +47,11 @@ export const OperationsActionsProvider = ({ children }) => {
     _setHasNewerOperations,
     _setLoadingMore,
     _setLoadingNewer,
-    _setActiveFilters,
     _setFiltersActive,
+    _setSearchState,
+    _setSearchText,
+    _updateSearchFilters,
+    _clearAllSearch,
     _hasActiveFilters,
     _oldestLoadedDate,
     _newestLoadedDate,
@@ -59,6 +66,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters = activeFilters, showLoading = true) => {
+    console.log('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
 
@@ -249,6 +257,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load operations on mount
   useEffect(() => {
+    console.log('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
     loadInitialOperations();
   }, [loadInitialOperations]);
 
@@ -368,7 +377,16 @@ export const OperationsActionsProvider = ({ children }) => {
   // Update filters and reload operations
   const updateFilters = useCallback(async (newFilters) => {
     try {
-      _setActiveFilters(newFilters);
+      // convert legacy activeFilters format to searchState format
+      _setSearchState({
+        text: newFilters.searchText || '',
+        types: newFilters.types || [],
+        accountIds: newFilters.accountIds || [],
+        categoryIds: newFilters.categoryIds || [],
+        dateRange: newFilters.dateRange || { startDate: null, endDate: null },
+        amountRange: newFilters.amountRange || { min: null, max: null },
+      });
+
       const isActive = _hasActiveFilters(newFilters);
       _setFiltersActive(isActive);
 
@@ -380,7 +398,7 @@ export const OperationsActionsProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to update filters:', error);
     }
-  }, [_hasActiveFilters, loadInitialOperations, _setActiveFilters, _setFiltersActive]);
+  }, [_hasActiveFilters, loadInitialOperations, _setSearchState, _setFiltersActive]);
 
   // Clear all filters
   const clearFilters = useCallback(async () => {
@@ -521,6 +539,10 @@ export const OperationsActionsProvider = ({ children }) => {
     updateFilters,
     clearFilters,
     getActiveFilterCount,
+    // New search API
+    setSearchText: _setSearchText,
+    updateSearchFilters: _updateSearchFilters,
+    clearAllSearch: _clearAllSearch,
   }), [
     addOperation,
     updateOperation,
@@ -537,6 +559,9 @@ export const OperationsActionsProvider = ({ children }) => {
     updateFilters,
     clearFilters,
     getActiveFilterCount,
+    _setSearchText,
+    _updateSearchFilters,
+    _clearAllSearch,
   ]);
 
   return (

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
 import LoadingView from '../components/LoadingView';
-import { FAB } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -16,32 +15,33 @@ import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
 import { getDistinctDescriptions } from '../services/OperationsDB';
 import OperationModal from '../modals/OperationModal';
-import FilterModal from '../components/FilterModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import PickerModal from '../components/operations/PickerModal';
+import SearchOverlay from '../components/search/SearchOverlay';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
 import useOperationPicker from '../hooks/useOperationPicker';
 import useQuickAddForm from '../hooks/useQuickAddForm';
+import { useSearch } from '../contexts/SearchContext';
 
 // Note: dynamic createStyles removed to keep linting stable.
 
 const OperationsScreen = () => {
+  console.log('[OperationsScreen] Component rendered');
   const { colors } = useThemeColors();
-  
+
   const { t } = useLocalization();
   const { showDialog } = useDialog();
+  const { registerSearchHandler } = useSearch();
   const {
     operations,
     loading: operationsLoading,
     loadingMore,
     hasMoreOperations,
-    activeFilters,
-    filtersActive,
   } = useOperationsData();
   const {
     deleteOperation,
@@ -50,9 +50,6 @@ const OperationsScreen = () => {
     validateOperation,
     loadMoreOperations,
     jumpToDate,
-    updateFilters,
-    clearFilters,
-    getActiveFilterCount,
   } = useOperationsActions();
   const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
   const { categories, loading: categoriesLoading } = useCategories();
@@ -60,7 +57,6 @@ const OperationsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
   const [isNew, setIsNew] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -68,6 +64,7 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -160,6 +157,29 @@ const OperationsScreen = () => {
       }
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
+
+  // Register search handler with SearchContext
+  useEffect(() => {
+    console.log('[OperationsScreen] Registering search handler');
+    registerSearchHandler(handleOpenSearch);
+    return () => {
+      console.log('[OperationsScreen] Unregistering search handler');
+      registerSearchHandler(null);
+    };
+  }, [handleOpenSearch]);
+
+  // Track mount/unmount
+  useEffect(() => {
+    console.log('[OperationsScreen] MOUNTED');
+    return () => {
+      console.log('[OperationsScreen] UNMOUNTING');
+    };
+  }, []);
+
+  // Track searchOverlayVisible changes
+  useEffect(() => {
+    console.log('[OperationsScreen] searchOverlayVisible changed to:', searchOverlayVisible);
+  }, [searchOverlayVisible]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
@@ -527,16 +547,18 @@ const OperationsScreen = () => {
   }, []);
 
   // Handlers for modal visibility
-  const handleOpenFilterModal = useCallback(() => {
-    setFilterModalVisible(true);
-  }, []);
-
-  const handleCloseFilterModal = useCallback(() => {
-    setFilterModalVisible(false);
-  }, []);
-
   const handleCloseOperationModal = useCallback(() => {
     setModalVisible(false);
+  }, []);
+
+  const handleOpenSearch = useCallback(() => {
+    console.log('[OperationsScreen] handleOpenSearch called');
+    setSearchOverlayVisible(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    console.log('[OperationsScreen] handleCloseSearch called');
+    setSearchOverlayVisible(false);
   }, []);
 
   const quickAddFormComponent = useMemo(() => (
@@ -664,52 +686,6 @@ const OperationsScreen = () => {
         </TouchableOpacity>
       )}
 
-      {/* Filter FAB */}
-      {!operationsLoading && (
-        <>
-          <FAB
-            icon="filter-variant"
-            testID="filter-fab"
-            style={[
-              styles.filterFab,
-              {
-                backgroundColor: filtersActive ? colors.primary + 'DE' : colors.surface + 'DE',
-                borderColor: colors.border + '80',
-              },
-            ]}
-            color={filtersActive ? '#fff' : colors.text}
-            onPress={handleOpenFilterModal}
-            label={filtersActive ? String(getActiveFilterCount()) : undefined}
-            small={false}
-          />
-
-          {/* Reset Filters Button - only show when filters are active */}
-          {filtersActive && (
-            <TouchableOpacity
-              style={[styles.resetFilterButton, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}
-              onPress={clearFilters}
-              accessibilityRole="button"
-              accessibilityLabel={t('clear_filters')}
-              accessibilityHint={t('clear_filters')}
-            >
-              <Icon name="filter-off" size={20} color={colors.text} />
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-
-      {/* Filter Modal */}
-      <FilterModal
-        visible={filterModalVisible}
-        onClose={handleCloseFilterModal}
-        filters={activeFilters}
-        onApplyFilters={updateFilters}
-        accounts={visibleAccounts}
-        categories={categories}
-        t={t}
-        colors={colors}
-      />
-
       <OperationModal
         visible={modalVisible}
         onClose={handleCloseOperationModal}
@@ -727,6 +703,14 @@ const OperationsScreen = () => {
           onChange={handleDatePickerChange}
         />
       )}
+
+      {/* Search Overlay - always rendered to prevent remount animations */}
+      <SearchOverlay
+        visible={searchOverlayVisible}
+        onClose={handleCloseSearch}
+        colors={colors}
+        t={t}
+      />
     </View>
   );
 };
@@ -734,35 +718,6 @@ const OperationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  filterFab: {
-    borderRadius: 28,
-    borderWidth: 1,
-    bottom: 100,
-    elevation: 8,
-    margin: SPACING.lg,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  resetFilterButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    bottom: 100 + SPACING.lg,
-    elevation: 8,
-    height: 40,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 80,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: 40,
   },
   scrollToTopButton: {
     alignItems: 'center',

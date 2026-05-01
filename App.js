@@ -17,6 +17,7 @@ import { ImportProgressProvider } from './app/contexts/ImportProgressContext';
 import { UpdateDownloadProvider } from './app/contexts/UpdateDownloadContext';
 import { AppBlurProvider, useAppBlur } from './app/contexts/AppBlurContext';
 import { DisplaySettingsProvider } from './app/contexts/DisplaySettingsContext';
+import { SearchProvider } from './app/contexts/SearchContext';
 import ErrorBoundary from './app/components/ErrorBoundary';
 import ImportProgressModal from './app/modals/ImportProgressModal';
 import { StatusBar, Platform, StyleSheet, View } from 'react-native';
@@ -68,27 +69,29 @@ export default function App() {
               <DisplaySettingsProvider>
                 <ThemeColorsProvider>
                   <AppBlurProvider>
-                    <DialogProvider>
-                      <UpdateDownloadProvider>
-                        <ImportProgressProvider>
-                          <AccountsDataProvider>
-                            <AccountsActionsProvider>
-                              <CategoriesProvider>
-                                <OperationsDataProvider>
-                                  <OperationsActionsProvider>
-                                    <BudgetsProvider>
-                                      <PlannedOperationsProvider>
-                                        <AppContent />
-                                      </PlannedOperationsProvider>
-                                    </BudgetsProvider>
-                                  </OperationsActionsProvider>
-                                </OperationsDataProvider>
-                              </CategoriesProvider>
-                            </AccountsActionsProvider>
-                          </AccountsDataProvider>
-                        </ImportProgressProvider>
-                      </UpdateDownloadProvider>
-                    </DialogProvider>
+                    <SearchProvider>
+                      <DialogProvider>
+                        <UpdateDownloadProvider>
+                          <ImportProgressProvider>
+                            <AccountsDataProvider>
+                              <AccountsActionsProvider>
+                                <CategoriesProvider>
+                                  <OperationsDataProvider>
+                                    <OperationsActionsProvider>
+                                      <BudgetsProvider>
+                                        <PlannedOperationsProvider>
+                                          <AppContent />
+                                        </PlannedOperationsProvider>
+                                      </BudgetsProvider>
+                                    </OperationsActionsProvider>
+                                  </OperationsDataProvider>
+                                </CategoriesProvider>
+                              </AccountsActionsProvider>
+                            </AccountsDataProvider>
+                          </ImportProgressProvider>
+                        </UpdateDownloadProvider>
+                      </DialogProvider>
+                    </SearchProvider>
                   </AppBlurProvider>
                 </ThemeColorsProvider>
               </DisplaySettingsProvider>

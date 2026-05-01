@@ -10,14 +10,19 @@ import { getDatabaseVersion } from '../services/db';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { useSearch } from '../contexts/SearchContext';
+import FilterBadge from './search/FilterBadge';
 
 const APP_VERSION = require('../../package.json').version;
 
-export default function Header({ onOpenSettings }) {
+export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
+  console.log('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
+  const { openSearch } = useSearch();
+  console.log('[Header] openSearch exists:', !!openSearch);
   const [dbVersion, setDbVersion] = useState(null);
 
   const fetchDbVersion = useCallback(async () => {
@@ -76,45 +81,72 @@ export default function Header({ onOpenSettings }) {
         </View>
       </View>
       <View style={styles.buttonContainer}>
-        {isDownloading && (
-          <View
-            style={styles.downloadIndicator}
-            accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
-            accessibilityRole="progressbar"
-            testID="download-indicator"
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-              {`${Math.round((downloadProgress ?? 0) * 100)}%`}
-            </Text>
-          </View>
+        {rightContent || (
+          <>
+            {isDownloading && (
+              <View
+                style={styles.downloadIndicator}
+                accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+                accessibilityRole="progressbar"
+                testID="download-indicator"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+                  {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+                </Text>
+              </View>
+            )}
+            {activeScreen === 'Operations' && (
+              <View style={styles.searchButtonContainer}>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('[Header] Search button pressed!');
+                    openSearch();
+                  }}
+                  testID="search-button"
+                  accessibilityLabel="Search operations"
+                  accessibilityRole="button"
+                  style={styles.searchButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="search-outline" size={24} color={colors.text} />
+                </TouchableOpacity>
+                {operationsData?.hasActiveSearch && (
+                  <FilterBadge
+                    count={operationsData.getSearchFilterCount()}
+                    colors={colors}
+                  />
+                )}
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={toggleTheme}
+              testID="theme-toggle-button"
+              accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              accessibilityRole="button"
+              accessibilityHint="Toggles between light and dark theme"
+              style={styles.themeButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={colorScheme === 'dark' ? 'moon' : 'sunny'}
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onOpenSettings}
+              testID="settings-button"
+              accessibilityLabel={t('settings')}
+              accessibilityRole="button"
+              accessibilityHint="Opens settings menu"
+              style={styles.settingsButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="settings-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </>
         )}
-        <TouchableOpacity
-          onPress={toggleTheme}
-          testID="theme-toggle-button"
-          accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          accessibilityRole="button"
-          accessibilityHint="Toggles between light and dark theme"
-          style={styles.themeButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={colorScheme === 'dark' ? 'moon' : 'sunny'}
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onOpenSettings}
-          testID="settings-button"
-          accessibilityLabel={t('settings')}
-          accessibilityRole="button"
-          accessibilityHint="Opens settings menu"
-          style={styles.settingsButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -122,10 +154,16 @@ export default function Header({ onOpenSettings }) {
 
 Header.propTypes = {
   onOpenSettings: PropTypes.func,
+  rightContent: PropTypes.node,
+  activeScreen: PropTypes.string,
+  operationsData: PropTypes.object,
 };
 
 Header.defaultProps = {
   onOpenSettings: () => {},
+  rightContent: null,
+  activeScreen: null,
+  operationsData: null,
 };
 
 const styles = StyleSheet.create({
@@ -152,6 +190,12 @@ const styles = StyleSheet.create({
     height: 50,
     marginRight: 4,
     width: 50,
+  },
+  searchButton: {
+    padding: 8,
+  },
+  searchButtonContainer: {
+    position: 'relative',
   },
   settingsButton: {
     padding: 8,

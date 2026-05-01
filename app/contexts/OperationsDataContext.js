@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { useAccountsData } from './AccountsDataContext';
+import { useCategories } from './CategoriesContext';
+import { useLocalization } from './LocalizationContext';
 
 /**
  * OperationsDataContext manages operations data state.
@@ -21,6 +24,13 @@ export const useOperationsData = () => {
 };
 
 export const OperationsDataProvider = ({ children }) => {
+  console.log('[OperationsDataProvider] Component rendered');
+
+  // Dependencies from other contexts
+  const { accounts } = useAccountsData();
+  const { categories } = useCategories();
+  const { t } = useLocalization();
+
   // Core data state
   const [operations, setOperations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,16 +45,34 @@ export const OperationsDataProvider = ({ children }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingNewer, setLoadingNewer] = useState(false);
 
-  // Filter state
-  const [activeFilters, setActiveFilters] = useState({
+  // Search state (unified API - single source of truth)
+  const [searchState, setSearchState] = useState({
+    text: '',
     types: [],
     accountIds: [],
     categoryIds: [],
-    searchText: '',
     dateRange: { startDate: null, endDate: null },
     amountRange: { min: null, max: null },
   });
+
+  // Track searchState changes
+  useEffect(() => {
+    console.log('[OperationsDataContext] searchState changed:', searchState);
+  }, [searchState]);
+
+  // Legacy filter state tracking (for backwards compatibility)
   const [filtersActive, setFiltersActive] = useState(false);
+
+  // activeFilters is now a computed property (alias) pointing to searchState
+  // maintains backwards compatibility while having single source of truth
+  const activeFilters = useMemo(() => ({
+    types: searchState.types,
+    accountIds: searchState.accountIds,
+    categoryIds: searchState.categoryIds,
+    searchText: searchState.text,
+    dateRange: searchState.dateRange,
+    amountRange: searchState.amountRange,
+  }), [searchState]);
 
   // Helper to check if any filters are active
   const hasActiveFilters = useCallback((filters) => {
@@ -60,13 +88,184 @@ export const OperationsDataProvider = ({ children }) => {
     );
   }, []);
 
+  // Search state action functions
+  const setSearchText = useCallback((text) => {
+    setSearchState(prev => {
+      // Don't update if text hasn't changed (prevents infinite loop)
+      if (prev.text === text) {
+        console.log('[OperationsDataContext] setSearchText called but text unchanged, skipping update');
+        return prev;
+      }
+      console.log('[OperationsDataContext] setSearchText updating from', prev.text, 'to', text);
+      return { ...prev, text };
+    });
+  }, []);
+
+  const updateSearchFilters = useCallback((partialFilters) => {
+    setSearchState(prev => ({ ...prev, ...partialFilters }));
+  }, []);
+
+  const clearAllSearch = useCallback(() => {
+    setSearchState({
+      text: '',
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    });
+  }, []);
+
+  // Computed property: check if any search is active
+  const hasActiveSearch = useMemo(() => {
+    return (
+      searchState.text !== '' ||
+      searchState.types.length > 0 ||
+      searchState.accountIds.length > 0 ||
+      searchState.categoryIds.length > 0 ||
+      searchState.dateRange.startDate !== null ||
+      searchState.dateRange.endDate !== null ||
+      searchState.amountRange.min !== null ||
+      searchState.amountRange.max !== null
+    );
+  }, [searchState]);
+
+  // Filtered operations based on search state
+  const filteredOperations = useMemo(() => {
+    let result = operations;
+
+    // text search - match description, account name, category name, amount, type
+    if (searchState.text) {
+      const searchLower = searchState.text.toLowerCase();
+      result = result.filter(op => {
+        // match description
+        if (op.description && op.description.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+
+        // match type (localized)
+        if (op.type) {
+          const typeName = t(op.type);
+          if (typeName.toLowerCase().includes(searchLower)) {
+            return true;
+          }
+        }
+
+        // match account name
+        const account = accounts.find(acc => acc.id === op.accountId);
+        if (account && account.name.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+
+        // match category name
+        const category = categories.find(cat => cat.id === op.categoryId);
+        if (category) {
+          const categoryName = category.nameKey ? t(category.nameKey) : category.name;
+          if (categoryName.toLowerCase().includes(searchLower)) {
+            return true;
+          }
+        }
+
+        // match amount (as string)
+        if (op.amount && String(op.amount).includes(searchLower)) {
+          return true;
+        }
+
+        return false;
+      });
+    }
+
+    // type filter
+    if (searchState.types.length > 0) {
+      result = result.filter(op => searchState.types.includes(op.type));
+    }
+
+    // account filter
+    if (searchState.accountIds.length > 0) {
+      result = result.filter(op => searchState.accountIds.includes(op.accountId));
+    }
+
+    // category filter
+    if (searchState.categoryIds.length > 0) {
+      result = result.filter(op => searchState.categoryIds.includes(op.categoryId));
+    }
+
+    // date range filter
+    if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
+      result = result.filter(op => {
+        const opDate = new Date(op.date);
+
+        // handle case when both dates are present
+        if (searchState.dateRange.startDate && searchState.dateRange.endDate) {
+          let start = new Date(searchState.dateRange.startDate);
+          let end = new Date(searchState.dateRange.endDate);
+
+          // swap if start > end
+          if (start > end) {
+            [start, end] = [end, start];
+          }
+
+          // filter to include operations within range
+          if (opDate < start || opDate > end) return false;
+        } else if (searchState.dateRange.startDate) {
+          // only start date
+          const startDate = new Date(searchState.dateRange.startDate);
+          if (opDate < startDate) return false;
+        } else if (searchState.dateRange.endDate) {
+          // only end date
+          const endDate = new Date(searchState.dateRange.endDate);
+          if (opDate > endDate) return false;
+        }
+
+        return true;
+      });
+    }
+
+    // amount range filter
+    if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) {
+      result = result.filter(op => {
+        const amount = parseFloat(op.amount);
+        if (isNaN(amount)) return false;
+
+        if (searchState.amountRange.min !== null && amount < searchState.amountRange.min) {
+          return false;
+        }
+        if (searchState.amountRange.max !== null && amount > searchState.amountRange.max) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [operations, searchState, accounts, categories, t]);
+
+  // Count active filter groups (excluding text search)
+  const getSearchFilterCount = useCallback(() => {
+    let count = 0;
+    if (searchState.types.length > 0) count++;
+    if (searchState.accountIds.length > 0) count++;
+    if (searchState.categoryIds.length > 0) count++;
+    if (searchState.dateRange.startDate !== null || searchState.dateRange.endDate !== null) count++;
+    if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) count++;
+    return count;
+  }, [searchState]);
+
   // Load filters from PreferencesDB on mount
   useEffect(() => {
     const loadFilters = async () => {
       try {
         const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
         if (filters) {
-          setActiveFilters(filters);
+          // convert legacy activeFilters format to searchState format
+          setSearchState({
+            text: filters.searchText || '',
+            types: filters.types || [],
+            accountIds: filters.accountIds || [],
+            categoryIds: filters.categoryIds || [],
+            dateRange: filters.dateRange || { startDate: null, endDate: null },
+            amountRange: filters.amountRange || { min: null, max: null },
+          });
           setFiltersActive(hasActiveFilters(filters));
         }
       } catch (error) {
@@ -94,7 +293,7 @@ export const OperationsDataProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     // Public data
-    operations,
+    operations: filteredOperations,
     loading,
     loadingMore,
     loadingNewer,
@@ -102,6 +301,11 @@ export const OperationsDataProvider = ({ children }) => {
     hasNewerOperations,
     activeFilters,
     filtersActive,
+
+    // New search state API
+    searchState,
+    hasActiveSearch,
+    getSearchFilterCount,
 
     // Internal setters for actions context (prefixed with _)
     _setOperations: setOperations,
@@ -114,25 +318,34 @@ export const OperationsDataProvider = ({ children }) => {
     _setHasNewerOperations: setHasNewerOperations,
     _setLoadingMore: setLoadingMore,
     _setLoadingNewer: setLoadingNewer,
-    _setActiveFilters: setActiveFilters,
     _setFiltersActive: setFiltersActive,
+    _setSearchState: setSearchState,
+    _setSearchText: setSearchText,
+    _updateSearchFilters: updateSearchFilters,
+    _clearAllSearch: clearAllSearch,
     _hasActiveFilters: hasActiveFilters,
     _oldestLoadedDate: oldestLoadedDate,
     _newestLoadedDate: newestLoadedDate,
     _dataLoaded: dataLoaded,
   }), [
-    operations,
+    filteredOperations,
     loading,
     loadingMore,
     loadingNewer,
     hasMoreOperations,
     hasNewerOperations,
-    activeFilters,
     filtersActive,
+    searchState,
+    hasActiveSearch,
     oldestLoadedDate,
     newestLoadedDate,
     dataLoaded,
     hasActiveFilters,
+    getSearchFilterCount,
+    setSearchText,
+    updateSearchFilters,
+    clearAllSearch,
+    activeFilters,
   ]);
 
   return (

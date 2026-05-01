@@ -3,6 +3,9 @@
  * These tests ensure category CRUD, hierarchy, validation, and default initialization work correctly
  */
 
+// Unmock CategoriesContext to use real implementation
+jest.unmock('../../app/contexts/CategoriesContext');
+
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { CategoriesProvider, useCategories } from '../../app/contexts/CategoriesContext';

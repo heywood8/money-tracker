@@ -33,6 +33,32 @@ jest.mock('../../app/contexts/DialogContext', () => ({
   }),
 }));
 
+// Mock AccountsActionsContext
+jest.mock('../../app/contexts/AccountsActionsContext', () => ({
+  AccountsActionsProvider: ({ children }) => children,
+  useAccountsActions: () => ({
+    reloadAccounts: jest.fn(),
+  }),
+}));
+
+// Mock CategoriesContext
+jest.mock('../../app/contexts/CategoriesContext', () => ({
+  CategoriesProvider: ({ children }) => children,
+  useCategories: () => ({
+    categories: [],
+    loading: false,
+  }),
+}));
+
+// Mock LocalizationContext
+jest.mock('../../app/contexts/LocalizationContext', () => ({
+  LocalizationProvider: ({ children }) => children,
+  useLocalization: () => ({
+    t: (key) => key,
+    currentLanguage: 'en',
+  }),
+}));
+
 // Mock auto-increment ID counter
 let mockOperationIdCounter = 0;
 
