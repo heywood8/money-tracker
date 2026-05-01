@@ -22,6 +22,7 @@ import ListCard from '../components/ListCard';
 import OperationsList from '../components/operations/OperationsList';
 import QuickAddForm from '../components/operations/QuickAddForm';
 import PickerModal from '../components/operations/PickerModal';
+import SearchOverlay from '../components/search/SearchOverlay';
 import * as Currency from '../services/currency';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import useMultiCurrencyTransfer from '../hooks/useMultiCurrencyTransfer';
@@ -68,6 +69,7 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -529,6 +531,14 @@ const OperationsScreen = () => {
     setModalVisible(false);
   }, []);
 
+  const handleOpenSearch = useCallback(() => {
+    setSearchOverlayVisible(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOverlayVisible(false);
+  }, []);
+
   const quickAddFormComponent = useMemo(() => (
     <QuickAddForm
       colors={colors}
@@ -715,6 +725,15 @@ const OperationsScreen = () => {
           mode="date"
           display="default"
           onChange={handleDatePickerChange}
+        />
+      )}
+
+      {/* Search Overlay */}
+      {searchOverlayVisible && (
+        <SearchOverlay
+          onClose={handleCloseSearch}
+          colors={colors}
+          t={t}
         />
       )}
     </View>
