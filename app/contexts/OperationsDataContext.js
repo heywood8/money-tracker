@@ -90,7 +90,15 @@ export const OperationsDataProvider = ({ children }) => {
 
   // Search state action functions
   const setSearchText = useCallback((text) => {
-    setSearchState(prev => ({ ...prev, text }));
+    setSearchState(prev => {
+      // Don't update if text hasn't changed (prevents infinite loop)
+      if (prev.text === text) {
+        console.log('[OperationsDataContext] setSearchText called but text unchanged, skipping update');
+        return prev;
+      }
+      console.log('[OperationsDataContext] setSearchText updating from', prev.text, 'to', text);
+      return { ...prev, text };
+    });
   }, []);
 
   const updateSearchFilters = useCallback((partialFilters) => {

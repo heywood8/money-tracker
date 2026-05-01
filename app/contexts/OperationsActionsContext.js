@@ -66,6 +66,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters = activeFilters, showLoading = true) => {
+    console.log('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
 
@@ -256,6 +257,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load operations on mount
   useEffect(() => {
+    console.log('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
     loadInitialOperations();
   }, [loadInitialOperations]);
 

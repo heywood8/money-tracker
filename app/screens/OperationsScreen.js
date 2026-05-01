@@ -31,6 +31,7 @@ import { useSearch } from '../contexts/SearchContext';
 // Note: dynamic createStyles removed to keep linting stable.
 
 const OperationsScreen = () => {
+  console.log('[OperationsScreen] Component rendered');
   const { colors } = useThemeColors();
 
   const { t } = useLocalization();
@@ -166,6 +167,14 @@ const OperationsScreen = () => {
       registerSearchHandler(null);
     };
   }, [handleOpenSearch]);
+
+  // Track mount/unmount
+  useEffect(() => {
+    console.log('[OperationsScreen] MOUNTED');
+    return () => {
+      console.log('[OperationsScreen] UNMOUNTING');
+    };
+  }, []);
 
   // Track searchOverlayVisible changes
   useEffect(() => {
