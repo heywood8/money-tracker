@@ -26,10 +26,9 @@ describe('DescriptionSuggestionRow', () => {
     expect(getByText('Bus fare')).toBeTruthy();
   });
 
-  it('renders hint and skip labels', () => {
+  it('renders dismiss button', () => {
     const { getByText } = render(<DescriptionSuggestionRow {...baseProps} />);
-    expect(getByText('label this?')).toBeTruthy();
-    expect(getByText('skip')).toBeTruthy();
+    expect(getByText('✕')).toBeTruthy();
   });
 
   it('calls onApply with chip text when chip is pressed', () => {
@@ -42,12 +41,12 @@ describe('DescriptionSuggestionRow', () => {
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onDismiss when skip is pressed', () => {
+  it('calls onDismiss when ✕ is pressed', () => {
     const onDismiss = jest.fn();
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <DescriptionSuggestionRow {...baseProps} onDismiss={onDismiss} />,
     );
-    fireEvent.press(getByText('skip'));
+    fireEvent.press(getByLabelText('dismiss suggestion'));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 

@@ -48,27 +48,26 @@ describe('OperationListItem', () => {
 
   describe('Suggestion Row Rendering', () => {
     it('renders without suggestion row when suggestionChips is not provided', () => {
-      const { queryByText } = render(<OperationListItem {...baseProps} />);
-      expect(queryByText('label this?')).toBeNull();
-      expect(queryByText('skip')).toBeNull();
+      const { queryByLabelText } = render(<OperationListItem {...baseProps} />);
+      expect(queryByLabelText('dismiss suggestion')).toBeNull();
     });
 
     it('renders without suggestion row when suggestionChips is null', () => {
-      const { queryByText } = render(
+      const { queryByLabelText } = render(
         <OperationListItem {...baseProps} suggestionChips={null} />,
       );
-      expect(queryByText('label this?')).toBeNull();
+      expect(queryByLabelText('dismiss suggestion')).toBeNull();
     });
 
     it('renders without suggestion row when suggestionChips is empty array', () => {
-      const { queryByText } = render(
+      const { queryByLabelText } = render(
         <OperationListItem {...baseProps} suggestionChips={[]} />,
       );
-      expect(queryByText('label this?')).toBeNull();
+      expect(queryByLabelText('dismiss suggestion')).toBeNull();
     });
 
     it('renders suggestion row with chips when suggestionChips is provided', () => {
-      const { getByText } = render(
+      const { getByText, getByLabelText } = render(
         <OperationListItem
           {...baseProps}
           suggestionChips={['Monthly pass', 'Bus fare']}
@@ -76,7 +75,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={jest.fn()}
         />,
       );
-      expect(getByText('label this?')).toBeTruthy();
+      expect(getByLabelText('dismiss suggestion')).toBeTruthy();
       expect(getByText('Monthly pass')).toBeTruthy();
       expect(getByText('Bus fare')).toBeTruthy();
     });
@@ -97,9 +96,9 @@ describe('OperationListItem', () => {
       expect(onApplySuggestion).toHaveBeenCalledWith('Monthly pass');
     });
 
-    it('calls onDismissSuggestion when skip is pressed', () => {
+    it('calls onDismissSuggestion when ✕ is pressed', () => {
       const onDismissSuggestion = jest.fn();
-      const { getByText } = render(
+      const { getByLabelText } = render(
         <OperationListItem
           {...baseProps}
           suggestionChips={['Monthly pass']}
@@ -107,7 +106,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={onDismissSuggestion}
         />,
       );
-      fireEvent.press(getByText('skip'));
+      fireEvent.press(getByLabelText('dismiss suggestion'));
       expect(onDismissSuggestion).toHaveBeenCalledTimes(1);
     });
 
@@ -231,7 +230,7 @@ describe('OperationListItem', () => {
 
     it('accepts default onDismissSuggestion when not provided', () => {
       // Should accept undefined onDismissSuggestion and use default
-      const { getByText } = render(
+      const { getByLabelText } = render(
         <OperationListItem
           {...baseProps}
           suggestionChips={['Test chip']}
@@ -239,7 +238,7 @@ describe('OperationListItem', () => {
           onDismissSuggestion={undefined}
         />,
       );
-      expect(getByText('skip')).toBeTruthy();
+      expect(getByLabelText('dismiss suggestion')).toBeTruthy();
     });
   });
 
