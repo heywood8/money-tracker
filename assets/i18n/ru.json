@@ -274,7 +274,7 @@
   "full_year": "Весь год",
   "filter_operations": "Фильтр операций",
   "search": "Поиск",
-  "search_operations_placeholder": "Поиск по описанию, сумме, счету...",
+  "search_operations_placeholder": "Поиск операций...",
   "search_helper_text": "Поиск по описанию, сумме, названию счета и категории",
   "operation_type": "Тип",
   "date_range": "Период",
@@ -284,7 +284,7 @@
   "min_amount": "Мин",
   "max_amount": "Макс",
   "apply_filters": "Применить",
-  "clear_all": "Очистить все",
+  "clear_all": "Очистить всё",
   "active_filters": "Фильтры активны",
   "clear": "Очистить",
   "no_operations_matching_filters": "Нет операций, соответствующих фильтрам",
@@ -354,5 +354,7 @@
   "delete_backup": "Удалить резервную копию",
   "delete_backup_confirm": "Удалить эту резервную копию? Это действие нельзя отменить.",
   "net_worth": "Чистый капитал",
-  "this_month": "в этом месяце"
+  "this_month": "в этом месяце",
+  "keep_filters_active": "Сохранить фильтры активными?",
+  "keep_filters": "Сохранить фильтры"
 }

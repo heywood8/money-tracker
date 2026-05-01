@@ -276,7 +276,7 @@
   "full_year": "Full Year",
   "filter_operations": "Filter Operations",
   "search": "Search",
-  "search_operations_placeholder": "Search description, amount, account...",
+  "search_operations_placeholder": "Search operations...",
   "search_helper_text": "Search across description, amount, account name, and category",
   "operation_type": "Type",
   "date_range": "Date Range",
@@ -356,5 +356,7 @@
   "delete_backup": "Delete Backup",
   "delete_backup_confirm": "Delete this backup? This cannot be undone.",
   "net_worth": "Net Worth",
-  "this_month": "this month"
+  "this_month": "this month",
+  "keep_filters_active": "Keep filters active?",
+  "keep_filters": "Keep Filters"
 }

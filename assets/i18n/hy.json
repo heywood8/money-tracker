@@ -275,7 +275,7 @@
   "full_year": "Ամբողջ տարի",
   "filter_operations": "Զտել գործարքները",
   "search": "Որոնել",
-  "search_operations_placeholder": "Որոնել նկարագրություն, գումար, հաշիվ...",
+  "search_operations_placeholder": "Որոնել գործարքներ...",
   "search_helper_text": "Որոնել նկարագրության, գումարի, հաշվի անվան և կատեգորիայի միջոցով",
   "operation_type": "Տեսակ",
   "date_range": "Ամսաթվի միջակայք",
@@ -342,5 +342,7 @@
   "delete_backup": "Ջնջել կրկնօրինակը",
   "delete_backup_confirm": "Ջնջե՞լ այս կրկնօրինակը: Հնարավոր չէ վերականգնել:",
   "net_worth": "Զուտ արժողություն",
-  "this_month": "այս ամիս"
+  "this_month": "այս ամիս",
+  "keep_filters_active": "Պահպանել զտիչները ակտիվ?",
+  "keep_filters": "Պահպանել զտիչները"
 }

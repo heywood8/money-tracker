@@ -115,5 +115,7 @@
   "delete_backup": "Elimina backup",
   "delete_backup_confirm": "Eliminare questo backup? Questa azione non può essere annullata.",
   "net_worth": "Patrimonio Netto",
-  "this_month": "questo mese"
+  "this_month": "questo mese",
+  "keep_filters_active": "Mantenere i filtri attivi?",
+  "keep_filters": "Mantieni Filtri"
 }

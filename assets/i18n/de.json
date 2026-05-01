@@ -276,7 +276,7 @@
   "full_year": "Volles Jahr",
   "filter_operations": "Vorgänge filtern",
   "search": "Suchen",
-  "search_operations_placeholder": "Beschreibung, Betrag, Konto suchen...",
+  "search_operations_placeholder": "Vorgänge suchen...",
   "search_helper_text": "Suche in Beschreibung, Betrag, Kontoname und Kategorie",
   "operation_type": "Typ",
   "date_range": "Datumsbereich",
@@ -356,5 +356,7 @@
   "delete_backup": "Backup löschen",
   "delete_backup_confirm": "Dieses Backup löschen? Dies kann nicht rückgängig gemacht werden.",
   "net_worth": "Nettovermögen",
-  "this_month": "diesen Monat"
+  "this_month": "diesen Monat",
+  "keep_filters_active": "Filter aktiv halten?",
+  "keep_filters": "Filter Behalten"
 }

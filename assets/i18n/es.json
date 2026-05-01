@@ -276,7 +276,7 @@
   "full_year": "Año completo",
   "filter_operations": "Filtrar operaciones",
   "search": "Buscar",
-  "search_operations_placeholder": "Buscar descripción, cantidad, cuenta...",
+  "search_operations_placeholder": "Buscar operaciones...",
   "search_helper_text": "Buscar en descripción, cantidad, nombre de cuenta y categoría",
   "operation_type": "Tipo",
   "date_range": "Rango de fechas",
@@ -356,5 +356,7 @@
   "delete_backup": "Eliminar copia de seguridad",
   "delete_backup_confirm": "¿Eliminar esta copia de seguridad? Esta acción no se puede deshacer.",
   "net_worth": "Patrimonio Neto",
-  "this_month": "este mes"
+  "this_month": "este mes",
+  "keep_filters_active": "¿Mantener filtros activos?",
+  "keep_filters": "Mantener Filtros"
 }

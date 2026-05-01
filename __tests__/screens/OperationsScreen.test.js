@@ -95,18 +95,6 @@ jest.mock('../../app/modals/OperationModal', () => {
   };
 });
 
-jest.mock('../../app/components/FilterModal', () => {
-  const React = require('react');
-  return function MockFilterModal(props) {
-    return React.createElement('FilterModal', {
-      testID: 'filter-modal',
-      visible: props.visible,
-      onClose: props.onClose,
-      onApplyFilters: props.onApplyFilters,
-    });
-  };
-});
-
 jest.mock('../../app/components/operations/OperationsList', () => {
   const React = require('react');
   return React.forwardRef(function MockOperationsList(props, ref) {
