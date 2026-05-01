@@ -24,6 +24,8 @@ export const useOperationsData = () => {
 };
 
 export const OperationsDataProvider = ({ children }) => {
+  console.log('[OperationsDataProvider] Component rendered');
+
   // Dependencies from other contexts
   const { accounts } = useAccountsData();
   const { categories } = useCategories();
@@ -52,6 +54,11 @@ export const OperationsDataProvider = ({ children }) => {
     dateRange: { startDate: null, endDate: null },
     amountRange: { min: null, max: null },
   });
+
+  // Track searchState changes
+  useEffect(() => {
+    console.log('[OperationsDataContext] searchState changed:', searchState);
+  }, [searchState]);
 
   // Legacy filter state tracking (for backwards compatibility)
   const [filtersActive, setFiltersActive] = useState(false);

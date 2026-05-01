@@ -7,10 +7,12 @@ export const SearchProvider = ({ children }) => {
   const [searchHandler, setSearchHandler] = useState(null);
 
   const registerSearchHandler = useCallback((handler) => {
+    console.log('[SearchContext] registerSearchHandler called with:', handler ? 'function' : 'null');
     setSearchHandler(() => handler);
   }, []);
 
   const openSearch = useCallback(() => {
+    console.log('[SearchContext] openSearch called, searchHandler exists:', !!searchHandler);
     if (searchHandler) {
       searchHandler();
     }

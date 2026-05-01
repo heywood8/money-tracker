@@ -159,9 +159,18 @@ const OperationsScreen = () => {
 
   // Register search handler with SearchContext
   useEffect(() => {
+    console.log('[OperationsScreen] Registering search handler');
     registerSearchHandler(handleOpenSearch);
-    return () => registerSearchHandler(null);
+    return () => {
+      console.log('[OperationsScreen] Unregistering search handler');
+      registerSearchHandler(null);
+    };
   }, [handleOpenSearch]);
+
+  // Track searchOverlayVisible changes
+  useEffect(() => {
+    console.log('[OperationsScreen] searchOverlayVisible changed to:', searchOverlayVisible);
+  }, [searchOverlayVisible]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
@@ -524,10 +533,12 @@ const OperationsScreen = () => {
   }, []);
 
   const handleOpenSearch = useCallback(() => {
+    console.log('[OperationsScreen] handleOpenSearch called');
     setSearchOverlayVisible(true);
   }, []);
 
   const handleCloseSearch = useCallback(() => {
+    console.log('[OperationsScreen] handleCloseSearch called');
     setSearchOverlayVisible(false);
   }, []);
 

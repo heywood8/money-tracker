@@ -20,6 +20,8 @@ import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useCategories } from '../../contexts/CategoriesContext';
 
 const SearchOverlay = ({ onClose, colors, t }) => {
+  console.log('[SearchOverlay] Component rendered');
+
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [localSearchText, setLocalSearchText] = useState('');
 
@@ -32,13 +34,20 @@ const SearchOverlay = ({ onClose, colors, t }) => {
   const overlayOpacity = useSharedValue(0);
 
   useEffect(() => {
+    console.log('[SearchOverlay] Mounted');
     // Slide in animation on mount
     slideAnim.value = withSpring(0, { damping: 20, stiffness: 300 });
+
+    return () => {
+      console.log('[SearchOverlay] Unmounting');
+    };
   }, []);
 
   useEffect(() => {
+    console.log('[SearchOverlay] localSearchText changed to:', localSearchText);
     // Debounce search text input
     const timer = setTimeout(() => {
+      console.log('[SearchOverlay] Setting search text after debounce:', localSearchText);
       setSearchText(localSearchText);
     }, 300);
 
@@ -58,12 +67,14 @@ const SearchOverlay = ({ onClose, colors, t }) => {
   });
 
   const handleToggleFilters = useCallback(() => {
+    console.log('[SearchOverlay] handleToggleFilters called');
     const willExpand = !filtersExpanded;
     setFiltersExpanded(willExpand);
     overlayOpacity.value = withTiming(willExpand ? 0.3 : 0, { duration: 200 });
   }, [filtersExpanded, overlayOpacity]);
 
   const handleCloseOverlay = useCallback(() => {
+    console.log('[SearchOverlay] handleCloseOverlay called, hasActiveSearch:', hasActiveSearch);
     // Check if filters are active
     if (hasActiveSearch) {
       Alert.alert(
@@ -74,6 +85,7 @@ const SearchOverlay = ({ onClose, colors, t }) => {
             text: t('clear_all'),
             style: 'destructive',
             onPress: () => {
+              console.log('[SearchOverlay] Clear all pressed');
               clearAllSearch();
               onClose();
             },
@@ -81,6 +93,7 @@ const SearchOverlay = ({ onClose, colors, t }) => {
           {
             text: t('keep_filters'),
             onPress: () => {
+              console.log('[SearchOverlay] Keep filters pressed');
               onClose();
             },
           },
@@ -88,6 +101,7 @@ const SearchOverlay = ({ onClose, colors, t }) => {
         { cancelable: true },
       );
     } else {
+      console.log('[SearchOverlay] Calling onClose directly (no active filters)');
       onClose();
     }
   }, [hasActiveSearch, clearAllSearch, onClose, t]);
