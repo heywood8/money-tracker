@@ -13,7 +13,7 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 
 const APP_VERSION = require('../../package.json').version;
 
-export default function Header({ onOpenSettings }) {
+export default function Header({ onOpenSettings, rightContent }) {
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -76,45 +76,49 @@ export default function Header({ onOpenSettings }) {
         </View>
       </View>
       <View style={styles.buttonContainer}>
-        {isDownloading && (
-          <View
-            style={styles.downloadIndicator}
-            accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
-            accessibilityRole="progressbar"
-            testID="download-indicator"
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-              {`${Math.round((downloadProgress ?? 0) * 100)}%`}
-            </Text>
-          </View>
+        {rightContent || (
+          <>
+            {isDownloading && (
+              <View
+                style={styles.downloadIndicator}
+                accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+                accessibilityRole="progressbar"
+                testID="download-indicator"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+                  {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={toggleTheme}
+              testID="theme-toggle-button"
+              accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              accessibilityRole="button"
+              accessibilityHint="Toggles between light and dark theme"
+              style={styles.themeButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={colorScheme === 'dark' ? 'moon' : 'sunny'}
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onOpenSettings}
+              testID="settings-button"
+              accessibilityLabel={t('settings')}
+              accessibilityRole="button"
+              accessibilityHint="Opens settings menu"
+              style={styles.settingsButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="settings-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </>
         )}
-        <TouchableOpacity
-          onPress={toggleTheme}
-          testID="theme-toggle-button"
-          accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          accessibilityRole="button"
-          accessibilityHint="Toggles between light and dark theme"
-          style={styles.themeButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={colorScheme === 'dark' ? 'moon' : 'sunny'}
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onOpenSettings}
-          testID="settings-button"
-          accessibilityLabel={t('settings')}
-          accessibilityRole="button"
-          accessibilityHint="Opens settings menu"
-          style={styles.settingsButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -122,10 +126,12 @@ export default function Header({ onOpenSettings }) {
 
 Header.propTypes = {
   onOpenSettings: PropTypes.func,
+  rightContent: PropTypes.node,
 };
 
 Header.defaultProps = {
   onOpenSettings: () => {},
+  rightContent: null,
 };
 
 const styles = StyleSheet.create({
