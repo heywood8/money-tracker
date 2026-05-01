@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.75.0](https://github.com/heywood8/money-tracker/compare/penny-v0.74.0...penny-v0.75.0) (2026-05-01)
+
+
+### Features
+
+* redesign description suggestion row UX ([#430](https://github.com/heywood8/money-tracker/issues/430)) ([d6e6cdd](https://github.com/heywood8/money-tracker/commit/d6e6cdd9245071399a84643cfa05ea05668fab2d))
+* redesign operations filter to integrated header search ([#431](https://github.com/heywood8/money-tracker/issues/431)) ([eb864da](https://github.com/heywood8/money-tracker/commit/eb864dab1ccda3f64a4b7dcfb1afffd53a3299f9))
+
 ## [0.74.0](https://github.com/heywood8/money-tracker/compare/penny-v0.73.3...penny-v0.74.0) (2026-04-30)
 
 
