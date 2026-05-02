@@ -195,9 +195,9 @@ describe('SearchBar', () => {
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should have subtle background (8% opacity) for visibility
+      // Should have subtle background (21% opacity) for visibility
       expect(containerStyle.backgroundColor).toBeDefined();
-      expect(containerStyle.backgroundColor).toMatch(/08$/);
+      expect(containerStyle.backgroundColor).toMatch(/15$/);
     });
 
     it('search input container has proper padding for underline style', () => {
