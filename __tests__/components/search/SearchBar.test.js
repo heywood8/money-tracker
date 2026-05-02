@@ -239,10 +239,9 @@ describe('SearchBar', () => {
     });
 
     it('filter icon uses primary color when filterCount > 0', () => {
-      const { getByTestId, UNSAFE_getAllByType } = render(
+      const { UNSAFE_getAllByType } = render(
         <SearchBar {...defaultProps} filterCount={2} colors={{ ...mockColors, primary: '#FF3B30' }} />,
       );
-      const button = getByTestId('filters-toggle-button');
       const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
       // The first icon in the button is the filter-variant icon
       const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
@@ -250,10 +249,9 @@ describe('SearchBar', () => {
     });
 
     it('filter icon uses text color when filterCount is 0', () => {
-      const { getByTestId, UNSAFE_getAllByType } = render(
+      const { UNSAFE_getAllByType } = render(
         <SearchBar {...defaultProps} filterCount={0} colors={{ ...mockColors, text: '#CCCCCC' }} />,
       );
-      const button = getByTestId('filters-toggle-button');
       const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
       const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
       expect(filterIcon.props.color).toBe('#CCCCCC');
