@@ -23,6 +23,14 @@ describe('SearchContext', () => {
       expect(result.current.registerSearchHandler).toBeInstanceOf(Function);
       expect(result.current.openSearch).toBeInstanceOf(Function);
     });
+
+    it('initializes with searchMode as closed', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      expect(result.current.searchMode).toBe('closed');
+    });
   });
 
   describe('Handler Registration', () => {

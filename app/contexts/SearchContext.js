@@ -5,6 +5,7 @@ const SearchContext = createContext(null);
 
 export const SearchProvider = ({ children }) => {
   const [searchHandler, setSearchHandler] = useState(null);
+  const [searchMode, setSearchMode] = useState('closed');
 
   const registerSearchHandler = useCallback((handler) => {
     console.log('[SearchContext] registerSearchHandler called with:', handler ? 'function' : 'null');
@@ -19,8 +20,8 @@ export const SearchProvider = ({ children }) => {
   }, [searchHandler]);
 
   const value = useMemo(
-    () => ({ registerSearchHandler, openSearch }),
-    [registerSearchHandler, openSearch],
+    () => ({ registerSearchHandler, openSearch, searchMode }),
+    [registerSearchHandler, openSearch, searchMode],
   );
 
   return (
