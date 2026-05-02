@@ -21,8 +21,9 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch } = useSearch();
+  const { openSearch, searchMode } = useSearch();
   console.log('[Header] openSearch exists:', !!openSearch);
+  console.log('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
 
   const fetchDbVersion = useCallback(async () => {
@@ -67,87 +68,97 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
         },
       ]}
     >
-      <View style={styles.titleContainer}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.icon}
-          accessibilityLabel="Penny app icon"
-        />
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
-          <Text style={[styles.version, { color: colors.mutedText }]}>
-            v{APP_VERSION} | DB v{dbVersion || '?'}
+      {searchMode === 'open' ? (
+        <View testID="search-bar-placeholder" style={styles.searchPlaceholder}>
+          <Text style={[styles.placeholderText, { color: colors.mutedText }]}>
+            SearchBar will be integrated in Task 7
           </Text>
         </View>
-      </View>
-      <View style={styles.buttonContainer}>
-        {rightContent || (
-          <>
-            {isDownloading && (
-              <View
-                style={styles.downloadIndicator}
-                accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
-                accessibilityRole="progressbar"
-                testID="download-indicator"
-              >
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-                  {`${Math.round((downloadProgress ?? 0) * 100)}%`}
-                </Text>
-              </View>
-            )}
-            {activeScreen === 'Operations' && (
-              <View style={styles.searchButtonContainer}>
+      ) : (
+        <>
+          <View style={styles.titleContainer}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.icon}
+              accessibilityLabel="Penny app icon"
+            />
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+              <Text style={[styles.version, { color: colors.mutedText }]}>
+                v{APP_VERSION} | DB v{dbVersion || '?'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.buttonContainer}>
+            {rightContent || (
+              <>
+                {isDownloading && (
+                  <View
+                    style={styles.downloadIndicator}
+                    accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+                    accessibilityRole="progressbar"
+                    testID="download-indicator"
+                  >
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+                      {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+                    </Text>
+                  </View>
+                )}
+                {activeScreen === 'Operations' && (
+                  <View style={styles.searchButtonContainer}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('[Header] Search button pressed!');
+                        openSearch();
+                      }}
+                      testID="search-button"
+                      accessibilityLabel="Search operations"
+                      accessibilityRole="button"
+                      style={styles.searchButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="search-outline" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    {operationsData?.hasActiveSearch && (
+                      <FilterBadge
+                        count={operationsData.getSearchFilterCount()}
+                        colors={colors}
+                      />
+                    )}
+                  </View>
+                )}
                 <TouchableOpacity
-                  onPress={() => {
-                    console.log('[Header] Search button pressed!');
-                    openSearch();
-                  }}
-                  testID="search-button"
-                  accessibilityLabel="Search operations"
+                  onPress={toggleTheme}
+                  testID="theme-toggle-button"
+                  accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
                   accessibilityRole="button"
-                  style={styles.searchButton}
+                  accessibilityHint="Toggles between light and dark theme"
+                  style={styles.themeButton}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="search-outline" size={24} color={colors.text} />
-                </TouchableOpacity>
-                {operationsData?.hasActiveSearch && (
-                  <FilterBadge
-                    count={operationsData.getSearchFilterCount()}
-                    colors={colors}
+                  <Ionicons
+                    name={colorScheme === 'dark' ? 'moon' : 'sunny'}
+                    size={24}
+                    color={colors.text}
                   />
-                )}
-              </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onOpenSettings}
+                  testID="settings-button"
+                  accessibilityLabel={t('settings')}
+                  accessibilityRole="button"
+                  accessibilityHint="Opens settings menu"
+                  style={styles.settingsButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="settings-outline" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </>
             )}
-            <TouchableOpacity
-              onPress={toggleTheme}
-              testID="theme-toggle-button"
-              accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              accessibilityRole="button"
-              accessibilityHint="Toggles between light and dark theme"
-              style={styles.themeButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons
-                name={colorScheme === 'dark' ? 'moon' : 'sunny'}
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onOpenSettings}
-              testID="settings-button"
-              accessibilityLabel={t('settings')}
-              accessibilityRole="button"
-              accessibilityHint="Opens settings menu"
-              style={styles.settingsButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="settings-outline" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -191,11 +202,19 @@ const styles = StyleSheet.create({
     marginRight: 4,
     width: 50,
   },
+  placeholderText: {
+    fontSize: 12,
+  },
   searchButton: {
     padding: 8,
   },
   searchButtonContainer: {
     position: 'relative',
+  },
+  searchPlaceholder: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
   },
   settingsButton: {
     padding: 8,
