@@ -194,12 +194,12 @@ describe('SearchBar', () => {
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should have very subtle background (5% opacity)
+      // Should have subtle background (10% opacity for visibility)
       expect(containerStyle.backgroundColor).toBeDefined();
-      expect(containerStyle.backgroundColor).toMatch(/05$/);
-      // Border color should be subtle (12% opacity)
+      expect(containerStyle.backgroundColor).toMatch(/10$/);
+      // Border color should be visible (25% opacity)
       expect(containerStyle.borderColor).toBeDefined();
-      expect(containerStyle.borderColor).toMatch(/12$/);
+      expect(containerStyle.borderColor).toMatch(/25$/);
     });
 
     it('search input container has proper padding for modern rounded style', () => {
