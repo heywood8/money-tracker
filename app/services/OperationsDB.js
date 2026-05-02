@@ -241,13 +241,13 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim()}%`;
+      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
       sql += ` AND (
-        o.description LIKE ? COLLATE NOCASE
+        LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR a.name LIKE ? COLLATE NOCASE
-        OR to_a.name LIKE ? COLLATE NOCASE
-        OR c.name LIKE ? COLLATE NOCASE
+        OR LOWER(a.name) LIKE ?
+        OR LOWER(to_a.name) LIKE ?
+        OR LOWER(c.name) LIKE ?
       )`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -1049,13 +1049,13 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim()}%`;
+      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
       sql += ` AND (
-        o.description LIKE ? COLLATE NOCASE
+        LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR a.name LIKE ? COLLATE NOCASE
-        OR to_a.name LIKE ? COLLATE NOCASE
-        OR c.name LIKE ? COLLATE NOCASE
+        OR LOWER(a.name) LIKE ?
+        OR LOWER(to_a.name) LIKE ?
+        OR LOWER(c.name) LIKE ?
       )`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -1142,13 +1142,13 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim()}%`;
+      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
       sql += ` AND (
-        o.description LIKE ? COLLATE NOCASE
+        LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR a.name LIKE ? COLLATE NOCASE
-        OR to_a.name LIKE ? COLLATE NOCASE
-        OR c.name LIKE ? COLLATE NOCASE
+        OR LOWER(a.name) LIKE ?
+        OR LOWER(to_a.name) LIKE ?
+        OR LOWER(c.name) LIKE ?
       )`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -1304,13 +1304,13 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim()}%`;
+      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
       sql += ` AND (
-        o.description LIKE ? COLLATE NOCASE
+        LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR a.name LIKE ? COLLATE NOCASE
-        OR to_a.name LIKE ? COLLATE NOCASE
-        OR c.name LIKE ? COLLATE NOCASE
+        OR LOWER(a.name) LIKE ?
+        OR LOWER(to_a.name) LIKE ?
+        OR LOWER(c.name) LIKE ?
       )`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -1409,13 +1409,13 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim()}%`;
+      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
       sql += ` AND (
-        o.description LIKE ? COLLATE NOCASE
+        LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR a.name LIKE ? COLLATE NOCASE
-        OR to_a.name LIKE ? COLLATE NOCASE
-        OR c.name LIKE ? COLLATE NOCASE
+        OR LOWER(a.name) LIKE ?
+        OR LOWER(to_a.name) LIKE ?
+        OR LOWER(c.name) LIKE ?
       )`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
