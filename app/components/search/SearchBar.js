@@ -28,8 +28,14 @@ const SearchBar = ({
   }, [onSearchTextChange]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      <View style={[styles.searchInputContainer, { backgroundColor: colors.secondary, borderColor: colors.inputBorder }]}>
+    <View
+      testID="search-bar-container"
+      style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+    >
+      <View
+        testID="search-input-container"
+        style={[styles.searchInputContainer, { backgroundColor: colors.secondary, borderColor: colors.inputBorder }]}
+      >
         <Icon name="magnify" size={20} color={colors.mutedText} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
@@ -114,6 +120,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
+    gap: 12,
     height: 56,
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -147,12 +154,9 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 12,
   },
 });
 

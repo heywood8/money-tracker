@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import SearchBar from '../../../app/components/search/SearchBar';
 
@@ -133,5 +134,24 @@ describe('SearchBar', () => {
 
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledTimes(1);
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
+  });
+
+  describe('SearchBar layout', () => {
+    it('search input container uses flex: 1 to take full available width', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.flex).toBe(1);
+    });
+
+    it('container has proper gap between elements', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      // Query parent container
+      const searchBar = getByTestId('search-bar-container');
+
+      const barStyle = StyleSheet.flatten(searchBar.props.style);
+      expect(barStyle.gap).toBe(12);
+    });
   });
 });
