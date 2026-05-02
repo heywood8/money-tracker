@@ -362,9 +362,12 @@ export default function SettingsModal({ visible, onClose }) {
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
 
       if (!result.success) {
+        const errorMessage = result.errorCode === 'releases_without_apks'
+          ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
+          : (t('update_check_failed') || 'Could not check updates right now. Please try again later.');
         showDialog(
           t('check_updates') || 'Check for updates',
-          t('update_check_failed') || 'Could not check updates right now. Please try again later.',
+          errorMessage,
           [{ text: t('ok') || 'OK' }],
         );
         return;
