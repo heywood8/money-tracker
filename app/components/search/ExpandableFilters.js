@@ -74,7 +74,7 @@ const ExpandableFilters = ({
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('operation_type')}
           </Text>
           <View style={styles.chipContainer}>
@@ -107,7 +107,7 @@ const ExpandableFilters = ({
 
         {/* Date Range Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('date_range')}
           </Text>
           <View style={styles.dateRangeContainer}>
@@ -145,7 +145,7 @@ const ExpandableFilters = ({
 
         {/* Amount Range Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('amount_range')}
           </Text>
           <View style={styles.amountRangeContainer}>
@@ -177,7 +177,7 @@ const ExpandableFilters = ({
 
         {/* Accounts Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('accounts')}
           </Text>
           {accounts.map(account => {
@@ -203,7 +203,7 @@ const ExpandableFilters = ({
 
         {/* Categories Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('categories')}
           </Text>
           {categories.filter(c => !c.isShadow).map(category => {
@@ -227,6 +227,22 @@ const ExpandableFilters = ({
             );
           })}
         </View>
+
+        <TouchableOpacity
+          testID="clear-all-button"
+          style={styles.clearAllButton}
+          onPress={() => onFilterChange({
+            types: [],
+            accountIds: [],
+            categoryIds: [],
+            dateRange: { startDate: null, endDate: null },
+            amountRange: { min: null, max: null },
+          })}
+        >
+          <Text style={[styles.clearAllText, { color: colors.primary }]}>
+            {t('clear_all')}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Date Pickers */}
@@ -329,6 +345,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  clearAllButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   clearDateButton: {
     marginTop: 7,
   },
@@ -364,10 +388,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 14,
   },
-  sectionTitle: {
-    fontSize: 16,
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.5,
     marginBottom: 10,
+    textTransform: 'uppercase',
   },
 });
 

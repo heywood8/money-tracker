@@ -99,4 +99,21 @@ describe('ExpandableFilters', () => {
     expect(getByText('Transport')).toBeTruthy();
     expect(queryByText('Shadow Category')).toBeNull();
   });
+
+  it('renders clear all button', () => {
+    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+    expect(getByTestId('clear-all-button')).toBeTruthy();
+  });
+
+  it('calls onFilterChange with all groups reset when clear all is pressed', () => {
+    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+    fireEvent.press(getByTestId('clear-all-button'));
+    expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    });
+  });
 });
