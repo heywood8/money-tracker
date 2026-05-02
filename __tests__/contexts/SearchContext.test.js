@@ -174,6 +174,46 @@ describe('SearchContext', () => {
     });
   });
 
+  describe('Search Mode Management', () => {
+    it('changes searchMode when setSearchMode is called', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('open');
+      });
+      expect(result.current.searchMode).toBe('open');
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+      expect(result.current.searchMode).toBe('collapsed');
+
+      act(() => {
+        result.current.setSearchMode('closed');
+      });
+      expect(result.current.searchMode).toBe('closed');
+    });
+
+    it('validates searchMode values and warns on invalid', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      act(() => {
+        result.current.setSearchMode('invalid');
+      });
+
+      expect(result.current.searchMode).toBe('closed');
+      expect(consoleWarn).toHaveBeenCalledWith('[SearchContext] Invalid searchMode:', 'invalid');
+
+      consoleWarn.mockRestore();
+    });
+  });
+
   describe('Edge Cases', () => {
     it('handles handler that throws error gracefully', () => {
       const errorHandler = jest.fn(() => {
