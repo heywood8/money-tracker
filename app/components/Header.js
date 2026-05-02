@@ -24,7 +24,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch, searchMode, closeSearch } = useSearch();
+  const { openSearch, searchMode, closeSearch, reopenSearch } = useSearch();
   console.log('[Header] openSearch exists:', !!openSearch);
   console.log('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
@@ -128,8 +128,24 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                   <View style={styles.searchButtonContainer}>
                     <TouchableOpacity
                       onPress={() => {
-                        console.log('[Header] Search button pressed!');
-                        openSearch();
+                        console.log('[Header] Search button pressed, mode:', searchMode);
+                        if (searchMode === 'collapsed') {
+                          // Reopen with smart logic
+                          const hasTextOnly = (searchState?.text !== '') &&
+                            (searchState?.types?.length === 0) &&
+                            (searchState?.accountIds?.length === 0) &&
+                            (searchState?.categoryIds?.length === 0) &&
+                            (!searchState?.dateRange?.startDate) &&
+                            (!searchState?.amountRange?.min);
+                          const hasOtherFilters = !hasTextOnly && hasActiveSearch;
+
+                          reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
+                            console.log('[Header] Should expand filters:', shouldExpand);
+                            // This callback will be handled by SearchOverlay in task 10
+                          });
+                        } else {
+                          openSearch();
+                        }
                       }}
                       testID="search-button"
                       accessibilityLabel="Search operations"
@@ -139,9 +155,9 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                     >
                       <Ionicons name="search-outline" size={24} color={colors.text} />
                     </TouchableOpacity>
-                    {operationsData?.hasActiveSearch && (
+                    {searchMode === 'collapsed' && hasActiveSearch && (
                       <FilterBadge
-                        count={operationsData.getSearchFilterCount()}
+                        count={getSearchFilterCount()}
                         colors={colors}
                       />
                     )}
