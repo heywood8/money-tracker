@@ -61,7 +61,10 @@ const SearchBar = ({
         <TouchableOpacity
           testID="filters-toggle-button"
           onPress={onToggleFilters}
-          style={styles.iconButton}
+          style={[
+            styles.iconButton,
+            filterCount > 0 && { backgroundColor: `${colors.primary}15` },
+          ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <View style={styles.filterButtonContent}>

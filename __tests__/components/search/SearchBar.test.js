@@ -208,4 +208,29 @@ describe('SearchBar', () => {
       expect(containerStyle.paddingHorizontal).toBe(4);
     });
   });
+
+  describe('SearchBar filter button active state', () => {
+    it('filter button has transparent background when no filters active', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} filterCount={0} />);
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.backgroundColor).toBeUndefined();
+    });
+
+    it('filter button has subtle background tint when filters active', () => {
+      const mockColors = {
+        ...defaultProps.colors,
+        primary: '#4da3ff',
+      };
+      const { getByTestId } = render(
+        <SearchBar {...defaultProps} colors={mockColors} filterCount={2} />,
+      );
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      // Should have background with primary color at 15% opacity (hex: 15 in decimal)
+      expect(buttonStyle.backgroundColor).toMatch(/#4da3ff/i);
+    });
+  });
 });
