@@ -19,13 +19,9 @@ import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useCategories } from '../../contexts/CategoriesContext';
 
 const SearchOverlay = ({ onClose, colors, t, visible }) => {
-  console.log('[SearchOverlay] Component rendered, visible:', visible);
-
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  // Initialize localSearchText from searchState so it persists across remounts
-  const [localSearchText, setLocalSearchText] = useState(searchState?.text || '');
   const { setSearchText, updateSearchFilters, clearAllSearch } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
   const { categories } = useCategories();
@@ -33,26 +29,13 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
   const slideAnim = useSharedValue(visible ? 0 : -100);
   const overlayOpacity = useSharedValue(0);
 
-  // Animate in/out when visibility changes
   useEffect(() => {
-    console.log('[SearchOverlay] Visibility changed to:', visible);
     if (visible) {
       slideAnim.value = withTiming(0, { duration: 200 });
     } else {
       slideAnim.value = withTiming(-100, { duration: 200 });
     }
   }, [visible]);
-
-  useEffect(() => {
-    console.log('[SearchOverlay] localSearchText changed to:', localSearchText);
-    // Debounce search text input
-    const timer = setTimeout(() => {
-      console.log('[SearchOverlay] Setting search text after debounce:', localSearchText);
-      setSearchText(localSearchText);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [localSearchText, setSearchText]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -141,8 +124,8 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
         pointerEvents="box-none"
       >
         <SearchBar
-          searchText={localSearchText}
-          onSearchTextChange={setLocalSearchText}
+          searchText={searchState?.text || ''}
+          onSearchTextChange={setSearchText}
           onToggleFilters={handleToggleFilters}
           onClose={handleCloseOverlay}
           filterCount={filterCount}
