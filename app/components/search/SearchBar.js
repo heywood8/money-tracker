@@ -35,8 +35,7 @@ const SearchBar = ({
       <View
         testID="search-input-container"
         style={[styles.searchInputContainer, {
-          backgroundColor: `${colors.text}10`,
-          borderColor: `${colors.text}25`,
+          borderBottomColor: colors.inputBorder,
         }]}
       >
         <Icon name="magnify" size={18} color={colors.mutedText} />
@@ -162,13 +161,12 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
+    borderBottomWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
   },
 });
 

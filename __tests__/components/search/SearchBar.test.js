@@ -180,35 +180,32 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar visual style', () => {
-    it('search input container has full border with rounded corners', () => {
+    it('search input container has underline only (borderBottomWidth: 1)', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.borderWidth).toBe(1);
-      expect(containerStyle.borderRadius).toBe(10);
+      expect(containerStyle.borderBottomWidth).toBe(1);
+      expect(containerStyle.borderWidth).toBeUndefined();
+      expect(containerStyle.borderRadius).toBeUndefined();
     });
 
-    it('search input container has subtle background and border colors', () => {
+    it('search input container has no background color in styles', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should have subtle background (10% opacity for visibility)
-      expect(containerStyle.backgroundColor).toBeDefined();
-      expect(containerStyle.backgroundColor).toMatch(/10$/);
-      // Border color should be visible (25% opacity)
-      expect(containerStyle.borderColor).toBeDefined();
-      expect(containerStyle.borderColor).toMatch(/25$/);
+      // Should not have backgroundColor in StyleSheet (may be passed via props)
+      expect(containerStyle.backgroundColor).toBeUndefined();
     });
 
-    it('search input container has proper padding for modern rounded style', () => {
+    it('search input container has proper padding for underline style', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.paddingVertical).toBe(10);
-      expect(containerStyle.paddingHorizontal).toBe(12);
+      expect(containerStyle.paddingVertical).toBe(8);
+      expect(containerStyle.paddingHorizontal).toBe(4);
     });
   });
 
