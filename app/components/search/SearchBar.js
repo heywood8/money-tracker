@@ -29,7 +29,7 @@ const SearchBar = ({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      <View style={styles.searchInputContainer}>
+      <View style={[styles.searchInputContainer, { backgroundColor: colors.secondary, borderColor: colors.inputBorder }]}>
         <Icon name="magnify" size={20} color={colors.mutedText} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
@@ -91,6 +91,8 @@ SearchBar.propTypes = {
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
     surface: PropTypes.string.isRequired,
+    secondary: PropTypes.string.isRequired,
+    inputBorder: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
     mutedText: PropTypes.string.isRequired,
@@ -145,9 +147,12 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
+    paddingHorizontal: 12,
   },
 });
 
