@@ -68,6 +68,9 @@ const OperationsScreen = () => {
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
+  // Synchronous guard: prevents multiple handleContentSizeChange firings from
+  // each scheduling their own scroll before React re-renders with pendingScroll=false.
+  const scrollScheduledRef = useRef(false);
 
   // Custom hooks for form and picker management
   const {
@@ -104,7 +107,7 @@ const OperationsScreen = () => {
 
   // Scroll to date after operations are loaded
   useEffect(() => {
-    if (scrollToDateString && !operationsLoading && groupedOperations.length > 0) {
+    if (scrollToDateString && !operationsLoading) {
       const separatorIndex = groupedOperations.findIndex(
         item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
@@ -113,7 +116,8 @@ const OperationsScreen = () => {
         // Mark that we have a pending scroll
         setPendingScroll(true);
       } else {
-        // Date not found, clear the scroll target
+        // Date not found (no operations on that date or empty result) — clear scroll target
+        scrollScheduledRef.current = false;
         setScrollToDateString(null);
         setPendingScroll(false);
       }
@@ -123,12 +127,21 @@ const OperationsScreen = () => {
   // Handle content size change - this fires after FlatList has laid out content
   // Wait for interactions/layout to finish, then perform a fast, graceful scroll to the target
   const handleContentSizeChange = useCallback((width, height) => {
+    // scrollScheduledRef gates re-entrant calls: between the first scheduling and the
+    // next React re-render (where pendingScroll becomes false), this callback can fire
+    // many times. Without the ref, each firing would queue another InteractionManager
+    // scroll and cause snap-back whenever the user tries to scroll away.
+    if (scrollScheduledRef.current) return;
+
     if (pendingScroll && scrollToDateString && !operationsLoading) {
       const separatorIndex = groupedOperations.findIndex(
         item => item.type === 'dateGroup' && item.date === scrollToDateString,
       );
 
       if (separatorIndex !== -1) {
+        // Synchronously mark as handled before the async scroll so subsequent firings bail out
+        scrollScheduledRef.current = true;
+
         // Defer scroll until after interactions/layout have settled
         InteractionManager.runAfterInteractions(() => {
           try {
@@ -306,6 +319,7 @@ const OperationsScreen = () => {
       } else {
         // Date is not in current list - load from that date to today
         // Set the target date for scrolling after load completes
+        scrollScheduledRef.current = false;
         setScrollToDateString(dateString);
         setPendingScroll(true);
         await jumpToDate(dateString);
