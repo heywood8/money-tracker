@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -12,6 +13,8 @@ import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
 import FilterBadge from './search/FilterBadge';
+import { useOperationsData } from '../contexts/OperationsDataContext';
+import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -21,10 +24,22 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch, searchMode } = useSearch();
+  const { openSearch, searchMode, closeSearch } = useSearch();
   console.log('[Header] openSearch exists:', !!openSearch);
   console.log('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
+
+  const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
+  const { setSearchText } = useOperationsActions();
+
+  const handleCloseSearch = useCallback(() => {
+    closeSearch(hasActiveSearch);
+  }, [closeSearch, hasActiveSearch]);
+
+  const handleToggleFilters = useCallback(() => {
+    console.log('[Header] Toggle filters - handled by SearchOverlay');
+    // SearchOverlay will handle filter expansion (task 10)
+  }, []);
 
   const fetchDbVersion = useCallback(async () => {
     try {
@@ -69,11 +84,15 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
       ]}
     >
       {searchMode === 'open' ? (
-        <View testID="search-bar-placeholder" style={styles.searchPlaceholder}>
-          <Text style={[styles.placeholderText, { color: colors.mutedText }]}>
-            SearchBar will be integrated in Task 7
-          </Text>
-        </View>
+        <SearchBar
+          searchText={searchState?.text || ''}
+          onSearchTextChange={setSearchText}
+          onToggleFilters={handleToggleFilters}
+          onClose={handleCloseSearch}
+          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
+          colors={colors}
+          t={t}
+        />
       ) : (
         <>
           <View style={styles.titleContainer}>
@@ -202,19 +221,11 @@ const styles = StyleSheet.create({
     marginRight: 4,
     width: 50,
   },
-  placeholderText: {
-    fontSize: 12,
-  },
   searchButton: {
     padding: 8,
   },
   searchButtonContainer: {
     position: 'relative',
-  },
-  searchPlaceholder: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
   },
   settingsButton: {
     padding: 8,
