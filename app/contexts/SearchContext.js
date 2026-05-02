@@ -21,9 +21,15 @@ export const SearchProvider = ({ children }) => {
     setInternalSearchMode('open');
   }, []);
 
+  const closeSearch = useCallback((hasActiveFilters) => {
+    console.log('[SearchContext] closeSearch called, hasActiveFilters:', hasActiveFilters);
+    const newMode = hasActiveFilters ? 'collapsed' : 'closed';
+    setInternalSearchMode(newMode);
+  }, []);
+
   const value = useMemo(
-    () => ({ openSearch, searchMode: internalSearchMode, setSearchMode }),
-    [openSearch, internalSearchMode, setSearchMode],
+    () => ({ openSearch, closeSearch, searchMode: internalSearchMode, setSearchMode }),
+    [openSearch, closeSearch, internalSearchMode, setSearchMode],
   );
 
   return (

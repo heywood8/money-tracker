@@ -243,6 +243,42 @@ describe('SearchContext', () => {
 
       consoleWarn.mockRestore();
     });
+
+    it('closes search to closed when no filters are active', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.openSearch();
+      });
+
+      expect(result.current.searchMode).toBe('open');
+
+      act(() => {
+        result.current.closeSearch(false); // false = no active filters
+      });
+
+      expect(result.current.searchMode).toBe('closed');
+    });
+
+    it('closes search to collapsed when filters are active', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.openSearch();
+      });
+
+      expect(result.current.searchMode).toBe('open');
+
+      act(() => {
+        result.current.closeSearch(true); // true = filters active
+      });
+
+      expect(result.current.searchMode).toBe('collapsed');
+    });
   });
 
   describe.skip('Edge Cases (deprecated)', () => {
