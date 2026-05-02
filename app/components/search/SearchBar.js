@@ -35,7 +35,7 @@ const SearchBar = ({
       <View
         testID="search-input-container"
         style={[styles.searchInputContainer, {
-          borderBottomColor: colors.inputBorder,
+          borderBottomColor: colors.mutedText,
         }]}
       >
         <Icon name="magnify" size={18} color={colors.mutedText} />
