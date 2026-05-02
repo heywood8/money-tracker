@@ -76,7 +76,7 @@ searchInputContainer: {
 
 **Visual changes:**
 
-Switch from bordered box to minimal underline:
+Switch from bordered box to minimal underline with subtle background:
 ```javascript
 // REMOVE
 searchInputContainer: {
@@ -88,13 +88,23 @@ searchInputContainer: {
   // ...
 }
 
-// CHANGE TO
+// CHANGE TO (in JSX, dynamic style)
+<View
+  style={[styles.searchInputContainer, {
+    backgroundColor: `${colors.text}15`,  // 21% opacity for visibility
+    borderBottomColor: colors.mutedText,
+  }]}
+>
+
+// Static styles
 searchInputContainer: {
   borderBottomWidth: 1,
-  borderBottomColor: colors.inputBorder,
   paddingVertical: 8,
   paddingHorizontal: 4,
   gap: 12,
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
   // ...
 }
 ```
@@ -236,9 +246,11 @@ No other changes needed - QuickAddForm animation already works correctly with ma
 
 ### Search Input Style
 
-- **Background**: None (transparent)
+- **Background**: `${colors.text}15` (21% opacity) - subtle fill for visibility
+  - _Note: Original mockup specified no background, but React Native rendering on Android requires subtle background for icon and placeholder text to be visible against dark theme surface_
 - **Border**: None on top/left/right
-- **Underline**: 1px solid, `colors.inputBorder` (#555 in dark theme)
+- **Underline**: 1px solid, `colors.mutedText` (#aaa in dark theme)
+  - _Note: Changed from `colors.inputBorder` (#555) which had insufficient contrast (2:1) against dark background. Using `colors.mutedText` (#aaa) provides ~4.5:1 contrast ratio_
 - **Padding**: 8px vertical, 4px horizontal
 - **Icon size**: 18px (magnify icon)
 - **Text color**: `colors.text` when active, `colors.mutedText` for placeholder
@@ -414,9 +426,13 @@ Only internal styling and layout changes.
 ### Theme Compatibility
 
 Changes work with both light and dark themes:
-- Uses theme color tokens (`colors.inputBorder`, `colors.primary`)
+- Uses theme color tokens (`colors.text`, `colors.mutedText`, `colors.primary`)
 - No hardcoded colors
-- Underline visible in both themes (tested: #555 on dark, adequate contrast)
+- Underline visible in both themes (using `colors.mutedText` for ~4.5:1 contrast)
+- Subtle background (21% text color opacity) provides visual definition while maintaining minimal aesthetic
+
+**React Native vs HTML/CSS Rendering:**
+The original mockup (HTML/CSS) specified underline-only with no background. This works in browser rendering but React Native on Android requires the subtle background fill to make the icon and placeholder text visible. The 21% opacity background maintains the clean, minimal aesthetic while ensuring usability.
 
 ## Open Questions
 
