@@ -30,11 +30,14 @@ const SearchBar = ({
   return (
     <View
       testID="search-bar-container"
-      style={[styles.container, { backgroundColor: colors.surface }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View
         testID="search-input-container"
-        style={[styles.searchInputContainer, { borderBottomColor: colors.border }]}
+        style={[styles.searchInputContainer, {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+        }]}
       >
         <Icon name="magnify" size={20} color={colors.text} />
         <TextInput
@@ -99,7 +102,7 @@ SearchBar.propTypes = {
   onClose: PropTypes.func.isRequired,
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
-    surface: PropTypes.string.isRequired,
+    background: PropTypes.string.isRequired,
     inputBorder: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
@@ -159,7 +162,6 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
-    backgroundColor: '#1f1f1f',
     borderBottomWidth: 1,
     borderRadius: 4,
     flex: 1,
