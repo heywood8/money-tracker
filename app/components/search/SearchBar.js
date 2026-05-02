@@ -36,13 +36,13 @@ const SearchBar = ({
         testID="search-input-container"
         style={[styles.searchInputContainer, { borderBottomColor: colors.inputBorder }]}
       >
-        <Icon name="magnify" size={18} color="#aaa" />
+        <Icon name="magnify" size={18} color={colors.mutedText} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           value={localText}
           onChangeText={setLocalText}
           placeholder={t('search_operations_placeholder')}
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.mutedText}
           autoFocus
           autoCorrect={false}
           autoCapitalize="none"
