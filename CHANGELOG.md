@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.77.0](https://github.com/heywood8/money-tracker/compare/penny-v0.76.2...penny-v0.77.0) (2026-05-02)
+
+
+### Features
+
+* **update:** improve app update check to handle releases without APKs ([#442](https://github.com/heywood8/money-tracker/issues/442)) ([7ab278b](https://github.com/heywood8/money-tracker/commit/7ab278b46df58a12a41d5dbf631ed3b9fda15fdd))
+
+
+### Bug Fixes
+
+* scroll-to-date race condition with synchronous guard ([#441](https://github.com/heywood8/money-tracker/issues/441)) ([097574b](https://github.com/heywood8/money-tracker/commit/097574b20053253fa5e9830f12b35acafaac6f66))
+
 ## [0.76.2](https://github.com/heywood8/money-tracker/compare/penny-v0.76.1...penny-v0.76.2) (2026-05-02)
 
 
