@@ -36,7 +36,7 @@ const SearchBar = ({
         testID="search-input-container"
         style={[styles.searchInputContainer, { borderBottomColor: colors.border }]}
       >
-        <Icon name="magnify" size={18} color={colors.mutedText} />
+        <Icon name="magnify" size={20} color={colors.text} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           value={localText}
@@ -124,6 +124,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: 56,
     paddingHorizontal: HORIZONTAL_PADDING,
+    width: '100%',
   },
   filterBadge: {
     alignItems: 'center',
