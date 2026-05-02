@@ -4,13 +4,7 @@ import PropTypes from 'prop-types';
 const SearchContext = createContext(null);
 
 export const SearchProvider = ({ children }) => {
-  const [searchHandler, setSearchHandler] = useState(null);
   const [internalSearchMode, setInternalSearchMode] = useState('closed');
-
-  const registerSearchHandler = useCallback((handler) => {
-    console.log('[SearchContext] registerSearchHandler called with:', handler ? 'function' : 'null');
-    setSearchHandler(() => handler);
-  }, []);
 
   const setSearchMode = useCallback((mode) => {
     const validModes = ['closed', 'open', 'collapsed'];
@@ -23,15 +17,13 @@ export const SearchProvider = ({ children }) => {
   }, []);
 
   const openSearch = useCallback(() => {
-    console.log('[SearchContext] openSearch called, searchHandler exists:', !!searchHandler);
-    if (searchHandler) {
-      searchHandler();
-    }
-  }, [searchHandler]);
+    console.log('[SearchContext] openSearch called');
+    setInternalSearchMode('open');
+  }, []);
 
   const value = useMemo(
-    () => ({ registerSearchHandler, openSearch, searchMode: internalSearchMode, setSearchMode }),
-    [registerSearchHandler, openSearch, internalSearchMode, setSearchMode],
+    () => ({ openSearch, searchMode: internalSearchMode, setSearchMode }),
+    [openSearch, internalSearchMode, setSearchMode],
   );
 
   return (

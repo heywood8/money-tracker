@@ -15,13 +15,14 @@ describe('SearchContext', () => {
       consoleError.mockRestore();
     });
 
-    it('provides default values when no handler is registered', () => {
+    it('provides default values', () => {
       const { result } = renderHook(() => useSearch(), {
         wrapper: SearchProvider,
       });
 
-      expect(result.current.registerSearchHandler).toBeInstanceOf(Function);
       expect(result.current.openSearch).toBeInstanceOf(Function);
+      expect(result.current.setSearchMode).toBeInstanceOf(Function);
+      expect(result.current.searchMode).toBe('closed');
     });
 
     it('initializes with searchMode as closed', () => {
@@ -33,7 +34,7 @@ describe('SearchContext', () => {
     });
   });
 
-  describe('Handler Registration', () => {
+  describe.skip('Handler Registration (deprecated)', () => {
     it('registers a search handler', () => {
       const mockHandler = jest.fn();
       const { result } = renderHook(() => useSearch(), {
@@ -98,7 +99,7 @@ describe('SearchContext', () => {
     });
   });
 
-  describe('Search Invocation', () => {
+  describe.skip('Search Invocation (deprecated)', () => {
     it('calls registered handler when openSearch is invoked', () => {
       const mockHandler = jest.fn();
       const { result } = renderHook(() => useSearch(), {
@@ -149,7 +150,7 @@ describe('SearchContext', () => {
     });
   });
 
-  describe('Multiple Consumers', () => {
+  describe.skip('Multiple Consumers (deprecated)', () => {
     it('provides same context to multiple consumers', () => {
       const mockHandler = jest.fn();
 
@@ -175,6 +176,36 @@ describe('SearchContext', () => {
   });
 
   describe('Search Mode Management', () => {
+    it('sets searchMode to open when openSearch is called', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      expect(result.current.searchMode).toBe('closed');
+
+      act(() => {
+        result.current.openSearch();
+      });
+
+      expect(result.current.searchMode).toBe('open');
+    });
+
+    it('sets searchMode to open from collapsed state', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+
+      act(() => {
+        result.current.openSearch();
+      });
+
+      expect(result.current.searchMode).toBe('open');
+    });
+
     it('changes searchMode when setSearchMode is called', () => {
       const { result } = renderHook(() => useSearch(), {
         wrapper: SearchProvider,
@@ -214,7 +245,7 @@ describe('SearchContext', () => {
     });
   });
 
-  describe('Edge Cases', () => {
+  describe.skip('Edge Cases (deprecated)', () => {
     it('handles handler that throws error gracefully', () => {
       const errorHandler = jest.fn(() => {
         throw new Error('Handler error');

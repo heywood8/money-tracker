@@ -36,7 +36,6 @@ const OperationsScreen = () => {
 
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { registerSearchHandler } = useSearch();
   const {
     operations,
     loading: operationsLoading,
@@ -170,16 +169,6 @@ const OperationsScreen = () => {
       }
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
-
-  // Register search handler with SearchContext
-  useEffect(() => {
-    console.log('[OperationsScreen] Registering search handler');
-    registerSearchHandler(handleOpenSearch);
-    return () => {
-      console.log('[OperationsScreen] Unregistering search handler');
-      registerSearchHandler(null);
-    };
-  }, [handleOpenSearch]);
 
   // Track mount/unmount
   useEffect(() => {
@@ -563,11 +552,6 @@ const OperationsScreen = () => {
   // Handlers for modal visibility
   const handleCloseOperationModal = useCallback(() => {
     setModalVisible(false);
-  }, []);
-
-  const handleOpenSearch = useCallback(() => {
-    console.log('[OperationsScreen] handleOpenSearch called');
-    setSearchOverlayVisible(true);
   }, []);
 
   const handleCloseSearch = useCallback(() => {
