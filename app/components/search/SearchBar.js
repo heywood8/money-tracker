@@ -30,11 +30,14 @@ const SearchBar = ({
   return (
     <View
       testID="search-bar-container"
-      style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+      style={[styles.container, { backgroundColor: colors.surface }]}
     >
       <View
         testID="search-input-container"
-        style={[styles.searchInputContainer, { borderBottomColor: colors.inputBorder }]}
+        style={[styles.searchInputContainer, {
+          backgroundColor: `${colors.text}08`,
+          borderBottomColor: colors.primary,
+        }]}
       >
         <Icon name="magnify" size={18} color={colors.mutedText} />
         <TextInput
@@ -120,7 +123,6 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: 'center',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 12,
     height: 56,
@@ -160,11 +162,12 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
+    borderRadius: 8,
     flex: 1,
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 4,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
 });

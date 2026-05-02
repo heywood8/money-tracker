@@ -180,32 +180,33 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar visual style', () => {
-    it('search input container has underline only (borderBottomWidth: 1)', () => {
+    it('search input container has prominent underline (borderBottomWidth: 2)', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.borderBottomWidth).toBe(1);
+      expect(containerStyle.borderBottomWidth).toBe(2);
       expect(containerStyle.borderWidth).toBeUndefined();
-      expect(containerStyle.borderRadius).toBeUndefined();
+      expect(containerStyle.borderRadius).toBe(8);
     });
 
-    it('search input container has no background color in styles', () => {
+    it('search input container has subtle background color', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should not have backgroundColor in StyleSheet (may be passed via props)
-      expect(containerStyle.backgroundColor).toBeUndefined();
+      // Should have subtle background for visual distinction
+      expect(containerStyle.backgroundColor).toBeDefined();
+      expect(containerStyle.backgroundColor).toMatch(/08$/); // 8% opacity
     });
 
-    it('search input container has proper padding for underline style', () => {
+    it('search input container has proper padding for polished style', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
       expect(containerStyle.paddingVertical).toBe(8);
-      expect(containerStyle.paddingHorizontal).toBe(4);
+      expect(containerStyle.paddingHorizontal).toBe(12);
     });
   });
 
