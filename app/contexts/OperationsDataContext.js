@@ -28,7 +28,7 @@ export const OperationsDataProvider = ({ children }) => {
 
   // Dependencies from other contexts
   const { accounts } = useAccountsData();
-  const { categories } = useCategories();
+  const { categories, getCategoryPath } = useCategories();
   const { t } = useLocalization();
 
   // Core data state
@@ -157,13 +157,13 @@ export const OperationsDataProvider = ({ children }) => {
           return true;
         }
 
-        // match category name
-        const category = categories.find(cat => cat.id === op.categoryId);
-        if (category) {
-          const categoryName = category.nameKey ? t(category.nameKey) : category.name;
-          if (categoryName.toLowerCase().includes(searchLower)) {
-            return true;
-          }
+        // match category name (including parent categories in hierarchy)
+        const categoryPath = getCategoryPath(op.categoryId);
+        if (categoryPath.some(cat => {
+          const name = cat.nameKey ? t(cat.nameKey) : cat.name;
+          return name && name.toLowerCase().includes(searchLower);
+        })) {
+          return true;
         }
 
         // match amount (as string)
@@ -238,7 +238,7 @@ export const OperationsDataProvider = ({ children }) => {
     }
 
     return result;
-  }, [operations, searchState, accounts, categories, t]);
+  }, [operations, searchState, accounts, getCategoryPath, t]);
 
   // Count active filter groups (excluding text search)
   const getSearchFilterCount = useCallback(() => {
