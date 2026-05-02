@@ -66,28 +66,25 @@ const OperationsScreen = () => {
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
 
   const { searchMode } = useSearch();
-  const [quickAddHeight, setQuickAddHeight] = useState(200); // estimated default
-
-  // Animation values
-  const quickAddAnimatedHeight = useSharedValue(quickAddHeight);
-  const quickAddAnimatedOpacity = useSharedValue(1);
+  const quickAddOpacity = useSharedValue(1);
+  const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
 
   // Animate when searchMode changes
   useEffect(() => {
     if (searchMode === 'open') {
       // Hide QuickAddForm
-      quickAddAnimatedHeight.value = withTiming(0, { duration: 300 });
-      quickAddAnimatedOpacity.value = withTiming(0, { duration: 300 });
+      quickAddMaxHeight.value = withTiming(0, { duration: 300 });
+      quickAddOpacity.value = withTiming(0, { duration: 300 });
     } else {
       // Show QuickAddForm
-      quickAddAnimatedHeight.value = withTiming(quickAddHeight, { duration: 300 });
-      quickAddAnimatedOpacity.value = withTiming(1, { duration: 300 });
+      quickAddMaxHeight.value = withTiming(1000, { duration: 300 });
+      quickAddOpacity.value = withTiming(1, { duration: 300 });
     }
-  }, [searchMode, quickAddHeight]);
+  }, [searchMode]);
 
   const animatedQuickAddStyle = useAnimatedStyle(() => ({
-    height: quickAddAnimatedHeight.value,
-    opacity: quickAddAnimatedOpacity.value,
+    maxHeight: quickAddMaxHeight.value,
+    opacity: quickAddOpacity.value,
     overflow: 'hidden',
   }));
 
@@ -577,15 +574,7 @@ const OperationsScreen = () => {
   }, []);
 
   const quickAddFormComponent = useMemo(() => (
-    <Animated.View
-      style={animatedQuickAddStyle}
-      onLayout={(e) => {
-        const height = e.nativeEvent.layout.height;
-        if (height > 0 && height !== quickAddHeight) {
-          setQuickAddHeight(height);
-        }
-      }}
-    >
+    <Animated.View style={animatedQuickAddStyle}>
       <QuickAddForm
         colors={colors}
         t={t}
@@ -610,7 +599,7 @@ const OperationsScreen = () => {
         rateSource={rateSource}
       />
     </Animated.View>
-  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, quickAddHeight]);
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
