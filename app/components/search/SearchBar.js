@@ -36,7 +36,7 @@ const SearchBar = ({
         testID="search-input-container"
         style={[styles.searchInputContainer, { borderBottomColor: colors.inputBorder }]}
       >
-        <Icon name="magnify" size={20} color={colors.mutedText} />
+        <Icon name="magnify" size={18} color={colors.mutedText} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           value={localText}
@@ -65,7 +65,7 @@ const SearchBar = ({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <View style={styles.filterButtonContent}>
-            <Icon name="filter-variant" size={24} color={colors.text} />
+            <Icon name="filter-variant" size={22} color={colors.text} />
             {filterCount > 0 && (
               <View
                 testID="filter-count-badge"
@@ -82,7 +82,7 @@ const SearchBar = ({
           style={styles.iconButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon name="close" size={24} color={colors.text} />
+          <Icon name="close" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>
