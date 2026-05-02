@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.76.1](https://github.com/heywood8/money-tracker/compare/penny-v0.76.0...penny-v0.76.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* eliminate search bar flicker by moving text state into SearchBar ([#437](https://github.com/heywood8/money-tracker/issues/437)) ([79540ae](https://github.com/heywood8/money-tracker/commit/79540ae3334f6d03e1be7b574d26ac7573fde05c))
+
 ## [0.76.0](https://github.com/heywood8/money-tracker/compare/penny-v0.75.1...penny-v0.76.0) (2026-05-02)
 
 
