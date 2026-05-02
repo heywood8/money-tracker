@@ -145,13 +145,15 @@ describe('SearchBar', () => {
       expect(containerStyle.flex).toBe(1);
     });
 
-    it('container has proper gap between elements', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
-      // Query parent container
-      const searchBar = getByTestId('search-bar-container');
+    it('button container has explicit width to prevent overlap', () => {
+      const { UNSAFE_getAllByType } = render(<SearchBar {...defaultProps} />);
+      const views = UNSAFE_getAllByType('View');
+      const buttonContainer = views.find(v => {
+        const style = StyleSheet.flatten(v.props.style);
+        return style && style.width === 96;
+      });
 
-      const barStyle = StyleSheet.flatten(searchBar.props.style);
-      expect(barStyle.gap).toBe(12);
+      expect(buttonContainer).toBeDefined();
     });
   });
 
@@ -180,14 +182,15 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar visual style', () => {
-    it('search input container has underline only (borderBottomWidth: 1)', () => {
+    it('search input container has clean rounded style', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
       expect(containerStyle.borderBottomWidth).toBe(1);
       expect(containerStyle.borderWidth).toBeUndefined();
-      expect(containerStyle.borderRadius).toBeUndefined();
+      expect(containerStyle.borderRadius).toBe(4);
+      expect(containerStyle.height).toBe(44);
     });
 
     it('search input container has subtle background for visibility', () => {
@@ -195,18 +198,17 @@ describe('SearchBar', () => {
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should have subtle background (~12.5% opacity) for visibility
-      expect(containerStyle.backgroundColor).toBeDefined();
-      expect(containerStyle.backgroundColor).toMatch(/20$/);
+      // Solid dark background for clear visual definition
+      expect(containerStyle.backgroundColor).toBe('#1f1f1f');
     });
 
-    it('search input container has proper padding for underline style', () => {
+    it('search input container has proper padding', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.paddingVertical).toBe(8);
-      expect(containerStyle.paddingHorizontal).toBe(4);
+      expect(containerStyle.paddingHorizontal).toBe(12);
+      expect(containerStyle.gap).toBe(12);
     });
   });
 
