@@ -34,18 +34,15 @@ const SearchBar = ({
     >
       <View
         testID="search-input-container"
-        style={[styles.searchInputContainer, {
-          backgroundColor: `${colors.text}20`,
-          borderBottomColor: colors.mutedText,
-        }]}
+        style={[styles.searchInputContainer, { borderBottomColor: colors.inputBorder }]}
       >
-        <Icon name="magnify" size={18} color={colors.mutedText} />
+        <Icon name="magnify" size={18} color="#aaa" />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           value={localText}
           onChangeText={setLocalText}
           placeholder={t('search_operations_placeholder')}
-          placeholderTextColor={colors.mutedText}
+          placeholderTextColor="#666"
           autoFocus
           autoCorrect={false}
           autoCapitalize="none"
@@ -157,7 +154,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 8,
+    height: 40,
   },
   searchInputContainer: {
     alignItems: 'center',
