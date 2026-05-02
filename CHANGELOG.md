@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.76.0](https://github.com/heywood8/money-tracker/compare/penny-v0.75.1...penny-v0.76.0) (2026-05-02)
+
+
+### Features
+
+* make text search case-insensitive in SQL queries ([#435](https://github.com/heywood8/money-tracker/issues/435)) ([e11bc4e](https://github.com/heywood8/money-tracker/commit/e11bc4e0c3e81ed351d7403b88cac7679797ee98))
+
 ## [0.75.1](https://github.com/heywood8/money-tracker/compare/penny-v0.75.0...penny-v0.75.1) (2026-05-01)
 
 
