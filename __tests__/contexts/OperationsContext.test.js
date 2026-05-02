@@ -51,6 +51,7 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
   CategoriesProvider: ({ children }) => children,
   useCategories: () => ({
     categories: [],
+    getCategoryPath: () => [],
     loading: false,
   }),
 }));
