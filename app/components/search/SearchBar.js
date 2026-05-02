@@ -145,7 +145,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   iconButton: {
-    padding: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   searchInput: {
     flex: 1,

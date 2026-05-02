@@ -154,4 +154,28 @@ describe('SearchBar', () => {
       expect(barStyle.gap).toBe(12);
     });
   });
+
+  describe('SearchBar button sizing', () => {
+    it('filter button has proper 44x44px touch target', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.width).toBe(44);
+      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.alignItems).toBe('center');
+      expect(buttonStyle.justifyContent).toBe('center');
+    });
+
+    it('close button has proper 44x44px touch target', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const button = getByTestId('close-search-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.width).toBe(44);
+      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.alignItems).toBe('center');
+      expect(buttonStyle.justifyContent).toBe('center');
+    });
+  });
 });
