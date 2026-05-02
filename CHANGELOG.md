@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.76.2](https://github.com/heywood8/money-tracker/compare/penny-v0.76.1...penny-v0.76.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **search:** support category hierarchy in operations search ([#439](https://github.com/heywood8/money-tracker/issues/439)) ([ccc1922](https://github.com/heywood8/money-tracker/commit/ccc192275f79bf7b5f93d43515cc9eacf88b3c13))
+
 ## [0.76.1](https://github.com/heywood8/money-tracker/compare/penny-v0.76.0...penny-v0.76.1) (2026-05-02)
 
 
