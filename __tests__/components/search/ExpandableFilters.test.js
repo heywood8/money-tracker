@@ -116,4 +116,44 @@ describe('ExpandableFilters', () => {
       amountRange: { min: null, max: null },
     });
   });
+
+  describe('Amount range input', () => {
+    it('preserves decimal point mid-typing without calling onFilterChange', () => {
+      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '1.');
+
+      // onFilterChange should NOT be called while still typing
+      expect(defaultProps.onFilterChange).not.toHaveBeenCalled();
+      // Input should still show '1.'
+      expect(minInput.props.value).toBe('1.');
+    });
+
+    it('calls onFilterChange with parsed float on blur', () => {
+      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '1.5');
+      fireEvent(minInput, 'blur');
+
+      expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+        amountRange: { min: 1.5, max: null },
+      });
+    });
+
+    it('calls onFilterChange with null on blur when input cleared', () => {
+      const { getByPlaceholderText } = render(
+        <ExpandableFilters {...defaultProps} filters={{ ...defaultFilters, amountRange: { min: 5, max: null } }} />,
+      );
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '');
+      fireEvent(minInput, 'blur');
+
+      expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+        amountRange: { min: null, max: null },
+      });
+    });
+  });
 });

@@ -17,6 +17,12 @@ const ExpandableFilters = ({
 }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [localMinAmount, setLocalMinAmount] = useState(
+    filters.amountRange.min !== null ? String(filters.amountRange.min) : '',
+  );
+  const [localMaxAmount, setLocalMaxAmount] = useState(
+    filters.amountRange.max !== null ? String(filters.amountRange.max) : '',
+  );
 
   if (!isExpanded) {
     return null;
@@ -151,10 +157,11 @@ const ExpandableFilters = ({
           <View style={styles.amountRangeContainer}>
             <TextInput
               style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={filters.amountRange.min !== null ? String(filters.amountRange.min) : ''}
-              onChangeText={(text) => {
-                const value = text === '' ? null : parseFloat(text);
-                onFilterChange({ amountRange: { ...filters.amountRange, min: value } });
+              value={localMinAmount}
+              onChangeText={setLocalMinAmount}
+              onBlur={() => {
+                const value = localMinAmount === '' ? null : parseFloat(localMinAmount);
+                onFilterChange({ amountRange: { ...filters.amountRange, min: isNaN(value) ? null : value } });
               }}
               placeholder={t('min_amount')}
               placeholderTextColor={colors.mutedText}
@@ -163,10 +170,11 @@ const ExpandableFilters = ({
             <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
             <TextInput
               style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={filters.amountRange.max !== null ? String(filters.amountRange.max) : ''}
-              onChangeText={(text) => {
-                const value = text === '' ? null : parseFloat(text);
-                onFilterChange({ amountRange: { ...filters.amountRange, max: value } });
+              value={localMaxAmount}
+              onChangeText={setLocalMaxAmount}
+              onBlur={() => {
+                const value = localMaxAmount === '' ? null : parseFloat(localMaxAmount);
+                onFilterChange({ amountRange: { ...filters.amountRange, max: isNaN(value) ? null : value } });
               }}
               placeholder={t('max_amount')}
               placeholderTextColor={colors.mutedText}
