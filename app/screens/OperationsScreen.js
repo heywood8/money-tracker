@@ -64,7 +64,6 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
-  const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
 
   const { searchMode } = useSearch();
   const [quickAddHeight, setQuickAddHeight] = useState(200); // estimated default
@@ -205,10 +204,6 @@ const OperationsScreen = () => {
     };
   }, []);
 
-  // Track searchOverlayVisible changes
-  useEffect(() => {
-    console.log('[OperationsScreen] searchOverlayVisible changed to:', searchOverlayVisible);
-  }, [searchOverlayVisible]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
@@ -581,11 +576,6 @@ const OperationsScreen = () => {
     setModalVisible(false);
   }, []);
 
-  const handleCloseSearch = useCallback(() => {
-    console.log('[OperationsScreen] handleCloseSearch called');
-    setSearchOverlayVisible(false);
-  }, []);
-
   const quickAddFormComponent = useMemo(() => (
     <Animated.View
       style={animatedQuickAddStyle}
@@ -739,10 +729,10 @@ const OperationsScreen = () => {
         />
       )}
 
-      {/* Search Overlay - always rendered to prevent remount animations */}
+      {/* Search Overlay - renders filters when search is open */}
       <SearchOverlay
-        visible={searchOverlayVisible}
-        onClose={handleCloseSearch}
+        visible={searchMode === 'open'}
+        onClose={() => {}}
         colors={colors}
         t={t}
       />
