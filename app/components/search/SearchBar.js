@@ -35,7 +35,7 @@ const SearchBar = ({
       <View
         testID="search-input-container"
         style={[styles.searchInputContainer, {
-          backgroundColor: `${colors.text}15`,
+          backgroundColor: `${colors.text}20`,
           borderBottomColor: colors.mutedText,
         }]}
       >
@@ -126,7 +126,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     height: 56,
-    justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
   },
   filterBadge: {
