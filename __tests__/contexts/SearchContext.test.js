@@ -279,6 +279,63 @@ describe('SearchContext', () => {
 
       expect(result.current.searchMode).toBe('collapsed');
     });
+
+    it('reopens search from collapsed without auto-expanding filters when only text filter', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+
+      const mockCallback = jest.fn();
+
+      act(() => {
+        result.current.reopenSearch(true, false, mockCallback); // hasText=true, hasOtherFilters=false
+      });
+
+      expect(result.current.searchMode).toBe('open');
+      expect(mockCallback).toHaveBeenCalledWith(false); // should NOT auto-expand filters
+    });
+
+    it('reopens search from collapsed and auto-expands filters when other filters present', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+
+      const mockCallback = jest.fn();
+
+      act(() => {
+        result.current.reopenSearch(false, true, mockCallback); // hasText=false, hasOtherFilters=true
+      });
+
+      expect(result.current.searchMode).toBe('open');
+      expect(mockCallback).toHaveBeenCalledWith(true); // should auto-expand filters
+    });
+
+    it('reopens search and auto-expands when both text and other filters', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+
+      const mockCallback = jest.fn();
+
+      act(() => {
+        result.current.reopenSearch(true, true, mockCallback); // both present
+      });
+
+      expect(result.current.searchMode).toBe('open');
+      expect(mockCallback).toHaveBeenCalledWith(true); // should auto-expand filters
+    });
   });
 
   describe.skip('Edge Cases (deprecated)', () => {

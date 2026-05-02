@@ -27,9 +27,20 @@ export const SearchProvider = ({ children }) => {
     setInternalSearchMode(newMode);
   }, []);
 
+  const reopenSearch = useCallback((hasTextFilter, hasOtherFilters, onShouldExpandFilters) => {
+    console.log('[SearchContext] reopenSearch called, hasText:', hasTextFilter, 'hasOther:', hasOtherFilters);
+    setInternalSearchMode('open');
+
+    // Auto-expand filters if other filters (non-text) are present
+    const shouldExpand = hasOtherFilters;
+    if (onShouldExpandFilters) {
+      onShouldExpandFilters(shouldExpand);
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ openSearch, closeSearch, searchMode: internalSearchMode, setSearchMode }),
-    [openSearch, closeSearch, internalSearchMode, setSearchMode],
+    () => ({ openSearch, closeSearch, reopenSearch, searchMode: internalSearchMode, setSearchMode }),
+    [openSearch, closeSearch, reopenSearch, internalSearchMode, setSearchMode],
   );
 
   return (
