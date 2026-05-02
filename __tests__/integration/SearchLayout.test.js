@@ -86,8 +86,8 @@ describe('SearchLayout integration', () => {
     // Flatten all styles to check
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should NOT have absolute positioning
-    expect(styles.position).not.toBe('absolute');
+    // Should use absolute positioning to overlay content from the top
+    expect(styles.position).toBe('absolute');
   });
 
   it('SearchOverlay does not have top offset', () => {
@@ -100,8 +100,8 @@ describe('SearchLayout integration', () => {
     }
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should NOT have top: 56 or any top offset
-    expect(styles.top).toBeUndefined();
+    // Should have top: 0 to anchor at the top of OperationsScreen
+    expect(styles.top).toBe(0);
   });
 
   it('SearchOverlay has proper zIndex for layering', () => {
