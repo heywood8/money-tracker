@@ -78,6 +78,8 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = UPDATE_CHECK_TIME
   }
 };
 
+const MAX_RELEASES_TO_CHECK = 5;
+
 export const checkForAppUpdate = async ({
   currentVersion = APP_VERSION,
   owner = DEFAULT_GITHUB_OWNER,
@@ -94,7 +96,7 @@ export const checkForAppUpdate = async ({
     };
   }
 
-  const endpoint = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=${MAX_RELEASES_TO_CHECK}`;
 
   try {
     const response = await fetchWithTimeout(
@@ -120,32 +122,47 @@ export const checkForAppUpdate = async ({
       };
     }
 
-    const release = await response.json();
-    const latestVersion = parseVersionFromRelease(release);
-    const apkAsset = extractApkAsset(release.assets);
-
-    if (!latestVersion || !apkAsset) {
+    const releases = await response.json();
+    if (!Array.isArray(releases) || releases.length === 0) {
       return {
         success: false,
         isUpdateAvailable: false,
         currentVersion: currentNormalized,
-        latestVersion,
         errorCode: 'invalid_release_data',
       };
     }
 
-    const compare = compareVersions(latestVersion, currentNormalized);
-    const isUpdateAvailable = compare > 0;
+    let foundReleasesWithoutApk = false;
+    for (const release of releases) {
+      const latestVersion = parseVersionFromRelease(release);
+      if (!latestVersion) {
+        continue;
+      }
+
+      const apkAsset = extractApkAsset(release.assets);
+      if (!apkAsset) {
+        foundReleasesWithoutApk = true;
+        continue;
+      }
+
+      const compare = compareVersions(latestVersion, currentNormalized);
+      return {
+        success: true,
+        isUpdateAvailable: compare > 0,
+        currentVersion: currentNormalized,
+        latestVersion,
+        downloadUrl: apkAsset.browser_download_url,
+        releaseUrl: release.html_url || apkAsset.browser_download_url,
+        publishedAt: release.published_at || null,
+        releaseName: release.name || release.tag_name || null,
+      };
+    }
 
     return {
-      success: true,
-      isUpdateAvailable,
+      success: false,
+      isUpdateAvailable: false,
       currentVersion: currentNormalized,
-      latestVersion,
-      downloadUrl: apkAsset.browser_download_url,
-      releaseUrl: release.html_url || apkAsset.browser_download_url,
-      publishedAt: release.published_at || null,
-      releaseName: release.name || release.tag_name || null,
+      errorCode: foundReleasesWithoutApk ? 'releases_without_apks' : 'invalid_release_data',
     };
   } catch (error) {
     const isTimeout = error?.name === 'AbortError';
