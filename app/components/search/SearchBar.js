@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
@@ -63,12 +63,16 @@ const SearchBar = ({
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           testID="filters-toggle-button"
-          onPress={onToggleFilters}
+          onPress={() => {
+            Keyboard.dismiss();
+            onToggleFilters();
+          }}
           style={[
             styles.iconButton,
             filterCount > 0 && { backgroundColor: `${colors.primary}15` },
           ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
         >
           <View style={styles.filterButtonContent}>
             <Icon name="filter-variant" size={22} color={colors.text} />
@@ -128,6 +132,7 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: HORIZONTAL_PADDING,
     width: '100%',
+    zIndex: 100,
   },
   filterBadge: {
     alignItems: 'center',

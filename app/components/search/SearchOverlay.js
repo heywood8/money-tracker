@@ -84,7 +84,11 @@ SearchOverlay.propTypes = {
 
 const styles = StyleSheet.create({
   filtersContainer: {
-    zIndex: 10,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 50,
   },
   overlayBackdrop: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -93,7 +97,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 999,
+    zIndex: 30,
   },
 });
 

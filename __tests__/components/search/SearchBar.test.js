@@ -5,8 +5,10 @@ import SearchBar from '../../../app/components/search/SearchBar';
 
 describe('SearchBar', () => {
   const mockColors = {
+    background: '#1f1f1f',
     surface: '#FFFFFF',
     border: '#E0E0E0',
+    inputBorder: '#E0E0E0',
     text: '#000000',
     mutedText: '#999999',
     primary: '#007AFF',
