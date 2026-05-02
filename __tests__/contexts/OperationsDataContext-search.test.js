@@ -32,9 +32,10 @@ const mockAccounts = [
 ];
 
 const mockCategories = [
-  { id: 'cat-1', name: 'Food', nameKey: 'category.food', type: 'expense' },
-  { id: 'cat-2', name: 'Salary', nameKey: 'category.salary', type: 'income' },
-  { id: 'cat-3', name: 'Transport', nameKey: 'category.transport', type: 'expense' },
+  { id: 'cat-1', name: 'Food', nameKey: 'category.food', type: 'expense', parentId: null },
+  { id: 'cat-2', name: 'Salary', nameKey: 'category.salary', type: 'income', parentId: null },
+  { id: 'cat-3', name: 'Transport', nameKey: 'category.transport', type: 'expense', parentId: null },
+  { id: 'cat-4', name: 'Restaurants', nameKey: null, type: 'expense', parentId: 'cat-1' },
 ];
 
 const mockOperations = [
@@ -104,10 +105,21 @@ jest.mock('../../app/contexts/AccountsActionsContext', () => ({
 }));
 
 // Mock CategoriesContext
+const mockGetCategoryPath = (categoryId) => {
+  const path = [];
+  let current = mockCategories.find(cat => cat.id === categoryId);
+  while (current) {
+    path.unshift(current);
+    current = mockCategories.find(cat => cat.id === current.parentId);
+  }
+  return path;
+};
+
 jest.mock('../../app/contexts/CategoriesContext', () => ({
   CategoriesProvider: ({ children }) => children,
   useCategories: () => ({
     categories: mockCategories,
+    getCategoryPath: mockGetCategoryPath,
     loading: false,
   }),
 }));
@@ -380,6 +392,45 @@ describe('OperationsDataContext - Search API', () => {
           const filtered = result.current.data.operations;
           expect(filtered).toHaveLength(2);
           expect(filtered.map(op => op.id).sort()).toEqual(['op-1', 'op-5']);
+        });
+      });
+
+      it('filters by parent category name match (hierarchy traversal)', async () => {
+        // Add an operation categorized under 'Restaurants' (child of 'Food')
+        OperationsDB.getOperationsByWeekOffset.mockResolvedValue([
+          ...mockOperations,
+          {
+            id: 'op-6',
+            type: 'expense',
+            accountId: 'acc-1',
+            categoryId: 'cat-4', // Restaurants, child of Food
+            amount: '30',
+            description: 'Dinner out',
+            date: '2026-04-12',
+          },
+        ]);
+
+        const { result } = renderHook(
+          () => ({
+            data: useOperationsData(),
+            actions: useOperationsActions(),
+          }),
+          { wrapper },
+        );
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(6);
+        });
+
+        act(() => {
+          result.current.actions.setSearchText('food');
+        });
+
+        await waitFor(() => {
+          const filtered = result.current.data.operations;
+          // op-1, op-5 have cat-1 (Food), op-6 has cat-4 (Restaurants, child of Food)
+          expect(filtered).toHaveLength(3);
+          expect(filtered.map(op => op.id).sort()).toEqual(['op-1', 'op-5', 'op-6']);
         });
       });
 
