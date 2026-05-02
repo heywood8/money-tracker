@@ -75,7 +75,7 @@ const SearchBar = ({
           activeOpacity={0.7}
         >
           <View style={styles.filterButtonContent}>
-            <Icon name="filter-variant" size={22} color={colors.text} />
+            <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
             {filterCount > 0 && (
               <View
                 testID="filter-count-badge"
