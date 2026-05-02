@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.77.1](https://github.com/heywood8/money-tracker/compare/penny-v0.77.0...penny-v0.77.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **search:** fix filters not appearing when toggled during search ([#445](https://github.com/heywood8/money-tracker/issues/445)) ([167f5dd](https://github.com/heywood8/money-tracker/commit/167f5dd142b3b2637ed7b497f1d279cc263bd63b))
+
 ## [0.77.0](https://github.com/heywood8/money-tracker/compare/penny-v0.76.2...penny-v0.77.0) (2026-05-02)
 
 
