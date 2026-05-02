@@ -100,7 +100,6 @@ SearchBar.propTypes = {
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
     surface: PropTypes.string.isRequired,
-    secondary: PropTypes.string.isRequired,
     inputBorder: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
