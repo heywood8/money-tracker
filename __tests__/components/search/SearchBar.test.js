@@ -178,4 +178,34 @@ describe('SearchBar', () => {
       expect(buttonStyle.justifyContent).toBe('center');
     });
   });
+
+  describe('SearchBar visual style', () => {
+    it('search input container has underline only (borderBottomWidth: 1)', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.borderBottomWidth).toBe(1);
+      expect(containerStyle.borderWidth).toBeUndefined();
+      expect(containerStyle.borderRadius).toBeUndefined();
+    });
+
+    it('search input container has no background color in styles', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      // Should not have backgroundColor in StyleSheet (may be passed via props)
+      expect(containerStyle.backgroundColor).toBeUndefined();
+    });
+
+    it('search input container has proper padding for underline style', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.paddingVertical).toBe(8);
+      expect(containerStyle.paddingHorizontal).toBe(4);
+    });
+  });
 });
