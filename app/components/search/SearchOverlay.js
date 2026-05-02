@@ -84,9 +84,16 @@ SearchOverlay.propTypes = {
 
 const styles = StyleSheet.create({
   filtersContainer: {
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    elevation: 8,
     left: 0,
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     top: 0,
     zIndex: 50,
   },
