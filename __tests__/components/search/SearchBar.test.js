@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import SearchBar from '../../../app/components/search/SearchBar';
 
 describe('SearchBar', () => {
@@ -25,6 +25,11 @@ describe('SearchBar', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('renders search input with placeholder', () => {
@@ -32,19 +37,34 @@ describe('SearchBar', () => {
     expect(getByPlaceholderText('search_operations_placeholder')).toBeTruthy();
   });
 
-  it('calls onSearchTextChange when typing', async () => {
+  it('calls onSearchTextChange after debounce when typing', () => {
     const { getByPlaceholderText } = render(<SearchBar {...defaultProps} />);
     const input = getByPlaceholderText('search_operations_placeholder');
 
     fireEvent.changeText(input, 'coffee');
 
-    await waitFor(() => {
-      expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
+    // Should not be called immediately
+    expect(defaultProps.onSearchTextChange).not.toHaveBeenCalledWith('coffee');
+
+    // Should be called after the 300ms debounce
+    act(() => {
+      jest.advanceTimersByTime(300);
     });
+
+    expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
   });
 
-  it('shows clear button when searchText is not empty', () => {
+  it('shows clear button when searchText prop initializes with text', () => {
     const { getByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+    expect(getByTestId('clear-search-button')).toBeTruthy();
+  });
+
+  it('shows clear button after typing text', () => {
+    const { getByPlaceholderText, getByTestId } = render(<SearchBar {...defaultProps} />);
+    const input = getByPlaceholderText('search_operations_placeholder');
+
+    fireEvent.changeText(input, 'coffee');
+
     expect(getByTestId('clear-search-button')).toBeTruthy();
   });
 
@@ -53,12 +73,21 @@ describe('SearchBar', () => {
     expect(queryByTestId('clear-search-button')).toBeNull();
   });
 
-  it('calls onSearchTextChange with empty string when clear button pressed', () => {
+  it('calls onSearchTextChange with empty string immediately when clear button pressed', () => {
     const { getByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
 
     fireEvent.press(getByTestId('clear-search-button'));
 
+    // Clear is immediate, no debounce
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('');
+  });
+
+  it('hides clear button after pressing clear', () => {
+    const { getByTestId, queryByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+
+    fireEvent.press(getByTestId('clear-search-button'));
+
+    expect(queryByTestId('clear-search-button')).toBeNull();
   });
 
   it('calls onToggleFilters when filters button pressed', () => {
@@ -85,5 +114,24 @@ describe('SearchBar', () => {
   it('does not show filter count badge when filterCount is 0', () => {
     const { queryByTestId } = render(<SearchBar {...defaultProps} filterCount={0} />);
     expect(queryByTestId('filter-count-badge')).toBeNull();
+  });
+
+  it('debounces rapid typing and only calls onSearchTextChange once with final value', () => {
+    const { getByPlaceholderText } = render(<SearchBar {...defaultProps} />);
+    const input = getByPlaceholderText('search_operations_placeholder');
+
+    fireEvent.changeText(input, 'c');
+    fireEvent.changeText(input, 'co');
+    fireEvent.changeText(input, 'cof');
+    fireEvent.changeText(input, 'coff');
+    fireEvent.changeText(input, 'coffe');
+    fireEvent.changeText(input, 'coffee');
+
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(defaultProps.onSearchTextChange).toHaveBeenCalledTimes(1);
+    expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
   });
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
@@ -13,24 +13,38 @@ const SearchBar = ({
   colors,
   t,
 }) => {
+  const [localText, setLocalText] = useState(searchText);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onSearchTextChange(localText);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localText, onSearchTextChange]);
+
+  const handleClear = useCallback(() => {
+    setLocalText('');
+    onSearchTextChange('');
+  }, [onSearchTextChange]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       <View style={styles.searchInputContainer}>
         <Icon name="magnify" size={20} color={colors.mutedText} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          value={searchText}
-          onChangeText={onSearchTextChange}
+          value={localText}
+          onChangeText={setLocalText}
           placeholder={t('search_operations_placeholder')}
           placeholderTextColor={colors.mutedText}
           autoFocus
           autoCorrect={false}
           autoCapitalize="none"
         />
-        {searchText.length > 0 && (
+        {localText.length > 0 && (
           <TouchableOpacity
             testID="clear-search-button"
-            onPress={() => onSearchTextChange('')}
+            onPress={handleClear}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="close-circle" size={20} color={colors.mutedText} />
