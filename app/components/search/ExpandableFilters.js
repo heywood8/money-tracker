@@ -180,25 +180,26 @@ const ExpandableFilters = ({
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('accounts')}
           </Text>
-          {accounts.map(account => {
-            const isSelected = filters.accountIds.includes(account.id);
-            return (
-              <TouchableOpacity
-                key={account.id}
-                style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                onPress={() => toggleAccount(account.id)}
-              >
-                <Icon
-                  name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
-                  color={isSelected ? colors.primary : colors.mutedText}
-                />
-                <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                  {account.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={styles.chipContainer}>
+            {accounts.map(account => {
+              const isSelected = filters.accountIds.includes(account.id);
+              const chipTextColor = isSelected ? '#fff' : colors.text;
+              return (
+                <TouchableOpacity
+                  key={account.id}
+                  style={[styles.chip, {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => toggleAccount(account.id)}
+                >
+                  <Text style={[styles.chipText, { color: chipTextColor }]}>
+                    {account.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Categories Section */}
@@ -206,26 +207,31 @@ const ExpandableFilters = ({
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('categories')}
           </Text>
-          {categories.filter(c => !c.isShadow).map(category => {
-            const isSelected = filters.categoryIds.includes(category.id);
-            return (
-              <TouchableOpacity
-                key={category.id}
-                style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                onPress={() => toggleCategory(category.id)}
-              >
-                <Icon
-                  name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
-                  color={isSelected ? colors.primary : colors.mutedText}
-                />
-                <Icon name={category.icon || 'tag'} size={20} color={colors.text} style={styles.categoryIcon} />
-                <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                  {category.nameKey ? t(category.nameKey) : category.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={styles.chipContainer}>
+            {categories.filter(c => !c.isShadow).map(category => {
+              const isSelected = filters.categoryIds.includes(category.id);
+              const chipTextColor = isSelected ? '#fff' : colors.text;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.chip, {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => toggleCategory(category.id)}
+                >
+                  <Icon
+                    name={category.icon || 'tag'}
+                    size={14}
+                    color={chipTextColor}
+                  />
+                  <Text style={[styles.chipText, { color: chipTextColor }]}>
+                    {category.nameKey ? t(category.nameKey) : category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -313,19 +319,6 @@ const styles = StyleSheet.create({
   },
   amountRangeSeparator: {
     fontSize: 16,
-  },
-  categoryIcon: {
-    marginLeft: 8,
-  },
-  checkboxItem: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  checkboxLabel: {
-    fontSize: 14,
   },
   chip: {
     alignItems: 'center',
