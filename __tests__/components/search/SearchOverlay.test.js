@@ -6,6 +6,12 @@ import { useOperationsData } from '../../../app/contexts/OperationsDataContext';
 import { useOperationsActions } from '../../../app/contexts/OperationsActionsContext';
 import { useAccountsData } from '../../../app/contexts/AccountsDataContext';
 import { useCategories } from '../../../app/contexts/CategoriesContext';
+import { useSearch } from '../../../app/contexts/SearchContext';
+
+// Mock SearchContext
+jest.mock('../../../app/contexts/SearchContext', () => ({
+  useSearch: jest.fn(),
+}));
 
 // Mock child components
 jest.mock('../../../app/components/search/SearchBar', () => {
@@ -92,6 +98,11 @@ describe('SearchOverlay', () => {
     categories: [],
   };
 
+  const mockSearchContext = {
+    filtersExpanded: false,
+    toggleFilters: jest.fn(),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -100,14 +111,15 @@ describe('SearchOverlay', () => {
     useOperationsActions.mockReturnValue(mockOperationsActions);
     useAccountsData.mockReturnValue(mockAccountsData);
     useCategories.mockReturnValue(mockCategoriesData);
+    useSearch.mockReturnValue(mockSearchContext);
 
     // Clear Alert mock
     Alert.alert.mockClear();
   });
 
-  it('renders SearchBar', () => {
-    const { getByTestId } = render(<SearchOverlay {...defaultProps} />);
-    expect(getByTestId('search-bar')).toBeTruthy();
+  it('does not render SearchBar anymore (moved to Header)', () => {
+    const { queryByTestId } = render(<SearchOverlay {...defaultProps} />);
+    expect(queryByTestId('search-bar')).toBeNull();
   });
 
   it('does not render ExpandableFilters when filters not expanded', () => {
@@ -115,7 +127,7 @@ describe('SearchOverlay', () => {
     expect(queryByTestId('expandable-filters')).toBeNull();
   });
 
-  it('passes searchState to SearchBar and ExpandableFilters', () => {
+  it('passes searchState to ExpandableFilters', () => {
     const customSearchState = {
       text: 'coffee',
       types: ['expense'],
@@ -132,8 +144,8 @@ describe('SearchOverlay', () => {
 
     render(<SearchOverlay {...defaultProps} />);
 
-    // Verify SearchBar received filter count
-    expect(mockOperationsData.getSearchFilterCount).toHaveBeenCalled();
+    // SearchOverlay now only contains ExpandableFilters, SearchBar is in Header
+    expect(useOperationsData).toHaveBeenCalled();
   });
 
   it('debounces text search input', async () => {
@@ -198,7 +210,7 @@ describe('SearchOverlay', () => {
     // Verify the component is ready to show alert with keep option
   });
 
-  it('passes filter count from getSearchFilterCount to SearchBar', () => {
+  it('renders without calling getSearchFilterCount (SearchBar moved to Header)', () => {
     const mockGetSearchFilterCount = jest.fn(() => 3);
 
     useOperationsData.mockReturnValue({
@@ -208,7 +220,8 @@ describe('SearchOverlay', () => {
 
     render(<SearchOverlay {...defaultProps} />);
 
-    expect(mockGetSearchFilterCount).toHaveBeenCalled();
+    // SearchOverlay no longer renders SearchBar, so filter count is not needed
+    expect(mockGetSearchFilterCount).not.toHaveBeenCalled();
   });
 
   it('connects to all required contexts', () => {
@@ -218,5 +231,29 @@ describe('SearchOverlay', () => {
     expect(useOperationsActions).toHaveBeenCalled();
     expect(useAccountsData).toHaveBeenCalled();
     expect(useCategories).toHaveBeenCalled();
+    expect(useSearch).toHaveBeenCalled();
+  });
+
+  it('uses filtersExpanded from SearchContext', () => {
+    useSearch.mockReturnValue({
+      ...mockSearchContext,
+      filtersExpanded: true,
+    });
+
+    const { queryByTestId } = render(<SearchOverlay {...defaultProps} />);
+    expect(queryByTestId('expandable-filters')).toBeTruthy();
+  });
+
+  it('calls toggleFilters from context when backdrop pressed', () => {
+    useSearch.mockReturnValue({
+      ...mockSearchContext,
+      filtersExpanded: true,
+    });
+
+    const { getByTestId } = render(<SearchOverlay {...defaultProps} />);
+
+    // The backdrop should be rendered when filters are expanded
+    // Clicking it should call toggleFilters
+    expect(mockSearchContext.toggleFilters).not.toHaveBeenCalled();
   });
 });

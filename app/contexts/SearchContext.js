@@ -5,6 +5,7 @@ const SearchContext = createContext(null);
 
 export const SearchProvider = ({ children }) => {
   const [internalSearchMode, setInternalSearchMode] = useState('closed');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const setSearchMode = useCallback((mode) => {
     const validModes = ['closed', 'open', 'collapsed'];
@@ -38,9 +39,21 @@ export const SearchProvider = ({ children }) => {
     }
   }, []);
 
+  const toggleFilters = useCallback(() => {
+    setFiltersExpanded(prev => !prev);
+  }, []);
+
   const value = useMemo(
-    () => ({ openSearch, closeSearch, reopenSearch, searchMode: internalSearchMode, setSearchMode }),
-    [openSearch, closeSearch, reopenSearch, internalSearchMode, setSearchMode],
+    () => ({
+      openSearch,
+      closeSearch,
+      reopenSearch,
+      searchMode: internalSearchMode,
+      setSearchMode,
+      filtersExpanded,
+      toggleFilters,
+    }),
+    [openSearch, closeSearch, reopenSearch, internalSearchMode, setSearchMode, filtersExpanded, toggleFilters],
   );
 
   return (

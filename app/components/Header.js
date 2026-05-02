@@ -24,7 +24,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch, searchMode, closeSearch, reopenSearch } = useSearch();
+  const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters } = useSearch();
   console.log('[Header] openSearch exists:', !!openSearch);
   console.log('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
@@ -37,9 +37,8 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   }, [closeSearch, hasActiveSearch]);
 
   const handleToggleFilters = useCallback(() => {
-    console.log('[Header] Toggle filters - handled by SearchOverlay');
-    // SearchOverlay will handle filter expansion (task 10)
-  }, []);
+    toggleFilters();
+  }, [toggleFilters]);
 
   const fetchDbVersion = useCallback(async () => {
     try {

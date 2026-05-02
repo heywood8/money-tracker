@@ -23,6 +23,8 @@ describe('SearchContext', () => {
       expect(result.current.openSearch).toBeInstanceOf(Function);
       expect(result.current.setSearchMode).toBeInstanceOf(Function);
       expect(result.current.searchMode).toBe('closed');
+      expect(result.current.filtersExpanded).toBe(false);
+      expect(result.current.toggleFilters).toBeInstanceOf(Function);
     });
 
     it('initializes with searchMode as closed', () => {
@@ -335,6 +337,51 @@ describe('SearchContext', () => {
 
       expect(result.current.searchMode).toBe('open');
       expect(mockCallback).toHaveBeenCalledWith(true); // should auto-expand filters
+    });
+  });
+
+  describe('Filters Expansion State', () => {
+    it('initializes filtersExpanded to false', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      expect(result.current.filtersExpanded).toBe(false);
+    });
+
+    it('toggles filtersExpanded when toggleFilters is called', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      expect(result.current.filtersExpanded).toBe(false);
+
+      act(() => {
+        result.current.toggleFilters();
+      });
+
+      expect(result.current.filtersExpanded).toBe(true);
+
+      act(() => {
+        result.current.toggleFilters();
+      });
+
+      expect(result.current.filtersExpanded).toBe(false);
+    });
+
+    it('toggles filtersExpanded multiple times', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      for (let i = 0; i < 5; i++) {
+        act(() => {
+          result.current.toggleFilters();
+        });
+
+        const expectedState = (i + 1) % 2 === 1;
+        expect(result.current.filtersExpanded).toBe(expectedState);
+      }
     });
   });
 
