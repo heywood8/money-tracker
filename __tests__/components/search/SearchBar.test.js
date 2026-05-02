@@ -190,13 +190,14 @@ describe('SearchBar', () => {
       expect(containerStyle.borderRadius).toBeUndefined();
     });
 
-    it('search input container has no background color in styles', () => {
+    it('search input container has subtle background for visibility', () => {
       const { getByTestId } = render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      // Should not have backgroundColor in StyleSheet (may be passed via props)
-      expect(containerStyle.backgroundColor).toBeUndefined();
+      // Should have subtle background (8% opacity) for visibility
+      expect(containerStyle.backgroundColor).toBeDefined();
+      expect(containerStyle.backgroundColor).toMatch(/08$/);
     });
 
     it('search input container has proper padding for underline style', () => {
