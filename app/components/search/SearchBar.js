@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { HORIZONTAL_PADDING } from '../../styles/layout';
@@ -28,9 +28,18 @@ const SearchBar = ({
   }, [onSearchTextChange]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      <View style={styles.searchInputContainer}>
-        <Icon name="magnify" size={20} color={colors.mutedText} />
+    <View
+      testID="search-bar-container"
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View
+        testID="search-input-container"
+        style={[styles.searchInputContainer, {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+        }]}
+      >
+        <Icon name="magnify" size={20} color={colors.text} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           value={localText}
@@ -54,12 +63,19 @@ const SearchBar = ({
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           testID="filters-toggle-button"
-          onPress={onToggleFilters}
-          style={styles.iconButton}
+          onPress={() => {
+            Keyboard.dismiss();
+            onToggleFilters();
+          }}
+          style={[
+            styles.iconButton,
+            filterCount > 0 && { backgroundColor: `${colors.primary}15` },
+          ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
         >
           <View style={styles.filterButtonContent}>
-            <Icon name="filter-variant" size={24} color={colors.text} />
+            <Icon name="filter-variant" size={22} color={colors.text} />
             {filterCount > 0 && (
               <View
                 testID="filter-count-badge"
@@ -76,7 +92,7 @@ const SearchBar = ({
           style={styles.iconButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon name="close" size={24} color={colors.text} />
+          <Icon name="close" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -90,7 +106,8 @@ SearchBar.propTypes = {
   onClose: PropTypes.func.isRequired,
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
-    surface: PropTypes.string.isRequired,
+    background: PropTypes.string.isRequired,
+    inputBorder: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
     mutedText: PropTypes.string.isRequired,
@@ -107,14 +124,15 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     gap: 8,
+    width: 96, // 44 + 44 + 8
   },
   container: {
     alignItems: 'center',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     height: 56,
-    justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
+    width: '100%',
+    zIndex: 100,
   },
   filterBadge: {
     alignItems: 'center',
@@ -136,18 +154,27 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   iconButton: {
-    padding: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 8,
+    height: 40,
   },
   searchInputContainer: {
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderRadius: 4,
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
+    height: 44,
+    marginRight: 12,
+    paddingHorizontal: 12,
   },
 });
 

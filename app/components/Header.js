@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -12,6 +13,8 @@ import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
 import FilterBadge from './search/FilterBadge';
+import { useOperationsData } from '../contexts/OperationsDataContext';
+import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
 const APP_VERSION = require('../../package.json').version;
 
@@ -21,9 +24,21 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch } = useSearch();
+  const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters } = useSearch();
   console.log('[Header] openSearch exists:', !!openSearch);
+  console.log('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
+
+  const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
+  const { setSearchText } = useOperationsActions();
+
+  const handleCloseSearch = useCallback(() => {
+    closeSearch(hasActiveSearch);
+  }, [closeSearch, hasActiveSearch]);
+
+  const handleToggleFilters = useCallback(() => {
+    toggleFilters();
+  }, [toggleFilters]);
 
   const fetchDbVersion = useCallback(async () => {
     try {
@@ -67,87 +82,117 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
         },
       ]}
     >
-      <View style={styles.titleContainer}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.icon}
-          accessibilityLabel="Penny app icon"
+      {searchMode === 'open' ? (
+        <SearchBar
+          searchText={searchState?.text || ''}
+          onSearchTextChange={setSearchText}
+          onToggleFilters={handleToggleFilters}
+          onClose={handleCloseSearch}
+          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
+          colors={colors}
+          t={t}
         />
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
-          <Text style={[styles.version, { color: colors.mutedText }]}>
-            v{APP_VERSION} | DB v{dbVersion || '?'}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.buttonContainer}>
-        {rightContent || (
-          <>
-            {isDownloading && (
-              <View
-                style={styles.downloadIndicator}
-                accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
-                accessibilityRole="progressbar"
-                testID="download-indicator"
-              >
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-                  {`${Math.round((downloadProgress ?? 0) * 100)}%`}
-                </Text>
-              </View>
-            )}
-            {activeScreen === 'Operations' && (
-              <View style={styles.searchButtonContainer}>
+      ) : (
+        <>
+          <View style={styles.titleContainer}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.icon}
+              accessibilityLabel="Penny app icon"
+            />
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
+              <Text style={[styles.version, { color: colors.mutedText }]}>
+                v{APP_VERSION} | DB v{dbVersion || '?'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.buttonContainer}>
+            {rightContent || (
+              <>
+                {isDownloading && (
+                  <View
+                    style={styles.downloadIndicator}
+                    accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+                    accessibilityRole="progressbar"
+                    testID="download-indicator"
+                  >
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+                      {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+                    </Text>
+                  </View>
+                )}
+                {activeScreen === 'Operations' && (
+                  <View style={styles.searchButtonContainer}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('[Header] Search button pressed, mode:', searchMode);
+                        if (searchMode === 'collapsed') {
+                          // Reopen with smart logic
+                          const hasTextOnly = (searchState?.text !== '') &&
+                            (searchState?.types?.length === 0) &&
+                            (searchState?.accountIds?.length === 0) &&
+                            (searchState?.categoryIds?.length === 0) &&
+                            (!searchState?.dateRange?.startDate) &&
+                            (!searchState?.amountRange?.min);
+                          const hasOtherFilters = !hasTextOnly && hasActiveSearch;
+
+                          reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
+                            console.log('[Header] Should expand filters:', shouldExpand);
+                            // This callback will be handled by SearchOverlay in task 10
+                          });
+                        } else {
+                          openSearch();
+                        }
+                      }}
+                      testID="search-button"
+                      accessibilityLabel="Search operations"
+                      accessibilityRole="button"
+                      style={styles.searchButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="search-outline" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    {searchMode === 'collapsed' && hasActiveSearch && (
+                      <FilterBadge
+                        count={getSearchFilterCount()}
+                        colors={colors}
+                      />
+                    )}
+                  </View>
+                )}
                 <TouchableOpacity
-                  onPress={() => {
-                    console.log('[Header] Search button pressed!');
-                    openSearch();
-                  }}
-                  testID="search-button"
-                  accessibilityLabel="Search operations"
+                  onPress={toggleTheme}
+                  testID="theme-toggle-button"
+                  accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
                   accessibilityRole="button"
-                  style={styles.searchButton}
+                  accessibilityHint="Toggles between light and dark theme"
+                  style={styles.themeButton}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="search-outline" size={24} color={colors.text} />
-                </TouchableOpacity>
-                {operationsData?.hasActiveSearch && (
-                  <FilterBadge
-                    count={operationsData.getSearchFilterCount()}
-                    colors={colors}
+                  <Ionicons
+                    name={colorScheme === 'dark' ? 'moon' : 'sunny'}
+                    size={24}
+                    color={colors.text}
                   />
-                )}
-              </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onOpenSettings}
+                  testID="settings-button"
+                  accessibilityLabel={t('settings')}
+                  accessibilityRole="button"
+                  accessibilityHint="Opens settings menu"
+                  style={styles.settingsButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="settings-outline" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </>
             )}
-            <TouchableOpacity
-              onPress={toggleTheme}
-              testID="theme-toggle-button"
-              accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              accessibilityRole="button"
-              accessibilityHint="Toggles between light and dark theme"
-              style={styles.themeButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons
-                name={colorScheme === 'dark' ? 'moon' : 'sunny'}
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onOpenSettings}
-              testID="settings-button"
-              accessibilityLabel={t('settings')}
-              accessibilityRole="button"
-              accessibilityHint="Opens settings menu"
-              style={styles.settingsButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="settings-outline" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+          </View>
+        </>
+      )}
     </View>
   );
 }

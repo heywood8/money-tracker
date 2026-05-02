@@ -255,7 +255,7 @@ export default function SimpleTabs() {
           </Animated.View>
         </GestureDetector>
       </View>
-      <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />
+      {settingsVisible && <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />}
       {/* Floating bar overlays content so screen shows through behind it */}
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
         <View

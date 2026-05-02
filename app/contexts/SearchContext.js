@@ -4,23 +4,56 @@ import PropTypes from 'prop-types';
 const SearchContext = createContext(null);
 
 export const SearchProvider = ({ children }) => {
-  const [searchHandler, setSearchHandler] = useState(null);
+  const [internalSearchMode, setInternalSearchMode] = useState('closed');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  const registerSearchHandler = useCallback((handler) => {
-    console.log('[SearchContext] registerSearchHandler called with:', handler ? 'function' : 'null');
-    setSearchHandler(() => handler);
+  const setSearchMode = useCallback((mode) => {
+    const validModes = ['closed', 'open', 'collapsed'];
+    if (!validModes.includes(mode)) {
+      console.warn('[SearchContext] Invalid searchMode:', mode);
+      return;
+    }
+    console.log('[SearchContext] setSearchMode:', mode);
+    setInternalSearchMode(mode);
   }, []);
 
   const openSearch = useCallback(() => {
-    console.log('[SearchContext] openSearch called, searchHandler exists:', !!searchHandler);
-    if (searchHandler) {
-      searchHandler();
+    console.log('[SearchContext] openSearch called');
+    setInternalSearchMode('open');
+  }, []);
+
+  const closeSearch = useCallback((hasActiveFilters) => {
+    console.log('[SearchContext] closeSearch called, hasActiveFilters:', hasActiveFilters);
+    const newMode = hasActiveFilters ? 'collapsed' : 'closed';
+    setInternalSearchMode(newMode);
+  }, []);
+
+  const reopenSearch = useCallback((hasTextFilter, hasOtherFilters, onShouldExpandFilters) => {
+    console.log('[SearchContext] reopenSearch called, hasText:', hasTextFilter, 'hasOther:', hasOtherFilters);
+    setInternalSearchMode('open');
+
+    // Auto-expand filters if other filters (non-text) are present
+    const shouldExpand = hasOtherFilters;
+    if (onShouldExpandFilters) {
+      onShouldExpandFilters(shouldExpand);
     }
-  }, [searchHandler]);
+  }, []);
+
+  const toggleFilters = useCallback(() => {
+    setFiltersExpanded(prev => !prev);
+  }, []);
 
   const value = useMemo(
-    () => ({ registerSearchHandler, openSearch }),
-    [registerSearchHandler, openSearch],
+    () => ({
+      openSearch,
+      closeSearch,
+      reopenSearch,
+      searchMode: internalSearchMode,
+      setSearchMode,
+      filtersExpanded,
+      toggleFilters,
+    }),
+    [openSearch, closeSearch, reopenSearch, internalSearchMode, setSearchMode, filtersExpanded, toggleFilters],
   );
 
   return (

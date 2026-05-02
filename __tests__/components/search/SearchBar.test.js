@@ -1,11 +1,14 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import SearchBar from '../../../app/components/search/SearchBar';
 
 describe('SearchBar', () => {
   const mockColors = {
+    background: '#1f1f1f',
     surface: '#FFFFFF',
     border: '#E0E0E0',
+    inputBorder: '#E0E0E0',
     text: '#000000',
     mutedText: '#999999',
     primary: '#007AFF',
@@ -133,5 +136,106 @@ describe('SearchBar', () => {
 
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledTimes(1);
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
+  });
+
+  describe('SearchBar layout', () => {
+    it('search input container uses flex: 1 to take full available width', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.flex).toBe(1);
+    });
+
+    it('button container has explicit width to prevent overlap', () => {
+      const { UNSAFE_getAllByType } = render(<SearchBar {...defaultProps} />);
+      const views = UNSAFE_getAllByType('View');
+      const buttonContainer = views.find(v => {
+        const style = StyleSheet.flatten(v.props.style);
+        return style && style.width === 96;
+      });
+
+      expect(buttonContainer).toBeDefined();
+    });
+  });
+
+  describe('SearchBar button sizing', () => {
+    it('filter button has proper 44x44px touch target', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.width).toBe(44);
+      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.alignItems).toBe('center');
+      expect(buttonStyle.justifyContent).toBe('center');
+    });
+
+    it('close button has proper 44x44px touch target', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const button = getByTestId('close-search-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.width).toBe(44);
+      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.alignItems).toBe('center');
+      expect(buttonStyle.justifyContent).toBe('center');
+    });
+  });
+
+  describe('SearchBar visual style', () => {
+    it('search input container has clean rounded style', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.borderBottomWidth).toBe(1);
+      expect(containerStyle.borderWidth).toBeUndefined();
+      expect(containerStyle.borderRadius).toBe(4);
+      expect(containerStyle.height).toBe(44);
+    });
+
+    it('search input container has subtle background for visibility', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      // Solid dark background for clear visual definition
+      expect(containerStyle.backgroundColor).toBe('#1f1f1f');
+    });
+
+    it('search input container has proper padding', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+      const container = getByTestId('search-input-container');
+
+      const containerStyle = StyleSheet.flatten(container.props.style);
+      expect(containerStyle.paddingHorizontal).toBe(12);
+      expect(containerStyle.gap).toBe(12);
+    });
+  });
+
+  describe('SearchBar filter button active state', () => {
+    it('filter button has transparent background when no filters active', () => {
+      const { getByTestId } = render(<SearchBar {...defaultProps} filterCount={0} />);
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      expect(buttonStyle.backgroundColor).toBeUndefined();
+    });
+
+    it('filter button has subtle background tint when filters active', () => {
+      const mockColors = {
+        ...defaultProps.colors,
+        primary: '#4da3ff',
+      };
+      const { getByTestId } = render(
+        <SearchBar {...defaultProps} colors={mockColors} filterCount={2} />,
+      );
+      const button = getByTestId('filters-toggle-button');
+
+      const buttonStyle = StyleSheet.flatten(button.props.style);
+      // Should have background with primary color at 15% opacity (hex: 15 in decimal)
+      expect(buttonStyle.backgroundColor).toMatch(/#4da3ff/i);
+    });
   });
 });

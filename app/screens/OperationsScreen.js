@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import LoadingView from '../components/LoadingView';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -36,7 +37,6 @@ const OperationsScreen = () => {
 
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { registerSearchHandler } = useSearch();
   const {
     operations,
     loading: operationsLoading,
@@ -64,7 +64,29 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
-  const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
+
+  const { searchMode } = useSearch();
+  const quickAddOpacity = useSharedValue(1);
+  const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
+
+  // Animate when searchMode changes
+  useEffect(() => {
+    if (searchMode === 'open') {
+      // Hide QuickAddForm
+      quickAddMaxHeight.value = withTiming(0, { duration: 300 });
+      quickAddOpacity.value = withTiming(0, { duration: 300 });
+    } else {
+      // Show QuickAddForm
+      quickAddMaxHeight.value = withTiming(1000, { duration: 300 });
+      quickAddOpacity.value = withTiming(1, { duration: 300 });
+    }
+  }, [searchMode]);
+
+  const animatedQuickAddStyle = useAnimatedStyle(() => ({
+    maxHeight: quickAddMaxHeight.value,
+    opacity: quickAddOpacity.value,
+    overflow: 'hidden',
+  }));
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -171,16 +193,6 @@ const OperationsScreen = () => {
     }
   }, [pendingScroll, scrollToDateString, operationsLoading, groupedOperations]);
 
-  // Register search handler with SearchContext
-  useEffect(() => {
-    console.log('[OperationsScreen] Registering search handler');
-    registerSearchHandler(handleOpenSearch);
-    return () => {
-      console.log('[OperationsScreen] Unregistering search handler');
-      registerSearchHandler(null);
-    };
-  }, [handleOpenSearch]);
-
   // Track mount/unmount
   useEffect(() => {
     console.log('[OperationsScreen] MOUNTED');
@@ -189,10 +201,6 @@ const OperationsScreen = () => {
     };
   }, []);
 
-  // Track searchOverlayVisible changes
-  useEffect(() => {
-    console.log('[OperationsScreen] searchOverlayVisible changed to:', searchOverlayVisible);
-  }, [searchOverlayVisible]);
 
   // Auto-populate exchange rate when multi-currency transfer accounts change (async with live rate)
   useEffect(() => {
@@ -565,41 +573,33 @@ const OperationsScreen = () => {
     setModalVisible(false);
   }, []);
 
-  const handleOpenSearch = useCallback(() => {
-    console.log('[OperationsScreen] handleOpenSearch called');
-    setSearchOverlayVisible(true);
-  }, []);
-
-  const handleCloseSearch = useCallback(() => {
-    console.log('[OperationsScreen] handleCloseSearch called');
-    setSearchOverlayVisible(false);
-  }, []);
-
   const quickAddFormComponent = useMemo(() => (
-    <QuickAddForm
-      colors={colors}
-      t={t}
-      quickAddValues={quickAddValues}
-      setQuickAddValues={setQuickAddValues}
-      accounts={visibleAccounts}
-      filteredCategories={filteredCategories}
-      topCategoriesForType={topCategoriesForType}
-      getCategoryInfo={getCategoryInfo}
-      getAccountName={getAccountName}
-      getAccountBalance={getAccountBalance}
-      getCategoryName={getCategoryName}
-      openPicker={openPicker}
-      handleQuickAdd={handleQuickAdd}
-      handleAmountChange={handleAmountChange}
-      handleExchangeRateChange={handleExchangeRateChange}
-      handleDestinationAmountChange={handleDestinationAmountChange}
-      onAutoAddWithCategory={handleAutoAddWithCategory}
-      topTransferAccounts={topTransferAccountsForForm}
-      onAutoAddWithAccount={handleAutoAddWithAccount}
-      TYPES={TYPES}
-      rateSource={rateSource}
-    />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
+    <Animated.View style={animatedQuickAddStyle}>
+      <QuickAddForm
+        colors={colors}
+        t={t}
+        quickAddValues={quickAddValues}
+        setQuickAddValues={setQuickAddValues}
+        accounts={visibleAccounts}
+        filteredCategories={filteredCategories}
+        topCategoriesForType={topCategoriesForType}
+        getCategoryInfo={getCategoryInfo}
+        getAccountName={getAccountName}
+        getAccountBalance={getAccountBalance}
+        getCategoryName={getCategoryName}
+        openPicker={openPicker}
+        handleQuickAdd={handleQuickAdd}
+        handleAmountChange={handleAmountChange}
+        handleExchangeRateChange={handleExchangeRateChange}
+        handleDestinationAmountChange={handleDestinationAmountChange}
+        onAutoAddWithCategory={handleAutoAddWithCategory}
+        topTransferAccounts={topTransferAccountsForForm}
+        onAutoAddWithAccount={handleAutoAddWithAccount}
+        TYPES={TYPES}
+        rateSource={rateSource}
+      />
+    </Animated.View>
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
@@ -718,10 +718,10 @@ const OperationsScreen = () => {
         />
       )}
 
-      {/* Search Overlay - always rendered to prevent remount animations */}
+      {/* Search Overlay - renders filters when search is open */}
       <SearchOverlay
-        visible={searchOverlayVisible}
-        onClose={handleCloseSearch}
+        visible={searchMode === 'open'}
+        onClose={() => {}}
         colors={colors}
         t={t}
       />
