@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import LoadingView from '../components/LoadingView';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -64,6 +65,32 @@ const OperationsScreen = () => {
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
+
+  const { searchMode } = useSearch();
+  const [quickAddHeight, setQuickAddHeight] = useState(200); // estimated default
+
+  // Animation values
+  const quickAddAnimatedHeight = useSharedValue(quickAddHeight);
+  const quickAddAnimatedOpacity = useSharedValue(1);
+
+  // Animate when searchMode changes
+  useEffect(() => {
+    if (searchMode === 'open') {
+      // Hide QuickAddForm
+      quickAddAnimatedHeight.value = withTiming(0, { duration: 300 });
+      quickAddAnimatedOpacity.value = withTiming(0, { duration: 300 });
+    } else {
+      // Show QuickAddForm
+      quickAddAnimatedHeight.value = withTiming(quickAddHeight, { duration: 300 });
+      quickAddAnimatedOpacity.value = withTiming(1, { duration: 300 });
+    }
+  }, [searchMode, quickAddHeight]);
+
+  const animatedQuickAddStyle = useAnimatedStyle(() => ({
+    height: quickAddAnimatedHeight.value,
+    opacity: quickAddAnimatedOpacity.value,
+    overflow: 'hidden',
+  }));
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -560,30 +587,40 @@ const OperationsScreen = () => {
   }, []);
 
   const quickAddFormComponent = useMemo(() => (
-    <QuickAddForm
-      colors={colors}
-      t={t}
-      quickAddValues={quickAddValues}
-      setQuickAddValues={setQuickAddValues}
-      accounts={visibleAccounts}
-      filteredCategories={filteredCategories}
-      topCategoriesForType={topCategoriesForType}
-      getCategoryInfo={getCategoryInfo}
-      getAccountName={getAccountName}
-      getAccountBalance={getAccountBalance}
-      getCategoryName={getCategoryName}
-      openPicker={openPicker}
-      handleQuickAdd={handleQuickAdd}
-      handleAmountChange={handleAmountChange}
-      handleExchangeRateChange={handleExchangeRateChange}
-      handleDestinationAmountChange={handleDestinationAmountChange}
-      onAutoAddWithCategory={handleAutoAddWithCategory}
-      topTransferAccounts={topTransferAccountsForForm}
-      onAutoAddWithAccount={handleAutoAddWithAccount}
-      TYPES={TYPES}
-      rateSource={rateSource}
-    />
-  ), [colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
+    <Animated.View
+      style={animatedQuickAddStyle}
+      onLayout={(e) => {
+        const height = e.nativeEvent.layout.height;
+        if (height > 0 && height !== quickAddHeight) {
+          setQuickAddHeight(height);
+        }
+      }}
+    >
+      <QuickAddForm
+        colors={colors}
+        t={t}
+        quickAddValues={quickAddValues}
+        setQuickAddValues={setQuickAddValues}
+        accounts={visibleAccounts}
+        filteredCategories={filteredCategories}
+        topCategoriesForType={topCategoriesForType}
+        getCategoryInfo={getCategoryInfo}
+        getAccountName={getAccountName}
+        getAccountBalance={getAccountBalance}
+        getCategoryName={getCategoryName}
+        openPicker={openPicker}
+        handleQuickAdd={handleQuickAdd}
+        handleAmountChange={handleAmountChange}
+        handleExchangeRateChange={handleExchangeRateChange}
+        handleDestinationAmountChange={handleDestinationAmountChange}
+        onAutoAddWithCategory={handleAutoAddWithCategory}
+        topTransferAccounts={topTransferAccountsForForm}
+        onAutoAddWithAccount={handleAutoAddWithAccount}
+        TYPES={TYPES}
+        rateSource={rateSource}
+      />
+    </Animated.View>
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, quickAddHeight]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
