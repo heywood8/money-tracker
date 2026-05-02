@@ -1,8 +1,8 @@
 name: Emulator Screenshots
 
 on:
-  pull_request:
-    branches: ['**']
+  issue_comment:
+    types: [created]
   workflow_dispatch:
 
 permissions:
@@ -11,18 +11,39 @@ permissions:
   actions: read
 
 concurrency:
-  group: screenshots-${{ github.head_ref || github.ref }}
+  group: screenshots-${{ github.event.issue.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   screenshots:
-    if: "!startsWith(github.head_ref, 'release')"
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '/screenshots'))
     name: Capture App Screenshots
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Get PR info
+        if: github.event_name == 'issue_comment'
+        id: pr-info
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('head_ref', pr.data.head.ref);
+            core.setOutput('pr_number', String(pr.data.number));
+
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && steps.pr-info.outputs.head_sha || github.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -118,10 +139,22 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Resolve PR number
+        if: always()
+        id: resolve-pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            if (context.eventName === 'issue_comment') {
+              core.setOutput('pr_number', String(context.issue.number));
+            } else {
+              core.setOutput('pr_number', '');
+            }
+
       - name: Push screenshots to ci-screenshots branch
-        if: github.event_name == 'pull_request' && always()
+        if: steps.resolve-pr.outputs.pr_number != '' && always()
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_NUMBER=${{ steps.resolve-pr.outputs.pr_number }}
           SCREENSHOT_DIR="pr-${PR_NUMBER}"
           BACKUP_DIR="/tmp/screenshots-backup"
 
@@ -165,13 +198,13 @@ jobs:
           cp "$BACKUP_DIR"/*.png screenshots/
 
       - name: Build PR comment body
-        if: github.event_name == 'pull_request' && always()
+        if: steps.resolve-pr.outputs.pr_number != '' && always()
         uses: actions/github-script@v9
         id: set-screenshot-results
         with:
           script: |
             const fs = require('fs');
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = ${{ steps.resolve-pr.outputs.pr_number }};
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const rawBase = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/ci-screenshots/pr-${prNumber}`;
 
@@ -245,9 +278,10 @@ jobs:
             core.setOutput('message', lines.join('\n'));
 
       - uses: marocchino/sticky-pull-request-comment@v3.0.4
-        if: github.event_name == 'pull_request' && always()
+        if: steps.resolve-pr.outputs.pr_number != '' && always()
         with:
           header: "App Screenshots"
+          number: ${{ steps.resolve-pr.outputs.pr_number }}
           message: ${{ steps.set-screenshot-results.outputs.message }}
           hide_and_recreate: true
           hide_classify: "OUTDATED"
