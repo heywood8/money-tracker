@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.78.0](https://github.com/heywood8/money-tracker/compare/penny-v0.77.1...penny-v0.78.0) (2026-05-03)
+
+
+### Features
+
+* **search:** filter panel redesign ([#447](https://github.com/heywood8/money-tracker/issues/447)) ([2d21ea0](https://github.com/heywood8/money-tracker/commit/2d21ea0d0751ac69eb4cced82de142a80d028648))
+
 ## [0.77.1](https://github.com/heywood8/money-tracker/compare/penny-v0.77.0...penny-v0.77.1) (2026-05-02)
 
 
