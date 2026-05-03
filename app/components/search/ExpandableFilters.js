@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   container: {
-    maxHeight: '60%',
+    flex: 1,
   },
   dateInput: {
     alignItems: 'center',

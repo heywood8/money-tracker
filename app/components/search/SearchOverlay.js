@@ -1,8 +1,11 @@
 import React, { useCallback } from 'react';
 import {
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
@@ -56,6 +59,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     elevation: 8,
     left: 0,
+    maxHeight: SCREEN_HEIGHT * 0.75,
     position: 'absolute',
     right: 0,
     shadowColor: '#000',
