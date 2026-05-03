@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.81.1](https://github.com/heywood8/money-tracker/compare/penny-v0.81.0...penny-v0.81.1) (2026-05-03)
+
+
+### Continuous Integration
+
+* mitigate cache poisoning and untrusted checkout in emulator-screenshots ([#457](https://github.com/heywood8/money-tracker/issues/457)) ([68731c6](https://github.com/heywood8/money-tracker/commit/68731c6e663871d75166e618ec5c6ba6777eb405))
+
 ## [0.81.0](https://github.com/heywood8/money-tracker/compare/penny-v0.80.1...penny-v0.81.0) (2026-05-03)
 
 
