@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.79.0](https://github.com/heywood8/money-tracker/compare/penny-v0.78.0...penny-v0.79.0) (2026-05-03)
+
+
+### Features
+
+* **search:** auto-scroll to top when filter closes if user is near recent entries ([#449](https://github.com/heywood8/money-tracker/issues/449)) ([6729d16](https://github.com/heywood8/money-tracker/commit/6729d16875a9b7ad2adc82d7d36c29b3f82dba4c))
+
 ## [0.78.0](https://github.com/heywood8/money-tracker/compare/penny-v0.77.1...penny-v0.78.0) (2026-05-03)
 
 
