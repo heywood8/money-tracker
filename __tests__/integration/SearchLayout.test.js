@@ -59,7 +59,7 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 
 describe('SearchLayout integration', () => {
   const mockColors = {
-    surface: '#1a1a1a',
+    background: '#1a1a1a',
   };
 
   const mockT = (key) => key;
@@ -71,10 +71,9 @@ describe('SearchLayout integration', () => {
     visible: true,
   };
 
-  it('SearchOverlay does not use absolute positioning', () => {
+  it('SearchOverlay uses flow (non-absolute) positioning', () => {
     const { getByText } = render(<SearchOverlay {...defaultProps} />);
 
-    // Get the mock filters which is inside the filtersContainer
     const mockFilters = getByText('Mock Filters');
 
     // Navigate up to find the RCTView with pointerEvents="box-none" (filtersContainer)
@@ -86,11 +85,11 @@ describe('SearchLayout integration', () => {
     // Flatten all styles to check
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should use absolute positioning to overlay content from the top
-    expect(styles.position).toBe('absolute');
+    // Should NOT use absolute positioning — flows in layout so list renders below it
+    expect(styles.position).not.toBe('absolute');
   });
 
-  it('SearchOverlay does not have top offset', () => {
+  it('SearchOverlay has no top/left/right/zIndex positioning properties', () => {
     const { getByText } = render(<SearchOverlay {...defaultProps} />);
 
     const mockFilters = getByText('Mock Filters');
@@ -100,11 +99,14 @@ describe('SearchLayout integration', () => {
     }
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should have top: 0 to anchor at the top of OperationsScreen
-    expect(styles.top).toBe(0);
+    // Flow element — no absolute-layout props
+    expect(styles.top).toBeUndefined();
+    expect(styles.left).toBeUndefined();
+    expect(styles.right).toBeUndefined();
+    expect(styles.zIndex).toBeUndefined();
   });
 
-  it('SearchOverlay has proper zIndex for layering', () => {
+  it('SearchOverlay filtersContainer has elevation for shadow', () => {
     const { getByText } = render(<SearchOverlay {...defaultProps} />);
 
     const mockFilters = getByText('Mock Filters');
@@ -114,8 +116,8 @@ describe('SearchLayout integration', () => {
     }
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should have zIndex for proper layering
-    expect(styles.zIndex).toBeDefined();
+    // Should still have elevation for the drop shadow
+    expect(styles.elevation).toBeDefined();
   });
 });
 

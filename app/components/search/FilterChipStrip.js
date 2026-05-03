@@ -45,13 +45,6 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
     chips.push({ key: 'accountIds', label: `${t('accounts')}: ${searchState.accountIds.length}` });
   }
 
-  if (searchState.categoryIds.length > 0) {
-    chips.push({
-      key: 'categoryIds',
-      label: `${t('categories')}: ${searchState.categoryIds.length}`,
-    });
-  }
-
   if (chips.length === 0) {
     return null;
   }

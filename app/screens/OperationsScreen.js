@@ -646,6 +646,14 @@ const OperationsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Search Overlay - renders filters when search is open, above the list */}
+      <SearchOverlay
+        visible={searchMode === 'open'}
+        onClose={() => {}}
+        colors={colors}
+        t={t}
+      />
+
       <OperationsList
         ref={flatListRef}
         groupedOperations={groupedOperations}
@@ -717,14 +725,6 @@ const OperationsScreen = () => {
           onChange={handleDatePickerChange}
         />
       )}
-
-      {/* Search Overlay - renders filters when search is open */}
-      <SearchOverlay
-        visible={searchMode === 'open'}
-        onClose={() => {}}
-        colors={colors}
-        t={t}
-      />
     </View>
   );
 };
