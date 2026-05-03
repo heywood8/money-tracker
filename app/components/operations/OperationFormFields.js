@@ -88,6 +88,10 @@ const OperationFormFields = memo(({
     borderColor: colors.inputBorder,
   }), [colors]);
 
+  const groupBorderStyle = useMemo(() => ({
+    borderColor: colors.border,
+  }), [colors]);
+
   const disabledStyle = useMemo(() =>
     disabled ? styles.disabledInput : null
   , [disabled]);
@@ -167,7 +171,7 @@ const OperationFormFields = memo(({
     testID,
   ) => (
     <Pressable
-      style={[style, compact && styles.formInputCompact, inputStyle, disabledStyle]}
+      style={[style, compact && styles.formInputCompact, inputStyle, groupBorderStyle, disabledStyle]}
       onPress={onPress}
       disabled={disabled}
       testID={testID}
@@ -253,7 +257,7 @@ const OperationFormFields = memo(({
         <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
           {/* Button to open picker */}
           <Pressable
-            style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
+            style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
             onPress={() => !disabled && openPicker('category', categories)}
             disabled={disabled}
           >
@@ -282,7 +286,7 @@ const OperationFormFields = memo(({
                   compact && styles.categoryShortcutButtonCompact,
                   {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.inputBorder,
+                    borderColor: colors.border,
                   },
                   disabledStyle,
                 ]}
@@ -342,7 +346,7 @@ const OperationFormFields = memo(({
       return (
         <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
           <Pressable
-            style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
+            style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
             onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
             disabled={disabled}
           >
@@ -368,7 +372,7 @@ const OperationFormFields = memo(({
                   compact && styles.accountShortcutButtonCompact,
                   {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.inputBorder,
+                    borderColor: colors.border,
                   },
                   disabledStyle,
                 ]}
