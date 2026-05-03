@@ -4,7 +4,7 @@ import ExpandableFilters from '../../../app/components/search/ExpandableFilters'
 
 describe('ExpandableFilters', () => {
   const mockColors = {
-    surface: '#FFFFFF',
+    background: '#FFFFFF',
     text: '#000000',
     mutedText: '#999999',
     border: '#E0E0E0',
@@ -28,17 +28,10 @@ describe('ExpandableFilters', () => {
     { id: 'acc-2', name: 'Savings Account' },
   ];
 
-  const mockCategories = [
-    { id: 'cat-1', name: 'Food', type: 'entry', icon: 'food', isShadow: false },
-    { id: 'cat-2', name: 'Transport', type: 'entry', icon: 'car', isShadow: false },
-    { id: 'cat-3', name: 'Shadow Category', type: 'entry', icon: 'tag', isShadow: true },
-  ];
-
   const defaultProps = {
     filters: defaultFilters,
     onFilterChange: jest.fn(),
     accounts: mockAccounts,
-    categories: mockCategories,
     colors: mockColors,
     t: mockT,
     isExpanded: true,
@@ -93,10 +86,60 @@ describe('ExpandableFilters', () => {
     });
   });
 
-  it('filters out categories with isShadow=true from rendered list', () => {
-    const { getByText, queryByText } = render(<ExpandableFilters {...defaultProps} />);
-    expect(getByText('Food')).toBeTruthy();
-    expect(getByText('Transport')).toBeTruthy();
-    expect(queryByText('Shadow Category')).toBeNull();
+  it('renders clear all button', () => {
+    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+    expect(getByTestId('clear-all-button')).toBeTruthy();
+  });
+
+  it('calls onFilterChange with all groups reset when clear all is pressed', () => {
+    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+    fireEvent.press(getByTestId('clear-all-button'));
+    expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+      types: [],
+      accountIds: [],
+      categoryIds: [],
+      dateRange: { startDate: null, endDate: null },
+      amountRange: { min: null, max: null },
+    });
+  });
+
+  describe('Amount range input', () => {
+    it('preserves decimal point mid-typing without calling onFilterChange', () => {
+      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '1.');
+
+      // onFilterChange should NOT be called while still typing
+      expect(defaultProps.onFilterChange).not.toHaveBeenCalled();
+      // Input should still show '1.'
+      expect(minInput.props.value).toBe('1.');
+    });
+
+    it('calls onFilterChange with parsed float on blur', () => {
+      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '1.5');
+      fireEvent(minInput, 'blur');
+
+      expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+        amountRange: { min: 1.5, max: null },
+      });
+    });
+
+    it('calls onFilterChange with null on blur when input cleared', () => {
+      const { getByPlaceholderText } = render(
+        <ExpandableFilters {...defaultProps} filters={{ ...defaultFilters, amountRange: { min: 5, max: null } }} />,
+      );
+      const minInput = getByPlaceholderText('min_amount');
+
+      fireEvent.changeText(minInput, '');
+      fireEvent(minInput, 'blur');
+
+      expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+        amountRange: { min: null, max: null },
+      });
+    });
   });
 });

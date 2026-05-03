@@ -64,8 +64,17 @@ export const OperationsActionsProvider = ({ children }) => {
   // Request ID counter to handle race conditions in loadInitialOperations
   const loadRequestIdRef = useRef(0);
 
+  // Ref so loadInitialOperations can read latest filters without depending on them
+  // (prevents the function from changing on every filter edit, which would re-trigger the
+  // mount effect and show a loading spinner on every keystroke or filter tap)
+  const activeFiltersRef = useRef(activeFilters);
+  useEffect(() => {
+    activeFiltersRef.current = activeFilters;
+  }, [activeFilters]);
+
   // Load initial week of operations
-  const loadInitialOperations = useCallback(async (filters = activeFilters, showLoading = true) => {
+  const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
+    const effectiveFilters = filters ?? activeFiltersRef.current;
     console.log('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
@@ -74,9 +83,9 @@ export const OperationsActionsProvider = ({ children }) => {
       if (showLoading) {
         _setLoading(true);
       }
-      const isFiltered = _hasActiveFilters(filters);
+      const isFiltered = _hasActiveFilters(effectiveFilters);
       let operationsData = isFiltered
-        ? await OperationsDB.getFilteredOperationsByWeekOffset(0, filters)
+        ? await OperationsDB.getFilteredOperationsByWeekOffset(0, effectiveFilters)
         : await OperationsDB.getOperationsByWeekOffset(0);
 
       // Check if this request is still the latest (ignore stale results)
@@ -112,7 +121,6 @@ export const OperationsActionsProvider = ({ children }) => {
       }
     }
   }, [
-    activeFilters,
     _hasActiveFilters,
     _setLoading,
     _setOperations,

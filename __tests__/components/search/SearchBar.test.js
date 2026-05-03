@@ -237,5 +237,24 @@ describe('SearchBar', () => {
       // Should have background with primary color at 15% opacity (hex: 15 in decimal)
       expect(buttonStyle.backgroundColor).toMatch(/#4da3ff/i);
     });
+
+    it('filter icon uses primary color when filterCount > 0', () => {
+      const { UNSAFE_getAllByType } = render(
+        <SearchBar {...defaultProps} filterCount={2} colors={{ ...mockColors, primary: '#FF3B30' }} />,
+      );
+      const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
+      // The first icon in the button is the filter-variant icon
+      const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
+      expect(filterIcon.props.color).toBe('#FF3B30');
+    });
+
+    it('filter icon uses text color when filterCount is 0', () => {
+      const { UNSAFE_getAllByType } = render(
+        <SearchBar {...defaultProps} filterCount={0} colors={{ ...mockColors, text: '#CCCCCC' }} />,
+      );
+      const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
+      const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
+      expect(filterIcon.props.color).toBe('#CCCCCC');
+    });
   });
 });

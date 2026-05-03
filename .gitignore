@@ -92,5 +92,5 @@ local/
 *.apk
 
 # Superpowers docs (plans, specs)
-docs/superpowers/
+docs/superpowers/*.html
 .superpowers/

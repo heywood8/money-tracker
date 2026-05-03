@@ -1,103 +1,85 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import {
   StyleSheet,
-  TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
-import { useCategories } from '../../contexts/CategoriesContext';
 import { useSearch } from '../../contexts/SearchContext';
 
-const SearchOverlay = ({ onClose, colors, t, visible }) => {
-  const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
-  const { filtersExpanded, toggleFilters } = useSearch();
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
+  const { searchState } = useOperationsData();
+  const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
-  const { categories } = useCategories();
-
-  const overlayOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    overlayOpacity.value = withTiming(filtersExpanded ? 0.3 : 0, { duration: 200 });
-  }, [filtersExpanded, overlayOpacity]);
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: overlayOpacity.value,
-    };
-  });
-
 
   const handleFilterChange = useCallback((partialFilters) => {
     updateSearchFilters(partialFilters);
   }, [updateSearchFilters]);
+
+  const handleLayout = useCallback((event) => {
+    if (onHeightChange) {
+      onHeightChange(event.nativeEvent.layout.height);
+    }
+  }, [onHeightChange]);
 
   if (!visible) {
     return null;
   }
 
   return (
-    <>
-      {filtersExpanded && (
-        <TouchableWithoutFeedback onPress={() => toggleFilters()}>
-          <Animated.View
-            style={[styles.overlayBackdrop, overlayAnimatedStyle]}
-            pointerEvents="auto"
-          />
-        </TouchableWithoutFeedback>
-      )}
-
-      <Animated.View
-        style={[styles.filtersContainer, { backgroundColor: colors.surface }]}
-        pointerEvents="box-none"
-      >
-        <ExpandableFilters
-          filters={searchState}
-          onFilterChange={handleFilterChange}
-          accounts={visibleAccounts}
-          categories={categories}
-          colors={colors}
-          t={t}
-          isExpanded={filtersExpanded}
-        />
-      </Animated.View>
-    </>
+    <Animated.View
+      style={[styles.filtersContainer, { backgroundColor: colors.background }]}
+      pointerEvents="box-none"
+      onLayout={handleLayout}
+    >
+      <ExpandableFilters
+        filters={searchState}
+        onFilterChange={handleFilterChange}
+        accounts={visibleAccounts}
+        colors={colors}
+        t={t}
+        isExpanded={filtersExpanded}
+      />
+    </Animated.View>
   );
 };
 
 SearchOverlay.propTypes = {
   onClose: PropTypes.func.isRequired,
+  onHeightChange: PropTypes.func,
   colors: PropTypes.shape({
-    surface: PropTypes.string.isRequired,
+    background: PropTypes.string.isRequired,
   }).isRequired,
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
 };
 
+SearchOverlay.defaultProps = {
+  onHeightChange: null,
+};
+
 const styles = StyleSheet.create({
   filtersContainer: {
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    elevation: 8,
     left: 0,
+    maxHeight: SCREEN_HEIGHT * 0.75,
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     top: 0,
     zIndex: 50,
-  },
-  overlayBackdrop: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 30,
   },
 });
 

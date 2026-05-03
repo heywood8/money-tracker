@@ -13,6 +13,7 @@ import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
 import FilterBadge from './search/FilterBadge';
+import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
@@ -30,7 +31,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const [dbVersion, setDbVersion] = useState(null);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
-  const { setSearchText } = useOperationsActions();
+  const { setSearchText, updateSearchFilters } = useOperationsActions();
 
   const handleCloseSearch = useCallback(() => {
     closeSearch(hasActiveSearch);
@@ -39,6 +40,17 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const handleToggleFilters = useCallback(() => {
     toggleFilters();
   }, [toggleFilters]);
+
+  const handleClearFilterGroup = useCallback((groupKey) => {
+    const clearValues = {
+      types: { types: [] },
+      dateRange: { dateRange: { startDate: null, endDate: null } },
+      amountRange: { amountRange: { min: null, max: null } },
+      accountIds: { accountIds: [] },
+      categoryIds: { categoryIds: [] },
+    };
+    updateSearchFilters(clearValues[groupKey]);
+  }, [updateSearchFilters]);
 
   const fetchDbVersion = useCallback(async () => {
     try {
@@ -76,22 +88,30 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
     <View
       style={[
         styles.container,
-        {
-          backgroundColor: colors.background,
-          borderBottomColor: colors.border,
-        },
+        { backgroundColor: colors.background, borderBottomColor: colors.border },
+        searchMode === 'open' && styles.containerSearchMode,
       ]}
     >
       {searchMode === 'open' ? (
-        <SearchBar
-          searchText={searchState?.text || ''}
-          onSearchTextChange={setSearchText}
-          onToggleFilters={handleToggleFilters}
-          onClose={handleCloseSearch}
-          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
-          colors={colors}
-          t={t}
-        />
+        <>
+          <SearchBar
+            searchText={searchState?.text || ''}
+            onSearchTextChange={setSearchText}
+            onToggleFilters={handleToggleFilters}
+            onClose={handleCloseSearch}
+            filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
+            colors={colors}
+            t={t}
+          />
+          {hasActiveSearch && (
+            <FilterChipStrip
+              searchState={searchState}
+              onClearGroup={handleClearFilterGroup}
+              colors={colors}
+              t={t}
+            />
+          )}
+        </>
       ) : (
         <>
           <View style={styles.titleContainer}>
@@ -222,6 +242,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
+  },
+  containerSearchMode: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    paddingHorizontal: 0,
   },
   downloadIndicator: {
     alignItems: 'center',

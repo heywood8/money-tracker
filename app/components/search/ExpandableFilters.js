@@ -10,13 +10,18 @@ const ExpandableFilters = ({
   filters,
   onFilterChange,
   accounts,
-  categories,
   colors,
   t,
   isExpanded,
 }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [localMinAmount, setLocalMinAmount] = useState(
+    filters.amountRange.min !== null ? String(filters.amountRange.min) : '',
+  );
+  const [localMaxAmount, setLocalMaxAmount] = useState(
+    filters.amountRange.max !== null ? String(filters.amountRange.max) : '',
+  );
 
   if (!isExpanded) {
     return null;
@@ -34,13 +39,6 @@ const ExpandableFilters = ({
       ? filters.accountIds.filter(id => id !== accountId)
       : [...filters.accountIds, accountId];
     onFilterChange({ accountIds: newAccountIds });
-  };
-
-  const toggleCategory = (categoryId) => {
-    const newCategoryIds = filters.categoryIds.includes(categoryId)
-      ? filters.categoryIds.filter(id => id !== categoryId)
-      : [...filters.categoryIds, categoryId];
-    onFilterChange({ categoryIds: newCategoryIds });
   };
 
   const handleStartDateChange = (event, selectedDate) => {
@@ -70,11 +68,11 @@ const ExpandableFilters = ({
   };
 
   return (
-    <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('operation_type')}
           </Text>
           <View style={styles.chipContainer}>
@@ -107,7 +105,7 @@ const ExpandableFilters = ({
 
         {/* Date Range Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('date_range')}
           </Text>
           <View style={styles.dateRangeContainer}>
@@ -145,16 +143,17 @@ const ExpandableFilters = ({
 
         {/* Amount Range Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('amount_range')}
           </Text>
           <View style={styles.amountRangeContainer}>
             <TextInput
               style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={filters.amountRange.min !== null ? String(filters.amountRange.min) : ''}
-              onChangeText={(text) => {
-                const value = text === '' ? null : parseFloat(text);
-                onFilterChange({ amountRange: { ...filters.amountRange, min: value } });
+              value={localMinAmount}
+              onChangeText={setLocalMinAmount}
+              onBlur={() => {
+                const value = localMinAmount === '' ? null : parseFloat(localMinAmount);
+                onFilterChange({ amountRange: { ...filters.amountRange, min: isNaN(value) ? null : value } });
               }}
               placeholder={t('min_amount')}
               placeholderTextColor={colors.mutedText}
@@ -163,10 +162,11 @@ const ExpandableFilters = ({
             <Text style={[styles.amountRangeSeparator, { color: colors.mutedText }]}>-</Text>
             <TextInput
               style={[styles.amountInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
-              value={filters.amountRange.max !== null ? String(filters.amountRange.max) : ''}
-              onChangeText={(text) => {
-                const value = text === '' ? null : parseFloat(text);
-                onFilterChange({ amountRange: { ...filters.amountRange, max: value } });
+              value={localMaxAmount}
+              onChangeText={setLocalMaxAmount}
+              onBlur={() => {
+                const value = localMaxAmount === '' ? null : parseFloat(localMaxAmount);
+                onFilterChange({ amountRange: { ...filters.amountRange, max: isNaN(value) ? null : value } });
               }}
               placeholder={t('max_amount')}
               placeholderTextColor={colors.mutedText}
@@ -177,56 +177,46 @@ const ExpandableFilters = ({
 
         {/* Accounts Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('accounts')}
           </Text>
-          {accounts.map(account => {
-            const isSelected = filters.accountIds.includes(account.id);
-            return (
-              <TouchableOpacity
-                key={account.id}
-                style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                onPress={() => toggleAccount(account.id)}
-              >
-                <Icon
-                  name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
-                  color={isSelected ? colors.primary : colors.mutedText}
-                />
-                <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                  {account.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={styles.chipContainer}>
+            {accounts.map(account => {
+              const isSelected = filters.accountIds.includes(account.id);
+              const chipTextColor = isSelected ? '#fff' : colors.text;
+              return (
+                <TouchableOpacity
+                  key={account.id}
+                  style={[styles.chip, {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => toggleAccount(account.id)}
+                >
+                  <Text style={[styles.chipText, { color: chipTextColor }]}>
+                    {account.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        {/* Categories Section */}
-        <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('categories')}
-          </Text>
-          {categories.filter(c => !c.isShadow).map(category => {
-            const isSelected = filters.categoryIds.includes(category.id);
-            return (
-              <TouchableOpacity
-                key={category.id}
-                style={[styles.checkboxItem, { borderBottomColor: colors.border }]}
-                onPress={() => toggleCategory(category.id)}
-              >
-                <Icon
-                  name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
-                  color={isSelected ? colors.primary : colors.mutedText}
-                />
-                <Icon name={category.icon || 'tag'} size={20} color={colors.text} style={styles.categoryIcon} />
-                <Text style={[styles.checkboxLabel, { color: colors.text }]}>
-                  {category.nameKey ? t(category.nameKey) : category.name}
-                </Text>
-              </TouchableOpacity>
-            );
+        <TouchableOpacity
+          testID="clear-all-button"
+          style={styles.clearAllButton}
+          onPress={() => onFilterChange({
+            types: [],
+            accountIds: [],
+            categoryIds: [],
+            dateRange: { startDate: null, endDate: null },
+            amountRange: { min: null, max: null },
           })}
-        </View>
+        >
+          <Text style={[styles.clearAllText, { color: colors.primary }]}>
+            {t('clear_all')}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Date Pickers */}
@@ -263,9 +253,8 @@ ExpandableFilters.propTypes = {
     id: PropTypes.string,
     name: PropTypes.string,
   })).isRequired,
-  categories: PropTypes.arrayOf(PropTypes.object).isRequired,
   colors: PropTypes.shape({
-    surface: PropTypes.string,
+    background: PropTypes.string,
     text: PropTypes.string,
     mutedText: PropTypes.string,
     border: PropTypes.string,
@@ -298,19 +287,6 @@ const styles = StyleSheet.create({
   amountRangeSeparator: {
     fontSize: 16,
   },
-  categoryIcon: {
-    marginLeft: 8,
-  },
-  checkboxItem: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-  },
   chip: {
     alignItems: 'center',
     borderRadius: 20,
@@ -329,6 +305,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  clearAllButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   clearDateButton: {
     marginTop: 7,
   },
@@ -337,7 +321,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   container: {
-    maxHeight: '60%',
+    flex: 1,
   },
   dateInput: {
     alignItems: 'center',
@@ -364,10 +348,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: 14,
   },
-  sectionTitle: {
-    fontSize: 16,
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.5,
     marginBottom: 10,
+    textTransform: 'uppercase',
   },
 });
 
