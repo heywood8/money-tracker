@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   typeSelectorCompact: {
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
 });
 
