@@ -41,15 +41,11 @@ const QuickAddForm = memo(({
   rateSource,
 }) => {
   const containerThemed = React.useMemo(() => ({
-    // Use altRow for outer background so QuickAdd area appears slightly gray
-    backgroundColor: colors.altRow,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.background,
   }), [colors]);
 
   const innerCardThemed = React.useMemo(() => ({
-    // Make inner card also gray so the whole form area is grayish
-    backgroundColor: colors.altRow,
+    backgroundColor: colors.background,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.sm,
   }), [colors]);
@@ -72,6 +68,7 @@ const QuickAddForm = memo(({
           openPicker={openPicker}
           onAmountChange={handleAmountChange}
           onAdd={handleQuickAdd}
+          containerBackground={colors.background}
           TYPES={TYPES}
           showAccountBalance={true}
           showFieldIcons={true}
@@ -118,17 +115,11 @@ QuickAddForm.propTypes = {
 const styles = StyleSheet.create({
   quickAddForm: {
     borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 0,
-    elevation: 2,
     gap: SPACING.sm,
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.sm,
     marginTop: SPACING.md,
     padding: SPACING.xsm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
 });
 
