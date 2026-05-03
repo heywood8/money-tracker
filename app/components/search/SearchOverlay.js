@@ -4,8 +4,6 @@ import {
   Dimensions,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
@@ -13,7 +11,9 @@ import { useOperationsActions } from '../../contexts/OperationsActionsContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useSearch } from '../../contexts/SearchContext';
 
-const SearchOverlay = ({ onClose, colors, t, visible }) => {
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
   const { searchState } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
@@ -23,6 +23,12 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
     updateSearchFilters(partialFilters);
   }, [updateSearchFilters]);
 
+  const handleLayout = useCallback((event) => {
+    if (onHeightChange) {
+      onHeightChange(event.nativeEvent.layout.height);
+    }
+  }, [onHeightChange]);
+
   if (!visible) {
     return null;
   }
@@ -31,6 +37,7 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
     <Animated.View
       style={[styles.filtersContainer, { backgroundColor: colors.background }]}
       pointerEvents="box-none"
+      onLayout={handleLayout}
     >
       <ExpandableFilters
         filters={searchState}
@@ -46,11 +53,16 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
 
 SearchOverlay.propTypes = {
   onClose: PropTypes.func.isRequired,
+  onHeightChange: PropTypes.func,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,
   }).isRequired,
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
+};
+
+SearchOverlay.defaultProps = {
+  onHeightChange: null,
 };
 
 const styles = StyleSheet.create({

@@ -64,6 +64,7 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
   const { searchMode } = useSearch();
   const quickAddOpacity = useSharedValue(1);
@@ -574,32 +575,35 @@ const OperationsScreen = () => {
   }, []);
 
   const quickAddFormComponent = useMemo(() => (
-    <Animated.View style={animatedQuickAddStyle}>
-      <QuickAddForm
-        colors={colors}
-        t={t}
-        quickAddValues={quickAddValues}
-        setQuickAddValues={setQuickAddValues}
-        accounts={visibleAccounts}
-        filteredCategories={filteredCategories}
-        topCategoriesForType={topCategoriesForType}
-        getCategoryInfo={getCategoryInfo}
-        getAccountName={getAccountName}
-        getAccountBalance={getAccountBalance}
-        getCategoryName={getCategoryName}
-        openPicker={openPicker}
-        handleQuickAdd={handleQuickAdd}
-        handleAmountChange={handleAmountChange}
-        handleExchangeRateChange={handleExchangeRateChange}
-        handleDestinationAmountChange={handleDestinationAmountChange}
-        onAutoAddWithCategory={handleAutoAddWithCategory}
-        topTransferAccounts={topTransferAccountsForForm}
-        onAutoAddWithAccount={handleAutoAddWithAccount}
-        TYPES={TYPES}
-        rateSource={rateSource}
-      />
-    </Animated.View>
-  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource]);
+    <>
+      <Animated.View style={animatedQuickAddStyle}>
+        <QuickAddForm
+          colors={colors}
+          t={t}
+          quickAddValues={quickAddValues}
+          setQuickAddValues={setQuickAddValues}
+          accounts={visibleAccounts}
+          filteredCategories={filteredCategories}
+          topCategoriesForType={topCategoriesForType}
+          getCategoryInfo={getCategoryInfo}
+          getAccountName={getAccountName}
+          getAccountBalance={getAccountBalance}
+          getCategoryName={getCategoryName}
+          openPicker={openPicker}
+          handleQuickAdd={handleQuickAdd}
+          handleAmountChange={handleAmountChange}
+          handleExchangeRateChange={handleExchangeRateChange}
+          handleDestinationAmountChange={handleDestinationAmountChange}
+          onAutoAddWithCategory={handleAutoAddWithCategory}
+          topTransferAccounts={topTransferAccountsForForm}
+          onAutoAddWithAccount={handleAutoAddWithAccount}
+          TYPES={TYPES}
+          rateSource={rateSource}
+        />
+      </Animated.View>
+      {filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
+    </>
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
@@ -722,6 +726,7 @@ const OperationsScreen = () => {
       <SearchOverlay
         visible={searchMode === 'open'}
         onClose={() => {}}
+        onHeightChange={setFilterPanelHeight}
         colors={colors}
         t={t}
       />
