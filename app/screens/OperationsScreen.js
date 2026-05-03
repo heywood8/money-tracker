@@ -76,13 +76,14 @@ const OperationsScreen = () => {
   // Animate when searchMode changes
   useEffect(() => {
     if (searchMode === 'open') {
-      // Hide QuickAddForm
+      // Smooth hide when opening search
       quickAddMaxHeight.value = withTiming(0, { duration: 300 });
       quickAddOpacity.value = withTiming(0, { duration: 300 });
     } else {
-      // Show QuickAddForm
-      quickAddMaxHeight.value = withTiming(1000, { duration: 300 });
-      quickAddOpacity.value = withTiming(1, { duration: 300 });
+      // Instant height restore on close (avoids JS/UI-thread race with scrollToOffset),
+      // fade opacity in for a smooth visual.
+      quickAddMaxHeight.value = 1000;
+      quickAddOpacity.value = withTiming(1, { duration: 250 });
     }
   }, [searchMode]);
 
@@ -632,11 +633,12 @@ const OperationsScreen = () => {
     prevSearchModeRef.current = searchMode;
 
     if (wasOpen && searchMode !== 'open') {
-      // Defer past the 300ms QuickAdd form re-expand animation (reanimated withTiming)
-      // so the FlatList layout is stable before we scroll.
-      setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-      }, 350);
+      // Defer one animation frame so FlatList layout has settled after the
+      // React commit, then scroll to the top before the QuickAdd form
+      // finishes re-expanding.
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
     }
   }, [searchMode]);
 
