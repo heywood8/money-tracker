@@ -1,22 +1,19 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import SearchOverlay from '../../app/components/search/SearchOverlay';
 import { useOperationsData } from '../../app/contexts/OperationsDataContext';
 import { useOperationsActions } from '../../app/contexts/OperationsActionsContext';
 import { useAccountsData } from '../../app/contexts/AccountsDataContext';
-import { useCategories } from '../../app/contexts/CategoriesContext';
 import { useSearch } from '../../app/contexts/SearchContext';
-import { Alert } from 'react-native';
 
-// Mock context hooks
 jest.mock('../../app/contexts/OperationsDataContext');
 jest.mock('../../app/contexts/OperationsActionsContext');
 jest.mock('../../app/contexts/AccountsDataContext');
-jest.mock('../../app/contexts/CategoriesContext');
 jest.mock('../../app/contexts/SearchContext');
 
-// Mock Alert
-jest.spyOn(Alert, 'alert');
+jest.mock('../../app/services/BalanceHistoryDB', () => ({
+  formatDate: jest.fn((date) => date.toISOString().split('T')[0]),
+}));
 
 describe('Search Integration', () => {
   const mockColors = {
@@ -31,46 +28,32 @@ describe('Search Integration', () => {
   };
 
   const mockT = (key) => key;
-
-  let mockSearchState;
-  let mockSetSearchText;
   let mockUpdateSearchFilters;
-  let mockClearAllSearch;
-  let mockGetSearchFilterCount;
+
+  const defaultSearchState = {
+    text: '',
+    types: [],
+    accountIds: [],
+    categoryIds: [],
+    dateRange: { startDate: null, endDate: null },
+    amountRange: { min: null, max: null },
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Initialize mock search state
-    mockSearchState = {
-      text: '',
-      types: [],
-      accountIds: [],
-      categoryIds: [],
-      dateRange: { startDate: null, endDate: null },
-      amountRange: { min: null, max: null },
-    };
-
-    mockSetSearchText = jest.fn();
     mockUpdateSearchFilters = jest.fn();
-    mockClearAllSearch = jest.fn();
-    mockGetSearchFilterCount = jest.fn(() => 0);
 
-    // Mock OperationsDataContext
     useOperationsData.mockReturnValue({
-      searchState: mockSearchState,
+      searchState: defaultSearchState,
       hasActiveSearch: false,
-      getSearchFilterCount: mockGetSearchFilterCount,
+      getSearchFilterCount: jest.fn(() => 0),
     });
 
-    // Mock OperationsActionsContext
     useOperationsActions.mockReturnValue({
-      setSearchText: mockSetSearchText,
+      setSearchText: jest.fn(),
       updateSearchFilters: mockUpdateSearchFilters,
-      clearAllSearch: mockClearAllSearch,
     });
 
-    // Mock AccountsDataContext
     useAccountsData.mockReturnValue({
       visibleAccounts: [
         { id: 'acc-1', name: 'Checking' },
@@ -78,91 +61,144 @@ describe('Search Integration', () => {
       ],
     });
 
-    // Mock CategoriesContext
-    useCategories.mockReturnValue({
-      categories: [
-        { id: 'cat-1', name: 'Food', type: 'entry', icon: 'food', isShadow: false },
-        { id: 'cat-2', name: 'Transport', type: 'entry', icon: 'car', isShadow: false },
-      ],
-    });
-
-    // Mock SearchContext
     useSearch.mockReturnValue({
       filtersExpanded: false,
       toggleFilters: jest.fn(),
     });
   });
 
-  describe('Complete Search Workflow', () => {
-    it.skip('complete search workflow: open -> type -> filter (SearchBar moved to Header)', async () => {
-      // This test is skipped because SearchBar is now in Header (Task 7), not SearchOverlay
-      // SearchOverlay only contains ExpandableFilters now
-      // Integration test for full workflow should test Header + SearchOverlay together
-    });
-
-    it.skip('shows alert when closing with active filters (SearchBar moved to Header)', async () => {
-      // This test is skipped because SearchBar (with close button) is now in Header
-      // Alert logic has also been moved to Header component
-    });
-
-    it.skip('closes without alert when no active filters (SearchBar moved to Header)', () => {
-      // This test is skipped because SearchBar (with close button) is now in Header
-    });
-
-    it('renders filters based on SearchContext.filtersExpanded', async () => {
-      useSearch.mockReturnValue({
-        filtersExpanded: true,
-        toggleFilters: jest.fn(),
-      });
-
-      const onClose = jest.fn();
+  describe('SearchOverlay Visibility', () => {
+    it('does not render when visible is false', () => {
       const { queryByTestId } = render(
-        <SearchOverlay visible={true} onClose={onClose} colors={mockColors} t={mockT} />,
+        <SearchOverlay visible={false} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
+      expect(queryByTestId('expandable-filters')).toBeNull();
+    });
 
-      // Should render expandable filters when filtersExpanded is true
+    it('does not render filters when filtersExpanded is false', () => {
+      const { queryByTestId } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      expect(queryByTestId('expandable-filters')).toBeNull();
+    });
+
+    it('renders filters when filtersExpanded is true', () => {
+      useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
+      const { queryByTestId } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
       expect(queryByTestId('expandable-filters')).toBeTruthy();
     });
+  });
 
-    it.skip('collapses filters when backdrop is pressed (filter toggle moved to Header)', () => {
-      // Filter toggle button is now in Header, not SearchOverlay
-      // Skip this test as it needs Header component
+  describe('Filter Sections', () => {
+    beforeEach(() => {
+      useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
     });
 
-    it.skip('shows filter count badge when filters are applied (SearchBar moved to Header)', async () => {
-      // SearchBar and filter count badge are now in Header, not SearchOverlay
+    it('renders all filter sections when expanded', () => {
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      expect(getByText('operation_type')).toBeTruthy();
+      expect(getByText('date_range')).toBeTruthy();
+      expect(getByText('amount_range')).toBeTruthy();
+      expect(getByText('accounts')).toBeTruthy();
     });
 
-    it.skip('clears search text when clear button is pressed (SearchBar moved to Header)', async () => {
-      // SearchBar and clear button are now in Header, not SearchOverlay
+    it('renders type filter chips', () => {
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      expect(getByText('expense')).toBeTruthy();
+      expect(getByText('income')).toBeTruthy();
+      expect(getByText('transfer')).toBeTruthy();
     });
 
-    it.skip('allows multiple filter types to be selected (filter toggle moved to Header)', async () => {
-      // Filter toggle button is now in Header, not SearchOverlay
-    });
-
-    it.skip('renders all filter sections when expanded (filter toggle moved to Header)', async () => {
-      // Filter toggle button is now in Header, not SearchOverlay
+    it('renders account chips for each visible account', () => {
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      expect(getByText('Checking')).toBeTruthy();
+      expect(getByText('Savings')).toBeTruthy();
     });
   });
 
   describe('Filter Interactions', () => {
-    it.skip('toggles account filters (filter toggle moved to Header)', async () => {
-      // Filter toggle button is now in Header, not SearchOverlay
+    beforeEach(() => {
+      useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
     });
 
-    it.skip('toggles category filters (filter toggle moved to Header)', async () => {
-      // Filter toggle button is now in Header, not SearchOverlay
-    });
-  });
-
-  describe('Alert Dialog Interactions', () => {
-    it.skip('calls clearAllSearch when Clear All is selected in alert (moved to Header)', async () => {
-      // Alert dialog for closing search with active filters is now in Header
+    it('selects a type filter when chip is pressed', () => {
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByText('expense'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: ['expense'] });
     });
 
-    it.skip('keeps filters when Keep Filters is selected in alert (moved to Header)', async () => {
-      // Alert dialog for closing search with active filters is now in Header
+    it('allows multiple type filters to be selected', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, types: ['expense'] },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 1),
+      });
+
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByText('income'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: ['expense', 'income'] });
+    });
+
+    it('deselects a type filter when selected chip is pressed again', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, types: ['expense'] },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 1),
+      });
+
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByText('expense'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: [] });
+    });
+
+    it('toggles account filter on', () => {
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByText('Checking'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ accountIds: ['acc-1'] });
+    });
+
+    it('toggles account filter off when already selected', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, accountIds: ['acc-1'] },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 1),
+      });
+
+      const { getByText } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByText('Checking'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ accountIds: [] });
+    });
+
+    it('clear all button resets all filters via updateSearchFilters', () => {
+      const { getByTestId } = render(
+        <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
+      );
+      fireEvent.press(getByTestId('clear-all-button'));
+      expect(mockUpdateSearchFilters).toHaveBeenCalledWith({
+        types: [],
+        accountIds: [],
+        categoryIds: [],
+        dateRange: { startDate: null, endDate: null },
+        amountRange: { min: null, max: null },
+      });
     });
   });
 });

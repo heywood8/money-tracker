@@ -2,12 +2,15 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import Header from '../../app/components/Header';
 import { useSearch } from '../../app/contexts/SearchContext';
+import { useOperationsData } from '../../app/contexts/OperationsDataContext';
+import { useOperationsActions } from '../../app/contexts/OperationsActionsContext';
 
-// Mock contexts
-let mockOpenSearch = jest.fn();
 jest.mock('../../app/contexts/SearchContext', () => ({
   useSearch: jest.fn(),
 }));
+
+jest.mock('../../app/contexts/OperationsDataContext');
+jest.mock('../../app/contexts/OperationsActionsContext');
 
 jest.mock('../../app/contexts/ThemeConfigContext', () => ({
   useThemeConfig: () => ({
@@ -32,27 +35,6 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({
     t: (key) => key,
-  }),
-}));
-
-jest.mock('../../app/contexts/OperationsDataContext', () => ({
-  useOperationsData: () => ({
-    searchState: {
-      text: '',
-      types: [],
-      accountIds: [],
-      categoryIds: [],
-      dateRange: { startDate: null, endDate: null },
-      amountRange: { min: null, max: null },
-    },
-    hasActiveSearch: false,
-    getSearchFilterCount: () => 0,
-  }),
-}));
-
-jest.mock('../../app/contexts/OperationsActionsContext', () => ({
-  useOperationsActions: () => ({
-    setSearchText: jest.fn(),
   }),
 }));
 
@@ -82,135 +64,259 @@ jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const { Text } = require('react-native');
   const PropTypes = require('prop-types');
-  function MockIonicons({ name }) {
+  function MockIcon({ name }) {
     return React.createElement(Text, { testID: `icon-${name}` }, name);
   }
-  MockIonicons.propTypes = { name: PropTypes.string };
-  return { Ionicons: MockIonicons };
+  MockIcon.propTypes = { name: PropTypes.string };
+  return { Ionicons: MockIcon, MaterialCommunityIcons: MockIcon };
 });
 
 jest.mock('../../app/styles/layout', () => ({
   HORIZONTAL_PADDING: 16,
 }));
 
+const defaultSearchState = {
+  text: '',
+  types: [],
+  accountIds: [],
+  categoryIds: [],
+  dateRange: { startDate: null, endDate: null },
+  amountRange: { min: null, max: null },
+};
+
 describe('Header Search Integration', () => {
+  let mockOpenSearch;
+  let mockCloseSearch;
+  let mockToggleFilters;
+  let mockSetSearchText;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
     mockOpenSearch = jest.fn();
+    mockCloseSearch = jest.fn();
+    mockToggleFilters = jest.fn();
+    mockSetSearchText = jest.fn();
+
     useSearch.mockReturnValue({
       openSearch: mockOpenSearch,
       searchMode: 'closed',
-      closeSearch: jest.fn(),
+      closeSearch: mockCloseSearch,
       reopenSearch: jest.fn(),
-      toggleFilters: jest.fn(),
+      toggleFilters: mockToggleFilters,
+    });
+
+    useOperationsData.mockReturnValue({
+      searchState: defaultSearchState,
+      hasActiveSearch: false,
+      getSearchFilterCount: jest.fn(() => 0),
+    });
+
+    useOperationsActions.mockReturnValue({
+      setSearchText: mockSetSearchText,
+      updateSearchFilters: jest.fn(),
     });
   });
 
   describe('Search Button Visibility', () => {
     it('does not show search button when activeScreen is not Operations', () => {
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Accounts" operationsData={null} />,
+        <Header onOpenSettings={() => {}} activeScreen="Accounts" />,
       );
-
       expect(queryByTestId('search-button')).toBeNull();
     });
 
     it('shows search button when activeScreen is Operations', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
       expect(getByTestId('search-button')).toBeTruthy();
     });
 
     it('does not show search button when rightContent is provided', () => {
       const CustomContent = () => <></>;
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" rightContent={<CustomContent />} operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" rightContent={<CustomContent />} />,
       );
-
       expect(queryByTestId('search-button')).toBeNull();
     });
   });
 
   describe('Search Button Functionality', () => {
     it('calls openSearch when button is pressed', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
-      const searchButton = getByTestId('search-button');
-      fireEvent.press(searchButton);
-
+      fireEvent.press(getByTestId('search-button'));
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
     });
 
     it('does not throw when search button is pressed', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
-      const searchButton = getByTestId('search-button');
-
       expect(() => {
-        fireEvent.press(searchButton);
+        fireEvent.press(getByTestId('search-button'));
       }).not.toThrow();
     });
   });
 
-  describe('Filter Badge', () => {
+  describe('Filter Badge (collapsed mode)', () => {
     it('does not show filter badge when no search filters are active', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
       expect(queryByTestId('filter-badge')).toBeNull();
     });
 
-    it.skip('shows filter badge with count when filters are active (needs context mock refactor)', () => {
-      // This test needs to be refactored to properly mock useOperationsData() context hook
-      // Currently Header gets data from context, not from props
-      // The module-level jest.mock() can't be overridden per-test
-      // TODO: Refactor to use jest.requireActual() and spyOn pattern
+    it('shows filter badge when search is collapsed and filters are active', () => {
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'collapsed',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+      });
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, types: ['expense'] },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 1),
+      });
+
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      expect(getByTestId('filter-badge')).toBeTruthy();
+    });
+
+    it('does not show filter badge when collapsed but no active filters', () => {
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'collapsed',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+      });
+
+      const { queryByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      expect(queryByTestId('filter-badge')).toBeNull();
+    });
+  });
+
+  describe('Search Mode (searchMode=open)', () => {
+    beforeEach(() => {
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'open',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+      });
+    });
+
+    it('renders SearchBar when search is open', () => {
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      expect(getByTestId('search-bar-container')).toBeTruthy();
+    });
+
+    it('does not render title when search is open', () => {
+      const { queryByText } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      expect(queryByText('Penny')).toBeNull();
+    });
+
+    it('close button calls closeSearch with false when no active search', () => {
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      fireEvent.press(getByTestId('close-search-button'));
+      expect(mockCloseSearch).toHaveBeenCalledWith(false);
+    });
+
+    it('close button calls closeSearch with true when search is active', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, text: 'groceries' },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 0),
+      });
+
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      fireEvent.press(getByTestId('close-search-button'));
+      expect(mockCloseSearch).toHaveBeenCalledWith(true);
+    });
+
+    it('filter toggle button calls toggleFilters', () => {
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      fireEvent.press(getByTestId('filters-toggle-button'));
+      expect(mockToggleFilters).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows filter count badge in SearchBar when filterCount > 0', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, types: ['expense'] },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 2),
+      });
+
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      expect(getByTestId('filter-count-badge')).toBeTruthy();
+    });
+
+    it('clears search text when clear button is pressed', () => {
+      useOperationsData.mockReturnValue({
+        searchState: { ...defaultSearchState, text: 'groceries' },
+        hasActiveSearch: true,
+        getSearchFilterCount: jest.fn(() => 0),
+      });
+
+      const { getByTestId } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+      fireEvent.press(getByTestId('clear-search-button'));
+      expect(mockSetSearchText).toHaveBeenCalledWith('');
+    });
+  });
+
+  describe('Complete Search Workflow', () => {
+    it('search button opens search and SearchBar becomes visible', () => {
+      const { getByTestId, queryByTestId, rerender } = render(
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+      );
+
+      expect(queryByTestId('search-bar-container')).toBeNull();
+      fireEvent.press(getByTestId('search-button'));
+      expect(mockOpenSearch).toHaveBeenCalledTimes(1);
+
+      // Simulate searchMode transitioning to 'open'
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'open',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+      });
+      rerender(<Header onOpenSettings={() => {}} activeScreen="Operations" />);
+
+      expect(getByTestId('search-bar-container')).toBeTruthy();
     });
   });
 
   describe('Integration with Other Header Buttons', () => {
     it('shows search button alongside theme toggle and settings buttons', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
       expect(getByTestId('search-button')).toBeTruthy();
       expect(getByTestId('theme-toggle-button')).toBeTruthy();
       expect(getByTestId('settings-button')).toBeTruthy();
@@ -218,39 +324,25 @@ describe('Header Search Integration', () => {
 
     it('all buttons remain functional when search button is present', () => {
       const mockOpenSettings = jest.fn();
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={mockOpenSettings} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={mockOpenSettings} activeScreen="Operations" />,
       );
 
-      // Press each button
       fireEvent.press(getByTestId('search-button'));
       fireEvent.press(getByTestId('theme-toggle-button'));
       fireEvent.press(getByTestId('settings-button'));
 
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
       expect(mockOpenSettings).toHaveBeenCalledTimes(1);
-      // Theme toggle doesn't have a mock, but it should not throw
     });
   });
 
   describe('Accessibility', () => {
     it('has proper accessibility props on search button', () => {
-      const mockOperationsData = {
-        hasActiveSearch: false,
-        getSearchFilterCount: () => 0,
-      };
-
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" operationsData={mockOperationsData} />,
+        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
       );
-
       const searchButton = getByTestId('search-button');
-
       expect(searchButton.props.accessibilityLabel).toBe('Search operations');
       expect(searchButton.props.accessibilityRole).toBe('button');
     });
