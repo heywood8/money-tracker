@@ -10,6 +10,7 @@ const ExpandableFilters = ({
   filters,
   onFilterChange,
   accounts,
+  categories,
   colors,
   t,
   isExpanded,
@@ -41,6 +42,13 @@ const ExpandableFilters = ({
     onFilterChange({ accountIds: newAccountIds });
   };
 
+  const toggleCategory = (categoryId) => {
+    const newCategoryIds = filters.categoryIds.includes(categoryId)
+      ? filters.categoryIds.filter(id => id !== categoryId)
+      : [...filters.categoryIds, categoryId];
+    onFilterChange({ categoryIds: newCategoryIds });
+  };
+
   const handleStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
     if (selectedDate) {
@@ -68,7 +76,7 @@ const ExpandableFilters = ({
   };
 
   return (
-    <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.background }]}>
+    <View testID="expandable-filters" style={[styles.container, { backgroundColor: colors.surface }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Type Section */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
@@ -202,6 +210,38 @@ const ExpandableFilters = ({
           </View>
         </View>
 
+        {/* Categories Section */}
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
+            {t('categories')}
+          </Text>
+          <View style={styles.chipContainer}>
+            {categories.filter(c => !c.isShadow).map(category => {
+              const isSelected = filters.categoryIds.includes(category.id);
+              const chipTextColor = isSelected ? '#fff' : colors.text;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.chip, {
+                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                    borderColor: colors.border,
+                  }]}
+                  onPress={() => toggleCategory(category.id)}
+                >
+                  <Icon
+                    name={category.icon || 'tag'}
+                    size={14}
+                    color={chipTextColor}
+                  />
+                  <Text style={[styles.chipText, { color: chipTextColor }]}>
+                    {category.nameKey ? t(category.nameKey) : category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         <TouchableOpacity
           testID="clear-all-button"
           style={styles.clearAllButton}
@@ -253,8 +293,9 @@ ExpandableFilters.propTypes = {
     id: PropTypes.string,
     name: PropTypes.string,
   })).isRequired,
+  categories: PropTypes.arrayOf(PropTypes.object).isRequired,
   colors: PropTypes.shape({
-    background: PropTypes.string,
+    surface: PropTypes.string,
     text: PropTypes.string,
     mutedText: PropTypes.string,
     border: PropTypes.string,

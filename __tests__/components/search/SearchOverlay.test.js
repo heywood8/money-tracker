@@ -5,6 +5,7 @@ import SearchOverlay from '../../../app/components/search/SearchOverlay';
 import { useOperationsData } from '../../../app/contexts/OperationsDataContext';
 import { useOperationsActions } from '../../../app/contexts/OperationsActionsContext';
 import { useAccountsData } from '../../../app/contexts/AccountsDataContext';
+import { useCategories } from '../../../app/contexts/CategoriesContext';
 import { useSearch } from '../../../app/contexts/SearchContext';
 
 // Mock SearchContext
@@ -57,6 +58,7 @@ jest.spyOn(Alert, 'alert');
 
 describe('SearchOverlay', () => {
   const mockColors = {
+    surface: '#FFFFFF',
     background: '#F5F5F5',
   };
 
@@ -92,6 +94,10 @@ describe('SearchOverlay', () => {
     visibleAccounts: [],
   };
 
+  const mockCategoriesData = {
+    categories: [],
+  };
+
   const mockSearchContext = {
     filtersExpanded: false,
     toggleFilters: jest.fn(),
@@ -104,6 +110,7 @@ describe('SearchOverlay', () => {
     useOperationsData.mockReturnValue(mockOperationsData);
     useOperationsActions.mockReturnValue(mockOperationsActions);
     useAccountsData.mockReturnValue(mockAccountsData);
+    useCategories.mockReturnValue(mockCategoriesData);
     useSearch.mockReturnValue(mockSearchContext);
 
     // Clear Alert mock
@@ -223,6 +230,7 @@ describe('SearchOverlay', () => {
     expect(useOperationsData).toHaveBeenCalled();
     expect(useOperationsActions).toHaveBeenCalled();
     expect(useAccountsData).toHaveBeenCalled();
+    expect(useCategories).toHaveBeenCalled();
     expect(useSearch).toHaveBeenCalled();
   });
 
