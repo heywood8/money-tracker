@@ -51,7 +51,7 @@ const QuickAddForm = memo(({
     // Make inner card also gray so the whole form area is grayish
     backgroundColor: colors.altRow,
     borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
+    padding: SPACING.sm,
   }), [colors]);
 
   return (
@@ -82,6 +82,7 @@ const QuickAddForm = memo(({
           topTransferAccounts={topTransferAccounts}
           onAutoAddWithAccount={onAutoAddWithAccount}
           rateSource={rateSource}
+          compact={true}
         />
       </View>
     </View>
