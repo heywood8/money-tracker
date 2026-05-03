@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.80.1](https://github.com/heywood8/money-tracker/compare/penny-v0.80.0...penny-v0.80.1) (2026-05-03)
+
+
+### Tests
+
+* rewrite skipped search tests against Header and SearchOverlay ([#453](https://github.com/heywood8/money-tracker/issues/453)) ([0a32d9d](https://github.com/heywood8/money-tracker/commit/0a32d9d177e8c826d6260788e503e92172a191c6))
+
 ## [0.80.0](https://github.com/heywood8/money-tracker/compare/penny-v0.79.0...penny-v0.80.0) (2026-05-03)
 
 
