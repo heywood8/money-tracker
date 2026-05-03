@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.81.2](https://github.com/heywood8/money-tracker/compare/penny-v0.81.1...penny-v0.81.2) (2026-05-03)
+
+
+### Styles
+
+* **quickadd:** align form borders with operation group style ([#459](https://github.com/heywood8/money-tracker/issues/459)) ([3a1eca7](https://github.com/heywood8/money-tracker/commit/3a1eca7a5267903073d9d70ab641d6de37c6f44f))
+
 ## [0.81.1](https://github.com/heywood8/money-tracker/compare/penny-v0.81.0...penny-v0.81.1) (2026-05-03)
 
 
