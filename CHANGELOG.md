@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.0](https://github.com/heywood8/money-tracker/compare/penny-v0.81.2...penny-v0.82.0) (2026-05-03)
+
+
+### Features
+
+* **quickadd:** add second suggested row for categories and transfer accounts ([#461](https://github.com/heywood8/money-tracker/issues/461)) ([93962a3](https://github.com/heywood8/money-tracker/commit/93962a3014f00cd1e7281a85cb2f00f967b4151a))
+
 ## [0.81.2](https://github.com/heywood8/money-tracker/compare/penny-v0.81.1...penny-v0.81.2) (2026-05-03)
 
 
