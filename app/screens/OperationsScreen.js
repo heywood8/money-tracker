@@ -67,19 +67,23 @@ const OperationsScreen = () => {
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
   const { searchMode, filtersExpanded } = useSearch();
+  const scrollOffsetRef = useRef(0);
+  const prevFiltersExpandedRef = useRef(false);
+  const prevSearchModeRef = useRef(searchMode);
   const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
 
   // Animate when searchMode changes
   useEffect(() => {
     if (searchMode === 'open') {
-      // Hide QuickAddForm
+      // Smooth hide when opening search
       quickAddMaxHeight.value = withTiming(0, { duration: 300 });
       quickAddOpacity.value = withTiming(0, { duration: 300 });
     } else {
-      // Show QuickAddForm
-      quickAddMaxHeight.value = withTiming(1000, { duration: 300 });
-      quickAddOpacity.value = withTiming(1, { duration: 300 });
+      // Instant height restore on close (avoids JS/UI-thread race with scrollToOffset),
+      // fade opacity in for a smooth visual.
+      quickAddMaxHeight.value = 1000;
+      quickAddOpacity.value = withTiming(1, { duration: 250 });
     }
   }, [searchMode]);
 
@@ -605,9 +609,43 @@ const OperationsScreen = () => {
     </>
   ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight, filtersExpanded]);
 
+  // Auto-scroll to top when filter panel closes, but only if the user is still
+  // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
+  // if the offset is within the spacer region the user was viewing recent entries.
+  useEffect(() => {
+    const wasExpanded = prevFiltersExpandedRef.current;
+    prevFiltersExpandedRef.current = filtersExpanded;
+
+    if (wasExpanded && !filtersExpanded) {
+      if (scrollOffsetRef.current <= filterPanelHeight) {
+        InteractionManager.runAfterInteractions(() => {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        });
+      }
+    }
+  }, [filtersExpanded, filterPanelHeight]);
+
+  // Auto-scroll to top when search closes (open → closed/collapsed).
+  // The user is returning to the normal view and should land on the QuickAdd form.
+  // Deferred via InteractionManager so the scroll runs after the close animation settles.
+  useEffect(() => {
+    const wasOpen = prevSearchModeRef.current === 'open';
+    prevSearchModeRef.current = searchMode;
+
+    if (wasOpen && searchMode !== 'open') {
+      // Defer one animation frame so FlatList layout has settled after the
+      // React commit, then scroll to the top before the QuickAdd form
+      // finishes re-expanding.
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+  }, [searchMode]);
+
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
+    scrollOffsetRef.current = offsetY;
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
   }, []);
