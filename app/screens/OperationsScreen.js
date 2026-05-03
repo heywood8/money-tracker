@@ -67,6 +67,8 @@ const OperationsScreen = () => {
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
   const { searchMode, filtersExpanded } = useSearch();
+  const scrollOffsetRef = useRef(0);
+  const prevFiltersExpandedRef = useRef(false);
   const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
 
@@ -605,9 +607,24 @@ const OperationsScreen = () => {
     </>
   ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight, filtersExpanded]);
 
+  // Auto-scroll to top when filter panel closes, but only if the user is still
+  // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
+  // if the offset is within the spacer region the user was viewing recent entries.
+  useEffect(() => {
+    const wasExpanded = prevFiltersExpandedRef.current;
+    prevFiltersExpandedRef.current = filtersExpanded;
+
+    if (wasExpanded && !filtersExpanded) {
+      if (scrollOffsetRef.current <= filterPanelHeight) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+    }
+  }, [filtersExpanded, filterPanelHeight]);
+
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
+    scrollOffsetRef.current = offsetY;
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
   }, []);
