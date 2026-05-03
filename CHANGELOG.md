@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.81.0](https://github.com/heywood8/money-tracker/compare/penny-v0.80.1...penny-v0.81.0) (2026-05-03)
+
+
+### Features
+
+* **quickadd:** remove outline and background from QuickAdd ([#455](https://github.com/heywood8/money-tracker/issues/455)) ([9b9e80a](https://github.com/heywood8/money-tracker/commit/9b9e80a5fed52423f98fd85d836bde34c832cf6e))
+
 ## [0.80.1](https://github.com/heywood8/money-tracker/compare/penny-v0.80.0...penny-v0.80.1) (2026-05-03)
 
 
