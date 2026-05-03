@@ -69,6 +69,7 @@ const OperationsScreen = () => {
   const { searchMode, filtersExpanded } = useSearch();
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
+  const prevSearchModeRef = useRef(searchMode);
   const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
 
@@ -620,6 +621,17 @@ const OperationsScreen = () => {
       }
     }
   }, [filtersExpanded, filterPanelHeight]);
+
+  // Auto-scroll to top when search closes (open → closed/collapsed).
+  // The user is returning to the normal view and should land on the QuickAdd form.
+  useEffect(() => {
+    const wasOpen = prevSearchModeRef.current === 'open';
+    prevSearchModeRef.current = searchMode;
+
+    if (wasOpen && searchMode !== 'open') {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }
+  }, [searchMode]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
