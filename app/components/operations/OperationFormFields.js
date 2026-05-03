@@ -78,6 +78,7 @@ const OperationFormFields = memo(({
   topTransferAccounts,
   onAutoAddWithAccount,
   rateSource,
+  compact = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
@@ -109,7 +110,7 @@ const OperationFormFields = memo(({
 
   // Render type selector buttons
   const renderTypeSelector = () => (
-    <View style={styles.typeSelector}>
+    <View style={[styles.typeSelector, compact && styles.typeSelectorCompact]}>
       {TYPES.map(type => {
         const isSelected = values.type === type.key;
         const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
@@ -166,7 +167,7 @@ const OperationFormFields = memo(({
     testID,
   ) => (
     <Pressable
-      style={[style, inputStyle, disabledStyle]}
+      style={[style, compact && styles.formInputCompact, inputStyle, disabledStyle]}
       onPress={onPress}
       disabled={disabled}
       testID={testID}
@@ -249,7 +250,7 @@ const OperationFormFields = memo(({
       };
 
       return (
-        <View style={styles.categoryButtonsContainer}>
+        <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
           {/* Button to open picker */}
           <Pressable
             style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
@@ -278,6 +279,7 @@ const OperationFormFields = memo(({
                 testID={`category-shortcut-${index}`}
                 style={[
                   styles.categoryShortcutButton,
+                  compact && styles.categoryShortcutButtonCompact,
                   {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
                     borderColor: colors.inputBorder,
@@ -338,7 +340,7 @@ const OperationFormFields = memo(({
       };
 
       return (
-        <View style={styles.categoryButtonsContainer}>
+        <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
           <Pressable
             style={[styles.categoryPickerButton, inputStyle, disabledStyle]}
             onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
@@ -363,6 +365,7 @@ const OperationFormFields = memo(({
                 key={account.id}
                 style={[
                   styles.accountShortcutButton,
+                  compact && styles.accountShortcutButtonCompact,
                   {
                     backgroundColor: isSelected ? colors.primary : colors.inputBackground,
                     borderColor: colors.inputBorder,
@@ -421,6 +424,7 @@ const OperationFormFields = memo(({
           placeholder={t('amount')}
           onAdd={onAdd}
           containerBackground={containerBackground}
+          compact={compact}
         />
       </View>
       {isMultiCurrencyTransfer && sourceAccount && destinationAccount && onExchangeRateChange && onDestinationAmountChange && (
@@ -482,6 +486,7 @@ OperationFormFields.propTypes = {
   topTransferAccounts: PropTypes.array,
   onAutoAddWithAccount: PropTypes.func,
   rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
+  compact: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
@@ -504,6 +509,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
   },
+  accountShortcutButtonCompact: {
+    minHeight: 38,
+  },
   accountShortcutName: {
     flex: 1,
     fontSize: FONT_SIZE.xs,
@@ -513,6 +521,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
     marginBottom: SPACING.md,
+  },
+  categoryButtonsContainerCompact: {
+    marginBottom: SPACING.xs,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -542,6 +553,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.xs,
   },
+  categoryShortcutButtonCompact: {
+    minHeight: 48,
+  },
   categoryShortcutText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '500',
@@ -564,6 +578,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
+  },
+  formInputCompact: {
+    marginBottom: SPACING.xs,
   },
   formInputText: {
     fontSize: 14,
@@ -600,6 +617,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.md,
+  },
+  typeSelectorCompact: {
+    marginBottom: SPACING.xs,
   },
 });
 

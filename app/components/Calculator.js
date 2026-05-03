@@ -172,7 +172,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null }) {
+export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null, compact = false }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -268,7 +268,8 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
   const sharedButtonStyle = useMemo(() => ({
     backgroundColor: buttonBackground,
-  }), [buttonBackground]);
+    ...(compact && { height: 38 }),
+  }), [buttonBackground, compact]);
 
   const operationTextStyle = useMemo(() => ({
     color: colors.primary,
@@ -289,7 +290,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
 
   return (
     // Use provided containerBackground or fallback to altRow for compatibility
-    <View style={[styles.container, { backgroundColor: containerBackground || colors.altRow }]}> 
+    <View style={[styles.container, compact && styles.containerCompact, { backgroundColor: containerBackground || colors.altRow }]}>
       {/* Display */}
       <View style={styles.display}>
         <View style={styles.displayLeftSpacer} />
@@ -469,6 +470,7 @@ Calculator.propTypes = {
   placeholder: PropTypes.string,
   onAdd: PropTypes.func,
   containerBackground: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  compact: PropTypes.bool,
 };
 
 Calculator.defaultProps = {
@@ -500,6 +502,9 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
     width: '100%',
+  },
+  containerCompact: {
+    marginBottom: SPACING.xs,
   },
   deleteButtonInDisplay: {
     backgroundColor: 'transparent',
