@@ -66,7 +66,7 @@ const OperationsScreen = () => {
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
-  const { searchMode } = useSearch();
+  const { searchMode, filtersExpanded } = useSearch();
   const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
 
@@ -601,9 +601,9 @@ const OperationsScreen = () => {
           rateSource={rateSource}
         />
       </Animated.View>
-      {filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
+      {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight]);
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight, filtersExpanded]);
 
   // Handle scroll event to show/hide scroll-to-top button
   const handleScroll = useCallback((event) => {
