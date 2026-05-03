@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.80.0](https://github.com/heywood8/money-tracker/compare/penny-v0.79.0...penny-v0.80.0) (2026-05-03)
+
+
+### Features
+
+* **quickadd:** shrink QuickAddForm height by ~15% ([#451](https://github.com/heywood8/money-tracker/issues/451)) ([59e6780](https://github.com/heywood8/money-tracker/commit/59e6780b8305a251161d08067a631857e0d03ce3))
+
 ## [0.79.0](https://github.com/heywood8/money-tracker/compare/penny-v0.78.0...penny-v0.79.0) (2026-05-03)
 
 
