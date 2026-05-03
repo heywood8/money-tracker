@@ -253,60 +253,87 @@ const OperationFormFields = memo(({
         }
       };
 
-      return (
-        <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
-          {/* Button to open picker */}
+      // Show "all" button only when there are more than 8 categories (not all fit in two rows)
+      const showAllButton = categories.length > 8;
+      const firstRowCats = showAllButton ? topCategoriesForType.slice(0, 3) : topCategoriesForType.slice(0, 4);
+      const secondRowCats = showAllButton ? topCategoriesForType.slice(3) : topCategoriesForType.slice(4);
+
+      const renderCategoryChip = (category, index, isSecondRow = false) => {
+        const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
+        const isSelected = values.categoryId === category.id;
+        const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+
+        return (
           <Pressable
-            style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
-            onPress={() => !disabled && openPicker('category', categories)}
+            key={category.id}
+            testID={`category-shortcut-${isSecondRow ? 'r2-' : ''}${index}`}
+            style={[
+              styles.categoryShortcutButton,
+              compact && styles.categoryShortcutButtonCompact,
+              {
+                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                borderColor: colors.border,
+              },
+              disabledStyle,
+            ]}
+            onPress={() => handleCategoryPress(category.id)}
             disabled={disabled}
           >
-            <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
+            <Icon name={categoryInfo.icon} size={18} color={textColor} />
             <Text
-              style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
-              numberOfLines={2}
+              style={[styles.categoryShortcutText, { color: textColor }]}
+              numberOfLines={isSecondRow ? 1 : 2}
+              ellipsizeMode="tail"
             >
-              {t('all_categories')}
+              {categoryInfo.name}
             </Text>
           </Pressable>
+        );
+      };
 
-          {/* Top 3 category shortcut buttons */}
-          {topCategoriesForType.map((category, index) => {
-            const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
-            const isSelected = values.categoryId === category.id;
-            const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
-            const parentColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
-
-            return (
+      return (
+        <View style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}>
+          {/* Row 1: "All categories" button (if > 8 total) + first 3 or 4 shortcuts */}
+          <View style={styles.categoryButtonsContainer}>
+            {showAllButton && (
               <Pressable
-                key={category.id}
-                testID={`category-shortcut-${index}`}
-                style={[
-                  styles.categoryShortcutButton,
-                  compact && styles.categoryShortcutButtonCompact,
-                  {
-                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.border,
-                  },
-                  disabledStyle,
-                ]}
-                onPress={() => handleCategoryPress(category.id)}
+                style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
+                onPress={() => !disabled && openPicker('category', categories)}
                 disabled={disabled}
               >
-                <Icon name={categoryInfo.icon} size={18} color={textColor} />
+                <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
                 <Text
-                  style={[
-                    styles.categoryShortcutText,
-                    { color: textColor },
-                  ]}
+                  style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
                   numberOfLines={2}
-                  ellipsizeMode="tail"
                 >
-                  {categoryInfo.name}
+                  {t('all_categories')}
                 </Text>
               </Pressable>
-            );
-          })}
+            )}
+            {firstRowCats.map((category, index) => renderCategoryChip(category, index, false))}
+          </View>
+
+          {/* Row 2: always 4 flex-1 slots to match row 1 widths; invisible spacers for empty slots */}
+          {secondRowCats.length > 0 && (
+            <View style={styles.categoryButtonsContainer}>
+              {Array.from({ length: 4 }, (_, i) => {
+                const category = secondRowCats[i];
+                if (!category) {
+                  return (
+                    <View
+                      key={`cat-spacer-${i}`}
+                      style={[
+                        styles.categoryShortcutButton,
+                        compact && styles.categoryShortcutButtonCompact,
+                        styles.invisible,
+                      ]}
+                    />
+                  );
+                }
+                return renderCategoryChip(category, i, true);
+              })}
+            </View>
+          )}
         </View>
       );
     }
@@ -343,64 +370,98 @@ const OperationFormFields = memo(({
         }
       };
 
-      return (
-        <View style={[styles.categoryButtonsContainer, compact && styles.categoryButtonsContainerCompact]}>
+      // Show "all" button only when there are more than 8 available target accounts
+      const availableAccountCount = accounts.filter(acc => acc.id !== values.accountId).length;
+      const showAllAccountsButton = availableAccountCount > 8;
+      const firstRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(0, 3) : topTransferAccounts.slice(0, 4);
+      const secondRowAccounts = showAllAccountsButton ? topTransferAccounts.slice(3) : topTransferAccounts.slice(4);
+
+      const renderAccountChip = (account) => {
+        const isSelected = values.toAccountId === account.id;
+        const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+        const balanceColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
+
+        return (
           <Pressable
-            style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
-            onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
+            key={account.id}
+            style={[
+              styles.accountShortcutButton,
+              compact && styles.accountShortcutButtonCompact,
+              {
+                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                borderColor: colors.border,
+              },
+              disabledStyle,
+            ]}
+            onPress={() => handleTargetPress(account.id)}
             disabled={disabled}
           >
-            <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
+            {getAccountBalance && (
+              hideBalances ? (
+                <View style={styles.hiddenBalanceSmall} />
+              ) : (
+                <Text
+                  style={[styles.accountShortcutBalance, { color: balanceColor }]}
+                  numberOfLines={1}
+                >
+                  {getAccountBalance(account.id)}
+                </Text>
+              )
+            )}
             <Text
-              style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
-              numberOfLines={2}
+              style={[styles.accountShortcutName, { color: textColor }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
-              {t('all_accounts')}
+              {account.name}
             </Text>
           </Pressable>
+        );
+      };
 
-          {topTransferAccounts.map((account) => {
-            const isSelected = values.toAccountId === account.id;
-            const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
-            const balanceColor = isSelected ? 'rgba(255,255,255,0.7)' : colors.mutedText;
-
-            return (
+      return (
+        <View style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}>
+          {/* Row 1: "All accounts" button (if > 8 total) + first 3 or 4 shortcuts */}
+          <View style={styles.categoryButtonsContainer}>
+            {showAllAccountsButton && (
               <Pressable
-                key={account.id}
-                style={[
-                  styles.accountShortcutButton,
-                  compact && styles.accountShortcutButtonCompact,
-                  {
-                    backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                    borderColor: colors.border,
-                  },
-                  disabledStyle,
-                ]}
-                onPress={() => handleTargetPress(account.id)}
+                style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
+                onPress={() => !disabled && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
                 disabled={disabled}
               >
-                {getAccountBalance && (
-                  hideBalances ? (
-                    <View style={styles.hiddenBalanceSmall} />
-                  ) : (
-                    <Text
-                      style={[styles.accountShortcutBalance, { color: balanceColor }]}
-                      numberOfLines={1}
-                    >
-                      {getAccountBalance(account.id)}
-                    </Text>
-                  )
-                )}
+                <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
                 <Text
-                  style={[styles.accountShortcutName, { color: textColor }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
+                  style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
+                  numberOfLines={2}
                 >
-                  {account.name}
+                  {t('all_accounts')}
                 </Text>
               </Pressable>
-            );
-          })}
+            )}
+            {firstRowAccounts.map((account) => renderAccountChip(account))}
+          </View>
+
+          {/* Row 2: always 4 flex-1 slots to match row 1 widths; invisible spacers for empty slots */}
+          {secondRowAccounts.length > 0 && (
+            <View style={styles.categoryButtonsContainer}>
+              {Array.from({ length: 4 }, (_, i) => {
+                const account = secondRowAccounts[i];
+                if (!account) {
+                  return (
+                    <View
+                      key={`acc-spacer-${i}`}
+                      style={[
+                        styles.accountShortcutButton,
+                        compact && styles.accountShortcutButtonCompact,
+                        styles.invisible,
+                      ]}
+                    />
+                  );
+                }
+                return renderAccountChip(account);
+              })}
+            </View>
+          )}
         </View>
       );
     }
@@ -524,10 +585,6 @@ const styles = StyleSheet.create({
   categoryButtonsContainer: {
     flexDirection: 'row',
     gap: SPACING.xs,
-    marginBottom: SPACING.md,
-  },
-  categoryButtonsContainerCompact: {
-    marginBottom: SPACING.xs,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -545,6 +602,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 2,
     textAlign: 'center',
+  },
+  categoryRowsWrapper: {
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  categoryRowsWrapperCompact: {
+    marginBottom: SPACING.xs,
   },
   categoryShortcutButton: {
     alignItems: 'center',
@@ -601,6 +665,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     height: 8,
     width: 40,
+  },
+  invisible: {
+    opacity: 0,
   },
   typeButton: {
     alignItems: 'center',

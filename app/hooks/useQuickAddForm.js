@@ -93,7 +93,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   useEffect(() => {
     async function loadTopCategories() {
       try {
-        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(5);
+        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
         setTopCategories(topCats);
       } catch (error) {
         console.error('Failed to load top categories:', error);
@@ -102,7 +102,7 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     }
     async function loadTopTransferTargets() {
       try {
-        const targets = await OperationsDB.getTopTransferTargetAccounts(5);
+        const targets = await OperationsDB.getTopTransferTargetAccounts(10);
         setTopTransferTargets(targets);
       } catch (error) {
         console.error('Failed to load top transfer targets:', error);
@@ -124,8 +124,8 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     });
   }, [categories, quickAddValues.type]);
 
-  // Get top 3 categories matching current operation type (expense/income)
-  // Fills remaining slots with leaf categories by id order when history has fewer than 3
+  // Get top 8 categories matching current operation type (expense/income)
+  // Fills remaining slots with leaf categories by id order when history has fewer than 8
   const topCategoriesForType = useMemo(() => {
     if (quickAddValues.type === 'transfer') return [];
 
@@ -133,15 +133,15 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     const fromHistory = topCategories
       .map(tc => categories.find(cat => cat.id === tc.categoryId))
       .filter(cat => cat && cat.categoryType === quickAddValues.type && !cat.isShadow && cat.type !== 'folder')
-      .slice(0, 3);
+      .slice(0, 8);
 
-    if (fromHistory.length >= 3) return fromHistory;
+    if (fromHistory.length >= 8) return fromHistory;
 
     // Fill remaining slots from leaf categories by id order, excluding already-selected
     const historyIds = new Set(fromHistory.map(cat => cat.id));
     const fillers = categories
       .filter(cat => cat.categoryType === quickAddValues.type && !cat.isShadow && cat.type !== 'folder' && !historyIds.has(cat.id))
-      .slice(0, 3 - fromHistory.length);
+      .slice(0, 8 - fromHistory.length);
 
     return [...fromHistory, ...fillers];
   }, [topCategories, categories, quickAddValues.type]);
@@ -156,14 +156,14 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     const fromHistory = topTransferTargets
       .map(tt => accounts.find(acc => acc.id === tt.accountId))
       .filter(acc => acc && acc.id !== sourceId)
-      .slice(0, 3);
+      .slice(0, 8);
 
     if (fromHistory.length > 0) return fromHistory;
 
-    // Fallback: first 3 visible accounts excluding current source
+    // Fallback: first 8 visible accounts excluding current source
     return visibleAccounts
       .filter(acc => acc.id !== sourceId)
-      .slice(0, 3);
+      .slice(0, 8);
   }, [topTransferTargets, accounts, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
 
   // Reset form but keep account and type

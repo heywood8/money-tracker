@@ -319,15 +319,17 @@ describe('useQuickAddForm', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.topCategoriesForType).toHaveLength(3);
+        // history: cat-e2, cat-e4 (2). fillers: cat-e1, cat-e3 (2 remaining). total: 4
+        expect(result.current.topCategoriesForType).toHaveLength(4);
         expect(result.current.topCategoriesForType[0].id).toBe('cat-e2');
         expect(result.current.topCategoriesForType[1].id).toBe('cat-e4');
         // Filled from remaining leaf categories by id order
         expect(result.current.topCategoriesForType[2].id).toBe('cat-e1');
+        expect(result.current.topCategoriesForType[3].id).toBe('cat-e3');
       });
     });
 
-    it('should fall back to first 3 leaf categories when no history for expense', async () => {
+    it('should fall back to up to 7 leaf categories when no history for expense', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
@@ -335,14 +337,16 @@ describe('useQuickAddForm', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.topCategoriesForType).toHaveLength(3);
+        // 4 expense leaf categories available, all returned (< 7 limit)
+        expect(result.current.topCategoriesForType).toHaveLength(4);
         expect(result.current.topCategoriesForType[0].id).toBe('cat-e1');
         expect(result.current.topCategoriesForType[1].id).toBe('cat-e2');
         expect(result.current.topCategoriesForType[2].id).toBe('cat-e3');
+        expect(result.current.topCategoriesForType[3].id).toBe('cat-e4');
       });
     });
 
-    it('should fall back to first 3 leaf categories when no history for income', async () => {
+    it('should fall back to up to 7 leaf categories when no history for income', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
@@ -353,10 +357,12 @@ describe('useQuickAddForm', () => {
         result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
       });
 
-      expect(result.current.topCategoriesForType).toHaveLength(3);
+      // 4 income leaf categories available (cat-i1..i4), all returned (< 7 limit)
+      expect(result.current.topCategoriesForType).toHaveLength(4);
       expect(result.current.topCategoriesForType[0].id).toBe('cat-i1');
       expect(result.current.topCategoriesForType[1].id).toBe('cat-i2');
       expect(result.current.topCategoriesForType[2].id).toBe('cat-i3');
+      expect(result.current.topCategoriesForType[3].id).toBe('cat-i4');
     });
 
     it('should exclude shadow and folder categories from fallback', async () => {
@@ -392,7 +398,8 @@ describe('useQuickAddForm', () => {
 
       const ids = result.current.topCategoriesForType.map(c => c.id);
       expect(ids).not.toContain('cat-folder');
-      expect(result.current.topCategoriesForType).toHaveLength(3);
+      // history: cat-i1, cat-i2 (2). fillers: cat-i3, cat-i4 (2 remaining). total: 4
+      expect(result.current.topCategoriesForType).toHaveLength(4);
       expect(result.current.topCategoriesForType[0].id).toBe('cat-i1');
       expect(result.current.topCategoriesForType[1].id).toBe('cat-i2');
     });
@@ -432,11 +439,13 @@ describe('useQuickAddForm', () => {
         result.current.setQuickAddValues(prev => ({ ...prev, type: 'income' }));
       });
 
-      expect(result.current.topCategoriesForType).toHaveLength(3);
+      // history: cat-i3, cat-i1 (2). fillers: cat-i2, cat-i4 (2 remaining). total: 4
+      expect(result.current.topCategoriesForType).toHaveLength(4);
       expect(result.current.topCategoriesForType[0].id).toBe('cat-i3');
       expect(result.current.topCategoriesForType[1].id).toBe('cat-i1');
       // Filled from remaining leaf categories by id order
       expect(result.current.topCategoriesForType[2].id).toBe('cat-i2');
+      expect(result.current.topCategoriesForType[3].id).toBe('cat-i4');
     });
   });
 
@@ -635,20 +644,30 @@ describe('useQuickAddForm', () => {
       expect(ids).toContain('acc-2');
     });
 
-    it('should limit to 3 accounts', async () => {
+    it('should limit to 8 accounts', async () => {
       const manyAccounts = [
         { id: 'acc-1', name: 'A1', currency: 'USD', balance: '100' },
         { id: 'acc-2', name: 'A2', currency: 'USD', balance: '200' },
         { id: 'acc-3', name: 'A3', currency: 'USD', balance: '300' },
         { id: 'acc-4', name: 'A4', currency: 'USD', balance: '400' },
         { id: 'acc-5', name: 'A5', currency: 'USD', balance: '500' },
+        { id: 'acc-6', name: 'A6', currency: 'USD', balance: '600' },
+        { id: 'acc-7', name: 'A7', currency: 'USD', balance: '700' },
+        { id: 'acc-8', name: 'A8', currency: 'USD', balance: '800' },
+        { id: 'acc-9', name: 'A9', currency: 'USD', balance: '900' },
+        { id: 'acc-10', name: 'A10', currency: 'USD', balance: '1000' },
       ];
 
       mockGetTopTransferTargets.mockResolvedValue([
         { accountId: 'acc-2', count: 10 },
         { accountId: 'acc-3', count: 8 },
         { accountId: 'acc-4', count: 5 },
-        { accountId: 'acc-5', count: 3 },
+        { accountId: 'acc-5', count: 4 },
+        { accountId: 'acc-6', count: 3 },
+        { accountId: 'acc-7', count: 2 },
+        { accountId: 'acc-8', count: 2 },
+        { accountId: 'acc-9', count: 1 },
+        { accountId: 'acc-10', count: 1 },
       ]);
 
       const { result } = renderHook(() =>
@@ -663,7 +682,7 @@ describe('useQuickAddForm', () => {
         result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
       });
 
-      expect(result.current.topTransferAccountsForForm).toHaveLength(3);
+      expect(result.current.topTransferAccountsForForm).toHaveLength(8);
     });
   });
 
