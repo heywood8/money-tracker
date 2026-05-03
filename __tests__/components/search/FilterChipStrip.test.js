@@ -4,7 +4,7 @@ import FilterChipStrip from '../../../app/components/search/FilterChipStrip';
 
 describe('FilterChipStrip', () => {
   const mockColors = {
-    surface: '#1A1A1A',
+    background: '#1A1A1A',
     primary: '#007AFF',
     border: '#333333',
     text: '#FFFFFF',
@@ -86,16 +86,6 @@ describe('FilterChipStrip', () => {
     expect(getByText('accounts: 2')).toBeTruthy();
   });
 
-  it('renders "categories: N" chip for active categoryIds', () => {
-    const { getByText } = render(
-      <FilterChipStrip
-        {...defaultProps}
-        searchState={{ ...emptySearchState, categoryIds: ['c1'] }}
-      />,
-    );
-    expect(getByText('categories: 1')).toBeTruthy();
-  });
-
   it('renders "> min" label for min-only amount range', () => {
     const { getByText } = render(
       <FilterChipStrip
@@ -156,12 +146,10 @@ describe('FilterChipStrip', () => {
           ...emptySearchState,
           types: ['expense'],
           accountIds: ['a1'],
-          categoryIds: ['c1'],
         }}
       />,
     );
     expect(getByTestId('chip-types')).toBeTruthy();
     expect(getByTestId('chip-accountIds')).toBeTruthy();
-    expect(getByTestId('chip-categoryIds')).toBeTruthy();
   });
 });

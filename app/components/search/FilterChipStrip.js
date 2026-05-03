@@ -45,13 +45,6 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
     chips.push({ key: 'accountIds', label: `${t('accounts')}: ${searchState.accountIds.length}` });
   }
 
-  if (searchState.categoryIds.length > 0) {
-    chips.push({
-      key: 'categoryIds',
-      label: `${t('categories')}: ${searchState.categoryIds.length}`,
-    });
-  }
-
   if (chips.length === 0) {
     return null;
   }
@@ -60,7 +53,7 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+      style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
       contentContainerStyle={styles.content}
     >
       {chips.map(({ key, label }) => (
@@ -102,7 +95,7 @@ FilterChipStrip.propTypes = {
   }).isRequired,
   onClearGroup: PropTypes.func.isRequired,
   colors: PropTypes.shape({
-    surface: PropTypes.string.isRequired,
+    background: PropTypes.string.isRequired,
     primary: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
   }).isRequired,

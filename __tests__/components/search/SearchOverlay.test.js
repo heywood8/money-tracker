@@ -230,7 +230,6 @@ describe('SearchOverlay', () => {
     expect(useOperationsData).toHaveBeenCalled();
     expect(useOperationsActions).toHaveBeenCalled();
     expect(useAccountsData).toHaveBeenCalled();
-    expect(useCategories).toHaveBeenCalled();
     expect(useSearch).toHaveBeenCalled();
   });
 

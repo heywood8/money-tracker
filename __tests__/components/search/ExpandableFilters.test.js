@@ -4,7 +4,7 @@ import ExpandableFilters from '../../../app/components/search/ExpandableFilters'
 
 describe('ExpandableFilters', () => {
   const mockColors = {
-    surface: '#FFFFFF',
+    background: '#FFFFFF',
     text: '#000000',
     mutedText: '#999999',
     border: '#E0E0E0',
@@ -28,17 +28,10 @@ describe('ExpandableFilters', () => {
     { id: 'acc-2', name: 'Savings Account' },
   ];
 
-  const mockCategories = [
-    { id: 'cat-1', name: 'Food', type: 'entry', icon: 'food', isShadow: false },
-    { id: 'cat-2', name: 'Transport', type: 'entry', icon: 'car', isShadow: false },
-    { id: 'cat-3', name: 'Shadow Category', type: 'entry', icon: 'tag', isShadow: true },
-  ];
-
   const defaultProps = {
     filters: defaultFilters,
     onFilterChange: jest.fn(),
     accounts: mockAccounts,
-    categories: mockCategories,
     colors: mockColors,
     t: mockT,
     isExpanded: true,
@@ -91,13 +84,6 @@ describe('ExpandableFilters', () => {
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
       accountIds: ['acc-1'],
     });
-  });
-
-  it('filters out categories with isShadow=true from rendered list', () => {
-    const { getByText, queryByText } = render(<ExpandableFilters {...defaultProps} />);
-    expect(getByText('Food')).toBeTruthy();
-    expect(getByText('Transport')).toBeTruthy();
-    expect(queryByText('Shadow Category')).toBeNull();
   });
 
   it('renders clear all button', () => {
