@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react';
 import {
   StyleSheet,
+  View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
@@ -25,10 +25,7 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
   }
 
   return (
-    <Animated.View
-      style={[styles.filtersContainer, { backgroundColor: colors.background }]}
-      pointerEvents="box-none"
-    >
+    <View style={[styles.filtersContainer, { backgroundColor: colors.background }]}>
       <ExpandableFilters
         filters={searchState}
         onFilterChange={handleFilterChange}
@@ -37,7 +34,7 @@ const SearchOverlay = ({ onClose, colors, t, visible }) => {
         t={t}
         isExpanded={filtersExpanded}
       />
-    </Animated.View>
+    </View>
   );
 };
 
