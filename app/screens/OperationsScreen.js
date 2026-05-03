@@ -617,19 +617,26 @@ const OperationsScreen = () => {
 
     if (wasExpanded && !filtersExpanded) {
       if (scrollOffsetRef.current <= filterPanelHeight) {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        InteractionManager.runAfterInteractions(() => {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        });
       }
     }
   }, [filtersExpanded, filterPanelHeight]);
 
   // Auto-scroll to top when search closes (open → closed/collapsed).
   // The user is returning to the normal view and should land on the QuickAdd form.
+  // Deferred via InteractionManager so the scroll runs after the close animation settles.
   useEffect(() => {
     const wasOpen = prevSearchModeRef.current === 'open';
     prevSearchModeRef.current = searchMode;
 
     if (wasOpen && searchMode !== 'open') {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      // Defer past the 300ms QuickAdd form re-expand animation (reanimated withTiming)
+      // so the FlatList layout is stable before we scroll.
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 350);
     }
   }, [searchMode]);
 
