@@ -375,13 +375,6 @@ const OperationFormFields = memo(({
                 onPress={() => handleTargetPress(account.id)}
                 disabled={disabled}
               >
-                <Text
-                  style={[styles.accountShortcutName, { color: textColor }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {account.name}
-                </Text>
                 {getAccountBalance && (
                   hideBalances ? (
                     <View style={styles.hiddenBalanceSmall} />
@@ -394,6 +387,13 @@ const OperationFormFields = memo(({
                     </Text>
                   )
                 )}
+                <Text
+                  style={[styles.accountShortcutName, { color: textColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {account.name}
+                </Text>
               </Pressable>
             );
           })}
@@ -494,28 +494,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   accountShortcutBalance: {
-    flexShrink: 1,
     fontSize: 10,
+    textAlign: 'center',
   },
   accountShortcutButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    justifyContent: 'space-between',
-    minHeight: 44,
-    paddingHorizontal: SPACING.sm,
+    flexDirection: 'column',
+    gap: 2,
+    justifyContent: 'center',
+    minHeight: 56,
+    paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.xs,
   },
   accountShortcutButtonCompact: {
-    minHeight: 38,
+    minHeight: 48,
   },
   accountShortcutName: {
-    flex: 1,
     fontSize: FONT_SIZE.xs,
     fontWeight: '500',
+    textAlign: 'center',
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
