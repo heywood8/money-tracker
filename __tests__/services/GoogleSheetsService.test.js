@@ -63,6 +63,18 @@ describe('GoogleSheetsService', () => {
         exchangeAndStoreTokens('bad-code', 'verifier', 'com.heywood8.monkeep://'),
       ).rejects.toThrow('token_exchange_failed');
     });
+
+    it('throws when response is ok but refresh_token is missing', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'access-123' }), // no refresh_token
+      });
+
+      await expect(
+        exchangeAndStoreTokens('auth-code', 'verifier', 'com.heywood8.monkeep://'),
+      ).rejects.toThrow('token_exchange_failed');
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    });
   });
 
   describe('clearStoredAuth', () => {
@@ -252,8 +264,9 @@ describe('GoogleSheetsService', () => {
       expect(setPreference).not.toHaveBeenCalled();
     });
 
-    it('throws refresh_failed when clearSheets returns 401', async () => {
+    it('throws refresh_failed and clears stored token when clearSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
+      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -261,10 +274,12 @@ describe('GoogleSheetsService', () => {
       }); // batchClear 401
 
       await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
     });
 
-    it('throws refresh_failed when writeSheets returns 401', async () => {
+    it('throws refresh_failed and clears stored token when writeSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
+      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear OK
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -273,6 +288,7 @@ describe('GoogleSheetsService', () => {
       }); // batchUpdate 401
 
       await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
     });
 
     it('throws quota_exceeded when batchUpdate returns 429', async () => {

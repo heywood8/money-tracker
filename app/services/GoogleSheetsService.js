@@ -29,7 +29,7 @@ export const exchangeAndStoreTokens = async (code, codeVerifier, redirectUri) =>
   });
 
   const data = await response.json();
-  if (!response.ok) {
+  if (!response.ok || !data.refresh_token) {
     throw new Error('token_exchange_failed');
   }
 
@@ -207,7 +207,10 @@ const clearSheets = async (accessToken, spreadsheetId, ranges) => {
   });
   if (!response.ok) {
     const data = await response.json();
-    if (response.status === 401) throw new Error('refresh_failed');
+    if (response.status === 401) {
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+      throw new Error('refresh_failed');
+    }
     throw new Error(data.error?.message || 'clear_sheets_failed');
   }
   await response.json().catch(() => {});
@@ -227,7 +230,10 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
   });
   if (!response.ok) {
     const data = await response.json();
-    if (response.status === 401) throw new Error('refresh_failed');
+    if (response.status === 401) {
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+      throw new Error('refresh_failed');
+    }
     if (response.status === 429) throw new Error('quota_exceeded');
     throw new Error(data.error?.message || 'write_sheets_failed');
   }
