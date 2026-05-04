@@ -6,7 +6,8 @@ const mockShowDialog = jest.fn();
 
 jest.mock('../../app/services/GoogleSheetsService', () => ({
   getValidAccessToken: jest.fn(),
-  exchangeAndStoreTokens: jest.fn(),
+  signIn: jest.fn(),
+  signOut: jest.fn(),
   exportToSheets: jest.fn(),
 }));
 
@@ -75,7 +76,7 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
   openURL: jest.fn(),
 }));
 
-const { getValidAccessToken, exchangeAndStoreTokens, exportToSheets } =
+const { getValidAccessToken, signIn, exportToSheets } =
   require('../../app/services/GoogleSheetsService');
 
 describe('GoogleSheetsExport integration', () => {
@@ -86,18 +87,13 @@ describe('GoogleSheetsExport integration', () => {
   const renderModal = () =>
     render(<SettingsModal visible={true} onClose={jest.fn()} />);
 
-  it('shows success dialog with Open button after successful export', async () => {
+  it('shows success dialog with Open button after successful export (already signed in)', async () => {
     getValidAccessToken.mockResolvedValue('access-token');
-    exportToSheets.mockResolvedValue(
-      'https://docs.google.com/spreadsheets/d/sheet-123',
-    );
+    exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-123');
 
     const { getByTestId } = renderModal();
-
-    // Open export sub-panel
     fireEvent.press(getByTestId('settings-export-row'));
 
-    // Tap Google Sheets option
     await waitFor(() => {
       fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
@@ -113,15 +109,31 @@ describe('GoogleSheetsExport integration', () => {
     });
   });
 
-  it('shows sign-in error dialog when auth fails', async () => {
-    getValidAccessToken.mockRejectedValue(new Error('no_refresh_token'));
+  it('falls back to signIn when not signed in, then exports successfully', async () => {
+    getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
+    signIn.mockResolvedValue('new-access-token');
+    exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-456');
 
-    const { useAuthRequest } = require('expo-auth-session/providers/google');
-    useAuthRequest.mockReturnValue([
-      { codeVerifier: 'verifier', redirectUri: 'com.googleusercontent.apps.test-client-id:/oauthredirect' },
-      null,
-      jest.fn().mockResolvedValue({ type: 'error' }),
-    ]);
+    const { getByTestId } = renderModal();
+    fireEvent.press(getByTestId('settings-export-row'));
+
+    await waitFor(() => {
+      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    });
+
+    await waitFor(() => {
+      expect(signIn).toHaveBeenCalled();
+      expect(mockShowDialog).toHaveBeenCalledWith(
+        expect.stringContaining('google_sheets'),
+        expect.stringContaining('google_sheets_export_success'),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('shows sign-in error dialog when signIn fails', async () => {
+    getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
+    signIn.mockRejectedValue(new Error('auth_failed'));
 
     const { getByTestId } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
@@ -155,6 +167,22 @@ describe('GoogleSheetsExport integration', () => {
         expect.stringContaining('google_sheets_access_revoked'),
         expect.anything(),
       );
+    });
+  });
+
+  it('silently returns when sign-in is cancelled', async () => {
+    getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
+    signIn.mockRejectedValue(new Error('sign_in_cancelled'));
+
+    const { getByTestId } = renderModal();
+    fireEvent.press(getByTestId('settings-export-row'));
+
+    await waitFor(() => {
+      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    });
+
+    await waitFor(() => {
+      expect(mockShowDialog).not.toHaveBeenCalled();
     });
   });
 });

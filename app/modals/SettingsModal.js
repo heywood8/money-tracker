@@ -19,16 +19,7 @@ import { checkForAppUpdate } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { getValidAccessToken, exchangeAndStoreTokens, exportToSheets } from '../services/GoogleSheetsService';
-
-WebBrowser.maybeCompleteAuthSession();
-
-// Android OAuth clients only accept reversed-client-ID scheme as redirect URI.
-// expo-auth-session defaults to applicationId:/oauthredirect which Google rejects.
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
-const GOOGLE_REDIRECT_URI = `${GOOGLE_CLIENT_ID.split('.').reverse().join('.')}:/oauthredirect`;
+import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../services/GoogleSheetsService';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -55,18 +46,6 @@ export default function SettingsModal({ visible, onClose }) {
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
-
-  const [request, , promptAsync] = Google.useAuthRequest(
-    {
-      androidClientId: GOOGLE_CLIENT_ID,
-      redirectUri: GOOGLE_REDIRECT_URI,
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file',
-      ],
-      shouldAutoExchangeCode: false,
-    },
-  );
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -211,26 +190,8 @@ export default function SettingsModal({ visible, onClose }) {
         if (authError.message === 'refresh_failed') {
           throw authError;
         }
-        console.log('[GSheets] clientId env:', process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID);
-        console.log('[GSheets] request.redirectUri:', request?.redirectUri);
-        console.log('[GSheets] request.url:', request?.url);
-        console.log('[GSheets] request.codeVerifier exists:', !!request?.codeVerifier);
-        const result = await promptAsync();
-        console.log('[GSheets] promptAsync result type:', result?.type);
-        if (result.type === 'error') {
-          console.log('[GSheets] promptAsync error params:', JSON.stringify(result.params));
-        }
-        if (result.type === 'cancel' || result.type === 'dismiss') {
-          return;
-        }
-        if (result.type !== 'success') {
-          throw new Error('auth_failed');
-        }
-        accessToken = await exchangeAndStoreTokens(
-          result.params.code,
-          request.codeVerifier,
-          request.redirectUri,
-        );
+        // Not signed in — trigger native sign-in UI
+        accessToken = await googleSignIn();
       }
       const backup = await createBackup();
       const sheetUrl = await exportToSheets(accessToken, backup);
@@ -243,6 +204,9 @@ export default function SettingsModal({ visible, onClose }) {
         ],
       );
     } catch (error) {
+      if (error.message === 'sign_in_cancelled') {
+        return; // User dismissed — no error dialog
+      }
       let dialogMsg;
       if (error.message === 'refresh_failed') {
         dialogMsg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
@@ -259,7 +223,7 @@ export default function SettingsModal({ visible, onClose }) {
     } finally {
       setGoogleSheetsLoading(false);
     }
-  }, [closeExportFormatModal, promptAsync, request, t, showDialog]);
+  }, [closeExportFormatModal, t, showDialog]);
 
   const handleResetDatabase = () => {
     showDialog(

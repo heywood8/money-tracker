@@ -692,15 +692,6 @@ jest.mock('expo-auth-session', () => ({
   ResponseType: { Code: 'code' },
 }));
 
-// Mock expo-auth-session/providers/google — kept until SettingsModal.js is refactored off it (Task 4)
-jest.mock('expo-auth-session/providers/google', () => ({
-  useAuthRequest: jest.fn(() => [
-    { codeVerifier: 'test-verifier', redirectUri: 'com.googleusercontent.apps.test-client-id:/oauthredirect' },
-    null,
-    jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
-  ]),
-}));
-
 // Mock @react-native-google-signin/google-signin
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
