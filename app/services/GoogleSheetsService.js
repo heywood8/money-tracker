@@ -78,3 +78,96 @@ export const getValidAccessToken = async () => {
 
   return data.access_token;
 };
+
+/**
+ * Build the 6-sheet data structure from a backup object.
+ * Uses human-readable account/category names in place of IDs.
+ * All categories included (including shadow). All balances shown as-is.
+ * @param {Object} backup - Backup object from createBackup()
+ * @returns {Array<{range: string, values: Array<Array>}>}
+ */
+export const buildSheetsData = (backup) => {
+  const { accounts, categories, operations, budgets, planned_operations, balance_history } = backup.data;
+
+  const accountNames = new Map(accounts.map(a => [a.id, a.name]));
+  const categoryNames = new Map(categories.map(c => [c.id, c.name]));
+
+  return [
+    {
+      range: 'Accounts!A1',
+      values: [
+        ['id', 'name', 'balance', 'currency'],
+        ...accounts.map(a => [a.id, a.name, a.balance, a.currency]),
+      ],
+    },
+    {
+      range: 'Operations!A1',
+      values: [
+        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description'],
+        ...operations.map(o => [
+          o.id,
+          o.date,
+          o.type,
+          o.amount,
+          o.source_currency || '',
+          categoryNames.get(o.category_id) || '',
+          accountNames.get(o.account_id) || '',
+          o.to_account_id ? (accountNames.get(o.to_account_id) || '') : '',
+          o.description || '',
+        ]),
+      ],
+    },
+    {
+      range: 'Categories!A1',
+      values: [
+        ['id', 'name', 'type', 'category_type', 'icon'],
+        ...categories.map(c => [c.id, c.name, c.type, c.category_type, c.icon || '']),
+      ],
+    },
+    {
+      range: 'Budgets!A1',
+      values: [
+        ['id', 'category', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled'],
+        ...(budgets || []).map(b => [
+          b.id,
+          categoryNames.get(b.category_id) || '',
+          b.amount,
+          b.currency,
+          b.period_type,
+          b.start_date,
+          b.end_date || '',
+          b.is_recurring,
+          b.rollover_enabled,
+        ]),
+      ],
+    },
+    {
+      range: 'Planned Operations!A1',
+      values: [
+        ['id', 'name', 'type', 'amount', 'account', 'category', 'to_account', 'description', 'is_recurring'],
+        ...(planned_operations || []).map(p => [
+          p.id,
+          p.name,
+          p.type,
+          p.amount,
+          accountNames.get(p.account_id) || '',
+          categoryNames.get(p.category_id) || '',
+          p.to_account_id ? (accountNames.get(p.to_account_id) || '') : '',
+          p.description || '',
+          p.is_recurring,
+        ]),
+      ],
+    },
+    {
+      range: 'Balance History!A1',
+      values: [
+        ['account', 'date', 'balance'],
+        ...(balance_history || []).map(h => [
+          accountNames.get(h.account_id) || '',
+          h.date,
+          h.balance,
+        ]),
+      ],
+    },
+  ];
+};

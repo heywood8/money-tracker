@@ -3,6 +3,7 @@ import {
   exchangeAndStoreTokens,
   clearStoredAuth,
   getValidAccessToken,
+  buildSheetsData,
   TOKEN_ENDPOINT,
 } from '../../app/services/GoogleSheetsService';
 
@@ -100,6 +101,97 @@ describe('GoogleSheetsService', () => {
 
       await expect(getValidAccessToken()).rejects.toThrow('refresh_failed');
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
+    });
+  });
+
+  describe('buildSheetsData', () => {
+    const mockBackup = {
+      data: {
+        accounts: [
+          { id: 1, name: 'Checking', balance: '1000', currency: 'USD' },
+        ],
+        categories: [
+          { id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense', icon: 'food', is_shadow: 0 },
+          { id: 'shadow-adj', name: 'Balance Adj', type: 'entry', category_type: 'expense', icon: 'cash', is_shadow: 1 },
+        ],
+        operations: [
+          {
+            id: 10, type: 'expense', amount: '50', account_id: 1,
+            category_id: 'cat-1', to_account_id: null,
+            date: '2026-01-01', description: 'Groceries', source_currency: 'USD',
+          },
+        ],
+        budgets: [
+          {
+            id: 'bud-1', category_id: 'cat-1', amount: '500', currency: 'USD',
+            period_type: 'monthly', start_date: '2026-01-01', end_date: null,
+            is_recurring: 1, rollover_enabled: 0,
+          },
+        ],
+        planned_operations: [
+          {
+            id: 'plan-1', name: 'Rent', type: 'expense', amount: '1200',
+            account_id: 1, category_id: 'cat-1', to_account_id: null,
+            description: 'Monthly rent', is_recurring: 1,
+          },
+        ],
+        balance_history: [
+          { account_id: 1, date: '2026-01-01', balance: '1000' },
+        ],
+      },
+    };
+
+    it('returns 6 sheets with correct titles', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const titles = sheets.map(s => s.range.split('!')[0]);
+      expect(titles).toEqual([
+        'Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History',
+      ]);
+    });
+
+    it('maps Accounts sheet with correct headers and data row', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const accounts = sheets.find(s => s.range.startsWith('Accounts'));
+      expect(accounts.values[0]).toEqual(['id', 'name', 'balance', 'currency']);
+      expect(accounts.values[1]).toEqual([1, 'Checking', '1000', 'USD']);
+    });
+
+    it('maps Operations sheet with human-readable account and category names', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const ops = sheets.find(s => s.range.startsWith('Operations'));
+      expect(ops.values[0]).toEqual([
+        'id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description',
+      ]);
+      expect(ops.values[1][5]).toBe('Food');    // category name
+      expect(ops.values[1][6]).toBe('Checking'); // account name
+      expect(ops.values[1][7]).toBe('');          // to_account empty
+    });
+
+    it('includes all categories including shadow ones', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const cats = sheets.find(s => s.range.startsWith('Categories'));
+      expect(cats.values).toHaveLength(3); // header + 2 categories (including shadow)
+    });
+
+    it('maps Budgets sheet with category name instead of id', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const budgets = sheets.find(s => s.range.startsWith('Budgets'));
+      expect(budgets.values[1][1]).toBe('Food'); // category name
+    });
+
+    it('maps Planned Operations with account and category names', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const planned = sheets.find(s => s.range.startsWith('Planned Operations'));
+      expect(planned.values[1][1]).toBe('Rent');
+      expect(planned.values[1][4]).toBe('Checking'); // account name
+      expect(planned.values[1][5]).toBe('Food');     // category name
+    });
+
+    it('maps Balance History with account name instead of id', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const history = sheets.find(s => s.range.startsWith('Balance History'));
+      expect(history.values[0]).toEqual(['account', 'date', 'balance']);
+      expect(history.values[1][0]).toBe('Checking'); // account name
     });
   });
 });
