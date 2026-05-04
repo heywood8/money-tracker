@@ -118,7 +118,7 @@ describe('GoogleSheetsExport integration', () => {
 
     const { useAuthRequest } = require('expo-auth-session/providers/google');
     useAuthRequest.mockReturnValue([
-      { codeVerifier: 'verifier', redirectUri: 'com.heywood8.monkeep:/oauthredirect' },
+      { codeVerifier: 'verifier', redirectUri: 'com.googleusercontent.apps.test-client-id:/oauthredirect' },
       null,
       jest.fn().mockResolvedValue({ type: 'error' }),
     ]);

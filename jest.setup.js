@@ -695,7 +695,7 @@ jest.mock('expo-auth-session', () => ({
 // Mock expo-auth-session/providers/google
 jest.mock('expo-auth-session/providers/google', () => ({
   useAuthRequest: jest.fn(() => [
-    { codeVerifier: 'test-verifier', redirectUri: 'com.heywood8.monkeep:/oauthredirect' },
+    { codeVerifier: 'test-verifier', redirectUri: 'com.googleusercontent.apps.test-client-id:/oauthredirect' },
     null,
     jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
   ]),

@@ -25,6 +25,11 @@ import { getValidAccessToken, exchangeAndStoreTokens, exportToSheets } from '../
 
 WebBrowser.maybeCompleteAuthSession();
 
+// Android OAuth clients only accept reversed-client-ID scheme as redirect URI.
+// expo-auth-session defaults to applicationId:/oauthredirect which Google rejects.
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+const GOOGLE_REDIRECT_URI = `${GOOGLE_CLIENT_ID.split('.').reverse().join('.')}:/oauthredirect`;
+
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
   warn: '#fb8c00',
@@ -53,7 +58,8 @@ export default function SettingsModal({ visible, onClose }) {
 
   const [request, , promptAsync] = Google.useAuthRequest(
     {
-      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+      androidClientId: GOOGLE_CLIENT_ID,
+      redirectUri: GOOGLE_REDIRECT_URI,
       scopes: [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive.file',
@@ -205,7 +211,15 @@ export default function SettingsModal({ visible, onClose }) {
         if (authError.message === 'refresh_failed') {
           throw authError;
         }
+        console.log('[GSheets] clientId env:', process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID);
+        console.log('[GSheets] request.redirectUri:', request?.redirectUri);
+        console.log('[GSheets] request.url:', request?.url);
+        console.log('[GSheets] request.codeVerifier exists:', !!request?.codeVerifier);
         const result = await promptAsync();
+        console.log('[GSheets] promptAsync result type:', result?.type);
+        if (result.type === 'error') {
+          console.log('[GSheets] promptAsync error params:', JSON.stringify(result.params));
+        }
         if (result.type === 'cancel' || result.type === 'dismiss') {
           return;
         }
