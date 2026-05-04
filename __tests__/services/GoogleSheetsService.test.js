@@ -2,6 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import {
   exchangeAndStoreTokens,
   clearStoredAuth,
+  getValidAccessToken,
+  TOKEN_ENDPOINT,
 } from '../../app/services/GoogleSheetsService';
 
 process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
@@ -61,6 +63,42 @@ describe('GoogleSheetsService', () => {
 
       await clearStoredAuth();
 
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
+    });
+  });
+
+  describe('getValidAccessToken', () => {
+    it('returns a new access token using the stored refresh token', async () => {
+      SecureStore.getItemAsync.mockResolvedValue('stored-refresh-token');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'new-access-token' }),
+      });
+
+      const token = await getValidAccessToken();
+
+      expect(token).toBe('new-access-token');
+      expect(mockFetch).toHaveBeenCalledWith(
+        TOKEN_ENDPOINT,
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    it('throws no_refresh_token when no token is stored', async () => {
+      SecureStore.getItemAsync.mockResolvedValue(null);
+
+      await expect(getValidAccessToken()).rejects.toThrow('no_refresh_token');
+    });
+
+    it('clears stored token and throws refresh_failed when refresh returns 400', async () => {
+      SecureStore.getItemAsync.mockResolvedValue('bad-refresh-token');
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'invalid_grant' }),
+      });
+      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
+
+      await expect(getValidAccessToken()).rejects.toThrow('refresh_failed');
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
     });
   });

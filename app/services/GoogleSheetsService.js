@@ -3,6 +3,7 @@ import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 import { createBackup } from './BackupRestore';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+export { TOKEN_ENDPOINT };
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const SECURE_STORE_KEY = 'google_refresh_token';
 
@@ -43,4 +44,37 @@ export const exchangeAndStoreTokens = async (code, codeVerifier, redirectUri) =>
  */
 export const clearStoredAuth = async () => {
   await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+};
+
+/**
+ * Get a valid access token using the stored refresh token.
+ * Throws 'no_refresh_token' if no refresh token is stored.
+ * Throws 'refresh_failed' if the refresh request fails (clears stored token).
+ * @returns {Promise<string>} Access token
+ */
+export const getValidAccessToken = async () => {
+  const refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEY);
+  if (!refreshToken) {
+    throw new Error('no_refresh_token');
+  }
+
+  const body = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+    grant_type: 'refresh_token',
+  }).toString();
+
+  const response = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+    throw new Error('refresh_failed');
+  }
+
+  return data.access_token;
 };
