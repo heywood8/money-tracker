@@ -1,4 +1,4 @@
-import { GoogleSignin, statusCodes, isErrorWithCode } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -43,7 +43,7 @@ export const signIn = async () => {
     const { accessToken } = await GoogleSignin.getTokens();
     return accessToken;
   } catch (error) {
-    if (isErrorWithCode(error, statusCodes.SIGN_IN_CANCELLED)) {
+    if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new Error('sign_in_cancelled');
     }
     throw new Error('auth_failed');

@@ -710,7 +710,6 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
     SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
   },
-  isErrorWithCode: jest.fn((error, code) => error?.code === code),
 }));
 
 // Mock expo-web-browser
