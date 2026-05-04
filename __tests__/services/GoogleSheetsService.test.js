@@ -252,6 +252,29 @@ describe('GoogleSheetsService', () => {
       expect(setPreference).not.toHaveBeenCalled();
     });
 
+    it('throws refresh_failed when clearSheets returns 401', async () => {
+      getPreference.mockResolvedValue('sheet-id');
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { message: 'Unauthorized' } }),
+      }); // batchClear 401
+
+      await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
+    });
+
+    it('throws refresh_failed when writeSheets returns 401', async () => {
+      getPreference.mockResolvedValue('sheet-id');
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear OK
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { message: 'Unauthorized' } }),
+      }); // batchUpdate 401
+
+      await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
+    });
+
     it('throws quota_exceeded when batchUpdate returns 429', async () => {
       getPreference.mockResolvedValue('sheet-id');
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear

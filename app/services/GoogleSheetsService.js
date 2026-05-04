@@ -1,9 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
-import { createBackup } from './BackupRestore';
 
-const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-export { TOKEN_ENDPOINT };
+export const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const SECURE_STORE_KEY = 'google_refresh_token';
 
@@ -209,8 +207,10 @@ const clearSheets = async (accessToken, spreadsheetId, ranges) => {
   });
   if (!response.ok) {
     const data = await response.json();
+    if (response.status === 401) throw new Error('refresh_failed');
     throw new Error(data.error?.message || 'clear_sheets_failed');
   }
+  await response.json().catch(() => {});
 };
 
 const writeSheets = async (accessToken, spreadsheetId, sheets) => {
@@ -227,9 +227,11 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
   });
   if (!response.ok) {
     const data = await response.json();
+    if (response.status === 401) throw new Error('refresh_failed');
     if (response.status === 429) throw new Error('quota_exceeded');
     throw new Error(data.error?.message || 'write_sheets_failed');
   }
+  await response.json().catch(() => {});
 };
 
 /**
