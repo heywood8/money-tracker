@@ -142,13 +142,6 @@ describe('GoogleSheetsExport integration', () => {
   it('shows revoked-access error when refresh fails', async () => {
     getValidAccessToken.mockRejectedValue(new Error('refresh_failed'));
 
-    const { useAuthRequest } = require('expo-auth-session');
-    useAuthRequest.mockReturnValue([
-      { codeVerifier: 'verifier' },
-      null,
-      jest.fn().mockResolvedValue({ type: 'error' }),
-    ]);
-
     const { getByTestId } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
 
