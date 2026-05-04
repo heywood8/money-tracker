@@ -1,11 +1,10 @@
-import * as SecureStore from 'expo-secure-store';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import {
-  exchangeAndStoreTokens,
-  clearStoredAuth,
   getValidAccessToken,
+  signIn,
+  signOut,
   buildSheetsData,
   exportToSheets,
-  TOKEN_ENDPOINT,
 } from '../../app/services/GoogleSheetsService';
 
 jest.mock('../../app/services/PreferencesDB', () => ({
@@ -13,8 +12,6 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   getPreference: jest.fn(),
   setPreference: jest.fn(),
 }));
-
-process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -25,101 +22,80 @@ describe('GoogleSheetsService', () => {
     mockFetch.mockReset();
   });
 
-  describe('exchangeAndStoreTokens', () => {
-    it('exchanges auth code for tokens and stores refresh token', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          access_token: 'access-123',
-          refresh_token: 'refresh-456',
-        }),
-      });
-      SecureStore.setItemAsync.mockResolvedValue(undefined);
-
-      const accessToken = await exchangeAndStoreTokens(
-        'auth-code',
-        'code-verifier',
-        'com.heywood8.monkeep://',
-      );
-
-      expect(accessToken).toBe('access-123');
-      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-        'google_refresh_token',
-        'refresh-456',
-      );
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://oauth2.googleapis.com/token',
-        expect.objectContaining({ method: 'POST' }),
-      );
-    });
-
-    it('throws when token endpoint returns error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'invalid_grant' }),
-      });
-
-      await expect(
-        exchangeAndStoreTokens('bad-code', 'verifier', 'com.heywood8.monkeep://'),
-      ).rejects.toThrow('token_exchange_failed');
-    });
-
-    it('throws when response is ok but refresh_token is missing', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: 'access-123' }), // no refresh_token
-      });
-
-      await expect(
-        exchangeAndStoreTokens('auth-code', 'verifier', 'com.heywood8.monkeep://'),
-      ).rejects.toThrow('token_exchange_failed');
-      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('clearStoredAuth', () => {
-    it('deletes the refresh token from secure store', async () => {
-      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
-
-      await clearStoredAuth();
-
-      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
-    });
-  });
-
   describe('getValidAccessToken', () => {
-    it('returns a new access token using the stored refresh token', async () => {
-      SecureStore.getItemAsync.mockResolvedValue('stored-refresh-token');
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: 'new-access-token' }),
-      });
+    it('returns access token from GoogleSignin when user has previous sign-in', async () => {
+      GoogleSignin.hasPreviousSignIn.mockReturnValue(true);
+      GoogleSignin.getTokens.mockResolvedValue({ accessToken: 'fresh-token', idToken: 'id' });
 
       const token = await getValidAccessToken();
 
-      expect(token).toBe('new-access-token');
-      expect(mockFetch).toHaveBeenCalledWith(
-        TOKEN_ENDPOINT,
-        expect.objectContaining({ method: 'POST' }),
-      );
+      expect(token).toBe('fresh-token');
+      expect(GoogleSignin.getTokens).toHaveBeenCalled();
     });
 
-    it('throws no_refresh_token when no token is stored', async () => {
-      SecureStore.getItemAsync.mockResolvedValue(null);
+    it('throws not_signed_in when no previous sign-in', async () => {
+      GoogleSignin.hasPreviousSignIn.mockReturnValue(false);
 
-      await expect(getValidAccessToken()).rejects.toThrow('no_refresh_token');
+      await expect(getValidAccessToken()).rejects.toThrow('not_signed_in');
+      expect(GoogleSignin.getTokens).not.toHaveBeenCalled();
     });
 
-    it('clears stored token and throws refresh_failed when refresh returns 400', async () => {
-      SecureStore.getItemAsync.mockResolvedValue('bad-refresh-token');
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'invalid_grant' }),
-      });
-      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
+    it('propagates errors from getTokens as refresh_failed', async () => {
+      GoogleSignin.hasPreviousSignIn.mockReturnValue(true);
+      GoogleSignin.getTokens.mockRejectedValue(new Error('network error'));
 
       await expect(getValidAccessToken()).rejects.toThrow('refresh_failed');
-      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
+    });
+  });
+
+  describe('signIn', () => {
+    it('calls hasPlayServices, signIn, getTokens and returns access token', async () => {
+      GoogleSignin.hasPlayServices.mockResolvedValue(true);
+      GoogleSignin.signIn.mockResolvedValue({ type: 'success', data: { user: { email: 'u@g.com' } } });
+      GoogleSignin.getTokens.mockResolvedValue({ accessToken: 'new-token', idToken: 'id' });
+
+      const token = await signIn();
+
+      expect(GoogleSignin.hasPlayServices).toHaveBeenCalled();
+      expect(GoogleSignin.signIn).toHaveBeenCalled();
+      expect(token).toBe('new-token');
+    });
+
+    it('throws when signIn is cancelled', async () => {
+      GoogleSignin.hasPlayServices.mockResolvedValue(true);
+      const cancelError = new Error('cancelled');
+      cancelError.code = statusCodes.SIGN_IN_CANCELLED;
+      GoogleSignin.signIn.mockRejectedValue(cancelError);
+
+      await expect(signIn()).rejects.toThrow('sign_in_cancelled');
+    });
+
+    it('throws auth_failed on other sign-in errors', async () => {
+      GoogleSignin.hasPlayServices.mockResolvedValue(true);
+      GoogleSignin.signIn.mockRejectedValue(new Error('something went wrong'));
+
+      await expect(signIn()).rejects.toThrow('auth_failed');
+    });
+  });
+
+  describe('signOut', () => {
+    it('calls revokeAccess and signOut', async () => {
+      GoogleSignin.revokeAccess.mockResolvedValue(undefined);
+      GoogleSignin.signOut.mockResolvedValue(undefined);
+
+      await signOut();
+
+      expect(GoogleSignin.revokeAccess).toHaveBeenCalled();
+      expect(GoogleSignin.signOut).toHaveBeenCalled();
+    });
+
+    it('still calls signOut even if revokeAccess throws', async () => {
+      GoogleSignin.revokeAccess.mockRejectedValue(new Error('already revoked'));
+      GoogleSignin.signOut.mockResolvedValue(undefined);
+
+      await signOut();
+
+      expect(GoogleSignin.signOut).toHaveBeenCalled();
     });
   });
 
@@ -181,36 +157,36 @@ describe('GoogleSheetsService', () => {
       expect(ops.values[0]).toEqual([
         'id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description',
       ]);
-      expect(ops.values[1][5]).toBe('Food');    // category name
-      expect(ops.values[1][6]).toBe('Checking'); // account name
-      expect(ops.values[1][7]).toBe('');          // to_account empty
+      expect(ops.values[1][5]).toBe('Food');
+      expect(ops.values[1][6]).toBe('Checking');
+      expect(ops.values[1][7]).toBe('');
     });
 
     it('includes all categories including shadow ones', () => {
       const sheets = buildSheetsData(mockBackup);
       const cats = sheets.find(s => s.range.startsWith('Categories'));
-      expect(cats.values).toHaveLength(3); // header + 2 categories (including shadow)
+      expect(cats.values).toHaveLength(3); // header + 2 categories
     });
 
     it('maps Budgets sheet with category name instead of id', () => {
       const sheets = buildSheetsData(mockBackup);
       const budgets = sheets.find(s => s.range.startsWith('Budgets'));
-      expect(budgets.values[1][1]).toBe('Food'); // category name
+      expect(budgets.values[1][1]).toBe('Food');
     });
 
     it('maps Planned Operations with account and category names', () => {
       const sheets = buildSheetsData(mockBackup);
       const planned = sheets.find(s => s.range.startsWith('Planned Operations'));
       expect(planned.values[1][1]).toBe('Rent');
-      expect(planned.values[1][4]).toBe('Checking'); // account name
-      expect(planned.values[1][5]).toBe('Food');     // category name
+      expect(planned.values[1][4]).toBe('Checking');
+      expect(planned.values[1][5]).toBe('Food');
     });
 
     it('maps Balance History with account name instead of id', () => {
       const sheets = buildSheetsData(mockBackup);
       const history = sheets.find(s => s.range.startsWith('Balance History'));
       expect(history.values[0]).toEqual(['account', 'date', 'balance']);
-      expect(history.values[1][0]).toBe('Checking'); // account name
+      expect(history.values[1][0]).toBe('Checking');
     });
   });
 
@@ -229,17 +205,13 @@ describe('GoogleSheetsService', () => {
     };
 
     it('creates a new spreadsheet and stores its ID on first export', async () => {
-      getPreference.mockResolvedValue(null); // no stored spreadsheetId
+      getPreference.mockResolvedValue(null);
       setPreference.mockResolvedValue(undefined);
-
-      // POST /v4/spreadsheets → create
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ spreadsheetId: 'new-sheet-id' }),
       });
-      // POST batchClear
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      // POST batchUpdate
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       const url = await exportToSheets('access-token', mockBackup);
@@ -250,55 +222,53 @@ describe('GoogleSheetsService', () => {
 
     it('updates existing spreadsheet without creating a new one on re-export', async () => {
       getPreference.mockResolvedValue('existing-sheet-id');
-
-      // POST batchClear
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
-      // POST batchUpdate
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       const url = await exportToSheets('access-token', mockBackup);
 
       expect(url).toBe('https://docs.google.com/spreadsheets/d/existing-sheet-id');
-      // Only 2 fetch calls (clear + write), not 3 (create + clear + write)
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(setPreference).not.toHaveBeenCalled();
     });
 
-    it('throws refresh_failed and clears stored token when clearSheets returns 401', async () => {
+    it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
+      GoogleSignin.revokeAccess.mockResolvedValue(undefined);
+      GoogleSignin.signOut.mockResolvedValue(undefined);
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         json: async () => ({ error: { message: 'Unauthorized' } }),
-      }); // batchClear 401
+      });
 
       await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
-      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
+      expect(GoogleSignin.signOut).toHaveBeenCalled();
     });
 
-    it('throws refresh_failed and clears stored token when writeSheets returns 401', async () => {
+    it('throws refresh_failed and signs out when writeSheets returns 401', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      SecureStore.deleteItemAsync.mockResolvedValue(undefined);
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear OK
+      GoogleSignin.revokeAccess.mockResolvedValue(undefined);
+      GoogleSignin.signOut.mockResolvedValue(undefined);
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         json: async () => ({ error: { message: 'Unauthorized' } }),
-      }); // batchUpdate 401
+      });
 
       await expect(exportToSheets('expired-token', mockBackup)).rejects.toThrow('refresh_failed');
-      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('google_refresh_token');
+      expect(GoogleSignin.signOut).toHaveBeenCalled();
     });
 
     it('throws quota_exceeded when batchUpdate returns 429', async () => {
       getPreference.mockResolvedValue('sheet-id');
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
         json: async () => ({ error: { message: 'Quota exceeded' } }),
-      }); // batchUpdate
+      });
 
       await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('quota_exceeded');
     });

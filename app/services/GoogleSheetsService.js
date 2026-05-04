@@ -1,86 +1,70 @@
-import * as SecureStore from 'expo-secure-store';
+import { GoogleSignin, statusCodes, isErrorWithCode } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
 
-export const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SECURE_STORE_KEY = 'google_refresh_token';
+
+// Configure GoogleSignin once at module load. No webClientId needed since we
+// only need client-side access tokens (no server-side offline access).
+GoogleSignin.configure({
+  scopes: [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file',
+  ],
+});
 
 /**
- * Exchange an OAuth authorization code for access + refresh tokens.
- * Stores the refresh token in SecureStore.
- * @param {string} code - Auth code from OAuth redirect
- * @param {string} codeVerifier - PKCE code verifier from the auth request
- * @param {string} redirectUri - Redirect URI used in the auth request
- * @returns {Promise<string>} Access token
- */
-export const exchangeAndStoreTokens = async (code, codeVerifier, redirectUri) => {
-  const body = new URLSearchParams({
-    code,
-    client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri,
-    grant_type: 'authorization_code',
-    code_verifier: codeVerifier,
-  }).toString();
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const data = await response.json();
-  if (!response.ok || !data.refresh_token) {
-    throw new Error('token_exchange_failed');
-  }
-
-  await SecureStore.setItemAsync(SECURE_STORE_KEY, data.refresh_token);
-  return data.access_token;
-};
-
-/**
- * Delete the stored refresh token (e.g. after revocation).
- */
-export const clearStoredAuth = async () => {
-  await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
-};
-
-/**
- * Get a valid access token using the stored refresh token.
- * Throws 'no_refresh_token' if no refresh token is stored.
- * Throws 'refresh_failed' if the refresh request fails (clears stored token).
+ * Get a valid access token using the native Google Sign-In SDK.
+ * Throws 'not_signed_in' if the user has never signed in.
+ * Throws 'refresh_failed' if getTokens fails (revoked or network error).
  * @returns {Promise<string>} Access token
  */
 export const getValidAccessToken = async () => {
-  const refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-  if (!refreshToken) {
-    throw new Error('no_refresh_token');
+  if (!GoogleSignin.hasPreviousSignIn()) {
+    throw new Error('not_signed_in');
   }
-
-  const body = new URLSearchParams({
-    refresh_token: refreshToken,
-    client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    grant_type: 'refresh_token',
-  }).toString();
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+  try {
+    const { accessToken } = await GoogleSignin.getTokens();
+    return accessToken;
+  } catch {
     throw new Error('refresh_failed');
   }
+};
 
-  return data.access_token;
+/**
+ * Trigger native Google Sign-In UI and return the resulting access token.
+ * Throws 'sign_in_cancelled' if the user dismisses the picker.
+ * Throws 'auth_failed' on any other error.
+ * @returns {Promise<string>} Access token
+ */
+export const signIn = async () => {
+  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  try {
+    await GoogleSignin.signIn();
+    const { accessToken } = await GoogleSignin.getTokens();
+    return accessToken;
+  } catch (error) {
+    if (isErrorWithCode(error, statusCodes.SIGN_IN_CANCELLED)) {
+      throw new Error('sign_in_cancelled');
+    }
+    throw new Error('auth_failed');
+  }
+};
+
+/**
+ * Revoke Google access and sign out (clears the native session).
+ * Safe to call even if the user has already revoked access externally.
+ */
+export const signOut = async () => {
+  try {
+    await GoogleSignin.revokeAccess();
+  } catch {
+    // Access may already be revoked; continue to sign out
+  }
+  await GoogleSignin.signOut();
 };
 
 /**
  * Build the 6-sheet data structure from a backup object.
- * Uses human-readable account/category names in place of IDs.
- * All categories included (including shadow). All balances shown as-is.
  * @param {Object} backup - Backup object from createBackup()
  * @returns {Array<{range: string, values: Array<Array>}>}
  */
@@ -208,7 +192,7 @@ const clearSheets = async (accessToken, spreadsheetId, ranges) => {
   if (!response.ok) {
     const data = await response.json();
     if (response.status === 401) {
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+      await signOut();
       throw new Error('refresh_failed');
     }
     throw new Error(data.error?.message || 'clear_sheets_failed');
@@ -231,7 +215,7 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
   if (!response.ok) {
     const data = await response.json();
     if (response.status === 401) {
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+      await signOut();
       throw new Error('refresh_failed');
     }
     if (response.status === 429) throw new Error('quota_exceeded');
@@ -242,7 +226,6 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
 
 /**
  * Export all app data to Google Sheets.
- * Creates the spreadsheet on first call; updates it on subsequent calls.
  * @param {string} accessToken - Valid Google OAuth access token
  * @param {Object} backup - Backup object from createBackup()
  * @returns {Promise<string>} URL of the spreadsheet
