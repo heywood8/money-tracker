@@ -6,10 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Penny is a React Native mobile app built with Expo for tracking personal finances. The app now supports only Android, with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (7 languages: English, Italian, Russian, Spanish, French, Chinese, German) and theme support (light/dark/system).
 
-## Development Commands
+## Documentation Verification with context7
 
-### Starting Development
-**IMPORTANT**: Never run `npm start`, `npm run android`, or similar commands. The developer manages the development server locally.
+Before proposing any approach that involves a third-party library, Expo API, or React Native module, **use context7 to verify the approach against current documentation**:
+
+1. Call `mcp__plugin_context7_context7__resolve-library-id` with the library name and a query describing what you're trying to do
+2. Call `mcp__plugin_context7_context7__query-docs` with the returned library ID and a specific question
+3. Let the docs inform your design — training data goes stale, docs don't
+
+This applies especially to: Expo SDK APIs, navigation libraries, auth libraries, database drivers, and any library with a track record of breaking changes between major versions.
+
+## Development Commands
 
 ### Testing
 ```bash
