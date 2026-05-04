@@ -19,6 +19,7 @@ module.exports = {
     packagerOpts: {
       hostType: 'tunnel',
     },
+    scheme: 'com.heywood8.monkeep',
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
