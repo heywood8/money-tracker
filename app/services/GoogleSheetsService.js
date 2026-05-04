@@ -171,3 +171,85 @@ export const buildSheetsData = (backup) => {
     },
   ];
 };
+
+const createSpreadsheet = async (accessToken) => {
+  const response = await fetch(SHEETS_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      properties: { title: 'Penny – export' },
+      sheets: [
+        { properties: { title: 'Accounts' } },
+        { properties: { title: 'Operations' } },
+        { properties: { title: 'Categories' } },
+        { properties: { title: 'Budgets' } },
+        { properties: { title: 'Planned Operations' } },
+        { properties: { title: 'Balance History' } },
+      ],
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'create_spreadsheet_failed');
+  }
+  return data.spreadsheetId;
+};
+
+const clearSheets = async (accessToken, spreadsheetId, ranges) => {
+  const response = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchClear`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ranges }),
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error?.message || 'clear_sheets_failed');
+  }
+};
+
+const writeSheets = async (accessToken, spreadsheetId, sheets) => {
+  const response = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchUpdate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      valueInputOption: 'RAW',
+      data: sheets.map(s => ({ range: s.range, values: s.values })),
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    if (response.status === 429) throw new Error('quota_exceeded');
+    throw new Error(data.error?.message || 'write_sheets_failed');
+  }
+};
+
+/**
+ * Export all app data to Google Sheets.
+ * Creates the spreadsheet on first call; updates it on subsequent calls.
+ * @param {string} accessToken - Valid Google OAuth access token
+ * @param {Object} backup - Backup object from createBackup()
+ * @returns {Promise<string>} URL of the spreadsheet
+ */
+export const exportToSheets = async (accessToken, backup) => {
+  let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
+
+  if (!spreadsheetId) {
+    spreadsheetId = await createSpreadsheet(accessToken);
+    await setPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID, spreadsheetId);
+  }
+
+  const sheets = buildSheetsData(backup);
+  await clearSheets(accessToken, spreadsheetId, sheets.map(s => s.range.split('!')[0]));
+  await writeSheets(accessToken, spreadsheetId, sheets);
+
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+};

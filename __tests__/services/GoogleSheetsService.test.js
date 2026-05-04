@@ -4,8 +4,15 @@ import {
   clearStoredAuth,
   getValidAccessToken,
   buildSheetsData,
+  exportToSheets,
   TOKEN_ENDPOINT,
 } from '../../app/services/GoogleSheetsService';
+
+jest.mock('../../app/services/PreferencesDB', () => ({
+  PREF_KEYS: { GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id' },
+  getPreference: jest.fn(),
+  setPreference: jest.fn(),
+}));
 
 process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID = 'test-client-id';
 
@@ -192,6 +199,69 @@ describe('GoogleSheetsService', () => {
       const history = sheets.find(s => s.range.startsWith('Balance History'));
       expect(history.values[0]).toEqual(['account', 'date', 'balance']);
       expect(history.values[1][0]).toBe('Checking'); // account name
+    });
+  });
+
+  describe('exportToSheets', () => {
+    const { getPreference, setPreference } = require('../../app/services/PreferencesDB');
+
+    const mockBackup = {
+      data: {
+        accounts: [{ id: 1, name: 'Cash', balance: '100', currency: 'USD' }],
+        categories: [{ id: 'c1', name: 'Food', type: 'entry', category_type: 'expense', icon: 'food' }],
+        operations: [],
+        budgets: [],
+        planned_operations: [],
+        balance_history: [],
+      },
+    };
+
+    it('creates a new spreadsheet and stores its ID on first export', async () => {
+      getPreference.mockResolvedValue(null); // no stored spreadsheetId
+      setPreference.mockResolvedValue(undefined);
+
+      // POST /v4/spreadsheets → create
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ spreadsheetId: 'new-sheet-id' }),
+      });
+      // POST batchClear
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      // POST batchUpdate
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+      const url = await exportToSheets('access-token', mockBackup);
+
+      expect(url).toBe('https://docs.google.com/spreadsheets/d/new-sheet-id');
+      expect(setPreference).toHaveBeenCalledWith('google_sheets_spreadsheet_id', 'new-sheet-id');
+    });
+
+    it('updates existing spreadsheet without creating a new one on re-export', async () => {
+      getPreference.mockResolvedValue('existing-sheet-id');
+
+      // POST batchClear
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      // POST batchUpdate
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+      const url = await exportToSheets('access-token', mockBackup);
+
+      expect(url).toBe('https://docs.google.com/spreadsheets/d/existing-sheet-id');
+      // Only 2 fetch calls (clear + write), not 3 (create + clear + write)
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(setPreference).not.toHaveBeenCalled();
+    });
+
+    it('throws quota_exceeded when batchUpdate returns 429', async () => {
+      getPreference.mockResolvedValue('sheet-id');
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // batchClear
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({ error: { message: 'Quota exceeded' } }),
+      }); // batchUpdate
+
+      await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('quota_exceeded');
     });
   });
 });
