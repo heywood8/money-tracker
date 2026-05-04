@@ -37,8 +37,8 @@ export const getValidAccessToken = async () => {
  * @returns {Promise<string>} Access token
  */
 export const signIn = async () => {
-  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   try {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     await GoogleSignin.signIn();
     const { accessToken } = await GoogleSignin.getTokens();
     return accessToken;
