@@ -10,7 +10,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
-    newArchEnabled: true,
+    newArchEnabled: true, // Required for react-native-worklets (used by reanimated 4.x)
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -43,6 +43,8 @@ module.exports = {
         'expo-build-properties',
         {
           android: {
+            // Only build arm64-v8a for preview builds to speed up build time (~75% faster)
+            // For production, build all architectures (default)
             ...(ANDROID_ARCHITECTURES && { buildArchs: ANDROID_ARCHITECTURES }),
           },
         },
