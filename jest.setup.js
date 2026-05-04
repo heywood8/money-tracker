@@ -677,7 +677,7 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
-// Mock expo-auth-session
+// Mock expo-auth-session (kept for any non-Google auth usage)
 jest.mock('expo-auth-session', () => ({
   useAutoDiscovery: jest.fn(() => ({
     authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -692,13 +692,25 @@ jest.mock('expo-auth-session', () => ({
   ResponseType: { Code: 'code' },
 }));
 
-// Mock expo-auth-session/providers/google
-jest.mock('expo-auth-session/providers/google', () => ({
-  useAuthRequest: jest.fn(() => [
-    { codeVerifier: 'test-verifier', redirectUri: 'com.googleusercontent.apps.test-client-id:/oauthredirect' },
-    null,
-    jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
-  ]),
+// Mock @react-native-google-signin/google-signin
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn().mockResolvedValue(true),
+    signIn: jest.fn().mockResolvedValue({ type: 'success', data: { user: { email: 'test@example.com', name: 'Test User' } } }),
+    signInSilently: jest.fn().mockResolvedValue({ type: 'success', data: { user: { email: 'test@example.com' } } }),
+    getTokens: jest.fn().mockResolvedValue({ accessToken: 'test-access-token', idToken: 'test-id-token' }),
+    hasPreviousSignIn: jest.fn().mockReturnValue(false),
+    signOut: jest.fn().mockResolvedValue(undefined),
+    revokeAccess: jest.fn().mockResolvedValue(undefined),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+  },
+  isErrorWithCode: jest.fn((error, code) => error?.code === code),
 }));
 
 // Mock expo-web-browser
