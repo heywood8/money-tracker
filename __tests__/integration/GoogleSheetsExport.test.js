@@ -116,9 +116,9 @@ describe('GoogleSheetsExport integration', () => {
   it('shows sign-in error dialog when auth fails', async () => {
     getValidAccessToken.mockRejectedValue(new Error('no_refresh_token'));
 
-    const { useAuthRequest } = require('expo-auth-session');
+    const { useAuthRequest } = require('expo-auth-session/providers/google');
     useAuthRequest.mockReturnValue([
-      { codeVerifier: 'verifier' },
+      { codeVerifier: 'verifier', redirectUri: 'com.heywood8.monkeep:/oauthredirect' },
       null,
       jest.fn().mockResolvedValue({ type: 'error' }),
     ]);

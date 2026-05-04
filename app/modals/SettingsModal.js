@@ -20,7 +20,7 @@ import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuthRequest, useAutoDiscovery, makeRedirectUri } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { getValidAccessToken, exchangeAndStoreTokens, exportToSheets } from '../services/GoogleSheetsService';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -51,17 +51,15 @@ export default function SettingsModal({ visible, onClose }) {
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
 
-  const discovery = useAutoDiscovery('https://accounts.google.com');
-  const [request, , promptAsync] = useAuthRequest(
+  const [request, , promptAsync] = Google.useAuthRequest(
     {
-      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
       scopes: [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive.file',
       ],
-      redirectUri: makeRedirectUri({ native: 'com.heywood8.monkeep:/oauth2redirect/google' }),
+      shouldAutoExchangeCode: false,
     },
-    discovery,
   );
 
   // Animation values
@@ -217,7 +215,7 @@ export default function SettingsModal({ visible, onClose }) {
         accessToken = await exchangeAndStoreTokens(
           result.params.code,
           request.codeVerifier,
-          makeRedirectUri({ native: 'com.heywood8.monkeep:/oauth2redirect/google' }),
+          request.redirectUri,
         );
       }
       const backup = await createBackup();
