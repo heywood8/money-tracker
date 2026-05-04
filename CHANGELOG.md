@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.1](https://github.com/heywood8/money-tracker/compare/penny-v0.82.0...penny-v0.82.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **header:** hide search bar when navigating away from operations screen ([#463](https://github.com/heywood8/money-tracker/issues/463)) ([94b1c2f](https://github.com/heywood8/money-tracker/commit/94b1c2fdc7528ddc13afcb71fa29a820f12d251f))
+
 ## [0.82.0](https://github.com/heywood8/money-tracker/compare/penny-v0.81.2...penny-v0.82.0) (2026-05-03)
 
 
