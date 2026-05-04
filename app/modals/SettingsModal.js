@@ -59,7 +59,7 @@ export default function SettingsModal({ visible, onClose }) {
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive.file',
       ],
-      redirectUri: makeRedirectUri({ scheme: 'com.heywood8.monkeep' }),
+      redirectUri: makeRedirectUri({ native: 'com.heywood8.monkeep:/oauth2redirect/google' }),
     },
     discovery,
   );
@@ -217,7 +217,7 @@ export default function SettingsModal({ visible, onClose }) {
         accessToken = await exchangeAndStoreTokens(
           result.params.code,
           request.codeVerifier,
-          makeRedirectUri({ scheme: 'com.heywood8.monkeep' }),
+          makeRedirectUri({ native: 'com.heywood8.monkeep:/oauth2redirect/google' }),
         );
       }
       const backup = await createBackup();
