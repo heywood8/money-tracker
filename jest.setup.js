@@ -677,6 +677,34 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
+// Mock expo-auth-session
+jest.mock('expo-auth-session', () => ({
+  useAutoDiscovery: jest.fn(() => ({
+    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  })),
+  useAuthRequest: jest.fn(() => [
+    { codeVerifier: 'test-verifier' },
+    { type: 'success', params: { code: 'test-code' } },
+    jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
+  ]),
+  makeRedirectUri: jest.fn(() => 'com.heywood8.monkeep://'),
+  ResponseType: { Code: 'code' },
+}));
+
+// Mock expo-web-browser
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(() => ({ type: 'success' })),
+  openBrowserAsync: jest.fn(),
+}));
+
+// Mock expo-secure-store
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+}));
+
 // Suppress console.error and console.warn during tests to reduce noise
 // This prevents expected errors from cluttering test output with red text
 const originalConsoleError = console.error;
