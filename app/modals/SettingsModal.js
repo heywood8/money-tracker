@@ -195,6 +195,7 @@ export default function SettingsModal({ visible, onClose }) {
       }
       const backup = await createBackup();
       const sheetUrl = await exportToSheets(accessToken, backup);
+      setGoogleSheetsLoading(false);
       showDialog(
         t('google_sheets') || 'Google Sheets',
         t('google_sheets_export_success') || 'Exported to Google Sheets',
@@ -204,6 +205,7 @@ export default function SettingsModal({ visible, onClose }) {
         ],
       );
     } catch (error) {
+      setGoogleSheetsLoading(false);
       if (error.message === 'sign_in_cancelled') {
         return; // User dismissed — no error dialog
       }
@@ -220,8 +222,6 @@ export default function SettingsModal({ visible, onClose }) {
         dialogMsg = t('google_sheets_export_failed') || 'Export failed. Please try again.';
       }
       showDialog(t('error') || 'Error', dialogMsg, [{ text: t('ok') || 'OK' }]);
-    } finally {
-      setGoogleSheetsLoading(false);
     }
   }, [closeExportFormatModal, t, showDialog]);
 
