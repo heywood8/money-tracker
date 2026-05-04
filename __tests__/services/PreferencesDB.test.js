@@ -65,6 +65,7 @@ describe('PreferencesDB', () => {
         'UPDATE_LAST_PROMPTED_VERSION',
         'UPDATE_SKIP_UNTIL',
         'HIDE_BALANCES',
+        'GOOGLE_SHEETS_SPREADSHEET_ID',
       ]);
     });
   });

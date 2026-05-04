@@ -117,5 +117,14 @@
   "net_worth": "Patrimonio Netto",
   "this_month": "questo mese",
   "keep_filters_active": "Mantenere i filtri attivi?",
-  "keep_filters": "Mantieni Filtri"
+  "keep_filters": "Mantieni Filtri",
+  "google_sheets": "Google Sheets",
+  "google_sheets_description": "Esporta in un foglio di calcolo Google Sheets",
+  "google_sheets_export_success": "Esportato su Google Sheets",
+  "google_sheets_open": "Apri",
+  "google_sheets_signin_failed": "Accesso Google fallito. Riprova.",
+  "google_sheets_access_revoked": "L'accesso a Google è stato revocato. Accedi di nuovo.",
+  "google_sheets_no_network": "Esportazione fallita: nessuna connessione internet.",
+  "google_sheets_export_failed": "Esportazione fallita. Riprova.",
+  "google_sheets_quota_exceeded": "Quota Google Sheets superata. Riprova più tardi."
 }
