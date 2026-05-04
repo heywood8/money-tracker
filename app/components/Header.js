@@ -89,10 +89,10 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
       style={[
         styles.container,
         { backgroundColor: colors.background, borderBottomColor: colors.border },
-        searchMode === 'open' && styles.containerSearchMode,
+        searchMode === 'open' && activeScreen === 'Operations' && styles.containerSearchMode,
       ]}
     >
-      {searchMode === 'open' ? (
+      {searchMode === 'open' && activeScreen === 'Operations' ? (
         <>
           <SearchBar
             searchText={searchState?.text || ''}
