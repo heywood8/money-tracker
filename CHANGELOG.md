@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.83.1](https://github.com/heywood8/money-tracker/compare/penny-v0.83.0...penny-v0.83.1) (2026-05-05)
+
+
+### Documentation
+
+* sync project guidance with actual codebase state ([#467](https://github.com/heywood8/money-tracker/issues/467)) ([f8233e3](https://github.com/heywood8/money-tracker/commit/f8233e3ccad1c807fdc617d177513be169f57182))
+
 ## [0.83.0](https://github.com/heywood8/money-tracker/compare/penny-v0.82.1...penny-v0.83.0) (2026-05-05)
 
 
