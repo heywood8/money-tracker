@@ -254,7 +254,7 @@ const CategorySpendingCard = ({
             onPress={() => setPickerVisible(true)}
           >
             {selectedCategoryIcon && (
-              <Icon name={selectedCategoryIcon} size={18} color={colors.primary} />
+              <Icon name={selectedCategoryIcon} size={18} color={colors.text} />
             )}
             <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
               {selectedCategoryName}

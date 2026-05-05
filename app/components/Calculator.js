@@ -272,10 +272,10 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
   }), [buttonBackground, compact]);
 
   const operationTextStyle = useMemo(() => ({
-    color: colors.primary,
+    color: colors.mutedText,
     fontSize: 24,
     fontWeight: 'bold',
-  }), [colors.primary]);
+  }), [colors.mutedText]);
 
   const numberTextStyle = useMemo(() => ({
     color: colors.text,
@@ -444,7 +444,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
               style={[
                 styles.button,
                 sharedButtonStyle,
-                { backgroundColor: colors.primary, borderColor: colors.border },
+                { backgroundColor: colors.selected, borderColor: colors.border },
               ]}
               onPress={() => onAdd()}
               accessibilityRole="button"

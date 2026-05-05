@@ -796,7 +796,7 @@ export default function AccountsScreen() {
               <Icon
                 name={showHiddenAccounts ? 'eye-off' : 'eye'}
                 size={20}
-                color={colors.primary}
+                color={colors.selected}
               />
               <Text style={[styles.showHiddenText, { color: colors.text }]}>
                 {showHiddenAccounts
