@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.86.0](https://github.com/heywood8/money-tracker/compare/penny-v0.85.0...penny-v0.86.0) (2026-05-05)
+
+
+### Features
+
+* **categories:** remove list view, keep grid-only layout ([#473](https://github.com/heywood8/money-tracker/issues/473)) ([b70c2c7](https://github.com/heywood8/money-tracker/commit/b70c2c794b3f117c6542e0904ceb349696b78cfd))
+
 ## [0.85.0](https://github.com/heywood8/money-tracker/compare/penny-v0.84.0...penny-v0.85.0) (2026-05-05)
 
 
