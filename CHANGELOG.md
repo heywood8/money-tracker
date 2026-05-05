@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.86.2](https://github.com/heywood8/money-tracker/compare/penny-v0.86.1...penny-v0.86.2) (2026-05-05)
+
+
+### Styles
+
+* refine theme colors for selected/accent elements ([#478](https://github.com/heywood8/money-tracker/issues/478)) ([46bef58](https://github.com/heywood8/money-tracker/commit/46bef58f566979481bfc5bdc8470439e445c9039))
+
 ## [0.86.1](https://github.com/heywood8/money-tracker/compare/penny-v0.86.0...penny-v0.86.1) (2026-05-05)
 
 
