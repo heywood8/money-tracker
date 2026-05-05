@@ -550,8 +550,8 @@ Since all CRUD operations, validation logic, state management, and data persiste
 
 **Phase 2 (Important)** - Target: 70% coverage
 7. ✅ BudgetsContext.test.js (41 tests - COMPLETE)
-8. ✅ BudgetsDB.test.js (65 tests - COMPLETE) ✅
-9. ⬜ db.test.js
+8. ✅ BudgetsDB.test.js (65 tests - COMPLETE)
+9. ✅ db.test.js (53 tests - COMPLETE)
 10. ✅ eventEmitter.test.js (41 tests - COMPLETE)
 11. ✅ SimpleTabs.test.js (41 tests - COMPLETE, logic-based)
 12. ⬜ ErrorBoundary.test.js
