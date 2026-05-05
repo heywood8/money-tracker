@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Penny is a React Native mobile app built with Expo for tracking personal finances. The app now supports only Android, with features for managing accounts, operations, categories, and viewing graphs. It includes internationalization (7 languages: English, Italian, Russian, Spanish, French, Chinese, German) and theme support (light/dark/system).
+Penny is a React Native mobile app built with Expo for tracking personal finances. The app targets Android, with features for managing accounts, operations, categories, planned operations, budgets, and viewing graphs. It includes internationalization (11 languages: English, Italian, Russian, Spanish, French, Chinese, German, Armenian, Japanese, Korean, Portuguese) and theme support (light/dark/system). Supports backup/restore (JSON, CSV, SQLite) and Google Sheets export via native Google Sign-In.
 
 ## Documentation Verification with context7
 
@@ -29,95 +29,140 @@ npm test               # Run Jest tests (if configured)
 
 The app follows a feature-based organization under the `app/` directory:
 
-- **contexts/** (7 files) - React Context providers for global state management
-  - `AccountsContext.js`, `BudgetsContext.js`, `CategoriesContext.js`, `DialogContext.js`
-  - `LocalizationContext.js`, `OperationsContext.js`, `ThemeContext.js`
+- **contexts/** (19 files) - React Context providers for global state management
+  - Theme: `ThemeContext.js`, `ThemeColorsContext.js`, `ThemeConfigContext.js`
+  - Accounts: `AccountsContext.js`, `AccountsDataContext.js`, `AccountsActionsContext.js`
+  - Operations: `OperationsContext.js`, `OperationsDataContext.js`, `OperationsActionsContext.js`
+  - Other: `BudgetsContext.js`, `CategoriesContext.js`, `DialogContext.js`, `LocalizationContext.js`
+  - `PlannedOperationsContext.js`, `SearchContext.js`, `DisplaySettingsContext.js`
+  - `AppBlurContext.js`, `ImportProgressContext.js`, `UpdateDownloadContext.js`
 
-- **screens/** (6 files) - Full-screen components for main navigation
+- **screens/** (7 files) - Full-screen components for main navigation
   - `AccountsScreen.js`, `AppInitializer.js`, `CategoriesScreen.js`
   - `GraphsScreen.js`, `LanguageSelectionScreen.js`, `OperationsScreen.js`
+  - `PlannedOperationsScreen.js`
 
-- **modals/** (4 files) - Modal dialog components for data entry
+- **modals/** (6 files) - Modal dialog components for data entry
   - `BudgetModal.js`, `CategoryModal.js`, `OperationModal.js`, `SettingsModal.js`
+  - `PlannedOperationModal.js`, `ImportProgressModal.js`
 
-- **components/** (8 files) - Reusable UI components
-  - `BudgetProgressBar.js`, `Calculator.js`, `ErrorBoundary.js`, `Header.js`
-  - `IconPicker.js`, `MaterialDialog.js`, `SimplePicker.js`, `SimpleTabs.js`
+- **components/** (40+ files across subdirectories) - Reusable UI components
+  - Root: `BudgetProgressBar.js`, `Calculator.js`, `ErrorBoundary.js`, `Header.js`
+  - Root: `IconPicker.js`, `MaterialDialog.js`, `SimplePicker.js`, `FormInput.js`
+  - Root: `AddFAB.js`, `DescriptionAutocomplete.js`, `EmptyState.js`, `ListCard.js`
+  - Root: `LoadingView.js`, `ModalBlurOverlay.js`, `ModalHeader.js`
+  - **components/operations/**: `OperationsList.js`, `OperationListItem.js`, `OperationFormFields.js`
+    - `QuickAddForm.js`, `SplitOperationModal.js`, `PickerModal.js`, `DateSeparator.js`, `DescriptionSuggestionRow.js`
+  - **components/search/**: `SearchBar.js`, `SearchOverlay.js`, `ExpandableFilters.js`, `FilterBadge.js`, `FilterChipStrip.js`
+  - **components/graphs/**: `ExpenseSummaryCard.js`, `IncomeSummaryCard.js`, `ExpensePieChart.js`, `IncomePieChart.js`
+    - `CategorySpendingCard.js`, `SpendingPredictionCard.js`, `BalanceHistoryCard.js`, `BalanceHistoryModal.js`
+    - `ChartModal.js`, `CustomLegend.js`
+  - **components/modals/**: `MultiCurrencyFields.js`
+  - **components/accounts/**: account-specific components
 
-- **hooks/** (1 file) - Custom React hooks
-  - `useMaterialTheme.js` - Bridges ThemeContext with React Native Paper
+- **navigation/** (1 file) - Navigation container
+  - `SimpleTabs.js` - Custom tab-based navigation
 
-- **types/** (1 file) - Type definitions
-  - `Account.js` - Account object type definition
+- **hooks/** (10 files) - Custom React hooks
+  - `useMaterialTheme.js`, `useOperationForm.js`, `useOperationPicker.js`
+  - `useQuickAddForm.js`, `useMultiCurrencyTransfer.js`, `useExpenseData.js`
+  - `useIncomeData.js`, `useBalanceHistory.js`, `useCategoryMonthlySpending.js`
+  - `useLogEntries.js`
 
-- **services/** (9 files) - Business logic and data access layer
+- **services/** (17 files) - Business logic and data access layer
   - Database: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`
+  - Database: `PlannedOperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
   - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
+  - Features: `GoogleSheetsService.js`, `DailyBackupService.js`, `AppUpdateService.js`
+  - Logging: `LogService.js`, `LogsFile.js`
 
-- **db/** (3 files) - Database configuration and schema
-  - `schema.js` (replaces `client.js` and `migrate.js` for database operations)
+- **db/** (1 file) - Database schema
+  - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, plannedOperations, balanceHistory, appMetadata)
 
 - **defaults/** (2 files) - Default/seed data
-  - `defaultAccounts.js`, `defaultCategories.json`
+  - `defaultAccounts.js`, `defaultOperations.js`
 
-- **utils/** (1 file) - Utility functions
-  - `resetDatabase.js`
+- **utils/** (4 files) - Utility functions
+  - `resetDatabase.js`, `emergencyReset.js`, `categoryUtils.js`, `calculatorUtils.js`
+
+- **styles/** (2 files) - Shared style definitions
+  - `designTokens.js`, `layout.js`
 
 ### Context-Based State Management
 
 The app uses React Context API for global state, with primary contexts that wrap the entire application in App.js:
 
 1. **LocalizationContext** (`app/contexts/LocalizationContext.js`)
-   - Manages app language (7 supported languages: en, it, ru, es, fr, zh, de)
+   - Manages app language (11 supported languages: en, it, ru, es, fr, zh, de, hy, ja, ko, pt)
    - Loads translations from separate files in `assets/i18n/` directory (one file per language)
    - Persists language preference to database (PreferencesDB)
    - Provides `t(key)` function for translations
 
-2. **ThemeContext** (`app/contexts/ThemeContext.js`)
-   - Manages theme selection: 'light', 'dark', or 'system'
+2. **ThemeContext / ThemeColorsContext / ThemeConfigContext** (split across 3 files)
+   - `ThemeContext.js` - Manages theme selection: 'light', 'dark', or 'system'
+   - `ThemeColorsContext.js` - Provides the resolved color palette
+   - `ThemeConfigContext.js` - Configuration and persistence (AsyncStorage)
    - Listens to OS appearance changes via `Appearance` API
-   - Provides color palette through `colors` object
-   - Persists theme preference to AsyncStorage
-   - Both themes define colors for: background, surface, primary, text, mutedText, border, selected, altRow, etc.
+   - Colors include: background, surface, primary, text, mutedText, border, selected, altRow, etc.
 
-3. **AccountsContext** (`app/contexts/AccountsContext.js`)
-   - Manages financial accounts (CRUD operations)
-   - Persists accounts to AsyncStorage with key 'accounts'
+3. **AccountsContext / AccountsDataContext / AccountsActionsContext** (split across 3 files)
+   - Manages financial accounts with CRUD operations
    - Each account has: id (uuid), name, balance (string), currency
-   - Provides validation function `validateAccount()`
+   - Provides validation via `validateAccount()`
    - Exposes currencies from `assets/currencies.json`
+
+4. **OperationsContext / OperationsDataContext / OperationsActionsContext** (split across 3 files)
+   - Manages financial transactions with full CRUD and filtering
+   - `SearchContext.js` provides search/filter state across operations
+
+5. **Other Contexts**
+   - `BudgetsContext.js` - Budget management
+   - `CategoriesContext.js` - Category management
+   - `PlannedOperationsContext.js` - Recurring/planned transactions
+   - `DialogContext.js` - Global dialog/alert system
+   - `DisplaySettingsContext.js` - UI preferences (e.g., hide balances)
+   - `AppBlurContext.js` - Blur overlay state for security
+   - `ImportProgressContext.js` - Import progress tracking
+   - `UpdateDownloadContext.js` - App update download state
 
 ### Navigation Structure
 
-Uses custom tab-based navigation (`app/components/SimpleTabs.js`) instead of react-navigation:
-- **Operations**: Financial transactions screen
-- **Accounts**: Account management with full CRUD
+Uses custom tab-based navigation (`app/navigation/SimpleTabs.js`) instead of react-navigation:
+- **Operations**: Financial transactions with search, filtering, quick-add, split operations
+- **Accounts**: Account management with full CRUD and multi-currency transfers
 - **Categories**: Transaction categories screen
-- **Graphs**: Financial visualizations screen
+- **Graphs**: Financial visualizations (expense/income pie charts, balance history, spending prediction)
+- **Planned**: Planned/recurring operations screen
 
 Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Key Components
 
-- **SimpleTabs** (`app/components/SimpleTabs.js`): Main navigation container with custom tab bar
-- **Header** (`app/components/Header.js`): Top header with settings icon
-- **SettingsModal** (`app/modals/SettingsModal.js`): Modal for theme and language preferences
+- **SimpleTabs** (`app/navigation/SimpleTabs.js`): Main navigation container with custom tab bar
+- **Header** (`app/components/Header.js`): Top header with settings icon and search integration
+- **SettingsModal** (`app/modals/SettingsModal.js`): Settings hub - theme, language, backup/restore, Google Sheets export, logs, app updates
 - **AccountsScreen** (`app/screens/AccountsScreen.js`): Full-featured account management with add/edit/delete
+- **OperationsScreen** (`app/screens/OperationsScreen.js`): Full transaction management with search, filters, quick-add
+- **GraphsScreen** (`app/screens/GraphsScreen.js`): Financial visualizations with multiple chart types
 
 ### Data Persistence
 
-**Database Layer** (SQLite):
+**Database Layer** (SQLite via Drizzle ORM):
 - SQLite database (`penny.db`)
-- Database modules: `db.js`, `AccountsDB.js`, `OperationsDB.js`, `CategoriesDB.js`
-- Uses Drizzle ORM for schema management and migrations
+- Schema defined in `app/db/schema.js` - tables: accounts, categories, operations, budgets, plannedOperations, balanceHistory, appMetadata
+- Migrations managed by Drizzle Kit in `drizzle/` directory
+- DB modules: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`, `PlannedOperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
 
-**Application Preferences** (AsyncStorage):
-- Theme: key `'theme_preference'`
-- Language: key `'app_language'`
+**Application Preferences** (PreferencesDB via SQLite):
+- Language, theme, Google Sheets spreadsheet ID, and other preferences are stored in the `appMetadata` table via `PreferencesDB.js`
+- Theme also persists to AsyncStorage as a fast-read fallback
 
 **Database Services**:
 - `app/services/db.js` - SQLite wrapper with transaction support
-- `app/services/currency.js` - Precise currency calculations (avoids floating-point errors)
+- `app/services/currency.js` - Precise currency calculations using `decimal.js` (avoids floating-point errors)
+- `app/services/GoogleSheetsService.js` - Google Sheets export via native `@react-native-google-signin/google-signin` and Sheets REST API
+- `app/services/DailyBackupService.js` - Automatic daily/weekly backup management
+- `app/services/BackupRestore.js` - Import/export in JSON, CSV, SQLite formats
 
 **Data Integrity**:
 - Atomic transactions for all multi-step operations
@@ -134,7 +179,7 @@ Bottom tab bar height is set to 80px with 24px bottom padding.
 
 ### Assets Structure
 
-- `assets/i18n/`: Translation files, one per language (en.json, it.json, ru.json, es.json, fr.json, zh.json, de.json)
+- `assets/i18n/`: Translation files, one per language (en.json, it.json, ru.json, es.json, fr.json, zh.json, de.json, hy.json, ja.json, ko.json, pt.json)
 - `assets/currencies.json`: Currency list for accounts
 - `assets/*.png`: App icons and splash screens
 
@@ -198,7 +243,7 @@ If builds hang on GitHub Actions:
 
 ### Code Organization
 - Use modular structure separating components, screens, services, contexts
-- Keep reusable components in `components/` directory (not yet created)
+- Keep reusable components in `components/` directory, organized into feature subdirectories (operations/, search/, graphs/, accounts/, modals/)
 - Organize assets in `assets/` folder
 - Use functional components and React hooks
 
@@ -309,7 +354,7 @@ If tests fail, DO NOT push. Fix the failures first.
    - Test error handling and recovery
    - Include regression tests for bugs and edge cases
 
-4. **Component Testing** (future - when UI components are tested):
+4. **Component Testing** (see `__tests__/components/`):
    - Use `render` from `@testing-library/react-native`
    - Test user interactions with `fireEvent` or `userEvent`
    - Verify rendered output with queries: `getByText`, `getByTestId`, etc.
@@ -388,16 +433,20 @@ describe('ComponentOrService', () => {
 
 **Completed:**
 - ✅ Basic app scaffold with Expo
-- ✅ Custom tab navigation
+- ✅ Custom tab navigation (5 tabs: Operations, Accounts, Categories, Graphs, Planned)
 - ✅ Theme system (light/dark/system)
-- ✅ Internationalization (en/ru)
-- ✅ Account management (full CRUD)
-- ✅ AsyncStorage persistence
-- ✅ Header with settings modal
-
-**Stub/Placeholder Screens:**
-- Operations (OperationsScreen.js)
-- Categories (CategoriesScreen.js)
-- Graphs (GraphsScreen.js)
-
-These screens currently only display the translated screen title and need implementation.
+- ✅ Internationalization (11 languages)
+- ✅ Account management (full CRUD, multi-currency transfers)
+- ✅ Operations management (full CRUD, search, filtering, quick-add, split operations)
+- ✅ Categories management (full CRUD)
+- ✅ Budgets (budget tracking with progress bars)
+- ✅ Planned/recurring operations
+- ✅ Graphs (expense/income pie charts, balance history, spending prediction, category spending)
+- ✅ Backup/restore (JSON, CSV, SQLite formats)
+- ✅ Google Sheets export (via native Google Sign-In)
+- ✅ Daily/weekly automatic backups
+- ✅ App update checking and download
+- ✅ Display settings (hide balances)
+- ✅ Developer tools (logs viewer, emergency reset)
+- ✅ SQLite persistence via Drizzle ORM
+- ✅ Comprehensive test suite (80+ test files)
