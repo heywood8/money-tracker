@@ -4,26 +4,24 @@ import { Text } from 'react-native-paper';
 import LoadingView from '../components/LoadingView';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import AddFAB from '../components/AddFAB';
 import EmptyState from '../components/EmptyState';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import CategoryModal from '../modals/CategoryModal';
-import ListCard from '../components/ListCard';
 
 const CategoriesScreen = () => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { categories, loading, expandedIds, toggleExpanded, getChildren } = useCategories();
+  const { categories, loading, getChildren } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isNew, setIsNew] = useState(false);
 
-  const [viewMode, setViewMode] = useState('grid');
   const [gridParentId, setGridParentId] = useState(null);
 
   const handleAddCategory = () => {
@@ -56,27 +54,6 @@ const CategoriesScreen = () => {
       ],
     );
   }, [t, handleEditCategory, showDialog]);
-
-  // Flatten the category tree based on expanded state (excluding shadow categories)
-  const flattenedCategories = useMemo(() => {
-    const flattened = [];
-    // Filter out shadow categories from display
-    const visibleCategories = categories.filter(cat => !cat.isShadow);
-    const rootCategories = visibleCategories.filter(cat => !cat.parentId);
-
-    const addWithChildren = (category, depth = 0) => {
-      flattened.push({ ...category, depth });
-
-      if (expandedIds.has(category.id)) {
-        const children = visibleCategories.filter(cat => cat.parentId === category.id);
-        children.forEach(child => addWithChildren(child, depth + 1));
-      }
-    };
-
-    rootCategories.forEach(cat => addWithChildren(cat));
-    return flattened;
-  }, [categories, expandedIds]);
-
 
   const gridCategories = useMemo(() => {
     const visible = categories.filter(c => !c.isShadow);
@@ -120,79 +97,14 @@ const CategoriesScreen = () => {
     );
   }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress]);
 
-  const renderCategory = useCallback(({ item }) => {
-    const category = item;
-    const depth = item.depth;
-    const children = getChildren(category.id);
-    const hasChildren = children.length > 0;
-    const isExpanded = expandedIds.has(category.id);
-    const indentWidth = depth * 20;
-    const categoryType = category.category_type || category.categoryType || 'expense';
-
-    return (
-      <View>
-        <ListCard
-          variant={categoryType}
-          onPress={() => {
-            if (hasChildren) {
-              toggleExpanded(category.id);
-            } else {
-              handleEditCategory(category);
-            }
-          }}
-          onLongPress={() => handleCategoryLongPress(category)}
-          leftIcon={category.icon}
-          style={{ paddingLeft: indentWidth }}
-          accessibilityLabel={`${category.nameKey ? t(category.nameKey) : category.name} category, ${categoryType}`}
-          accessibilityHint={hasChildren ? 'Double tap to expand or collapse' : 'Double tap to edit'}
-        >
-          <View style={styles.categoryContent}>
-            {/* Expand/Collapse Icon */}
-            {hasChildren ? (
-              <TouchableOpacity
-                onPress={() => toggleExpanded(category.id)}
-                style={styles.expandButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isExpanded
-                    ? `Collapse ${category.nameKey ? t(category.nameKey) : category.name}`
-                    : `Expand ${category.nameKey ? t(category.nameKey) : category.name}`
-                }
-                accessibilityHint="Shows or hides subcategories"
-                accessibilityState={{ expanded: isExpanded }}
-              >
-                <Icon
-                  name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                  size={18}
-                  color={colors.mutedText}
-                  accessible={false}
-                />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.expandButton} />
-            )}
-
-            {/* Category Name */}
-            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-              {category.nameKey ? t(category.nameKey) : category.name}
-            </Text>
-
-          </View>
-        </ListCard>
-      </View>
-    );
-  }, [colors, t, expandedIds, getChildren, toggleExpanded, handleEditCategory, handleCategoryLongPress]);
-
   if (loading) {
     return <LoadingView message={t('loading_categories') || 'Loading categories...'} />;
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Toggle bar */}
-      <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
-        {viewMode === 'grid' && gridParentId !== null ? (
+      {gridParentId !== null && (
+        <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
           <TouchableOpacity
             onPress={() => setGridParentId(null)}
             style={styles.backButton}
@@ -205,63 +117,22 @@ const CategoriesScreen = () => {
               {gridParentCategory?.nameKey ? t(gridParentCategory.nameKey) : gridParentCategory?.name}
             </Text>
           </TouchableOpacity>
-        ) : (
-          <View />
-        )}
-        <View style={styles.toggleButtons}>
-          <TouchableOpacity
-            onPress={() => setViewMode('list')}
-            style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: colors.selected }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityRole="button"
-            accessibilityLabel="List view"
-          >
-            <Icon name="format-list-bulleted" size={18} color={viewMode === 'list' ? colors.primary : colors.mutedText} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { setViewMode('grid'); setGridParentId(null); }}
-            style={[styles.toggleBtn, viewMode === 'grid' && { backgroundColor: colors.selected }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityRole="button"
-            accessibilityLabel="Grid view"
-          >
-            <Icon name="view-grid" size={18} color={viewMode === 'grid' ? colors.primary : colors.mutedText} />
-          </TouchableOpacity>
         </View>
-      </View>
-
-      {viewMode === 'grid' ? (
-        <FlatList
-          key="grid"
-          data={gridCategories}
-          renderItem={renderGridCell}
-          keyExtractor={item => item.id}
-          numColumns={3}
-          columnWrapperStyle={styles.gridRow}
-          ListEmptyComponent={
-            <EmptyState icon="shape-outline" message={t('no_categories')} />
-          }
-          contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
-          windowSize={10}
-          removeClippedSubviews={true}
-        />
-      ) : (
-        <FlatList
-          key="list"
-          data={flattenedCategories}
-          renderItem={renderCategory}
-          keyExtractor={item => item.id}
-          ListEmptyComponent={
-            <EmptyState icon="shape-outline" message={t('no_categories')} />
-          }
-          contentContainerStyle={flattenedCategories.length === 0 ? styles.emptyList : styles.listContent}
-          windowSize={10}
-          maxToRenderPerBatch={10}
-          initialNumToRender={15}
-          updateCellsBatchingPeriod={50}
-          removeClippedSubviews={true}
-        />
       )}
+
+      <FlatList
+        data={gridCategories}
+        renderItem={renderGridCell}
+        keyExtractor={item => item.id}
+        numColumns={3}
+        columnWrapperStyle={styles.gridRow}
+        ListEmptyComponent={
+          <EmptyState icon="shape-outline" message={t('no_categories')} />
+        }
+        contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
+        windowSize={10}
+        removeClippedSubviews={true}
+      />
 
       <AddFAB
         testID="categories-add-fab"
@@ -290,29 +161,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  categoryContent: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flex: 1,
-  },
-  categoryName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-  },
   container: {
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
   emptyList: {
     flex: 1,
-  },
-  expandButton: {
-    alignItems: 'center',
-    height: 32,
-    justifyContent: 'center',
-    marginRight: SPACING.xs,
-    width: 32,
   },
   gridCell: {
     alignItems: 'center',
@@ -335,24 +189,12 @@ const styles = StyleSheet.create({
   gridRow: {
     justifyContent: 'flex-start',
   },
-  listContent: {
-    paddingBottom: 180,
-  },
   toggleBar: {
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-  },
-  toggleBtn: {
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.xs,
-  },
-  toggleButtons: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
   },
 });
 
