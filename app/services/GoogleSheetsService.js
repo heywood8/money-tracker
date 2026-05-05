@@ -43,6 +43,7 @@ export const signIn = async () => {
     const { accessToken } = await GoogleSignin.getTokens();
     return accessToken;
   } catch (error) {
+    console.error('[GoogleSignIn] signIn error:', JSON.stringify(error), 'code:', error?.code, 'message:', error?.message);
     if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new Error('sign_in_cancelled');
     }
