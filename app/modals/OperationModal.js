@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -312,37 +313,39 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         </Pressable>
       );
     } else if (pickerState.type === 'category') {
-      // Determine if this is a folder or entry
       const isFolder = item.type === 'folder';
+      const isSelected = !isFolder && values.categoryId === item.id;
+      const name = item.nameKey ? t(item.nameKey) : item.name;
 
       return (
         <Pressable
           onPress={() => {
             if (isFolder) {
-              // Navigate into folder
               navigateIntoFolder(item);
             } else {
               handleCategorySelect(item);
             }
           }}
           style={({ pressed }) => [
-            styles.pickerOption,
-            { borderColor: colors.border },
+            styles.gridCell,
+            { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
             pressed && { backgroundColor: colors.selected },
           ]}
         >
-          <View style={styles.categoryOption}>
-            <Icon name={item.icon} size={24} color={colors.text} />
-            <Text style={[styles.pickerOptionText, styles.categoryLabel, { color: colors.text }]}>
-              {item.nameKey ? t(item.nameKey) : item.name}
-            </Text>
-            {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
-          </View>
+          <Icon name={item.icon} size={24} color={colors.text} />
+          <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
+            {name}
+          </Text>
+          {isFolder && (
+            <View style={styles.folderBadge}>
+              <Icon name="folder-outline" size={12} color={colors.mutedText} />
+            </View>
+          )}
         </Pressable>
       );
     }
     return null;
-  }, [pickerState.type, colors, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
+  }, [pickerState.type, colors, values, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -609,6 +612,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             <FlatList
               data={pickerState.data}
               keyExtractor={keyExtractor}
+              numColumns={pickerState.type === 'category' ? 3 : 1}
+              columnWrapperStyle={pickerState.type === 'category' ? styles.gridRow : undefined}
+              contentContainerStyle={pickerState.type === 'category' ? styles.gridContent : undefined}
               renderItem={renderPickerItem}
               ListEmptyComponent={
                 <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
@@ -665,14 +671,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
-  categoryLabel: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  categoryOption: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -711,8 +709,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: SPACING.sm,
   },
+  folderBadge: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+  },
   fullFlex: {
     flex: 1,
+  },
+  gridCell: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    margin: SPACING.xs,
+    padding: SPACING.md,
+    position: 'relative',
+    width: (Dimensions.get('window').width - SPACING.md * 2 - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
+  },
+  gridCellName: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  gridContent: {
+    padding: SPACING.sm,
+  },
+  gridRow: {
+    justifyContent: 'flex-start',
   },
   modalButton: {
     alignItems: 'center',
