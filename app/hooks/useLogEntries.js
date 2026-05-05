@@ -8,7 +8,10 @@ export function useLogEntries(levelFilter = 'all') {
 
   useEffect(() => {
     const unsubscribe = logService.subscribe(() => {
-      setTick(t => t + 1);
+      // Defer setState to avoid updating during a render phase — LogService intercepts
+      // console.*, which React calls internally during rendering (e.g. dev warnings),
+      // so a synchronous setTick here causes "Cannot update a component while rendering".
+      setTimeout(() => setTick(t => t + 1), 0);
     });
     return unsubscribe;
   }, []);
