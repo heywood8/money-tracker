@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.86.3](https://github.com/heywood8/money-tracker/compare/penny-v0.86.2...penny-v0.86.3) (2026-05-05)
+
+
+### Bug Fixes
+
+* **logging:** reclassify log levels across codebase ([#477](https://github.com/heywood8/money-tracker/issues/477)) ([26dac01](https://github.com/heywood8/money-tracker/commit/26dac0111f4c9670c2c27bb9ce96c576be03f655))
+
+
+### Documentation
+
+* add receipt scanner implementation plan ([#480](https://github.com/heywood8/money-tracker/issues/480)) ([bbe623b](https://github.com/heywood8/money-tracker/commit/bbe623b4b83e73c7f07462e387850e32b915cba2))
+
 ## [0.86.2](https://github.com/heywood8/money-tracker/compare/penny-v0.86.1...penny-v0.86.2) (2026-05-05)
 
 
