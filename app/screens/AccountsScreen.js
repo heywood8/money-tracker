@@ -951,7 +951,7 @@ export default function AccountsScreen() {
                     <View style={styles.deleteRowContent}>
                       <Icon name="delete-outline" size={18} color={colors.delete} />
                       <Text style={[styles.deleteRowText, { color: colors.delete }]}>
-                        {t('delete_account') || 'Delete Account'}
+                        {t('delete') || 'Delete'}
                       </Text>
                     </View>
                   </TouchableRipple>
