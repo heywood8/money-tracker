@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.85.0](https://github.com/heywood8/money-tracker/compare/penny-v0.84.0...penny-v0.85.0) (2026-05-05)
+
+
+### Features
+
+* **categories:** bottom sheet modal with animated picker panels ([#471](https://github.com/heywood8/money-tracker/issues/471)) ([f0646f2](https://github.com/heywood8/money-tracker/commit/f0646f235f7f603cdd94ab3c3669092137b9a23c))
+
 ## [0.84.0](https://github.com/heywood8/money-tracker/compare/penny-v0.83.1...penny-v0.84.0) (2026-05-05)
 
 
