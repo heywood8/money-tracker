@@ -339,7 +339,7 @@ export const restoreBackup = async (backup) => {
       for (const account of backup.data.accounts) {
         // Validate required fields
         if (!account.name) {
-          console.error('Skipping account with missing name:', account);
+          console.warn('Skipping account with missing name:', account);
           continue;
         }
 
@@ -405,7 +405,7 @@ export const restoreBackup = async (backup) => {
       for (const category of backup.data.categories) {
         // Validate required fields
         if (!category.id || !category.name) {
-          console.error('Skipping category with missing id or name:', category);
+          console.warn('Skipping category with missing id or name:', category);
           continue;
         }
 
@@ -448,7 +448,7 @@ export const restoreBackup = async (backup) => {
         
         // Validate that account_id is not null/undefined
         if (mappedAccountId == null) {
-          console.error('Skipping operation with null account_id:', operation);
+          console.warn('Skipping operation with null account_id:', operation);
           continue;
         }
 
@@ -532,7 +532,7 @@ export const restoreBackup = async (backup) => {
         for (const budget of backup.data.budgets) {
           // Validate required fields
           if (!budget.id || !budget.category_id || !budget.amount || !budget.currency) {
-            console.error('Skipping budget with missing required fields:', budget);
+            console.warn('Skipping budget with missing required fields:', budget);
             continue;
           }
 
@@ -615,7 +615,7 @@ export const restoreBackup = async (backup) => {
         });
         for (const planned of backup.data.planned_operations) {
           if (!planned.id || !planned.name) {
-            console.error('Skipping planned operation with missing id or name:', planned);
+            console.warn('Skipping planned operation with missing id or name:', planned);
             continue;
           }
 
@@ -919,7 +919,7 @@ const importBackupSQLite = async (fileUri) => {
     try {
       plannedOperations = await tempDb.getAllAsync('SELECT * FROM planned_operations ORDER BY created_at ASC');
     } catch (e) {
-      console.log('No planned_operations table in imported database (older format)');
+      console.warn('No planned_operations table in imported database (older format)');
     }
 
     // Create backup object

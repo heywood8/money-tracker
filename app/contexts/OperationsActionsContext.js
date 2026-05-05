@@ -75,7 +75,7 @@ export const OperationsActionsProvider = ({ children }) => {
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
     const effectiveFilters = filters ?? activeFiltersRef.current;
-    console.log('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
+    console.debug('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
 
@@ -90,7 +90,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Check if this request is still the latest (ignore stale results)
       if (requestId !== loadRequestIdRef.current) {
-        console.log(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
+        console.debug(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
         return;
       }
 
@@ -265,7 +265,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load operations on mount
   useEffect(() => {
-    console.log('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
+    console.debug('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
     loadInitialOperations();
   }, [loadInitialOperations]);
 
@@ -285,7 +285,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   const addOperation = useCallback(async (operation) => {
     try {
-      console.log('[OperationsContext] addOperation called with:', {
+      console.debug('[OperationsContext] addOperation called with:', {
         type: operation.type,
         amount: operation.amount,
         accountId: operation.accountId,
@@ -298,7 +298,7 @@ export const OperationsActionsProvider = ({ children }) => {
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
 
-      console.log('[OperationsContext] Operation created successfully:', createdOperation?.id);
+      console.debug('[OperationsContext] Operation created successfully:', createdOperation?.id);
 
       // Reload operations to include the new one (without showing loading spinner)
       // Note: We reload to ensure consistency with lazy-loaded week ranges

@@ -58,7 +58,7 @@ export const initializeDefaultOperations = async () => {
     const accounts = await AccountsDB.getAllAccounts();
 
     if (!accounts || accounts.length === 0) {
-      console.log('[OperationsDB] No accounts found, skipping default operations initialization');
+      console.debug('[OperationsDB] No accounts found, skipping default operations initialization');
       return;
     }
 
@@ -66,7 +66,7 @@ export const initializeDefaultOperations = async () => {
     const visibleAccounts = accounts.filter(acc => acc.hidden === 0);
 
     if (visibleAccounts.length === 0) {
-      console.log('[OperationsDB] No visible accounts found, using first available account');
+      console.warn('[OperationsDB] No visible accounts found, using first available account');
       visibleAccounts.push(accounts[0]);
     }
 
@@ -90,7 +90,7 @@ export const initializeDefaultOperations = async () => {
     // Create each operation (this also updates account balances and balance history)
     for (const op of defaultOps) {
       await createOperation(op);
-      console.log(`[OperationsDB] Created default operation: ${op.type} - ${op.amount}`);
+      console.debug(`[OperationsDB] Created default operation: ${op.type} - ${op.amount}`);
     }
 
     console.log(`[OperationsDB] Successfully initialized ${defaultOps.length} default operations`);
@@ -254,11 +254,11 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.log(`Loading filtered operations from ${startDate} to ${endDate}`, filters);
+    console.debug(`Loading filtered operations from ${startDate} to ${endDate}`, filters);
 
     const operations = await queryAll(sql, params);
 
-    console.log(`Filtered operations loaded: ${operations?.length || 0} operations`);
+    console.debug(`Filtered operations loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -325,18 +325,18 @@ const calculateBalanceChanges = (operation) => {
  */
 export const createOperation = async (operation) => {
   try {
-    console.log('[OperationsDB] createOperation - type:', operation.type, 'amount:', operation.amount, typeof operation.amount, 'accountId:', operation.accountId, typeof operation.accountId, 'toAccountId:', operation.toAccountId, typeof operation.toAccountId, 'categoryId:', operation.categoryId, typeof operation.categoryId, 'date:', operation.date);
+    console.debug('[OperationsDB] createOperation - type:', operation.type, 'amount:', operation.amount, typeof operation.amount, 'accountId:', operation.accountId, typeof operation.accountId, 'toAccountId:', operation.toAccountId, typeof operation.toAccountId, 'categoryId:', operation.categoryId, typeof operation.categoryId, 'date:', operation.date);
     
     const now = new Date().toISOString();
     
     // Safely extract primitive IDs (handle case where objects might be passed)
     const extractId = (value, fieldName) => {
       if (value === null || value === undefined || value === '') {
-        console.log(`[OperationsDB] ${fieldName}: null/undefined/empty`);
+        console.debug(`[OperationsDB] ${fieldName}: null/undefined/empty`);
         return null;
       }
       if (typeof value === 'object' && value !== null) {
-        console.log(`[OperationsDB] ${fieldName}: object with id=${value.id} (${typeof value.id})`);
+        console.debug(`[OperationsDB] ${fieldName}: object with id=${value.id} (${typeof value.id})`);
         if (value.id !== undefined) {
           return value.id;
         }
@@ -359,7 +359,7 @@ export const createOperation = async (operation) => {
       destination_currency: operation.destinationCurrency || null,
     };
     
-    console.log('[OperationsDB] operationData - account_id:', operationData.account_id, typeof operationData.account_id, 'to_account_id:', operationData.to_account_id, typeof operationData.to_account_id, 'category_id:', operationData.category_id, typeof operationData.category_id);
+    console.debug('[OperationsDB] operationData - account_id:', operationData.account_id, typeof operationData.account_id, 'to_account_id:', operationData.to_account_id, typeof operationData.to_account_id, 'category_id:', operationData.category_id, typeof operationData.category_id);
 
     let newOperationId;
 
@@ -380,7 +380,7 @@ export const createOperation = async (operation) => {
         operationData.destination_currency,
       ];
       
-      console.log('[OperationsDB] INSERT params:', insertParams.map((p, i) => 
+      console.debug('[OperationsDB] INSERT params:', insertParams.map((p, i) =>
         `[${i}]: ${JSON.stringify(p)} (${typeof p})`,
       ).join(', '));
       
@@ -900,14 +900,14 @@ export const getOperationsByWeekOffset = async (weekOffset) => {
     const startDateStr = formatLocalDate(startDate);
     const endDateStr = formatLocalDate(endDate);
 
-    console.log(`Loading week ${weekOffset}: ${startDateStr} to ${endDateStr}`);
+    console.debug(`Loading week ${weekOffset}: ${startDateStr} to ${endDateStr}`);
 
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
       [startDateStr, endDateStr],
     );
 
-    console.log(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
+    console.debug(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -951,14 +951,14 @@ export const getOperationsByWeekFromDate = async (endDate) => {
     const startDateStr = formatLocalDate(start);
     const endDateStr = formatLocalDate(end);
 
-    console.log(`Loading week from ${startDateStr} to ${endDateStr}`);
+    console.debug(`Loading week from ${startDateStr} to ${endDateStr}`);
 
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
       [startDateStr, endDateStr],
     );
 
-    console.log(`Week loaded: ${operations?.length || 0} operations`);
+    console.debug(`Week loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -1062,11 +1062,11 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.log(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
+    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
 
     const operations = await queryAll(sql, params);
 
-    console.log(`Filtered week loaded: ${operations?.length || 0} operations`);
+    console.debug(`Filtered week loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -1221,14 +1221,14 @@ export const getOperationsByWeekToDate = async (startDate) => {
     const startDateStr = formatLocalDate(start);
     const endDateStr = formatLocalDate(end);
 
-    console.log(`Loading week from ${startDateStr} to ${endDateStr}`);
+    console.debug(`Loading week from ${startDateStr} to ${endDateStr}`);
 
     const operations = await queryAll(
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
       [startDateStr, endDateStr],
     );
 
-    console.log(`Week loaded: ${operations?.length || 0} operations`);
+    console.debug(`Week loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {
@@ -1422,11 +1422,11 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.log(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
+    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
 
     const operations = await queryAll(sql, params);
 
-    console.log(`Filtered week loaded: ${operations?.length || 0} operations`);
+    console.debug(`Filtered week loaded: ${operations?.length || 0} operations`);
 
     return (operations || []).map(mapOperationFields);
   } catch (error) {

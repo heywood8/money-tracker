@@ -43,7 +43,7 @@ export const AccountsDataProvider = ({ children }) => {
       setLoading(true);
       // Load accounts from SQLite
       let accountsData = await AccountsDB.getAllAccounts();
-      console.log(`[AccountsDataContext] loadAccounts: found ${accountsData.length} accounts, createDefaultsIfEmpty=${createDefaultsIfEmpty}`);
+      console.debug(`[AccountsDataContext] loadAccounts: found ${accountsData.length} accounts, createDefaultsIfEmpty=${createDefaultsIfEmpty}`);
 
       // If no accounts exist and we should create defaults, create default ones
       if (accountsData.length === 0 && createDefaultsIfEmpty) {
@@ -68,7 +68,7 @@ export const AccountsDataProvider = ({ children }) => {
 
         // Emit RELOAD_ALL to refresh all screens with new data
         setTimeout(() => {
-          console.log('Emitting RELOAD_ALL after default data creation');
+          console.debug('Emitting RELOAD_ALL after default data creation');
           appEvents.emit(EVENTS.RELOAD_ALL);
         }, 100);
       }
@@ -107,7 +107,7 @@ export const AccountsDataProvider = ({ children }) => {
   // Listen for RELOAD_ALL event to reload accounts
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('AccountsDataContext: Reloading accounts due to RELOAD_ALL event');
+      console.debug('AccountsDataContext: Reloading accounts due to RELOAD_ALL event');
       loadAccounts();
     });
 

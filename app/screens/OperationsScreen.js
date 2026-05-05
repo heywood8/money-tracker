@@ -657,7 +657,7 @@ const OperationsScreen = () => {
 
   // Handle scroll to index failures (when item is not rendered yet)
   const handleScrollToIndexFailed = useCallback((info) => {
-    console.log('scrollToIndex failed for index:', info.index, 'Using offset fallback');
+    console.warn('scrollToIndex failed for index:', info.index, 'Using offset fallback');
 
     // Scroll to approximate position using offset
     const estimatedItemHeight = 75;
@@ -677,7 +677,7 @@ const OperationsScreen = () => {
           viewPosition: 0,
         });
       } catch (error) {
-        console.log('Second scrollToIndex attempt failed');
+        console.warn('Second scrollToIndex attempt failed');
       }
     }, 100);
   }, []);

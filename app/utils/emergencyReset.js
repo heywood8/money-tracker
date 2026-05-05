@@ -19,20 +19,20 @@ const DB_NAME = 'penny.db';
  */
 export const forceDeleteDatabase = async (baseDir = FileSystem.documentDirectory) => {
   try {
-    console.log('Emergency database deletion initiated...');
+    console.debug('Emergency database deletion initiated...');
 
     // Construct database file path
     const dbPath = `${baseDir}SQLite/${DB_NAME}`;
-    console.log('Database path:', dbPath);
+    console.debug('Database path:', dbPath);
 
     // Check if file exists
     const fileInfo = await FileSystem.getInfoAsync(dbPath);
     if (fileInfo.exists) {
-      console.log('Database file found, deleting...');
+      console.debug('Database file found, deleting...');
       await FileSystem.deleteAsync(dbPath, { idempotent: true });
-      console.log('Database file deleted successfully');
+      console.debug('Database file deleted successfully');
     } else {
-      console.log('Database file does not exist');
+      console.debug('Database file does not exist');
     }
 
     // Also try to delete WAL and SHM files if they exist
@@ -41,19 +41,19 @@ export const forceDeleteDatabase = async (baseDir = FileSystem.documentDirectory
 
     try {
       await FileSystem.deleteAsync(walPath, { idempotent: true });
-      console.log('WAL file deleted');
+      console.debug('WAL file deleted');
     } catch (e) {
-      console.log('No WAL file to delete');
+      console.debug('No WAL file to delete');
     }
 
     try {
       await FileSystem.deleteAsync(shmPath, { idempotent: true });
-      console.log('SHM file deleted');
+      console.debug('SHM file deleted');
     } catch (e) {
-      console.log('No SHM file to delete');
+      console.debug('No SHM file to delete');
     }
 
-    console.log('Emergency database deletion completed');
+    console.debug('Emergency database deletion completed');
     return true;
   } catch (error) {
     console.error('Emergency database deletion failed:', error);

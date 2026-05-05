@@ -1197,8 +1197,8 @@ describe('OperationsScreen', () => {
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      // Spy on console.log to verify the handler is called
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      // Spy on console.warn to verify the handler is called
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       useOperationsData.mockReturnValue({
         operations: [],
