@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.84.0](https://github.com/heywood8/money-tracker/compare/penny-v0.83.1...penny-v0.84.0) (2026-05-05)
+
+
+### Features
+
+* **accounts:** bottom sheet modal with animated currency panel ([#469](https://github.com/heywood8/money-tracker/issues/469)) ([e1b3a55](https://github.com/heywood8/money-tracker/commit/e1b3a55521fe78b56b948373490e57307bbd9849))
+
 ## [0.83.1](https://github.com/heywood8/money-tracker/compare/penny-v0.83.0...penny-v0.83.1) (2026-05-05)
 
 
