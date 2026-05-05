@@ -93,6 +93,11 @@ const CategoriesScreen = () => {
         <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
           {name}
         </Text>
+        {hasChildren && (
+          <View style={styles.folderBadge}>
+            <Icon name="folder-outline" size={12} color={colors.mutedText} accessible={false} />
+          </View>
+        )}
       </TouchableOpacity>
     );
   }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress]);
@@ -168,6 +173,11 @@ const styles = StyleSheet.create({
   emptyList: {
     flex: 1,
   },
+  folderBadge: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+  },
   gridCell: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.lg,
@@ -175,6 +185,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     margin: SPACING.xs,
     padding: SPACING.md,
+    position: 'relative',
     width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
   },
   gridCellName: {

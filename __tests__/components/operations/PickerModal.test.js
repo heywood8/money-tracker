@@ -38,6 +38,7 @@ describe('PickerModal', () => {
     mutedText: '#666666',
     primary: '#6200EE',
     selected: '#F0F0F0',
+    altRow: '#F5F5F5',
   };
 
   const mockT = (key) => {
@@ -245,7 +246,7 @@ describe('PickerModal', () => {
       expect(getByTestId('icon-car')).toBeTruthy();
     });
 
-    it('renders chevron for folder categories', () => {
+    it('renders folder badge for folder categories', () => {
       const { getAllByTestId } = render(
         <PickerModal
           {...defaultProps}
@@ -256,8 +257,8 @@ describe('PickerModal', () => {
         />,
       );
 
-      const chevrons = getAllByTestId('icon-chevron-right');
-      expect(chevrons.length).toBe(1); // Only Shopping folder has chevron
+      const folderBadges = getAllByTestId('icon-folder-outline');
+      expect(folderBadges.length).toBe(1); // Only Shopping folder has badge
     });
 
     it('calls onNavigateIntoFolder when folder is pressed', () => {
