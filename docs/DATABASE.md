@@ -15,7 +15,7 @@ Penny uses **SQLite** as its local database with **Drizzle ORM** for type-safe s
 
 ## Database Schema
 
-The database consists of five main tables:
+The database consists of seven main tables:
 
 ### 1. app_metadata
 
@@ -114,6 +114,46 @@ Budget tracking for categories:
 ```
 
 **Indexes**: `category_id`, `period_type`, `start_date`+`end_date`, `currency`, `is_recurring`
+
+### 6. planned_operations
+
+Templates for recurring or one-time planned expenses/income/transfers:
+
+```javascript
+{
+  id: TEXT PRIMARY KEY,
+  name: TEXT NOT NULL,
+  type: TEXT NOT NULL,  // 'expense', 'income', or 'transfer'
+  amount: TEXT NOT NULL,
+  account_id: INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  category_id: TEXT REFERENCES categories(id) ON DELETE SET NULL,
+  to_account_id: INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
+  description: TEXT,
+  is_recurring: INTEGER NOT NULL DEFAULT 1,
+  last_executed_month: TEXT,  // ISO date string, tracks when last auto-applied
+  display_order: INTEGER,
+  created_at: TEXT NOT NULL,
+  updated_at: TEXT NOT NULL
+}
+```
+
+**Indexes**: `account_id`, `type`, `is_recurring`
+
+### 7. accounts_balance_history
+
+Tracks daily end-of-day balances per account for the balance history graph:
+
+```javascript
+{
+  id: INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id: INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  date: TEXT NOT NULL,     // ISO date string (YYYY-MM-DD)
+  balance: TEXT NOT NULL,  // String for precision
+  created_at: TEXT NOT NULL
+}
+```
+
+**Indexes**: `(account_id, date)` composite (unique), `date`
 
 ## Design Principles
 

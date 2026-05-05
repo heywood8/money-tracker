@@ -20,7 +20,7 @@ app/
 
 ## Directory Details
 
-### contexts/ (7 files)
+### contexts/ (19 files)
 
 **Purpose:** React Context providers for global state management
 
@@ -30,13 +30,19 @@ app/
 - State management for cross-cutting concerns
 
 **Files:**
-- `AccountsContext.js` - Financial accounts state
+- `AccountsContext.js` / `AccountsDataContext.js` / `AccountsActionsContext.js` - Financial accounts state (split for performance)
+- `OperationsContext.js` / `OperationsDataContext.js` / `OperationsActionsContext.js` - Financial operations state (split)
+- `ThemeContext.js` / `ThemeColorsContext.js` / `ThemeConfigContext.js` - Theme state (split)
 - `BudgetsContext.js` - Budget management state
 - `CategoriesContext.js` - Transaction categories state
 - `DialogContext.js` - Global dialog/alert management
 - `LocalizationContext.js` - i18n and language state
-- `OperationsContext.js` - Financial operations/transactions state
-- `ThemeContext.js` - Theme (light/dark/system) state
+- `PlannedOperationsContext.js` - Planned/recurring operations state
+- `SearchContext.js` - Search and filter state for operations
+- `DisplaySettingsContext.js` - UI preferences (e.g., hide balances)
+- `AppBlurContext.js` - Blur overlay state for security
+- `ImportProgressContext.js` - Import progress tracking
+- `UpdateDownloadContext.js` - App update download state
 
 **Guidelines:**
 - Each context should export a Provider component and a custom hook (e.g., `useAccounts`)
@@ -46,7 +52,7 @@ app/
 
 ---
 
-### screens/ (6 files)
+### screens/ (7 files)
 
 **Purpose:** Full-screen components that represent main navigation destinations
 
@@ -62,6 +68,7 @@ app/
 - `GraphsScreen.js` - Financial visualizations/charts screen
 - `LanguageSelectionScreen.js` - Language selection during onboarding
 - `OperationsScreen.js` - Financial operations/transactions screen
+- `PlannedOperationsScreen.js` - Planned/recurring operations screen
 
 **Guidelines:**
 - One file per screen
@@ -71,7 +78,7 @@ app/
 
 ---
 
-### modals/ (4 files)
+### modals/ (6 files)
 
 **Purpose:** Modal dialog components for data entry and editing
 
@@ -83,7 +90,9 @@ app/
 **Files:**
 - `BudgetModal.js` - Add/edit budget modal
 - `CategoryModal.js` - Add/edit category modal
+- `ImportProgressModal.js` - Import progress display modal
 - `OperationModal.js` - Add/edit financial operation modal
+- `PlannedOperationModal.js` - Add/edit planned/recurring operation modal
 - `SettingsModal.js` - App settings modal (theme, language, backup/restore)
 
 **Guidelines:**
@@ -118,7 +127,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ---
 
-### components/ (7 files)
+### components/ (15 root files + subdirectories)
 
 **Purpose:** Reusable UI components used across the app
 
@@ -128,14 +137,29 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - Generic form components
 - Presentational components
 
-**Files:**
+**Root files:**
+- `AddFAB.js` - Floating action button for adding items
 - `BudgetProgressBar.js` - Budget progress visualization
 - `Calculator.js` - Calculator widget for amount entry
+- `DescriptionAutocomplete.js` - Autocomplete for operation descriptions
+- `EmptyState.js` - Empty list placeholder
 - `ErrorBoundary.js` - React error boundary wrapper
-- `Header.js` - Top header with settings icon
+- `FormInput.js` - Styled form input component
+- `Header.js` - Top header with settings and search integration
 - `IconPicker.js` - Icon selection component
+- `ListCard.js` - Card wrapper for list items
+- `LoadingView.js` - Loading spinner/placeholder
 - `MaterialDialog.js` - Material Design dialog/alert component
+- `ModalBlurOverlay.js` - Blur overlay for modals
+- `ModalHeader.js` - Consistent modal header
 - `SimplePicker.js` - Custom picker component
+
+**Subdirectories:**
+- `accounts/` - Account-specific components
+- `graphs/` - Chart and visualization components
+- `modals/` - Shared modal sub-components
+- `operations/` - Operation list, form, and picker components
+- `search/` - Search bar, filters, and overlay components
 
 **Guidelines:**
 - Components should be pure/presentational when possible
@@ -146,7 +170,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ---
 
-### hooks/ (1 file)
+### hooks/ (10 files)
 
 **Purpose:** Custom React hooks that don't belong to a specific context
 
@@ -156,7 +180,16 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - Side-effect management hooks
 
 **Files:**
+- `useBalanceHistory.js` - Balance history data for graphs
+- `useCategoryMonthlySpending.js` - Monthly spending per category
+- `useExpenseData.js` - Expense summary data for graphs
+- `useIncomeData.js` - Income summary data for graphs
+- `useLogEntries.js` - App log entries for developer tools
 - `useMaterialTheme.js` - Bridges ThemeContext with React Native Paper theme
+- `useMultiCurrencyTransfer.js` - Multi-currency transfer logic
+- `useOperationForm.js` - Operation form state and validation
+- `useOperationPicker.js` - Picker state for operation form
+- `useQuickAddForm.js` - Quick-add form state management
 
 **Guidelines:**
 - Hooks should be pure functions
@@ -166,7 +199,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ---
 
-### services/ (10 files)
+### services/ (17 files)
 
 **Purpose:** Business logic and data access layer
 
@@ -181,14 +214,24 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 **Database Services:**
 - `AccountsDB.js` - Account database operations
+- `BalanceHistoryDB.js` - Balance history database operations
 - `BudgetsDB.js` - Budget database operations
 - `CategoriesDB.js` - Category database operations
 - `OperationsDB.js` - Operation database operations
+- `PlannedOperationsDB.js` - Planned operations database operations
+- `PreferencesDB.js` - App preferences stored in SQLite
 - `db.js` - SQLite database wrapper
 
+**Feature Services:**
+- `AppUpdateService.js` - GitHub release checking and APK download
+- `BackupRestore.js` - Backup and restore (JSON, CSV, SQLite)
+- `DailyBackupService.js` - Automatic daily/weekly backup management
+- `GoogleSheetsService.js` - Google Sheets export via native sign-in
+- `LogService.js` - App logging service
+- `LogsFile.js` - Log file persistence
+
 **Utility Services:**
-- `BackupRestore.js` - Backup and restore functionality
-- `currency.js` - Currency formatting and calculations
+- `currency.js` - Currency formatting and calculations (decimal.js)
 - `eventEmitter.js` - Event system for cross-component communication
 - `LastAccount.js` - Tracks last accessed account
 
@@ -223,7 +266,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ---
 
-### defaults/ (2 files)
+### defaults/ (3 files)
 
 **Purpose:** Default/seed data for initial app setup
 
@@ -235,6 +278,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 **Files:**
 - `defaultAccounts.js` - Default account seed data
 - `defaultCategories.json` - Default category definitions
+- `defaultOperations.js` - Default operation seed data
 
 **Guidelines:**
 - Use JSON for static data
@@ -244,7 +288,7 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 
 ---
 
-### utils/ (1 file)
+### utils/ (4 files)
 
 **Purpose:** Utility functions and helpers
 
@@ -254,6 +298,9 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - Pure functions for common tasks
 
 **Files:**
+- `calculatorUtils.js` - Calculator logic utilities
+- `categoryUtils.js` - Category tree/hierarchy helpers
+- `emergencyReset.js` - Emergency full data wipe utility
 - `resetDatabase.js` - Database reset utility
 
 **Guidelines:**
@@ -373,6 +420,5 @@ This folder structure was created in December 2024 to improve code organization.
 - ✅ Deleted 2 legacy files
 - ✅ Updated 100+ import statements
 - ✅ Preserved git history using `git mv`
-- ✅ All tests pass (184 tests)
 
 For the complete refactoring details, see the git history starting from commit `78fd845`.

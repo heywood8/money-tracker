@@ -20,7 +20,7 @@ Welcome to Penny, a personal finance tracking application built with your privac
 - **Local-First Design**: All your financial data is stored locally on your device, not on our servers
 - **No Personal Information Required**: Penny doesn't require or collect names, emails, phone numbers, or any personally identifiable information
 - **You Control Your Data**: Export, backup, and delete your data at any time
-- **Minimal External Services**: We use only essential services (error reporting and app updates) with privacy protections
+- **Minimal External Services**: We use only essential services (app updates and optional Google Sheets export) with privacy protections
 
 ---
 
@@ -36,42 +36,52 @@ Penny stores the following financial information **locally on your device only**
 - **Budgets**: Budget amounts, currencies, time periods, and rollover settings
 - **Balance History**: Historical account balance snapshots for tracking trends
 - **App Preferences**: Theme selection (light/dark/system), language preference (English, Italian, Russian, Spanish, French, Chinese, German, Armenian), and display settings
+- **Planned Operations**: Templates for recurring or one-time planned transactions
 
-**Important**: This data is stored in a SQLite database (`penny.db`) in your app's private storage directory. No other apps can access this data, and it never leaves your device except in two specific circumstances described below (error reporting and manual backups).
+**Important**: This data is stored in a SQLite database (`penny.db`) in your app's private storage directory. No other apps can access this data, and it never leaves your device except in two specific circumstances: app update checks (no financial data transmitted) and optional Google Sheets export (only when you explicitly trigger it).
 
 ### 2.2 Technical Data (Collected by Third Parties)
 
-#### Sentry Error Reporting
+#### Expo Over-the-Air Updates
 
-To improve app stability and fix crashes, Penny uses Sentry (sentry.io) for error tracking. When the app experiences an error or crash, Sentry may collect:
+Penny uses Expo's update service to deliver minor bug fixes and improvements without requiring a full app reinstall. This service collects:
 
-- **Error Information**: Error messages, stack traces, and code execution logs
-- **Device Information**: Device model, operating system version, app version
-- **Session Data**: Timestamp of the error, app state at time of crash
-- **Session Replays**: Visual recordings of 10% of app sessions and 100% of sessions with errors (anonymized)
-
-**Privacy Configuration**: We have configured Sentry with `sendDefaultPii: false` to prevent transmission of personally identifiable information. Financial data (account balances, transaction amounts, descriptions) is **not included** in error reports.
-
-**Data Location**: Sentry stores data on servers in Germany (EU data residency).
-
-**Sentry's Privacy Policy**: [https://sentry.io/privacy/](https://sentry.io/privacy/)
-
-#### Expo Updates
-
-Penny uses Expo's over-the-air update service to deliver bug fixes and feature improvements without requiring a full app store update. This service collects:
-
-- **Update Requests**: App version, platform (Android), device type
+- **Update Requests**: App version, platform (Android), device type, runtime version
 - **Update Success/Failure**: Whether updates were successfully applied
 
 No personal information or financial data is transmitted during update checks.
 
 **Expo's Privacy Policy**: [https://expo.dev/privacy](https://expo.dev/privacy)
 
+#### GitHub Releases API (App Update Checks)
+
+When checking for new major app versions, Penny contacts the GitHub public API (`api.github.com`) to compare your current version against the latest release. This transmits:
+
+- **App version**: Current version string (e.g., `Penny/0.86.2`)
+- **Request metadata**: Standard HTTP headers (no personal or financial data)
+
+No financial data is transmitted. GitHub's API is public and unauthenticated.
+
+**GitHub's Privacy Policy**: [https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
+
+#### Google Sheets Export (Optional)
+
+Penny offers an optional feature to export your financial data directly to a Google Sheets spreadsheet. This feature:
+
+- **Requires Google Sign-In**: Uses your Google account via `@react-native-google-signin/google-signin`
+- **Sends financial data to Google**: When you trigger an export, your transaction and account data is transmitted to Google's Sheets API and stored in your Google Drive
+- **Is entirely opt-in**: The feature only activates when you explicitly initiate an export from Settings
+- **Uses your own Google account**: Data goes to a spreadsheet in your Google Drive, not to our servers
+
+**Important**: Once exported to Google Sheets, your financial data is subject to Google's privacy policy and storage practices, not ours.
+
+**Google's Privacy Policy**: [https://policies.google.com/privacy](https://policies.google.com/privacy)
+
 ### 2.3 Information We Do NOT Collect
 
 Penny does **not** collect, store, or have access to:
 
-- Personal names, email addresses, or phone numbers
+- Personal names, email addresses, or phone numbers (Google Sign-In credentials are used only to authorize the Sheets export and are not stored by us)
 - Location data or GPS coordinates
 - Contact lists or address books
 - Banking credentials or account login information
@@ -80,6 +90,7 @@ Penny does **not** collect, store, or have access to:
 - Social media profiles or connections
 - Browsing history or activity outside the app
 - Device identifiers for advertising purposes
+- Crash logs, error reports, or usage analytics (Penny has no crash reporting service)
 
 ---
 
@@ -90,20 +101,22 @@ Penny does **not** collect, store, or have access to:
 - Used to generate graphs, statistics, and financial insights displayed within the app
 - Remains on your device and under your complete control
 
-### Error Data (Sentry):
-- Used solely to identify and fix bugs, crashes, and performance issues
-- Helps us improve app stability and user experience
-- Reviewed by our development team only when investigating specific issues
+### Google Sheets Export Data:
+- Transmitted to Google's Sheets API only when you explicitly initiate an export
+- Written to a spreadsheet in your own Google Drive account
+- We have no access to or copies of this exported data
 
-### Update Data (Expo):
+### Update Data (Expo OTA + GitHub API):
 - Used solely to deliver app updates and security patches
 - Ensures you have the latest bug fixes and features
+- No personal or financial data is included in update requests
 
 ### We do NOT:
 - Sell, rent, or share your data with advertisers, marketers, or data brokers
 - Use your financial data for any purpose other than providing app functionality
 - Track your behavior for analytics or advertising purposes
 - Profile users or create marketing segments
+- Collect crash reports, error logs, or usage analytics
 
 ---
 
@@ -145,17 +158,19 @@ Penny allows you to manually export your data in three formats:
 
 ### Third-Party Services:
 
-Penny integrates with only two third-party services:
+Penny integrates with three third-party services:
 
-1. **Sentry (Error Tracking)**: As described in Section 2.2, error reports and crash logs are sent to Sentry (Germany-based servers) for debugging purposes only.
+1. **Expo OTA Updates**: Minor update checks sent to Expo's servers. No personal or financial data transmitted.
 
-2. **Expo Updates**: Update checks are sent to Expo's servers to deliver over-the-air updates.
+2. **GitHub Releases API**: Version checks sent to `api.github.com` to detect new APK releases. Only app version string transmitted; no personal or financial data.
+
+3. **Google Sheets API (optional)**: When you use the Google Sheets export feature, your financial data is sent to Google's API and stored in your Google Drive. This is entirely opt-in and only happens when you explicitly trigger it.
 
 ### No Data Sharing:
 - We do **not** share, sell, rent, or trade your data with any third parties
-- We do **not** use analytics services (no Google Analytics, Firebase Analytics, Facebook SDK, etc.)
+- We do **not** use analytics or crash reporting services (no Sentry, no Firebase, no Google Analytics, etc.)
 - We do **not** integrate with advertising networks
-- We do **not** send your financial data to any servers (ours or third-party)
+- We do **not** send your financial data to our own servers
 
 ### Legal Requirements:
 - Because we don't collect or store your personal data on our servers, we have no data to provide to authorities even if legally required
@@ -180,9 +195,9 @@ You have complete control over your data in Penny:
 
 **Portability**: Exported data can be imported into other financial apps or analyzed with spreadsheet software.
 
-**Sentry Data Deletion**: If you'd like error data associated with your device removed from Sentry, contact us at lopatinikita+pennyapp@gmail.com with your request.
+**Google Sheets Data**: If you've exported data to Google Sheets and want it removed, delete the spreadsheet directly from your Google Drive. We have no access to or copies of that data.
 
-**No Account Required**: Penny doesn't use accounts, logins, or cloud sync, so there's no account to delete or profile to manage.
+**No Account Required**: Penny doesn't use its own accounts, logins, or cloud sync, so there's no account to delete or profile to manage. Google Sign-In is used only to authorize the optional Sheets export.
 
 ---
 
@@ -190,9 +205,11 @@ You have complete control over your data in Penny:
 
 **Local Data**: Penny retains all financial data on your device indefinitely until you delete it or uninstall the app. You control retention periods.
 
-**Sentry Error Data**: Sentry retains error reports for 90 days by default, after which they are automatically deleted.
+**Expo Update Data**: Expo retains update request logs for operational purposes (typically 30-90 days). No personal or financial data is included.
 
-**Expo Update Data**: Expo retains update request logs for operational purposes (typically 30-90 days).
+**GitHub API Data**: GitHub may log API requests (app version, IP address) per their standard server logging practices.
+
+**Google Sheets Data**: If you use the Sheets export feature, data is retained in your Google Drive until you delete it. Subject to Google's data retention policies.
 
 ---
 
@@ -207,7 +224,7 @@ Because Penny:
 
 We have no way to determine if users are under 13. Parents and guardians should supervise children's use of financial apps and ensure device-level parental controls are enabled.
 
-If you believe a child under 13 has used Penny and you'd like error data removed from Sentry, please contact us at lopatinikita+pennyapp@gmail.com.
+If you have concerns about a child under 13 using Penny, please contact us at lopatinikita+pennyapp@gmail.com.
 
 ---
 
@@ -215,9 +232,11 @@ If you believe a child under 13 has used Penny and you'd like error data removed
 
 **Your Financial Data**: Never leaves your device, so no international transfers occur.
 
-**Sentry Data (Error Reports)**: If you're located outside the European Union, error data sent to Sentry (hosted in Germany, EU) constitutes an international data transfer. Sentry complies with GDPR and provides appropriate safeguards for EU data protection standards.
+**Expo OTA Updates**: Expo's update service may involve data transfers across borders depending on your location. Only technical update metadata is transmitted (no personal or financial data).
 
-**Expo Updates**: Expo's update service may involve data transfers across borders depending on your location. Only technical update metadata is transmitted (no personal or financial data).
+**GitHub API**: Update version checks contact GitHub's US-based servers. Only app version metadata is transmitted.
+
+**Google Sheets Export (if used)**: Your financial data is transmitted to Google's servers, which may be located in multiple countries depending on your Google account settings. Subject to Google's data transfer policies and GDPR compliance measures.
 
 ---
 
@@ -226,19 +245,19 @@ If you believe a child under 13 has used Penny and you'd like error data removed
 Penny requires the following Android permissions:
 
 **INTERNET**:
-- **Purpose**: Send error reports to Sentry and check for app updates via Expo
-- **Data Transmitted**: Error logs (crashes, bugs) and update check requests only
-- **NOT used for**: Uploading financial data, analytics, advertising, or tracking
+- **Purpose**: Check for app updates (Expo OTA + GitHub Releases API) and enable optional Google Sheets export
+- **Data Transmitted**: App version metadata for update checks; your financial data only if you explicitly trigger a Google Sheets export
+- **NOT used for**: Uploading financial data without your action, analytics, advertising, or tracking
 
-**READ_EXTERNAL_STORAGE**:
-- **Purpose**: Import backup files you've previously exported
-- **Access**: Only files you explicitly select via the file picker
-- **NOT used for**: Scanning your files, reading photos, or accessing unrelated documents
+**REQUEST_INSTALL_PACKAGES**:
+- **Purpose**: Install APK update files that you download through the in-app update prompt
+- **When used**: Only when you confirm an update download and choose to install it
+- **NOT used for**: Installing any software without your explicit confirmation
 
-**WRITE_EXTERNAL_STORAGE**:
-- **Purpose**: Export backup files (JSON, CSV, SQLite) to your device storage
-- **Access**: Only writes backup files you request
-- **NOT used for**: Writing data without your knowledge
+**File access (via Expo document picker)**:
+- Penny uses Expo's file system APIs to read backup files you select for import and write backup files you request to export
+- This does not require legacy `READ_EXTERNAL_STORAGE` or `WRITE_EXTERNAL_STORAGE` permissions on modern Android versions
+- Access is limited to files you explicitly select or locations you choose
 
 All permissions are used only for their stated purposes and not for tracking, advertising, or data collection.
 
@@ -304,7 +323,6 @@ If you have questions, concerns, or requests regarding this Privacy Policy or Pe
 
 ### Requests We Can Help With:
 - Questions about data handling practices
-- Requests to delete Sentry error data
 - Bug reports or security concerns
 - Privacy policy clarifications
 
@@ -324,20 +342,22 @@ This section summarizes how Penny's data practices align with Google Play Store'
 - ❌ No location data
 - ❌ No photos, videos, or audio
 - ❌ No contacts or calendar data
-- ✅ Crash logs (via Sentry, no PII, optional)
-- ✅ App performance data (via Sentry, anonymized)
+- ❌ No crash logs or error reports (Penny has no crash reporting service)
+- ✅ Financial data — stored locally on device only, never collected by us
+- ✅ Google account used for optional Sheets export (not stored by us)
 
 ### Data Usage:
-- **App functionality**: Financial data stored locally
-- **App analytics**: Error tracking only (Sentry)
+- **App functionality**: All financial data stored locally on device
+- **Optional export**: Financial data sent to Google Sheets only when you explicitly trigger it
+- **No analytics or crash reporting**
 - **No advertising**
-- **No data shared with third parties** except Sentry (error logs only)
+- **No data shared with third parties** except Google (only if you use the Sheets export feature)
 
 ### Data Security:
-- Data encrypted in transit (HTTPS for Sentry/Expo)
+- Data encrypted in transit (HTTPS for Expo/GitHub/Google APIs)
 - Local data stored in Android app sandbox
 - No cloud sync or backup to our servers
-- You can request data deletion (Sentry error logs)
+- Google Sheets export data can be deleted by removing the spreadsheet from your Drive
 
 ---
 

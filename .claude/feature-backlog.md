@@ -69,38 +69,36 @@ This document contains potential features for the Penny app. Use the architect a
 ## Low Priority Features
 
 ### 10. Recurring Transactions
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Automate regular expenses and income (salary, rent, subscriptions, etc.).
 **User Value**: Saves time by automatically creating expected transactions.
-**Command**: Use architect agent to design recurring transactions feature
+**Implementation**: PlannedOperationsScreen with PlannedOperationModal; planned ops marked with isRecurring flag, executed monthly via lastExecutedMonth tracking.
 
 ### 11. Reports and Analytics
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Provide insights into spending patterns, trends over time, and financial summaries.
 **User Value**: Helps users understand their financial behavior and make better decisions.
-**Command**: Use architect agent to design reports and analytics feature
+**Implementation**: GraphsScreen with expense/income pie charts, category spending card, spending prediction card, and balance history chart with account picker.
 
 ### 12. Split Transactions
-**Status**: Not Started
+**Status**: ✅ Completed
 **Description**: Enable dividing a single transaction across multiple categories.
 **User Value**: More accurate categorization (e.g., grocery shopping with household items).
-**Command**: Use architect agent to design split transactions feature
+**Implementation**: SplitOperationModal in components/operations/; accessible from OperationModal.
 
 ### 13. Live Exchange Rates
-**Status**: Not Started
+**Status**: ✅ Completed
 **Priority**: Low
-**Description**: Integrate live exchange rate API (e.g., https://github.com/fawazahmed0/exchange-api) to fetch real-time currency conversion rates and update offline rates periodically.
+**Description**: Integrate live exchange rate API to fetch real-time currency conversion rates with offline rates as fallback.
 **User Value**: More accurate currency conversions for international transactions.
-**Technical Notes**: Should maintain offline rates as fallback when API is unavailable.
-**Command**: Use architect agent to design live exchange rates feature
+**Implementation**: `currency.js` fetches live rates with offline fallback; `useMultiCurrencyTransfer` hook integrates rate source tracking. (#288)
 
 ### 14. Transfer Screen UX Redesign
-**Status**: Not Started
+**Status**: ✅ Completed
 **Priority**: Low
-**Description**: Redesign the "add new transfer" screen to improve user experience with multi-currency transfers, making exchange rate and destination amount calculations more intuitive and visually clear.
+**Description**: Redesign the transfer form to improve UX for multi-currency transfers with clearer layout and bidirectional editing.
 **User Value**: Easier and more intuitive transfer creation, especially for multi-currency scenarios.
-**Considerations**: Clear visual feedback for bidirectional editing, better layout for currency-specific fields, inline validation.
-**Command**: Use architect agent to design transfer screen UX improvements
+**Implementation**: Category/to-account and date pickers shown side-by-side; bidirectional exchange rate and destination amount editing in OperationModal. (#348, #356)
 
 ## Future Considerations
 
