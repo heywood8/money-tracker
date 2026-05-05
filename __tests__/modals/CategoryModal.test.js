@@ -601,8 +601,8 @@ describe('CategoryModal', () => {
   });
 
   describe('Picker Modal Interactions', () => {
-    it('opens type picker modal when type button is pressed', async () => {
-      const { queryByText, queryAllByText } = render(
+    it('opens type picker panel when type button is pressed', async () => {
+      const { queryByTestId, queryAllByText } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -612,14 +612,14 @@ describe('CategoryModal', () => {
         fireEvent.press(folderTexts[0]);
       }
 
-      // Type picker modal should show close button
+      // Type picker panel should show back button
       await waitFor(() => {
-        expect(queryByText('close')).toBeTruthy();
+        expect(queryByTestId('picker-back-button')).toBeTruthy();
       });
     });
 
-    it('opens category type picker modal when category type button is pressed', async () => {
-      const { queryByText, queryAllByText } = render(
+    it('opens category type picker panel when category type button is pressed', async () => {
+      const { queryByTestId, queryAllByText } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -629,14 +629,14 @@ describe('CategoryModal', () => {
         fireEvent.press(expenseTexts[0]);
       }
 
-      // Category type picker modal should show close button
+      // Category type picker panel should show back button
       await waitFor(() => {
-        expect(queryByText('close')).toBeTruthy();
+        expect(queryByTestId('picker-back-button')).toBeTruthy();
       });
     });
 
-    it('opens parent picker modal when parent button is pressed', async () => {
-      const { queryByText, queryAllByText } = render(
+    it('opens parent picker panel when parent button is pressed', async () => {
+      const { queryByTestId, queryAllByText } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -646,9 +646,9 @@ describe('CategoryModal', () => {
         fireEvent.press(noneTexts[0]);
       }
 
-      // Parent picker modal should show close button
+      // Parent picker panel should show back button
       await waitFor(() => {
-        expect(queryByText('close')).toBeTruthy();
+        expect(queryByTestId('picker-back-button')).toBeTruthy();
       });
     });
 
@@ -729,8 +729,8 @@ describe('CategoryModal', () => {
       });
     });
 
-    it('closes type picker via close button', async () => {
-      const { queryAllByText, queryByText } = render(
+    it('closes type picker via back button', async () => {
+      const { queryAllByText, queryByTestId } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -740,17 +740,17 @@ describe('CategoryModal', () => {
         fireEvent.press(folderTexts[0]);
       }
 
-      // Press close button
+      // Press back button
       await waitFor(() => {
-        const closeButton = queryByText('close');
-        if (closeButton) {
-          fireEvent.press(closeButton);
+        const backButton = queryByTestId('picker-back-button');
+        if (backButton) {
+          fireEvent.press(backButton);
         }
       });
     });
 
-    it('closes category type picker via close button', async () => {
-      const { queryAllByText, queryByText } = render(
+    it('closes category type picker via back button', async () => {
+      const { queryAllByText, queryByTestId } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -760,17 +760,17 @@ describe('CategoryModal', () => {
         fireEvent.press(expenseTexts[0]);
       }
 
-      // Press close button
+      // Press back button
       await waitFor(() => {
-        const closeButton = queryByText('close');
-        if (closeButton) {
-          fireEvent.press(closeButton);
+        const backButton = queryByTestId('picker-back-button');
+        if (backButton) {
+          fireEvent.press(backButton);
         }
       });
     });
 
-    it('closes parent picker via close button', async () => {
-      const { queryAllByText, queryByText } = render(
+    it('closes parent picker via back button', async () => {
+      const { queryAllByText, queryByTestId } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -780,11 +780,11 @@ describe('CategoryModal', () => {
         fireEvent.press(noneTexts[0]);
       }
 
-      // Press close button
+      // Press back button
       await waitFor(() => {
-        const closeButton = queryByText('close');
-        if (closeButton) {
-          fireEvent.press(closeButton);
+        const backButton = queryByTestId('picker-back-button');
+        if (backButton) {
+          fireEvent.press(backButton);
         }
       });
     });
