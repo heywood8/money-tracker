@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList, Linking } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, importBackup, restoreBackup } from '../services/BackupRestore';
+import { exportBackup, importBackup, restoreBackup, createBackup } from '../services/BackupRestore';
 import { getStoredBackups } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
@@ -19,6 +19,7 @@ import { checkForAppUpdate } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../services/GoogleSheetsService';
 
 const LOG_LEVEL_COLORS = {
   error: '#e53935',
@@ -44,6 +45,7 @@ export default function SettingsModal({ visible, onClose }) {
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
+  const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -176,6 +178,52 @@ export default function SettingsModal({ visible, onClose }) {
       );
     }
   }, [closeExportFormatModal, t, showDialog, onClose]);
+
+  const handleGoogleSheetsExport = useCallback(async () => {
+    closeExportFormatModal();
+    setGoogleSheetsLoading(true);
+    try {
+      let accessToken;
+      try {
+        accessToken = await getValidAccessToken();
+      } catch (authError) {
+        if (authError.message === 'refresh_failed') {
+          throw authError;
+        }
+        // Not signed in — trigger native sign-in UI
+        accessToken = await googleSignIn();
+      }
+      const backup = await createBackup();
+      const sheetUrl = await exportToSheets(accessToken, backup);
+      setGoogleSheetsLoading(false);
+      showDialog(
+        t('google_sheets') || 'Google Sheets',
+        t('google_sheets_export_success') || 'Exported to Google Sheets',
+        [
+          { text: t('google_sheets_open') || 'Open', onPress: () => Linking.openURL(sheetUrl) },
+          { text: t('ok') || 'OK' },
+        ],
+      );
+    } catch (error) {
+      setGoogleSheetsLoading(false);
+      if (error.message === 'sign_in_cancelled') {
+        return; // User dismissed — no error dialog
+      }
+      let dialogMsg;
+      if (error.message === 'refresh_failed') {
+        dialogMsg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
+      } else if (error.message === 'auth_failed') {
+        dialogMsg = t('google_sheets_signin_failed') || 'Google sign-in failed. Please try again.';
+      } else if (error.message === 'quota_exceeded') {
+        dialogMsg = t('google_sheets_quota_exceeded') || 'Google Sheets quota exceeded. Try again later.';
+      } else if (error.message === 'Network request failed') {
+        dialogMsg = t('google_sheets_no_network') || 'Export failed: no internet connection.';
+      } else {
+        dialogMsg = t('google_sheets_export_failed') || 'Export failed. Please try again.';
+      }
+      showDialog(t('error') || 'Error', dialogMsg, [{ text: t('ok') || 'OK' }]);
+    }
+  }, [closeExportFormatModal, t, showDialog]);
 
   const handleResetDatabase = () => {
     showDialog(
@@ -796,6 +844,28 @@ export default function SettingsModal({ visible, onClose }) {
                     </Text>
                     <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
                       {t('sqlite_description') || 'Raw database file, complete backup'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            <TouchableRipple
+              onPress={handleGoogleSheetsExport}
+              style={styles.languageItem}
+              disabled={googleSheetsLoading}
+              testID="settings-export-google-sheets"
+            >
+              <View style={styles.languageItemContent}>
+                <View style={styles.formatItemRow}>
+                  <Ionicons name="logo-google" size={24} color={colors.text} />
+                  <View style={styles.formatTextContainer}>
+                    <Text style={[styles.languageItemText, { color: colors.text }]}>
+                      Google Sheets
+                    </Text>
+                    <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                      {t('google_sheets_description') || 'Export to a Google Sheets spreadsheet'}
                     </Text>
                   </View>
                 </View>

@@ -19,6 +19,7 @@ module.exports = {
     packagerOpts: {
       hostType: 'tunnel',
     },
+    scheme: 'com.heywood8.monkeep',
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
@@ -37,6 +38,7 @@ module.exports = {
     platforms: ['android'],
     plugins: [
       'expo-sqlite',
+      '@react-native-google-signin/google-signin',
       [
         'expo-build-properties',
         {

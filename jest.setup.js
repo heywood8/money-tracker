@@ -677,6 +677,54 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
+// Mock expo-auth-session (kept for any non-Google auth usage)
+jest.mock('expo-auth-session', () => ({
+  useAutoDiscovery: jest.fn(() => ({
+    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  })),
+  useAuthRequest: jest.fn(() => [
+    { codeVerifier: 'test-verifier' },
+    { type: 'success', params: { code: 'test-code' } },
+    jest.fn().mockResolvedValue({ type: 'success', params: { code: 'test-code' } }),
+  ]),
+  makeRedirectUri: jest.fn(() => 'com.heywood8.monkeep://'),
+  ResponseType: { Code: 'code' },
+}));
+
+// Mock @react-native-google-signin/google-signin
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn().mockResolvedValue(true),
+    signIn: jest.fn().mockResolvedValue({ type: 'success', data: { user: { email: 'test@example.com', name: 'Test User' } } }),
+    signInSilently: jest.fn().mockResolvedValue({ type: 'success', data: { user: { email: 'test@example.com' } } }),
+    getTokens: jest.fn().mockResolvedValue({ accessToken: 'test-access-token', idToken: 'test-id-token' }),
+    hasPreviousSignIn: jest.fn().mockReturnValue(false),
+    signOut: jest.fn().mockResolvedValue(undefined),
+    revokeAccess: jest.fn().mockResolvedValue(undefined),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+  },
+}));
+
+// Mock expo-web-browser
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(() => ({ type: 'success' })),
+  openBrowserAsync: jest.fn(),
+}));
+
+// Mock expo-secure-store
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+}));
+
 // Suppress console.error and console.warn during tests to reduce noise
 // This prevents expected errors from cluttering test output with red text
 const originalConsoleError = console.error;
