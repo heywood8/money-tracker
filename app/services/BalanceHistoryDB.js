@@ -187,7 +187,7 @@ export const populateCurrentMonthHistory = async (providedDb = null) => {
       error.message.includes('cannot rollback') ||
       error.message.includes('no transaction is active')
     )) {
-      console.log('Skipping balance history population - transaction conflict detected');
+      console.warn('Skipping balance history population - transaction conflict detected');
       return;
     }
     console.error('Failed to populate current month history:', error);

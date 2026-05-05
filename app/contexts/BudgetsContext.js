@@ -68,7 +68,7 @@ export const BudgetsProvider = ({ children }) => {
    */
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, () => {
-      console.log('Operation changed, refreshing budget statuses...');
+      console.debug('Operation changed, refreshing budget statuses...');
       refreshBudgetStatuses();
     });
 
@@ -80,7 +80,7 @@ export const BudgetsProvider = ({ children }) => {
    */
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading all budgets...');
+      console.debug('Reloading all budgets...');
       reloadBudgets();
     });
 

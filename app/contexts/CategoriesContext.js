@@ -80,7 +80,7 @@ export const CategoriesProvider = ({ children }) => {
   // But skip if it's first launch - categories will be initialized after language selection
   useEffect(() => {
     if (!isFirstLaunch) {
-      console.log('Loading categories on mount with language:', language);
+      console.debug('Loading categories on mount with language:', language);
       reloadCategories(language);
     } else {
       console.log('Skipping initial category load - first launch detected');
@@ -91,7 +91,7 @@ export const CategoriesProvider = ({ children }) => {
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading categories due to RELOAD_ALL event with language:', language);
+      console.debug('Reloading categories due to RELOAD_ALL event with language:', language);
       reloadCategories(language);
     });
 

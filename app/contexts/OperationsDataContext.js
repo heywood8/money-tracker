@@ -24,7 +24,7 @@ export const useOperationsData = () => {
 };
 
 export const OperationsDataProvider = ({ children }) => {
-  console.log('[OperationsDataProvider] Component rendered');
+  console.debug('[OperationsDataProvider] Component rendered');
 
   // Dependencies from other contexts
   const { accounts } = useAccountsData();
@@ -57,7 +57,7 @@ export const OperationsDataProvider = ({ children }) => {
 
   // Track searchState changes
   useEffect(() => {
-    console.log('[OperationsDataContext] searchState changed:', searchState);
+    console.debug('[OperationsDataContext] searchState changed:', searchState);
   }, [searchState]);
 
   // Legacy filter state tracking (for backwards compatibility)
@@ -93,10 +93,10 @@ export const OperationsDataProvider = ({ children }) => {
     setSearchState(prev => {
       // Don't update if text hasn't changed (prevents infinite loop)
       if (prev.text === text) {
-        console.log('[OperationsDataContext] setSearchText called but text unchanged, skipping update');
+        console.debug('[OperationsDataContext] setSearchText called but text unchanged, skipping update');
         return prev;
       }
-      console.log('[OperationsDataContext] setSearchText updating from', prev.text, 'to', text);
+      console.debug('[OperationsDataContext] setSearchText updating from', prev.text, 'to', text);
       return { ...prev, text };
     });
   }, []);

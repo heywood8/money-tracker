@@ -236,7 +236,7 @@ describe('Header', () => {
         eventHandler = handler;
       });
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       render(<Header onOpenSettings={mockOnOpenSettings} />);
 

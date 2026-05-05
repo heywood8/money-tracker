@@ -20,14 +20,14 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
-  console.log('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
+  console.debug('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
   const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters } = useSearch();
-  console.log('[Header] openSearch exists:', !!openSearch);
-  console.log('[Header] searchMode:', searchMode);
+  console.debug('[Header] openSearch exists:', !!openSearch);
+  console.debug('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
@@ -67,7 +67,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
     // Listen for import completion to refresh DB version
     const handleImportProgress = (event) => {
       if (event.stepId === 'complete' && event.status === 'completed') {
-        console.log('Import completed, refreshing DB version...');
+        console.debug('Import completed, refreshing DB version...');
         fetchDbVersion();
       }
     };
@@ -147,7 +147,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                   <View style={styles.searchButtonContainer}>
                     <TouchableOpacity
                       onPress={() => {
-                        console.log('[Header] Search button pressed, mode:', searchMode);
+                        console.debug('[Header] Search button pressed, mode:', searchMode);
                         if (searchMode === 'collapsed') {
                           // Reopen with smart logic
                           const hasTextOnly = (searchState?.text !== '') &&
@@ -159,7 +159,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                           const hasOtherFilters = !hasTextOnly && hasActiveSearch;
 
                           reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
-                            console.log('[Header] Should expand filters:', shouldExpand);
+                            console.debug('[Header] Should expand filters:', shouldExpand);
                             // This callback will be handled by SearchOverlay in task 10
                           });
                         } else {

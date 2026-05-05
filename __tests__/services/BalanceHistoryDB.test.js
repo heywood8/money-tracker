@@ -377,7 +377,7 @@ describe('BalanceHistoryDB', () => {
     });
 
     it('handles transaction conflict errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       executeTransaction.mockRejectedValue(new Error('transaction within a transaction'));
 
       await expect(BalanceHistoryDB.populateCurrentMonthHistory()).resolves.toBeUndefined();
@@ -387,7 +387,7 @@ describe('BalanceHistoryDB', () => {
     });
 
     it('handles cannot rollback errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       executeTransaction.mockRejectedValue(new Error('cannot rollback'));
 
       await expect(BalanceHistoryDB.populateCurrentMonthHistory()).resolves.toBeUndefined();
@@ -397,7 +397,7 @@ describe('BalanceHistoryDB', () => {
     });
 
     it('handles no transaction is active errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       executeTransaction.mockRejectedValue(new Error('no transaction is active'));
 
       await expect(BalanceHistoryDB.populateCurrentMonthHistory()).resolves.toBeUndefined();
