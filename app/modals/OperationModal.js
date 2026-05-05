@@ -11,8 +11,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -312,37 +312,39 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         </Pressable>
       );
     } else if (pickerState.type === 'category') {
-      // Determine if this is a folder or entry
       const isFolder = item.type === 'folder';
+      const isSelected = !isFolder && values.categoryId === item.id;
+      const name = item.nameKey ? t(item.nameKey) : item.name;
 
       return (
         <Pressable
           onPress={() => {
             if (isFolder) {
-              // Navigate into folder
               navigateIntoFolder(item);
             } else {
               handleCategorySelect(item);
             }
           }}
           style={({ pressed }) => [
-            styles.pickerOption,
-            { borderColor: colors.border },
+            styles.gridCell,
+            { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
             pressed && { backgroundColor: colors.selected },
           ]}
         >
-          <View style={styles.categoryOption}>
-            <Icon name={item.icon} size={24} color={colors.text} />
-            <Text style={[styles.pickerOptionText, styles.categoryLabel, { color: colors.text }]}>
-              {item.nameKey ? t(item.nameKey) : item.name}
-            </Text>
-            {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
-          </View>
+          <Icon name={item.icon} size={24} color={colors.text} />
+          <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
+            {name}
+          </Text>
+          {isFolder && (
+            <View style={styles.folderBadge}>
+              <Icon name="folder-outline" size={12} color={colors.mutedText} />
+            </View>
+          )}
         </Pressable>
       );
     }
     return null;
-  }, [pickerState.type, colors, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
+  }, [pickerState.type, colors, values, handleAccountSelect, handleToAccountSelect, handleCategorySelect, navigateIntoFolder, t]);
 
   const TYPES = [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },
@@ -359,208 +361,204 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         transparent={true}
         onRequestClose={handleClose}
       >
-        <SafeAreaView style={styles.fullFlex} edges={['top', 'bottom']}>
-          <KeyboardAvoidingView
-            behavior="padding"
-            style={styles.fullFlex}
-          >
-            <Pressable style={styles.modalOverlay} onPress={handleClose}>
-              <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
-                <ScrollView
-                  ref={scrollViewRef}
-                  style={styles.scrollView}
-                  contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {isNew && <ModalHeader title={t('add_operation')} />}
+        <KeyboardAvoidingView behavior="padding" style={styles.fullFlex}>
+          <Pressable style={styles.modalOverlay} onPress={handleClose}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={handleStopPropagation}>
+              <View style={[styles.sheetDragHandle, { backgroundColor: colors.border }]} />
+              <ScrollView
+                ref={scrollViewRef}
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {isNew && <ModalHeader title={t('add_operation')} />}
 
-                  {/* Shared Form Fields: Type selector, Amount, Account(s), Category, Multi-currency */}
-                  <OperationFormFields
-                    colors={colors}
-                    t={t}
-                    values={values}
-                    setValues={setValues}
-                    accounts={accounts}
-                    categories={filteredCategories}
-                    getAccountName={getAccountName}
-                    getAccountBalance={getAccountBalance}
-                    getCategoryName={getCategoryName}
-                    openPicker={openPicker}
-                    onAmountChange={handleAmountChange}
-                    TYPES={TYPES}
-                    showTypeSelector={true}
-                    showAccountBalance={true}
-                    showFieldIcons={true}
-                    hideCategoryPicker={!isNew}
-                    hideTransferTargetPicker={true}
-                    transferLayout="sideBySide"
-                    disabled={isShadowOperation}
-                    containerBackground={colors.card}
-                    onExchangeRateChange={handleExchangeRateChange}
-                    onDestinationAmountChange={handleDestinationAmountChange}
-                    rateSource={rateSource}
-                  />
+                {/* Shared Form Fields: Type selector, Amount, Account(s), Category, Multi-currency */}
+                <OperationFormFields
+                  colors={colors}
+                  t={t}
+                  values={values}
+                  setValues={setValues}
+                  accounts={accounts}
+                  categories={filteredCategories}
+                  getAccountName={getAccountName}
+                  getAccountBalance={getAccountBalance}
+                  getCategoryName={getCategoryName}
+                  openPicker={openPicker}
+                  onAmountChange={handleAmountChange}
+                  TYPES={TYPES}
+                  showTypeSelector={true}
+                  showAccountBalance={true}
+                  showFieldIcons={true}
+                  hideCategoryPicker={!isNew}
+                  hideTransferTargetPicker={true}
+                  transferLayout="sideBySide"
+                  disabled={isShadowOperation}
+                  containerBackground={colors.card}
+                  onExchangeRateChange={handleExchangeRateChange}
+                  onDestinationAmountChange={handleDestinationAmountChange}
+                  rateSource={rateSource}
+                />
 
-                  {/* Date + Category (or To Account for transfer) row */}
-                  <View style={styles.categoryDateRow}>
-                    {values.type === 'transfer' ? (
-                      <Pressable
-                        style={[
-                          styles.pickerButtonHalf,
-                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                          isShadowOperation && styles.disabledInput,
-                        ]}
-                        onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
-                        disabled={isShadowOperation}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('to_account')}
-                        testID="to-account-picker"
-                      >
-                        <Icon name="swap-horizontal" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                        <Text
-                          style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {values.toAccountId ? getAccountName(values.toAccountId) : t('to_account')}
-                        </Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={[
-                          styles.pickerButtonHalf,
-                          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                          isShadowOperation && styles.disabledInput,
-                        ]}
-                        onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
-                        disabled={isShadowOperation}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('select_category')}
-                      >
-                        <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                        <Text
-                          style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {getCategoryName(values.categoryId)}
-                        </Text>
-                      </Pressable>
-                    )}
+                {/* Date + Category (or To Account for transfer) row */}
+                <View style={styles.categoryDateRow}>
+                  {values.type === 'transfer' ? (
                     <Pressable
                       style={[
                         styles.pickerButtonHalf,
                         { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                         isShadowOperation && styles.disabledInput,
                       ]}
-                      onPress={handleOpenDatePicker}
+                      onPress={() => !isShadowOperation && openPicker('toAccount', accounts.filter(acc => acc.id !== values.accountId))}
                       disabled={isShadowOperation}
                       accessibilityRole="button"
-                      accessibilityLabel={t('select_date')}
-                      testID="date-input"
+                      accessibilityLabel={t('to_account')}
+                      testID="to-account-picker"
                     >
-                      <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
-                      <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
-                        {formatDateForDisplay(values.date)}
+                      <Icon name="swap-horizontal" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      <Text
+                        style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {values.toAccountId ? getAccountName(values.toAccountId) : t('to_account')}
                       </Text>
                     </Pressable>
-                  </View>
-
-                  {/* Description Input with autocomplete suggestions */}
-                  <DescriptionAutocomplete
-                    value={values.description || ''}
-                    onChangeText={handleDescriptionChange}
-                    suggestions={descriptionSuggestions}
-                    placeholder={t('description')}
-                    editable={!isShadowOperation}
-                    colors={colors}
-                    onFocus={handleDescriptionFocus}
-                  />
-
-                  {errors.general && <Text style={styles.error}>{errors.general}</Text>}
-                </ScrollView>
-
-                {/* Action Buttons */}
-                <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
+                  ) : (
+                    <Pressable
+                      style={[
+                        styles.pickerButtonHalf,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                        isShadowOperation && styles.disabledInput,
+                      ]}
+                      onPress={() => !isShadowOperation && openPicker('category', filteredCategories)}
+                      disabled={isShadowOperation}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('select_category')}
+                    >
+                      <Icon name="tag" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                      <Text
+                        style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {getCategoryName(values.categoryId)}
+                      </Text>
+                    </Pressable>
+                  )}
                   <Pressable
-                    style={[styles.modalButton, { backgroundColor: colors.secondary }]}
-                    onPress={handleClose}
+                    style={[
+                      styles.pickerButtonHalf,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      isShadowOperation && styles.disabledInput,
+                    ]}
+                    onPress={handleOpenDatePicker}
+                    disabled={isShadowOperation}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('select_date')}
+                    testID="date-input"
                   >
-                    <Text style={[styles.buttonText, { color: colors.text }]}>
-                      {isShadowOperation ? t('close') : t('cancel')}
+                    <Icon name="calendar" size={20} color={isShadowOperation ? colors.mutedText : colors.text} />
+                    <Text style={[styles.pickerButtonText, { color: isShadowOperation ? colors.mutedText : colors.text }]}>
+                      {formatDateForDisplay(values.date)}
                     </Text>
                   </Pressable>
-                  {!isShadowOperation && (
+                </View>
+
+                {/* Description Input with autocomplete suggestions */}
+                <DescriptionAutocomplete
+                  value={values.description || ''}
+                  onChangeText={handleDescriptionChange}
+                  suggestions={descriptionSuggestions}
+                  placeholder={t('description')}
+                  editable={!isShadowOperation}
+                  colors={colors}
+                  onFocus={handleDescriptionFocus}
+                />
+
+                {errors.general && <Text style={styles.error}>{errors.general}</Text>}
+              </ScrollView>
+
+              {/* Action Buttons */}
+              <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                  onPress={handleClose}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>
+                    {isShadowOperation ? t('close') : t('cancel')}
+                  </Text>
+                </Pressable>
+                {!isShadowOperation && (
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                    onPress={handleSave}
+                    accessibilityLabel="Save"
+                    testID="save-button" // Added testID for Save button
+                  >
+                    <Text style={[styles.buttonText, { color: colors.text }]}>
+                      {t('save')}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Split & Delete Buttons Row */}
+              {(canSplit || (!isNew && onDelete)) && (
+                <View style={styles.splitDeleteRow}>
+                  {canSplit && (
                     <Pressable
-                      style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                      onPress={handleSave}
-                      accessibilityLabel="Save"
-                      testID="save-button" // Added testID for Save button
+                      style={[
+                        styles.splitButtonContainer,
+                        { backgroundColor: colors.card },
+                      ]}
+                      onPress={() => setShowSplitModal(true)}
+                      testID="split-button"
                     >
-                      <Text style={[styles.buttonText, { color: colors.text }]}>
-                        {t('save')}
+                      <Icon
+                        name="call-split"
+                        size={18}
+                        color={colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.splitButtonText,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {t('split_transaction')}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {!isNew && onDelete && (
+                    <Pressable
+                      style={[
+                        styles.deleteButtonContainer,
+                        { backgroundColor: colors.card },
+                        !canDeleteShadowOperation && styles.disabledButton,
+                      ]}
+                      onPress={handleDelete}
+                      disabled={!canDeleteShadowOperation}
+                    >
+                      <Icon
+                        name="delete-outline"
+                        size={18}
+                        color={canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText}
+                      />
+                      <Text
+                        style={[
+                          styles.deleteButtonText,
+                          { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText },
+                        ]}
+                      >
+                        {t('delete_operation')}
                       </Text>
                     </Pressable>
                   )}
                 </View>
-
-                {/* Split & Delete Buttons Row */}
-                {(canSplit || (!isNew && onDelete)) && (
-                  <View style={styles.splitDeleteRow}>
-                    {canSplit && (
-                      <Pressable
-                        style={[
-                          styles.splitButtonContainer,
-                          { backgroundColor: colors.card },
-                        ]}
-                        onPress={() => setShowSplitModal(true)}
-                        testID="split-button"
-                      >
-                        <Icon
-                          name="call-split"
-                          size={18}
-                          color={colors.primary}
-                        />
-                        <Text
-                          style={[
-                            styles.splitButtonText,
-                            { color: colors.primary },
-                          ]}
-                        >
-                          {t('split_transaction')}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {!isNew && onDelete && (
-                      <Pressable
-                        style={[
-                          styles.deleteButtonContainer,
-                          { backgroundColor: colors.card },
-                          !canDeleteShadowOperation && styles.disabledButton,
-                        ]}
-                        onPress={handleDelete}
-                        disabled={!canDeleteShadowOperation}
-                      >
-                        <Icon
-                          name="delete-outline"
-                          size={18}
-                          color={canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText}
-                        />
-                        <Text
-                          style={[
-                            styles.deleteButtonText,
-                            { color: canDeleteShadowOperation ? (colors.delete || '#ff6b6b') : colors.mutedText },
-                          ]}
-                        >
-                          {t('delete_operation')}
-                        </Text>
-                      </Pressable>
-                    )}
-                  </View>
-                )}
-              </Pressable>
+              )}
             </Pressable>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Split Operation Modal */}
@@ -609,6 +607,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
             <FlatList
               data={pickerState.data}
               keyExtractor={keyExtractor}
+              numColumns={pickerState.type === 'category' ? 3 : 1}
+              columnWrapperStyle={pickerState.type === 'category' ? styles.gridRow : undefined}
+              contentContainerStyle={pickerState.type === 'category' ? styles.gridContent : undefined}
               renderItem={renderPickerItem}
               ListEmptyComponent={
                 <Text style={[styles.pickerEmptyText, { color: colors.mutedText }]}>
@@ -665,14 +666,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
-  categoryLabel: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  categoryOption: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
   closeButton: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -711,8 +704,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: SPACING.sm,
   },
+  folderBadge: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+  },
   fullFlex: {
     flex: 1,
+  },
+  gridCell: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    margin: SPACING.xs,
+    padding: SPACING.md,
+    position: 'relative',
+    width: (Dimensions.get('window').width - SPACING.md * 2 - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
+  },
+  gridCellName: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  gridContent: {
+    padding: SPACING.sm,
+  },
+  gridRow: {
+    justifyContent: 'flex-start',
   },
   modalButton: {
     alignItems: 'center',
@@ -728,22 +747,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   modalContent: {
-    borderRadius: BORDER_RADIUS.lg,
-    elevation: 5,
-    flexDirection: 'column',
-    maxHeight: '80%',
-    minHeight: '60%',
-    padding: SPACING.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    width: '90%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    overflow: 'hidden',
+    paddingBottom: SPACING.xxl,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+    width: '100%',
   },
   modalOverlay: {
-    alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
   pickerButtonHalf: {
     alignItems: 'center',
@@ -794,6 +809,13 @@ const styles = StyleSheet.create({
   scrollView: {
     flexGrow: 0,
     flexShrink: 1,
+  },
+  sheetDragHandle: {
+    alignSelf: 'center',
+    borderRadius: 3,
+    height: 4,
+    marginBottom: SPACING.md,
+    width: 44,
   },
   splitButtonContainer: {
     alignItems: 'center',
