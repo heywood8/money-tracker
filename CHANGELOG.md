@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.88.0](https://github.com/heywood8/money-tracker/compare/penny-v0.87.0...penny-v0.88.0) (2026-05-05)
+
+
+### Features
+
+* **ui:** replace category row list with grid in operation modal ([#486](https://github.com/heywood8/money-tracker/issues/486)) ([50eb319](https://github.com/heywood8/money-tracker/commit/50eb3193629ec27b96f8989960764e98c5a6da61))
+
 ## [0.87.0](https://github.com/heywood8/money-tracker/compare/penny-v0.86.4...penny-v0.87.0) (2026-05-05)
 
 
