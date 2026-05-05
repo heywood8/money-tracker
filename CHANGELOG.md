@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.83.0](https://github.com/heywood8/money-tracker/compare/penny-v0.82.1...penny-v0.83.0) (2026-05-05)
+
+
+### Features
+
+* **google-sheets:** add Google Sheets export ([#465](https://github.com/heywood8/money-tracker/issues/465)) ([32674ca](https://github.com/heywood8/money-tracker/commit/32674ca8360c134f83bbf0aef4d7804a7f3f6ef1))
+
 ## [0.82.1](https://github.com/heywood8/money-tracker/compare/penny-v0.82.0...penny-v0.82.1) (2026-05-04)
 
 
