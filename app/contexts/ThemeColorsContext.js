@@ -21,7 +21,7 @@ const lightTheme = {
     calcButtonBackground: '#ffffff',
     danger: 'red',
     delete: '#d9534f',
-    selected: '#c0e0ff',
+    selected: '#a8d0f5',
     altRow: '#ffffff', // Added for alternating rows
     expense: '#5a3030',
     income: '#4a8a4a',
@@ -49,7 +49,7 @@ const darkTheme = {
     calcButtonBackground: '#1e1e1e',
     danger: 'red',
     delete: '#ff6b6b',
-    selected: '#005fa3',
+    selected: '#003a7a',
     altRow: '#1a1a1a', // Added for alternating rows
     expense: '#e6cccc',
     income: '#66aa66',

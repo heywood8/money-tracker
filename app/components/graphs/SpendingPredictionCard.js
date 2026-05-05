@@ -24,7 +24,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
     <View style={[styles.predictionCard, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       <View style={styles.predictionHeader}>
         <View style={styles.predictionTitleContainer}>
-          <Icon name="chart-line" size={24} color={colors.primary} />
+          <Icon name="chart-line" size={24} color={colors.text} />
           <Text style={[styles.predictionTitle, { color: colors.text }]}>
             {t('spending_prediction')}
           </Text>
@@ -65,7 +65,7 @@ const SpendingPredictionCard = ({ colors, t, spendingPrediction, selectedCurrenc
               styles.predictionProgressBar,
               {
                 width: `${Math.min(spendingPrediction.percentElapsed, 100)}%`,
-                backgroundColor: colors.primary,
+                backgroundColor: colors.selected,
               },
             ]}
           />

@@ -117,7 +117,7 @@ const OperationFormFields = memo(({
     <View style={[styles.typeSelector, compact && styles.typeSelectorCompact]}>
       {TYPES.map(type => {
         const isSelected = values.type === type.key;
-        const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+        const textColor = isSelected ? colors.text : (disabled ? colors.mutedText : colors.text);
 
         return (
           <Pressable
@@ -125,7 +125,7 @@ const OperationFormFields = memo(({
             style={[
               styles.typeButton,
               {
-                backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                backgroundColor: isSelected ? colors.selected : colors.inputBackground,
                 borderColor: colors.border,
               },
               disabledStyle,
