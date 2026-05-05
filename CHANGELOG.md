@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.86.1](https://github.com/heywood8/money-tracker/compare/penny-v0.86.0...penny-v0.86.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **useLogEntries:** defer setTick to avoid setState-during-render ([#475](https://github.com/heywood8/money-tracker/issues/475)) ([3f05344](https://github.com/heywood8/money-tracker/commit/3f053444b70dec39d14436e28f695f0ec83f76dc))
+
 ## [0.86.0](https://github.com/heywood8/money-tracker/compare/penny-v0.85.0...penny-v0.86.0) (2026-05-05)
 
 
