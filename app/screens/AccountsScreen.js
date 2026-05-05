@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Modal as RNModal } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Modal as RNModal, Animated, Dimensions } from 'react-native';
 import ModalBlurOverlay from '../components/ModalBlurOverlay';
 import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, Switch } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
@@ -429,7 +429,8 @@ export default function AccountsScreen() {
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
   const [createAdjustmentOperation, setCreateAdjustmentOperation] = useState(true);
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const [currencyPanelVisible, setCurrencyPanelVisible] = useState(false);
+  const currencySlideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [accountToDeleteCurrency, setAccountToDeleteCurrency] = useState(null);
@@ -455,7 +456,17 @@ export default function AccountsScreen() {
   const startEdit = useCallback((id) => {
     setEditingId(id);
     const acc = accounts.find(a => a.id === id);
-    setEditValues({ ...acc });
+    const decimals = currencies[acc.currency]?.decimal_digits ?? 2;
+    let balance = String(acc.balance ?? '');
+    if (decimals === 0) {
+      balance = balance.replace(/\..*/g, '');
+    } else {
+      const dotIndex = balance.indexOf('.');
+      if (dotIndex !== -1) {
+        balance = balance.substring(0, dotIndex + 1) + balance.substring(dotIndex + 1).substring(0, decimals);
+      }
+    }
+    setEditValues({ ...acc, balance });
     setErrors({});
     setCreateAdjustmentOperation(true);
   }, [accounts]);
@@ -535,25 +546,77 @@ export default function AccountsScreen() {
   }, []);
 
   const handleOpenPicker = useCallback(() => {
-    setPickerVisible(true);
-  }, []);
+    currencySlideAnim.setValue(Dimensions.get('window').width);
+    setCurrencyPanelVisible(true);
+    Animated.timing(currencySlideAnim, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [currencySlideAnim]);
 
   const handleClosePicker = useCallback(() => {
-    setPickerVisible(false);
-  }, []);
+    Animated.timing(currencySlideAnim, {
+      toValue: Dimensions.get('window').width,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => setCurrencyPanelVisible(false));
+  }, [currencySlideAnim]);
 
   const handleNameChange = useCallback((text) => {
     setEditValues(v => ({ ...v, name: text }));
   }, []);
 
   const handleBalanceChange = useCallback((text) => {
-    setEditValues(v => ({ ...v, balance: text }));
+    setEditValues(v => {
+      const decimals = currencies[v.currency]?.decimal_digits ?? 2;
+
+      // Strip anything that isn't a digit, minus, or decimal point
+      let filtered = text.replace(/[^0-9.-]/g, '');
+
+      // Only allow a leading minus
+      const isNegative = filtered.startsWith('-');
+      filtered = filtered.replace(/-/g, '');
+      if (isNegative) filtered = '-' + filtered;
+
+      if (decimals === 0) {
+        // No fractional part allowed
+        filtered = filtered.replace(/\./g, '');
+      } else {
+        // Keep only the first decimal point, cap fractional digits
+        const dotIndex = filtered.indexOf('.');
+        if (dotIndex !== -1) {
+          const intPart = filtered.substring(0, dotIndex + 1);
+          const fracPart = filtered.substring(dotIndex + 1).replace(/\./g, '').substring(0, decimals);
+          filtered = intPart + fracPart;
+        }
+      }
+
+      return { ...v, balance: filtered };
+    });
   }, []);
 
   const handleCurrencySelect = useCallback((code) => {
-    setEditValues(v => ({ ...v, currency: code }));
-    setPickerVisible(false);
-  }, []);
+    setEditValues(v => {
+      const decimals = currencies[code]?.decimal_digits ?? 2;
+      let balance = v.balance;
+
+      if (decimals === 0) {
+        // Strip any fractional part
+        balance = balance.replace(/\..*/g, '');
+      } else {
+        // Trim fractional part to the new currency's allowed digits
+        const dotIndex = balance.indexOf('.');
+        if (dotIndex !== -1) {
+          const fracPart = balance.substring(dotIndex + 1).substring(0, decimals);
+          balance = balance.substring(0, dotIndex + 1) + fracPart;
+        }
+      }
+
+      return { ...v, currency: code, balance };
+    });
+    handleClosePicker();
+  }, [handleClosePicker]);
 
   const handleToggleAdjustmentSwitch = useCallback(() => {
     setCreateAdjustmentOperation(prev => !prev);
@@ -756,22 +819,37 @@ export default function AccountsScreen() {
       <RNModal
         visible={!!editingId}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={handleCloseModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <KeyboardAvoidingView
-              behavior="height"
-            >
+        <KeyboardAvoidingView behavior="padding" style={styles.modalKAV}>
+          <Pressable style={styles.modalOverlay} onPress={handleCloseModal}>
+            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
+              {/* Drag handle */}
+              <View style={[styles.sheetDragHandle, { backgroundColor: colors.border }]} />
+
+              {/* Sheet header */}
+              <View style={styles.sheetHeader}>
+                <Text style={[styles.sheetTitle, { color: colors.text }]}>
+                  {editingId === 'new' ? (t('add_account') || 'New Account') : (t('edit_account') || 'Edit Account')}
+                </Text>
+                {editingId !== 'new' && !!editValues.name && (
+                  <Text style={[styles.sheetSubtitle, { color: colors.mutedText }]}>{editValues.name}</Text>
+                )}
+              </View>
+
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={styles.listContentContainer}
+                showsVerticalScrollIndicator={false}
+                style={styles.sheetScroll}
               >
-                <Text variant="headlineSmall" style={styles.modalTitle}>{t('edit_account') || 'Edit Account'}</Text>
+                {/* Account name */}
+                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('account_name') || 'Account name').toUpperCase()}
+                </Text>
                 <PaperTextInput
                   mode="outlined"
-                  label={t('account_name') || 'Account Name'}
                   value={editValues.name}
                   onChangeText={handleNameChange}
                   error={!!errors.name}
@@ -782,87 +860,159 @@ export default function AccountsScreen() {
                   style={styles.textInput}
                 />
                 {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+
+                {/* Balance */}
+                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('balance') || 'Balance').toUpperCase()}
+                </Text>
                 <PaperTextInput
                   ref={balanceInputRef}
                   mode="outlined"
-                  label={t('balance') || 'Balance'}
                   value={editValues.balance}
                   onChangeText={handleBalanceChange}
                   error={!!errors.balance}
                   keyboardType="numeric"
                   returnKeyType="done"
+                  placeholder={(() => {
+                    const dec = currencies[editValues.currency]?.decimal_digits ?? 2;
+                    return dec === 0 ? '0' : `0.${'0'.repeat(dec)}`;
+                  })()}
                   onSubmitEditing={Keyboard.dismiss}
                   style={styles.textInput}
                 />
                 {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
-                {editingId !== 'new' && (
-                  <View style={styles.switchContainer}>
-                    <View style={styles.switchLabelContainer}>
-                      <Text variant="bodyLarge">{t('create_adjustment_operation') || 'Create adjustment operation'}</Text>
-                      <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                        {t('create_adjustment_operation_hint') || 'Automatically create a shadow operation to track balance adjustments'}
+
+                {/* Currency selector */}
+                <TouchableRipple onPress={handleOpenPicker} style={[styles.currencyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={styles.currencyRowInner}>
+                    <View>
+                      <Text style={[styles.currencyRowLabel, { color: colors.mutedText }]}>
+                        {(t('currency') || 'Currency').toUpperCase()}
+                      </Text>
+                      <Text style={[styles.currencyRowValue, { color: colors.text }]}>
+                        {editValues.currency
+                          ? `${currencies[editValues.currency]?.name} · ${currencies[editValues.currency]?.symbol}`
+                          : (t('select_currency') || 'Select currency')}
                       </Text>
                     </View>
-                    <Switch
-                      value={createAdjustmentOperation}
-                      onValueChange={handleToggleAdjustmentSwitch}
-                      color={colors.primary}
-                    />
-                  </View>
-                )}
-                <View style={styles.switchContainer}>
-                  <View style={styles.switchLabelContainer}>
-                    <Text variant="bodyLarge">{t('hidden_account') || 'Hidden account'}</Text>
-                    <Text variant="bodySmall" style={[styles.bodySmallMutedMarginTop, { color: colors.mutedText }]}>
-                      {t('hidden_account_hint') || 'Hide this account from the main list and operations'}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={!!editValues.hidden}
-                    onValueChange={handleToggleHiddenSwitch}
-                    color={colors.primary}
-                  />
-                </View>
-                <TouchableRipple onPress={handleOpenPicker} style={[styles.pickerWrapper, { backgroundColor: colors.inputBackground }]}>
-                  <View style={styles.pickerDisplay}>
-                    <Text variant="bodyLarge">
-                      {editValues.currency ? `${currencies[editValues.currency]?.name} (${currencies[editValues.currency]?.symbol})` : t('select_currency') || 'Select currency'}
-                    </Text>
+                    <Icon name="chevron-right" size={22} color={colors.mutedText} />
                   </View>
                 </TouchableRipple>
                 {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+
+                {/* Settings group */}
+                <View style={[styles.settingsGroup, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  {editingId !== 'new' && (
+                    <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
+                      <View style={styles.settingItemText}>
+                        <Text style={[styles.settingTitle, { color: colors.text }]}>
+                          {t('create_adjustment_operation') || 'Log adjustment'}
+                        </Text>
+                        <Text style={[styles.settingHint, { color: colors.mutedText }]}>
+                          {t('create_adjustment_operation_hint') || 'Record balance change as a transaction'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={createAdjustmentOperation}
+                        onValueChange={handleToggleAdjustmentSwitch}
+                        color={colors.primary}
+                      />
+                    </View>
+                  )}
+                  <View style={styles.settingItem}>
+                    <View style={styles.settingItemText}>
+                      <Text style={[styles.settingTitle, { color: colors.text }]}>
+                        {t('hidden_account') || 'Hidden account'}
+                      </Text>
+                      <Text style={[styles.settingHint, { color: colors.mutedText }]}>
+                        {t('hidden_account_hint') || 'Hide from main list and operations'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={!!editValues.hidden}
+                      onValueChange={handleToggleHiddenSwitch}
+                      color={colors.primary}
+                    />
+                  </View>
+                </View>
+
               </ScrollView>
-              <View style={styles.modalButtonRow}>
-                <Button mode="outlined" onPress={handleCloseModal} style={styles.modalButton}>
-                  {t('cancel') || 'Cancel'}
-                </Button>
-                {editingId !== 'new' && (
-                  <Button
+
+              {/* Delete zone (existing accounts only) — outside ScrollView for reliable centering */}
+              {editingId !== 'new' && (
+                <View style={styles.deleteWrapper}>
+                  <TouchableRipple
                     testID="account-delete-button"
-                    mode="contained"
-                    buttonColor={colors.delete}
                     onPress={handleDeleteEditingAccount}
-                    style={styles.modalButton}
+                    rippleColor={colors.delete + '18'}
+                    style={[styles.sheetBtn, styles.deleteRow, { borderColor: colors.delete + '40' }]}
+                    borderless={false}
                   >
-                    {t('delete') || 'Delete'}
-                  </Button>
-                )}
-                <Button mode="contained" onPress={saveEdit} style={styles.modalButton}>
-                  {t('save') || 'Save'}
-                </Button>
+                    <View style={styles.deleteRowContent}>
+                      <Icon name="delete-outline" size={18} color={colors.delete} />
+                      <Text style={[styles.deleteRowText, { color: colors.delete }]}>
+                        {t('delete') || 'Delete'}
+                      </Text>
+                    </View>
+                  </TouchableRipple>
+                </View>
+              )}
+
+              {/* Action buttons */}
+              <View style={[styles.sheetActions, { borderTopColor: colors.border }]}>
+                <TouchableRipple
+                  onPress={handleCloseModal}
+                  style={[styles.sheetBtn, styles.sheetBtnCancel, { borderColor: colors.border }]}
+                  rippleColor="rgba(0,0,0,0.05)"
+                  borderless={false}
+                >
+                  <Text style={[styles.sheetBtnText, { color: colors.text }]}>{t('cancel') || 'Cancel'}</Text>
+                </TouchableRipple>
+                <TouchableRipple
+                  onPress={saveEdit}
+                  style={[styles.sheetBtn, styles.sheetBtnSave, { backgroundColor: colors.primary }]}
+                  rippleColor="rgba(255,255,255,0.2)"
+                  borderless={false}
+                >
+                  <Text style={[styles.sheetBtnText, styles.sheetBtnSaveText]}>{t('save') || 'Save'}</Text>
+                </TouchableRipple>
               </View>
-            </KeyboardAvoidingView>
-          </View>
-        </View>
+
+              {/* In-sheet currency picker — slides in from the right */}
+              {currencyPanelVisible && (
+                <Animated.View
+                  style={[styles.currencyPanel, { backgroundColor: colors.card, transform: [{ translateX: currencySlideAnim }] }]}
+                >
+                  <View style={[styles.currencyPanelHeader, { borderBottomColor: colors.border }]}>
+                    <TouchableOpacity onPress={handleClosePicker} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Icon name="arrow-left" size={22} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.currencyPanelTitle, { color: colors.text }]}>
+                      {t('select_currency') || 'Currency'}
+                    </Text>
+                  </View>
+                  <FlatList
+                    data={Object.entries(currencies)}
+                    keyExtractor={([code]) => code}
+                    renderItem={({ item: [code, cur] }) => (
+                      <TouchableRipple
+                        onPress={() => handleCurrencySelect(code)}
+                        style={styles.currencyPanelItem}
+                        rippleColor="rgba(0,0,0,0.08)"
+                      >
+                        <Text style={[styles.currencyPanelItemText, { color: colors.text }]}>
+                          {cur.name} ({cur.symbol})
+                        </Text>
+                      </TouchableRipple>
+                    )}
+                    ItemSeparatorComponent={() => <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                  />
+                </Animated.View>
+              )}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </RNModal>
-      <CurrencyPickerModal
-        visible={pickerVisible}
-        onClose={handleClosePicker}
-        currencies={currencies}
-        colors={colors}
-        t={t}
-        onSelect={handleCurrencySelect}
-      />
       <TransferAccountPickerModal
         visible={transferModalVisible}
         onClose={handleCloseTransferModal}
@@ -964,9 +1114,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
   },
-  bodySmallMutedMarginTop: {
-    marginTop: SPACING.xs,
-  },
   centeredBodyMedium: {
     marginBottom: SPACING.lg,
     textAlign: 'center',
@@ -1013,6 +1160,76 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
+  currencyPanel: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  currencyPanelHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  currencyPanelItem: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  currencyPanelItemText: {
+    fontSize: 16,
+  },
+  currencyPanelTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  currencyRow: {
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginBottom: SPACING.xs,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
+  },
+  currencyRowInner: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  currencyRowLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  currencyRowValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  deleteRow: {
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  deleteRowContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  deleteRowText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  deleteWrapper: {
+    flexDirection: 'row',
+    marginTop: SPACING.sm,
+  },
   divider: {
     height: 1,
     marginHorizontal: SPACING.lg,
@@ -1030,6 +1247,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    marginTop: SPACING.sm,
+  },
   hiddenBalance: {
     backgroundColor: 'rgba(120, 120, 120, 0.25)',
     borderRadius: 6,
@@ -1046,30 +1270,23 @@ const styles = StyleSheet.create({
     width: 70,
   },
   listContentContainer: {
-    paddingBottom: SPACING.xl,
-  },
-  modalButton: {
-    flex: 1,
-  },
-  modalButtonRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'space-between',
-    marginTop: SPACING.lg,
+    paddingBottom: SPACING.sm,
   },
   modalContent: {
-    borderRadius: BORDER_RADIUS.lg,
-    margin: SPACING.xl,
-    maxHeight: '90%',
-    padding: SPACING.xl,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    overflow: 'hidden',
+    paddingBottom: 0,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
+  modalKAV: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
+    justifyContent: 'flex-end',
   },
   monthlyChangeRow: {
     marginTop: SPACING.sm,
@@ -1110,10 +1327,6 @@ const styles = StyleSheet.create({
   pickerCloseButton: {
     marginTop: SPACING.sm,
   },
-  pickerDisplay: {
-    justifyContent: 'center',
-    padding: HORIZONTAL_PADDING,
-  },
   pickerList: {
     maxHeight: 400,
   },
@@ -1129,16 +1342,82 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     fontSize: 16,
   },
-  pickerWrapper: {
-    borderColor: 'rgba(0, 0, 0, 0.12)',
+  scrollContent: {
+    paddingBottom: 180,
+  },
+  settingHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  settingItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  settingItemBorder: {
+    borderBottomWidth: 1,
+  },
+  settingItemText: {
+    flex: 1,
+    marginRight: SPACING.lg,
+  },
+  settingTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  settingsGroup: {
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    marginBottom: SPACING.sm,
     marginTop: SPACING.sm,
     overflow: 'hidden',
   },
-  scrollContent: {
-    paddingBottom: 180,
+  sheetActions: {
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingBottom: SPACING.xl,
+    paddingTop: SPACING.sm,
+  },
+  sheetBtn: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    flex: 1,
+    overflow: 'hidden',
+    paddingVertical: SPACING.sm,
+  },
+  sheetBtnCancel: {
+    borderWidth: 1,
+  },
+  sheetBtnSaveText: {
+    color: '#fff',
+  },
+  sheetBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sheetDragHandle: {
+    alignSelf: 'center',
+    borderRadius: 3,
+    height: 4,
+    marginBottom: SPACING.md,
+    width: 44,
+  },
+  sheetHeader: {
+    marginBottom: SPACING.sm,
+  },
+  sheetScroll: {
+    flexShrink: 1,
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   showHiddenButton: {
     borderRadius: 12,
@@ -1159,18 +1438,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  switchContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
-  switchLabelContainer: {
-    flex: 1,
-    marginRight: SPACING.lg,
-  },
   textInput: {
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
 });

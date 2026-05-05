@@ -745,9 +745,9 @@ describe('AccountsScreen', () => {
       const fab = getByLabelText('add_account');
       fireEvent.press(fab);
 
-      // Modal should now show edit form
+      // Modal should now show add form
       await waitFor(() => {
-        expect(getByText('edit_account')).toBeTruthy();
+        expect(getByText('add_account')).toBeTruthy();
       });
     });
 
@@ -1002,9 +1002,9 @@ describe('AccountsScreen', () => {
       const fab = getByLabelText('add_account');
       fireEvent.press(fab);
 
-      // The modal should be visible with the edit form
+      // The modal should be visible with the add form
       await waitFor(() => {
-        expect(getByText('edit_account')).toBeTruthy();
+        expect(getByText('add_account')).toBeTruthy();
       });
     });
   });
