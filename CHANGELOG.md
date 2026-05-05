@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.86.4](https://github.com/heywood8/money-tracker/compare/penny-v0.86.3...penny-v0.86.4) (2026-05-05)
+
+
+### Documentation
+
+* audit and update all documentation for accuracy ([#482](https://github.com/heywood8/money-tracker/issues/482)) ([35293b8](https://github.com/heywood8/money-tracker/commit/35293b8208098d07d3b8901c66947a2f8572a78d))
+
 ## [0.86.3](https://github.com/heywood8/money-tracker/compare/penny-v0.86.2...penny-v0.86.3) (2026-05-05)
 
 
