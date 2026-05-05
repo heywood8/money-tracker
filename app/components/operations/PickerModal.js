@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Modal, Pressable, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import * as Currency from '../../services/currency';
 import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
 /**
  * Get currency symbol from currency code
@@ -64,6 +65,9 @@ const PickerModal = ({
             <FlatList
               data={pickerData}
               keyExtractor={(item) => item.id || item.key}
+              numColumns={pickerType === 'category' ? 3 : 1}
+              columnWrapperStyle={pickerType === 'category' ? styles.gridRow : undefined}
+              contentContainerStyle={pickerType === 'category' ? styles.gridContent : undefined}
               renderItem={({ item }) => {
                 if (pickerType === 'account' || pickerType === 'toAccount') {
                   return (
@@ -99,45 +103,42 @@ const PickerModal = ({
                     </Pressable>
                   );
                 } else if (pickerType === 'category') {
-                // Determine if this is a folder or entry
                   const isFolder = item.type === 'folder';
+                  const isSelected = !isFolder && quickAddValues?.categoryId === item.id;
+                  const name = item.nameKey ? t(item.nameKey) : item.name;
 
                   return (
                     <Pressable
                       onPress={async () => {
                         if (isFolder) {
-                        // Navigate into folder
                           onNavigateIntoFolder(item);
                         } else {
-                        // Check if amount is valid and auto-add operation
-                          const hasValidAmount = quickAddValues.amount &&
+                          const hasValidAmount = quickAddValues?.amount &&
                           quickAddValues.amount.trim() !== '';
 
                           if (hasValidAmount) {
-                          // Auto-add with category
                             await onAutoAddWithCategory(item.id);
                           } else {
-                          // Just select the category without auto-add
                             onSelectCategory(item.id);
                             onClose();
                           }
                         }
                       }}
                       style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
+                        styles.gridCell,
+                        { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
                         pressed && { backgroundColor: colors.selected },
-                        // Highlight selected category
-                        !isFolder && quickAddValues.categoryId === item.id && { backgroundColor: colors.selected },
                       ]}
                     >
-                      <View style={styles.categoryOption}>
-                        <Icon name={item.icon} size={24} color={colors.text} />
-                        <Text style={[styles.pickerOptionText, styles.pickerOptionTextExpanded, { color: colors.text }]}>
-                          {item.nameKey ? t(item.nameKey) : item.name}
-                        </Text>
-                        {isFolder && <Icon name="chevron-right" size={24} color={colors.mutedText} />}
-                      </View>
+                      <Icon name={item.icon} size={24} color={colors.text} />
+                      <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
+                        {name}
+                      </Text>
+                      {isFolder && (
+                        <View style={styles.folderBadge}>
+                          <Icon name="folder-outline" size={12} color={colors.mutedText} />
+                        </View>
+                      )}
                     </Pressable>
                   );
                 }
@@ -189,12 +190,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  categoryOption: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 12,
-  },
   centeredPaddedText: {
     paddingVertical: 40,
     textAlign: 'center',
@@ -206,6 +201,32 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  folderBadge: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+  },
+  gridCell: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    margin: SPACING.xs,
+    padding: SPACING.md,
+    position: 'relative',
+    width: (Dimensions.get('window').width - SPACING.sm * 2 - SPACING.xs * 2 * 3) / 3,
+  },
+  gridCellName: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  gridContent: {
+    padding: SPACING.sm,
+  },
+  gridRow: {
+    justifyContent: 'flex-start',
   },
   modalOverlay: {
     alignItems: 'center',
@@ -226,9 +247,6 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: {
     fontSize: 16,
-  },
-  pickerOptionTextExpanded: {
-    flex: 1,
   },
   pickerSmallText: {
     fontSize: 14,
