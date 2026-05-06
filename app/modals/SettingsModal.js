@@ -19,6 +19,7 @@ import { checkForAppUpdate } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../services/GoogleSheetsService';
 
 const LOG_LEVEL_COLORS = {
@@ -64,6 +65,38 @@ export default function SettingsModal({ visible, onClose }) {
   }, [hideBalances, toggleAnim]);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
+
+  const handleToggleHideBalances = useCallback(async () => {
+    if (!hideBalances) {
+      // Hiding — no auth required
+      setHideBalances(true);
+      return;
+    }
+    // Unhiding — require biometric auth
+    const result = await authenticateWithBiometrics(t('biometric_prompt') || 'Authenticate to show balances');
+    if (result === BiometricResult.SUCCESS) {
+      setHideBalances(false);
+    } else if (result === BiometricResult.NOT_AVAILABLE) {
+      showDialog({
+        title: t('error') || 'Error',
+        message: t('biometric_unavailable') || 'Biometric authentication is not available on this device',
+        buttons: [{ text: t('ok') || 'OK' }],
+      });
+    } else if (result === BiometricResult.NOT_ENROLLED) {
+      showDialog({
+        title: t('error') || 'Error',
+        message: t('biometric_not_enrolled') || 'No biometrics enrolled. Please set up biometrics in device settings.',
+        buttons: [{ text: t('ok') || 'OK' }],
+      });
+    } else if (result === BiometricResult.FAILED) {
+      showDialog({
+        title: t('error') || 'Error',
+        message: t('biometric_failed') || 'Authentication failed',
+        buttons: [{ text: t('ok') || 'OK' }],
+      });
+    }
+    // CANCELLED: do nothing silently
+  }, [hideBalances, setHideBalances, t, showDialog]);
 
   const openLanguageModal = useCallback(() => {
     setLanguageModalVisible(true);
@@ -635,7 +668,7 @@ export default function SettingsModal({ visible, onClose }) {
             </View>
           </TouchableRipple>
 
-          <TouchableRipple onPress={() => setHideBalances(!hideBalances)} style={styles.settingsRow}>
+          <TouchableRipple onPress={handleToggleHideBalances} style={styles.settingsRow}>
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="eye-off-outline" size={22} color={colors.text} />

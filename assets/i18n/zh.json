@@ -367,5 +367,9 @@
   "net_worth": "净资产",
   "this_month": "本月",
   "keep_filters_active": "保持筛选器活动状态？",
-  "keep_filters": "保持筛选器"
+  "keep_filters": "保持筛选器",
+  "biometric_prompt": "验证身份以显示余额",
+  "biometric_unavailable": "此设备不支持生物识别验证",
+  "biometric_not_enrolled": "未注册生物识别。请在设备设置中设置生物识别。",
+  "biometric_failed": "验证失败"
 }

@@ -367,5 +367,9 @@
   "net_worth": "Patrimonio Neto",
   "this_month": "este mes",
   "keep_filters_active": "¿Mantener filtros activos?",
-  "keep_filters": "Mantener Filtros"
+  "keep_filters": "Mantener Filtros",
+  "biometric_prompt": "Autenticar para mostrar saldos",
+  "biometric_unavailable": "La autenticación biométrica no está disponible en este dispositivo",
+  "biometric_not_enrolled": "No hay biometría registrada. Configure la biometría en los ajustes del dispositivo.",
+  "biometric_failed": "Autenticación fallida"
 }
