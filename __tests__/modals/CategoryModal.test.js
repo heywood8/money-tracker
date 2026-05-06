@@ -248,8 +248,8 @@ describe('CategoryModal', () => {
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      // Should show type selector
-      expect(getByText('select_type')).toBeTruthy();
+      // Should show type selector (label rendered uppercase)
+      expect(getByText('SELECT_TYPE')).toBeTruthy();
     });
 
     it('prevents changing folder to entry when category has children', () => {
@@ -300,7 +300,7 @@ describe('CategoryModal', () => {
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      expect(getByText('category_type')).toBeTruthy();
+      expect(getByText('CATEGORY_TYPE')).toBeTruthy();
       expect(getByText('expense')).toBeTruthy();
     });
 
@@ -310,7 +310,7 @@ describe('CategoryModal', () => {
       );
 
       // Parent picker should only show categories of the same type
-      expect(getByText('parent_category')).toBeTruthy();
+      expect(getByText('PARENT_CATEGORY')).toBeTruthy();
     });
   });
 

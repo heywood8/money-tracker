@@ -394,11 +394,11 @@ describe('OperationModal', () => {
 
   describe('Save Operations', () => {
     it('shows save button', () => {
-      const { getByTestId } = render(
+      const { getByText } = render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      const saveButton = getByTestId('save-button');
+      const saveButton = getByText('save');
       expect(saveButton).toBeTruthy();
     });
 
@@ -410,11 +410,11 @@ describe('OperationModal', () => {
         handleSave: mockHandleSave,
       });
 
-      const { getByTestId } = render(
+      const { getByText } = render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      const saveButton = getByTestId('save-button');
+      const saveButton = getByText('save');
       fireEvent.press(saveButton);
 
       expect(mockHandleSave).toHaveBeenCalled();

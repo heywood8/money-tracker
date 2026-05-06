@@ -2,17 +2,14 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   Modal,
   Pressable,
   StyleSheet,
   FlatList,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Keyboard,
   Switch,
 } from 'react-native';
+import { TextInput as PaperTextInput, TouchableRipple } from 'react-native-paper';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -23,9 +20,9 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
-import { SPACING, BORDER_RADIUS, HEIGHTS, FONT_SIZE } from '../styles/designTokens';
-import ModalBlurOverlay from '../components/ModalBlurOverlay';
-import ModalHeader from '../components/ModalHeader';
+import ModalShell from '../components/ModalShell';
+import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
+import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
 
 const TYPE_OPTIONS = [
   { key: 'expense', icon: 'arrow-up', colorKey: 'expense' },
@@ -35,6 +32,7 @@ const TYPE_OPTIONS = [
 
 export default function PlannedOperationModal({ visible, onClose, plannedOperation, isNew }) {
   const { colors } = useThemeColors();
+  const { paperInputTheme } = makeModalStyles(colors);
   const { t } = useLocalization();
   const { showDialog } = useDialog();
   const { addPlannedOperation, updatePlannedOperation, deletePlannedOperation } = usePlannedOperations();
@@ -235,204 +233,204 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
 
   return (
     <>
-      {visible && <ModalBlurOverlay />}
-      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
-          <Pressable style={styles.modalOverlay} onPress={handleClose}>
-            <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-
-                <ModalHeader title={isNew ? t('add_planned_operation') : t('edit_planned_operation')} />
-
-                {/* Name Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('planned_name')}</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.name ? colors.error : colors.inputBorder }]}
-                    value={values.name}
-                    onChangeText={text => setValues(v => ({ ...v, name: text }))}
-                    placeholder={t('planned_operation_name_hint')}
-                    placeholderTextColor={colors.mutedText}
-                    returnKeyType="next"
-                  />
-                  {errors.name && <Text style={[styles.error, { color: colors.error }]}>{errors.name}</Text>}
-                </View>
-
-                {/* Type Selector */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('operation_type')}</Text>
-                  <View style={styles.typeRow}>
-                    {TYPE_OPTIONS.map(opt => {
-                      const isActive = values.type === opt.key;
-                      const typeLabelStyle = { color: isActive ? '#fff' : colors.mutedText };
-                      return (
-                        <Pressable
-                          key={opt.key}
-                          style={[
-                            styles.typeButton,
-                            {
-                              backgroundColor: isActive ? colors[opt.colorKey] : colors.inputBackground,
-                              borderColor: isActive ? colors[opt.colorKey] : colors.inputBorder,
-                            },
-                          ]}
-                          onPress={() => setValues(v => ({ ...v, type: opt.key, categoryId: null }))}
-                        >
-                          <Icon name={opt.icon} size={18} color={isActive ? '#fff' : colors.mutedText} />
-                          <Text style={[styles.typeLabel, typeLabelStyle]}>
-                            {t(`${opt.key}_label`) || t(opt.key)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* Amount Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('amount')}</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: errors.amount ? colors.error : colors.inputBorder }]}
-                    value={values.amount}
-                    onChangeText={text => setValues(v => ({ ...v, amount: text }))}
-                    placeholder="0.00"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                  />
-                  {errors.amount && <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>}
-                </View>
-
-                {/* Account Picker */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_account')}</Text>
-                  <Pressable
-                    testID="planned-account-picker"
-                    style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.accountId ? colors.error : colors.inputBorder }]}
-                    onPress={() => setAccountPickerVisible(true)}
-                  >
-                    <Text style={[styles.pickerButtonText, { color: values.accountId ? colors.text : colors.mutedText }]}>
-                      {values.accountId ? getAccountName(values.accountId) : t('select_account')}
-                    </Text>
-                    <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                  </Pressable>
-                  {errors.accountId && <Text style={[styles.error, { color: colors.error }]}>{errors.accountId}</Text>}
-                </View>
-
-                {/* Category Picker (for expense/income) */}
-                {values.type !== 'transfer' && (
-                  <View style={styles.inputContainer}>
-                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('select_category')}</Text>
-                    <Pressable
-                      testID="planned-category-picker"
-                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.categoryId ? colors.error : colors.inputBorder }]}
-                      onPress={() => openCategoryPicker('category', filteredCategories)}
-                    >
-                      <Text style={[styles.pickerButtonText, { color: values.categoryId ? colors.text : colors.mutedText }]}>
-                        {values.categoryId ? getCategoryName(values.categoryId) : t('select_category')}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                    </Pressable>
-                    {errors.categoryId && <Text style={[styles.error, { color: colors.error }]}>{errors.categoryId}</Text>}
-                  </View>
-                )}
-
-                {/* To Account Picker (for transfers) */}
-                {values.type === 'transfer' && (
-                  <View style={styles.inputContainer}>
-                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('to_account')}</Text>
-                    <Pressable
-                      style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: errors.toAccountId ? colors.error : colors.inputBorder }]}
-                      onPress={() => setToAccountPickerVisible(true)}
-                    >
-                      <Text style={[styles.pickerButtonText, { color: values.toAccountId ? colors.text : colors.mutedText }]}>
-                        {values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={colors.mutedText} />
-                    </Pressable>
-                    {errors.toAccountId && <Text style={[styles.error, { color: colors.error }]}>{errors.toAccountId}</Text>}
-                  </View>
-                )}
-
-                {/* Recurring Toggle */}
-                <View style={[styles.inputContainer, styles.switchRow]}>
-                  <Text style={[styles.inputLabel, styles.inputLabelNoMargin, { color: colors.mutedText }]}>
-                    {t('recurring')}
-                  </Text>
-                  <Switch
-                    value={values.isRecurring}
-                    onValueChange={val => setValues(v => ({ ...v, isRecurring: val }))}
-                    trackColor={{ false: colors.border, true: colors.primary + '66' }}
-                    thumbColor={values.isRecurring ? colors.primary : colors.mutedText}
-                  />
-                </View>
-
-                {/* Description */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>{t('description')}</Text>
-                  <TextInput
-                    style={[styles.input, styles.multilineInput, { color: colors.text, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
-                    value={values.description}
-                    onChangeText={text => setValues(v => ({ ...v, description: text }))}
-                    placeholder={t('description')}
-                    placeholderTextColor={colors.mutedText}
-                    multiline
-                    numberOfLines={2}
-                  />
-                </View>
-
-                {/* Action Buttons */}
-                <View style={styles.buttonRow}>
-                  {!isNew && (
-                    <Pressable style={[styles.button, { backgroundColor: colors.danger || colors.delete }]} onPress={handleDelete}>
-                      <Text style={styles.buttonText}>{t('delete')}</Text>
-                    </Pressable>
-                  )}
-                  <Pressable style={[styles.button, { backgroundColor: colors.border }]} onPress={handleClose}>
-                    <Text style={[styles.buttonText, { color: colors.text }]}>{t('cancel')}</Text>
-                  </Pressable>
-                  <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSave}>
-                    <Text style={styles.buttonText}>{t('save')}</Text>
-                  </Pressable>
-                </View>
-              </ScrollView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-
-        {/* Account Picker Modal */}
-        {renderPickerModal(
-          accountPickerVisible,
-          setAccountPickerVisible,
-          accounts.map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
-          (id) => setValues(v => ({ ...v, accountId: id })),
-          t('select_account'),
-        )}
-
-        {/* To Account Picker Modal */}
-        {renderPickerModal(
-          toAccountPickerVisible,
-          setToAccountPickerVisible,
-          accounts.filter(a => a.id !== values.accountId).map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
-          (id) => setValues(v => ({ ...v, toAccountId: id })),
-          t('to_account'),
-        )}
-
-        {/* Category Picker Modal (hierarchical) */}
-        <PickerModal
-          visible={categoryPickerState.visible}
-          pickerType={categoryPickerState.type}
-          pickerData={categoryPickerState.data}
-          colors={colors}
-          t={t}
-          onClose={closeCategoryPicker}
-          categoryNavigation={categoryNavigation}
-          quickAddValues={{ ...values, amount: '' }}
-          onNavigateBack={navigateBack}
-          onNavigateIntoFolder={navigateIntoFolder}
-          onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
+      <ModalShell
+        visible={visible}
+        onDismiss={handleClose}
+        title={isNew ? t('add_planned_operation') : t('edit_planned_operation')}
+        onSave={handleSave}
+        onCancel={handleClose}
+        onDelete={isNew ? undefined : handleDelete}
+        deleteLabel={t('delete_planned_operation')}
+        showBlurOverlay
+      >
+        {/* Name */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('planned_name') || 'Name').toUpperCase()}
+        </Text>
+        <PaperTextInput
+          mode="outlined"
+          value={values.name}
+          onChangeText={text => setValues(v => ({ ...v, name: text }))}
+          placeholder={t('planned_operation_name_hint')}
+          returnKeyType="next"
+          theme={paperInputTheme}
+          style={modalSharedStyles.textInput}
         />
-      </Modal>
+        {errors.name && <Text style={[styles.error, { color: colors.error }]}>{errors.name}</Text>}
+
+        {/* Type Selector */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('operation_type') || 'Type').toUpperCase()}
+        </Text>
+        <View style={styles.typeRow}>
+          {TYPE_OPTIONS.map(opt => {
+            const isActive = values.type === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                style={[
+                  styles.typeButton,
+                  {
+                    backgroundColor: isActive ? colors[opt.colorKey] : colors.inputBackground,
+                    borderColor: isActive ? colors[opt.colorKey] : colors.inputBorder,
+                  },
+                ]}
+                onPress={() => setValues(v => ({ ...v, type: opt.key, categoryId: null }))}
+              >
+                <Icon name={opt.icon} size={18} color={isActive ? '#fff' : colors.mutedText} />
+                <Text style={[styles.typeLabel, isActive ? styles.typeLabelActive : { color: colors.mutedText }]}>
+                  {t(`${opt.key}_label`) || t(opt.key)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Amount */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('amount') || 'Amount').toUpperCase()}
+        </Text>
+        <PaperTextInput
+          mode="outlined"
+          value={values.amount}
+          onChangeText={text => setValues(v => ({ ...v, amount: text }))}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+          onSubmitEditing={Keyboard.dismiss}
+          theme={paperInputTheme}
+          style={modalSharedStyles.textInput}
+        />
+        {errors.amount && <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>}
+
+        {/* Account */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('select_account') || 'Account').toUpperCase()}
+        </Text>
+        <TouchableRipple
+          testID="planned-account-picker"
+          style={[modalSharedStyles.pickerRow, { borderColor: errors.accountId ? colors.error : colors.border, backgroundColor: colors.card }]}
+          onPress={() => setAccountPickerVisible(true)}
+          rippleColor="rgba(0,0,0,0.05)"
+          borderless={false}
+        >
+          <View style={modalSharedStyles.pickerRowInner}>
+            <Text style={[modalSharedStyles.pickerRowValue, { color: values.accountId ? colors.text : colors.mutedText }]}>
+              {values.accountId ? getAccountName(values.accountId) : t('select_account')}
+            </Text>
+            <Icon name="chevron-down" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
+        {errors.accountId && <Text style={[styles.error, { color: colors.error }]}>{errors.accountId}</Text>}
+
+        {/* Category (expense/income only) */}
+        {values.type !== 'transfer' && (
+          <>
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('select_category') || 'Category').toUpperCase()}
+            </Text>
+            <TouchableRipple
+              testID="planned-category-picker"
+              style={[modalSharedStyles.pickerRow, { borderColor: errors.categoryId ? colors.error : colors.border, backgroundColor: colors.card }]}
+              onPress={() => openCategoryPicker('category', filteredCategories)}
+              rippleColor="rgba(0,0,0,0.05)"
+              borderless={false}
+            >
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: values.categoryId ? colors.text : colors.mutedText }]}>
+                  {values.categoryId ? getCategoryName(values.categoryId) : t('select_category')}
+                </Text>
+                <Icon name="chevron-down" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+            {errors.categoryId && <Text style={[styles.error, { color: colors.error }]}>{errors.categoryId}</Text>}
+          </>
+        )}
+
+        {/* To Account (transfer only) */}
+        {values.type === 'transfer' && (
+          <>
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('to_account') || 'To Account').toUpperCase()}
+            </Text>
+            <TouchableRipple
+              style={[modalSharedStyles.pickerRow, { borderColor: errors.toAccountId ? colors.error : colors.border, backgroundColor: colors.card }]}
+              onPress={() => setToAccountPickerVisible(true)}
+              rippleColor="rgba(0,0,0,0.05)"
+              borderless={false}
+            >
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: values.toAccountId ? colors.text : colors.mutedText }]}>
+                  {values.toAccountId ? getAccountName(values.toAccountId) : t('select_account')}
+                </Text>
+                <Icon name="chevron-down" size={20} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+            {errors.toAccountId && <Text style={[styles.error, { color: colors.error }]}>{errors.toAccountId}</Text>}
+          </>
+        )}
+
+        {/* Recurring Toggle */}
+        <View style={styles.switchRow}>
+          <Text style={[modalSharedStyles.fieldLabel, styles.switchLabel, { color: colors.mutedText }]}>
+            {(t('recurring') || 'Recurring').toUpperCase()}
+          </Text>
+          <Switch
+            value={values.isRecurring}
+            onValueChange={val => setValues(v => ({ ...v, isRecurring: val }))}
+            trackColor={{ false: colors.border, true: colors.primary + '66' }}
+            thumbColor={values.isRecurring ? colors.primary : colors.mutedText}
+          />
+        </View>
+
+        {/* Description */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('description') || 'Description').toUpperCase()}
+        </Text>
+        <PaperTextInput
+          mode="outlined"
+          multiline
+          numberOfLines={2}
+          value={values.description}
+          onChangeText={text => setValues(v => ({ ...v, description: text }))}
+          placeholder={t('description')}
+          theme={paperInputTheme}
+          style={modalSharedStyles.textInput}
+        />
+      </ModalShell>
+
+      {/* Account Picker Modal */}
+      {renderPickerModal(
+        accountPickerVisible,
+        setAccountPickerVisible,
+        accounts.map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
+        (id) => setValues(v => ({ ...v, accountId: id })),
+        t('select_account'),
+      )}
+
+      {/* To Account Picker Modal */}
+      {renderPickerModal(
+        toAccountPickerVisible,
+        setToAccountPickerVisible,
+        accounts.filter(a => a.id !== values.accountId).map(a => ({ id: a.id, name: `${a.name} (${a.currency})` })),
+        (id) => setValues(v => ({ ...v, toAccountId: id })),
+        t('to_account'),
+      )}
+
+      {/* Category Picker Modal (hierarchical) */}
+      <PickerModal
+        visible={categoryPickerState.visible}
+        pickerType={categoryPickerState.type}
+        pickerData={categoryPickerState.data}
+        colors={colors}
+        t={t}
+        onClose={closeCategoryPicker}
+        categoryNavigation={categoryNavigation}
+        quickAddValues={{ ...values, amount: '' }}
+        onNavigateBack={navigateBack}
+        onNavigateIntoFolder={navigateIntoFolder}
+        onSelectCategory={(id) => { setValues(v => ({ ...v, categoryId: id })); closeCategoryPicker(); }}
+      />
     </>
   );
 }
@@ -451,78 +449,10 @@ PlannedOperationModal.defaultProps = {
 };
 
 const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    flex: 1,
-    justifyContent: 'center',
-    marginHorizontal: SPACING.xs,
-    paddingVertical: SPACING.md,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    marginTop: SPACING.lg,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
   error: {
     fontSize: FONT_SIZE.sm,
-    marginTop: SPACING.xs,
-  },
-  flex1: {
-    flex: 1,
-  },
-  input: {
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    fontSize: FONT_SIZE.base,
-    height: HEIGHTS.input,
-    paddingHorizontal: SPACING.md,
-  },
-  inputContainer: {
-    marginBottom: SPACING.md,
-  },
-  inputLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
     marginBottom: SPACING.xs,
-  },
-  inputLabelNoMargin: {
-    marginBottom: 0,
-  },
-  modalContent: {
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-    borderTopRightRadius: BORDER_RADIUS.lg,
-    maxHeight: '90%',
-    paddingBottom: SPACING.xxl,
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.lg,
-    width: '100%',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  multilineInput: {
-    height: 70,
-    paddingTop: SPACING.md,
-    textAlignVertical: 'top',
-  },
-  pickerButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: HEIGHTS.input,
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-  },
-  pickerButtonText: {
-    flex: 1,
-    fontSize: FONT_SIZE.base,
+    marginTop: SPACING.xs,
   },
   pickerCancel: {
     alignItems: 'center',
@@ -566,16 +496,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.xl,
   },
-  scrollContent: {
-    paddingBottom: SPACING.lg,
-  },
-  scrollView: {
-    flexGrow: 0,
+  switchLabel: {
+    marginTop: 0,
   },
   switchRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: SPACING.sm,
   },
   typeButton: {
     alignItems: 'center',
@@ -592,7 +520,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
+  typeLabelActive: {
+    color: '#fff',
+  },
   typeRow: {
     flexDirection: 'row',
+    marginBottom: SPACING.xs,
   },
 });
