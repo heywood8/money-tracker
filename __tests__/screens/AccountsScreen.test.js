@@ -879,7 +879,7 @@ describe('AccountsScreen', () => {
 
       await waitFor(() => {
         // Find and press delete button
-        const deleteButtons = getAllByText('delete');
+        const deleteButtons = getAllByText('delete_account');
         fireEvent.press(deleteButtons[0]);
       });
 
@@ -924,7 +924,7 @@ describe('AccountsScreen', () => {
 
       await waitFor(() => {
         // Find and press delete button
-        const deleteButtons = getAllByText('delete');
+        const deleteButtons = getAllByText('delete_account');
         fireEvent.press(deleteButtons[0]);
       });
 
@@ -970,16 +970,14 @@ describe('AccountsScreen', () => {
 
       await waitFor(() => {
         // Find and press delete button
-        const deleteButtons = getAllByText('delete');
+        const deleteButtons = getAllByText('delete_account');
         fireEvent.press(deleteButtons[0]);
       });
 
       // Wait for confirmation dialog to appear and then confirm
-      await waitFor(async () => {
+      await waitFor(() => {
         const confirmDeleteButtons = getAllByText('delete');
-        if (confirmDeleteButtons.length > 1) {
-          fireEvent.press(confirmDeleteButtons[confirmDeleteButtons.length - 1]);
-        }
+        fireEvent.press(confirmDeleteButtons[0]);
       });
     });
   });
