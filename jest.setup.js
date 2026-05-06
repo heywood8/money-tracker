@@ -541,8 +541,15 @@ jest.mock('react-native-paper', () => {
   const Modal = ({ children, visible, ...props }) => visible ? React.createElement(View, props, children) : null;
   Modal.propTypes = { children: PropTypes.node, visible: PropTypes.bool };
 
-  const TextInput = ({ ...props }) => React.createElement(View, props);
-  TextInput.propTypes = { children: PropTypes.node };
+  const { TextInput: RNTextInput } = require('react-native');
+  const TextInput = ({ label, mode, theme, error, ...props }) => React.createElement(RNTextInput, props);  
+  TextInput.propTypes = {
+    children: PropTypes.node,
+    label: PropTypes.string,
+    mode: PropTypes.string,
+    theme: PropTypes.object,
+    error: PropTypes.bool,
+  };
 
   const Button = ({ children, onPress, ...props }) => React.createElement(TouchableOpacity, { onPress, ...props }, children);
   Button.propTypes = { children: PropTypes.node, onPress: PropTypes.func };
