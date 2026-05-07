@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.92.1](https://github.com/heywood8/money-tracker/compare/penny-v0.92.0...penny-v0.92.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* no error when biometrics not configured for hide balances toggle ([#498](https://github.com/heywood8/money-tracker/issues/498)) ([efd3eca](https://github.com/heywood8/money-tracker/commit/efd3eca917abd40f69654dd0b2f305873282428b))
+
 ## [0.92.0](https://github.com/heywood8/money-tracker/compare/penny-v0.91.0...penny-v0.92.0) (2026-05-07)
 
 
