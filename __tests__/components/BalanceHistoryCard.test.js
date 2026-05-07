@@ -30,6 +30,9 @@ jest.mock('../../assets/currencies.json', () => ({
   BTC: { decimal_digits: 8 },
 }));
 
+jest.mock('../../app/components/graphs/BalanceHistoryCalendarView', () => 'BalanceHistoryCalendarView');
+jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: 'Icon' }));
+
 const mockColors = {
   primary: '#6200ee',
   text: '#000',
@@ -90,10 +93,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -116,10 +126,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -142,10 +159,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -172,10 +196,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -200,10 +231,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -228,10 +266,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -254,10 +299,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [{ x: 1, y: 100 }],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -280,10 +332,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -321,10 +380,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -341,12 +407,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -366,10 +439,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -389,12 +469,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -430,12 +517,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={mockSpendingPrediction}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -456,12 +550,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -487,10 +588,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={dataWithoutPrevMonth}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -514,38 +622,23 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={dataWithUndefinedPrevMonth}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
       const lineChart = UNSAFE_getByType('LineChart');
       // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth since all undefined)
       expect(lineChart.props.data.datasets).toHaveLength(3);
-    });
-
-    it('accepts onChartPress prop', () => {
-      const mockOnChartPress = jest.fn();
-      const { root } = render(
-        <BalanceHistoryCard
-          colors={mockColors}
-          t={mockT}
-          selectedAccount="acc1"
-          onAccountChange={jest.fn()}
-          accountItems={mockAccountItems}
-          loadingBalanceHistory={false}
-          balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={mockOnChartPress}
-          selectedYear={2024}
-          selectedMonth={0}
-          accounts={mockAccounts}
-        />,
-      );
-
-      // Verify component renders with the onChartPress prop
-      expect(root).toBeTruthy();
     });
   });
 
@@ -574,12 +667,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -599,12 +699,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -639,12 +746,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={mockSpendingPrediction}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -671,12 +785,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={dataWithoutPrevMonth}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -702,10 +823,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -733,10 +861,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -759,10 +894,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -792,10 +934,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [{ x: 1, y: 1000 }],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={accountsWithoutCurrency}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -827,10 +976,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [{ x: 1, y: 1000 }],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={5}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -858,10 +1014,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={largeValueData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -907,12 +1070,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={midMonthStartData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11} // December 2023 – past month
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -948,12 +1118,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullSpanData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={10} // November 2023 – 30-day past month
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -984,12 +1161,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={singlePointData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1018,10 +1202,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={dataWithUndefined}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1048,10 +1239,17 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={zeroValueData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1083,10 +1281,17 @@ describe('BalanceHistoryCard', () => {
             burndown: [{ x: 1, y: 1000 }],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={accountsWithUnknownCurrency}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1136,12 +1341,19 @@ describe('BalanceHistoryCard', () => {
             prevMonthTotalExpenses: 1400,
             prevMonthDaysCount: 28,
           }}
-          onChartPress={jest.fn()}
           selectedYear={2026}
           selectedMonth={2} // March
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1181,12 +1393,19 @@ describe('BalanceHistoryCard', () => {
             prevMonthTotalExpenses: 350,
             prevMonthDaysCount: 7,
           }}
-          onChartPress={jest.fn()}
           selectedYear={2026}
           selectedMonth={2}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1220,12 +1439,19 @@ describe('BalanceHistoryCard', () => {
             burndown: [],
             prevMonth: [],
           }}
-          onChartPress={jest.fn()}
           selectedYear={2026}
           selectedMonth={2}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1273,12 +1499,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2025}
           selectedMonth={11}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1300,12 +1533,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2025}
           selectedMonth={5}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1327,12 +1567,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2025}
           selectedMonth={10}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1354,12 +1601,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1382,12 +1636,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1410,12 +1671,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1448,12 +1716,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={fullMonthData}
-          onChartPress={jest.fn()}
           selectedYear={2024}
           selectedMonth={0}
           accounts={mockAccounts}
           isCurrentMonth={true}
           spendingPrediction={mockSpendingPrediction}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1502,12 +1777,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1534,12 +1816,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1561,12 +1850,19 @@ describe('BalanceHistoryCard', () => {
           accountItems={mockAccountItems}
           loadingBalanceHistory={false}
           balanceHistoryData={mockBalanceHistoryData}
-          onChartPress={jest.fn()}
           selectedYear={2023}
           selectedMonth={11}
           accounts={mockAccounts}
           isCurrentMonth={false}
           spendingPrediction={null}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
         />,
       );
 
@@ -1576,6 +1872,73 @@ describe('BalanceHistoryCard', () => {
       expect(lineChart.props.formatYLabel('0')).toBe('');
 
       global.Date.mockRestore();
+    });
+  });
+
+  describe('Calendar toggle', () => {
+    const mockBalanceHistoryData = {
+      labels: [1, 2, 3],
+      actual: [{ x: 1, y: 1000 }],
+      actualForChart: [1000, 1000, 1000],
+      burndown: [],
+      prevMonth: [],
+    };
+
+    it('renders the calendar toggle button', () => {
+      const { getByTestId } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
+        />,
+      );
+      expect(getByTestId('calendar-toggle-btn')).toBeTruthy();
+    });
+
+    it('calls onShowCalendar once when switching to calendar view, not when switching back', () => {
+      const onShowCalendar = jest.fn();
+      const { getByTestId } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={mockBalanceHistoryData}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={onShowCalendar}
+        />,
+      );
+      fireEvent.press(getByTestId('calendar-toggle-btn'));
+      expect(onShowCalendar).toHaveBeenCalledTimes(1);
+      // Pressing again (back to chart) should NOT call onShowCalendar again
+      fireEvent.press(getByTestId('calendar-toggle-btn'));
+      expect(onShowCalendar).toHaveBeenCalledTimes(1);
     });
   });
 });
