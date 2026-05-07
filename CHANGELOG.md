@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.92.0](https://github.com/heywood8/money-tracker/compare/penny-v0.91.0...penny-v0.92.0) (2026-05-07)
+
+
+### Features
+
+* **logs:** improve logs modal UX and fix animation consistency ([#496](https://github.com/heywood8/money-tracker/issues/496)) ([2648fab](https://github.com/heywood8/money-tracker/commit/2648fab7f7688eadc6b5290c210d3d7f9e2f8e49))
+
 ## [0.91.0](https://github.com/heywood8/money-tracker/compare/penny-v0.90.0...penny-v0.91.0) (2026-05-07)
 
 
