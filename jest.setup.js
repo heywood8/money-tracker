@@ -447,6 +447,13 @@ jest.mock('react-native-gesture-handler', () => {
   const GestureDetector = ({ children }) => React.createElement(View, {}, children);
   GestureDetector.propTypes = { children: PropTypes.node };
 
+  const { View: RNView } = require('react-native');
+  const SwipeableMock = ({ children, renderRightActions }) => {
+    const rightActions = renderRightActions ? renderRightActions() : null;
+    return React.createElement(RNView, {}, children, rightActions);
+  };
+  SwipeableMock.propTypes = { children: PropTypes.node, renderRightActions: PropTypes.func };
+
   const Gesture = {
     Pan: jest.fn(() => ({
       onStart: jest.fn().mockReturnThis(),
@@ -481,7 +488,7 @@ jest.mock('react-native-gesture-handler', () => {
   };
 
   return {
-    Swipeable: View,
+    Swipeable: SwipeableMock,
     DrawerLayout: View,
     State: {},
     ScrollView: View,

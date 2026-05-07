@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, SectionList, Pressable } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
@@ -240,6 +241,19 @@ export default function PlannedOperationsScreen() {
     );
   }, [showDialog, t, handleEdit, deletePlannedOperation]);
 
+  const renderRightActions = useCallback((item) => (
+    <Pressable
+      testID={`execute-action-${item.id}`}
+      style={[styles.swipeExecute, { backgroundColor: colors.primary }]}
+      onPress={() => handleExecute(item)}
+      accessibilityRole="button"
+      accessibilityLabel={t('execute')}
+    >
+      <Icon name="play" size={20} color="white" />
+      <Text style={styles.swipeExecuteText}>{t('execute')}</Text>
+    </Pressable>
+  ), [colors.primary, handleExecute, t]);
+
   const renderSectionHeader = useCallback(({ section }) => {
     const label = section.key === 'recurring' ? `🔁 ${t('recurring')}` : `1️⃣ ${t('one_time')}`;
     const count = section.data.length;
@@ -307,16 +321,31 @@ export default function PlannedOperationsScreen() {
       </Pressable>
     );
 
+    if (executed) {
+      return (
+        <View
+          testID={`item-opacity-${item.id}`}
+          style={styles.executedWrapper}
+        >
+          {rowContent}
+        </View>
+      );
+    }
+
     return (
-      <View
-        testID={`item-opacity-${item.id}`}
-        style={executed ? styles.executedWrapper : null}
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
+        friction={2}
+        rightThreshold={60}
       >
-        {rowContent}
-      </View>
+        <View testID={`item-opacity-${item.id}`}>
+          {rowContent}
+        </View>
+      </Swipeable>
     );
   }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency,
-    getCurrencySymbol, handleEdit, handleLongPress]);
+    getCurrencySymbol, handleEdit, handleLongPress, renderRightActions]);
 
   const renderEmpty = useCallback(() => {
     if (loading) {
@@ -499,5 +528,19 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
+  },
+  swipeExecute: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    width: 72,
+  },
+  swipeExecuteText: {
+    color: 'white',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
