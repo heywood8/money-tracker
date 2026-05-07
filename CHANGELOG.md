@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.90.0](https://github.com/heywood8/money-tracker/compare/penny-v0.89.0...penny-v0.90.0) (2026-05-07)
+
+
+### Features
+
+* add drag-to-dismiss gesture to ModalShell bottom sheet ([#490](https://github.com/heywood8/money-tracker/issues/490)) ([5cf7d62](https://github.com/heywood8/money-tracker/commit/5cf7d6202c29c7435c5246b0b8795bb569421008))
+
 ## [0.89.0](https://github.com/heywood8/money-tracker/compare/penny-v0.88.0...penny-v0.89.0) (2026-05-06)
 
 
