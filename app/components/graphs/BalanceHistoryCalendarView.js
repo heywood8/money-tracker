@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: 18 },
   cell: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingVertical: 2 },
   dayBalance: { fontSize: 8, fontWeight: '600' },
-  dayCell: { borderRadius: 4, minHeight: 34, paddingVertical: 3 },
+  dayCell: { borderRadius: 4, minHeight: 46, paddingVertical: 6 },
   dayHeader: { fontSize: 10, fontWeight: '600' },
   dayNumber: { fontSize: 11 },
   deleteBtn: { backgroundColor: '#f44336' },

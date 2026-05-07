@@ -120,6 +120,7 @@ const BalanceHistoryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   const [showCalendar, setShowCalendar] = useState(false);
+  const [contentHeight, setContentHeight] = useState(340);
 
   const selectedAccountData = accounts.find(acc => acc.id === selectedAccount);
   const currency = selectedAccountData?.currency || 'USD';
@@ -191,7 +192,7 @@ const BalanceHistoryCard = ({
       ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
         <>
           {showCalendar ? (
-            <View style={styles.calendarContainer}>
+            <View style={[styles.calendarContainer, { minHeight: contentHeight }]}>
               <BalanceHistoryCalendarView
                 colors={colors}
                 selectedYear={selectedYear}
@@ -206,7 +207,7 @@ const BalanceHistoryCard = ({
               />
             </View>
           ) : (
-            <>
+            <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
               <View
                 style={styles.balanceHistoryChartContainer}
               >
@@ -567,7 +568,7 @@ const BalanceHistoryCard = ({
                   </View>
                 );
               })()}
-            </>
+            </View>
           )}
         </>
       ) : (
