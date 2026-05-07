@@ -204,6 +204,7 @@ const BalanceHistoryCard = ({
                 onCancelEdit={onCancelEdit}
                 onSaveBalance={onSaveBalance}
                 onDeleteBalance={onDeleteBalance}
+                currency={currency}
               />
             </View>
           ) : (

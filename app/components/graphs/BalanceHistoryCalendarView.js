@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import PropTypes from 'prop-types';
+import currencies from '../../../assets/currencies.json';
 
 const DAY_HEADERS = ['M', 'T', 'W', 'T', 'F', 'S', 'Su'];
 
@@ -28,7 +29,10 @@ const BalanceHistoryCalendarView = ({
   onCancelEdit,
   onSaveBalance,
   onDeleteBalance,
+  currency,
 }) => {
+  const decimalDigits = currencies[currency]?.decimal_digits ?? 2;
+
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
   const firstDayOffset = (new Date(selectedYear, selectedMonth, 1).getDay() + 6) % 7;
 
@@ -38,13 +42,21 @@ const BalanceHistoryCalendarView = ({
 
   const [selectedDay, setSelectedDay] = useState(isCurrentMonth ? todayDate : null);
 
+  const formatForInput = (balance) => {
+    if (!balance) return '';
+    const num = parseFloat(balance);
+    if (isNaN(num)) return balance;
+    return num.toFixed(decimalDigits);
+  };
+
   const hasAutoSelectedRef = useRef(false);
   useEffect(() => {
-    if (hasAutoSelectedRef.current || !isCurrentMonth) return;
+    if (hasAutoSelectedRef.current || !isCurrentMonth || balanceHistoryTableData.length === 0) return;
     hasAutoSelectedRef.current = true;
     const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
     const entry = balanceHistoryTableData.find((r) => r.date === dateStr);
-    onEditBalance(dateStr, entry?.balance || '');
+    onEditBalance(dateStr, formatForInput(entry?.balance));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrentMonth, todayDate, selectedYear, selectedMonth, balanceHistoryTableData, onEditBalance]);
 
   const getEntry = (day) => {
@@ -55,7 +67,7 @@ const BalanceHistoryCalendarView = ({
   const handleDayPress = (day) => {
     const entry = getEntry(day);
     setSelectedDay(day);
-    onEditBalance(getDateStr(selectedYear, selectedMonth, day), entry?.balance || '');
+    onEditBalance(getDateStr(selectedYear, selectedMonth, day), formatForInput(entry?.balance));
   };
 
   const handleSave = () => {
@@ -154,7 +166,7 @@ const BalanceHistoryCalendarView = ({
             onChangeText={onEditingBalanceValueChange}
             keyboardType="decimal-pad"
             autoFocus
-            placeholder="0"
+            placeholder={(0).toFixed(decimalDigits)}
             placeholderTextColor={colors.mutedText}
           />
           <TouchableOpacity
@@ -199,6 +211,7 @@ BalanceHistoryCalendarView.propTypes = {
   onCancelEdit: PropTypes.func.isRequired,
   onSaveBalance: PropTypes.func.isRequired,
   onDeleteBalance: PropTypes.func.isRequired,
+  currency: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
