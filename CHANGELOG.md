@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.93.0](https://github.com/heywood8/money-tracker/compare/penny-v0.92.1...penny-v0.93.0) (2026-05-07)
+
+
+### Features
+
+* **planned:** redesign screen with summary strip, sections, and swipe-to-execute ([#500](https://github.com/heywood8/money-tracker/issues/500)) ([5e2b8ac](https://github.com/heywood8/money-tracker/commit/5e2b8acc575fac983fb5b7c128df26e862e8fa28))
+
 ## [0.92.1](https://github.com/heywood8/money-tracker/compare/penny-v0.92.0...penny-v0.92.1) (2026-05-07)
 
 
