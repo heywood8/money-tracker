@@ -51,7 +51,9 @@ export default function ModalShell({
   const { t } = useLocalization();
   const insets = useSafeAreaInsets();
 
-  const translateY = useRef(new Animated.Value(0)).current;
+  const screenHeight = Dimensions.get('window').height;
+  // Start offscreen so the first render is invisible — eliminates open flicker
+  const translateY = useRef(new Animated.Value(screenHeight)).current;
   // Use a ref so the PanResponder closure always calls the latest onDismiss
   const onDismissRef = useRef(onDismiss);
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
@@ -59,7 +61,6 @@ export default function ModalShell({
   // Slide in from bottom when modal opens
   useEffect(() => {
     if (visible) {
-      translateY.setValue(Dimensions.get('window').height * 0.6);
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
@@ -72,14 +73,15 @@ export default function ModalShell({
   // Animate out then call callback — used for overlay tap and cancel button
   const animateOut = useCallback((callback) => {
     Animated.timing(translateY, {
-      toValue: Dimensions.get('window').height,
+      toValue: screenHeight,
       duration: 200,
       useNativeDriver: true,
+      // Leave translateY at screenHeight after close so the next open
+      // renders offscreen immediately (no reset-to-0 flicker)
     }).start(() => {
-      translateY.setValue(0);
       callback?.();
     });
-  }, [translateY]);
+  }, [translateY, screenHeight]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -91,11 +93,11 @@ export default function ModalShell({
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 80 || gs.vy > 0.3) {
           Animated.timing(translateY, {
-            toValue: 800,
+            toValue: Dimensions.get('window').height,
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
+            // Leave translateY at screen height — no reset to avoid close flicker
             onDismissRef.current?.();
           });
         } else {
