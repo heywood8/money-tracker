@@ -371,5 +371,10 @@
   "biometric_prompt": "验证身份以显示余额",
   "biometric_unavailable": "此设备不支持生物识别验证",
   "biometric_not_enrolled": "未注册生物识别。请在设备设置中设置生物识别。",
-  "biometric_failed": "验证失败"
+  "biometric_failed": "验证失败",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }

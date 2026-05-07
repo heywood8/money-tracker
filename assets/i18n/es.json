@@ -371,5 +371,10 @@
   "biometric_prompt": "Autenticar para mostrar saldos",
   "biometric_unavailable": "La autenticación biométrica no está disponible en este dispositivo",
   "biometric_not_enrolled": "No hay biometría registrada. Configure la biometría en los ajustes del dispositivo.",
-  "biometric_failed": "Autenticación fallida"
+  "biometric_failed": "Autenticación fallida",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }

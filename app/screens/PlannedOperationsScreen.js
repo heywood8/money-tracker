@@ -78,6 +78,88 @@ export default function PlannedOperationsScreen() {
     return result;
   }, [recurringOps, oneTimeOps]);
 
+  const summary = useMemo(() => {
+    const pending = plannedOperations.filter(op => !isExecutedThisMonth(op));
+    const pendingOut = pending
+      .filter(op => op.type === 'expense' || op.type === 'transfer')
+      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
+    const pendingIn = pending
+      .filter(op => op.type === 'income')
+      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
+    const doneCount = plannedOperations.filter(op => isExecutedThisMonth(op)).length;
+    const total = plannedOperations.length;
+    const progressFraction = total > 0 ? doneCount / total : 0;
+    return { pendingOut, pendingIn, doneCount, total, progressFraction };
+  }, [plannedOperations, isExecutedThisMonth]);
+
+  const formatSummaryAmount = useCallback((amount) => {
+    if (amount === 0) return '0';
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `${Math.round(amount / 1000)}K`;
+    return String(Math.round(amount));
+  }, []);
+
+  const renderSummaryStrip = useCallback(() => (
+    <View style={[styles.summaryStrip, { backgroundColor: colors.surface }]}>
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-pending-out"
+            style={[styles.summaryValue, { color: colors.expense }]}
+          >
+            {formatSummaryAmount(summary.pendingOut)}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('pending_out')}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-done-count"
+            style={[styles.summaryValue, { color: colors.text }]}
+          >
+            {`${summary.doneCount} / ${summary.total}`}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('done_this_month')}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-pending-in"
+            style={[styles.summaryValue, { color: colors.income }]}
+          >
+            {formatSummaryAmount(summary.pendingIn)}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('pending_in')}
+          </Text>
+        </View>
+      </View>
+      <View
+        testID="summary-progress-bar"
+        style={[styles.progressTrack, { backgroundColor: colors.border }]}
+      >
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round(summary.progressFraction * 100)}%`, backgroundColor: colors.primary },
+          ]}
+        />
+      </View>
+      <View style={styles.progressLabels}>
+        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
+          {`${summary.doneCount} ${t('done')}`}
+        </Text>
+        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
+          {`${summary.total - summary.doneCount} ${t('remaining')}`}
+        </Text>
+      </View>
+    </View>
+  ), [colors, summary, t, formatSummaryAmount]);
+
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(a => a.id === accountId);
     return account ? account.name : '?';
@@ -247,6 +329,7 @@ export default function PlannedOperationsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {renderSummaryStrip()}
       {/* List */}
       <SectionList
         sections={sections}
@@ -346,6 +429,24 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 180,
   },
+  progressFill: {
+    borderRadius: 2,
+    height: 3,
+  },
+  progressLabel: {
+    fontSize: FONT_SIZE.xs,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 3,
+  },
+  progressTrack: {
+    borderRadius: 2,
+    height: 3,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
+  },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -371,5 +472,32 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     marginBottom: 100,
+  },
+  summaryDivider: {
+    height: 30,
+    width: StyleSheet.hairlineWidth,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: FONT_SIZE.xs,
+    marginTop: 2,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryStrip: {
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  summaryValue: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
   },
 });

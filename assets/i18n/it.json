@@ -130,5 +130,10 @@
   "biometric_prompt": "Autenticati per mostrare i saldi",
   "biometric_unavailable": "Autenticazione biometrica non disponibile su questo dispositivo",
   "biometric_not_enrolled": "Nessuna biometria registrata. Configura la biometria nelle impostazioni del dispositivo.",
-  "biometric_failed": "Autenticazione fallita"
+  "biometric_failed": "Autenticazione fallita",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }

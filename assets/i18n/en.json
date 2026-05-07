@@ -371,5 +371,10 @@
   "biometric_prompt": "Authenticate to show balances",
   "biometric_unavailable": "Biometric authentication is not available on this device",
   "biometric_not_enrolled": "No biometrics enrolled. Please set up biometrics in device settings.",
-  "biometric_failed": "Authentication failed"
+  "biometric_failed": "Authentication failed",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }

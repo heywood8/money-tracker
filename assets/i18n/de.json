@@ -371,5 +371,10 @@
   "biometric_prompt": "Authentifizieren, um Guthaben anzuzeigen",
   "biometric_unavailable": "Biometrische Authentifizierung ist auf diesem Gerät nicht verfügbar",
   "biometric_not_enrolled": "Keine Biometrie eingerichtet. Bitte richten Sie Biometrie in den Geräteeinstellungen ein.",
-  "biometric_failed": "Authentifizierung fehlgeschlagen"
+  "biometric_failed": "Authentifizierung fehlgeschlagen",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }

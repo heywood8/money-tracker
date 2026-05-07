@@ -357,5 +357,10 @@
   "biometric_prompt": "Հաստատեք ինքնությունը՝ մնացորդները ցուցադրելու համար",
   "biometric_unavailable": "Կենսաչափական նույնականացումը հասանելի չէ այս սարքում",
   "biometric_not_enrolled": "Կենսաչափություն գրանցված չէ։ Կարգաբերեք կենսաչափությունը սարքի կարգավորումներում։",
-  "biometric_failed": "Նույնականացումը ձախողվեց"
+  "biometric_failed": "Նույնականացումը ձախողվեց",
+  "pending_out": "Pending out",
+  "pending_in": "Pending in",
+  "done_this_month": "Done this month",
+  "done": "done",
+  "remaining": "remaining"
 }
