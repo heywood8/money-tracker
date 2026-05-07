@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.3](https://github.com/heywood8/money-tracker/compare/penny-v0.94.2...penny-v0.94.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* **calendar:** improve edit row UX in balance history calendar ([#513](https://github.com/heywood8/money-tracker/issues/513)) ([d7a2162](https://github.com/heywood8/money-tracker/commit/d7a21623e49b43342c07655d71f85f9b3064a558))
+
 ## [0.94.2](https://github.com/heywood8/money-tracker/compare/penny-v0.94.1...penny-v0.94.2) (2026-05-07)
 
 
