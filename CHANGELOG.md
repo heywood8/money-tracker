@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.0](https://github.com/heywood8/money-tracker/compare/penny-v0.93.2...penny-v0.94.0) (2026-05-07)
+
+
+### Features
+
+* **graphs:** inline calendar view replaces BalanceHistoryModal ([#506](https://github.com/heywood8/money-tracker/issues/506)) ([b050533](https://github.com/heywood8/money-tracker/commit/b0505333b75ea09ab05996b3a392dc29ce1079e6))
+
 ## [0.93.2](https://github.com/heywood8/money-tracker/compare/penny-v0.93.1...penny-v0.93.2) (2026-05-07)
 
 
