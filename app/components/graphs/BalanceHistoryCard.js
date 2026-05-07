@@ -263,8 +263,9 @@ const BalanceHistoryCard = ({
                       },
                     ],
                   }}
-                  width={screenWidth - 64}
+                  width={screenWidth - 33}
                   height={220}
+                  paddingLeft="40"
                   yAxisLabel=""
                   yAxisSuffix=""
                   yAxisInterval={niceInterval}
@@ -272,9 +273,10 @@ const BalanceHistoryCard = ({
                   fromZero={!hasNegativeValues}
                   formatYLabel={hideBalances ? () => '' : (value) => {
                     const numValue = parseFloat(value);
+                    if (numValue === 0) return '';
                     const absValue = Math.abs(numValue);
                     const isNegative = numValue < 0;
-                    
+
                     if (absValue >= 1000000) {
                       const result = `${(absValue / 1000000).toFixed(0)}M`;
                       return isNegative ? `-${result}` : result;
@@ -314,8 +316,8 @@ const BalanceHistoryCard = ({
                     },
                   }}
                   decorator={() => {
-                    const chartWidth = screenWidth - 64;
-                    const paddingLeft = 64;
+                    const chartWidth = screenWidth - 16;
+                    const paddingLeft = 40;
                     const paddingRight = 16;
                     const usableWidth = chartWidth - paddingLeft - paddingRight;
                     const dataLength = balanceHistoryData.labels.length;
@@ -325,23 +327,6 @@ const BalanceHistoryCard = ({
                     const chartAreaHeight = chartBottom - chartTop;
 
                     const elements = [];
-
-                    // Zero axis label — only needed when negatives exist; chart's own "0" handles the positive-only case
-                    if (hasNegativeValues && maxValue !== minValue) {
-                      const yZero = chartTop + (maxValue / (maxValue - minValue)) * chartAreaHeight;
-                      elements.push(
-                        <SvgText
-                          key="zero-label"
-                          x={paddingLeft - 10}
-                          y={yZero - 4}
-                          fontSize={12}
-                          fill={colors.mutedText}
-                          textAnchor="end"
-                        >
-                          {String('0')}
-                        </SvgText>,
-                      );
-                    }
 
                     if (isCurrentMonth) {
                       const todayIndex = currentDay - 1;
@@ -613,10 +598,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 16,
+    overflow: 'hidden',
     padding: 16,
   },
   balanceHistoryChartContainer: {
-    alignItems: 'center',
+    marginHorizontal: -16,
   },
   balanceHistoryHeader: {
     alignItems: 'center',
