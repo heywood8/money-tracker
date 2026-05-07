@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, SectionList, Pressable } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
