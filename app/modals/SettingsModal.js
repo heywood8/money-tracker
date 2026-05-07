@@ -79,17 +79,11 @@ export default function SettingsModal({ visible, onClose }) {
     if (result === BiometricResult.SUCCESS) {
       setHideBalances(false);
     } else if (result === BiometricResult.NOT_AVAILABLE) {
-      showDialog(
-        t('error') || 'Error',
-        t('biometric_unavailable') || 'Biometric authentication is not available on this device',
-        [{ text: t('ok') || 'OK' }],
-      );
+      console.warn('biometric not available, allowing hide balances toggle without auth');
+      setHideBalances(false);
     } else if (result === BiometricResult.NOT_ENROLLED) {
-      showDialog(
-        t('error') || 'Error',
-        t('biometric_not_enrolled') || 'No biometrics enrolled. Please set up biometrics in device settings.',
-        [{ text: t('ok') || 'OK' }],
-      );
+      console.warn('biometric not enrolled, allowing hide balances toggle without auth');
+      setHideBalances(false);
     } else if (result === BiometricResult.FAILED) {
       showDialog(
         t('error') || 'Error',

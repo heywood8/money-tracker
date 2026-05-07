@@ -14,6 +14,11 @@ const mockResetDatabase = jest.fn(() => Promise.resolve());
 const mockStartImport = jest.fn();
 const mockCancelImport = jest.fn();
 const mockCompleteImport = jest.fn();
+const mockSetHideBalances = jest.fn();
+const mockAuthenticateWithBiometrics = jest.fn();
+
+// Mutable state so individual tests can control hideBalances
+const displaySettingsMockState = { hideBalances: false };
 
 // Mock all context dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -60,9 +65,20 @@ jest.mock('../../app/contexts/ImportProgressContext', () => ({
 
 jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: () => ({
-    hideBalances: false,
-    setHideBalances: jest.fn(),
+    hideBalances: displaySettingsMockState.hideBalances,
+    setHideBalances: mockSetHideBalances,
   }),
+}));
+
+jest.mock('../../app/services/BiometricService', () => ({
+  authenticateWithBiometrics: (...args) => mockAuthenticateWithBiometrics(...args),
+  BiometricResult: {
+    SUCCESS: 'success',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+    NOT_AVAILABLE: 'not_available',
+    NOT_ENROLLED: 'not_enrolled',
+  },
 }));
 
 jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
@@ -125,6 +141,9 @@ describe('SettingsModal Component', () => {
     mockCompleteImport.mockClear();
     mockExportBackup.mockClear();
     mockImportBackup.mockClear();
+    mockSetHideBalances.mockClear();
+    mockAuthenticateWithBiometrics.mockClear();
+    displaySettingsMockState.hideBalances = false;
   });
 
   describe('Basic Rendering', () => {
@@ -473,6 +492,52 @@ describe('SettingsModal Component', () => {
 
       expect(modalInstance).toBeTruthy();
       expect(modalInstance.props.visible).toBe(true);
+    });
+  });
+
+  describe('Hide Balances Toggle', () => {
+    it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_AVAILABLE', async () => {
+      displaySettingsMockState.hideBalances = true;
+      mockAuthenticateWithBiometrics.mockResolvedValue('not_available');
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      await act(async () => {
+        fireEvent.press(getByText('hide_balances'));
+      });
+
+      expect(mockShowDialog).not.toHaveBeenCalled();
+      expect(mockSetHideBalances).toHaveBeenCalledWith(false);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('biometric not available'),
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_ENROLLED', async () => {
+      displaySettingsMockState.hideBalances = true;
+      mockAuthenticateWithBiometrics.mockResolvedValue('not_enrolled');
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      await act(async () => {
+        fireEvent.press(getByText('hide_balances'));
+      });
+
+      expect(mockShowDialog).not.toHaveBeenCalled();
+      expect(mockSetHideBalances).toHaveBeenCalledWith(false);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('biometric not enrolled'),
+      );
+
+      consoleWarnSpy.mockRestore();
     });
   });
 });
