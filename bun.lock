@@ -18,6 +18,7 @@
         "expo-document-picker": "~14.0.8",
         "expo-file-system": "^19.0.21",
         "expo-intent-launcher": "~13.0.8",
+        "expo-local-authentication": "~17.0.8",
         "expo-secure-store": "~15.0.8",
         "expo-sharing": "~14.0.8",
         "expo-sqlite": "~16.0.10",
@@ -1021,6 +1022,8 @@
     "expo-keep-awake": ["expo-keep-awake@15.0.8", "", { "peerDependencies": { "expo": "*", "react": "*" } }, "sha512-YK9M1VrnoH1vLJiQzChZgzDvVimVoriibiDIFLbQMpjYBnvyfUeHJcin/Gx1a+XgupNXy92EQJLgI/9ZuXajYQ=="],
 
     "expo-linking": ["expo-linking@8.0.12", "", { "dependencies": { "expo-constants": "~18.0.13", "invariant": "^2.2.4" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-FpXeIpFgZuxihwT9lBo86YD3y6LphBuAhN680MMxm/Y7fmsc57vimn2d3vFu68VI0+Z9w457t494mu2wvlgWTQ=="],
+
+    "expo-local-authentication": ["expo-local-authentication@17.0.8", "", { "dependencies": { "invariant": "^2.2.4" }, "peerDependencies": { "expo": "*" } }, "sha512-Q5fXHhu6w3pVPlFCibU72SYIAN+9wX7QpFn9h49IUqs0Equ44QgswtGrxeh7fdnDqJrrYGPet5iBzjnE70uolA=="],
 
     "expo-manifests": ["expo-manifests@1.0.10", "", { "dependencies": { "@expo/config": "~12.0.11", "expo-json-utils": "~0.15.0" }, "peerDependencies": { "expo": "*" } }, "sha512-oxDUnURPcL4ZsOBY6X1DGWGuoZgVAFzp6PISWV7lPP2J0r8u1/ucuChBgpK7u1eLGFp6sDIPwXyEUCkI386XSQ=="],
 

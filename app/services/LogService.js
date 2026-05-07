@@ -81,6 +81,7 @@ class LogService {
       if (arg === null) return 'null';
       if (arg === undefined) return 'undefined';
       if (typeof arg === 'string') return arg;
+      if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
       try {
         const seen = new WeakSet();
         return JSON.stringify(arg, (key, value) => {
