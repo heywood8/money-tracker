@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.2](https://github.com/heywood8/money-tracker/compare/penny-v0.94.1...penny-v0.94.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* show correct currency symbol in graphs currency selector ([#511](https://github.com/heywood8/money-tracker/issues/511)) ([8b35a97](https://github.com/heywood8/money-tracker/commit/8b35a9708adb2ddafcd5010d0adf1ff29bc4fcee))
+
 ## [0.94.1](https://github.com/heywood8/money-tracker/compare/penny-v0.94.0...penny-v0.94.1) (2026-05-07)
 
 
