@@ -56,7 +56,6 @@ const BalanceHistoryCalendarView = ({
     const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
     const entry = balanceHistoryTableData.find((r) => r.date === dateStr);
     onEditBalance(dateStr, formatForInput(entry?.balance));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrentMonth, todayDate, selectedYear, selectedMonth, balanceHistoryTableData, onEditBalance]);
 
   const getEntry = (day) => {
