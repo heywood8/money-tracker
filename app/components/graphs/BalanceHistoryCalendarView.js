@@ -152,6 +152,9 @@ const BalanceHistoryCalendarView = ({
           testID="calendar-edit-row"
           style={[styles.editRow, { borderColor: colors.primary, backgroundColor: colors.surface }]}
         >
+          <TouchableOpacity testID="calendar-cancel-btn" onPress={handleCancel} style={styles.cancelBtn}>
+            <Text style={[styles.cancelBtnText, { color: colors.mutedText }]}>↩</Text>
+          </TouchableOpacity>
           <Text style={[styles.editDateLabel, { color: colors.mutedText }]}>
             {selectedDay}
           </Text>
@@ -164,7 +167,6 @@ const BalanceHistoryCalendarView = ({
             value={editingBalanceValue}
             onChangeText={onEditingBalanceValueChange}
             keyboardType="decimal-pad"
-            autoFocus
             placeholder={(0).toFixed(decimalDigits)}
             placeholderTextColor={colors.mutedText}
           />
@@ -181,12 +183,9 @@ const BalanceHistoryCalendarView = ({
               style={[styles.editBtn, styles.deleteBtn]}
               onPress={handleDelete}
             >
-              <Text style={styles.editBtnText}>✕</Text>
+              <Text style={styles.editBtnText}>🗑</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity testID="calendar-cancel-btn" onPress={handleCancel} style={styles.cancelBtn}>
-            <Text style={[styles.cancelBtnText, { color: colors.mutedText }]}>×</Text>
-          </TouchableOpacity>
         </View>
       )}
     </View>
