@@ -367,5 +367,9 @@
   "net_worth": "Nettovermögen",
   "this_month": "diesen Monat",
   "keep_filters_active": "Filter aktiv halten?",
-  "keep_filters": "Filter Behalten"
+  "keep_filters": "Filter Behalten",
+  "biometric_prompt": "Authentifizieren, um Guthaben anzuzeigen",
+  "biometric_unavailable": "Biometrische Authentifizierung ist auf diesem Gerät nicht verfügbar",
+  "biometric_not_enrolled": "Keine Biometrie eingerichtet. Bitte richten Sie Biometrie in den Geräteeinstellungen ein.",
+  "biometric_failed": "Authentifizierung fehlgeschlagen"
 }

@@ -367,5 +367,9 @@
   "net_worth": "Net Worth",
   "this_month": "this month",
   "keep_filters_active": "Keep filters active?",
-  "keep_filters": "Keep Filters"
+  "keep_filters": "Keep Filters",
+  "biometric_prompt": "Authenticate to show balances",
+  "biometric_unavailable": "Biometric authentication is not available on this device",
+  "biometric_not_enrolled": "No biometrics enrolled. Please set up biometrics in device settings.",
+  "biometric_failed": "Authentication failed"
 }

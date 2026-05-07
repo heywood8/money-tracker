@@ -367,5 +367,9 @@
   "net_worth": "Valeur Nette",
   "this_month": "ce mois-ci",
   "keep_filters_active": "Conserver les filtres actifs?",
-  "keep_filters": "Conserver les Filtres"
+  "keep_filters": "Conserver les Filtres",
+  "biometric_prompt": "Authentifiez-vous pour afficher les soldes",
+  "biometric_unavailable": "L'authentification biométrique n'est pas disponible sur cet appareil",
+  "biometric_not_enrolled": "Aucune biométrie enregistrée. Configurez la biométrie dans les paramètres de l'appareil.",
+  "biometric_failed": "Échec de l'authentification"
 }
