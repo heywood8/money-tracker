@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.91.0](https://github.com/heywood8/money-tracker/compare/penny-v0.90.0...penny-v0.91.0) (2026-05-07)
+
+
+### Features
+
+* show spinner on update check row while check is in progress ([2417c97](https://github.com/heywood8/money-tracker/commit/2417c97219bc0774f282c107de3433ada6e7748d))
+
 ## [0.90.0](https://github.com/heywood8/money-tracker/compare/penny-v0.89.0...penny-v0.90.0) (2026-05-07)
 
 
