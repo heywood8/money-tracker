@@ -155,13 +155,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
-  // Left text label (currency symbol, etc.)
-  leftText: {
-    fontSize: 14,
-    fontWeight: '600',
-    minWidth: 16,
-    textAlign: 'center',
-  },
   // Chip-style button with left icon and right chevron
   chipButton: {
     alignItems: 'center',
@@ -184,6 +177,13 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Left text label (currency symbol, etc.)
+  leftText: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 16,
+    textAlign: 'center',
   },
   // Modal styles
   modalContent: {
