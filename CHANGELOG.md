@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.93.1](https://github.com/heywood8/money-tracker/compare/penny-v0.93.0...penny-v0.93.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **modal:** fix double-slide, bottom gap, and description visibility ([#502](https://github.com/heywood8/money-tracker/issues/502)) ([80b3fd5](https://github.com/heywood8/money-tracker/commit/80b3fd5b26d07390d7741ac4f8438bc709359bf4))
+
 ## [0.93.0](https://github.com/heywood8/money-tracker/compare/penny-v0.92.1...penny-v0.93.0) (2026-05-07)
 
 
