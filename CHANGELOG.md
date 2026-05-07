@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.93.2](https://github.com/heywood8/money-tracker/compare/penny-v0.93.1...penny-v0.93.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* **graphs:** stretch balance history chart to fill card width ([#504](https://github.com/heywood8/money-tracker/issues/504)) ([bf7564f](https://github.com/heywood8/money-tracker/commit/bf7564fc5937e65d3f3cf0be54edb09fb9ba58b8))
+
 ## [0.93.1](https://github.com/heywood8/money-tracker/compare/penny-v0.93.0...penny-v0.93.1) (2026-05-07)
 
 
