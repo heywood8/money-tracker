@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.94.1](https://github.com/heywood8/money-tracker/compare/penny-v0.94.0...penny-v0.94.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **ModalShell:** eliminate open and close flicker in slide animation ([#508](https://github.com/heywood8/money-tracker/issues/508)) ([f66da79](https://github.com/heywood8/money-tracker/commit/f66da79ad3ba78a6febba978e552a9ff5e017c1a))
+
 ## [0.94.0](https://github.com/heywood8/money-tracker/compare/penny-v0.93.2...penny-v0.94.0) (2026-05-07)
 
 
