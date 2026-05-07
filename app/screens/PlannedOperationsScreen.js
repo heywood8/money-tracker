@@ -290,7 +290,7 @@ export default function PlannedOperationsScreen() {
           {executed && (
             <View
               testID={`check-badge-${item.id}`}
-              style={[styles.checkBadge, { borderColor: colors.background }]}
+              style={[styles.checkBadge, { borderColor: colors.background, backgroundColor: colors.income }]}
             >
               <Icon name="check" size={7} color="white" />
             </View>
@@ -358,7 +358,7 @@ export default function PlannedOperationsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {renderSummaryStrip()}
+      {plannedOperations.length > 0 && renderSummaryStrip()}
       {/* List */}
       <SectionList
         sections={sections}
@@ -402,7 +402,6 @@ export default function PlannedOperationsScreen() {
 const styles = StyleSheet.create({
   checkBadge: {
     alignItems: 'center',
-    backgroundColor: '#66bb6a',
     borderRadius: 7,
     borderWidth: 1.5,
     bottom: -2,
