@@ -191,18 +191,20 @@ const BalanceHistoryCard = ({
       ) : balanceHistoryData.actual && balanceHistoryData.actual.length > 0 ? (
         <>
           {showCalendar ? (
-            <BalanceHistoryCalendarView
-              colors={colors}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-              balanceHistoryTableData={balanceHistoryTableData}
-              editingBalanceValue={editingBalanceValue}
-              onEditingBalanceValueChange={onEditingBalanceValueChange}
-              onEditBalance={onEditBalance}
-              onCancelEdit={onCancelEdit}
-              onSaveBalance={onSaveBalance}
-              onDeleteBalance={onDeleteBalance}
-            />
+            <View style={styles.calendarContainer}>
+              <BalanceHistoryCalendarView
+                colors={colors}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                balanceHistoryTableData={balanceHistoryTableData}
+                editingBalanceValue={editingBalanceValue}
+                onEditingBalanceValueChange={onEditingBalanceValueChange}
+                onEditBalance={onEditBalance}
+                onCancelEdit={onCancelEdit}
+                onSaveBalance={onSaveBalance}
+                onDeleteBalance={onDeleteBalance}
+              />
+            </View>
           ) : (
             <>
               <View
@@ -689,6 +691,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
     overflow: 'hidden',
+  },
+  calendarContainer: {
+    minHeight: 340,
   },
   calendarToggleBtn: {
     alignItems: 'center',

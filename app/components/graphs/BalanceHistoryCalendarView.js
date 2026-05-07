@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import PropTypes from 'prop-types';
 
@@ -29,14 +29,23 @@ const BalanceHistoryCalendarView = ({
   onSaveBalance,
   onDeleteBalance,
 }) => {
-  const [selectedDay, setSelectedDay] = useState(null);
-
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
   const firstDayOffset = (new Date(selectedYear, selectedMonth, 1).getDay() + 6) % 7;
 
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === selectedYear && now.getMonth() === selectedMonth;
   const todayDate = now.getDate();
+
+  const [selectedDay, setSelectedDay] = useState(isCurrentMonth ? todayDate : null);
+
+  const hasAutoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (hasAutoSelectedRef.current || !isCurrentMonth) return;
+    hasAutoSelectedRef.current = true;
+    const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(todayDate).padStart(2, '0')}`;
+    const entry = balanceHistoryTableData.find((r) => r.date === dateStr);
+    onEditBalance(dateStr, entry?.balance || '');
+  }, [isCurrentMonth, todayDate, selectedYear, selectedMonth, balanceHistoryTableData, onEditBalance]);
 
   const getEntry = (day) => {
     const dateStr = getDateStr(selectedYear, selectedMonth, day);
