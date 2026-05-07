@@ -15,7 +15,6 @@ import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
 import ChartModal from '../components/graphs/ChartModal';
-import BalanceHistoryModal from '../components/graphs/BalanceHistoryModal';
 import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
@@ -40,7 +39,6 @@ const GraphsScreen = () => {
 
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
-  const [balanceHistoryModalVisible, setBalanceHistoryModalVisible] = useState(false);
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -76,7 +74,6 @@ const GraphsScreen = () => {
     loadBalanceHistory,
     balanceHistoryTableData,
     loadBalanceHistoryTable,
-    editingBalanceRow,
     editingBalanceValue,
     setEditingBalanceValue,
     handleEditBalance,
@@ -93,6 +90,10 @@ const GraphsScreen = () => {
   const handleIncomeLegendItemPress = useCallback((categoryId) => {
     setSelectedIncomeCategory(categoryId);
   }, []);
+
+  const handleShowCalendar = useCallback(async () => {
+    await loadBalanceHistoryTable();
+  }, [loadBalanceHistoryTable]);
 
   // Month names translation keys
   const monthKeys = [
@@ -198,18 +199,6 @@ const GraphsScreen = () => {
 
     return unsubscribe;
   }, [loadCategories, loadAvailableMonthsData]);
-
-
-
-
-
-  // Open balance history modal with table data
-  const handleBalanceHistoryPress = useCallback(async () => {
-    const result = await loadBalanceHistoryTable();
-    if (result) {
-      setBalanceHistoryModalVisible(true);
-    }
-  }, [loadBalanceHistoryTable]);
 
   // Reload data when filters change
   useEffect(() => {
@@ -370,10 +359,6 @@ const GraphsScreen = () => {
     setModalVisible(false);
   }, []);
 
-  const closeBalanceHistoryModal = useCallback(() => {
-    setBalanceHistoryModalVisible(false);
-  }, []);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -433,13 +418,20 @@ const GraphsScreen = () => {
               accountItems={accountItems}
               loadingBalanceHistory={loadingBalanceHistory}
               balanceHistoryData={balanceHistoryData}
-              onChartPress={handleBalanceHistoryPress}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               accounts={accounts}
               spendingPrediction={spendingPrediction}
               isCurrentMonth={isCurrentMonth}
               closeLabel={t('close')}
+              onShowCalendar={handleShowCalendar}
+              balanceHistoryTableData={balanceHistoryTableData}
+              editingBalanceValue={editingBalanceValue}
+              onEditingBalanceValueChange={setEditingBalanceValue}
+              onEditBalance={handleEditBalance}
+              onCancelEdit={handleCancelEdit}
+              onSaveBalance={handleSaveBalance}
+              onDeleteBalance={handleDeleteBalance}
             />
           )}
 
@@ -478,21 +470,6 @@ const GraphsScreen = () => {
         onIncomeLegendItemPress={handleIncomeLegendItemPress}
       />
 
-      {/* Balance History Details Modal */}
-      <BalanceHistoryModal
-        visible={balanceHistoryModalVisible}
-        colors={colors}
-        t={t}
-        onClose={closeBalanceHistoryModal}
-        balanceHistoryTableData={balanceHistoryTableData}
-        editingBalanceRow={editingBalanceRow}
-        editingBalanceValue={editingBalanceValue}
-        onEditingBalanceValueChange={setEditingBalanceValue}
-        onEditBalance={handleEditBalance}
-        onCancelEdit={handleCancelEdit}
-        onSaveBalance={handleSaveBalance}
-        onDeleteBalance={handleDeleteBalance}
-      />
     </View>
   );
 };
