@@ -89,7 +89,7 @@ export default function ModalShell({
           bounciness: 0,
         }).start();
       },
-    })
+    }),
   ).current;
 
   return (
@@ -104,96 +104,96 @@ export default function ModalShell({
         <KeyboardAvoidingView behavior="padding" style={styles.flex1}>
           <Pressable style={styles.overlay} onPress={onDismiss}>
             <Animated.View style={{ transform: [{ translateY }] }}>
-            <Pressable
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => {}}
-            >
-              {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
-              <View {...panResponder.panHandlers}>
-                <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
-
-                {/* Header */}
-                <View style={styles.header}>
-                  <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-                  {subtitle ? (
-                    <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-                      {subtitle}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Scrollable form content */}
-              <ScrollView
-                ref={scrollRef}
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
+              <Pressable
+                style={[styles.card, { backgroundColor: colors.card }]}
+                onPress={() => {}}
               >
-                {children}
-              </ScrollView>
+                {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
+                <View {...panResponder.panHandlers}>
+                  <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-              {/* Delete row (shown only when onDelete is provided) */}
-              {onDelete ? (
-                <View style={styles.deleteWrapper}>
+                  {/* Header */}
+                  <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+                    {subtitle ? (
+                      <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                {/* Scrollable form content */}
+                <ScrollView
+                  ref={scrollRef}
+                  style={styles.scroll}
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {children}
+                </ScrollView>
+
+                {/* Delete row (shown only when onDelete is provided) */}
+                {onDelete ? (
+                  <View style={styles.deleteWrapper}>
+                    <TouchableRipple
+                      onPress={deleteDisabled ? undefined : onDelete}
+                      disabled={deleteDisabled}
+                      rippleColor={colors.delete + '18'}
+                      style={[
+                        styles.btn,
+                        styles.deleteRow,
+                        { borderColor: colors.delete + '40' },
+                        deleteDisabled && styles.disabled,
+                      ]}
+                      borderless={false}
+                    >
+                      <View style={styles.deleteRowContent}>
+                        <Icon name="delete-outline" size={18} color={colors.delete} />
+                        <Text style={[styles.deleteRowText, { color: colors.delete }]}>
+                          {deleteLabel || t('delete')}
+                        </Text>
+                      </View>
+                    </TouchableRipple>
+                  </View>
+                ) : null}
+
+                {/* Extra actions slot (e.g. Split button in OperationModal) */}
+                {extraActions || null}
+
+                {/* Cancel / Save (or full-width Cancel when onSave is absent) */}
+                <View style={[styles.actions, { borderTopColor: colors.border }]}>
                   <TouchableRipple
-                    onPress={deleteDisabled ? undefined : onDelete}
-                    disabled={deleteDisabled}
-                    rippleColor={colors.delete + '18'}
+                    onPress={onCancel}
                     style={[
                       styles.btn,
-                      styles.deleteRow,
-                      { borderColor: colors.delete + '40' },
-                      deleteDisabled && styles.disabled,
+                      styles.cancelBtn,
+                      { borderColor: colors.border },
+                      !onSave && styles.fullWidthBtn,
                     ]}
+                    rippleColor="rgba(0,0,0,0.05)"
                     borderless={false}
                   >
-                    <View style={styles.deleteRowContent}>
-                      <Icon name="delete-outline" size={18} color={colors.delete} />
-                      <Text style={[styles.deleteRowText, { color: colors.delete }]}>
-                        {deleteLabel || t('delete')}
-                      </Text>
-                    </View>
-                  </TouchableRipple>
-                </View>
-              ) : null}
-
-              {/* Extra actions slot (e.g. Split button in OperationModal) */}
-              {extraActions || null}
-
-              {/* Cancel / Save (or full-width Cancel when onSave is absent) */}
-              <View style={[styles.actions, { borderTopColor: colors.border }]}>
-                <TouchableRipple
-                  onPress={onCancel}
-                  style={[
-                    styles.btn,
-                    styles.cancelBtn,
-                    { borderColor: colors.border },
-                    !onSave && styles.fullWidthBtn,
-                  ]}
-                  rippleColor="rgba(0,0,0,0.05)"
-                  borderless={false}
-                >
-                  <Text style={[styles.btnText, { color: colors.text }]}>
-                    {cancelLabel || t('cancel')}
-                  </Text>
-                </TouchableRipple>
-
-                {onSave ? (
-                  <TouchableRipple
-                    onPress={onSave}
-                    style={[styles.btn, { backgroundColor: colors.primary }]}
-                    rippleColor="rgba(255,255,255,0.2)"
-                    borderless={false}
-                  >
-                    <Text style={[styles.btnText, styles.saveBtnText]}>
-                      {saveLabel || t('save')}
+                    <Text style={[styles.btnText, { color: colors.text }]}>
+                      {cancelLabel || t('cancel')}
                     </Text>
                   </TouchableRipple>
-                ) : null}
-              </View>
-            </Pressable>
+
+                  {onSave ? (
+                    <TouchableRipple
+                      onPress={onSave}
+                      style={[styles.btn, { backgroundColor: colors.primary }]}
+                      rippleColor="rgba(255,255,255,0.2)"
+                      borderless={false}
+                    >
+                      <Text style={[styles.btnText, styles.saveBtnText]}>
+                        {saveLabel || t('save')}
+                      </Text>
+                    </TouchableRipple>
+                  ) : null}
+                </View>
+              </Pressable>
             </Animated.View>
           </Pressable>
         </KeyboardAvoidingView>
