@@ -617,6 +617,21 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+// Mock react-native-safe-area-context
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const PropTypes = require('prop-types');
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  const SafeAreaProvider = ({ children }) => children;
+  SafeAreaProvider.propTypes = { children: PropTypes.node };
+  return {
+    SafeAreaProvider,
+    SafeAreaView: ({ children }) => children,
+    useSafeAreaInsets: () => insets,
+    SafeAreaConsumer: ({ children }) => children(insets),
+  };
+});
+
 // Mock react-native-draggable-flatlist
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');

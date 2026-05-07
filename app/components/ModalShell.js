@@ -1,5 +1,5 @@
 // app/components/ModalShell.js
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Modal as RNModal,
@@ -9,10 +9,12 @@ import {
   ScrollView,
   PanResponder,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { Text, TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -47,15 +49,37 @@ export default function ModalShell({
 }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
+  const insets = useSafeAreaInsets();
 
   const translateY = useRef(new Animated.Value(0)).current;
   // Use a ref so the PanResponder closure always calls the latest onDismiss
   const onDismissRef = useRef(onDismiss);
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
 
+  // Slide in from bottom when modal opens
   useEffect(() => {
-    if (visible) translateY.setValue(0);
+    if (visible) {
+      translateY.setValue(Dimensions.get('window').height * 0.6);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 2,
+        speed: 14,
+      }).start();
+    }
   }, [visible, translateY]);
+
+  // Animate out then call callback — used for overlay tap and cancel button
+  const animateOut = useCallback((callback) => {
+    Animated.timing(translateY, {
+      toValue: Dimensions.get('window').height,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      translateY.setValue(0);
+      callback?.();
+    });
+  }, [translateY]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -97,15 +121,15 @@ export default function ModalShell({
       {showBlurOverlay && visible && <ModalBlurOverlay />}
       <RNModal
         visible={visible}
-        animationType="slide"
+        animationType="none"
         transparent={true}
-        onRequestClose={onDismiss}
+        onRequestClose={() => animateOut(onDismiss)}
       >
         <KeyboardAvoidingView behavior="padding" style={styles.flex1}>
-          <Pressable style={styles.overlay} onPress={onDismiss}>
+          <Pressable style={styles.overlay} onPress={() => animateOut(onDismiss)}>
             <Animated.View style={{ transform: [{ translateY }] }}>
               <Pressable
-                style={[styles.card, { backgroundColor: colors.card }]}
+                style={[styles.card, { backgroundColor: colors.card, maxHeight: Dimensions.get('window').height * 0.88 }]}
                 onPress={() => {}}
               >
                 {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
@@ -134,38 +158,38 @@ export default function ModalShell({
                   {children}
                 </ScrollView>
 
-                {/* Delete row (shown only when onDelete is provided) */}
-                {onDelete ? (
+                {/* Secondary actions: delete + extra actions in one compact row */}
+                {(onDelete || extraActions) ? (
                   <View style={styles.deleteWrapper}>
-                    <TouchableRipple
-                      onPress={deleteDisabled ? undefined : onDelete}
-                      disabled={deleteDisabled}
-                      rippleColor={colors.delete + '18'}
-                      style={[
-                        styles.btn,
-                        styles.deleteRow,
-                        { borderColor: colors.delete + '40' },
-                        deleteDisabled && styles.disabled,
-                      ]}
-                      borderless={false}
-                    >
-                      <View style={styles.deleteRowContent}>
-                        <Icon name="delete-outline" size={18} color={colors.delete} />
-                        <Text style={[styles.deleteRowText, { color: colors.delete }]}>
-                          {deleteLabel || t('delete')}
-                        </Text>
-                      </View>
-                    </TouchableRipple>
+                    {onDelete ? (
+                      <TouchableRipple
+                        onPress={deleteDisabled ? undefined : onDelete}
+                        disabled={deleteDisabled}
+                        rippleColor={colors.delete + '18'}
+                        style={[
+                          styles.btn,
+                          styles.deleteRow,
+                          { borderColor: colors.delete + '40' },
+                          deleteDisabled && styles.disabled,
+                        ]}
+                        borderless={false}
+                      >
+                        <View style={styles.deleteRowContent}>
+                          <Icon name="delete-outline" size={18} color={colors.delete} />
+                          <Text style={[styles.deleteRowText, { color: colors.delete }]}>
+                            {deleteLabel || t('delete')}
+                          </Text>
+                        </View>
+                      </TouchableRipple>
+                    ) : null}
+                    {extraActions || null}
                   </View>
                 ) : null}
 
-                {/* Extra actions slot (e.g. Split button in OperationModal) */}
-                {extraActions || null}
-
                 {/* Cancel / Save (or full-width Cancel when onSave is absent) */}
-                <View style={[styles.actions, { borderTopColor: colors.border }]}>
+                <View style={[styles.actions, { borderTopColor: colors.border, paddingBottom: SPACING.md + insets.bottom }]}>
                   <TouchableRipple
-                    onPress={onCancel}
+                    onPress={() => animateOut(onCancel)}
                     style={[
                       styles.btn,
                       styles.cancelBtn,
@@ -238,7 +262,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: SPACING.sm,
-    paddingBottom: SPACING.xl,
     paddingTop: SPACING.sm,
   },
   btn: {
@@ -258,7 +281,7 @@ const styles = StyleSheet.create({
   card: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    maxHeight: undefined,
     overflow: 'hidden',
     paddingBottom: 0,
     paddingHorizontal: SPACING.lg,
@@ -278,6 +301,7 @@ const styles = StyleSheet.create({
   },
   deleteWrapper: {
     flexDirection: 'row',
+    gap: SPACING.sm,
     marginTop: SPACING.sm,
   },
   disabled: {
@@ -310,7 +334,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   scrollContent: {
-    paddingBottom: SPACING.sm,
+    paddingBottom: 0,
   },
   subtitle: {
     fontSize: 12,

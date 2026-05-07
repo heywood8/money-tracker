@@ -544,7 +544,7 @@ describe('OperationModal', () => {
   });
 
   describe('Modal Dismissal', () => {
-    it('calls handleClose when cancel button is pressed', () => {
+    it('calls handleClose when cancel button is pressed', async () => {
       const mockHandleClose = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -560,7 +560,9 @@ describe('OperationModal', () => {
       const cancelButtons = getAllByText('cancel');
       fireEvent.press(cancelButtons[0]);
 
-      expect(mockHandleClose).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockHandleClose).toHaveBeenCalled();
+      });
     });
 
     it('shows close button instead of cancel for shadow operations', () => {
