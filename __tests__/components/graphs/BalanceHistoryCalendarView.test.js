@@ -13,21 +13,18 @@ const mockColors = {
   background: '#f5f5f5',
 };
 
-const makeTableData = (year, month) => {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  return Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return { date: dateStr, displayDate: String(day), balance: null };
-  });
-};
+const makeEntry = (year, month, day, balance) => ({
+  date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  displayDate: String(day),
+  balance,
+});
 
 const defaultProps = {
   colors: mockColors,
   t: (key) => key,
   selectedYear: 2024,
   selectedMonth: 0, // January
-  balanceHistoryTableData: makeTableData(2024, 0),
+  balanceHistoryTableData: [], // real data is sparse; only recorded days have entries
   editingBalanceRow: null,
   editingBalanceValue: '',
   onEditingBalanceValueChange: jest.fn(),
@@ -42,11 +39,14 @@ describe('BalanceHistoryCalendarView', () => {
 
   describe('Grid rendering', () => {
     it('renders all 7 day-of-week headers', () => {
-      const { getByText } = render(<BalanceHistoryCalendarView {...defaultProps} />);
+      const { getByText, getAllByText } = render(<BalanceHistoryCalendarView {...defaultProps} />);
       expect(getByText('M')).toBeTruthy();
+      const tHeaders = getAllByText('T');
+      expect(tHeaders).toHaveLength(2); // Tuesday and Thursday
       expect(getByText('W')).toBeTruthy();
       expect(getByText('F')).toBeTruthy();
       expect(getByText('S')).toBeTruthy();
+      expect(getByText('Su')).toBeTruthy();
     });
 
     it('renders a cell for every day of the month', () => {
@@ -57,9 +57,10 @@ describe('BalanceHistoryCalendarView', () => {
     });
 
     it('shows formatted balance in cells that have an entry', () => {
-      const tableData = makeTableData(2024, 0);
-      tableData[4].balance = '532000'; // day 5 → 532K
-      tableData[14].balance = '1500000'; // day 15 → 1.5M
+      const tableData = [
+        makeEntry(2024, 0, 5, '532000'),  // day 5 → 532K
+        makeEntry(2024, 0, 15, '1500000'), // day 15 → 1.5M
+      ];
       const { getByTestId } = render(
         <BalanceHistoryCalendarView {...defaultProps} balanceHistoryTableData={tableData} />,
       );
@@ -81,8 +82,7 @@ describe('BalanceHistoryCalendarView', () => {
     });
 
     it('calls onEditBalance with existing balance when tapping a day with an entry', () => {
-      const tableData = makeTableData(2024, 0);
-      tableData[9].balance = '1200.00'; // day 10
+      const tableData = [makeEntry(2024, 0, 10, '1200.00')];
       const { getByTestId } = render(
         <BalanceHistoryCalendarView {...defaultProps} balanceHistoryTableData={tableData} />,
       );
@@ -118,8 +118,7 @@ describe('BalanceHistoryCalendarView', () => {
     });
 
     it('shows delete button only for days with an existing entry', () => {
-      const tableData = makeTableData(2024, 0);
-      tableData[6].balance = '999.00'; // day 7 has entry
+      const tableData = [makeEntry(2024, 0, 7, '999.00')]; // day 7 has entry
       const { getByTestId, queryByTestId } = render(
         <BalanceHistoryCalendarView {...defaultProps} balanceHistoryTableData={tableData} />,
       );
@@ -131,8 +130,7 @@ describe('BalanceHistoryCalendarView', () => {
     });
 
     it('calls onDeleteBalance with the correct date and hides edit row', () => {
-      const tableData = makeTableData(2024, 0);
-      tableData[9].balance = '500'; // day 10
+      const tableData = [makeEntry(2024, 0, 10, '500')]; // day 10
       const { getByTestId, queryByTestId } = render(
         <BalanceHistoryCalendarView {...defaultProps} balanceHistoryTableData={tableData} />,
       );
