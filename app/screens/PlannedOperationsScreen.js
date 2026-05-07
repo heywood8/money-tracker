@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, StyleSheet, SectionList, Pressable } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
@@ -45,22 +46,120 @@ export default function PlannedOperationsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOp, setEditingOp] = useState(null);
   const [isNew, setIsNew] = useState(true);
-  const [activeTab, setActiveTab] = useState('recurring');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  // Filter planned operations by tab
-  const filteredOps = useMemo(() => {
-    const ops = plannedOperations.filter(op =>
-      activeTab === 'recurring' ? op.isRecurring : !op.isRecurring,
-    );
+  const sortByExecution = useCallback((ops) => {
     return [...ops].sort((a, b) => {
       const aEx = isExecutedThisMonth(a);
       const bEx = isExecutedThisMonth(b);
       if (aEx === bEx) return 0;
       return aEx ? 1 : -1;
     });
-  }, [plannedOperations, activeTab, isExecutedThisMonth]);
+  }, [isExecutedThisMonth]);
+
+  const recurringOps = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => op.isRecurring)),
+    [plannedOperations, sortByExecution],
+  );
+
+  const oneTimeOps = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => !op.isRecurring)),
+    [plannedOperations, sortByExecution],
+  );
+
+  const sections = useMemo(() => {
+    const result = [];
+    if (recurringOps.length > 0) {
+      result.push({ key: 'recurring', data: recurringOps });
+    }
+    if (oneTimeOps.length > 0) {
+      result.push({ key: 'one_time', data: oneTimeOps });
+    }
+    return result;
+  }, [recurringOps, oneTimeOps]);
+
+  const summary = useMemo(() => {
+    const pending = plannedOperations.filter(op => !isExecutedThisMonth(op));
+    const pendingOut = pending
+      .filter(op => op.type === 'expense' || op.type === 'transfer')
+      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
+    const pendingIn = pending
+      .filter(op => op.type === 'income')
+      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
+    const doneCount = plannedOperations.filter(op => isExecutedThisMonth(op)).length;
+    const total = plannedOperations.length;
+    const progressFraction = total > 0 ? doneCount / total : 0;
+    return { pendingOut, pendingIn, doneCount, total, progressFraction };
+  }, [plannedOperations, isExecutedThisMonth]);
+
+  const formatSummaryAmount = useCallback((amount) => {
+    if (amount === 0) return '0';
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `${Math.round(amount / 1000)}K`;
+    return String(Math.round(amount));
+  }, []);
+
+  const renderSummaryStrip = useCallback(() => (
+    <View style={[styles.summaryStrip, { backgroundColor: colors.surface }]}>
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-pending-out"
+            style={[styles.summaryValue, { color: colors.expense }]}
+          >
+            {formatSummaryAmount(summary.pendingOut)}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('pending_out')}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-done-count"
+            style={[styles.summaryValue, { color: colors.text }]}
+          >
+            {`${summary.doneCount} / ${summary.total}`}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('done_this_month')}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text
+            testID="summary-pending-in"
+            style={[styles.summaryValue, { color: colors.income }]}
+          >
+            {formatSummaryAmount(summary.pendingIn)}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>
+            {t('pending_in')}
+          </Text>
+        </View>
+      </View>
+      <View
+        testID="summary-progress-bar"
+        style={[styles.progressTrack, { backgroundColor: colors.border }]}
+      >
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round(summary.progressFraction * 100)}%`, backgroundColor: colors.primary },
+          ]}
+        />
+      </View>
+      <View style={styles.progressLabels}>
+        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
+          {`${summary.doneCount} ${t('done')}`}
+        </Text>
+        <Text style={[styles.progressLabel, { color: colors.mutedText }]}>
+          {`${summary.total - summary.doneCount} ${t('remaining')}`}
+        </Text>
+      </View>
+    </View>
+  ), [colors, summary, t, formatSummaryAmount]);
 
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(a => a.id === accountId);
@@ -142,71 +241,111 @@ export default function PlannedOperationsScreen() {
     );
   }, [showDialog, t, handleEdit, deletePlannedOperation]);
 
+  const renderRightActions = useCallback((item) => (
+    <Pressable
+      testID={`execute-action-${item.id}`}
+      style={[styles.swipeExecute, { backgroundColor: colors.primary }]}
+      onPress={() => handleExecute(item)}
+      accessibilityRole="button"
+      accessibilityLabel={t('execute')}
+    >
+      <Icon name="play" size={20} color="white" />
+      <Text style={styles.swipeExecuteText}>{t('execute')}</Text>
+    </Pressable>
+  ), [colors.primary, handleExecute, t]);
+
+  const renderSectionHeader = useCallback(({ section }) => {
+    const label = section.key === 'recurring' ? `🔁 ${t('recurring')}` : `1️⃣ ${t('one_time')}`;
+    const count = section.data.length;
+    return (
+      <View style={styles.sectionHeader} testID={`section-header-${section.key}`}>
+        <Text style={[styles.sectionHeaderText, { color: colors.mutedText }]}>{label}</Text>
+        <View style={[styles.sectionHeaderLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.sectionHeaderCount, { color: colors.mutedText }]}>{count}</Text>
+      </View>
+    );
+  }, [colors, t]);
+
   const renderItem = useCallback(({ item }) => {
     const executed = isExecutedThisMonth(item);
     const categoryInfo = getCategoryInfo(item.categoryId);
     const accountCurrency = getAccountCurrency(item.accountId);
     const currencySymbol = getCurrencySymbol(accountCurrency);
     const typeColor = colors[TYPE_COLORS[item.type]] || colors.text;
+    const mutedTypeColor = typeColor + '60';
 
-    const itemStyle = {
-      backgroundColor: colors.card,
-      borderColor: executed ? colors.mutedText + '60' : colors.border,
-    };
-
-    return (
+    const rowContent = (
       <Pressable
-        style={[styles.itemContainer, itemStyle]}
+        style={styles.itemContainer}
         onPress={() => handleEdit(item)}
         onLongPress={() => handleLongPress(item)}
       >
-        {/* Left: Category icon or type icon */}
+        {/* Left: Category icon with optional checkmark badge */}
         <View style={[styles.iconContainer, { backgroundColor: typeColor + '1A' }]}>
           <Icon
             name={categoryInfo.icon || TYPE_ICONS[item.type]}
             size={22}
-            color={typeColor}
+            color={executed ? mutedTypeColor : typeColor}
           />
+          {executed && (
+            <View
+              testID={`check-badge-${item.id}`}
+              style={[styles.checkBadge, { borderColor: colors.background, backgroundColor: colors.income }]}
+            >
+              <Icon name="check" size={7} color="white" />
+            </View>
+          )}
         </View>
 
-        {/* Center: Name, account, category */}
+        {/* Center: Name and meta */}
         <View style={styles.itemDetails}>
-          <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.itemName, { color: executed ? colors.mutedText : colors.text }]}
+            numberOfLines={1}
+          >
             {item.name}
           </Text>
-          <View style={styles.itemMeta}>
-            <Text style={[styles.itemMetaText, { color: colors.mutedText }]} numberOfLines={1}>
-              {getAccountName(item.accountId)}
-              {categoryInfo.name ? ` • ${categoryInfo.name}` : ''}
-            </Text>
-          </View>
+          <Text style={[styles.itemMetaText, { color: colors.mutedText }]} numberOfLines={1}>
+            {getAccountName(item.accountId)}
+            {categoryInfo.name ? ` · ${categoryInfo.name}` : ''}
+          </Text>
         </View>
 
-        {/* Right: Amount and execute button */}
-        <View style={styles.itemRight}>
-          <Text style={[styles.itemAmount, { color: typeColor }]} numberOfLines={1}>
-            {currencySymbol}{item.amount}
-          </Text>
-          <Pressable
-            style={[
-              styles.executeButton,
-              {
-                backgroundColor: executed ? colors.income + '1A' : colors.primary + '1A',
-              },
-            ]}
-            onPress={() => handleExecute(item)}
-            hitSlop={8}
-          >
-            <Icon
-              name={executed ? 'check-circle' : 'play-circle-outline'}
-              size={24}
-              color={executed ? colors.income : colors.primary}
-            />
-          </Pressable>
-        </View>
+        {/* Right: Amount */}
+        <Text
+          style={[styles.itemAmount, { color: executed ? mutedTypeColor : typeColor }]}
+          numberOfLines={1}
+        >
+          {currencySymbol}{item.amount}
+        </Text>
       </Pressable>
     );
-  }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency, getCurrencySymbol, handleEdit, handleLongPress, handleExecute]);
+
+    if (executed) {
+      return (
+        <View
+          testID={`item-opacity-${item.id}`}
+          style={styles.executedWrapper}
+        >
+          {rowContent}
+        </View>
+      );
+    }
+
+    return (
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
+        friction={2}
+        rightThreshold={60}
+      >
+        <View testID={`item-opacity-${item.id}`}>
+          {rowContent}
+        </View>
+      </Swipeable>
+    );
+  }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency,
+    getCurrencySymbol, handleEdit, handleLongPress, renderRightActions]);
 
   const renderEmpty = useCallback(() => {
     if (loading) {
@@ -217,54 +356,17 @@ export default function PlannedOperationsScreen() {
     );
   }, [loading, t]);
 
-  const recurringTabStyle = {
-    backgroundColor: activeTab === 'recurring' ? colors.primary + '1A' : 'transparent',
-    borderColor: activeTab === 'recurring' ? colors.primary : colors.border,
-  };
-  const oneTimeTabStyle = {
-    backgroundColor: activeTab === 'one_time' ? colors.primary + '1A' : 'transparent',
-    borderColor: activeTab === 'one_time' ? colors.primary : colors.border,
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tab Selector */}
-      <View style={styles.tabRow}>
-        <Pressable
-          style={[styles.tab, recurringTabStyle]}
-          onPress={() => setActiveTab('recurring')}
-        >
-          <Icon
-            name="refresh"
-            size={16}
-            color={activeTab === 'recurring' ? colors.primary : colors.mutedText}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'recurring' ? colors.primary : colors.mutedText }]}>
-            {t('recurring')}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, oneTimeTabStyle]}
-          onPress={() => setActiveTab('one_time')}
-        >
-          <Icon
-            name="numeric-1-circle-outline"
-            size={16}
-            color={activeTab === 'one_time' ? colors.primary : colors.mutedText}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'one_time' ? colors.primary : colors.mutedText }]}>
-            {t('one_time')}
-          </Text>
-        </Pressable>
-      </View>
-
+      {plannedOperations.length > 0 && renderSummaryStrip()}
       {/* List */}
-      <FlatList
-        data={filteredOps}
+      <SectionList
+        sections={sections}
         keyExtractor={item => item.id}
         renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={filteredOps.length === 0 ? styles.emptyList : styles.listContent}
+        contentContainerStyle={sections.length === 0 ? styles.emptyList : styles.listContent}
         windowSize={10}
         maxToRenderPerBatch={10}
         removeClippedSubviews={true}
@@ -298,6 +400,17 @@ export default function PlannedOperationsScreen() {
 }
 
 const styles = StyleSheet.create({
+  checkBadge: {
+    alignItems: 'center',
+    borderRadius: 7,
+    borderWidth: 1.5,
+    bottom: -2,
+    height: 13,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: 13,
+  },
   container: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -306,12 +419,8 @@ const styles = StyleSheet.create({
   emptyList: {
     flexGrow: 1,
   },
-  executeButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
+  executedWrapper: {
+    opacity: 0.4,
   },
   iconContainer: {
     alignItems: 'center',
@@ -328,19 +437,15 @@ const styles = StyleSheet.create({
   itemContainer: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: SPACING.md,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.md,
   },
   itemDetails: {
     flex: 1,
     gap: 2,
-  },
-  itemMeta: {
-    flexDirection: 'row',
   },
   itemMetaText: {
     fontSize: FONT_SIZE.sm,
@@ -349,33 +454,92 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
-  itemRight: {
-    alignItems: 'flex-end',
-    gap: SPACING.xs,
-  },
   listContent: {
     paddingBottom: 180,
+  },
+  progressFill: {
+    borderRadius: 2,
+    height: 3,
+  },
+  progressLabel: {
+    fontSize: FONT_SIZE.xs,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 3,
+  },
+  progressTrack: {
+    borderRadius: 2,
+    height: 3,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+  },
+  sectionHeaderCount: {
+    flexShrink: 0,
+    fontSize: FONT_SIZE.xs,
+  },
+  sectionHeaderLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  sectionHeaderText: {
+    flexShrink: 0,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   snackbar: {
     marginBottom: 100,
   },
-  tab: {
+  summaryDivider: {
+    height: 30,
+    width: StyleSheet.hairlineWidth,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: FONT_SIZE.xs,
+    marginTop: 2,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryStrip: {
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  summaryValue: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+  },
+  swipeExecute: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
     justifyContent: 'center',
-    marginHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    width: 72,
   },
-  tabRow: {
-    flexDirection: 'row',
-    marginBottom: SPACING.md,
-  },
-  tabText: {
-    fontSize: FONT_SIZE.sm,
+  swipeExecuteText: {
+    color: 'white',
+    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
+    marginTop: 2,
   },
 });

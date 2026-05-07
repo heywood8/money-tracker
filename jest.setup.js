@@ -447,6 +447,13 @@ jest.mock('react-native-gesture-handler', () => {
   const GestureDetector = ({ children }) => React.createElement(View, {}, children);
   GestureDetector.propTypes = { children: PropTypes.node };
 
+  const { View: RNView } = require('react-native');
+  const SwipeableMock = ({ children, renderRightActions }) => {
+    const rightActions = renderRightActions ? renderRightActions() : null;
+    return React.createElement(RNView, {}, children, rightActions);
+  };
+  SwipeableMock.propTypes = { children: PropTypes.node, renderRightActions: PropTypes.func };
+
   const Gesture = {
     Pan: jest.fn(() => ({
       onStart: jest.fn().mockReturnThis(),
@@ -481,7 +488,7 @@ jest.mock('react-native-gesture-handler', () => {
   };
 
   return {
-    Swipeable: View,
+    Swipeable: SwipeableMock,
     DrawerLayout: View,
     State: {},
     ScrollView: View,
@@ -566,6 +573,10 @@ jest.mock('react-native-paper', () => {
   const PaperText = ({ children, style, ...props }) => React.createElement(Text, { style, ...props }, children);
   PaperText.propTypes = { children: PropTypes.node, style: PropTypes.any };
 
+  const Snackbar = ({ children, visible, onDismiss, duration, style, ...props }) =>
+    visible ? React.createElement(View, { style, ...props }, React.createElement(Text, {}, children)) : null;
+  Snackbar.propTypes = { children: PropTypes.node, visible: PropTypes.bool, onDismiss: PropTypes.func, duration: PropTypes.number, style: PropTypes.any };
+
   return {
     Card,
     TouchableRipple,
@@ -579,6 +590,7 @@ jest.mock('react-native-paper', () => {
     Divider: View,
     Switch,
     Provider,
+    Snackbar,
   };
 });
 
