@@ -152,22 +152,24 @@ const BalanceHistoryCard = ({
           )}
         </View>
         {/* Calendar / Chart toggle */}
-        <TouchableOpacity
-          testID="calendar-toggle-btn"
-          style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
-          onPress={() => {
-            const next = !showCalendar;
-            setShowCalendar(next);
-            if (next) onShowCalendar();
-          }}
-          activeOpacity={0.7}
-        >
-          <Icon
-            name={showCalendar ? 'chart-line' : 'calendar-month'}
-            size={18}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        {balanceHistoryData.actual && balanceHistoryData.actual.length > 0 && (
+          <TouchableOpacity
+            testID="calendar-toggle-btn"
+            style={[styles.calendarToggleBtn, { backgroundColor: colors.surface }]}
+            onPress={() => {
+              const next = !showCalendar;
+              setShowCalendar(next);
+              if (next) onShowCalendar();
+            }}
+            activeOpacity={0.7}
+          >
+            <Icon
+              name={showCalendar ? 'chart-line' : 'calendar-month'}
+              size={18}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        )}
         {/* Account Pill Picker */}
         <View style={[styles.accountPickerWrapper, { backgroundColor: colors.card }]}>
           <SimplePicker
