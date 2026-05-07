@@ -1,5 +1,5 @@
 // app/components/ModalShell.js
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Modal as RNModal,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   ScrollView,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { Text, TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -46,6 +48,50 @@ export default function ModalShell({
   const { colors } = useThemeColors();
   const { t } = useLocalization();
 
+  const translateY = useRef(new Animated.Value(0)).current;
+  // Use a ref so the PanResponder closure always calls the latest onDismiss
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
+
+  useEffect(() => {
+    if (visible) translateY.setValue(0);
+  }, [visible, translateY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) translateY.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.3) {
+          Animated.timing(translateY, {
+            toValue: 800,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            translateY.setValue(0);
+            onDismissRef.current?.();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 0,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 0,
+        }).start();
+      },
+    })
+  ).current;
+
   return (
     <>
       {showBlurOverlay && visible && <ModalBlurOverlay />}
@@ -57,21 +103,24 @@ export default function ModalShell({
       >
         <KeyboardAvoidingView behavior="padding" style={styles.flex1}>
           <Pressable style={styles.overlay} onPress={onDismiss}>
+            <Animated.View style={{ transform: [{ translateY }] }}>
             <Pressable
               style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => {}}
             >
-              {/* Drag handle */}
-              <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+              {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
+              <View {...panResponder.panHandlers}>
+                <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-                {subtitle ? (
-                  <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-                    {subtitle}
-                  </Text>
-                ) : null}
+                {/* Header */}
+                <View style={styles.header}>
+                  <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+                  {subtitle ? (
+                    <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
 
               {/* Scrollable form content */}
@@ -145,6 +194,7 @@ export default function ModalShell({
                 ) : null}
               </View>
             </Pressable>
+            </Animated.View>
           </Pressable>
         </KeyboardAvoidingView>
       </RNModal>
