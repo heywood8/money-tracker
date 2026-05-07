@@ -349,18 +349,16 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   ];
 
   const splitExtraActions = canSplit ? (
-    <View style={styles.splitDeleteRow}>
-      <Pressable
-        style={[styles.splitButtonContainer, { backgroundColor: colors.card }]}
-        onPress={() => setShowSplitModal(true)}
-        testID="split-button"
-      >
-        <Icon name="call-split" size={18} color={colors.primary} />
-        <Text style={[styles.splitButtonText, { color: colors.primary }]}>
-          {t('split_transaction')}
-        </Text>
-      </Pressable>
-    </View>
+    <Pressable
+      style={[styles.splitButtonContainer, { backgroundColor: colors.card }]}
+      onPress={() => setShowSplitModal(true)}
+      testID="split-button"
+    >
+      <Icon name="call-split" size={18} color={colors.primary} />
+      <Text style={[styles.splitButtonText, { color: colors.primary }]}>
+        {t('split_transaction')}
+      </Text>
+    </Pressable>
   ) : null;
 
   return (
@@ -399,6 +397,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           hideCategoryPicker={!isNew}
           hideTransferTargetPicker={true}
           transferLayout="sideBySide"
+          compact={true}
           disabled={isShadowOperation}
           containerBackground={colors.card}
           onExchangeRateChange={handleExchangeRateChange}
@@ -704,10 +703,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  splitDeleteRow: {
-    flexDirection: 'row',
-    marginTop: SPACING.sm,
-  },
+
 });
 
 OperationModal.propTypes = {

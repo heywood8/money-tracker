@@ -563,7 +563,7 @@ describe('CategoryModal', () => {
   });
 
   describe('Modal Dismissal', () => {
-    it('calls onClose when cancel button is pressed', () => {
+    it('calls onClose when cancel button is pressed', async () => {
       const { getByText } = render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
@@ -571,7 +571,9 @@ describe('CategoryModal', () => {
       const cancelButton = getByText('cancel');
       fireEvent.press(cancelButton);
 
-      expect(mockOnClose).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled();
+      });
     });
 
     it('clears errors when modal is closed and reopened', () => {

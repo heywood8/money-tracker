@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
   chipsWrapper: {
     marginBottom: SPACING.md,
     marginTop: SPACING.xs,
-    minHeight: 30,
   },
   container: {
     marginBottom: SPACING.md,
