@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList, Linking } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,6 +47,7 @@ export default function SettingsModal({ visible, onClose }) {
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -438,6 +439,7 @@ export default function SettingsModal({ visible, onClose }) {
   }, [showDialog, t]);
 
   const handleCheckForUpdates = useCallback(async () => {
+    setIsCheckingUpdate(true);
     try {
       const result = await checkForAppUpdate();
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
@@ -497,6 +499,8 @@ export default function SettingsModal({ visible, onClose }) {
         t('update_check_failed') || 'Could not check updates right now. Please try again later.',
         [{ text: t('ok') || 'OK' }],
       );
+    } finally {
+      setIsCheckingUpdate(false);
     }
   }, [showDialog, t, startDownload, onClose]);
 
@@ -735,7 +739,7 @@ export default function SettingsModal({ visible, onClose }) {
             </View>
           </TouchableRipple>
 
-          <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+          <TouchableRipple onPress={handleCheckForUpdates} disabled={isCheckingUpdate} style={styles.settingsRow} testID="check-updates-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
                 <Ionicons name="download-outline" size={22} color={colors.text} />
@@ -743,7 +747,9 @@ export default function SettingsModal({ visible, onClose }) {
                   {t('check_updates') || 'Check for updates'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              {isCheckingUpdate
+                ? <ActivityIndicator size="small" color={colors.mutedText} />
+                : <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />}
             </View>
           </TouchableRipple>
 
