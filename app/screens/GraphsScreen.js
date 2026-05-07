@@ -235,6 +235,11 @@ const GraphsScreen = () => {
   [currencies],
   );
 
+  const selectedCurrencySymbol = useMemo(() => {
+    const info = currenciesJson[selectedCurrency];
+    return info ? info.symbol : selectedCurrency;
+  }, [selectedCurrency]);
+
   const accountItems = useMemo(() =>
     accounts
       .filter(acc => !acc.hidden)
@@ -372,7 +377,7 @@ const GraphsScreen = () => {
                 onValueChange={setSelectedCurrency}
                 items={currencyItems}
                 colors={colors}
-                leftIcon="currency-usd"
+                leftText={selectedCurrencySymbol}
               />
             </View>
 

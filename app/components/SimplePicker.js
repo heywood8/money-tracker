@@ -9,7 +9,7 @@ import ModalBlurOverlay from './ModalBlurOverlay';
  * SimplePicker - A picker component for Android
  * Uses native HTML select on web, custom modal picker on Android
  */
-const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon, closeLabel }) => {
+const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, leftIcon, leftText, closeLabel }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   // Defensive check for undefined items with warning
@@ -65,13 +65,17 @@ const SimplePicker = ({ value, onValueChange, items, style, textStyle, colors, l
   // Android: Use custom modal picker for better control
   return (
     <>
-      {leftIcon ? (
+      {(leftIcon || leftText) ? (
         <TouchableOpacity
           style={[styles.chipButton, style]}
           onPress={() => setModalVisible(true)}
           activeOpacity={0.7}
         >
-          <Icon name={leftIcon} size={16} color={safeColors.mutedText ?? '#666666'} />
+          {leftText ? (
+            <Text style={[styles.leftText, { color: safeColors.mutedText ?? '#666666' }]}>{leftText}</Text>
+          ) : (
+            <Icon name={leftIcon} size={16} color={safeColors.mutedText ?? '#666666'} />
+          )}
           <Text style={[styles.chipButtonText, textStyle, { color: safeColors.text }]} numberOfLines={1}>
             {selectedLabel}
           </Text>
@@ -149,6 +153,13 @@ const styles = StyleSheet.create({
   androidButtonText: {
     fontSize: 16,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  // Left text label (currency symbol, etc.)
+  leftText: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 16,
     textAlign: 'center',
   },
   // Chip-style button with left icon and right chevron
@@ -239,6 +250,7 @@ SimplePicker.propTypes = {
     mutedText: PropTypes.string,
   }),
   leftIcon: PropTypes.string,
+  leftText: PropTypes.string,
   closeLabel: PropTypes.string,
 };
 
