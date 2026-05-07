@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import { View, StyleSheet, SectionList, Pressable } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Text, Snackbar } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
@@ -45,22 +46,38 @@ export default function PlannedOperationsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOp, setEditingOp] = useState(null);
   const [isNew, setIsNew] = useState(true);
-  const [activeTab, setActiveTab] = useState('recurring');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  // Filter planned operations by tab
-  const filteredOps = useMemo(() => {
-    const ops = plannedOperations.filter(op =>
-      activeTab === 'recurring' ? op.isRecurring : !op.isRecurring,
-    );
+  const sortByExecution = useCallback((ops) => {
     return [...ops].sort((a, b) => {
       const aEx = isExecutedThisMonth(a);
       const bEx = isExecutedThisMonth(b);
       if (aEx === bEx) return 0;
       return aEx ? 1 : -1;
     });
-  }, [plannedOperations, activeTab, isExecutedThisMonth]);
+  }, [isExecutedThisMonth]);
+
+  const recurringOps = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => op.isRecurring)),
+    [plannedOperations, sortByExecution],
+  );
+
+  const oneTimeOps = useMemo(
+    () => sortByExecution(plannedOperations.filter(op => !op.isRecurring)),
+    [plannedOperations, sortByExecution],
+  );
+
+  const sections = useMemo(() => {
+    const result = [];
+    if (recurringOps.length > 0) {
+      result.push({ key: 'recurring', data: recurringOps });
+    }
+    if (oneTimeOps.length > 0) {
+      result.push({ key: 'one_time', data: oneTimeOps });
+    }
+    return result;
+  }, [recurringOps, oneTimeOps]);
 
   const getAccountName = useCallback((accountId) => {
     const account = accounts.find(a => a.id === accountId);
@@ -142,6 +159,18 @@ export default function PlannedOperationsScreen() {
     );
   }, [showDialog, t, handleEdit, deletePlannedOperation]);
 
+  const renderSectionHeader = useCallback(({ section }) => {
+    const label = section.key === 'recurring' ? `🔁 ${t('recurring')}` : `1️⃣ ${t('one_time')}`;
+    const count = section.data.length;
+    return (
+      <View style={styles.sectionHeader} testID={`section-header-${section.key}`}>
+        <Text style={[styles.sectionHeaderText, { color: colors.mutedText }]}>{label}</Text>
+        <View style={[styles.sectionHeaderLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.sectionHeaderCount, { color: colors.mutedText }]}>{count}</Text>
+      </View>
+    );
+  }, [colors, t]);
+
   const renderItem = useCallback(({ item }) => {
     const executed = isExecutedThisMonth(item);
     const categoryInfo = getCategoryInfo(item.categoryId);
@@ -150,7 +179,7 @@ export default function PlannedOperationsScreen() {
     const typeColor = colors[TYPE_COLORS[item.type]] || colors.text;
 
     const itemStyle = {
-      backgroundColor: colors.card,
+      backgroundColor: 'transparent',
       borderColor: executed ? colors.mutedText + '60' : colors.border,
     };
 
@@ -217,54 +246,16 @@ export default function PlannedOperationsScreen() {
     );
   }, [loading, t]);
 
-  const recurringTabStyle = {
-    backgroundColor: activeTab === 'recurring' ? colors.primary + '1A' : 'transparent',
-    borderColor: activeTab === 'recurring' ? colors.primary : colors.border,
-  };
-  const oneTimeTabStyle = {
-    backgroundColor: activeTab === 'one_time' ? colors.primary + '1A' : 'transparent',
-    borderColor: activeTab === 'one_time' ? colors.primary : colors.border,
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tab Selector */}
-      <View style={styles.tabRow}>
-        <Pressable
-          style={[styles.tab, recurringTabStyle]}
-          onPress={() => setActiveTab('recurring')}
-        >
-          <Icon
-            name="refresh"
-            size={16}
-            color={activeTab === 'recurring' ? colors.primary : colors.mutedText}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'recurring' ? colors.primary : colors.mutedText }]}>
-            {t('recurring')}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, oneTimeTabStyle]}
-          onPress={() => setActiveTab('one_time')}
-        >
-          <Icon
-            name="numeric-1-circle-outline"
-            size={16}
-            color={activeTab === 'one_time' ? colors.primary : colors.mutedText}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'one_time' ? colors.primary : colors.mutedText }]}>
-            {t('one_time')}
-          </Text>
-        </Pressable>
-      </View>
-
       {/* List */}
-      <FlatList
-        data={filteredOps}
+      <SectionList
+        sections={sections}
         keyExtractor={item => item.id}
         renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={filteredOps.length === 0 ? styles.emptyList : styles.listContent}
+        contentContainerStyle={sections.length === 0 ? styles.emptyList : styles.listContent}
         windowSize={10}
         maxToRenderPerBatch={10}
         removeClippedSubviews={true}
@@ -356,26 +347,30 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 180,
   },
+  sectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+  },
+  sectionHeaderCount: {
+    flexShrink: 0,
+    fontSize: FONT_SIZE.xs,
+  },
+  sectionHeaderLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  sectionHeaderText: {
+    flexShrink: 0,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   snackbar: {
     marginBottom: 100,
-  },
-  tab: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    justifyContent: 'center',
-    marginHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    marginBottom: SPACING.md,
-  },
-  tabText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
   },
 });

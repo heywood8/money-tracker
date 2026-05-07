@@ -566,6 +566,10 @@ jest.mock('react-native-paper', () => {
   const PaperText = ({ children, style, ...props }) => React.createElement(Text, { style, ...props }, children);
   PaperText.propTypes = { children: PropTypes.node, style: PropTypes.any };
 
+  const Snackbar = ({ children, visible, onDismiss, duration, style, ...props }) =>
+    visible ? React.createElement(View, { style, ...props }, React.createElement(Text, {}, children)) : null;
+  Snackbar.propTypes = { children: PropTypes.node, visible: PropTypes.bool, onDismiss: PropTypes.func, duration: PropTypes.number, style: PropTypes.any };
+
   return {
     Card,
     TouchableRipple,
@@ -579,6 +583,7 @@ jest.mock('react-native-paper', () => {
     Divider: View,
     Switch,
     Provider,
+    Snackbar,
   };
 });
 
