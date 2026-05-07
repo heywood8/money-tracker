@@ -176,65 +176,65 @@ export default function PlannedOperationsScreen() {
     const accountCurrency = getAccountCurrency(item.accountId);
     const currencySymbol = getCurrencySymbol(accountCurrency);
     const typeColor = colors[TYPE_COLORS[item.type]] || colors.text;
+    const mutedTypeColor = typeColor + '60';
 
-    const itemStyle = {
-      backgroundColor: 'transparent',
-      borderColor: executed ? colors.mutedText + '60' : colors.border,
-    };
-
-    return (
+    const rowContent = (
       <Pressable
-        style={[styles.itemContainer, itemStyle]}
+        style={styles.itemContainer}
         onPress={() => handleEdit(item)}
         onLongPress={() => handleLongPress(item)}
       >
-        {/* Left: Category icon or type icon */}
+        {/* Left: Category icon with optional checkmark badge */}
         <View style={[styles.iconContainer, { backgroundColor: typeColor + '1A' }]}>
           <Icon
             name={categoryInfo.icon || TYPE_ICONS[item.type]}
             size={22}
-            color={typeColor}
+            color={executed ? mutedTypeColor : typeColor}
           />
+          {executed && (
+            <View
+              testID={`check-badge-${item.id}`}
+              style={[styles.checkBadge, { borderColor: colors.background }]}
+            >
+              <Icon name="check" size={7} color="white" />
+            </View>
+          )}
         </View>
 
-        {/* Center: Name, account, category */}
+        {/* Center: Name and meta */}
         <View style={styles.itemDetails}>
-          <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.itemName, { color: executed ? colors.mutedText : colors.text }]}
+            numberOfLines={1}
+          >
             {item.name}
           </Text>
-          <View style={styles.itemMeta}>
-            <Text style={[styles.itemMetaText, { color: colors.mutedText }]} numberOfLines={1}>
-              {getAccountName(item.accountId)}
-              {categoryInfo.name ? ` • ${categoryInfo.name}` : ''}
-            </Text>
-          </View>
+          <Text style={[styles.itemMetaText, { color: colors.mutedText }]} numberOfLines={1}>
+            {getAccountName(item.accountId)}
+            {categoryInfo.name ? ` · ${categoryInfo.name}` : ''}
+          </Text>
         </View>
 
-        {/* Right: Amount and execute button */}
-        <View style={styles.itemRight}>
-          <Text style={[styles.itemAmount, { color: typeColor }]} numberOfLines={1}>
-            {currencySymbol}{item.amount}
-          </Text>
-          <Pressable
-            style={[
-              styles.executeButton,
-              {
-                backgroundColor: executed ? colors.income + '1A' : colors.primary + '1A',
-              },
-            ]}
-            onPress={() => handleExecute(item)}
-            hitSlop={8}
-          >
-            <Icon
-              name={executed ? 'check-circle' : 'play-circle-outline'}
-              size={24}
-              color={executed ? colors.income : colors.primary}
-            />
-          </Pressable>
-        </View>
+        {/* Right: Amount */}
+        <Text
+          style={[styles.itemAmount, { color: executed ? mutedTypeColor : typeColor }]}
+          numberOfLines={1}
+        >
+          {currencySymbol}{item.amount}
+        </Text>
       </Pressable>
     );
-  }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency, getCurrencySymbol, handleEdit, handleLongPress, handleExecute]);
+
+    return (
+      <View
+        testID={`item-opacity-${item.id}`}
+        style={executed ? styles.executedWrapper : null}
+      >
+        {rowContent}
+      </View>
+    );
+  }, [colors, isExecutedThisMonth, getCategoryInfo, getAccountName, getAccountCurrency,
+    getCurrencySymbol, handleEdit, handleLongPress]);
 
   const renderEmpty = useCallback(() => {
     if (loading) {
@@ -288,6 +288,18 @@ export default function PlannedOperationsScreen() {
 }
 
 const styles = StyleSheet.create({
+  checkBadge: {
+    alignItems: 'center',
+    backgroundColor: '#66bb6a',
+    borderRadius: 7,
+    borderWidth: 1.5,
+    bottom: -2,
+    height: 13,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: 13,
+  },
   container: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -296,12 +308,8 @@ const styles = StyleSheet.create({
   emptyList: {
     flexGrow: 1,
   },
-  executeButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
+  executedWrapper: {
+    opacity: 0.4,
   },
   iconContainer: {
     alignItems: 'center',
@@ -318,19 +326,15 @@ const styles = StyleSheet.create({
   itemContainer: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: SPACING.md,
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.md,
   },
   itemDetails: {
     flex: 1,
     gap: 2,
-  },
-  itemMeta: {
-    flexDirection: 'row',
   },
   itemMetaText: {
     fontSize: FONT_SIZE.sm,
@@ -338,10 +342,6 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-  },
-  itemRight: {
-    alignItems: 'flex-end',
-    gap: SPACING.xs,
   },
   listContent: {
     paddingBottom: 180,
