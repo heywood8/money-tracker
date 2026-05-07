@@ -609,7 +609,12 @@ BalanceHistoryCard.propTypes = {
   }),
   isCurrentMonth: PropTypes.bool,
   closeLabel: PropTypes.string,
-  balanceHistoryTableData: PropTypes.array.isRequired,
+  balanceHistoryTableData: PropTypes.arrayOf(
+    PropTypes.shape({
+      date: PropTypes.string.isRequired,
+      balance: PropTypes.string,
+    }),
+  ).isRequired,
   editingBalanceValue: PropTypes.string.isRequired,
   onEditingBalanceValueChange: PropTypes.func.isRequired,
   onEditBalance: PropTypes.func.isRequired,

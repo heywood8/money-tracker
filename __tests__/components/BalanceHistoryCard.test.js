@@ -1910,6 +1910,38 @@ describe('BalanceHistoryCard', () => {
       expect(getByTestId('calendar-toggle-btn')).toBeTruthy();
     });
 
+    it('does not render the calendar toggle button when there is no balance data', () => {
+      const { queryByTestId } = render(
+        <BalanceHistoryCard
+          colors={mockColors}
+          t={mockT}
+          selectedAccount="acc1"
+          onAccountChange={jest.fn()}
+          accountItems={mockAccountItems}
+          loadingBalanceHistory={false}
+          balanceHistoryData={{
+            labels: [],
+            actual: [],
+            actualForChart: [],
+            burndown: [],
+            prevMonth: [],
+          }}
+          selectedYear={2024}
+          selectedMonth={0}
+          accounts={mockAccounts}
+          balanceHistoryTableData={[]}
+          editingBalanceValue=""
+          onEditingBalanceValueChange={jest.fn()}
+          onEditBalance={jest.fn()}
+          onCancelEdit={jest.fn()}
+          onSaveBalance={jest.fn()}
+          onDeleteBalance={jest.fn()}
+          onShowCalendar={jest.fn()}
+        />,
+      );
+      expect(queryByTestId('calendar-toggle-btn')).toBeNull();
+    });
+
     it('calls onShowCalendar once when switching to calendar view, not when switching back', () => {
       const onShowCalendar = jest.fn();
       const { getByTestId } = render(
