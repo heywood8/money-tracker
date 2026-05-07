@@ -118,7 +118,7 @@ describe('PlannedOperationsScreen', () => {
       mockIsExecuted.mockImplementation((op) => op.id === 'r2');
       const { getByTestId } = renderScreen();
       const counter = getByTestId('summary-done-count');
-      expect(counter.props.children).toContain('1');
+      expect(counter.props.children).toMatch(/1/);
     });
 
     it('shows pending in amount for un-executed income', () => {
@@ -150,7 +150,7 @@ describe('PlannedOperationsScreen', () => {
       const { getByTestId } = renderScreen();
       const wrapper = getByTestId('item-opacity-r1');
       expect(wrapper.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ opacity: 0.4 })]),
+        expect.objectContaining({ opacity: 0.4 }),
       );
     });
   });
