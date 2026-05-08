@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, ScrollView, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/designTokens';
 
@@ -29,7 +29,13 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
             <Text style={[styles.chipText, { color: colors.mutedText }]}>✕</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.chipRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          contentContainerStyle={styles.chipRow}
+          style={styles.chipScroll}
+        >
           {chips.map((chip) => (
             <TouchableOpacity
               key={chip}
@@ -38,10 +44,10 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
               accessibilityRole="button"
               accessibilityLabel={`label: ${chip}`}
             >
-              <Text style={[styles.chipText, { color: colors.primary }]}>{chip}</Text>
+              <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{chip}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
     </Animated.View>
   );
@@ -55,10 +61,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   chipRow: {
-    flex: 1,
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: SPACING.xs,
+    paddingRight: SPACING.lg,
+  },
+  chipScroll: {
+    flex: 1,
   },
   chipText: {
     fontSize: FONT_SIZE.sm,

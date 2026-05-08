@@ -443,7 +443,7 @@ const OperationsScreen = () => {
       // Check for matching description suggestions for this category
       const effectiveCategoryId = operationData.categoryId;
       if (effectiveCategoryId && createdOperation?.id) {
-        const suggestions = await getDistinctDescriptions(3, effectiveCategoryId);
+        const suggestions = await getDistinctDescriptions(8, effectiveCategoryId);
         if (suggestions.length > 0) {
           setPendingSuggestionId(createdOperation.id);
           setPendingSuggestions(suggestions);
