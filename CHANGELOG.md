@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.95.0](https://github.com/heywood8/money-tracker/compare/penny-v0.94.3...penny-v0.95.0) (2026-05-08)
+
+
+### Features
+
+* **quickadd:** show up to 8 scrollable description suggestions after quick add ([#515](https://github.com/heywood8/money-tracker/issues/515)) ([70cf996](https://github.com/heywood8/money-tracker/commit/70cf996ec063284293c4a53cba89f3ca0405ba63))
+
 ## [0.94.3](https://github.com/heywood8/money-tracker/compare/penny-v0.94.2...penny-v0.94.3) (2026-05-07)
 
 
