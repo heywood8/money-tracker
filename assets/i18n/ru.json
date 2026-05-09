@@ -204,7 +204,7 @@
   "import_from_cloud_description": "Coming soon",
   "import_from_cloud_coming_soon": "Cloud backup restore is coming soon.",
   "save_local_backup": "Save local backup",
-  "save_local_backup_description": "Save a backup to device storage and share",
+  "save_local_backup_description": "Save a backup to local device storage",
   "save_local_backup_saving": "Saving…",
   "save_local_backup_success": "Backup saved",
   "cloud_backup": "Cloud Backup",

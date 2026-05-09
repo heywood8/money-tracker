@@ -10,7 +10,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup, restoreBackup, createBackup } from '../services/BackupRestore';
-import { getStoredBackups } from '../services/DailyBackupService';
+import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
@@ -359,20 +359,16 @@ export default function SettingsModal({ visible, onClose }) {
     setSaveLocalBackupLoading(true);
     try {
       const backup = await createBackup();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `manual_backup_${timestamp}.json`;
-      const fileUri = `${LegacyFileSystem.documentDirectory}${filename}`;
-      await LegacyFileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
+      const today = new Date().toISOString().split('T')[0];
+      const filename = `manual_${today}.json`;
+      const dirInfo = await LegacyFileSystem.getInfoAsync(DAILY_BACKUP_DIR);
+      if (!dirInfo.exists) {
+        await LegacyFileSystem.makeDirectoryAsync(DAILY_BACKUP_DIR, { intermediates: true });
+      }
+      const fileUri = `${DAILY_BACKUP_DIR}${filename}`;
+      await LegacyFileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
       setSaveLocalBackupLoading(false);
       setSaveLocalBackupSuccess(true);
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: t('save_local_backup') || 'Save Local Backup',
-          UTI: 'public.json',
-        });
-      }
     } catch (error) {
       console.error('Save local backup error:', error);
       setSaveLocalBackupLoading(false);
