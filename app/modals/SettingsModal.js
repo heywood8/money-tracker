@@ -32,13 +32,14 @@ const LOG_LEVEL_COLORS = {
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const stripMarkdown = (md) => md
+  .replace(/\r\n/g, '\n')
   .replace(/#{1,6}\s+/g, '')
   .replace(/\*\*(.+?)\*\*/g, '$1')
   .replace(/\*(.+?)\*/g, '$1')
   .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
   .replace(/`([^`]+)`/g, '$1')
   .replace(/^\s*[-*+]\s+/gm, '• ')
-  .replace(/\r\n/g, '\n')
+  .replace(/\n{3,}/g, '\n\n')
   .trim();
 
 export default function SettingsModal({ visible, onClose }) {
