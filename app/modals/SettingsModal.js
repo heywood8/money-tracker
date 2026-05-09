@@ -55,6 +55,7 @@ export default function SettingsModal({ visible, onClose }) {
   const settingsAnim = useRef(new Animated.Value(0)).current;
   const subPanelAnim = useRef(new Animated.Value(0)).current;
   const toggleAnim = useRef(new Animated.Value(hideBalances ? 1 : 0)).current;
+  const updateContentAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(toggleAnim, {
       toValue: hideBalances ? 1 : 0,
@@ -63,6 +64,17 @@ export default function SettingsModal({ visible, onClose }) {
       bounciness: 4,
     }).start();
   }, [hideBalances, toggleAnim]);
+
+  useEffect(() => {
+    if (!isCheckingUpdate && updateResult) {
+      Animated.timing(updateContentAnim, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isCheckingUpdate, updateResult, updateContentAnim]);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
 
@@ -323,41 +335,28 @@ export default function SettingsModal({ visible, onClose }) {
   }, [showDialog, t]);
 
   const handleCheckForUpdates = useCallback(async () => {
+    updateContentAnim.setValue(0);
+    setUpdateResult(null);
     setIsCheckingUpdate(true);
+    openSubPanel('update');
     try {
       const result = await checkForAppUpdate();
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
 
       if (!result.success) {
-        const errorMessage = result.errorCode === 'releases_without_apks'
-          ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
-          : (t('update_check_failed') || 'Could not check updates right now. Please try again later.');
-        showDialog(t('check_updates') || 'Check for updates', errorMessage, [{ text: t('ok') || 'OK' }]);
-        return;
+        setUpdateResult({ type: 'error', errorCode: result.errorCode });
+      } else if (!result.isUpdateAvailable) {
+        setUpdateResult({ type: 'up_to_date' });
+      } else {
+        setUpdateResult({ type: 'available', latestVersion: result.latestVersion, downloadUrl: result.downloadUrl });
       }
-
-      if (!result.isUpdateAvailable) {
-        showDialog(
-          t('check_updates') || 'Check for updates',
-          t('up_to_date') || 'You already have the latest version installed.',
-          [{ text: t('ok') || 'OK' }],
-        );
-        return;
-      }
-
-      setUpdateResult(result);
-      openSubPanel('update');
     } catch (error) {
       console.error('Manual update check failed:', error);
-      showDialog(
-        t('check_updates') || 'Check for updates',
-        t('update_check_failed') || 'Could not check updates right now. Please try again later.',
-        [{ text: t('ok') || 'OK' }],
-      );
+      setUpdateResult({ type: 'error', errorCode: null });
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [showDialog, t, openSubPanel]);
+  }, [openSubPanel, updateContentAnim]);
 
   useEffect(() => {
     if (visible) {
@@ -555,7 +554,7 @@ export default function SettingsModal({ visible, onClose }) {
               </View>
             </TouchableRipple>
 
-            <TouchableRipple onPress={handleCheckForUpdates} disabled={isCheckingUpdate} style={styles.settingsRow} testID="check-updates-row">
+            <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="download-outline" size={22} color={colors.text} />
@@ -563,9 +562,7 @@ export default function SettingsModal({ visible, onClose }) {
                     {t('check_updates') || 'Check for updates'}
                   </Text>
                 </View>
-                {isCheckingUpdate
-                  ? <ActivityIndicator size="small" color={colors.mutedText} />
-                  : <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />}
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
               </View>
             </TouchableRipple>
 
@@ -600,7 +597,13 @@ export default function SettingsModal({ visible, onClose }) {
                   {activeSubPanel === 'import' && (t('restore_database') || 'Restore Database')}
                   {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
                   {activeSubPanel === 'backups' && (t('local_backups') || 'Local Backups')}
-                  {activeSubPanel === 'update' && (t('update_available_title') || 'Update available')}
+                  {activeSubPanel === 'update' && (
+                    isCheckingUpdate
+                      ? (t('check_updates') || 'Check for updates')
+                      : updateResult?.type === 'available'
+                        ? (t('update_available_title') || 'Update available')
+                        : (t('check_updates') || 'Check for updates')
+                  )}
                   {activeSubPanel === 'reset' && (t('reset_database') || 'Reset Database')}
                 </Text>
                 {activeSubPanel === 'backups' ? (
@@ -821,38 +824,69 @@ export default function SettingsModal({ visible, onClose }) {
                 </>
               )}
 
-              {activeSubPanel === 'update' && updateResult && (
-                <View style={styles.importConfirmContent}>
-                  <Ionicons name="download-outline" size={48} color={colors.primary} style={styles.importWarningIcon} />
-                  <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                    {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
-                      .replace('{latestVersion}', updateResult.latestVersion)}
-                  </Text>
-                  <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
-                    {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-                  </Text>
-                  <TouchableRipple
-                    onPress={async () => {
-                      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                      closeSubPanel();
-                      onClose();
-                      startDownload(updateResult.downloadUrl, {
-                        onError: () => {
-                          showDialog(
-                            t('error') || 'Error',
-                            t('update_download_failed') || 'Could not download the update. Please try again.',
-                            [{ text: t('ok') || 'OK' }],
-                          );
-                        },
-                      });
-                    }}
-                    style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
-                  >
-                    <Text style={styles.importConfirmButtonText}>
-                      {t('update_now') || 'Update now'}
+              {activeSubPanel === 'update' && (
+                isCheckingUpdate ? (
+                  <View style={styles.updateCheckingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.updateCheckingText, { color: colors.text }]}>
+                      {t('checking_for_updates') || 'Checking for available updates…'}
                     </Text>
-                  </TouchableRipple>
-                </View>
+                  </View>
+                ) : updateResult && (
+                  <Animated.View style={[styles.importConfirmContent, { opacity: updateContentAnim }]}>
+                    {updateResult.type === 'available' && (
+                      <>
+                        <Ionicons name="download-outline" size={48} color={colors.primary} style={styles.importWarningIcon} />
+                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                          {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
+                            .replace('{latestVersion}', updateResult.latestVersion)}
+                        </Text>
+                        <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
+                          {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
+                        </Text>
+                        <TouchableRipple
+                          onPress={async () => {
+                            await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+                            closeSubPanel();
+                            onClose();
+                            startDownload(updateResult.downloadUrl, {
+                              onError: () => {
+                                showDialog(
+                                  t('error') || 'Error',
+                                  t('update_download_failed') || 'Could not download the update. Please try again.',
+                                  [{ text: t('ok') || 'OK' }],
+                                );
+                              },
+                            });
+                          }}
+                          style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
+                        >
+                          <Text style={styles.importConfirmButtonText}>
+                            {t('update_now') || 'Update now'}
+                          </Text>
+                        </TouchableRipple>
+                      </>
+                    )}
+                    {updateResult.type === 'up_to_date' && (
+                      <>
+                        <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
+                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                          {t('up_to_date') || 'You already have the latest version installed.'}
+                        </Text>
+                      </>
+                    )}
+                    {updateResult.type === 'error' && (
+                      <>
+                        <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
+                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                          {updateResult.errorCode === 'releases_without_apks'
+                            ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
+                            : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
+                        </Text>
+                      </>
+                    )}
+                  </Animated.View>
+                )
               )}
 
               {activeSubPanel === 'backups' && (
@@ -1167,6 +1201,18 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 44,
+  },
+  updateCheckingContainer: {
+    alignItems: 'center',
+    flex: 1,
+    gap: SPACING.lg,
+    justifyContent: 'center',
+    paddingHorizontal: HORIZONTAL_PADDING * 2,
+  },
+  updateCheckingText: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   updateHintText: {
     fontSize: 13,

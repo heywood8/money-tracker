@@ -354,6 +354,7 @@
   "added_to_operations": "Added to operations",
   "planned_operation_name_hint": "e.g. Rent, Netflix, Groceries",
   "check_updates": "Check for updates",
+  "checking_for_updates": "업데이트 확인 중…",
   "update_check_failed": "Could not check updates right now. Please try again later.",
   "up_to_date": "You already have the latest version installed.",
   "update_available_title": "Update available",

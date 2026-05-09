@@ -352,6 +352,7 @@
   "added_to_operations": "Добавлено в операции",
   "planned_operation_name_hint": "напр. Аренда, Netflix, Продукты",
   "check_updates": "Check for updates",
+  "checking_for_updates": "Проверка доступных обновлений…",
   "update_check_failed": "Could not check updates right now. Please try again later.",
   "up_to_date": "You already have the latest version installed.",
   "update_available_title": "Update available",
