@@ -871,9 +871,18 @@ export default function SettingsModal({ visible, onClose }) {
                               {t('whats_new') || "What's new"}
                             </Text>
                             <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
-                              <Text style={[styles.changelogText, { color: colors.text }]}>
-                                {stripMarkdown(updateResult.releaseNotes)}
-                              </Text>
+                              {updateResult.releaseNotes.map(({ version, notes }) => (
+                                <View key={version} style={styles.changelogSection}>
+                                  {updateResult.releaseNotes.length > 1 && (
+                                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                                      v{version}
+                                    </Text>
+                                  )}
+                                  <Text style={[styles.changelogText, { color: colors.text }]}>
+                                    {stripMarkdown(notes)}
+                                  </Text>
+                                </View>
+                              ))}
                             </ScrollView>
                           </>
                         ) : (
@@ -1010,6 +1019,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: SPACING.xs,
   },
+  changelogSection: {
+    marginBottom: SPACING.md,
+  },
   changelogText: {
     fontSize: 13,
     lineHeight: 20,
@@ -1019,6 +1031,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.8,
     marginTop: SPACING.md,
+    textTransform: 'uppercase',
+  },
+  changelogVersion: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: SPACING.xs,
     textTransform: 'uppercase',
   },
   clearLogsText: {
