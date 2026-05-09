@@ -254,6 +254,7 @@
   "sqlite_description": "Հում տվյալների բազայի ֆայլ, ամբողջական պահուստ",
   "google_sheets": "Google Sheets",
   "google_sheets_description": "Արտահանել Google Sheets աղյուսակ",
+  "google_sheets_exporting": "Արտահանում…",
   "google_sheets_export_success": "Արտահանվել է Google Sheets-ում",
   "google_sheets_open": "Բացել",
   "google_sheets_signin_failed": "Google-ի մուտքը ձախողվեց: Կրկին փորձեք:",

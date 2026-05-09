@@ -255,6 +255,7 @@
   "sqlite_description": "Roh-Datenbankdatei, vollständiges Backup",
   "google_sheets": "Google Tabellen",
   "google_sheets_description": "In eine Google Tabelle exportieren",
+  "google_sheets_exporting": "Exportieren…",
   "google_sheets_export_success": "In Google Tabellen exportiert",
   "google_sheets_open": "Öffnen",
   "google_sheets_signin_failed": "Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",

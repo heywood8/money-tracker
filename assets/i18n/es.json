@@ -255,6 +255,7 @@
   "sqlite_description": "Archivo de base de datos sin procesar, copia de seguridad completa",
   "google_sheets": "Google Sheets",
   "google_sheets_description": "Exportar a una hoja de cálculo de Google Sheets",
+  "google_sheets_exporting": "Exportando…",
   "google_sheets_export_success": "Exportado a Google Sheets",
   "google_sheets_open": "Abrir",
   "google_sheets_signin_failed": "Error al iniciar sesión en Google. Inténtalo de nuevo.",

@@ -255,6 +255,7 @@
   "sqlite_description": "原始数据库文件，完整备份",
   "google_sheets": "Google 表格",
   "google_sheets_description": "导出到 Google 表格电子表格",
+  "google_sheets_exporting": "正在导出…",
   "google_sheets_export_success": "已导出到 Google 表格",
   "google_sheets_open": "打开",
   "google_sheets_signin_failed": "Google 登录失败，请重试。",

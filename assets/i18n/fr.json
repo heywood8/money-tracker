@@ -255,6 +255,7 @@
   "sqlite_description": "Fichier de base de données brut, sauvegarde complète",
   "google_sheets": "Google Sheets",
   "google_sheets_description": "Exporter vers une feuille de calcul Google Sheets",
+  "google_sheets_exporting": "Exportation…",
   "google_sheets_export_success": "Exporté vers Google Sheets",
   "google_sheets_open": "Ouvrir",
   "google_sheets_signin_failed": "Échec de la connexion Google. Veuillez réessayer.",

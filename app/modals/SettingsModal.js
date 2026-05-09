@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native'; // FlatList used for backups list
+import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native'; // FlatList used for backups list
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,23 +39,21 @@ export default function SettingsModal({ visible, onClose }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
   const { startDownload } = useUpdateDownload();
-  const [languageModalVisible, setLanguageModalVisible] = useState(false);
-  const [exportFormatModalVisible, setExportFormatModalVisible] = useState(false);
-  const [logsModalVisible, setLogsModalVisible] = useState(false);
-  const [backupsModalVisible, setBackupsModalVisible] = useState(false);
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // 'language' | 'export' | 'logs' | 'backups' | null
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
+  const [googleSheetsSuccessUrl, setGoogleSheetsSuccessUrl] = useState(null);
+  const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  // Computed colors
+  const googleSheetsTextColor = googleSheetsSuccessUrl ? '#4caf50' : (googleSheetsLoading ? colors.mutedText : colors.text);
 
   // Animation values
   const settingsAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const exportFormatSlideAnim = useRef(new Animated.Value(0)).current;
-  const logsSlideAnim = useRef(new Animated.Value(0)).current;
-  const backupsSlideAnim = useRef(new Animated.Value(0)).current;
-  const logsFlatListRef = useRef(null);
+  const subPanelAnim = useRef(new Animated.Value(0)).current;
   const toggleAnim = useRef(new Animated.Value(hideBalances ? 1 : 0)).current;
   useEffect(() => {
     Animated.spring(toggleAnim, {
@@ -94,25 +92,30 @@ export default function SettingsModal({ visible, onClose }) {
     // CANCELLED: do nothing silently
   }, [hideBalances, setHideBalances, t, showDialog]);
 
-  const openLanguageModal = useCallback(() => {
-    setLanguageModalVisible(true);
+  const openSubPanel = useCallback((panel) => {
+    if (panel === 'backups') loadStoredBackups();
+    setActiveSubPanel(panel);
     Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.timing(settingsAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(subPanelAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-  }, [settingsAnim, slideAnim]);
+  }, [settingsAnim, subPanelAnim, loadStoredBackups]);
 
-  const closeLanguageModal = useCallback(() => {
+  const closeSubPanel = useCallback(() => {
     Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setLanguageModalVisible(false));
-  }, [settingsAnim, slideAnim]);
+      Animated.timing(subPanelAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(settingsAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => {
+      setActiveSubPanel(null);
+      setGoogleSheetsSuccessUrl(null);
+      setUpdateResult(null);
+    });
+  }, [settingsAnim, subPanelAnim]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
-    closeLanguageModal();
-  }, [setLanguage, closeLanguageModal]);
+    closeSubPanel();
+  }, [setLanguage, closeSubPanel]);
 
   // Map of language codes to their native display names
   const nativeLanguageNames = {
@@ -144,62 +147,21 @@ export default function SettingsModal({ visible, onClose }) {
     pt: '🇵🇹',
   };
 
-  const openExportFormatModal = useCallback(() => {
-    console.debug('openExportFormatModal called - showing modal');
-    setExportFormatModalVisible(true);
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.timing(exportFormatSlideAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-    ]).start();
-  }, [settingsAnim, exportFormatSlideAnim]);
-
-  const closeExportFormatModal = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-      Animated.timing(exportFormatSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setExportFormatModalVisible(false));
-  }, [settingsAnim, exportFormatSlideAnim]);
-
-  const openLogsModal = useCallback(() => {
-    setLogsModalVisible(true);
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.timing(logsSlideAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-    ]).start(() => {
-      logsFlatListRef.current?.scrollToEnd({ animated: false });
-    });
-  }, [settingsAnim, logsSlideAnim]);
-
-  const closeLogsModal = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-      Animated.timing(logsSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setLogsModalVisible(false));
-  }, [settingsAnim, logsSlideAnim]);
-
   const handleExportFormatSelect = useCallback(async (format) => {
-    closeExportFormatModal();
+    closeSubPanel();
     try {
       await exportBackup(format);
-      showDialog(
-        t('backup_database') || 'Backup Database',
-        t('backup_success') || 'Backup exported successfully',
-        [{ text: 'OK', onPress: onClose }],
-      );
     } catch (error) {
       console.error('Export backup error:', error);
       showDialog(
         t('error') || 'Error',
-        error.message === 'Import cancelled'
-          ? t('cancel') || 'Cancelled'
-          : t('backup_error') || 'Failed to create backup',
+        t('backup_error') || 'Failed to create backup',
         [{ text: 'OK' }],
       );
     }
-  }, [closeExportFormatModal, t, showDialog, onClose]);
+  }, [closeSubPanel, t, showDialog]);
 
   const handleGoogleSheetsExport = useCallback(async () => {
-    closeExportFormatModal();
     setGoogleSheetsLoading(true);
     try {
       let accessToken;
@@ -215,19 +177,13 @@ export default function SettingsModal({ visible, onClose }) {
       const backup = await createBackup();
       const sheetUrl = await exportToSheets(accessToken, backup);
       setGoogleSheetsLoading(false);
-      showDialog(
-        t('google_sheets') || 'Google Sheets',
-        t('google_sheets_export_success') || 'Exported to Google Sheets',
-        [
-          { text: t('google_sheets_open') || 'Open', onPress: () => Linking.openURL(sheetUrl) },
-          { text: t('ok') || 'OK' },
-        ],
-      );
+      setGoogleSheetsSuccessUrl(sheetUrl);
     } catch (error) {
       setGoogleSheetsLoading(false);
       if (error.message === 'sign_in_cancelled') {
-        return; // User dismissed — no error dialog
+        return; // User dismissed — stay on subpanel, no dialog
       }
+      closeSubPanel();
       let dialogMsg;
       if (error.message === 'refresh_failed') {
         dialogMsg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
@@ -242,76 +198,39 @@ export default function SettingsModal({ visible, onClose }) {
       }
       showDialog(t('error') || 'Error', dialogMsg, [{ text: t('ok') || 'OK' }]);
     }
-  }, [closeExportFormatModal, t, showDialog]);
+  }, [closeSubPanel, t, showDialog]);
 
-  const handleResetDatabase = () => {
-    showDialog(
-      t('reset_database') || 'Reset Database',
-      t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('reset') || 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await resetDatabase();
-              onClose();
-            } catch (error) {
-              // Error already handled in resetDatabase
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleExportBackup = () => {
-    console.debug('handleExportBackup called - opening export format modal');
-    openExportFormatModal();
-  };
+  const confirmResetDatabase = useCallback(async () => {
+    closeSubPanel();
+    try {
+      await resetDatabase();
+      onClose();
+    } catch (error) {
+      // Error already handled in resetDatabase
+    }
+  }, [closeSubPanel, resetDatabase, onClose]);
 
   // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
-  const handleImportBackup = () => {
-    showDialog(
-      t('restore_database') || 'Restore Database',
-      t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('restore_database') || 'Restore',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Close settings modal first
-              onClose();
-
-              // Start import progress tracking
-              startImport();
-
-              // Perform the import
-              await importBackup();
-
-              // Mark import as complete to enable OK button
-              completeImport();
-            } catch (error) {
-              console.error('Import backup error:', error);
-              // Cancel import progress on error
-              cancelImport();
-              showDialog(
-                t('error') || 'Error',
-                error.message === 'Import cancelled'
-                  ? t('cancel') || 'Cancelled'
-                  : error.message || t('restore_error') || 'Failed to restore backup',
-                [{ text: 'OK' }],
-              );
-            }
-          },
-        },
-      ],
-    );
-  };
+  const confirmImportBackup = useCallback(async () => {
+    closeSubPanel();
+    onClose();
+    startImport();
+    try {
+      await importBackup();
+      completeImport();
+    } catch (error) {
+      console.error('Import backup error:', error);
+      cancelImport();
+      showDialog(
+        t('error') || 'Error',
+        error.message === 'Import cancelled'
+          ? t('cancel') || 'Cancelled'
+          : error.message || t('restore_error') || 'Failed to restore backup',
+        [{ text: 'OK' }],
+      );
+    }
+  }, [closeSubPanel, onClose, startImport, completeImport, cancelImport, t, showDialog]);
 
   const handleShareLogs = useCallback(async () => {
     try {
@@ -348,22 +267,6 @@ export default function SettingsModal({ visible, onClose }) {
       setBackupsLoading(false);
     }
   }, []);
-
-  const openBackupsModal = useCallback(() => {
-    setBackupsModalVisible(true);
-    loadStoredBackups();
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.timing(backupsSlideAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-    ]).start();
-  }, [settingsAnim, backupsSlideAnim, loadStoredBackups]);
-
-  const closeBackupsModal = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(settingsAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-      Animated.timing(backupsSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setBackupsModalVisible(false));
-  }, [settingsAnim, backupsSlideAnim]);
 
   const handleRestoreLocalBackup = useCallback((uri) => {
     showDialog(
@@ -429,11 +332,7 @@ export default function SettingsModal({ visible, onClose }) {
         const errorMessage = result.errorCode === 'releases_without_apks'
           ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
           : (t('update_check_failed') || 'Could not check updates right now. Please try again later.');
-        showDialog(
-          t('check_updates') || 'Check for updates',
-          errorMessage,
-          [{ text: t('ok') || 'OK' }],
-        );
+        showDialog(t('check_updates') || 'Check for updates', errorMessage, [{ text: t('ok') || 'OK' }]);
         return;
       }
 
@@ -446,33 +345,8 @@ export default function SettingsModal({ visible, onClose }) {
         return;
       }
 
-      showDialog(
-        t('update_available_title') || 'Update available',
-        `${(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
-          .replace('{latestVersion}', result.latestVersion)}\n\n${
-          t('update_install_hint')
-          || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'
-        }`,
-        [
-          { text: t('later') || 'Later' },
-          {
-            text: t('update_now') || 'Update now',
-            onPress: async () => {
-              await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
-              onClose();
-              startDownload(result.downloadUrl, {
-                onError: () => {
-                  showDialog(
-                    t('error') || 'Error',
-                    t('update_download_failed') || 'Could not download the update. Please try again.',
-                    [{ text: t('ok') || 'OK' }],
-                  );
-                },
-              });
-            },
-          },
-        ],
-      );
+      setUpdateResult(result);
+      openSubPanel('update');
     } catch (error) {
       console.error('Manual update check failed:', error);
       showDialog(
@@ -483,21 +357,17 @@ export default function SettingsModal({ visible, onClose }) {
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [showDialog, t, startDownload, onClose]);
+  }, [showDialog, t, openSubPanel]);
 
   useEffect(() => {
     if (visible) {
-      setLanguageModalVisible(false);
-      setExportFormatModalVisible(false);
-      setLogsModalVisible(false);
-      setBackupsModalVisible(false);
+      setActiveSubPanel(null);
+      setGoogleSheetsSuccessUrl(null);
+      setUpdateResult(null);
       settingsAnim.setValue(0);
-      slideAnim.setValue(0);
-      exportFormatSlideAnim.setValue(0);
-      logsSlideAnim.setValue(0);
-      backupsSlideAnim.setValue(0);
+      subPanelAnim.setValue(0);
     }
-  }, [visible, settingsAnim, slideAnim, exportFormatSlideAnim, logsSlideAnim, backupsSlideAnim]);
+  }, [visible, settingsAnim, subPanelAnim]);
 
   const settingsTranslateX = settingsAnim.interpolate({
     inputRange: [0, 1],
@@ -509,52 +379,17 @@ export default function SettingsModal({ visible, onClose }) {
     outputRange: [1, 0],
   });
 
-  // Interpolate animation values for language modal
-
-  const languageTranslateX = slideAnim.interpolate({
+  const subPanelTranslateX = subPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [50, 0],
   });
 
-  const languageOpacity = slideAnim.interpolate({
+  const subPanelOpacity = subPanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
 
-  // Interpolate animation values for export format modal
-  const exportFormatTranslateX = exportFormatSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-  const exportFormatOpacity = exportFormatSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  // Interpolate animation values for logs modal
-  const logsTranslateX = logsSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-  const logsOpacity = logsSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  // Interpolate animation values for backups modal
-  const backupsTranslateX = backupsSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-  const backupsOpacity = backupsSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  const anySubModalOpen = languageModalVisible || exportFormatModalVisible || logsModalVisible || backupsModalVisible;
+  const anySubModalOpen = activeSubPanel !== null;
 
   const formatBackupLabel = useCallback((filename) => {
     if (filename.startsWith('daily_')) {
@@ -619,7 +454,7 @@ export default function SettingsModal({ visible, onClose }) {
     <Portal>
       <Modal
         visible={visible}
-        onDismiss={backupsModalVisible ? closeBackupsModal : (logsModalVisible ? closeLogsModal : (exportFormatModalVisible ? closeExportFormatModal : (languageModalVisible ? closeLanguageModal : onClose)))}
+        onDismiss={activeSubPanel ? closeSubPanel : onClose}
         dismissable={true}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
@@ -638,7 +473,7 @@ export default function SettingsModal({ visible, onClose }) {
               </TouchableOpacity>
             </View>
 
-            <TouchableRipple onPress={openLanguageModal} style={styles.settingsRow} testID="settings-language-row">
+            <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="language-outline" size={22} color={colors.text} />
@@ -676,7 +511,7 @@ export default function SettingsModal({ visible, onClose }) {
 
             <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
 
-            <TouchableRipple onPress={handleExportBackup} style={styles.settingsRow} testID="settings-export-row">
+            <TouchableRipple onPress={() => openSubPanel('export')} style={styles.settingsRow} testID="settings-export-row">
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
@@ -686,7 +521,7 @@ export default function SettingsModal({ visible, onClose }) {
               </View>
             </TouchableRipple>
 
-            <TouchableRipple onPress={handleImportBackup} style={styles.settingsRow}>
+            <TouchableRipple onPress={() => openSubPanel('import')} style={styles.settingsRow}>
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
@@ -696,7 +531,7 @@ export default function SettingsModal({ visible, onClose }) {
               </View>
             </TouchableRipple>
 
-            <TouchableRipple onPress={openBackupsModal} style={styles.settingsRow} testID="settings-backups-row">
+            <TouchableRipple onPress={() => openSubPanel('backups')} style={styles.settingsRow} testID="settings-backups-row">
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="archive-outline" size={22} color={colors.text} />
@@ -710,7 +545,7 @@ export default function SettingsModal({ visible, onClose }) {
 
             <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
 
-            <TouchableRipple onPress={openLogsModal} style={styles.settingsRow} testID="logs-row">
+            <TouchableRipple onPress={() => openSubPanel('logs')} style={styles.settingsRow} testID="logs-row">
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="terminal-outline" size={22} color={colors.text} />
@@ -736,7 +571,7 @@ export default function SettingsModal({ visible, onClose }) {
 
             <View style={styles.resetSpacer} />
 
-            <TouchableRipple onPress={handleResetDatabase} style={styles.settingsRow}>
+            <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
               <View style={styles.settingsRowContent}>
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="trash-outline" size={22} color="#c44" />
@@ -746,277 +581,302 @@ export default function SettingsModal({ visible, onClose }) {
             </TouchableRipple>
           </Animated.View>
 
-          <Animated.View style={[
-            styles.languageModalContent,
-            { backgroundColor: colors.card },
-            {
-              transform: [{ translateX: languageTranslateX }],
-              opacity: languageOpacity,
-            },
-            !languageModalVisible && styles.invisible,
-          ]}>
-            <View style={styles.languageModalHeader}>
-              <TouchableOpacity onPress={closeLanguageModal} style={styles.backButton} testID="settings-language-back">
-                <Ionicons name="arrow-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-                {t('language')}
-              </Text>
-              <View style={styles.backButton} />
-            </View>
+          {activeSubPanel && (
+            <Animated.View style={[
+              styles.subPanelContent,
+              { backgroundColor: colors.card },
+              {
+                transform: [{ translateX: subPanelTranslateX }],
+                opacity: subPanelOpacity,
+              },
+            ]}>
+              <View style={styles.languageModalHeader}>
+                <TouchableOpacity onPress={closeSubPanel} style={styles.backButton} testID="settings-subpanel-back">
+                  <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                  {activeSubPanel === 'language' && t('language')}
+                  {activeSubPanel === 'export' && (t('export_format') || 'Export Format')}
+                  {activeSubPanel === 'import' && (t('restore_database') || 'Restore Database')}
+                  {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
+                  {activeSubPanel === 'backups' && (t('local_backups') || 'Local Backups')}
+                  {activeSubPanel === 'update' && (t('update_available_title') || 'Update available')}
+                  {activeSubPanel === 'reset' && (t('reset_database') || 'Reset Database')}
+                </Text>
+                {activeSubPanel === 'backups' ? (
+                  <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+                    <Ionicons name="refresh-outline" size={22} color={colors.text} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.backButton} />
+                )}
+              </View>
 
-            <Divider />
+              <Divider />
 
-            <ScrollView style={styles.languageList}>
-              {availableLanguages.map(lng => {
-                return (
+              {activeSubPanel === 'language' && (
+                <ScrollView style={styles.languageList}>
+                  {availableLanguages.map(lng => (
+                    <TouchableRipple
+                      key={lng}
+                      onPress={() => handleLanguageSelect(lng)}
+                      style={styles.languageItem}
+                    >
+                      <View style={styles.languageItemContent}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>
+                          {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
+                        </Text>
+                        {language === lng && (
+                          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                        )}
+                      </View>
+                    </TouchableRipple>
+                  ))}
+                </ScrollView>
+              )}
+
+              {activeSubPanel === 'export' && (
+                <ScrollView style={styles.languageList}>
+                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="code-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>JSON</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('json_description') || 'Standard format, compatible with all versions'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>CSV</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('csv_description') || 'Plain text format, easy to edit'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="server-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>SQLite Database</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('sqlite_description') || 'Raw database file, complete backup'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
                   <TouchableRipple
-                    key={lng}
-                    onPress={() => handleLanguageSelect(lng)}
+                    onPress={googleSheetsSuccessUrl ? null : handleGoogleSheetsExport}
                     style={styles.languageItem}
+                    disabled={googleSheetsLoading || !!googleSheetsSuccessUrl}
+                    testID="settings-export-google-sheets"
                   >
                     <View style={styles.languageItemContent}>
-                      <Text style={[styles.languageItemText, { color: colors.text }]}>
-                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
-                      </Text>
-                      {language === lng && (
-                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      <View style={styles.formatItemRow}>
+                        <Ionicons
+                          name="logo-google"
+                          size={24}
+                          color={googleSheetsTextColor}
+                        />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: googleSheetsTextColor }]}>
+                            Google Sheets
+                          </Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {googleSheetsLoading
+                              ? (t('google_sheets_exporting') || 'Exporting…')
+                              : googleSheetsSuccessUrl
+                                ? (t('google_sheets_export_success') || 'Exported to Google Sheets')
+                                : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
+                          </Text>
+                        </View>
+                      </View>
+                      {googleSheetsLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : googleSheetsSuccessUrl ? (
+                        <View style={styles.googleSheetsSuccessTrailing}>
+                          <TouchableOpacity
+                            onPress={() => Linking.openURL(googleSheetsSuccessUrl)}
+                            style={[styles.googleSheetsOpenButton, { backgroundColor: colors.border }]}
+                          >
+                            <Text style={styles.googleSheetsOpenText}>
+                              {t('google_sheets_open') || 'Open'}
+                            </Text>
+                          </TouchableOpacity>
+                          <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                        </View>
+                      ) : (
+                        <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                       )}
                     </View>
                   </TouchableRipple>
-                );
-              })}
-            </ScrollView>
-          </Animated.View>
-
-          <Animated.View style={[
-            styles.languageModalContent,
-            { backgroundColor: colors.card },
-            {
-              transform: [{ translateX: exportFormatTranslateX }],
-              opacity: exportFormatOpacity,
-            },
-            !exportFormatModalVisible && styles.invisible,
-          ]}>
-            <View style={styles.languageModalHeader}>
-              <TouchableOpacity onPress={closeExportFormatModal} style={styles.backButton} testID="settings-export-back">
-                <Ionicons name="arrow-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-                {t('export_format') || 'Export Format'}
-              </Text>
-              <View style={styles.backButton} />
-            </View>
-
-            <Divider />
-
-            <ScrollView style={styles.languageList}>
-              <TouchableRipple
-                onPress={() => handleExportFormatSelect('json')}
-                style={styles.languageItem}
-              >
-                <View style={styles.languageItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="code-outline" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      JSON
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('json_description') || 'Standard format, compatible with all versions'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={() => handleExportFormatSelect('csv')}
-                style={styles.languageItem}
-              >
-                <View style={styles.languageItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      CSV
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('csv_description') || 'Plain text format, easy to edit'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={() => handleExportFormatSelect('sqlite')}
-                style={styles.languageItem}
-              >
-                <View style={styles.languageItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="server-outline" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      SQLite Database
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('sqlite_description') || 'Raw database file, complete backup'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={handleGoogleSheetsExport}
-                style={styles.languageItem}
-                disabled={googleSheetsLoading}
-                testID="settings-export-google-sheets"
-              >
-                <View style={styles.languageItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="logo-google" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.languageItemText, { color: colors.text }]}>
-                      Google Sheets
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('google_sheets_description') || 'Export to a Google Sheets spreadsheet'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-            </ScrollView>
-          </Animated.View>
-
-          <Animated.View style={[
-            styles.logsModalContent,
-            { backgroundColor: colors.card },
-            {
-              transform: [{ translateX: logsTranslateX }],
-              opacity: logsOpacity,
-            },
-            !logsModalVisible && styles.invisible,
-          ]}>
-            <View style={styles.languageModalHeader}>
-              <TouchableOpacity onPress={closeLogsModal} style={styles.backButton} testID="settings-logs-back">
-                <Ionicons name="arrow-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-                {t('logs') || 'Logs'}
-              </Text>
-              <View style={styles.backButton} />
-            </View>
-
-            <Divider />
-
-            <View style={styles.filterRow}>
-              {LOG_FILTERS.map(f => {
-                const isSelected = f === logFilter;
-                const filterLabelKey = `log_level_${f}`;
-                return (
-                  <TouchableOpacity
-                    key={f}
-                    onPress={() => setLogFilter(f)}
-                    style={[
-                      styles.filterChip,
-                      { borderColor: colors.border },
-                      isSelected && { backgroundColor: colors.primary },
-                    ]}
-                  >
-                    <Text style={[
-                      styles.filterChipText,
-                      isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                    ]}>
-                      {t(filterLabelKey) || f}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <ScrollView ref={logsFlatListRef} style={styles.logsList}>
-              {entries.length === 0 ? (
-                <View style={styles.logsEmptyContainer}>
-                  <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                    {t('no_logs') || 'No logs yet'}
-                  </Text>
-                </View>
-              ) : (
-                entries.map(item => (
-                  <React.Fragment key={item.id}>{renderLogEntry({ item })}</React.Fragment>
-                ))
+                </ScrollView>
               )}
-            </ScrollView>
 
-            <Divider />
-
-            <View style={styles.logsActionBar}>
-              <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-                <Ionicons name="share-outline" size={20} color={colors.primary} />
-                <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                  {t('share_logs') || 'Share Logs'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-                <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                <Text style={[styles.logsActionText, styles.clearLogsText]}>
-                  {t('clear_logs') || 'Clear Logs'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-
-          <Animated.View style={[
-            styles.logsModalContent,
-            { backgroundColor: colors.card },
-            {
-              transform: [{ translateX: backupsTranslateX }],
-              opacity: backupsOpacity,
-            },
-            !backupsModalVisible && styles.invisible,
-          ]}>
-            <View style={styles.languageModalHeader}>
-              <TouchableOpacity onPress={closeBackupsModal} style={styles.backButton} testID="settings-backups-back">
-                <Ionicons name="arrow-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-                {t('local_backups') || 'Local Backups'}
-              </Text>
-              <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
-                <Ionicons name="refresh-outline" size={22} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Divider />
-
-            {backupsLoading ? (
-              <View style={styles.logsEmptyContainer}>
-                <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                  {'Loading...'}
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={storedBackups}
-                keyExtractor={(item) => item.uri}
-                renderItem={renderBackupItem}
-                style={styles.logsList}
-                contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
-                ListEmptyComponent={
-                  <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                    {t('local_backups_empty') || 'No local backups yet'}
+              {activeSubPanel === 'reset' && (
+                <View style={styles.importConfirmContent}>
+                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                    {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
                   </Text>
-                }
-              />
-            )}
-          </Animated.View>
+                  <TouchableRipple onPress={confirmResetDatabase} style={styles.importConfirmButtonDestructive}>
+                    <Text style={styles.importConfirmButtonText}>
+                      {t('reset') || 'Reset'}
+                    </Text>
+                  </TouchableRipple>
+                </View>
+              )}
+
+              {activeSubPanel === 'import' && (
+                <View style={styles.importConfirmContent}>
+                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                    {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                  </Text>
+                  <TouchableRipple onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
+                    <Text style={styles.importConfirmButtonText}>
+                      {t('restore_database') || 'Restore'}
+                    </Text>
+                  </TouchableRipple>
+                </View>
+              )}
+
+              {activeSubPanel === 'logs' && (
+                <>
+                  <View style={styles.filterRow}>
+                    {LOG_FILTERS.map(f => {
+                      const isSelected = f === logFilter;
+                      const filterLabelKey = `log_level_${f}`;
+                      return (
+                        <TouchableOpacity
+                          key={f}
+                          onPress={() => setLogFilter(f)}
+                          style={[
+                            styles.filterChip,
+                            { borderColor: colors.border },
+                            isSelected && { backgroundColor: colors.primary },
+                          ]}
+                        >
+                          <Text style={[
+                            styles.filterChipText,
+                            isSelected ? styles.filterChipTextSelected : { color: colors.text },
+                          ]}>
+                            {t(filterLabelKey) || f}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <FlatList
+                    data={entries.slice().reverse()}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderLogEntry}
+                    style={styles.logsList}
+                    inverted
+                    initialNumToRender={20}
+                    maxToRenderPerBatch={20}
+                    windowSize={5}
+                    contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
+                    ListEmptyComponent={
+                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                        {t('no_logs') || 'No logs yet'}
+                      </Text>
+                    }
+                  />
+
+                  <Divider />
+
+                  <View style={styles.logsActionBar}>
+                    <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
+                      <Ionicons name="share-outline" size={20} color={colors.primary} />
+                      <Text style={[styles.logsActionText, { color: colors.primary }]}>
+                        {t('share_logs') || 'Share Logs'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
+                      <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
+                      <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                        {t('clear_logs') || 'Clear Logs'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {activeSubPanel === 'update' && updateResult && (
+                <View style={styles.importConfirmContent}>
+                  <Ionicons name="download-outline" size={48} color={colors.primary} style={styles.importWarningIcon} />
+                  <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                    {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
+                      .replace('{latestVersion}', updateResult.latestVersion)}
+                  </Text>
+                  <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
+                    {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
+                  </Text>
+                  <TouchableRipple
+                    onPress={async () => {
+                      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+                      closeSubPanel();
+                      onClose();
+                      startDownload(updateResult.downloadUrl, {
+                        onError: () => {
+                          showDialog(
+                            t('error') || 'Error',
+                            t('update_download_failed') || 'Could not download the update. Please try again.',
+                            [{ text: t('ok') || 'OK' }],
+                          );
+                        },
+                      });
+                    }}
+                    style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.importConfirmButtonText}>
+                      {t('update_now') || 'Update now'}
+                    </Text>
+                  </TouchableRipple>
+                </View>
+              )}
+
+              {activeSubPanel === 'backups' && (
+                backupsLoading ? (
+                  <View style={styles.logsEmptyContainer}>
+                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={storedBackups}
+                    keyExtractor={(item) => item.uri}
+                    renderItem={renderBackupItem}
+                    style={styles.logsList}
+                    contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+                    ListEmptyComponent={
+                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                        {t('local_backups_empty') || 'No local backups yet'}
+                      </Text>
+                    }
+                  />
+                )
+              )}
+            </Animated.View>
+          )}
         </View>
       </Modal>
     </Portal>
@@ -1120,6 +980,21 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
   },
+  googleSheetsOpenButton: {
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  googleSheetsOpenText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  googleSheetsSuccessTrailing: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1130,9 +1005,39 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontWeight: '600',
   },
-  invisible: {
-    opacity: 0,
-    pointerEvents: 'none',
+  importConfirmButton: {
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+  },
+  importConfirmButtonDestructive: {
+    backgroundColor: '#c44',
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+  },
+  importConfirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  importConfirmContent: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: HORIZONTAL_PADDING * 2,
+    paddingVertical: SPACING.xl,
+  },
+  importConfirmText: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  importWarningIcon: {
+    marginBottom: SPACING.lg,
   },
   languageItem: {
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -1148,13 +1053,6 @@ const styles = StyleSheet.create({
   },
   languageList: {
     paddingVertical: SPACING.sm,
-  },
-  languageModalContent: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
   },
   languageModalHeader: {
     alignItems: 'center',
@@ -1212,13 +1110,6 @@ const styles = StyleSheet.create({
   logsList: {
     flex: 1,
   },
-  logsModalContent: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
   modalContainer: {
     ...centeredModal,
     overflow: 'hidden',
@@ -1257,6 +1148,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  subPanelContent: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
   switchThumb: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -1269,6 +1167,17 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 44,
+  },
+  updateHintText: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: SPACING.md,
+    textAlign: 'center',
+  },
+  updateVersionText: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });
 

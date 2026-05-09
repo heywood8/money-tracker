@@ -253,6 +253,7 @@
   "sqlite_description": "Исходный файл базы данных, полная резервная копия",
   "google_sheets": "Google Таблицы",
   "google_sheets_description": "Экспорт в таблицу Google Sheets",
+  "google_sheets_exporting": "Экспорт…",
   "google_sheets_export_success": "Данные экспортированы в Google Таблицы",
   "google_sheets_open": "Открыть",
   "google_sheets_signin_failed": "Не удалось войти в Google. Попробуйте ещё раз.",

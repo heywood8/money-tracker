@@ -255,6 +255,7 @@
   "sqlite_description": "Raw database file, complete backup",
   "google_sheets": "Google Sheets",
   "google_sheets_description": "Export to a Google Sheets spreadsheet",
+  "google_sheets_exporting": "エクスポート中…",
   "google_sheets_export_success": "Exported to Google Sheets",
   "google_sheets_open": "Open",
   "google_sheets_signin_failed": "Google sign-in failed. Please try again.",
