@@ -141,18 +141,26 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       });
 
       // Create previous month data line (forward-filled for all available days)
+      // lastKnownPrevValue is carried forward so that days beyond the previous
+      // month's length (e.g. day 31 when prev month is April) keep the final
+      // balance instead of falling back to null/0 in the chart library.
+      let lastKnownPrevValue;
       const prevMonthData = allDays.map(day => {
-        // Only include data if the day exists in previous month
-        if (day > prevMonthDays) return undefined;
+        if (day > prevMonthDays) {
+          // Current month has more days than prev month — hold the last value flat
+          return lastKnownPrevValue;
+        }
 
         if (prevBalanceByDay[day] !== undefined) {
-          return prevBalanceByDay[day];
+          lastKnownPrevValue = prevBalanceByDay[day];
+          return lastKnownPrevValue;
         }
 
         // Forward fill: use the most recent balance before this day
         for (let d = day - 1; d >= 1; d--) {
           if (prevBalanceByDay[d] !== undefined) {
-            return prevBalanceByDay[d];
+            lastKnownPrevValue = prevBalanceByDay[d];
+            return lastKnownPrevValue;
           }
         }
 
