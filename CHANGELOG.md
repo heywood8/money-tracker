@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.95.2](https://github.com/heywood8/money-tracker/compare/penny-v0.95.1...penny-v0.95.2) (2026-05-09)
+
+
+### Bug Fixes
+
+* prev month balance graph drops to 0 on last day of longer months ([#518](https://github.com/heywood8/money-tracker/issues/518)) ([aa79acc](https://github.com/heywood8/money-tracker/commit/aa79accb29e8eaf0844e49682931f6402634c940))
+
 ## [0.95.1](https://github.com/heywood8/money-tracker/compare/penny-v0.95.0...penny-v0.95.1) (2026-05-09)
 
 
