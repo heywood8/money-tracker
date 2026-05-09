@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.98.0](https://github.com/heywood8/money-tracker/compare/penny-v0.97.0...penny-v0.98.0) (2026-05-09)
+
+
+### Features
+
+* apply basic filters to all sheets after Google Sheets export ([#527](https://github.com/heywood8/money-tracker/issues/527)) ([37471f1](https://github.com/heywood8/money-tracker/commit/37471f11d20b19f3040ca4f535360d29e429e6e9))
+
 ## [0.97.0](https://github.com/heywood8/money-tracker/compare/penny-v0.96.0...penny-v0.97.0) (2026-05-09)
 
 
