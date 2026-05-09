@@ -181,6 +181,45 @@ const createSpreadsheet = async (accessToken) => {
   return data.spreadsheetId;
 };
 
+const getSheetIds = async (accessToken, spreadsheetId, sheetNames) => {
+  const response = await fetch(
+    `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error?.message || 'get_sheet_ids_failed');
+  }
+  const data = await response.json();
+  const nameToId = new Map(data.sheets.map(s => [s.properties.title, s.properties.sheetId]));
+  return sheetNames.map(name => nameToId.get(name)).filter(id => id !== undefined);
+};
+
+const applyFilters = async (accessToken, spreadsheetId, sheetIds) => {
+  const requests = sheetIds.map(sheetId => ({
+    setBasicFilter: {
+      filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0 } },
+    },
+  }));
+  const response = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ requests }),
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('refresh_failed');
+    }
+    throw new Error(data.error?.message || 'apply_filters_failed');
+  }
+  await response.json().catch(() => {});
+};
+
 const clearSheets = async (accessToken, spreadsheetId, ranges) => {
   const response = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchClear`, {
     method: 'POST',
@@ -240,8 +279,11 @@ export const exportToSheets = async (accessToken, backup) => {
   }
 
   const sheets = buildSheetsData(backup);
-  await clearSheets(accessToken, spreadsheetId, sheets.map(s => s.range.split('!')[0]));
+  const sheetNames = sheets.map(s => s.range.split('!')[0]);
+  await clearSheets(accessToken, spreadsheetId, sheetNames);
   await writeSheets(accessToken, spreadsheetId, sheets);
+  const sheetIds = await getSheetIds(accessToken, spreadsheetId, sheetNames);
+  await applyFilters(accessToken, spreadsheetId, sheetIds);
 
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 };

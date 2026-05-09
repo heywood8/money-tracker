@@ -204,6 +204,17 @@ describe('GoogleSheetsService', () => {
       },
     };
 
+    const mockMetadata = {
+      sheets: [
+        { properties: { title: 'Accounts', sheetId: 0 } },
+        { properties: { title: 'Operations', sheetId: 1 } },
+        { properties: { title: 'Categories', sheetId: 2 } },
+        { properties: { title: 'Budgets', sheetId: 3 } },
+        { properties: { title: 'Planned Operations', sheetId: 4 } },
+        { properties: { title: 'Balance History', sheetId: 5 } },
+      ],
+    };
+
     it('creates a new spreadsheet and stores its ID on first export', async () => {
       getPreference.mockResolvedValue(null);
       setPreference.mockResolvedValue(undefined);
@@ -212,6 +223,8 @@ describe('GoogleSheetsService', () => {
         json: async () => ({ spreadsheetId: 'new-sheet-id' }),
       });
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata });
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       const url = await exportToSheets('access-token', mockBackup);
@@ -224,12 +237,30 @@ describe('GoogleSheetsService', () => {
       getPreference.mockResolvedValue('existing-sheet-id');
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       const url = await exportToSheets('access-token', mockBackup);
 
       expect(url).toBe('https://docs.google.com/spreadsheets/d/existing-sheet-id');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(4);
       expect(setPreference).not.toHaveBeenCalled();
+    });
+
+    it('applies basic filters to all 6 sheets after writing data', async () => {
+      getPreference.mockResolvedValue('sheet-id');
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // clearSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // writeSheets
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }); // getSheetIds
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // applyFilters
+
+      await exportToSheets('access-token', mockBackup);
+
+      const applyFiltersCall = mockFetch.mock.calls[3];
+      const body = JSON.parse(applyFiltersCall[1].body);
+      expect(body.requests).toHaveLength(6);
+      expect(body.requests[0].setBasicFilter.filter.range.sheetId).toBe(0);
+      expect(body.requests[5].setBasicFilter.filter.range.sheetId).toBe(5);
     });
 
     it('throws refresh_failed and signs out when clearSheets returns 401', async () => {
