@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.96.0](https://github.com/heywood8/money-tracker/compare/penny-v0.95.2...penny-v0.96.0) (2026-05-09)
+
+
+### Features
+
+* **settings:** refactor sub-navigation to unified subpanel pattern ([#522](https://github.com/heywood8/money-tracker/issues/522)) ([3497013](https://github.com/heywood8/money-tracker/commit/34970130650dce5689341f48d7e4bbf4c1db5f8c))
+
 ## [0.95.2](https://github.com/heywood8/money-tracker/compare/penny-v0.95.1...penny-v0.95.2) (2026-05-09)
 
 
