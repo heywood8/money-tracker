@@ -139,5 +139,14 @@
   "pending_in": "Pending in",
   "done_this_month": "Done this month",
   "done": "done",
-  "remaining": "remaining"
+  "remaining": "remaining",
+  "import": "Import",
+  "import_from_file": "From Google Drive",
+  "import_from_file_description": "Pick a backup file from Google Drive",
+  "import_from_local": "From local backup",
+  "import_from_local_description": "Restore from a daily or weekly automatic backup",
+  "save_local_backup": "Save local backup",
+  "save_local_backup_description": "Save a backup to local device storage",
+  "save_local_backup_saving": "Saving…",
+  "save_local_backup_success": "Backup saved"
 }

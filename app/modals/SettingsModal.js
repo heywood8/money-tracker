@@ -10,7 +10,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
 import { exportBackup, importBackup, restoreBackup, createBackup } from '../services/BackupRestore';
-import { getStoredBackups } from '../services/DailyBackupService';
+import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
@@ -54,13 +54,19 @@ export default function SettingsModal({ visible, onClose }) {
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
+  const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
   const [googleSheetsSuccessUrl, setGoogleSheetsSuccessUrl] = useState(null);
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [importStep, setImportStep] = useState('source'); // 'source' | 'local-list' | 'confirm-file' | 'confirm-local' | 'cloud'
+  const [importSelectedBackup, setImportSelectedBackup] = useState(null);
+  const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
+  const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
 
   // Computed colors
   const googleSheetsTextColor = googleSheetsSuccessUrl ? '#4caf50' : (googleSheetsLoading ? colors.mutedText : colors.text);
+  const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
 
   // Animation values
   const settingsAnim = useRef(new Animated.Value(0)).current;
@@ -116,7 +122,11 @@ export default function SettingsModal({ visible, onClose }) {
   }, [hideBalances, setHideBalances, t, showDialog]);
 
   const openSubPanel = useCallback((panel) => {
-    if (panel === 'backups') loadStoredBackups();
+    if (panel === 'import') {
+      setImportStep('source');
+      setImportSelectedBackup(null);
+      loadStoredBackups();
+    }
     setActiveSubPanel(panel);
     Animated.parallel([
       Animated.timing(settingsAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
@@ -132,6 +142,10 @@ export default function SettingsModal({ visible, onClose }) {
       setActiveSubPanel(null);
       setGoogleSheetsSuccessUrl(null);
       setUpdateResult(null);
+      setImportStep('source');
+      setImportSelectedBackup(null);
+      setSaveLocalBackupLoading(false);
+      setSaveLocalBackupSuccess(false);
     });
   }, [settingsAnim, subPanelAnim]);
 
@@ -171,9 +185,9 @@ export default function SettingsModal({ visible, onClose }) {
   };
 
   const handleExportFormatSelect = useCallback(async (format) => {
-    closeSubPanel();
     try {
       await exportBackup(format);
+      // share sheet is user feedback; stay on subpanel so cancel returns here
     } catch (error) {
       console.error('Export backup error:', error);
       showDialog(
@@ -182,7 +196,7 @@ export default function SettingsModal({ visible, onClose }) {
         [{ text: 'OK' }],
       );
     }
-  }, [closeSubPanel, t, showDialog]);
+  }, [t, showDialog]);
 
   const handleGoogleSheetsExport = useCallback(async () => {
     setGoogleSheetsLoading(true);
@@ -236,20 +250,23 @@ export default function SettingsModal({ visible, onClose }) {
   // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
   const confirmImportBackup = useCallback(async () => {
-    closeSubPanel();
-    onClose();
     startImport();
     try {
       await importBackup();
+      closeSubPanel();
+      onClose();
       completeImport();
     } catch (error) {
-      console.error('Import backup error:', error);
       cancelImport();
+      if (error.message === 'Import cancelled') {
+        console.info('[Import] User cancelled file selection');
+        setImportStep('source');
+        return;
+      }
+      console.error('Import backup error:', error);
       showDialog(
         t('error') || 'Error',
-        error.message === 'Import cancelled'
-          ? t('cancel') || 'Cancelled'
-          : error.message || t('restore_error') || 'Failed to restore backup',
+        error.message || t('restore_error') || 'Failed to restore backup',
         [{ text: 'OK' }],
       );
     }
@@ -291,59 +308,96 @@ export default function SettingsModal({ visible, onClose }) {
     }
   }, []);
 
-  const handleRestoreLocalBackup = useCallback((uri) => {
-    showDialog(
-      t('restore_database') || 'Restore Database',
-      t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('restore_database') || 'Restore',
-          style: 'destructive',
-          onPress: async () => {
-            onClose();
-            startImport();
-            try {
-              const content = await LegacyFileSystem.readAsStringAsync(uri);
-              const backup = JSON.parse(content);
-              await restoreBackup(backup);
-              completeImport();
-            } catch (error) {
-              console.error('Local backup restore error:', error);
-              cancelImport();
-              showDialog(
-                t('error') || 'Error',
-                error.message || t('restore_error') || 'Failed to restore backup',
-                [{ text: 'OK' }],
-              );
-            }
-          },
-        },
-      ],
-    );
-  }, [showDialog, t, onClose, startImport, completeImport, cancelImport]);
+  const handleImportSourceSelect = useCallback((source) => {
+    if (source === 'file') {
+      setImportStep('confirm-file');
+    } else if (source === 'local') {
+      setImportStep('local-list');
+    } else if (source === 'cloud') {
+      setImportStep('cloud');
+    }
+  }, []);
+
+  const handleImportLocalBackupSelect = useCallback((item) => {
+    setImportSelectedBackup(item);
+    setImportStep('confirm-local');
+  }, []);
+
+  const handleImportBack = useCallback(() => {
+    if (importStep === 'source') {
+      closeSubPanel();
+    } else if (importStep === 'local-list') {
+      setImportStep('source');
+    } else if (importStep === 'confirm-file') {
+      setImportStep('source');
+    } else if (importStep === 'confirm-local') {
+      setImportStep('local-list');
+      setImportSelectedBackup(null);
+    }
+  }, [importStep, closeSubPanel]);
+
+  const confirmRestoreLocalBackup = useCallback(async () => {
+    if (!importSelectedBackup) return;
+    closeSubPanel();
+    onClose();
+    startImport();
+    try {
+      const content = await LegacyFileSystem.readAsStringAsync(importSelectedBackup.uri);
+      const backup = JSON.parse(content);
+      await restoreBackup(backup);
+      completeImport();
+    } catch (error) {
+      console.error('Local backup restore error:', error);
+      cancelImport();
+      showDialog(
+        t('error') || 'Error',
+        error.message || t('restore_error') || 'Failed to restore backup',
+        [{ text: 'OK' }],
+      );
+    }
+  }, [importSelectedBackup, closeSubPanel, onClose, startImport, completeImport, cancelImport, t, showDialog]);
+
+  const handleSaveLocalBackup = useCallback(async () => {
+    setSaveLocalBackupLoading(true);
+    try {
+      const backup = await createBackup();
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+      const filename = `manual_${dateStr}_${timeStr}.json`;
+      const dirInfo = await LegacyFileSystem.getInfoAsync(DAILY_BACKUP_DIR);
+      if (!dirInfo.exists) {
+        await LegacyFileSystem.makeDirectoryAsync(DAILY_BACKUP_DIR, { intermediates: true });
+      }
+      const fileUri = `${DAILY_BACKUP_DIR}${filename}`;
+      await LegacyFileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup));
+      setSaveLocalBackupLoading(false);
+      setSaveLocalBackupSuccess(true);
+    } catch (error) {
+      console.error('Save local backup error:', error);
+      setSaveLocalBackupLoading(false);
+      showDialog(
+        t('error') || 'Error',
+        t('backup_error') || 'Failed to create backup',
+        [{ text: 'OK' }],
+      );
+    }
+  }, [t, showDialog]);
 
   const handleDeleteLocalBackup = useCallback((uri) => {
-    showDialog(
-      t('delete_backup') || 'Delete Backup',
-      t('delete_backup_confirm') || 'Delete this backup? This cannot be undone.',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('delete') || 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
-              setStoredBackups(prev => prev.filter(b => b.uri !== uri));
-            } catch (error) {
-              console.error('Failed to delete backup:', error);
-            }
-          },
-        },
-      ],
-    );
-  }, [showDialog, t]);
+    setPendingDeleteUri(uri);
+  }, []);
+
+  const handleConfirmDeleteLocalBackup = useCallback(async (uri) => {
+    setPendingDeleteUri(null);
+    try {
+      await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
+      setStoredBackups(prev => prev.filter(b => b.uri !== uri));
+    } catch (error) {
+      console.error('Failed to delete backup:', error);
+    }
+  }, []);
 
   const handleCheckForUpdates = useCallback(async () => {
     updateContentAnim.setValue(0);
@@ -380,6 +434,11 @@ export default function SettingsModal({ visible, onClose }) {
       setActiveSubPanel(null);
       setGoogleSheetsSuccessUrl(null);
       setUpdateResult(null);
+      setImportStep('source');
+      setImportSelectedBackup(null);
+      setSaveLocalBackupLoading(false);
+      setSaveLocalBackupSuccess(false);
+      setPendingDeleteUri(null);
       settingsAnim.setValue(0);
       subPanelAnim.setValue(0);
     }
@@ -420,36 +479,66 @@ export default function SettingsModal({ visible, onClose }) {
       const [year, weekPart] = weekStr.split('-');
       return `${t('weekly') || 'Weekly'} ${weekPart}, ${year}`;
     }
+    if (filename.startsWith('manual_')) {
+      const inner = filename.replace('manual_', '').replace('.json', '');
+      const [datePart, timePart] = inner.split('_');
+      if (datePart) {
+        const [year, month, day] = datePart.split('-').map(Number);
+        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric',
+        });
+        if (timePart) {
+          const [hh, mm] = timePart.split('-');
+          return `${dateLabel} · ${hh}:${mm}`;
+        }
+        return dateLabel;
+      }
+    }
     return filename;
   }, [t]);
 
   const renderBackupItem = useCallback(({ item }) => {
     const isDaily = item.filename.startsWith('daily_');
+    const isManual = item.filename.startsWith('manual_');
     const label = formatBackupLabel(item.filename);
-    const typeLabel = isDaily ? 'Daily' : (t('weekly') || 'Weekly');
+    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
     const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
+    const isPending = pendingDeleteUri === item.uri;
     return (
       <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
         <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : 'calendar-number-outline'} size={22} color={colors.text} />
+          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
           <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
             <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {typeLabel}{sizeKB ? ` · ${sizeKB}` : ''}
+              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
             </Text>
           </View>
         </View>
         <View style={styles.backupItemActions}>
-          <TouchableOpacity onPress={() => handleRestoreLocalBackup(item.uri)} style={styles.backupActionButton}>
-            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
-            <Ionicons name="trash-outline" size={18} color="#c44" />
-          </TouchableOpacity>
+          {isPending ? (
+            <>
+              <TouchableOpacity onPress={() => setPendingDeleteUri(null)} style={styles.backupConfirmButton}>
+                <Text style={[styles.backupConfirmButtonText, { color: colors.mutedText }]}>{t('cancel') || 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleConfirmDeleteLocalBackup(item.uri)} style={styles.backupConfirmButton}>
+                <Text style={styles.backupConfirmButtonDestructiveText}>{t('delete') || 'Delete'}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity onPress={() => handleImportLocalBackupSelect(item)} style={styles.backupActionButton}>
+                <Ionicons name="refresh-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
+                <Ionicons name="trash-outline" size={18} color="#c44" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     );
-  }, [colors, t, formatBackupLabel, handleRestoreLocalBackup, handleDeleteLocalBackup]);
+  }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
 
   const renderLogEntry = useCallback(({ item }) => (
     <View style={styles.logEntry}>
@@ -547,16 +636,6 @@ export default function SettingsModal({ visible, onClose }) {
               </View>
             </TouchableRipple>
 
-            <TouchableRipple onPress={() => openSubPanel('backups')} style={styles.settingsRow} testID="settings-backups-row">
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="archive-outline" size={22} color={colors.text} />
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('local_backups') || 'Local Backups'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-
             <Divider style={styles.divider} />
 
             <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
@@ -605,15 +684,24 @@ export default function SettingsModal({ visible, onClose }) {
               },
             ]}>
               <View style={styles.languageModalHeader}>
-                <TouchableOpacity onPress={closeSubPanel} style={styles.backButton} testID="settings-subpanel-back">
+                <TouchableOpacity
+                  onPress={activeSubPanel === 'import' ? handleImportBack : closeSubPanel}
+                  style={styles.backButton}
+                  testID="settings-subpanel-back"
+                >
                   <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
                   {activeSubPanel === 'language' && t('language')}
                   {activeSubPanel === 'export' && (t('export_format') || 'Export Format')}
-                  {activeSubPanel === 'import' && (t('restore_database') || 'Restore Database')}
+                  {activeSubPanel === 'import' && (
+                    importStep === 'source'
+                      ? (t('import') || 'Import')
+                      : importStep === 'local-list'
+                        ? (t('local_backups') || 'Local Backups')
+                        : (t('restore_database') || 'Restore Database')
+                  )}
                   {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
-                  {activeSubPanel === 'backups' && (t('local_backups') || 'Local Backups')}
                   {activeSubPanel === 'update' && (
                     isCheckingUpdate
                       ? (t('check_updates') || 'Check for updates')
@@ -623,7 +711,7 @@ export default function SettingsModal({ visible, onClose }) {
                   )}
                   {activeSubPanel === 'reset' && (t('reset_database') || 'Reset Database')}
                 </Text>
-                {activeSubPanel === 'backups' ? (
+                {activeSubPanel === 'import' && importStep === 'local-list' ? (
                   <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
                     <Ionicons name="refresh-outline" size={22} color={colors.text} />
                   </TouchableOpacity>
@@ -657,48 +745,39 @@ export default function SettingsModal({ visible, onClose }) {
 
               {activeSubPanel === 'export' && (
                 <ScrollView style={styles.languageList}>
-                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
+                  <TouchableRipple
+                    onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
+                    style={styles.languageItem}
+                    disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
+                    testID="settings-export-save-local-backup"
+                  >
                     <View style={styles.languageItemContent}>
                       <View style={styles.formatItemRow}>
-                        <Ionicons name="code-outline" size={24} color={colors.text} />
+                        <Ionicons
+                          name="archive-outline"
+                          size={24}
+                          color={saveLocalBackupColor}
+                        />
                         <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>JSON</Text>
+                          <Text style={[styles.languageItemText, { color: saveLocalBackupColor }]}>
+                            {t('save_local_backup') || 'Save local backup'}
+                          </Text>
                           <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('json_description') || 'Standard format, compatible with all versions'}
+                            {saveLocalBackupLoading
+                              ? (t('save_local_backup_saving') || 'Saving…')
+                              : saveLocalBackupSuccess
+                                ? (t('save_local_backup_success') || 'Backup saved')
+                                : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
                           </Text>
                         </View>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>CSV</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('csv_description') || 'Plain text format, easy to edit'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="server-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>SQLite Database</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('sqlite_description') || 'Raw database file, complete backup'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                      {saveLocalBackupLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : saveLocalBackupSuccess ? (
+                        <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                      ) : (
+                        <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                      )}
                     </View>
                   </TouchableRipple>
 
@@ -747,6 +826,51 @@ export default function SettingsModal({ visible, onClose }) {
                       )}
                     </View>
                   </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="server-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to SQLite</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('sqlite_description') || 'Raw database file, complete backup'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to CSV</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('csv_description') || 'Plain text format, easy to edit'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="code-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to JSON</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('json_description') || 'Standard format, compatible with all versions'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
                 </ScrollView>
               )}
 
@@ -764,13 +888,91 @@ export default function SettingsModal({ visible, onClose }) {
                 </View>
               )}
 
-              {activeSubPanel === 'import' && (
+              {activeSubPanel === 'import' && importStep === 'source' && (
+                <ScrollView style={styles.languageList}>
+                  <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="logo-google" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>
+                            {t('import_from_file') || 'From Google Drive'}
+                          </Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="archive-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>
+                            {t('import_from_local') || 'From local backup'}
+                          </Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+                </ScrollView>
+              )}
+
+              {activeSubPanel === 'import' && importStep === 'local-list' && (
+                backupsLoading ? (
+                  <View style={styles.logsEmptyContainer}>
+                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={storedBackups}
+                    keyExtractor={(item) => item.uri}
+                    renderItem={renderBackupItem}
+                    style={styles.logsList}
+                    contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+                    ListEmptyComponent={
+                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                        {t('local_backups_empty') || 'No local backups yet'}
+                      </Text>
+                    }
+                  />
+                )
+              )}
+
+              {activeSubPanel === 'import' && importStep === 'confirm-file' && (
                 <View style={styles.importConfirmContent}>
                   <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
                   <Text style={[styles.importConfirmText, { color: colors.text }]}>
                     {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                   </Text>
-                  <TouchableRipple onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
+                  <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
+                    <Text style={styles.importConfirmButtonText}>
+                      {t('restore_database') || 'Restore'}
+                    </Text>
+                  </TouchableRipple>
+                </View>
+              )}
+
+              {activeSubPanel === 'import' && importStep === 'confirm-local' && (
+                <View style={styles.importConfirmContent}>
+                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                  {importSelectedBackup && (
+                    <Text style={[styles.importConfirmText, { color: colors.mutedText }]}>
+                      {formatBackupLabel(importSelectedBackup.filename)}
+                    </Text>
+                  )}
+                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                    {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                  </Text>
+                  <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.importConfirmButtonDestructive}>
                     <Text style={styles.importConfirmButtonText}>
                       {t('restore_database') || 'Restore'}
                     </Text>
@@ -943,26 +1145,6 @@ export default function SettingsModal({ visible, onClose }) {
                 )
               )}
 
-              {activeSubPanel === 'backups' && (
-                backupsLoading ? (
-                  <View style={styles.logsEmptyContainer}>
-                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={storedBackups}
-                    keyExtractor={(item) => item.uri}
-                    renderItem={renderBackupItem}
-                    style={styles.logsList}
-                    contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
-                    ListEmptyComponent={
-                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                        {t('local_backups_empty') || 'No local backups yet'}
-                      </Text>
-                    }
-                  />
-                )
-              )}
             </Animated.View>
           )}
         </View>
@@ -986,6 +1168,19 @@ const styles = StyleSheet.create({
   },
   backupActionButton: {
     padding: 6,
+  },
+  backupConfirmButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  backupConfirmButtonDestructiveText: {
+    color: '#c44',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  backupConfirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   backupItem: {
     alignItems: 'center',

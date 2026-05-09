@@ -200,6 +200,19 @@ describe('DailyBackupService', () => {
       ]);
     });
 
+    it('includes manual backup files alongside daily and weekly', async () => {
+      mockFileSystem.readDirectoryAsync.mockResolvedValue([
+        'daily_2026-02-26.json',
+        'manual_2026-02-26_14-32-05.json',
+        'weekly_2026-W09.json',
+      ]);
+
+      const result = await getStoredBackups();
+      expect(result).toContain(`${DAILY_BACKUP_DIR}manual_2026-02-26_14-32-05.json`);
+      expect(result).toContain(`${DAILY_BACKUP_DIR}daily_2026-02-26.json`);
+      expect(result).toContain(`${DAILY_BACKUP_DIR}weekly_2026-W09.json`);
+    });
+
     it('creates the backup directory if it does not exist', async () => {
       mockFileSystem.getInfoAsync.mockResolvedValue({ exists: false });
       await getStoredBackups();

@@ -92,9 +92,30 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
 const mockImportBackup = jest.fn(() => Promise.resolve());
+const mockRestoreBackup = jest.fn(() => Promise.resolve());
+const mockCreateBackup = jest.fn(() => Promise.resolve({ version: 1, data: {} }));
 jest.mock('../../app/services/BackupRestore', () => ({
-  exportBackup: mockExportBackup,
-  importBackup: mockImportBackup,
+  exportBackup: (...args) => mockExportBackup(...args),
+  importBackup: (...args) => mockImportBackup(...args),
+  restoreBackup: (...args) => mockRestoreBackup(...args),
+  createBackup: (...args) => mockCreateBackup(...args),
+}));
+
+// Mock DailyBackupService
+const mockGetStoredBackups = jest.fn(() => Promise.resolve([]));
+jest.mock('../../app/services/DailyBackupService', () => ({
+  getStoredBackups: (...args) => mockGetStoredBackups(...args),
+}));
+
+// Mock expo-file-system/legacy
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: '/mock/docs/',
+  getInfoAsync: jest.fn(() => Promise.resolve({ size: 1024, exists: true })),
+  readDirectoryAsync: jest.fn(() => Promise.resolve([])),
+  readAsStringAsync: jest.fn(() => Promise.resolve(JSON.stringify({ version: 1, data: {} }))),
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+  deleteAsync: jest.fn(() => Promise.resolve()),
+  makeDirectoryAsync: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock useLogEntries hook
@@ -121,6 +142,7 @@ jest.mock('expo-file-system', () => ({
 // Mock expo-sharing
 jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(() => Promise.resolve()),
+  isAvailableAsync: jest.fn(() => Promise.resolve(false)),
 }));
 
 // Mock Ionicons
@@ -141,6 +163,9 @@ describe('SettingsModal Component', () => {
     mockCompleteImport.mockClear();
     mockExportBackup.mockClear();
     mockImportBackup.mockClear();
+    mockRestoreBackup.mockClear();
+    mockCreateBackup.mockClear();
+    mockGetStoredBackups.mockClear();
     mockSetHideBalances.mockClear();
     mockAuthenticateWithBiometrics.mockClear();
     displaySettingsMockState.hideBalances = false;
@@ -278,33 +303,38 @@ describe('SettingsModal Component', () => {
       expect(getByText('reset')).toBeTruthy();
     });
 
-    it('shows import confirmation subpanel when import row is pressed', () => {
-      const { getByText, getAllByText } = render(
+    it('shows import source picker when import row is pressed', () => {
+      const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('import'));
 
-      expect(getByText('restore_confirm')).toBeTruthy();
-      // restore_database appears in the subpanel title and the confirm button
-      expect(getAllByText('restore_database').length).toBeGreaterThanOrEqual(1);
+      expect(getByText('import_from_file')).toBeTruthy();
+      expect(getByText('import_from_local')).toBeTruthy();
     });
 
-    it('performs import when subpanel confirm button is pressed', async () => {
-      const { getByText, getAllByText } = render(
+    it('performs import when confirm button is pressed after selecting from file', async () => {
+      const { getByText, getByTestId } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('import'));
+      fireEvent.press(getByText('import_from_file'));
 
-      // The confirm button is the last element with this text (subpanel title uses same key)
-      const confirmButtons = getAllByText('restore_database');
+      expect(getByText('restore_confirm')).toBeTruthy();
+
       await act(async () => {
-        fireEvent.press(confirmButtons[confirmButtons.length - 1]);
+        fireEvent.press(getByTestId('confirm-import-file-btn'));
       });
 
       expect(mockStartImport).toHaveBeenCalled();
-      expect(mockOnClose).toHaveBeenCalled();
+      expect(mockCancelImport).not.toHaveBeenCalled();
+
+      await waitFor(() => {
+        expect(mockImportBackup).toHaveBeenCalled();
+        expect(mockOnClose).toHaveBeenCalled();
+      });
     });
 
     it('performs reset when subpanel confirm button is pressed', async () => {
@@ -343,9 +373,9 @@ describe('SettingsModal Component', () => {
         fireEvent.press(getByText('export'));
       });
 
-      expect(getByText('JSON')).toBeTruthy();
-      expect(getByText('CSV')).toBeTruthy();
-      expect(getByText('SQLite Database')).toBeTruthy();
+      expect(getByText('Save externally to JSON')).toBeTruthy();
+      expect(getByText('Save externally to CSV')).toBeTruthy();
+      expect(getByText('Save externally to SQLite')).toBeTruthy();
     });
 
     it('renders export format descriptions', () => {
@@ -464,6 +494,71 @@ describe('SettingsModal Component', () => {
 
       expect(modalInstance).toBeTruthy();
       expect(modalInstance.props.visible).toBe(true);
+    });
+  });
+
+  describe('Import Flow', () => {
+    it('shows three source options in the source picker', () => {
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      fireEvent.press(getByText('import'));
+
+      expect(getByText('import_from_file')).toBeTruthy();
+      expect(getByText('import_from_local')).toBeTruthy();
+    });
+
+    it('shows confirm step after selecting from file', () => {
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      fireEvent.press(getByText('import'));
+      fireEvent.press(getByText('import_from_file'));
+
+      expect(getByText('restore_confirm')).toBeTruthy();
+    });
+
+    it('back button from confirm-file returns to source picker', () => {
+      const { getByText, getByTestId } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      fireEvent.press(getByText('import'));
+      fireEvent.press(getByText('import_from_file'));
+      fireEvent.press(getByTestId('settings-subpanel-back'));
+
+      expect(getByText('import_from_file')).toBeTruthy();
+    });
+
+  });
+
+  describe('Save Local Backup', () => {
+    it('shows save local backup option in export panel', () => {
+      const { getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      expect(getByText('save_local_backup')).toBeTruthy();
+    });
+
+    it('calls createBackup when save local backup row is pressed', async () => {
+      mockCreateBackup.mockResolvedValue({ version: 1, data: {} });
+
+      const { getByTestId, getByText } = render(
+        <SettingsModal visible={true} onClose={mockOnClose} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      await act(async () => {
+        fireEvent.press(getByTestId('settings-export-save-local-backup'));
+      });
+
+      expect(mockCreateBackup).toHaveBeenCalled();
     });
   });
 
