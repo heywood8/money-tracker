@@ -184,9 +184,9 @@ export default function SettingsModal({ visible, onClose }) {
   };
 
   const handleExportFormatSelect = useCallback(async (format) => {
-    closeSubPanel();
     try {
       await exportBackup(format);
+      // share sheet is user feedback; stay on subpanel so cancel returns here
     } catch (error) {
       console.error('Export backup error:', error);
       showDialog(
@@ -195,7 +195,7 @@ export default function SettingsModal({ visible, onClose }) {
         [{ text: 'OK' }],
       );
     }
-  }, [closeSubPanel, t, showDialog]);
+  }, [t, showDialog]);
 
   const handleGoogleSheetsExport = useCallback(async () => {
     setGoogleSheetsLoading(true);
@@ -249,20 +249,23 @@ export default function SettingsModal({ visible, onClose }) {
   // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
   const confirmImportBackup = useCallback(async () => {
-    closeSubPanel();
-    onClose();
     startImport();
     try {
       await importBackup();
+      closeSubPanel();
+      onClose();
       completeImport();
     } catch (error) {
-      console.error('Import backup error:', error);
       cancelImport();
+      if (error.message === 'Import cancelled') {
+        console.info('[Import] User cancelled file selection');
+        setImportStep('source');
+        return;
+      }
+      console.error('Import backup error:', error);
       showDialog(
         t('error') || 'Error',
-        error.message === 'Import cancelled'
-          ? t('cancel') || 'Cancelled'
-          : error.message || t('restore_error') || 'Failed to restore backup',
+        error.message || t('restore_error') || 'Failed to restore backup',
         [{ text: 'OK' }],
       );
     }
@@ -942,7 +945,7 @@ export default function SettingsModal({ visible, onClose }) {
                   <Text style={[styles.importConfirmText, { color: colors.text }]}>
                     {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                   </Text>
-                  <TouchableRipple onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
+                  <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
                     <Text style={styles.importConfirmButtonText}>
                       {t('restore_database') || 'Restore'}
                     </Text>

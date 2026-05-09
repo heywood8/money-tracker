@@ -95,8 +95,8 @@ const mockImportBackup = jest.fn(() => Promise.resolve());
 const mockRestoreBackup = jest.fn(() => Promise.resolve());
 const mockCreateBackup = jest.fn(() => Promise.resolve({ version: 1, data: {} }));
 jest.mock('../../app/services/BackupRestore', () => ({
-  exportBackup: mockExportBackup,
-  importBackup: mockImportBackup,
+  exportBackup: (...args) => mockExportBackup(...args),
+  importBackup: (...args) => mockImportBackup(...args),
   restoreBackup: (...args) => mockRestoreBackup(...args),
   createBackup: (...args) => mockCreateBackup(...args),
 }));
@@ -315,7 +315,7 @@ describe('SettingsModal Component', () => {
     });
 
     it('performs import when confirm button is pressed after selecting from file', async () => {
-      const { getByText, getAllByText } = render(
+      const { getByText, getByTestId } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
@@ -324,13 +324,17 @@ describe('SettingsModal Component', () => {
 
       expect(getByText('restore_confirm')).toBeTruthy();
 
-      const confirmButtons = getAllByText('restore_database');
       await act(async () => {
-        fireEvent.press(confirmButtons[confirmButtons.length - 1]);
+        fireEvent.press(getByTestId('confirm-import-file-btn'));
       });
 
       expect(mockStartImport).toHaveBeenCalled();
-      expect(mockOnClose).toHaveBeenCalled();
+      expect(mockCancelImport).not.toHaveBeenCalled();
+
+      await waitFor(() => {
+        expect(mockImportBackup).toHaveBeenCalled();
+        expect(mockOnClose).toHaveBeenCalled();
+      });
     });
 
     it('performs reset when subpanel confirm button is pressed', async () => {
