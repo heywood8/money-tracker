@@ -734,51 +734,6 @@ export default function SettingsModal({ visible, onClose }) {
 
               {activeSubPanel === 'export' && (
                 <ScrollView style={styles.languageList}>
-                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="code-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>JSON</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('json_description') || 'Standard format, compatible with all versions'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>CSV</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('csv_description') || 'Plain text format, easy to edit'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="server-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>SQLite Database</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('sqlite_description') || 'Raw database file, complete backup'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
                   <TouchableRipple
                     onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
                     style={styles.languageItem}
@@ -858,6 +813,51 @@ export default function SettingsModal({ visible, onClose }) {
                       ) : (
                         <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                       )}
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="server-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to SQLite</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('sqlite_description') || 'Raw database file, complete backup'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to CSV</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('csv_description') || 'Plain text format, easy to edit'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+
+                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="code-outline" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to JSON</Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('json_description') || 'Standard format, compatible with all versions'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                     </View>
                   </TouchableRipple>
                 </ScrollView>

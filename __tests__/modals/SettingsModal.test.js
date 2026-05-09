@@ -369,9 +369,9 @@ describe('SettingsModal Component', () => {
         fireEvent.press(getByText('export'));
       });
 
-      expect(getByText('JSON')).toBeTruthy();
-      expect(getByText('CSV')).toBeTruthy();
-      expect(getByText('SQLite Database')).toBeTruthy();
+      expect(getByText('Save externally to JSON')).toBeTruthy();
+      expect(getByText('Save externally to CSV')).toBeTruthy();
+      expect(getByText('Save externally to SQLite')).toBeTruthy();
     });
 
     it('renders export format descriptions', () => {
