@@ -127,11 +127,11 @@ describe('GoogleSheetsExport integration', () => {
     });
   });
 
-  it('shows sign-in error dialog when signIn fails', async () => {
+  it('shows sign-in error inline when signIn fails', async () => {
     getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
     signIn.mockRejectedValue(new Error('auth_failed'));
 
-    const { getByTestId } = renderModal();
+    const { getByTestId, getByText } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
 
     await waitFor(() => {
@@ -139,18 +139,15 @@ describe('GoogleSheetsExport integration', () => {
     });
 
     await waitFor(() => {
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('google_sheets_signin_failed'),
-        expect.anything(),
-      );
+      expect(getByText('google_sheets_signin_failed')).toBeTruthy();
     });
+    expect(mockShowDialog).not.toHaveBeenCalled();
   });
 
-  it('shows revoked-access error when refresh fails', async () => {
+  it('shows revoked-access error inline when refresh fails', async () => {
     getValidAccessToken.mockRejectedValue(new Error('refresh_failed'));
 
-    const { getByTestId } = renderModal();
+    const { getByTestId, getByText } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
 
     await waitFor(() => {
@@ -158,12 +155,9 @@ describe('GoogleSheetsExport integration', () => {
     });
 
     await waitFor(() => {
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('google_sheets_access_revoked'),
-        expect.anything(),
-      );
+      expect(getByText('google_sheets_access_revoked')).toBeTruthy();
     });
+    expect(mockShowDialog).not.toHaveBeenCalled();
   });
 
   it('silently returns when sign-in is cancelled', async () => {

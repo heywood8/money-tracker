@@ -268,22 +268,33 @@ const writeSheets = async (accessToken, spreadsheetId, sheets) => {
  * Export all app data to Google Sheets.
  * @param {string} accessToken - Valid Google OAuth access token
  * @param {Object} backup - Backup object from createBackup()
+ * @param {Function} [onProgress] - Optional callback({ step, status }) for progress reporting.
+ *   Steps: 'connect' | 'clear' | 'write'. Statuses: 'in_progress' | 'completed'.
  * @returns {Promise<string>} URL of the spreadsheet
  */
-export const exportToSheets = async (accessToken, backup) => {
-  let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
+export const exportToSheets = async (accessToken, backup, onProgress) => {
+  const report = (step, status) => onProgress?.({ step, status });
 
+  report('connect', 'in_progress');
+  let spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
   if (!spreadsheetId) {
     spreadsheetId = await createSpreadsheet(accessToken);
     await setPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID, spreadsheetId);
   }
+  report('connect', 'completed');
 
   const sheets = buildSheetsData(backup);
   const sheetNames = sheets.map(s => s.range.split('!')[0]);
+
+  report('clear', 'in_progress');
   await clearSheets(accessToken, spreadsheetId, sheetNames);
+  report('clear', 'completed');
+
+  report('write', 'in_progress');
   await writeSheets(accessToken, spreadsheetId, sheets);
   const sheetIds = await getSheetIds(accessToken, spreadsheetId, sheetNames);
   await applyFilters(accessToken, spreadsheetId, sheetIds);
+  report('write', 'completed');
 
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 };
