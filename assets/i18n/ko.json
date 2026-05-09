@@ -357,6 +357,8 @@
   "checking_for_updates": "업데이트 확인 중…",
   "update_check_failed": "Could not check updates right now. Please try again later.",
   "up_to_date": "You already have the latest version installed.",
+  "update_from_version": "설치됨: v{currentVersion}",
+  "whats_new": "새로운 기능",
   "update_available_title": "Update available",
   "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
   "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",

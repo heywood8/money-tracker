@@ -155,6 +155,7 @@ export const checkForAppUpdate = async ({
         releaseUrl: release.html_url || apkAsset.browser_download_url,
         publishedAt: release.published_at || null,
         releaseName: release.name || release.tag_name || null,
+        releaseNotes: release.body || null,
       };
     }
 

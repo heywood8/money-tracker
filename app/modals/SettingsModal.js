@@ -31,6 +31,16 @@ const LOG_LEVEL_COLORS = {
 
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
+const stripMarkdown = (md) => md
+  .replace(/#{1,6}\s+/g, '')
+  .replace(/\*\*(.+?)\*\*/g, '$1')
+  .replace(/\*(.+?)\*/g, '$1')
+  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  .replace(/`([^`]+)`/g, '$1')
+  .replace(/^\s*[-*+]\s+/gm, '• ')
+  .replace(/\r\n/g, '\n')
+  .trim();
+
 export default function SettingsModal({ visible, onClose }) {
   const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
@@ -348,7 +358,13 @@ export default function SettingsModal({ visible, onClose }) {
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({ type: 'up_to_date' });
       } else {
-        setUpdateResult({ type: 'available', latestVersion: result.latestVersion, downloadUrl: result.downloadUrl });
+        setUpdateResult({
+          type: 'available',
+          latestVersion: result.latestVersion,
+          currentVersion: result.currentVersion,
+          downloadUrl: result.downloadUrl,
+          releaseNotes: result.releaseNotes || null,
+        });
       }
     } catch (error) {
       console.error('Manual update check failed:', error);
@@ -833,57 +849,85 @@ export default function SettingsModal({ visible, onClose }) {
                     </Text>
                   </View>
                 ) : updateResult && (
-                  <Animated.View style={[styles.importConfirmContent, { opacity: updateContentAnim }]}>
+                  <Animated.View style={[styles.updateResultContainer, { opacity: updateContentAnim }]}>
                     {updateResult.type === 'available' && (
                       <>
-                        <Ionicons name="download-outline" size={48} color={colors.primary} style={styles.importWarningIcon} />
-                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                          {(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
-                            .replace('{latestVersion}', updateResult.latestVersion)}
-                        </Text>
-                        <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
-                          {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-                        </Text>
-                        <TouchableRipple
-                          onPress={async () => {
-                            await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                            closeSubPanel();
-                            onClose();
-                            startDownload(updateResult.downloadUrl, {
-                              onError: () => {
-                                showDialog(
-                                  t('error') || 'Error',
-                                  t('update_download_failed') || 'Could not download the update. Please try again.',
-                                  [{ text: t('ok') || 'OK' }],
-                                );
-                              },
-                            });
-                          }}
-                          style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
-                        >
-                          <Text style={styles.importConfirmButtonText}>
-                            {t('update_now') || 'Update now'}
+                        <View style={styles.updateAvailableHeader}>
+                          <Ionicons name="download-outline" size={36} color={colors.primary} />
+                          <View style={styles.updateVersionInfo}>
+                            <Text style={[styles.updateNewVersion, { color: colors.text }]}>
+                              v{updateResult.latestVersion}
+                            </Text>
+                            <Text style={[styles.updateCurrentVersion, { color: colors.mutedText }]}>
+                              {(t('update_from_version') || 'installed: v{currentVersion}')
+                                .replace('{currentVersion}', updateResult.currentVersion)}
+                            </Text>
+                          </View>
+                        </View>
+                        {updateResult.releaseNotes ? (
+                          <>
+                            <Divider style={styles.updateDivider} />
+                            <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
+                              {t('whats_new') || "What's new"}
+                            </Text>
+                            <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
+                              <Text style={[styles.changelogText, { color: colors.text }]}>
+                                {stripMarkdown(updateResult.releaseNotes)}
+                              </Text>
+                            </ScrollView>
+                          </>
+                        ) : (
+                          <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
+                            {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
                           </Text>
-                        </TouchableRipple>
+                        )}
+                        <View style={styles.updateActions}>
+                          {updateResult.releaseNotes && (
+                            <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
+                              {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
+                            </Text>
+                          )}
+                          <TouchableRipple
+                            onPress={async () => {
+                              await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+                              closeSubPanel();
+                              onClose();
+                              startDownload(updateResult.downloadUrl, {
+                                onError: () => {
+                                  showDialog(
+                                    t('error') || 'Error',
+                                    t('update_download_failed') || 'Could not download the update. Please try again.',
+                                    [{ text: t('ok') || 'OK' }],
+                                  );
+                                },
+                              });
+                            }}
+                            style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
+                          >
+                            <Text style={styles.importConfirmButtonText}>
+                              {t('update_now') || 'Update now'}
+                            </Text>
+                          </TouchableRipple>
+                        </View>
                       </>
                     )}
                     {updateResult.type === 'up_to_date' && (
-                      <>
+                      <View style={styles.importConfirmContent}>
                         <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
                         <Text style={[styles.updateVersionText, { color: colors.text }]}>
                           {t('up_to_date') || 'You already have the latest version installed.'}
                         </Text>
-                      </>
+                      </View>
                     )}
                     {updateResult.type === 'error' && (
-                      <>
+                      <View style={styles.importConfirmContent}>
                         <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
                         <Text style={[styles.updateVersionText, { color: colors.text }]}>
                           {updateResult.errorCode === 'releases_without_apks'
                             ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
                             : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
                         </Text>
-                      </>
+                      </View>
                     )}
                   </Animated.View>
                 )
@@ -961,6 +1005,21 @@ const styles = StyleSheet.create({
   },
   backupItemText: {
     flex: 1,
+  },
+  changelogScroll: {
+    flex: 1,
+    marginTop: SPACING.xs,
+  },
+  changelogText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  changelogTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginTop: SPACING.md,
+    textTransform: 'uppercase',
   },
   clearLogsText: {
     color: '#e53935',
@@ -1202,6 +1261,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  updateActions: {
+    paddingTop: SPACING.md,
+  },
+  updateAvailableHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingBottom: SPACING.sm,
+  },
   updateCheckingContainer: {
     alignItems: 'center',
     flex: 1,
@@ -1214,11 +1282,30 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
   },
+  updateCurrentVersion: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  updateDivider: {
+    marginTop: SPACING.sm,
+  },
   updateHintText: {
     fontSize: 13,
     lineHeight: 19,
     marginTop: SPACING.md,
     textAlign: 'center',
+  },
+  updateNewVersion: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  updateResultContainer: {
+    flex: 1,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.lg,
+  },
+  updateVersionInfo: {
+    flex: 1,
   },
   updateVersionText: {
     fontSize: 15,

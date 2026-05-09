@@ -357,6 +357,8 @@
   "checking_for_updates": "Recherche de mises à jour disponibles…",
   "update_check_failed": "Could not check updates right now. Please try again later.",
   "up_to_date": "You already have the latest version installed.",
+  "update_from_version": "installée: v{currentVersion}",
+  "whats_new": "Nouveautés",
   "update_available_title": "Update available",
   "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
   "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",
