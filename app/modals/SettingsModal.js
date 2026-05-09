@@ -732,8 +732,8 @@ export default function SettingsModal({ visible, onClose }) {
                 <TouchableOpacity
                   onPress={
                     activeSubPanel === 'import' ? handleImportBack :
-                    activeSubPanel === 'export' ? handleExportBack :
-                    closeSubPanel
+                      activeSubPanel === 'export' ? handleExportBack :
+                        closeSubPanel
                   }
                   style={styles.backButton}
                   testID="settings-subpanel-back"
@@ -923,11 +923,8 @@ export default function SettingsModal({ visible, onClose }) {
                       </View>
                       <Text style={[
                         styles.sheetsProgressStepLabel,
-                        {
-                          color: step.status === 'error' ? '#c44'
-                            : step.status === 'pending' ? colors.mutedText
-                            : colors.text,
-                        },
+                        step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                          { color: step.status === 'pending' ? colors.mutedText : colors.text },
                       ]}>
                         {step.label}
                       </Text>
@@ -935,7 +932,7 @@ export default function SettingsModal({ visible, onClose }) {
                   ))}
 
                   {sheetsError && (
-                    <Text style={[styles.sheetsErrorText, { color: '#c44' }]}>{sheetsError}</Text>
+                    <Text style={styles.sheetsErrorText}>{sheetsError}</Text>
                   )}
 
                   {sheetsSuccessUrl && (
@@ -1366,47 +1363,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
   },
-  sheetsErrorText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: SPACING.lg,
-    textAlign: 'center',
-  },
-  sheetsOpenButton: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    justifyContent: 'center',
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
-  sheetsOpenButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sheetsProgressContent: {
-    flex: 1,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: SPACING.lg,
-  },
-  sheetsProgressStep: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-  },
-  sheetsProgressStepIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-  },
-  sheetsProgressStepLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1559,6 +1515,51 @@ const styles = StyleSheet.create({
   settingsRowValue: {
     fontSize: 13,
     marginTop: 2,
+  },
+  sheetsErrorText: {
+    color: '#c44',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: SPACING.lg,
+    textAlign: 'center',
+  },
+  sheetsOpenButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'center',
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+  },
+  sheetsOpenButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sheetsProgressContent: {
+    flex: 1,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: SPACING.lg,
+  },
+  sheetsProgressStep: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  sheetsProgressStepIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+  },
+  sheetsProgressStepLabel: {
+    flex: 1,
+    fontSize: 15,
+  },
+  sheetsProgressStepLabelError: {
+    color: '#c44',
   },
   subPanelContent: {
     bottom: 0,
