@@ -96,7 +96,7 @@ export const getStoredBackups = async () => {
     return filenames
       .filter(
         name =>
-          (name.startsWith('daily_') || name.startsWith('weekly_')) &&
+          (name.startsWith('daily_') || name.startsWith('weekly_') || name.startsWith('manual_')) &&
           name.endsWith('.json'),
       )
       .sort()

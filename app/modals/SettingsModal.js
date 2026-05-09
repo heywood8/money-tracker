@@ -359,8 +359,11 @@ export default function SettingsModal({ visible, onClose }) {
     setSaveLocalBackupLoading(true);
     try {
       const backup = await createBackup();
-      const today = new Date().toISOString().split('T')[0];
-      const filename = `manual_${today}.json`;
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+      const filename = `manual_${dateStr}_${timeStr}.json`;
       const dirInfo = await LegacyFileSystem.getInfoAsync(DAILY_BACKUP_DIR);
       if (!dirInfo.exists) {
         await LegacyFileSystem.makeDirectoryAsync(DAILY_BACKUP_DIR, { intermediates: true });
@@ -481,18 +484,34 @@ export default function SettingsModal({ visible, onClose }) {
       const [year, weekPart] = weekStr.split('-');
       return `${t('weekly') || 'Weekly'} ${weekPart}, ${year}`;
     }
+    if (filename.startsWith('manual_')) {
+      const inner = filename.replace('manual_', '').replace('.json', '');
+      const [datePart, timePart] = inner.split('_');
+      if (datePart) {
+        const [year, month, day] = datePart.split('-').map(Number);
+        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric',
+        });
+        if (timePart) {
+          const [hh, mm] = timePart.split('-');
+          return `${dateLabel} · ${hh}:${mm}`;
+        }
+        return dateLabel;
+      }
+    }
     return filename;
   }, [t]);
 
   const renderBackupItem = useCallback(({ item }) => {
     const isDaily = item.filename.startsWith('daily_');
+    const isManual = item.filename.startsWith('manual_');
     const label = formatBackupLabel(item.filename);
-    const typeLabel = isDaily ? 'Daily' : (t('weekly') || 'Weekly');
+    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
     const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
     return (
       <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
         <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : 'calendar-number-outline'} size={22} color={colors.text} />
+          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={colors.text} />
           <View style={styles.backupItemText}>
             <Text style={[styles.backupItemLabel, { color: colors.text }]}>{label}</Text>
             <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
