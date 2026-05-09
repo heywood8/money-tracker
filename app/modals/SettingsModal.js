@@ -329,8 +329,6 @@ export default function SettingsModal({ visible, onClose }) {
     } else if (importStep === 'confirm-local') {
       setImportStep('local-list');
       setImportSelectedBackup(null);
-    } else if (importStep === 'cloud') {
-      setImportStep('source');
     }
   }, [importStep, closeSubPanel]);
 
@@ -690,9 +688,7 @@ export default function SettingsModal({ visible, onClose }) {
                       ? (t('import') || 'Import')
                       : importStep === 'local-list'
                         ? (t('local_backups') || 'Local Backups')
-                        : importStep === 'cloud'
-                          ? (t('cloud_backup') || 'Cloud Backup')
-                          : (t('restore_database') || 'Restore Database')
+                        : (t('restore_database') || 'Restore Database')
                   )}
                   {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
                   {activeSubPanel === 'update' && (
@@ -886,13 +882,13 @@ export default function SettingsModal({ visible, onClose }) {
                   <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.languageItem}>
                     <View style={styles.languageItemContent}>
                       <View style={styles.formatItemRow}>
-                        <Ionicons name="document-outline" size={24} color={colors.text} />
+                        <Ionicons name="logo-google" size={24} color={colors.text} />
                         <View style={styles.formatTextContainer}>
                           <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            {t('import_from_file') || 'From file'}
+                            {t('import_from_file') || 'From Google Drive'}
                           </Text>
                           <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('import_from_file_description') || 'Select a backup file from your device'}
+                            {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
                           </Text>
                         </View>
                       </View>
@@ -910,23 +906,6 @@ export default function SettingsModal({ visible, onClose }) {
                           </Text>
                           <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
                             {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleImportSourceSelect('cloud')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="cloud-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            {t('import_from_cloud') || 'From cloud backup'}
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('import_from_cloud_description') || 'Coming soon'}
                           </Text>
                         </View>
                       </View>
@@ -987,15 +966,6 @@ export default function SettingsModal({ visible, onClose }) {
                       {t('restore_database') || 'Restore'}
                     </Text>
                   </TouchableRipple>
-                </View>
-              )}
-
-              {activeSubPanel === 'import' && importStep === 'cloud' && (
-                <View style={styles.importConfirmContent}>
-                  <Ionicons name="cloud-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
-                  <Text style={[styles.importConfirmText, { color: colors.mutedText }]}>
-                    {t('import_from_cloud_coming_soon') || 'Cloud backup restore is coming soon.'}
-                  </Text>
                 </View>
               )}
 

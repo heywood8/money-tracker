@@ -312,7 +312,6 @@ describe('SettingsModal Component', () => {
 
       expect(getByText('import_from_file')).toBeTruthy();
       expect(getByText('import_from_local')).toBeTruthy();
-      expect(getByText('import_from_cloud')).toBeTruthy();
     });
 
     it('performs import when confirm button is pressed after selecting from file', async () => {
@@ -504,7 +503,6 @@ describe('SettingsModal Component', () => {
 
       expect(getByText('import_from_file')).toBeTruthy();
       expect(getByText('import_from_local')).toBeTruthy();
-      expect(getByText('import_from_cloud')).toBeTruthy();
     });
 
     it('shows confirm step after selecting from file', () => {
@@ -530,28 +528,6 @@ describe('SettingsModal Component', () => {
       expect(getByText('import_from_file')).toBeTruthy();
     });
 
-    it('shows coming-soon placeholder when cloud backup is selected', () => {
-      const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      fireEvent.press(getByText('import'));
-      fireEvent.press(getByText('import_from_cloud'));
-
-      expect(getByText('import_from_cloud_coming_soon')).toBeTruthy();
-    });
-
-    it('back button from cloud step returns to source picker', () => {
-      const { getByText, getByTestId } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      fireEvent.press(getByText('import'));
-      fireEvent.press(getByText('import_from_cloud'));
-      fireEvent.press(getByTestId('settings-subpanel-back'));
-
-      expect(getByText('import_from_file')).toBeTruthy();
-    });
   });
 
   describe('Save Local Backup', () => {
