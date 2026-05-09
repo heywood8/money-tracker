@@ -314,26 +314,24 @@ const OperationFormFields = memo(({
           </View>
 
           {/* Row 2: always 4 flex-1 slots to match row 1 widths; invisible spacers for empty slots */}
-          {secondRowCats.length > 0 && (
-            <View style={styles.categoryButtonsContainer}>
-              {Array.from({ length: 4 }, (_, i) => {
-                const category = secondRowCats[i];
-                if (!category) {
-                  return (
-                    <View
-                      key={`cat-spacer-${i}`}
-                      style={[
-                        styles.categoryShortcutButton,
-                        compact && styles.categoryShortcutButtonCompact,
-                        styles.invisible,
-                      ]}
-                    />
-                  );
-                }
-                return renderCategoryChip(category, i, true);
-              })}
-            </View>
-          )}
+          <View style={[styles.categoryButtonsContainer, secondRowCats.length === 0 && styles.invisible]}>
+            {Array.from({ length: 4 }, (_, i) => {
+              const category = secondRowCats[i];
+              if (!category) {
+                return (
+                  <View
+                    key={`cat-spacer-${i}`}
+                    style={[
+                      styles.categoryShortcutButton,
+                      compact && styles.categoryShortcutButtonCompact,
+                      styles.invisible,
+                    ]}
+                  />
+                );
+              }
+              return renderCategoryChip(category, i, true);
+            })}
+          </View>
         </View>
       );
     }
@@ -442,26 +440,24 @@ const OperationFormFields = memo(({
           </View>
 
           {/* Row 2: always 4 flex-1 slots to match row 1 widths; invisible spacers for empty slots */}
-          {secondRowAccounts.length > 0 && (
-            <View style={styles.categoryButtonsContainer}>
-              {Array.from({ length: 4 }, (_, i) => {
-                const account = secondRowAccounts[i];
-                if (!account) {
-                  return (
-                    <View
-                      key={`acc-spacer-${i}`}
-                      style={[
-                        styles.accountShortcutButton,
-                        compact && styles.accountShortcutButtonCompact,
-                        styles.invisible,
-                      ]}
-                    />
-                  );
-                }
-                return renderAccountChip(account);
-              })}
-            </View>
-          )}
+          <View style={[styles.categoryButtonsContainer, secondRowAccounts.length === 0 && styles.invisible]}>
+            {Array.from({ length: 4 }, (_, i) => {
+              const account = secondRowAccounts[i];
+              if (!account) {
+                return (
+                  <View
+                    key={`acc-spacer-${i}`}
+                    style={[
+                      styles.accountShortcutButton,
+                      compact && styles.accountShortcutButtonCompact,
+                      styles.invisible,
+                    ]}
+                  />
+                );
+              }
+              return renderAccountChip(account);
+            })}
+          </View>
         </View>
       );
     }
