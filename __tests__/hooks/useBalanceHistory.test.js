@@ -455,6 +455,38 @@ describe('useBalanceHistory', () => {
       });
     });
 
+    it('should not produce undefined/null at end of prevMonth when current month has more days than previous month', async () => {
+      // May has 31 days, April has 30 — day 31 previously returned undefined which
+      // react-native-chart-kit rendered as 0, making the purple line drop to zero.
+      const mayYear = 2026;
+      const mayMonthIndex = 4; // May (0-based)
+
+      const mockMayHistory = [];
+      const mockAprilHistory = [
+        { date: '2026-04-01', balance: '-250000' },
+        { date: '2026-04-30', balance: '-262000' },
+      ];
+
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce(mockMayHistory)
+        .mockResolvedValueOnce(mockAprilHistory);
+
+      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mayYear, mayMonthIndex));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        const prevMonth = result.current.balanceHistoryData.prevMonth;
+        expect(prevMonth).toBeDefined();
+        // May has 31 elements; the last element (day 31) must NOT be undefined/null
+        // It should forward-fill from April's last known value (-262000)
+        expect(prevMonth[30]).toBe(-262000);
+        expect(prevMonth[30]).not.toBeUndefined();
+      });
+    });
+
     it('should include prevMonthTotalExpenses and prevMonthDaysCount in balance history data', async () => {
       BalanceHistoryDB.getBalanceHistory
         .mockResolvedValueOnce([])
