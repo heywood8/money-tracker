@@ -139,5 +139,18 @@
   "pending_in": "Pending in",
   "done_this_month": "Done this month",
   "done": "done",
-  "remaining": "remaining"
+  "remaining": "remaining",
+  "import": "Import",
+  "import_from_file": "From file",
+  "import_from_file_description": "Select a backup file from your device",
+  "import_from_local": "From local backup",
+  "import_from_local_description": "Restore from a daily or weekly automatic backup",
+  "import_from_cloud": "From cloud backup",
+  "import_from_cloud_description": "Coming soon",
+  "import_from_cloud_coming_soon": "Cloud backup restore is coming soon.",
+  "save_local_backup": "Save local backup",
+  "save_local_backup_description": "Save a backup to device storage and share",
+  "save_local_backup_saving": "Saving…",
+  "save_local_backup_success": "Backup saved",
+  "cloud_backup": "Cloud Backup"
 }
