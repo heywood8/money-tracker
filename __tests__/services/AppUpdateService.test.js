@@ -272,7 +272,7 @@ describe('AppUpdateService', () => {
       expect(result.errorCode).toBe('invalid_release_data');
     });
 
-    it('uses releases endpoint with per_page=5', async () => {
+    it('uses releases endpoint with per_page=20', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ([
@@ -286,7 +286,7 @@ describe('AppUpdateService', () => {
       await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
 
       expect(fetchImpl).toHaveBeenCalledWith(
-        expect.stringContaining('/releases?per_page=5'),
+        expect.stringContaining('/releases?per_page=20'),
         expect.any(Object),
       );
     });

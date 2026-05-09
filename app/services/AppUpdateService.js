@@ -78,7 +78,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = UPDATE_CHECK_TIME
   }
 };
 
-const MAX_RELEASES_TO_CHECK = 5;
+const MAX_RELEASES_TO_CHECK = 20;
 
 export const checkForAppUpdate = async ({
   currentVersion = APP_VERSION,
@@ -132,38 +132,72 @@ export const checkForAppUpdate = async ({
       };
     }
 
+    // Collect all releases newer than current (GitHub returns newest first).
+    // Stop as soon as we reach a release that is not newer — everything after is older.
+    let bestRelease = null; // first (newest) release with a downloadable APK
     let foundReleasesWithoutApk = false;
+    const newerReleases = []; // all releases with version > current, for changelog
+
     for (const release of releases) {
-      const latestVersion = parseVersionFromRelease(release);
-      if (!latestVersion) {
+      const releaseVersion = parseVersionFromRelease(release);
+      if (!releaseVersion) {
         continue;
       }
+
+      if (compareVersions(releaseVersion, currentNormalized) <= 0) {
+        break; // reached current or older — stop
+      }
+
+      newerReleases.push({ version: releaseVersion, notes: release.body || null });
 
       const apkAsset = extractApkAsset(release.assets);
-      if (!apkAsset) {
+      if (apkAsset && !bestRelease) {
+        bestRelease = {
+          version: releaseVersion,
+          downloadUrl: apkAsset.browser_download_url,
+          releaseUrl: release.html_url || apkAsset.browser_download_url,
+          publishedAt: release.published_at || null,
+          releaseName: release.name || release.tag_name || null,
+        };
+      } else if (!apkAsset) {
         foundReleasesWithoutApk = true;
-        continue;
       }
+    }
 
-      const compare = compareVersions(latestVersion, currentNormalized);
+    if (newerReleases.length === 0) {
+      // Nothing newer found at all — either up to date or all releases lacked versions
       return {
         success: true,
-        isUpdateAvailable: compare > 0,
+        isUpdateAvailable: false,
         currentVersion: currentNormalized,
-        latestVersion,
-        downloadUrl: apkAsset.browser_download_url,
-        releaseUrl: release.html_url || apkAsset.browser_download_url,
-        publishedAt: release.published_at || null,
-        releaseName: release.name || release.tag_name || null,
       };
     }
 
+    if (!bestRelease) {
+      return {
+        success: false,
+        isUpdateAvailable: false,
+        currentVersion: currentNormalized,
+        errorCode: foundReleasesWithoutApk ? 'releases_without_apks' : 'invalid_release_data',
+      };
+    }
+
+    const releaseNotes = newerReleases
+      .filter((r) => r.notes)
+      .map((r) => ({ version: r.version, notes: r.notes }));
+
     return {
-      success: false,
-      isUpdateAvailable: false,
+      success: true,
+      isUpdateAvailable: true,
       currentVersion: currentNormalized,
-      errorCode: foundReleasesWithoutApk ? 'releases_without_apks' : 'invalid_release_data',
+      latestVersion: bestRelease.version,
+      downloadUrl: bestRelease.downloadUrl,
+      releaseUrl: bestRelease.releaseUrl,
+      publishedAt: bestRelease.publishedAt,
+      releaseName: bestRelease.releaseName,
+      releaseNotes: releaseNotes.length > 0 ? releaseNotes : null,
     };
+
   } catch (error) {
     const isTimeout = error?.name === 'AbortError';
     return {

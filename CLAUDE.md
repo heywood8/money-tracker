@@ -270,6 +270,63 @@ If builds hang on GitHub Actions:
 - Use secure storage libraries like `react-native-keychain` for sensitive data
 - Validate user inputs to prevent injection attacks
 
+### Modal Sub-Navigation: Subpanel Pattern
+
+**Rule: never open a new modal for secondary views inside an existing modal. Use the subpanel pattern instead.**
+
+`SettingsModal` is the reference implementation. When a settings row leads to a secondary view (language picker, export options, confirmation, logs, etc.), that view slides in over the main settings list within the same modal — no `showDialog`, no nested `Modal`, no extra screen.
+
+**Core pattern:**
+
+```javascript
+// State
+const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'language' | 'export' | ...
+const settingsAnim = useRef(new Animated.Value(0)).current;  // main list: 0=visible, 1=dimmed/shifted
+const subPanelAnim = useRef(new Animated.Value(0)).current;  // subpanel: 0=hidden, 1=visible
+
+const openSubPanel = useCallback((panel) => {
+  setActiveSubPanel(panel);
+  Animated.parallel([
+    Animated.timing(settingsAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    Animated.timing(subPanelAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+  ]).start();
+}, [settingsAnim, subPanelAnim]);
+
+const closeSubPanel = useCallback(() => {
+  Animated.parallel([
+    Animated.timing(subPanelAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    Animated.timing(settingsAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+  ]).start(() => setActiveSubPanel(null));
+}, [settingsAnim, subPanelAnim]);
+
+// JSX — single Animated.View, conditionally mounted
+{activeSubPanel && (
+  <Animated.View style={[styles.subPanelContent, { transform: [{ translateX: subPanelTranslateX }], opacity: subPanelOpacity }]}>
+    {/* header with back arrow */}
+    {activeSubPanel === 'language' && <LanguageContent />}
+    {activeSubPanel === 'export' && <ExportContent />}
+    {/* ... */}
+  </Animated.View>
+)}
+```
+
+**Easing conventions:**
+- Exit (main list fades/slides away): `Easing.in(Easing.quad)`, 200ms
+- Entry (subpanel slides in): `Easing.out(Easing.cubic)`, 260ms
+- Reverse on close: 180ms exit for subpanel, 240ms entry for main list
+
+**Critical: never use `Animated.delay` or `Animated.sequence` with `useNativeDriver: true`.** The delay node does not propagate `useNativeDriver`, breaking native-thread transform animations. Use asymmetric durations inside `Animated.parallel` to achieve visual stagger without a delay node.
+
+**Conditional mount vs always-in-tree:** Mount the `Animated.View` only when `activeSubPanel !== null`. An always-mounted view with `opacity: 0` conflicts with the animated value and causes the panel to appear without sliding.
+
+**Confirmation flows (destructive actions):** Use a centered layout inside the subpanel — warning icon + message text + destructive button. The back arrow serves as cancel; no separate cancel button needed.
+
+**Long async operations (e.g. Google Sheets export):** Keep the subpanel open during the async work. Show an `ActivityIndicator` inline on the triggering row. On success, show inline feedback (green checkmark, "Open" button) on the same row. On error, show inline error text. Never close the subpanel silently while work is in-flight.
+
+**Share-sheet exports (Expo `Sharing.shareAsync`):** Do not show a success dialog — the share sheet is the user feedback. `shareAsync` resolves when the sheet is dismissed with no cancel signal, so you cannot distinguish cancel from success.
+
+**Log/chat-style lists:** Use `FlatList` with `inverted={true}` and `data={entries.slice().reverse()}`. Newest entry is always item[0], shown at the bottom automatically — no `scrollToEnd` calls needed, and no mount cost from rendering all entries at once.
+
 ### Testing
 
 The app uses Jest with React Native Testing Library for unit, integration, and regression testing.
