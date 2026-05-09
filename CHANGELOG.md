@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.97.0](https://github.com/heywood8/money-tracker/compare/penny-v0.96.0...penny-v0.97.0) (2026-05-09)
+
+
+### Features
+
+* **settings:** multi-step import flow, source picker, save backup in export ([#525](https://github.com/heywood8/money-tracker/issues/525)) ([7150c61](https://github.com/heywood8/money-tracker/commit/7150c61f8927c074b69d1818801d409364a11066))
+
 ## [0.96.0](https://github.com/heywood8/money-tracker/compare/penny-v0.95.2...penny-v0.96.0) (2026-05-09)
 
 
