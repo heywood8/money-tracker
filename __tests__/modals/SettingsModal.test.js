@@ -267,83 +267,55 @@ describe('SettingsModal Component', () => {
   });
 
   describe('Database Operations', () => {
-    it('shows dialog when reset row is pressed', () => {
+    it('shows reset confirmation subpanel when reset row is pressed', () => {
       const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('reset_database'));
 
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(String),
-        expect.arrayContaining([
-          expect.objectContaining({ text: 'cancel' }),
-          expect.objectContaining({ text: 'reset', style: 'destructive' }),
-        ]),
-      );
+      expect(getByText('reset_database_confirm')).toBeTruthy();
+      expect(getByText('reset')).toBeTruthy();
     });
 
-    it('shows dialog when import row is pressed', () => {
-      const { getByText } = render(
+    it('shows import confirmation subpanel when import row is pressed', () => {
+      const { getByText, getAllByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('import'));
 
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(String),
-        expect.arrayContaining([
-          expect.objectContaining({ text: 'cancel' }),
-          expect.objectContaining({ text: expect.any(String), style: 'destructive' }),
-        ]),
-      );
+      expect(getByText('restore_confirm')).toBeTruthy();
+      // restore_database appears in the subpanel title and the confirm button
+      expect(getAllByText('restore_database').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('performs import when confirmed', async () => {
-      const { getByText } = render(
+    it('performs import when subpanel confirm button is pressed', async () => {
+      const { getByText, getAllByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('import'));
 
-      const dialogCall = mockShowDialog.mock.calls[0];
-      const dialogButtons = dialogCall[2];
-      const restoreButton = dialogButtons.find(b => b.style === 'destructive');
+      // The confirm button is the last element with this text (subpanel title uses same key)
+      const confirmButtons = getAllByText('restore_database');
+      await act(async () => {
+        fireEvent.press(confirmButtons[confirmButtons.length - 1]);
+      });
 
-      expect(restoreButton.onPress).toBeDefined();
-      expect(typeof restoreButton.onPress).toBe('function');
+      expect(mockStartImport).toHaveBeenCalled();
+      expect(mockOnClose).toHaveBeenCalled();
     });
 
-    it('import dialog has destructive confirm button', () => {
-      const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      fireEvent.press(getByText('import'));
-
-      const dialogCall = mockShowDialog.mock.calls[0];
-      const dialogButtons = dialogCall[2];
-      const restoreButton = dialogButtons.find(b => b.style === 'destructive');
-
-      expect(restoreButton).toBeTruthy();
-      expect(restoreButton.style).toBe('destructive');
-    });
-
-    it('performs reset when confirmed', async () => {
+    it('performs reset when subpanel confirm button is pressed', async () => {
       const { getByText } = render(
         <SettingsModal visible={true} onClose={mockOnClose} />,
       );
 
       fireEvent.press(getByText('reset_database'));
-
-      const dialogCall = mockShowDialog.mock.calls[0];
-      const dialogButtons = dialogCall[2];
-      const resetDialogButton = dialogButtons.find(b => b.style === 'destructive');
 
       await act(async () => {
-        await resetDialogButton.onPress();
+        fireEvent.press(getByText('reset'));
       });
 
       expect(mockResetDatabase).toHaveBeenCalled();

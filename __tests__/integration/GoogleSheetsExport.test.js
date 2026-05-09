@@ -87,11 +87,11 @@ describe('GoogleSheetsExport integration', () => {
   const renderModal = () =>
     render(<SettingsModal visible={true} onClose={jest.fn()} />);
 
-  it('shows success dialog with Open button after successful export (already signed in)', async () => {
+  it('shows inline Open button after successful export (already signed in)', async () => {
     getValidAccessToken.mockResolvedValue('access-token');
     exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-123');
 
-    const { getByTestId } = renderModal();
+    const { getByTestId, getByText } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
 
     await waitFor(() => {
@@ -99,14 +99,14 @@ describe('GoogleSheetsExport integration', () => {
     });
 
     await waitFor(() => {
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        expect.stringContaining('google_sheets'),
-        expect.stringContaining('google_sheets_export_success'),
-        expect.arrayContaining([
-          expect.objectContaining({ text: 'google_sheets_open' }),
-        ]),
-      );
+      expect(getByText('google_sheets_open')).toBeTruthy();
     });
+
+    expect(mockShowDialog).not.toHaveBeenCalledWith(
+      expect.stringContaining('google_sheets'),
+      expect.stringContaining('google_sheets_export_success'),
+      expect.anything(),
+    );
   });
 
   it('falls back to signIn when not signed in, then exports successfully', async () => {
@@ -114,7 +114,7 @@ describe('GoogleSheetsExport integration', () => {
     signIn.mockResolvedValue('new-access-token');
     exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-456');
 
-    const { getByTestId } = renderModal();
+    const { getByTestId, getByText } = renderModal();
     fireEvent.press(getByTestId('settings-export-row'));
 
     await waitFor(() => {
@@ -123,11 +123,7 @@ describe('GoogleSheetsExport integration', () => {
 
     await waitFor(() => {
       expect(signIn).toHaveBeenCalled();
-      expect(mockShowDialog).toHaveBeenCalledWith(
-        expect.stringContaining('google_sheets'),
-        expect.stringContaining('google_sheets_export_success'),
-        expect.anything(),
-      );
+      expect(getByText('google_sheets_open')).toBeTruthy();
     });
   });
 
