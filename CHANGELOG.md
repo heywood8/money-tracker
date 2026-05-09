@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.95.1](https://github.com/heywood8/money-tracker/compare/penny-v0.95.0...penny-v0.95.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* **operations:** prevent layout slide when switching operation types ([#519](https://github.com/heywood8/money-tracker/issues/519)) ([38322d4](https://github.com/heywood8/money-tracker/commit/38322d4b6f3c43049eaf9d0cdfbe80187740fe7b))
+
 ## [0.95.0](https://github.com/heywood8/money-tracker/compare/penny-v0.94.3...penny-v0.95.0) (2026-05-08)
 
 
