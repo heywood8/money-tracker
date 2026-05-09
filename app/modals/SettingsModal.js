@@ -54,6 +54,7 @@ export default function SettingsModal({ visible, onClose }) {
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
+  const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
   const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
   const [googleSheetsSuccessUrl, setGoogleSheetsSuccessUrl] = useState(null);
   const [updateResult, setUpdateResult] = useState(null);
@@ -385,26 +386,18 @@ export default function SettingsModal({ visible, onClose }) {
   }, [t, showDialog]);
 
   const handleDeleteLocalBackup = useCallback((uri) => {
-    showDialog(
-      t('delete_backup') || 'Delete Backup',
-      t('delete_backup_confirm') || 'Delete this backup? This cannot be undone.',
-      [
-        { text: t('cancel') || 'Cancel', style: 'cancel' },
-        {
-          text: t('delete') || 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
-              setStoredBackups(prev => prev.filter(b => b.uri !== uri));
-            } catch (error) {
-              console.error('Failed to delete backup:', error);
-            }
-          },
-        },
-      ],
-    );
-  }, [showDialog, t]);
+    setPendingDeleteUri(uri);
+  }, []);
+
+  const handleConfirmDeleteLocalBackup = useCallback(async (uri) => {
+    setPendingDeleteUri(null);
+    try {
+      await LegacyFileSystem.deleteAsync(uri, { idempotent: true });
+      setStoredBackups(prev => prev.filter(b => b.uri !== uri));
+    } catch (error) {
+      console.error('Failed to delete backup:', error);
+    }
+  }, []);
 
   const handleCheckForUpdates = useCallback(async () => {
     updateContentAnim.setValue(0);
@@ -445,6 +438,7 @@ export default function SettingsModal({ visible, onClose }) {
       setImportSelectedBackup(null);
       setSaveLocalBackupLoading(false);
       setSaveLocalBackupSuccess(false);
+      setPendingDeleteUri(null);
       settingsAnim.setValue(0);
       subPanelAnim.setValue(0);
     }
@@ -509,28 +503,42 @@ export default function SettingsModal({ visible, onClose }) {
     const label = formatBackupLabel(item.filename);
     const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
     const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
+    const isPending = pendingDeleteUri === item.uri;
     return (
       <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
         <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={colors.text} />
+          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
           <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
             <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {typeLabel}{sizeKB ? ` · ${sizeKB}` : ''}
+              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
             </Text>
           </View>
         </View>
         <View style={styles.backupItemActions}>
-          <TouchableOpacity onPress={() => handleImportLocalBackupSelect(item)} style={styles.backupActionButton}>
-            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
-            <Ionicons name="trash-outline" size={18} color="#c44" />
-          </TouchableOpacity>
+          {isPending ? (
+            <>
+              <TouchableOpacity onPress={() => setPendingDeleteUri(null)} style={styles.backupConfirmButton}>
+                <Text style={[styles.backupConfirmButtonText, { color: colors.mutedText }]}>{t('cancel') || 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleConfirmDeleteLocalBackup(item.uri)} style={styles.backupConfirmButton}>
+                <Text style={styles.backupConfirmButtonDestructiveText}>{t('delete') || 'Delete'}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity onPress={() => handleImportLocalBackupSelect(item)} style={styles.backupActionButton}>
+                <Ionicons name="refresh-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDeleteLocalBackup(item.uri)} style={styles.backupActionButton}>
+                <Ionicons name="trash-outline" size={18} color="#c44" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     );
-  }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup]);
+  }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
 
   const renderLogEntry = useCallback(({ item }) => (
     <View style={styles.logEntry}>
@@ -1160,6 +1168,19 @@ const styles = StyleSheet.create({
   },
   backupActionButton: {
     padding: 6,
+  },
+  backupConfirmButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  backupConfirmButtonDestructiveText: {
+    color: '#c44',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  backupConfirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   backupItem: {
     alignItems: 'center',
