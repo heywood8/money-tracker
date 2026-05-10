@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 
 // Mock all dependencies
 jest.mock('react-native-chart-kit', () => ({
@@ -719,6 +719,49 @@ describe('GraphsScreen', () => {
 
       // Should fallback to default when currency not in currencies.json
       expect(() => render(<GraphsScreen />)).not.toThrow();
+    });
+  });
+
+  describe('Card Expansion', () => {
+    it('renders both summary cards on mount', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = render(<GraphsScreen />);
+
+      expect(getByTestId('income-summary-card')).toBeTruthy();
+      expect(getByTestId('expense-summary-card')).toBeTruthy();
+    });
+
+    it('keeps expense card in tree after pressing income card', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = render(<GraphsScreen />);
+
+      fireEvent.press(getByTestId('income-summary-card'));
+
+      // With the new always-mounted design, the expense card must still be in the tree
+      expect(getByTestId('expense-summary-card')).toBeTruthy();
+      expect(getByTestId('income-summary-card')).toBeTruthy();
+    });
+
+    it('keeps income card in tree after pressing expense card', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = render(<GraphsScreen />);
+
+      fireEvent.press(getByTestId('expense-summary-card'));
+
+      expect(getByTestId('income-summary-card')).toBeTruthy();
+      expect(getByTestId('expense-summary-card')).toBeTruthy();
+    });
+
+    it('collapses back when pressing the expanded income card again', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = render(<GraphsScreen />);
+
+      fireEvent.press(getByTestId('income-summary-card')); // expand
+      fireEvent.press(getByTestId('income-summary-card')); // collapse
+
+      // Both cards still present after collapse too
+      expect(getByTestId('income-summary-card')).toBeTruthy();
+      expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
   });
 });
