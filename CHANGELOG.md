@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.100.0](https://github.com/heywood8/money-tracker/compare/penny-v0.99.0...penny-v0.100.0) (2026-05-10)
+
+
+### Features
+
+* **graphs:** Add vs category comparison to spending trend chart ([#532](https://github.com/heywood8/money-tracker/issues/532)) ([cdd325d](https://github.com/heywood8/money-tracker/commit/cdd325d2f1e331abde2fbaa44dc54902c6074724))
+
 ## [0.99.0](https://github.com/heywood8/money-tracker/compare/penny-v0.98.0...penny-v0.99.0) (2026-05-09)
 
 
