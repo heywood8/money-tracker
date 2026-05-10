@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.103.2](https://github.com/heywood8/money-tracker/compare/penny-v0.103.1...penny-v0.103.2) (2026-05-10)
+
+
+### Bug Fixes
+
+* format chart legend amounts with K/M/B and currency symbol ([#543](https://github.com/heywood8/money-tracker/issues/543)) ([d09f7a2](https://github.com/heywood8/money-tracker/commit/d09f7a2d32e9914e7473811c3fddd3746d8d6aec))
+* replace ActivityIndicator with animated arrow-down icon for update download ([#544](https://github.com/heywood8/money-tracker/issues/544)) ([1d15bf9](https://github.com/heywood8/money-tracker/commit/1d15bf9f45cfbfbe6ea8cee6ee48727d7b365c1b))
+
 ## [0.103.1](https://github.com/heywood8/money-tracker/compare/penny-v0.103.0...penny-v0.103.1) (2026-05-10)
 
 
