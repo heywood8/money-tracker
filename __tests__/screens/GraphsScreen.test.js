@@ -763,5 +763,17 @@ describe('GraphsScreen', () => {
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
+
+    it('handles switching directly from income expanded to expense', () => {
+      const GraphsScreen = require('../../app/screens/GraphsScreen').default;
+      const { getByTestId } = render(<GraphsScreen />);
+
+      fireEvent.press(getByTestId('income-summary-card')); // expand income
+      fireEvent.press(getByTestId('expense-summary-card')); // switch to expense without collapsing
+
+      // Both cards still in tree
+      expect(getByTestId('income-summary-card')).toBeTruthy();
+      expect(getByTestId('expense-summary-card')).toBeTruthy();
+    });
   });
 });

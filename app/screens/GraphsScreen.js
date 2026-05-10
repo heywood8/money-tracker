@@ -405,6 +405,9 @@ const GraphsScreen = () => {
     }
   }, [expandedCard, animValue, chartContentAnim]);
 
+  const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
+  const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
+
   // Trigger expand animation after expandedCard state and interpolations are in place
   useEffect(() => {
     if (expandedCard !== null) {
@@ -517,7 +520,7 @@ const GraphsScreen = () => {
                 loadingIncome={loadingIncome}
                 totalIncome={totalIncome}
                 selectedCurrency={selectedCurrency}
-                onPress={() => toggleCard('income')}
+                onPress={handleToggleIncome}
                 expanded={expandedCard === 'income'}
               />
               <Animated.View
@@ -573,7 +576,7 @@ const GraphsScreen = () => {
                 loading={loading}
                 totalExpenses={totalExpenses}
                 selectedCurrency={selectedCurrency}
-                onPress={() => toggleCard('expense')}
+                onPress={handleToggleExpense}
                 expanded={expandedCard === 'expense'}
               />
               <Animated.View
