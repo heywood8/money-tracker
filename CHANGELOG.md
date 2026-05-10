@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.105.0](https://github.com/heywood8/money-tracker/compare/penny-v0.104.0...penny-v0.105.0) (2026-05-10)
+
+
+### Features
+
+* show downloaded APKs in the check-for-updates panel ([#551](https://github.com/heywood8/money-tracker/issues/551)) ([9393c13](https://github.com/heywood8/money-tracker/commit/9393c138a1bdce3668b68f45bca1189dd93665ec))
+
 ## [0.104.0](https://github.com/heywood8/money-tracker/compare/penny-v0.103.4...penny-v0.104.0) (2026-05-10)
 
 
