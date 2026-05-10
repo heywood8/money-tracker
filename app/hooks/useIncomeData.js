@@ -125,6 +125,7 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
 
       // Transform aggregated data for pie chart
       const data = Object.values(aggregatedIncome).map((item, index) => {
+        const hasChildren = categories.some(cat => cat.parentId === item.category.id);
         return {
           name: item.category.name,
           amount: item.total,
@@ -132,7 +133,8 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: item.category.icon || null,
-          categoryId: item.category.id, // For clickable legend navigation
+          categoryId: item.category.id,
+          hasChildren,
         };
       });
 
