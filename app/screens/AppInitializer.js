@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
@@ -9,6 +9,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 
 const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPDATE_REMINDER_DELAY_DAYS = 3;
@@ -23,6 +24,7 @@ const AppInitializer = () => {
   const { showDialog } = useDialog();
   const { startDownload } = useUpdateDownload();
   const [isInitializing, setIsInitializing] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState(null);
 
   // Run once on every app open (after first launch is complete)
   useEffect(() => {
@@ -52,41 +54,12 @@ const AppInitializer = () => {
             return;
           }
 
-          showDialog(
-            t('update_available_title') || 'Update available',
-            `${(t('update_available_message') || 'A newer app version ({latestVersion}) is available. Install it from GitHub release APK.')
-              .replace('{latestVersion}', result.latestVersion)}\n\n${
-              t('update_install_hint')
-              || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'
-            }`,
-            [
-              {
-                text: t('later') || 'Later',
-                onPress: async () => {
-                  const suppressUntil = new Date(
-                    Date.now() + UPDATE_REMINDER_DELAY_DAYS * 24 * 60 * 60 * 1000,
-                  ).toISOString();
-                  await setPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, suppressUntil);
-                  await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
-                },
-              },
-              {
-                text: t('update_now') || 'Update now',
-                onPress: async () => {
-                  await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, result.latestVersion);
-                  startDownload(result.downloadUrl, {
-                    onError: () => {
-                      showDialog(
-                        t('error') || 'Error',
-                        t('update_download_failed') || 'Could not download the update. Please try again.',
-                        [{ text: t('ok') || 'OK' }],
-                      );
-                    },
-                  });
-                },
-              },
-            ],
-          );
+          setPendingUpdate({
+            latestVersion: result.latestVersion,
+            currentVersion: result.currentVersion,
+            downloadUrl: result.downloadUrl,
+            releaseNotes: result.releaseNotes || null,
+          });
         } catch (error) {
           console.warn('[AppInitializer] Failed to auto-check updates:', error);
         }
@@ -94,7 +67,34 @@ const AppInitializer = () => {
 
       runUpdateCheck();
     }
-  }, [isFirstLaunch, showDialog, t, startDownload]);
+  }, [isFirstLaunch]);
+
+  const handleUpdateDismiss = useCallback(async () => {
+    if (pendingUpdate) {
+      const suppressUntil = new Date(
+        Date.now() + UPDATE_REMINDER_DELAY_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      await setPreference(PREF_KEYS.UPDATE_SKIP_UNTIL, suppressUntil);
+      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, pendingUpdate.latestVersion);
+    }
+    setPendingUpdate(null);
+  }, [pendingUpdate]);
+
+  const handleUpdateNow = useCallback(async (downloadUrl) => {
+    if (pendingUpdate) {
+      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, pendingUpdate.latestVersion);
+    }
+    setPendingUpdate(null);
+    startDownload(downloadUrl, {
+      onError: () => {
+        showDialog(
+          t('error') || 'Error',
+          t('update_download_failed') || 'Could not download the update. Please try again.',
+          [{ text: t('ok') || 'OK' }],
+        );
+      },
+    });
+  }, [pendingUpdate, startDownload, showDialog, t]);
 
   const handleLanguageSelected = async (selectedLanguage) => {
     try {
@@ -125,7 +125,17 @@ const AppInitializer = () => {
   }
 
   // Normal app flow - not first launch
-  return <SimpleTabs />;
+  return (
+    <>
+      <SimpleTabs />
+      <UpdateAvailableModal
+        visible={!!pendingUpdate}
+        onDismiss={handleUpdateDismiss}
+        onUpdate={handleUpdateNow}
+        updateData={pendingUpdate}
+      />
+    </>
+  );
 };
 
 const styles = StyleSheet.create({
