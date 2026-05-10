@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -53,10 +54,16 @@ const GraphsScreen = () => {
   // Inline chart expansion state
   // null = neither expanded, 'income' | 'expense' = that card is expanded/expanding
   const [expandedCard, setExpandedCard] = useState(null);
-  // animValue: 0 = collapsed, 1 = expanded (drives width, height, opacity on JS thread)
-  const animValue = useRef(new Animated.Value(0)).current;
-  // chartContentAnim: 0 = hidden, 1 = visible (drives chart content on native thread)
-  const chartContentAnim = useRef(new Animated.Value(0)).current;
+  // Reanimated shared values — all run on UI thread, immune to JS contention
+  // 0=collapsed, 1=expanded; drives width/height/opacity interpolations
+  const animProgress = useSharedValue(0);
+  // 0=hidden, 1=visible; drives chart content opacity + slide
+  const chartProgress = useSharedValue(0);
+  // 0=none, 1=income expanding, 2=expense expanding
+  const expandingCard = useSharedValue(0);
+  // Dimension values updated on orientation change
+  const halfWidthSV = useSharedValue(halfWidth);
+  const rowWidthSV = useSharedValue(rowWidth);
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -382,98 +389,94 @@ const GraphsScreen = () => {
 
   const toggleCard = useCallback((card) => {
     if (expandedCard === card) {
-      // Collapse: fade chart content first (native thread), then shrink layout (JS thread)
-      Animated.parallel([
-        Animated.timing(chartContentAnim, {
-          toValue: 0,
-          duration: 150,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(animValue, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: false,
-        }),
-      ]).start(() => setExpandedCard(null));
+      // Collapse: fade chart content (150ms), collapse layout (220ms), then clear state
+      chartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
+      animProgress.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }, (finished) => {
+        if (finished) {
+          expandingCard.value = 0;
+          runOnJS(setExpandedCard)(null);
+        }
+      });
     } else {
-      // Expand: reset anim values, set the new expanded card, let useEffect trigger animation
-      animValue.setValue(0);
-      chartContentAnim.setValue(0);
+      // Expand: set direction, reset to 0, start both animations immediately
+      animProgress.value = 0;
+      chartProgress.value = 0;
+      expandingCard.value = card === 'income' ? 1 : 2;
       setExpandedCard(card);
+      animProgress.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+      chartProgress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
     }
-  }, [expandedCard, animValue, chartContentAnim]);
+  }, [expandedCard, animProgress, chartProgress, expandingCard]);
 
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
 
-  // Trigger expand animation after expandedCard state and interpolations are in place
+  // Reset expansion and update dimension shared values on orientation change
   useEffect(() => {
-    if (expandedCard !== null) {
-      Animated.parallel([
-        Animated.timing(animValue, {
-          toValue: 1,
-          duration: 300,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-        Animated.timing(chartContentAnim, {
-          toValue: 1,
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [expandedCard]); // intentionally omit animValue/chartContentAnim — stable refs
-
-  // Reset expansion if screen dimensions change (orientation change) to avoid stale widths
-  useEffect(() => {
-    animValue.setValue(0);
-    chartContentAnim.setValue(0);
+    halfWidthSV.value = halfWidth;
+    rowWidthSV.value = rowWidth;
+    animProgress.value = 0;
+    chartProgress.value = 0;
+    expandingCard.value = 0;
     setExpandedCard(null);
-  }, [windowWidth]); // intentionally omit animValue/chartContentAnim — stable refs
+  }, [windowWidth]); // intentionally omit stable shared value refs
 
-  // Animated style values for the two card containers
-  const incomeCardAnimStyle = {
-    width: expandedCard === 'expense'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, 0] })
-      : expandedCard === 'income'
-        ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, rowWidth - CARD_GAP] })
-        : halfWidth,
-    height: expandedCard === 'income'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT] })
-      : CARD_HEADER_HEIGHT,
-    opacity: expandedCard === 'expense'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
-      : 1,
-  };
+  // Animated styles via Reanimated — all run on UI thread, no JS contention
+  const incomeCardAnimStyle = useAnimatedStyle(() => {
+    const ev = expandingCard.value;
+    const p = animProgress.value;
+    const hw = halfWidthSV.value;
+    const rw = rowWidthSV.value;
+    if (ev === 1) {
+      return {
+        width: interpolate(p, [0, 1], [hw, rw]),
+        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        opacity: 1,
+      };
+    }
+    if (ev === 2) {
+      return {
+        width: interpolate(p, [0, 1], [hw, 0]),
+        height: CARD_HEADER_HEIGHT,
+        opacity: interpolate(p, [0, 1], [1, 0]),
+      };
+    }
+    return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
+  });
 
-  const expenseCardAnimStyle = {
-    width: expandedCard === 'income'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, 0] })
-      : expandedCard === 'expense'
-        ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, rowWidth - CARD_GAP] })
-        : halfWidth,
-    height: expandedCard === 'expense'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT] })
-      : CARD_HEADER_HEIGHT,
-    opacity: expandedCard === 'income'
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
-      : 1,
-  };
+  const expenseCardAnimStyle = useAnimatedStyle(() => {
+    const ev = expandingCard.value;
+    const p = animProgress.value;
+    const hw = halfWidthSV.value;
+    const rw = rowWidthSV.value;
+    if (ev === 2) {
+      return {
+        width: interpolate(p, [0, 1], [hw, rw]),
+        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        opacity: 1,
+      };
+    }
+    if (ev === 1) {
+      return {
+        width: interpolate(p, [0, 1], [hw, 0]),
+        height: CARD_HEADER_HEIGHT,
+        opacity: interpolate(p, [0, 1], [1, 0]),
+      };
+    }
+    return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
+  });
 
-  const spacerAnimStyle = {
-    width: expandedCard !== null
-      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_GAP, 0] })
-      : CARD_GAP,
-  };
+  const spacerAnimStyle = useAnimatedStyle(() => {
+    if (expandingCard.value !== 0) {
+      return { width: interpolate(animProgress.value, [0, 1], [CARD_GAP, 0]) };
+    }
+    return { width: CARD_GAP };
+  });
 
-  const chartContentAnimStyle = {
-    opacity: chartContentAnim,
-    transform: [{ translateY: chartContentAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
+  const chartContentAnimStyle = useAnimatedStyle(() => ({
+    opacity: chartProgress.value,
+    transform: [{ translateY: interpolate(chartProgress.value, [0, 1], [16, 0]) }],
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
