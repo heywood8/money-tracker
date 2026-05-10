@@ -26,7 +26,7 @@ const IncomeSummaryCard = ({
   totalIncome,
   selectedCurrency,
   onPress,
-  expanded,
+  expanded = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
@@ -60,10 +60,6 @@ IncomeSummaryCard.propTypes = {
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
-};
-
-IncomeSummaryCard.defaultProps = {
-  expanded: false,
 };
 
 const styles = StyleSheet.create({

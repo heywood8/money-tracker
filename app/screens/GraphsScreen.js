@@ -556,10 +556,54 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
+  expenseChartPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 12,
+  },
+  expensePanelBackButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  expensePanelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  expensePanelPicker: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
+  },
   filtersRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+  },
+  incomeChartPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 12,
+  },
+  incomePanelBackButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  incomePanelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  incomePanelPicker: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
   },
   periodPickerWrapper: {
     borderRadius: 12,
@@ -585,50 +629,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
-  },
-  incomeChartPanel: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 12,
-  },
-  incomePanelHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  incomePanelBackButton: {
-    marginRight: 8,
-    padding: 4,
-  },
-  incomePanelPicker: {
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    height: 40,
-    overflow: 'hidden',
-  },
-  expenseChartPanel: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 12,
-  },
-  expensePanelHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  expensePanelBackButton: {
-    marginRight: 8,
-    padding: 4,
-  },
-  expensePanelPicker: {
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    height: 40,
-    overflow: 'hidden',
   },
 });
 
