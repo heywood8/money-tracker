@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.0](https://github.com/heywood8/money-tracker/compare/penny-v0.102.0...penny-v0.103.0) (2026-05-10)
+
+
+### Features
+
+* **graphs:** smooth sequenced card expand animation with Reanimated ([#539](https://github.com/heywood8/money-tracker/issues/539)) ([3c2e620](https://github.com/heywood8/money-tracker/commit/3c2e6207dcd25bf9d71fe3f085326a080ce6de1e))
+
 ## [0.102.0](https://github.com/heywood8/money-tracker/compare/penny-v0.101.0...penny-v0.102.0) (2026-05-10)
 
 
