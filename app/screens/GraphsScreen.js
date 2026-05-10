@@ -55,9 +55,12 @@ const GraphsScreen = () => {
   // null = neither expanded, 'income' | 'expense' = that card is expanded/expanding
   const [expandedCard, setExpandedCard] = useState(null);
   // Reanimated shared values — all run on UI thread, immune to JS contention
-  // 0=collapsed, 1=expanded; drives width/height/opacity interpolations
-  const animProgress = useSharedValue(0);
-  // 0=hidden, 1=visible; drives chart content opacity + slide
+  // Sequential animation: width first, then height
+  // 0=collapsed, 1=expanded; drives width/opacity (phase 1)
+  const widthProgress = useSharedValue(0);
+  // 0=collapsed, 1=expanded; drives height (phase 2)
+  const heightProgress = useSharedValue(0);
+  // 0=hidden, 1=visible; drives chart content opacity + slide (phase 2)
   const chartProgress = useSharedValue(0);
   // 0=none, 1=income expanding, 2=expense expanding
   const expandingCard = useSharedValue(0);
@@ -389,24 +392,33 @@ const GraphsScreen = () => {
 
   const toggleCard = useCallback((card) => {
     if (expandedCard === card) {
-      // Collapse: fade chart content (150ms), collapse layout (220ms), then clear state
+      // Collapse: fade chart + shrink height first (180ms), then restore width (200ms)
       chartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
-      animProgress.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }, (finished) => {
+      heightProgress.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.quad) }, (finished) => {
         if (finished) {
-          expandingCard.value = 0;
-          runOnJS(setExpandedCard)(null);
+          widthProgress.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.quad) }, (done) => {
+            if (done) {
+              expandingCard.value = 0;
+              runOnJS(setExpandedCard)(null);
+            }
+          });
         }
       });
     } else {
-      // Expand: set direction, reset to 0, start both animations immediately
-      animProgress.value = 0;
+      // Expand phase 1: animate width (200ms), then phase 2: animate height + chart (280ms)
+      widthProgress.value = 0;
+      heightProgress.value = 0;
       chartProgress.value = 0;
       expandingCard.value = card === 'income' ? 1 : 2;
       setExpandedCard(card);
-      animProgress.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
-      chartProgress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+      widthProgress.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }, (finished) => {
+        if (finished) {
+          heightProgress.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) });
+          chartProgress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+        }
+      });
     }
-  }, [expandedCard, animProgress, chartProgress, expandingCard]);
+  }, [expandedCard, widthProgress, heightProgress, chartProgress, expandingCard]);
 
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
@@ -415,7 +427,8 @@ const GraphsScreen = () => {
   useEffect(() => {
     halfWidthSV.value = halfWidth;
     rowWidthSV.value = rowWidth;
-    animProgress.value = 0;
+    widthProgress.value = 0;
+    heightProgress.value = 0;
     chartProgress.value = 0;
     expandingCard.value = 0;
     setExpandedCard(null);
@@ -424,21 +437,22 @@ const GraphsScreen = () => {
   // Animated styles via Reanimated — all run on UI thread, no JS contention
   const incomeCardAnimStyle = useAnimatedStyle(() => {
     const ev = expandingCard.value;
-    const p = animProgress.value;
+    const wp = widthProgress.value;
+    const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
     if (ev === 1) {
       return {
-        width: interpolate(p, [0, 1], [hw, rw]),
-        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        width: interpolate(wp, [0, 1], [hw, rw]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
         opacity: 1,
       };
     }
     if (ev === 2) {
       return {
-        width: interpolate(p, [0, 1], [hw, 0]),
+        width: interpolate(wp, [0, 1], [hw, 0]),
         height: CARD_HEADER_HEIGHT,
-        opacity: interpolate(p, [0, 1], [1, 0]),
+        opacity: interpolate(wp, [0, 1], [1, 0]),
       };
     }
     return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
@@ -446,21 +460,22 @@ const GraphsScreen = () => {
 
   const expenseCardAnimStyle = useAnimatedStyle(() => {
     const ev = expandingCard.value;
-    const p = animProgress.value;
+    const wp = widthProgress.value;
+    const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
     if (ev === 2) {
       return {
-        width: interpolate(p, [0, 1], [hw, rw]),
-        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        width: interpolate(wp, [0, 1], [hw, rw]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
         opacity: 1,
       };
     }
     if (ev === 1) {
       return {
-        width: interpolate(p, [0, 1], [hw, 0]),
+        width: interpolate(wp, [0, 1], [hw, 0]),
         height: CARD_HEADER_HEIGHT,
-        opacity: interpolate(p, [0, 1], [1, 0]),
+        opacity: interpolate(wp, [0, 1], [1, 0]),
       };
     }
     return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
@@ -468,7 +483,7 @@ const GraphsScreen = () => {
 
   const spacerAnimStyle = useAnimatedStyle(() => {
     if (expandingCard.value !== 0) {
-      return { width: interpolate(animProgress.value, [0, 1], [CARD_GAP, 0]) };
+      return { width: interpolate(widthProgress.value, [0, 1], [CARD_GAP, 0]) };
     }
     return { width: CARD_GAP };
   });
