@@ -147,6 +147,14 @@ describe('CategorySpendingCard', () => {
 
       expect(toJSON()).toBeNull();
     });
+
+    it('renders vs selector button with plus icon and "vs" label', () => {
+      const { getByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      expect(getByText('vs')).toBeTruthy();
+    });
   });
 
   describe('Category Selection', () => {
@@ -234,10 +242,6 @@ describe('CategorySpendingCard', () => {
 
       // Find and click the expand chevron for Food
       const icons = UNSAFE_getAllByType('Icon');
-      const foodChevron = icons.find(icon =>
-        icon.props.name === 'chevron-right' &&
-        icon.parent?.parent?.props?.style?.[0]?.flexDirection === 'row',
-      );
 
       // Click the first chevron-right to expand Food
       const chevronButtons = icons.filter(icon => icon.props.name === 'chevron-right');
@@ -398,6 +402,173 @@ describe('CategorySpendingCard', () => {
         'cat-food', // Falls back to first parent expense category
         defaultCategories,
       );
+    });
+
+    it('calls hook twice: once for primary and once for vs category', () => {
+      render(<CategorySpendingCard {...defaultProps} />);
+
+      // Called twice per render: primary + vs (null by default)
+      expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
+        'USD',
+        'cat-food',
+        defaultCategories,
+      );
+      expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
+        'USD',
+        null, // No vs category selected
+        defaultCategories,
+      );
+    });
+  });
+
+  describe('VS Category Comparison', () => {
+    it('shows vs selector button by default', () => {
+      const { getByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      expect(getByText('vs')).toBeTruthy();
+      const icons = UNSAFE_getAllByType('Icon');
+      const plusIcon = icons.find(icon => icon.props.name === 'plus-circle-outline');
+      expect(plusIcon).toBeTruthy();
+    });
+
+    it('opens picker in vs mode when vs selector is pressed', () => {
+      const { getByText, getAllByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Press the "vs" button
+      fireEvent.press(getByText('vs'));
+
+      // Modal should open showing category list (Transport should appear)
+      expect(getAllByText('Transport').length).toBeGreaterThan(0);
+    });
+
+    it('shows vs category name and amount after selection', () => {
+      const { getByText, getAllByText, queryAllByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Initially only one amount shown
+      expect(queryAllByText('$200.00').length).toBe(1);
+
+      // Open vs picker and select Transport
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // Now both primary and vs amounts shown (both return same mock data: $200.00)
+      expect(queryAllByText('$200.00').length).toBe(2);
+
+      // Transport name should appear in vs row
+      expect(getByText('Transport')).toBeTruthy();
+    });
+
+    it('shows X button to clear vs category after selection', () => {
+      const { getByText, getAllByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Before selection: no close icon
+      const initialIcons = UNSAFE_getAllByType('Icon');
+      expect(initialIcons.find(i => i.props.name === 'close')).toBeFalsy();
+
+      // Select a vs category
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // After selection: close icon should appear
+      const updatedIcons = UNSAFE_getAllByType('Icon');
+      expect(updatedIcons.find(i => i.props.name === 'close')).toBeTruthy();
+    });
+
+    it('clears vs category when X button is pressed', () => {
+      const { getByText, getAllByText, queryAllByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Select Transport as vs category
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // Verify two amounts are shown
+      expect(queryAllByText('$200.00').length).toBe(2);
+
+      // Press the X button to clear vs category
+      const icons = UNSAFE_getAllByType('Icon');
+      const closeIcon = icons.find(i => i.props.name === 'close');
+      fireEvent.press(closeIcon.parent);
+
+      // Only primary amount should remain
+      expect(queryAllByText('$200.00').length).toBe(1);
+    });
+
+    it('passes vs category to hook after selection', () => {
+      const { getByText, getAllByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Select Transport as vs category
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // Hook should now be called with Transport for vs
+      expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
+        'USD',
+        'cat-transport',
+        defaultCategories,
+      );
+    });
+
+    it('does not show vs amounts when hideBalances is true', () => {
+      const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ hideBalances: true });
+
+      const { getByText, getAllByText, queryAllByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Select a vs category
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // No amounts shown when hideBalances is true
+      expect(queryAllByText('$200.00').length).toBe(0);
+
+      useDisplaySettings.mockReturnValue({ hideBalances: false });
+    });
+
+    it('resets expanded state when opening vs picker', () => {
+      const categoriesWithChildren = [
+        { id: 'cat-food', name: 'Food', parentId: null, categoryType: 'expense', isShadow: false },
+        { id: 'cat-groceries', name: 'Groceries', parentId: 'cat-food', categoryType: 'expense', isShadow: false },
+        { id: 'cat-transport', name: 'Transport', parentId: null, categoryType: 'expense', isShadow: false },
+      ];
+
+      const { getByText, getAllByText, queryByText, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} categories={categoriesWithChildren} />,
+      );
+
+      // Open primary picker and expand Food
+      fireEvent.press(getByText('Food'));
+      const icons = UNSAFE_getAllByType('Icon');
+      const chevrons = icons.filter(i => i.props.name === 'chevron-right');
+      if (chevrons.length > 0) {
+        fireEvent.press(chevrons[0].parent);
+      }
+      // Close primary picker by selecting a category
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // Open vs picker - expansion should be reset
+      fireEvent.press(getByText('vs'));
+      // Groceries should NOT be visible (expansion was reset when openPicker was called)
+      expect(queryByText('Groceries')).toBeFalsy();
     });
   });
 });

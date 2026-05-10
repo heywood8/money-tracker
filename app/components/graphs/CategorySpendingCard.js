@@ -22,6 +22,7 @@ const BAR_HEIGHT = 90;
 const LABEL_HEIGHT = 18;
 const TOP_PADDING = 8;
 const Y_AXIS_WIDTH = 32;
+const VS_COLOR = '#FF7043';
 
 const formatYTick = (value) => {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -29,13 +30,16 @@ const formatYTick = (value) => {
   return value.toFixed(0);
 };
 
-const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
-  const max = Math.max(...data.map(d => d.total), 1);
+const BarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
+  const hasVs = vsData != null && vsData.length === data.length;
+  const max = Math.max(
+    ...data.map(d => d.total),
+    ...(hasVs ? vsData.map(d => d.total) : []),
+    1,
+  );
   const count = data.length;
   const chartW = width - Y_AXIS_WIDTH;
   const slotW = chartW / count;
-  const barW = slotW * 0.55;
-  const gap = slotW * 0.45;
   const totalHeight = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
 
   const niceStep = (() => {
@@ -58,6 +62,15 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
     y: TOP_PADDING + BAR_HEIGHT - (niceStep * i / axisMax) * BAR_HEIGHT,
   }));
 
+  // Single bar dimensions (original layout)
+  const singleBarW = slotW * 0.55;
+  const singleGap = slotW * 0.45;
+
+  // Dual bar dimensions
+  const dualGapBetween = Math.max(slotW * 0.04, 1);
+  const dualOuterPad = slotW * 0.07;
+  const dualBarW = (slotW - 2 * dualOuterPad - dualGapBetween) / 2;
+
   return (
     <Svg width={width} height={totalHeight} style={styles.barChartSvg}>
       {/* Y axis ticks */}
@@ -76,7 +89,7 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
         </SvgText>
       ))}
 
-      {/* Selected bar dotted line */}
+      {/* Selected bar dotted reference line (primary category) */}
       {selectedIndex !== null && selectedIndex !== undefined && data[selectedIndex] && (() => {
         const selH = Math.max((data[selectedIndex].total / axisMax) * BAR_HEIGHT, data[selectedIndex].total > 0 ? 2 : 0);
         const lineY = TOP_PADDING + BAR_HEIGHT - selH;
@@ -96,17 +109,76 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
 
       {/* Bars */}
       {data.map((d, i) => {
-        const h = Math.max((d.total / axisMax) * BAR_HEIGHT, d.total > 0 ? 2 : 0);
-        const x = Y_AXIS_WIDTH + i * slotW + gap / 2;
-        const y = TOP_PADDING + BAR_HEIGHT - h;
         const isSelected = i === selectedIndex;
         const label = monthAbbreviations[d.month];
+
+        if (hasVs) {
+          const vsD = vsData[i];
+          const h1 = Math.max((d.total / axisMax) * BAR_HEIGHT, d.total > 0 ? 2 : 0);
+          const h2 = Math.max((vsD.total / axisMax) * BAR_HEIGHT, vsD.total > 0 ? 2 : 0);
+          const bar1X = Y_AXIS_WIDTH + i * slotW + dualOuterPad;
+          const bar2X = bar1X + dualBarW + dualGapBetween;
+          const y1 = TOP_PADDING + BAR_HEIGHT - h1;
+          const y2 = TOP_PADDING + BAR_HEIGHT - h2;
+
+          return (
+            <React.Fragment key={i}>
+              {/* Full-slot transparent hit area */}
+              <Rect
+                x={Y_AXIS_WIDTH + i * slotW}
+                y={TOP_PADDING}
+                width={slotW}
+                height={BAR_HEIGHT}
+                fill="transparent"
+                onPress={() => onBarPress(i)}
+              />
+              {/* Primary bar */}
+              <Rect
+                x={bar1X}
+                y={y1}
+                width={dualBarW}
+                height={h1}
+                rx={2}
+                fill={colors.primary}
+                fillOpacity={isSelected ? 1 : 0.3}
+                onPress={() => onBarPress(i)}
+              />
+              {/* VS bar */}
+              <Rect
+                x={bar2X}
+                y={y2}
+                width={dualBarW}
+                height={h2}
+                rx={2}
+                fill={VS_COLOR}
+                fillOpacity={isSelected ? 1 : 0.3}
+                onPress={() => onBarPress(i)}
+              />
+              {/* Month label centered in slot */}
+              <SvgText
+                x={Y_AXIS_WIDTH + i * slotW + slotW / 2}
+                y={TOP_PADDING + BAR_HEIGHT + 13}
+                fontSize={9.5}
+                fontFamily="Inter"
+                fill={colors.mutedText}
+                textAnchor="middle"
+              >
+                {label}
+              </SvgText>
+            </React.Fragment>
+          );
+        }
+
+        // Single bar (original layout)
+        const h = Math.max((d.total / axisMax) * BAR_HEIGHT, d.total > 0 ? 2 : 0);
+        const x = Y_AXIS_WIDTH + i * slotW + singleGap / 2;
+        const y = TOP_PADDING + BAR_HEIGHT - h;
         return (
           <React.Fragment key={i}>
             <Rect
               x={x}
               y={TOP_PADDING}
-              width={barW}
+              width={singleBarW}
               height={BAR_HEIGHT}
               fill="transparent"
               onPress={() => onBarPress(i)}
@@ -114,7 +186,7 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
             <Rect
               x={x}
               y={y}
-              width={barW}
+              width={singleBarW}
               height={h}
               rx={3}
               fill={isSelected ? colors.primary : colors.mutedText}
@@ -122,7 +194,7 @@ const BarChart = ({ data, monthAbbreviations, colors, width, selectedIndex, onBa
               onPress={() => onBarPress(i)}
             />
             <SvgText
-              x={x + barW / 2}
+              x={x + singleBarW / 2}
               y={TOP_PADDING + BAR_HEIGHT + 13}
               fontSize={9.5}
               fontFamily="Inter"
@@ -146,11 +218,12 @@ const CategorySpendingCard = ({
   onCategoryChange,
   categories,
 }) => {
-  const [pickerVisible, setPickerVisible] = useState(false);
+  // null = closed, 'primary' = picking primary, 'vs' = picking vs category
+  const [pickerMode, setPickerMode] = useState(null);
+  const [vsCategory, setVsCategory] = useState(null);
   const [expandedParents, setExpandedParents] = useState(new Set());
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
 
-  // Get all expense categories (parent and child)
   const allExpenseCategories = useMemo(() => {
     return categories.filter(cat =>
       cat.categoryType === 'expense' &&
@@ -158,12 +231,10 @@ const CategorySpendingCard = ({
     );
   }, [categories]);
 
-  // Get parent expense categories for default selection
   const parentExpenseCategories = useMemo(() => {
     return allExpenseCategories.filter(cat => cat.parentId === null);
   }, [allExpenseCategories]);
 
-  // Get children for each parent
   const childrenByParent = useMemo(() => {
     const map = new Map();
     parentExpenseCategories.forEach(parent => {
@@ -173,7 +244,6 @@ const CategorySpendingCard = ({
     return map;
   }, [parentExpenseCategories, allExpenseCategories]);
 
-  // Default to first parent category if none selected
   const effectiveCategory = useMemo(() => {
     if (selectedCategory && allExpenseCategories.some(c => c.id === selectedCategory)) {
       return selectedCategory;
@@ -181,7 +251,11 @@ const CategorySpendingCard = ({
     return parentExpenseCategories.length > 0 ? parentExpenseCategories[0].id : null;
   }, [selectedCategory, allExpenseCategories, parentExpenseCategories]);
 
-  // Get display info for selected category
+  const effectiveVsCategory = useMemo(() => {
+    if (!vsCategory) return null;
+    return allExpenseCategories.some(c => c.id === vsCategory) ? vsCategory : null;
+  }, [vsCategory, allExpenseCategories]);
+
   const selectedCategoryName = useMemo(() => {
     const cat = allExpenseCategories.find(c => c.id === effectiveCategory);
     return cat ? cat.name : '';
@@ -192,41 +266,52 @@ const CategorySpendingCard = ({
     return cat?.icon ?? null;
   }, [allExpenseCategories, effectiveCategory]);
 
-  // Toggle parent expansion (only one can be expanded at a time)
+  const vsCategoryName = useMemo(() => {
+    if (!effectiveVsCategory) return '';
+    const cat = allExpenseCategories.find(c => c.id === effectiveVsCategory);
+    return cat ? cat.name : '';
+  }, [allExpenseCategories, effectiveVsCategory]);
+
+  const vsCategoryIcon = useMemo(() => {
+    if (!effectiveVsCategory) return null;
+    const cat = allExpenseCategories.find(c => c.id === effectiveVsCategory);
+    return cat?.icon ?? null;
+  }, [allExpenseCategories, effectiveVsCategory]);
+
   const toggleParent = useCallback((parentId) => {
     setExpandedParents(prev => {
-      if (prev.has(parentId)) {
-        // Collapse if already expanded
-        return new Set();
-      } else {
-        // Expand this one, collapse all others
-        return new Set([parentId]);
-      }
+      if (prev.has(parentId)) return new Set();
+      return new Set([parentId]);
     });
   }, []);
 
-  // Handle category selection
-  const handleSelectCategory = useCallback((categoryId) => {
-    onCategoryChange(categoryId);
-    setPickerVisible(false);
-  }, [onCategoryChange]);
+  const openPicker = useCallback((mode) => {
+    setExpandedParents(new Set());
+    setPickerMode(mode);
+  }, []);
 
-  // Use the hook to get monthly spending data (last 12 months)
-  const {
-    monthlyData,
-    loading,
-  } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
+  const handleSelectCategory = useCallback((categoryId) => {
+    if (pickerMode === 'primary') {
+      onCategoryChange(categoryId);
+    } else if (pickerMode === 'vs') {
+      setVsCategory(categoryId);
+    }
+    setPickerMode(null);
+  }, [pickerMode, onCategoryChange]);
+
+  const clearVsCategory = useCallback(() => setVsCategory(null), []);
+
+  const { monthlyData, loading } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
+  const { monthlyData: vsMonthlyData, loading: vsLoading } = useCategoryMonthlySpending(selectedCurrency, effectiveVsCategory, categories);
 
   const { hideBalances } = useDisplaySettings();
 
-  // Two-letter month abbreviations (for bar labels)
   const monthAbbreviations = ['Ja', 'Fe', 'Mr', 'Ap', 'My', 'Jn', 'Jl', 'Au', 'Se', 'Oc', 'No', 'De'];
   const monthKeys = ['month_january', 'month_february', 'month_march', 'month_april', 'month_may', 'month_june', 'month_july', 'month_august', 'month_september', 'month_october', 'month_november', 'month_december'];
 
-  // Check if there's any data to display
   const hasData = monthlyData.some(item => item.total > 0);
+  const hasVsData = effectiveVsCategory !== null && !vsLoading && vsMonthlyData.length > 0;
 
-  // Reset bar selection when data changes (e.g. category switch)
   const prevDataRef = React.useRef(monthlyData);
   if (prevDataRef.current !== monthlyData) {
     prevDataRef.current = monthlyData;
@@ -235,23 +320,91 @@ const CategorySpendingCard = ({
 
   const effectiveBarIndex = selectedBarIndex !== null ? selectedBarIndex : monthlyData.length - 1;
   const displayedTotal = monthlyData.length > 0 ? (monthlyData[effectiveBarIndex]?.total ?? 0) : 0;
+  const vsDisplayedTotal = effectiveVsCategory && vsMonthlyData.length > 0
+    ? (vsMonthlyData[effectiveBarIndex]?.total ?? 0)
+    : 0;
 
-  // Don't render if no parent categories available
   if (parentExpenseCategories.length === 0) {
     return null;
   }
 
+  const pickerContent = (
+    <ScrollView>
+      {parentExpenseCategories.map(parent => {
+        const children = childrenByParent.get(parent.id) || [];
+        const hasChildren = children.length > 0;
+        const isExpanded = expandedParents.has(parent.id);
+        const isSelected = pickerMode === 'primary'
+          ? effectiveCategory === parent.id
+          : effectiveVsCategory === parent.id;
+
+        return (
+          <View key={parent.id}>
+            <View style={[styles.parentRow, { borderBottomColor: colors.border }]}>
+              {hasChildren && (
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => toggleParent(parent.id)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Icon
+                    name={isExpanded ? 'chevron-down' : 'chevron-right'}
+                    size={20}
+                    color={colors.mutedText}
+                  />
+                </TouchableOpacity>
+              )}
+              {!hasChildren && <View style={styles.expandPlaceholder} />}
+              <TouchableOpacity
+                style={[
+                  styles.categoryItem,
+                  isSelected && { backgroundColor: colors.selected },
+                ]}
+                onPress={() => handleSelectCategory(parent.id)}
+              >
+                <Text style={[styles.categoryText, { color: colors.text }]}>
+                  {parent.name}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {hasChildren && isExpanded && children.map(child => {
+              const isChildSelected = pickerMode === 'primary'
+                ? effectiveCategory === child.id
+                : effectiveVsCategory === child.id;
+              return (
+                <TouchableOpacity
+                  key={child.id}
+                  style={[
+                    styles.childRow,
+                    { borderBottomColor: colors.border },
+                    isChildSelected && { backgroundColor: colors.selected },
+                  ]}
+                  onPress={() => handleSelectCategory(child.id)}
+                >
+                  <Text style={[styles.childText, { color: colors.text }]}>
+                    {child.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+
   return (
     <View style={[styles.card, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
       <View style={styles.header}>
-        {/* Left: label + category selector */}
+        {/* Left: label + primary category selector + vs selector */}
         <View style={styles.headerLeft}>
           <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
             {t('category_spending_trend').toUpperCase()}
           </Text>
           <TouchableOpacity
             style={styles.categorySelector}
-            onPress={() => setPickerVisible(true)}
+            onPress={() => openPicker('primary')}
           >
             {selectedCategoryIcon && (
               <Icon name={selectedCategoryIcon} size={18} color={colors.text} />
@@ -261,95 +414,80 @@ const CategorySpendingCard = ({
             </Text>
             <Icon name="chevron-down" size={18} color={colors.mutedText} />
           </TouchableOpacity>
+
+          {/* VS category selector row */}
+          <View style={styles.vsRow}>
+            <TouchableOpacity
+              style={styles.vsSelector}
+              onPress={() => openPicker('vs')}
+            >
+              {effectiveVsCategory ? (
+                <>
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                  {vsCategoryIcon && (
+                    <Icon name={vsCategoryIcon} size={14} color={VS_COLOR} />
+                  )}
+                  <Text style={[styles.vsCategoryName, { color: VS_COLOR }]} numberOfLines={1}>
+                    {vsCategoryName}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Icon name="plus-circle-outline" size={13} color={colors.mutedText} />
+                  <Text style={[styles.vsText, { color: colors.mutedText }]}>vs</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {effectiveVsCategory && (
+              <TouchableOpacity
+                onPress={clearVsCategory}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="close" size={14} color={colors.mutedText} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        {/* Right: current month amount */}
+
+        {/* Right: amount(s) + month label */}
         <View style={styles.headerRight}>
           {!hideBalances && (
-            <Text style={[styles.currentAmount, { color: colors.text }]}>
-              {formatCurrency(displayedTotal, selectedCurrency)}
-            </Text>
+            <>
+              <Text style={[styles.currentAmount, { color: effectiveVsCategory ? colors.primary : colors.text }]}>
+                {formatCurrency(displayedTotal, selectedCurrency)}
+              </Text>
+              {effectiveVsCategory && (
+                <Text style={[styles.currentAmount, { color: VS_COLOR }]}>
+                  {vsLoading ? '...' : formatCurrency(vsDisplayedTotal, selectedCurrency)}
+                </Text>
+              )}
+            </>
           )}
           <Text style={[styles.thisMonthLabel, { color: colors.mutedText }]}>
-            {effectiveBarIndex === monthlyData.length - 1 ? t('this_month') : monthlyData[effectiveBarIndex] ? `${t(monthKeys[monthlyData[effectiveBarIndex].month])} ${monthlyData[effectiveBarIndex].year}` : ''}
+            {effectiveBarIndex === monthlyData.length - 1
+              ? t('this_month')
+              : monthlyData[effectiveBarIndex]
+                ? `${t(monthKeys[monthlyData[effectiveBarIndex].month])} ${monthlyData[effectiveBarIndex].year}`
+                : ''}
           </Text>
         </View>
       </View>
 
-      {/* Custom Category Picker Modal */}
-      {pickerVisible && <ModalBlurOverlay />}
+      {/* Category Picker Modal (shared for primary and vs) */}
+      {pickerMode !== null && <ModalBlurOverlay />}
       <Modal
-        visible={pickerVisible}
+        visible={pickerMode !== null}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setPickerVisible(false)}
+        onRequestClose={() => setPickerMode(null)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setPickerVisible(false)}
+          onPress={() => setPickerMode(null)}
         >
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <ScrollView>
-              {parentExpenseCategories.map(parent => {
-                const children = childrenByParent.get(parent.id) || [];
-                const hasChildren = children.length > 0;
-                const isExpanded = expandedParents.has(parent.id);
-                const isSelected = effectiveCategory === parent.id;
-
-                return (
-                  <View key={parent.id}>
-                    {/* Parent row */}
-                    <View style={[styles.parentRow, { borderBottomColor: colors.border }]}>
-                      {hasChildren && (
-                        <TouchableOpacity
-                          style={styles.expandButton}
-                          onPress={() => toggleParent(parent.id)}
-                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                        >
-                          <Icon
-                            name={isExpanded ? 'chevron-down' : 'chevron-right'}
-                            size={20}
-                            color={colors.mutedText}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {!hasChildren && <View style={styles.expandPlaceholder} />}
-                      <TouchableOpacity
-                        style={[
-                          styles.categoryItem,
-                          isSelected && { backgroundColor: colors.selected },
-                        ]}
-                        onPress={() => handleSelectCategory(parent.id)}
-                      >
-                        <Text style={[styles.categoryText, { color: colors.text }]}>
-                          {parent.name}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Children (if expanded) */}
-                    {hasChildren && isExpanded && children.map(child => {
-                      const isChildSelected = effectiveCategory === child.id;
-                      return (
-                        <TouchableOpacity
-                          key={child.id}
-                          style={[
-                            styles.childRow,
-                            { borderBottomColor: colors.border },
-                            isChildSelected && { backgroundColor: colors.selected },
-                          ]}
-                          onPress={() => handleSelectCategory(child.id)}
-                        >
-                          <Text style={[styles.childText, { color: colors.text }]}>
-                            {child.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              })}
-            </ScrollView>
+            {pickerContent}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -367,6 +505,7 @@ const CategorySpendingCard = ({
       ) : (
         <BarChart
           data={monthlyData}
+          vsData={hasVsData ? vsMonthlyData : null}
           monthAbbreviations={monthAbbreviations}
           colors={colors}
           width={screenWidth - 64}
@@ -384,6 +523,7 @@ BarChart.propTypes = {
   monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
   onBarPress: PropTypes.func.isRequired,
   selectedIndex: PropTypes.number,
+  vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })),
   width: PropTypes.number.isRequired,
 };
 
@@ -501,6 +641,26 @@ const styles = StyleSheet.create({
   thisMonthLabel: {
     fontSize: 11,
     marginTop: 2,
+  },
+  vsCategoryName: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  vsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+  },
+  vsSelector: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  vsText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 
