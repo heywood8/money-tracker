@@ -40,8 +40,8 @@ describe('CustomLegend', () => {
   };
 
   const mockData = [
-    { name: 'Food', amount: 100, color: '#FF5733', icon: 'food', categoryId: 'cat-1' },
-    { name: 'Transport', amount: 50, color: '#33FF57', icon: 'car', categoryId: 'cat-2' },
+    { name: 'Food', amount: 100, color: '#FF5733', icon: 'food', categoryId: 'cat-1', hasChildren: true },
+    { name: 'Transport', amount: 50, color: '#33FF57', icon: 'car', categoryId: 'cat-2', hasChildren: true },
   ];
 
   const defaultProps = {
@@ -218,6 +218,28 @@ describe('CustomLegend', () => {
         <CustomLegend {...defaultProps} data={dataWithoutCategoryId} isClickable={true} />,
       );
       expect(queryByTestId('icon-chevron-right')).toBeNull();
+    });
+
+    it('does not show chevron for leaf categories (hasChildren is false)', () => {
+      const leafData = [
+        { name: 'Leaf', amount: 100, color: '#000', categoryId: 'cat-leaf', hasChildren: false },
+      ];
+      const { queryByTestId } = render(
+        <CustomLegend {...defaultProps} data={leafData} isClickable={true} />,
+      );
+      expect(queryByTestId('icon-chevron-right')).toBeNull();
+    });
+
+    it('leaf category is not clickable even when isClickable is true', () => {
+      const onItemPress = jest.fn();
+      const leafData = [
+        { name: 'Leaf', amount: 100, color: '#000', categoryId: 'cat-leaf', hasChildren: false },
+      ];
+      const { getByText } = render(
+        <CustomLegend {...defaultProps} data={leafData} isClickable={true} onItemPress={onItemPress} />,
+      );
+      fireEvent.press(getByText('Leaf'));
+      expect(onItemPress).not.toHaveBeenCalled();
     });
 
     it('item without categoryId is not clickable even when isClickable is true', () => {
