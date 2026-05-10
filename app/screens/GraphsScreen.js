@@ -532,35 +532,42 @@ const GraphsScreen = () => {
                 testID="income-chart-content"
                 style={[styles.chartContent, chartContentAnimStyle]}
               >
-                {selectedIncomeCategory !== 'all' && (
-                  <View style={styles.chartNavRow}>
-                    <TouchableOpacity
-                      onPress={handleBackToIncomeParent}
-                      style={styles.chartNavBack}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('back')}
-                    >
-                      <Icon name="arrow-left" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <SimplePicker
-                        value={selectedIncomeCategory}
-                        onValueChange={setSelectedIncomeCategory}
-                        items={incomeCategoryItems}
-                        colors={colors}
-                      />
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {selectedIncomeCategory !== 'all' && (
+                    <View style={styles.chartNavRow}>
+                      <TouchableOpacity
+                        onPress={handleBackToIncomeParent}
+                        style={styles.chartNavBack}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('back')}
+                      >
+                        <Icon name="arrow-left" size={20} color={colors.primary} />
+                      </TouchableOpacity>
+                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <SimplePicker
+                          value={selectedIncomeCategory}
+                          onValueChange={setSelectedIncomeCategory}
+                          items={incomeCategoryItems}
+                          colors={colors}
+                        />
+                      </View>
                     </View>
-                  </View>
-                )}
-                <IncomePieChart
-                  colors={colors}
-                  t={t}
-                  loadingIncome={loadingIncome}
-                  incomeChartData={incomeChartData}
-                  selectedCurrency={selectedCurrency}
-                  onLegendItemPress={handleIncomeLegendItemPress}
-                  selectedIncomeCategory={selectedIncomeCategory}
-                />
+                  )}
+                  <IncomePieChart
+                    colors={colors}
+                    t={t}
+                    loadingIncome={loadingIncome}
+                    incomeChartData={incomeChartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleIncomeLegendItemPress}
+                    selectedIncomeCategory={selectedIncomeCategory}
+                  />
+                </ScrollView>
               </Animated.View>
             </Animated.View>
 
@@ -590,35 +597,42 @@ const GraphsScreen = () => {
                 testID="expense-chart-content"
                 style={[styles.chartContent, chartContentAnimStyle]}
               >
-                {selectedCategory !== 'all' && (
-                  <View style={styles.chartNavRow}>
-                    <TouchableOpacity
-                      onPress={handleBackToExpenseParent}
-                      style={styles.chartNavBack}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('back')}
-                    >
-                      <Icon name="arrow-left" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <SimplePicker
-                        value={selectedCategory}
-                        onValueChange={setSelectedCategory}
-                        items={categoryItems}
-                        colors={colors}
-                      />
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {selectedCategory !== 'all' && (
+                    <View style={styles.chartNavRow}>
+                      <TouchableOpacity
+                        onPress={handleBackToExpenseParent}
+                        style={styles.chartNavBack}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('back')}
+                      >
+                        <Icon name="arrow-left" size={20} color={colors.primary} />
+                      </TouchableOpacity>
+                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <SimplePicker
+                          value={selectedCategory}
+                          onValueChange={setSelectedCategory}
+                          items={categoryItems}
+                          colors={colors}
+                        />
+                      </View>
                     </View>
-                  </View>
-                )}
-                <ExpensePieChart
-                  colors={colors}
-                  t={t}
-                  loading={loading}
-                  chartData={chartData}
-                  selectedCurrency={selectedCurrency}
-                  onLegendItemPress={handleExpenseLegendItemPress}
-                  selectedCategory={selectedCategory}
-                />
+                  )}
+                  <ExpensePieChart
+                    colors={colors}
+                    t={t}
+                    loading={loading}
+                    chartData={chartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleExpenseLegendItemPress}
+                    selectedCategory={selectedCategory}
+                  />
+                </ScrollView>
               </Animated.View>
             </Animated.View>
           </View>
@@ -673,8 +687,6 @@ const styles = StyleSheet.create({
   chartContent: {
     bottom: 0,
     left: 0,
-    paddingBottom: 8,
-    paddingHorizontal: 12,
     position: 'absolute',
     right: 0,
     top: CARD_HEADER_HEIGHT,
@@ -695,6 +707,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
     marginTop: 4,
+  },
+  chartScrollContent: {
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+  },
+  chartScrollView: {
+    flex: 1,
   },
   container: {
     flex: 1,
