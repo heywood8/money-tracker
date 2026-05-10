@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.4](https://github.com/heywood8/money-tracker/compare/penny-v0.103.3...penny-v0.103.4) (2026-05-10)
+
+
+### Bug Fixes
+
+* replace startup update dialog with rich UpdateAvailableModal ([#547](https://github.com/heywood8/money-tracker/issues/547)) ([b469873](https://github.com/heywood8/money-tracker/commit/b4698731cba33ceed72bb4a892c986aa88dc8ed4))
+
 ## [0.103.3](https://github.com/heywood8/money-tracker/compare/penny-v0.103.2...penny-v0.103.3) (2026-05-10)
 
 
