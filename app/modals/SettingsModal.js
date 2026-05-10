@@ -1308,6 +1308,25 @@ const centeredModal = {
 };
 
 const styles = StyleSheet.create({
+  apkChip: {
+    alignItems: 'center',
+    gap: SPACING.xs,
+    minWidth: 72,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  apkChipDate: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  apkChipVersion: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  apkListContent: {
+    paddingHorizontal: SPACING.sm,
+  },
   backButton: {
     alignItems: 'center',
     height: 40,
@@ -1402,6 +1421,18 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: SPACING.xs,
+  },
+  downloadedApksSection: {
+    paddingBottom: SPACING.md,
+  },
+  downloadedApksTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: SPACING.md,
+    textTransform: 'uppercase',
   },
   filterChip: {
     borderRadius: 16,
@@ -1654,37 +1685,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  apkChip: {
-    alignItems: 'center',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    minWidth: 72,
-  },
-  apkChipDate: {
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  apkChipVersion: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  apkListContent: {
-    paddingHorizontal: SPACING.sm,
-  },
-  downloadedApksSection: {
-    paddingBottom: SPACING.md,
-  },
-  downloadedApksTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    paddingBottom: SPACING.sm,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: SPACING.md,
-    textTransform: 'uppercase',
-  },
   updateActions: {
     paddingTop: SPACING.md,
   },
@@ -1723,13 +1723,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
   },
+  updatePanelWrapper: {
+    flex: 1,
+  },
   updateResultContainer: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
-  },
-  updatePanelWrapper: {
-    flex: 1,
   },
   updateVersionInfo: {
     flex: 1,
