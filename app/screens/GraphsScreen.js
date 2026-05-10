@@ -514,15 +514,17 @@ const GraphsScreen = () => {
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <IncomeSummaryCard
-                colors={colors}
-                t={t}
-                loadingIncome={loadingIncome}
-                totalIncome={totalIncome}
-                selectedCurrency={selectedCurrency}
-                onPress={handleToggleIncome}
-                expanded={expandedCard === 'income'}
-              />
+              <View style={styles.cardHeader}>
+                <IncomeSummaryCard
+                  colors={colors}
+                  t={t}
+                  loadingIncome={loadingIncome}
+                  totalIncome={totalIncome}
+                  selectedCurrency={selectedCurrency}
+                  onPress={handleToggleIncome}
+                  expanded={expandedCard === 'income'}
+                />
+              </View>
               <Animated.View
                 testID="income-chart-content"
                 style={[styles.chartContent, chartContentAnimStyle]}
@@ -570,15 +572,17 @@ const GraphsScreen = () => {
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <ExpenseSummaryCard
-                colors={colors}
-                t={t}
-                loading={loading}
-                totalExpenses={totalExpenses}
-                selectedCurrency={selectedCurrency}
-                onPress={handleToggleExpense}
-                expanded={expandedCard === 'expense'}
-              />
+              <View style={styles.cardHeader}>
+                <ExpenseSummaryCard
+                  colors={colors}
+                  t={t}
+                  loading={loading}
+                  totalExpenses={totalExpenses}
+                  selectedCurrency={selectedCurrency}
+                  onPress={handleToggleExpense}
+                  expanded={expandedCard === 'expense'}
+                />
+              </View>
               <Animated.View
                 testID="expense-chart-content"
                 style={[styles.chartContent, chartContentAnimStyle]}
@@ -660,9 +664,17 @@ const GraphsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  cardHeader: {
+    height: CARD_HEADER_HEIGHT,
+  },
   chartContent: {
+    bottom: 0,
+    left: 0,
     paddingBottom: 8,
     paddingHorizontal: 12,
+    position: 'absolute',
+    right: 0,
+    top: CARD_HEADER_HEIGHT,
   },
   chartNavBack: {
     marginRight: 8,
