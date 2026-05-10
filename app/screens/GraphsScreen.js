@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform, Animated, Easing } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -21,14 +22,18 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
+const CARD_HEADER_HEIGHT = 56;
+const CHART_HEIGHT = 300;
+const CARD_GAP = 8;
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
+
+  const { width: windowWidth } = useWindowDimensions();
+  const rowWidth = windowWidth - TOP_CONTENT_SPACING * 2;
+  const halfWidth = (rowWidth - CARD_GAP) / 2;
 
   // Get current month and year
   const now = new Date();
@@ -47,10 +52,18 @@ const GraphsScreen = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
 
   // Inline chart expansion state
-  const [incomeChartExpanded, setIncomeChartExpanded] = useState(false);
-  const [expenseChartExpanded, setExpenseChartExpanded] = useState(false);
-  const incomeChartAnim = useRef(new Animated.Value(0)).current;
-  const expenseChartAnim = useRef(new Animated.Value(0)).current;
+  // null = neither expanded, 'income' | 'expense' = that card is expanded/expanding
+  const [expandedCard, setExpandedCard] = useState(null);
+  // Reanimated shared values — all run on UI thread, immune to JS contention
+  // 0=collapsed, 1=expanded; drives width/height/opacity interpolations
+  const animProgress = useSharedValue(0);
+  // 0=hidden, 1=visible; drives chart content opacity + slide
+  const chartProgress = useSharedValue(0);
+  // 0=none, 1=income expanding, 2=expense expanding
+  const expandingCard = useSharedValue(0);
+  // Dimension values updated on orientation change
+  const halfWidthSV = useSharedValue(halfWidth);
+  const rowWidthSV = useSharedValue(rowWidth);
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -366,73 +379,104 @@ const GraphsScreen = () => {
     return category.parentId;
   }, [categories]);
 
-  // Income chart inline expansion
-  const toggleIncomeChart = useCallback(() => {
-    if (incomeChartExpanded) {
-      Animated.timing(incomeChartAnim, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setIncomeChartExpanded(false);
-      });
-    } else {
-      incomeChartAnim.setValue(0);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setIncomeChartExpanded(true);
-    }
-  }, [incomeChartExpanded, incomeChartAnim]);
-
-  useEffect(() => {
-    if (incomeChartExpanded) {
-      Animated.timing(incomeChartAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [incomeChartExpanded, incomeChartAnim]);
-
   const handleBackToIncomeParent = useCallback(() => {
     setSelectedIncomeCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
-  // Expense chart inline expansion
-  const toggleExpenseChart = useCallback(() => {
-    if (expenseChartExpanded) {
-      Animated.timing(expenseChartAnim, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setExpenseChartExpanded(false);
-      });
-    } else {
-      expenseChartAnim.setValue(0);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setExpenseChartExpanded(true);
-    }
-  }, [expenseChartExpanded, expenseChartAnim]);
-
-  useEffect(() => {
-    if (expenseChartExpanded) {
-      Animated.timing(expenseChartAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [expenseChartExpanded, expenseChartAnim]);
-
   const handleBackToExpenseParent = useCallback(() => {
     setSelectedCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
+
+  const toggleCard = useCallback((card) => {
+    if (expandedCard === card) {
+      // Collapse: fade chart content (150ms), collapse layout (220ms), then clear state
+      chartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
+      animProgress.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }, (finished) => {
+        if (finished) {
+          expandingCard.value = 0;
+          runOnJS(setExpandedCard)(null);
+        }
+      });
+    } else {
+      // Expand: set direction, reset to 0, start both animations immediately
+      animProgress.value = 0;
+      chartProgress.value = 0;
+      expandingCard.value = card === 'income' ? 1 : 2;
+      setExpandedCard(card);
+      animProgress.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+      chartProgress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+    }
+  }, [expandedCard, animProgress, chartProgress, expandingCard]);
+
+  const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
+  const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
+
+  // Reset expansion and update dimension shared values on orientation change
+  useEffect(() => {
+    halfWidthSV.value = halfWidth;
+    rowWidthSV.value = rowWidth;
+    animProgress.value = 0;
+    chartProgress.value = 0;
+    expandingCard.value = 0;
+    setExpandedCard(null);
+  }, [windowWidth]); // intentionally omit stable shared value refs
+
+  // Animated styles via Reanimated — all run on UI thread, no JS contention
+  const incomeCardAnimStyle = useAnimatedStyle(() => {
+    const ev = expandingCard.value;
+    const p = animProgress.value;
+    const hw = halfWidthSV.value;
+    const rw = rowWidthSV.value;
+    if (ev === 1) {
+      return {
+        width: interpolate(p, [0, 1], [hw, rw]),
+        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        opacity: 1,
+      };
+    }
+    if (ev === 2) {
+      return {
+        width: interpolate(p, [0, 1], [hw, 0]),
+        height: CARD_HEADER_HEIGHT,
+        opacity: interpolate(p, [0, 1], [1, 0]),
+      };
+    }
+    return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
+  });
+
+  const expenseCardAnimStyle = useAnimatedStyle(() => {
+    const ev = expandingCard.value;
+    const p = animProgress.value;
+    const hw = halfWidthSV.value;
+    const rw = rowWidthSV.value;
+    if (ev === 2) {
+      return {
+        width: interpolate(p, [0, 1], [hw, rw]),
+        height: interpolate(p, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        opacity: 1,
+      };
+    }
+    if (ev === 1) {
+      return {
+        width: interpolate(p, [0, 1], [hw, 0]),
+        height: CARD_HEADER_HEIGHT,
+        opacity: interpolate(p, [0, 1], [1, 0]),
+      };
+    }
+    return { width: hw, height: CARD_HEADER_HEIGHT, opacity: 1 };
+  });
+
+  const spacerAnimStyle = useAnimatedStyle(() => {
+    if (expandingCard.value !== 0) {
+      return { width: interpolate(animProgress.value, [0, 1], [CARD_GAP, 0]) };
+    }
+    return { width: CARD_GAP };
+  });
+
+  const chartContentAnimStyle = useAnimatedStyle(() => ({
+    opacity: chartProgress.value,
+    transform: [{ translateY: interpolate(chartProgress.value, [0, 1], [16, 0]) }],
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -463,115 +507,134 @@ const GraphsScreen = () => {
             </View>
           </View>
 
-          {/* Summary Cards Row — one or both cards; expanded card goes full-width */}
+          {/* Summary Cards Row — always-mounted, width/height driven by Animated */}
           <View style={styles.summaryCardsRow}>
-            {/* Income card + chart (hidden when expense is expanded) */}
-            {!expenseChartExpanded && (
-              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {/* Income card */}
+            <Animated.View
+              style={[
+                styles.summaryCardBase,
+                incomeCardAnimStyle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.cardHeader}>
                 <IncomeSummaryCard
                   colors={colors}
                   t={t}
                   loadingIncome={loadingIncome}
                   totalIncome={totalIncome}
                   selectedCurrency={selectedCurrency}
-                  onPress={toggleIncomeChart}
-                  expanded={incomeChartExpanded}
+                  onPress={handleToggleIncome}
+                  expanded={expandedCard === 'income'}
                 />
-                {incomeChartExpanded && (
-                  <Animated.View style={[
-                    styles.chartContent,
-                    {
-                      opacity: incomeChartAnim,
-                      transform: [{ translateY: incomeChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                    },
-                  ]}>
-                    {selectedIncomeCategory !== 'all' && (
-                      <View style={styles.chartNavRow}>
-                        <TouchableOpacity
-                          onPress={handleBackToIncomeParent}
-                          style={styles.chartNavBack}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('back')}
-                        >
-                          <Icon name="arrow-left" size={20} color={colors.primary} />
-                        </TouchableOpacity>
-                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                          <SimplePicker
-                            value={selectedIncomeCategory}
-                            onValueChange={setSelectedIncomeCategory}
-                            items={incomeCategoryItems}
-                            colors={colors}
-                          />
-                        </View>
-                      </View>
-                    )}
-                    <IncomePieChart
-                      colors={colors}
-                      t={t}
-                      loadingIncome={loadingIncome}
-                      incomeChartData={incomeChartData}
-                      selectedCurrency={selectedCurrency}
-                      onLegendItemPress={handleIncomeLegendItemPress}
-                      selectedIncomeCategory={selectedIncomeCategory}
-                    />
-                  </Animated.View>
-                )}
               </View>
-            )}
+              <Animated.View
+                testID="income-chart-content"
+                style={[styles.chartContent, chartContentAnimStyle]}
+              >
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {selectedIncomeCategory !== 'all' && (
+                    <View style={styles.chartNavRow}>
+                      <TouchableOpacity
+                        onPress={handleBackToIncomeParent}
+                        style={styles.chartNavBack}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('back')}
+                      >
+                        <Icon name="arrow-left" size={20} color={colors.primary} />
+                      </TouchableOpacity>
+                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <SimplePicker
+                          value={selectedIncomeCategory}
+                          onValueChange={setSelectedIncomeCategory}
+                          items={incomeCategoryItems}
+                          colors={colors}
+                        />
+                      </View>
+                    </View>
+                  )}
+                  <IncomePieChart
+                    colors={colors}
+                    t={t}
+                    loadingIncome={loadingIncome}
+                    incomeChartData={incomeChartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleIncomeLegendItemPress}
+                    selectedIncomeCategory={selectedIncomeCategory}
+                  />
+                </ScrollView>
+              </Animated.View>
+            </Animated.View>
 
-            {/* Expense card + chart (hidden when income is expanded) */}
-            {!incomeChartExpanded && (
-              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {/* Spacer that collapses as one card expands */}
+            <Animated.View style={spacerAnimStyle} />
+
+            {/* Expense card */}
+            <Animated.View
+              style={[
+                styles.summaryCardBase,
+                expenseCardAnimStyle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.cardHeader}>
                 <ExpenseSummaryCard
                   colors={colors}
                   t={t}
                   loading={loading}
                   totalExpenses={totalExpenses}
                   selectedCurrency={selectedCurrency}
-                  onPress={toggleExpenseChart}
-                  expanded={expenseChartExpanded}
+                  onPress={handleToggleExpense}
+                  expanded={expandedCard === 'expense'}
                 />
-                {expenseChartExpanded && (
-                  <Animated.View style={[
-                    styles.chartContent,
-                    {
-                      opacity: expenseChartAnim,
-                      transform: [{ translateY: expenseChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                    },
-                  ]}>
-                    {selectedCategory !== 'all' && (
-                      <View style={styles.chartNavRow}>
-                        <TouchableOpacity
-                          onPress={handleBackToExpenseParent}
-                          style={styles.chartNavBack}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('back')}
-                        >
-                          <Icon name="arrow-left" size={20} color={colors.primary} />
-                        </TouchableOpacity>
-                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                          <SimplePicker
-                            value={selectedCategory}
-                            onValueChange={setSelectedCategory}
-                            items={categoryItems}
-                            colors={colors}
-                          />
-                        </View>
-                      </View>
-                    )}
-                    <ExpensePieChart
-                      colors={colors}
-                      t={t}
-                      loading={loading}
-                      chartData={chartData}
-                      selectedCurrency={selectedCurrency}
-                      onLegendItemPress={handleExpenseLegendItemPress}
-                      selectedCategory={selectedCategory}
-                    />
-                  </Animated.View>
-                )}
               </View>
-            )}
+              <Animated.View
+                testID="expense-chart-content"
+                style={[styles.chartContent, chartContentAnimStyle]}
+              >
+                <ScrollView
+                  style={styles.chartScrollView}
+                  contentContainerStyle={styles.chartScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {selectedCategory !== 'all' && (
+                    <View style={styles.chartNavRow}>
+                      <TouchableOpacity
+                        onPress={handleBackToExpenseParent}
+                        style={styles.chartNavBack}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('back')}
+                      >
+                        <Icon name="arrow-left" size={20} color={colors.primary} />
+                      </TouchableOpacity>
+                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <SimplePicker
+                          value={selectedCategory}
+                          onValueChange={setSelectedCategory}
+                          items={categoryItems}
+                          colors={colors}
+                        />
+                      </View>
+                    </View>
+                  )}
+                  <ExpensePieChart
+                    colors={colors}
+                    t={t}
+                    loading={loading}
+                    chartData={chartData}
+                    selectedCurrency={selectedCurrency}
+                    onLegendItemPress={handleExpenseLegendItemPress}
+                    selectedCategory={selectedCategory}
+                  />
+                </ScrollView>
+              </Animated.View>
+            </Animated.View>
           </View>
 
           {/* Balance History Card */}
@@ -618,9 +681,15 @@ const GraphsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  cardHeader: {
+    height: CARD_HEADER_HEIGHT,
+  },
   chartContent: {
-    paddingBottom: 8,
-    paddingHorizontal: 12,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: CARD_HEADER_HEIGHT,
   },
   chartNavBack: {
     marginRight: 8,
@@ -638,6 +707,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
     marginTop: 4,
+  },
+  chartScrollContent: {
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+  },
+  chartScrollView: {
+    flex: 1,
   },
   container: {
     flex: 1,
@@ -671,15 +747,13 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  summaryCardContainer: {
+  summaryCardBase: {
     borderRadius: 14,
     borderWidth: 1,
-    flex: 1,
     overflow: 'hidden',
   },
   summaryCardsRow: {
     flexDirection: 'row',
-    gap: 8,
     marginBottom: 16,
   },
 });
