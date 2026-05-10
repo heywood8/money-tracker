@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.3](https://github.com/heywood8/money-tracker/compare/penny-v0.103.2...penny-v0.103.3) (2026-05-10)
+
+
+### Bug Fixes
+
+* add missing trailing comma in Header.js animation sequence ([#546](https://github.com/heywood8/money-tracker/issues/546)) ([354252a](https://github.com/heywood8/money-tracker/commit/354252afc087a42860a2fd816ad27396a5d5802a))
+
 ## [0.103.2](https://github.com/heywood8/money-tracker/compare/penny-v0.103.1...penny-v0.103.2) (2026-05-10)
 
 
