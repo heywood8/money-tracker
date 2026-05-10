@@ -727,8 +727,8 @@ const GraphsScreen = () => {
               onValueChanged={({ item }) => setSelectedCurrency(item.value)}
               itemHeight={48}
               visibleItemCount={5}
-              itemTextStyle={{ color: colors.text, fontSize: 16 }}
-              overlayItemStyle={{ backgroundColor: colors.selected, borderRadius: 8 }}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
               enableScrollByTapOnItem
               keyExtractor={(item, index) => `currency-${index}`}
             />
@@ -760,8 +760,8 @@ const GraphsScreen = () => {
               onValueChanged={({ item }) => setSelectedPeriod(item.value)}
               itemHeight={48}
               visibleItemCount={5}
-              itemTextStyle={{ color: colors.text, fontSize: 16 }}
-              overlayItemStyle={{ backgroundColor: colors.selected, borderRadius: 8 }}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
               enableScrollByTapOnItem
               keyExtractor={(item, index) => `period-${index}`}
             />
@@ -776,11 +776,6 @@ const GraphsScreen = () => {
 const styles = StyleSheet.create({
   cardHeader: {
     height: CARD_HEADER_HEIGHT,
-  },
-  currencySymbol: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginRight: 6,
   },
   chartContent: {
     bottom: 0,
@@ -819,6 +814,11 @@ const styles = StyleSheet.create({
   content: {
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
+  },
+  currencySymbol: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginRight: 6,
   },
   filtersRow: {
     flexDirection: 'row',
@@ -894,6 +894,12 @@ const styles = StyleSheet.create({
   summaryCardsRow: {
     flexDirection: 'row',
     marginBottom: 16,
+  },
+  wheelItemText: {
+    fontSize: 16,
+  },
+  wheelOverlayItem: {
+    borderRadius: 8,
   },
 });
 
