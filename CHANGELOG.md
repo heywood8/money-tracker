@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.102.0](https://github.com/heywood8/money-tracker/compare/penny-v0.101.0...penny-v0.102.0) (2026-05-10)
+
+
+### Features
+
+* **graphs:** animate income/expense card expand with corner-drag effect ([#537](https://github.com/heywood8/money-tracker/issues/537)) ([dcf2d5b](https://github.com/heywood8/money-tracker/commit/dcf2d5b33a0e69015ef6959257cd93dbd55c1919))
+
 ## [0.101.0](https://github.com/heywood8/money-tracker/compare/penny-v0.100.1...penny-v0.101.0) (2026-05-10)
 
 
