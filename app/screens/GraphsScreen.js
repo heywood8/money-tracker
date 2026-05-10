@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform, Animated, Easing } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -21,14 +21,18 @@ import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
+const CARD_HEADER_HEIGHT = 56;
+const CHART_HEIGHT = 300;
+const CARD_GAP = 8;
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { accounts } = useAccountsData();
+
+  const { width: windowWidth } = useWindowDimensions();
+  const rowWidth = windowWidth - TOP_CONTENT_SPACING * 2;
+  const halfWidth = (rowWidth - CARD_GAP) / 2;
 
   // Get current month and year
   const now = new Date();
@@ -47,10 +51,12 @@ const GraphsScreen = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
 
   // Inline chart expansion state
-  const [incomeChartExpanded, setIncomeChartExpanded] = useState(false);
-  const [expenseChartExpanded, setExpenseChartExpanded] = useState(false);
-  const incomeChartAnim = useRef(new Animated.Value(0)).current;
-  const expenseChartAnim = useRef(new Animated.Value(0)).current;
+  // null = neither expanded, 'income' | 'expense' = that card is expanded/expanding
+  const [expandedCard, setExpandedCard] = useState(null);
+  // animValue: 0 = collapsed, 1 = expanded (drives width, height, opacity on JS thread)
+  const animValue = useRef(new Animated.Value(0)).current;
+  // chartContentAnim: 0 = hidden, 1 = visible (drives chart content on native thread)
+  const chartContentAnim = useRef(new Animated.Value(0)).current;
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -366,73 +372,105 @@ const GraphsScreen = () => {
     return category.parentId;
   }, [categories]);
 
-  // Income chart inline expansion
-  const toggleIncomeChart = useCallback(() => {
-    if (incomeChartExpanded) {
-      Animated.timing(incomeChartAnim, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setIncomeChartExpanded(false);
-      });
-    } else {
-      incomeChartAnim.setValue(0);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setIncomeChartExpanded(true);
-    }
-  }, [incomeChartExpanded, incomeChartAnim]);
-
-  useEffect(() => {
-    if (incomeChartExpanded) {
-      Animated.timing(incomeChartAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [incomeChartExpanded, incomeChartAnim]);
-
   const handleBackToIncomeParent = useCallback(() => {
     setSelectedIncomeCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
-  // Expense chart inline expansion
-  const toggleExpenseChart = useCallback(() => {
-    if (expenseChartExpanded) {
-      Animated.timing(expenseChartAnim, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setExpenseChartExpanded(false);
-      });
-    } else {
-      expenseChartAnim.setValue(0);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setExpenseChartExpanded(true);
-    }
-  }, [expenseChartExpanded, expenseChartAnim]);
-
-  useEffect(() => {
-    if (expenseChartExpanded) {
-      Animated.timing(expenseChartAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [expenseChartExpanded, expenseChartAnim]);
-
   const handleBackToExpenseParent = useCallback(() => {
     setSelectedCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
+
+  const toggleCard = useCallback((card) => {
+    if (expandedCard === card) {
+      // Collapse: fade chart content first (native thread), then shrink layout (JS thread)
+      Animated.parallel([
+        Animated.timing(chartContentAnim, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animValue, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: false,
+        }),
+      ]).start(() => setExpandedCard(null));
+    } else {
+      // Expand: reset anim values, set the new expanded card, let useEffect trigger animation
+      animValue.setValue(0);
+      chartContentAnim.setValue(0);
+      setExpandedCard(card);
+    }
+  }, [expandedCard, animValue, chartContentAnim]);
+
+  // Trigger expand animation after expandedCard state and interpolations are in place
+  useEffect(() => {
+    if (expandedCard !== null) {
+      Animated.parallel([
+        Animated.timing(animValue, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(chartContentAnim, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [expandedCard]); // intentionally omit animValue/chartContentAnim — stable refs
+
+  // Reset expansion if screen dimensions change (orientation change) to avoid stale widths
+  useEffect(() => {
+    animValue.setValue(0);
+    chartContentAnim.setValue(0);
+    setExpandedCard(null);
+  }, [windowWidth]); // intentionally omit animValue/chartContentAnim — stable refs
+
+  // Animated style values for the two card containers
+  const incomeCardAnimStyle = {
+    width: expandedCard === 'expense'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, 0] })
+      : expandedCard === 'income'
+        ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, rowWidth - CARD_GAP] })
+        : halfWidth,
+    height: expandedCard === 'income'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT] })
+      : CARD_HEADER_HEIGHT,
+    opacity: expandedCard === 'expense'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
+      : 1,
+  };
+
+  const expenseCardAnimStyle = {
+    width: expandedCard === 'income'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, 0] })
+      : expandedCard === 'expense'
+        ? animValue.interpolate({ inputRange: [0, 1], outputRange: [halfWidth, rowWidth - CARD_GAP] })
+        : halfWidth,
+    height: expandedCard === 'expense'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT] })
+      : CARD_HEADER_HEIGHT,
+    opacity: expandedCard === 'income'
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
+      : 1,
+  };
+
+  const spacerAnimStyle = {
+    width: expandedCard !== null
+      ? animValue.interpolate({ inputRange: [0, 1], outputRange: [CARD_GAP, 0] })
+      : CARD_GAP,
+  };
+
+  const chartContentAnimStyle = {
+    opacity: chartContentAnim,
+    transform: [{ translateY: chartContentAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -463,115 +501,116 @@ const GraphsScreen = () => {
             </View>
           </View>
 
-          {/* Summary Cards Row — one or both cards; expanded card goes full-width */}
+          {/* Summary Cards Row — always-mounted, width/height driven by Animated */}
           <View style={styles.summaryCardsRow}>
-            {/* Income card + chart (hidden when expense is expanded) */}
-            {!expenseChartExpanded && (
-              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <IncomeSummaryCard
+            {/* Income card */}
+            <Animated.View
+              style={[
+                styles.summaryCardBase,
+                incomeCardAnimStyle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <IncomeSummaryCard
+                colors={colors}
+                t={t}
+                loadingIncome={loadingIncome}
+                totalIncome={totalIncome}
+                selectedCurrency={selectedCurrency}
+                onPress={() => toggleCard('income')}
+                expanded={expandedCard === 'income'}
+              />
+              <Animated.View
+                testID="income-chart-content"
+                style={[styles.chartContent, chartContentAnimStyle]}
+              >
+                {selectedIncomeCategory !== 'all' && (
+                  <View style={styles.chartNavRow}>
+                    <TouchableOpacity
+                      onPress={handleBackToIncomeParent}
+                      style={styles.chartNavBack}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back')}
+                    >
+                      <Icon name="arrow-left" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                    <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <SimplePicker
+                        value={selectedIncomeCategory}
+                        onValueChange={setSelectedIncomeCategory}
+                        items={incomeCategoryItems}
+                        colors={colors}
+                      />
+                    </View>
+                  </View>
+                )}
+                <IncomePieChart
                   colors={colors}
                   t={t}
                   loadingIncome={loadingIncome}
-                  totalIncome={totalIncome}
+                  incomeChartData={incomeChartData}
                   selectedCurrency={selectedCurrency}
-                  onPress={toggleIncomeChart}
-                  expanded={incomeChartExpanded}
+                  onLegendItemPress={handleIncomeLegendItemPress}
+                  selectedIncomeCategory={selectedIncomeCategory}
                 />
-                {incomeChartExpanded && (
-                  <Animated.View style={[
-                    styles.chartContent,
-                    {
-                      opacity: incomeChartAnim,
-                      transform: [{ translateY: incomeChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                    },
-                  ]}>
-                    {selectedIncomeCategory !== 'all' && (
-                      <View style={styles.chartNavRow}>
-                        <TouchableOpacity
-                          onPress={handleBackToIncomeParent}
-                          style={styles.chartNavBack}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('back')}
-                        >
-                          <Icon name="arrow-left" size={20} color={colors.primary} />
-                        </TouchableOpacity>
-                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                          <SimplePicker
-                            value={selectedIncomeCategory}
-                            onValueChange={setSelectedIncomeCategory}
-                            items={incomeCategoryItems}
-                            colors={colors}
-                          />
-                        </View>
-                      </View>
-                    )}
-                    <IncomePieChart
-                      colors={colors}
-                      t={t}
-                      loadingIncome={loadingIncome}
-                      incomeChartData={incomeChartData}
-                      selectedCurrency={selectedCurrency}
-                      onLegendItemPress={handleIncomeLegendItemPress}
-                      selectedIncomeCategory={selectedIncomeCategory}
-                    />
-                  </Animated.View>
-                )}
-              </View>
-            )}
+              </Animated.View>
+            </Animated.View>
 
-            {/* Expense card + chart (hidden when income is expanded) */}
-            {!incomeChartExpanded && (
-              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <ExpenseSummaryCard
+            {/* Spacer that collapses as one card expands */}
+            <Animated.View style={spacerAnimStyle} />
+
+            {/* Expense card */}
+            <Animated.View
+              style={[
+                styles.summaryCardBase,
+                expenseCardAnimStyle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <ExpenseSummaryCard
+                colors={colors}
+                t={t}
+                loading={loading}
+                totalExpenses={totalExpenses}
+                selectedCurrency={selectedCurrency}
+                onPress={() => toggleCard('expense')}
+                expanded={expandedCard === 'expense'}
+              />
+              <Animated.View
+                testID="expense-chart-content"
+                style={[styles.chartContent, chartContentAnimStyle]}
+              >
+                {selectedCategory !== 'all' && (
+                  <View style={styles.chartNavRow}>
+                    <TouchableOpacity
+                      onPress={handleBackToExpenseParent}
+                      style={styles.chartNavBack}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back')}
+                    >
+                      <Icon name="arrow-left" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                    <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <SimplePicker
+                        value={selectedCategory}
+                        onValueChange={setSelectedCategory}
+                        items={categoryItems}
+                        colors={colors}
+                      />
+                    </View>
+                  </View>
+                )}
+                <ExpensePieChart
                   colors={colors}
                   t={t}
                   loading={loading}
-                  totalExpenses={totalExpenses}
+                  chartData={chartData}
                   selectedCurrency={selectedCurrency}
-                  onPress={toggleExpenseChart}
-                  expanded={expenseChartExpanded}
+                  onLegendItemPress={handleExpenseLegendItemPress}
+                  selectedCategory={selectedCategory}
                 />
-                {expenseChartExpanded && (
-                  <Animated.View style={[
-                    styles.chartContent,
-                    {
-                      opacity: expenseChartAnim,
-                      transform: [{ translateY: expenseChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                    },
-                  ]}>
-                    {selectedCategory !== 'all' && (
-                      <View style={styles.chartNavRow}>
-                        <TouchableOpacity
-                          onPress={handleBackToExpenseParent}
-                          style={styles.chartNavBack}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('back')}
-                        >
-                          <Icon name="arrow-left" size={20} color={colors.primary} />
-                        </TouchableOpacity>
-                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                          <SimplePicker
-                            value={selectedCategory}
-                            onValueChange={setSelectedCategory}
-                            items={categoryItems}
-                            colors={colors}
-                          />
-                        </View>
-                      </View>
-                    )}
-                    <ExpensePieChart
-                      colors={colors}
-                      t={t}
-                      loading={loading}
-                      chartData={chartData}
-                      selectedCurrency={selectedCurrency}
-                      onLegendItemPress={handleExpenseLegendItemPress}
-                      selectedCategory={selectedCategory}
-                    />
-                  </Animated.View>
-                )}
-              </View>
-            )}
+              </Animated.View>
+            </Animated.View>
           </View>
 
           {/* Balance History Card */}
@@ -671,15 +710,13 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  summaryCardContainer: {
+  summaryCardBase: {
     borderRadius: 14,
     borderWidth: 1,
-    flex: 1,
     overflow: 'hidden',
   },
   summaryCardsRow: {
     flexDirection: 'row',
-    gap: 8,
     marginBottom: 16,
   },
 });
