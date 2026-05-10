@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.103.1](https://github.com/heywood8/money-tracker/compare/penny-v0.103.0...penny-v0.103.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* hide expand chevron for leaf categories in pie chart legends ([#541](https://github.com/heywood8/money-tracker/issues/541)) ([d41282c](https://github.com/heywood8/money-tracker/commit/d41282c4d17fb4429e7741d0aa1c1518d2b879ad))
+
 ## [0.103.0](https://github.com/heywood8/money-tracker/compare/penny-v0.102.0...penny-v0.103.0) (2026-05-10)
 
 
