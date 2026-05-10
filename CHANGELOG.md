@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.100.1](https://github.com/heywood8/money-tracker/compare/penny-v0.100.0...penny-v0.100.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **settings:** fix import progress panel z-order and double-tap crash ([#534](https://github.com/heywood8/money-tracker/issues/534)) ([a92978e](https://github.com/heywood8/money-tracker/commit/a92978e318372e17ba440b194772a9e249380ac1))
+
 ## [0.100.0](https://github.com/heywood8/money-tracker/compare/penny-v0.99.0...penny-v0.100.0) (2026-05-10)
 
 
