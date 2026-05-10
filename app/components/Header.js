@@ -1,5 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
@@ -29,6 +29,22 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   console.debug('[Header] openSearch exists:', !!openSearch);
   console.debug('[Header] searchMode:', searchMode);
   const [dbVersion, setDbVersion] = useState(null);
+  const downloadArrowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!isDownloading) {
+      downloadArrowAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(downloadArrowAnim, { toValue: 5, duration: 400, useNativeDriver: true }),
+        Animated.timing(downloadArrowAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isDownloading, downloadArrowAnim]);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
   const { setSearchText, updateSearchFilters } = useOperationsActions();
@@ -137,7 +153,9 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                     accessibilityRole="progressbar"
                     testID="download-indicator"
                   >
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
+                      <Ionicons name="arrow-down-outline" size={20} color={colors.primary} />
+                    </Animated.View>
                     <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
                       {`${Math.round((downloadProgress ?? 0) * 100)}%`}
                     </Text>
