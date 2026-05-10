@@ -32,7 +32,7 @@ const ExpenseSummaryCard = ({
   return (
     <TouchableOpacity
       testID="expense-summary-card"
-      style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={styles.summaryCard}
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -82,8 +82,6 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
