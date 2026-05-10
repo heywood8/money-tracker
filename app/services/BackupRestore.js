@@ -1005,20 +1005,24 @@ const detectFileFormat = (filename) => {
  * Import backup from a file (auto-detects format)
  * @returns {Promise<Object>} Imported backup info
  */
-export const importBackup = async () => {
+export const pickImportFile = async () => {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: '*/*',
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled) {
+    throw new Error('Import cancelled');
+  }
+
+  return {
+    fileUri: result.assets[0].uri,
+    filename: result.assets[0].name || '',
+  };
+};
+
+export const importBackupFromFile = async ({ fileUri, filename }) => {
   try {
-    // Pick a document (allow all types)
-    const result = await DocumentPicker.getDocumentAsync({
-      type: '*/*',
-      copyToCacheDirectory: true,
-    });
-
-    if (result.canceled) {
-      throw new Error('Import cancelled');
-    }
-
-    const fileUri = result.assets[0].uri;
-    const filename = result.assets[0].name || '';
     console.log('Reading backup file:', fileUri, 'Name:', filename);
 
     // Detect format from filename
@@ -1041,7 +1045,6 @@ export const importBackup = async () => {
       break;
     case 'json':
     default: {
-      // Original JSON import
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
       const fileContent = await FileSystem.readAsStringAsync(fileUri);
       try {
@@ -1060,6 +1063,11 @@ export const importBackup = async () => {
     console.error('Failed to import backup:', error);
     throw error;
   }
+};
+
+export const importBackup = async () => {
+  const fileInfo = await pickImportFile();
+  return importBackupFromFile(fileInfo);
 };
 
 /**

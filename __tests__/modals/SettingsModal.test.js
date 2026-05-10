@@ -91,12 +91,14 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
 
 // Mock BackupRestore service
 const mockExportBackup = jest.fn(() => Promise.resolve());
-const mockImportBackup = jest.fn(() => Promise.resolve());
+const mockPickImportFile = jest.fn(() => Promise.resolve({ fileUri: '/mock/file.json', filename: 'backup.json' }));
+const mockImportBackupFromFile = jest.fn(() => Promise.resolve());
 const mockRestoreBackup = jest.fn(() => Promise.resolve());
 const mockCreateBackup = jest.fn(() => Promise.resolve({ version: 1, data: {} }));
 jest.mock('../../app/services/BackupRestore', () => ({
   exportBackup: (...args) => mockExportBackup(...args),
-  importBackup: (...args) => mockImportBackup(...args),
+  pickImportFile: (...args) => mockPickImportFile(...args),
+  importBackupFromFile: (...args) => mockImportBackupFromFile(...args),
   restoreBackup: (...args) => mockRestoreBackup(...args),
   createBackup: (...args) => mockCreateBackup(...args),
 }));
@@ -162,7 +164,8 @@ describe('SettingsModal Component', () => {
     mockCancelImport.mockClear();
     mockCompleteImport.mockClear();
     mockExportBackup.mockClear();
-    mockImportBackup.mockClear();
+    mockPickImportFile.mockClear();
+    mockImportBackupFromFile.mockClear();
     mockRestoreBackup.mockClear();
     mockCreateBackup.mockClear();
     mockGetStoredBackups.mockClear();
@@ -328,11 +331,12 @@ describe('SettingsModal Component', () => {
         fireEvent.press(getByTestId('confirm-import-file-btn'));
       });
 
-      expect(mockStartImport).toHaveBeenCalled();
+      expect(mockPickImportFile).toHaveBeenCalled();
       expect(mockCancelImport).not.toHaveBeenCalled();
 
       await waitFor(() => {
-        expect(mockImportBackup).toHaveBeenCalled();
+        expect(mockImportBackupFromFile).toHaveBeenCalledWith({ fileUri: '/mock/file.json', filename: 'backup.json' });
+        expect(mockStartImport).toHaveBeenCalled();
         expect(mockOnClose).toHaveBeenCalled();
       });
     });

@@ -9,7 +9,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, importBackup, restoreBackup, createBackup } from '../services/BackupRestore';
+import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup } from '../services/BackupRestore';
 import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
@@ -81,6 +81,7 @@ export default function SettingsModal({ visible, onClose }) {
   // Animation values
   const settingsAnim = useRef(new Animated.Value(0)).current;
   const subPanelAnim = useRef(new Animated.Value(0)).current;
+  const importPickInProgress = useRef(false);
   const toggleAnim = useRef(new Animated.Value(hideBalances ? 1 : 0)).current;
   const updateContentAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -292,25 +293,38 @@ export default function SettingsModal({ visible, onClose }) {
   // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
   const confirmImportBackup = useCallback(async () => {
-    startImport();
+    if (importPickInProgress.current) return;
+    importPickInProgress.current = true;
+
+    // Phase 1: pick file while settings modal is still open (cancel returns to source picker)
+    let fileInfo;
     try {
-      await importBackup();
-      closeSubPanel();
-      onClose();
-      completeImport();
+      fileInfo = await pickImportFile();
     } catch (error) {
-      cancelImport();
+      importPickInProgress.current = false;
       if (error.message === 'Import cancelled') {
         console.info('[Import] User cancelled file selection');
         setImportStep('source');
         return;
       }
+      console.error('Import file pick error:', error);
+      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
+      return;
+    }
+
+    importPickInProgress.current = false;
+
+    // Phase 2: file confirmed — close settings modal, then show progress panel on top
+    closeSubPanel();
+    onClose();
+    startImport();
+    try {
+      await importBackupFromFile(fileInfo);
+      completeImport();
+    } catch (error) {
+      cancelImport();
       console.error('Import backup error:', error);
-      showDialog(
-        t('error') || 'Error',
-        error.message || t('restore_error') || 'Failed to restore backup',
-        [{ text: 'OK' }],
-      );
+      showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
     }
   }, [closeSubPanel, onClose, startImport, completeImport, cancelImport, t, showDialog]);
 
