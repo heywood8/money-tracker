@@ -62,6 +62,16 @@ jest.mock('../../app/components/SimplePicker', () => {
   };
 });
 
+jest.mock('@quidone/react-native-wheel-picker', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: function MockWheelPicker() {
+      return React.createElement('WheelPicker', null);
+    },
+  };
+});
+
 jest.mock('../../assets/currencies.json', () => ({
   USD: { symbol: '$', decimal_digits: 2 },
   EUR: { symbol: '€', decimal_digits: 2 },

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, Text, Modal, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
@@ -47,6 +48,9 @@ const GraphsScreen = () => {
   const [topLevelIncomeCategories, setTopLevelIncomeCategories] = useState([]);
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedCategoryForTrend, setSelectedCategoryForTrend] = useState(null);
+
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -500,26 +504,34 @@ const GraphsScreen = () => {
           {/* Filters Row */}
           <View style={styles.filtersRow}>
             {/* Currency Picker */}
-            <View style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <SimplePicker
-                value={selectedCurrency}
-                onValueChange={setSelectedCurrency}
-                items={currencyItems}
-                colors={colors}
-                leftText={selectedCurrencySymbol}
-              />
-            </View>
+            <TouchableOpacity
+              style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setShowCurrencyPicker(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.periodPickerButton}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>{selectedCurrencySymbol}</Text>
+                <Text style={[styles.periodPickerText, { color: colors.text }]} numberOfLines={1}>
+                  {selectedCurrency}
+                </Text>
+                <Icon name="chevron-down" size={18} color={colors.mutedText} />
+              </View>
+            </TouchableOpacity>
 
             {/* Period Picker (Combined Month + Year) */}
-            <View style={[styles.periodPickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <SimplePicker
-                value={selectedPeriod}
-                onValueChange={setSelectedPeriod}
-                items={periodItems}
-                colors={colors}
-                leftIcon="calendar-month"
-              />
-            </View>
+            <TouchableOpacity
+              style={[styles.periodPickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setShowPeriodPicker(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.periodPickerButton}>
+                <Icon name="calendar-month" size={18} color={colors.primary} style={styles.periodPickerIcon} />
+                <Text style={[styles.periodPickerText, { color: colors.text }]} numberOfLines={1}>
+                  {periodItems.find(item => item.value === selectedPeriod)?.label ?? ''}
+                </Text>
+                <Icon name="chevron-down" size={18} color={colors.mutedText} />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Summary Cards Row — always-mounted, width/height driven by Animated */}
@@ -691,6 +703,72 @@ const GraphsScreen = () => {
         </View>
       </ScrollView>
 
+      <Modal
+        visible={showCurrencyPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCurrencyPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCurrencyPicker(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerModalSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.pickerModalTitle, { color: colors.text }]}>{t('select_currency')}</Text>
+              <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
+                <Text style={[styles.pickerModalDone, { color: colors.primary }]}>{t('done')}</Text>
+              </TouchableOpacity>
+            </View>
+            <WheelPicker
+              data={currencyItems}
+              value={selectedCurrency}
+              onValueChanged={({ item }) => setSelectedCurrency(item.value)}
+              itemHeight={48}
+              visibleItemCount={5}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+              enableScrollByTapOnItem
+              keyExtractor={(item, index) => `currency-${index}`}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showPeriodPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPeriodPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPeriodPicker(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerModalSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.pickerModalTitle, { color: colors.text }]}>{t('select_month')}</Text>
+              <TouchableOpacity onPress={() => setShowPeriodPicker(false)}>
+                <Text style={[styles.pickerModalDone, { color: colors.primary }]}>{t('done')}</Text>
+              </TouchableOpacity>
+            </View>
+            <WheelPicker
+              data={periodItems}
+              value={selectedPeriod}
+              onValueChanged={({ item }) => setSelectedPeriod(item.value)}
+              itemHeight={48}
+              visibleItemCount={5}
+              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+              enableScrollByTapOnItem
+              keyExtractor={(item, index) => `period-${index}`}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
     </View>
   );
 };
@@ -737,22 +815,68 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
+  currencySymbol: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginRight: 6,
+  },
   filtersRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+  },
+  periodPickerButton: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+  },
+  periodPickerIcon: {
+    marginRight: 6,
+  },
+  periodPickerText: {
+    flex: 1,
+    fontSize: 14,
   },
   periodPickerWrapper: {
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
     height: 44,
+    justifyContent: 'center',
     overflow: 'hidden',
+  },
+  pickerModalDone: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pickerModalHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  pickerModalOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  pickerModalSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 32,
+  },
+  pickerModalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   pickerWrapper: {
     borderRadius: 12,
     borderWidth: 1,
     height: 44,
+    justifyContent: 'center',
     minWidth: 110,
     overflow: 'hidden',
   },
@@ -770,6 +894,12 @@ const styles = StyleSheet.create({
   summaryCardsRow: {
     flexDirection: 'row',
     marginBottom: 16,
+  },
+  wheelItemText: {
+    fontSize: 16,
+  },
+  wheelOverlayItem: {
+    borderRadius: 8,
   },
 });
 
