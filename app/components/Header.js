@@ -40,7 +40,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
       Animated.sequence([
         Animated.timing(downloadArrowAnim, { toValue: 5, duration: 400, useNativeDriver: true }),
         Animated.timing(downloadArrowAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ])
+      ]),
     );
     loop.start();
     return () => loop.stop();
