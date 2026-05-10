@@ -92,29 +92,29 @@ describe('CustomLegend', () => {
   describe('Currency Formatting', () => {
     it('formats USD amounts with 2 decimal places', () => {
       const { getByText } = render(<CustomLegend {...defaultProps} currency="USD" />);
-      expect(getByText('100.00 USD')).toBeTruthy();
-      expect(getByText('50.00 USD')).toBeTruthy();
+      expect(getByText('$100.00')).toBeTruthy();
+      expect(getByText('$50.00')).toBeTruthy();
     });
 
     it('formats EUR amounts with 2 decimal places', () => {
       const { getByText } = render(<CustomLegend {...defaultProps} currency="EUR" />);
-      expect(getByText('100.00 EUR')).toBeTruthy();
+      expect(getByText('€100.00')).toBeTruthy();
     });
 
     it('formats JPY amounts with 0 decimal places', () => {
       const { getByText } = render(<CustomLegend {...defaultProps} currency="JPY" />);
-      expect(getByText('100 JPY')).toBeTruthy();
+      expect(getByText('¥100')).toBeTruthy();
     });
 
     it('formats BTC amounts with 8 decimal places', () => {
       const data = [{ name: 'Bitcoin', amount: 0.00001234, color: '#F7931A', categoryId: 'btc-1' }];
       const { getByText } = render(<CustomLegend {...defaultProps} data={data} currency="BTC" />);
-      expect(getByText('0.00001234 BTC')).toBeTruthy();
+      expect(getByText('₿0.00001234')).toBeTruthy();
     });
 
     it('defaults to 2 decimal places for unknown currency', () => {
       const { getByText } = render(<CustomLegend {...defaultProps} currency="XYZ" />);
-      expect(getByText('100.00 XYZ')).toBeTruthy();
+      expect(getByText('XYZ100.00')).toBeTruthy();
     });
   });
 
@@ -340,14 +340,14 @@ describe('CustomLegend', () => {
     it('handles very small amounts', () => {
       const smallData = [{ name: 'Tiny', amount: 0.01, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = render(<CustomLegend {...defaultProps} data={smallData} />);
-      expect(getByText('0.01 USD')).toBeTruthy();
+      expect(getByText('$0.01')).toBeTruthy();
       expect(getByText('100.0%')).toBeTruthy();
     });
 
     it('handles very large amounts', () => {
       const largeData = [{ name: 'Big', amount: 1000000, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = render(<CustomLegend {...defaultProps} data={largeData} />);
-      expect(getByText('1000000.00 USD')).toBeTruthy();
+      expect(getByText('$1.0M')).toBeTruthy();
     });
 
     it('handles items with missing optional fields', () => {
@@ -356,7 +356,7 @@ describe('CustomLegend', () => {
       ];
       const { getByText } = render(<CustomLegend {...defaultProps} data={minimalData} />);
       expect(getByText('Minimal')).toBeTruthy();
-      expect(getByText('100.00 USD')).toBeTruthy();
+      expect(getByText('$100.00')).toBeTruthy();
     });
 
     it('handles decimal percentages', () => {

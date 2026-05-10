@@ -7,8 +7,19 @@ import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 
 const formatCurrency = (amount, currency) => {
   const currencyInfo = currencies[currency];
+  const symbol = currencyInfo?.symbol ?? currency;
+  const value = parseFloat(amount);
+  if (value >= 1000000000) {
+    return `${symbol}${(value / 1000000000).toFixed(1)}B`;
+  }
+  if (value >= 1000000) {
+    return `${symbol}${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `${symbol}${(value / 1000).toFixed(1)}K`;
+  }
   const decimals = currencyInfo?.decimal_digits ?? 2;
-  return `${parseFloat(amount).toFixed(decimals)} ${currency}`;
+  return `${symbol}${value.toFixed(decimals)}`;
 };
 
 const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
