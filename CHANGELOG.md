@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.101.0](https://github.com/heywood8/money-tracker/compare/penny-v0.100.1...penny-v0.101.0) (2026-05-10)
+
+
+### Features
+
+* **graphs:** expand income and expense cards inline instead of modal ([#531](https://github.com/heywood8/money-tracker/issues/531)) ([28ba2bf](https://github.com/heywood8/money-tracker/commit/28ba2bfcc27668fa9a42b3e28e986c3e13a151f7))
+
 ## [0.100.1](https://github.com/heywood8/money-tracker/compare/penny-v0.100.0...penny-v0.100.1) (2026-05-10)
 
 
