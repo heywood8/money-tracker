@@ -15,7 +15,7 @@ import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { checkForAppUpdate } from '../services/AppUpdateService';
+import { checkForAppUpdate, listDownloadedApks, installApk } from '../services/AppUpdateService';
 import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
@@ -39,6 +39,11 @@ const LOG_LEVEL_COLORS = {
 };
 
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
+
+const formatApkDate = (modificationTime) => {
+  if (!modificationTime) return '';
+  return new Date(modificationTime * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
 const stripMarkdown = (md) => md
   .replace(/\r\n/g, '\n')
@@ -70,6 +75,7 @@ export default function SettingsModal({ visible, onClose }) {
   const [sheetsError, setSheetsError] = useState(null);
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [downloadedApks, setDownloadedApks] = useState([]);
   const [importStep, setImportStep] = useState('source'); // 'source' | 'local-list' | 'confirm-file' | 'confirm-local' | 'cloud'
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
@@ -163,6 +169,7 @@ export default function SettingsModal({ visible, onClose }) {
       setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
       setSheetsSuccessUrl(null);
       setSheetsError(null);
+      setDownloadedApks([]);
     });
   }, [settingsAnim, subPanelAnim]);
 
@@ -455,11 +462,30 @@ export default function SettingsModal({ visible, onClose }) {
     }
   }, []);
 
+  const loadDownloadedApks = useCallback(async () => {
+    const apks = await listDownloadedApks();
+    setDownloadedApks(apks);
+  }, []);
+
+  const handleInstallApk = useCallback(async (uri) => {
+    try {
+      await installApk(uri);
+    } catch (error) {
+      console.error('Failed to install APK:', error);
+      showDialog(
+        t('error') || 'Error',
+        t('update_download_failed') || 'Could not install the APK. The file may have been removed.',
+        [{ text: t('ok') || 'OK' }],
+      );
+    }
+  }, [showDialog, t]);
+
   const handleCheckForUpdates = useCallback(async () => {
     updateContentAnim.setValue(0);
     setUpdateResult(null);
     setIsCheckingUpdate(true);
     openSubPanel('update');
+    loadDownloadedApks();
     try {
       const result = await checkForAppUpdate();
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
@@ -483,7 +509,7 @@ export default function SettingsModal({ visible, onClose }) {
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [openSubPanel, updateContentAnim]);
+  }, [openSubPanel, updateContentAnim, loadDownloadedApks]);
 
   useEffect(() => {
     if (visible) {
@@ -1133,105 +1159,138 @@ export default function SettingsModal({ visible, onClose }) {
               )}
 
               {activeSubPanel === 'update' && (
-                isCheckingUpdate ? (
-                  <View style={styles.updateCheckingContainer}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={[styles.updateCheckingText, { color: colors.text }]}>
-                      {t('checking_for_updates') || 'Checking for available updates…'}
-                    </Text>
-                  </View>
-                ) : updateResult && (
-                  <Animated.View style={[styles.updateResultContainer, { opacity: updateContentAnim }]}>
-                    {updateResult.type === 'available' && (
-                      <>
-                        <View style={styles.updateAvailableHeader}>
-                          <Ionicons name="download-outline" size={36} color={colors.primary} />
-                          <View style={styles.updateVersionInfo}>
-                            <Text style={[styles.updateNewVersion, { color: colors.text }]}>
-                              v{updateResult.latestVersion}
-                            </Text>
-                            <Text style={[styles.updateCurrentVersion, { color: colors.mutedText }]}>
-                              {(t('update_from_version') || 'installed: v{currentVersion}')
-                                .replace('{currentVersion}', updateResult.currentVersion)}
-                            </Text>
+                <View style={styles.updatePanelWrapper}>
+                  {isCheckingUpdate ? (
+                    <View style={styles.updateCheckingContainer}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                      <Text style={[styles.updateCheckingText, { color: colors.text }]}>
+                        {t('checking_for_updates') || 'Checking for available updates…'}
+                      </Text>
+                    </View>
+                  ) : updateResult && (
+                    <Animated.View style={[styles.updateResultContainer, { opacity: updateContentAnim }]}>
+                      {updateResult.type === 'available' && (
+                        <>
+                          <View style={styles.updateAvailableHeader}>
+                            <Ionicons name="download-outline" size={36} color={colors.primary} />
+                            <View style={styles.updateVersionInfo}>
+                              <Text style={[styles.updateNewVersion, { color: colors.text }]}>
+                                v{updateResult.latestVersion}
+                              </Text>
+                              <Text style={[styles.updateCurrentVersion, { color: colors.mutedText }]}>
+                                {(t('update_from_version') || 'installed: v{currentVersion}')
+                                  .replace('{currentVersion}', updateResult.currentVersion)}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
-                        {updateResult.releaseNotes ? (
-                          <>
-                            <Divider style={styles.updateDivider} />
-                            <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
-                              {t('whats_new') || "What's new"}
-                            </Text>
-                            <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
-                              {updateResult.releaseNotes.map(({ version, notes }) => (
-                                <View key={version} style={styles.changelogSection}>
-                                  {updateResult.releaseNotes.length > 1 && (
-                                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                                      v{version}
+                          {updateResult.releaseNotes ? (
+                            <>
+                              <Divider style={styles.updateDivider} />
+                              <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
+                                {t('whats_new') || "What's new"}
+                              </Text>
+                              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
+                                {updateResult.releaseNotes.map(({ version, notes }) => (
+                                  <View key={version} style={styles.changelogSection}>
+                                    {updateResult.releaseNotes.length > 1 && (
+                                      <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                                        v{version}
+                                      </Text>
+                                    )}
+                                    <Text style={[styles.changelogText, { color: colors.text }]}>
+                                      {stripMarkdown(notes)}
                                     </Text>
-                                  )}
-                                  <Text style={[styles.changelogText, { color: colors.text }]}>
-                                    {stripMarkdown(notes)}
-                                  </Text>
-                                </View>
-                              ))}
-                            </ScrollView>
-                          </>
-                        ) : (
-                          <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
-                            {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-                          </Text>
-                        )}
-                        <View style={styles.updateActions}>
-                          {updateResult.releaseNotes && (
-                            <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
+                                  </View>
+                                ))}
+                              </ScrollView>
+                            </>
+                          ) : (
+                            <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
                               {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
                             </Text>
                           )}
-                          <TouchableRipple
-                            onPress={async () => {
-                              await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                              closeSubPanel();
-                              onClose();
-                              startDownload(updateResult.downloadUrl, {
-                                onError: () => {
-                                  showDialog(
-                                    t('error') || 'Error',
-                                    t('update_download_failed') || 'Could not download the update. Please try again.',
-                                    [{ text: t('ok') || 'OK' }],
-                                  );
-                                },
-                              });
-                            }}
-                            style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
-                          >
-                            <Text style={styles.importConfirmButtonText}>
-                              {t('update_now') || 'Update now'}
-                            </Text>
-                          </TouchableRipple>
+                          <View style={styles.updateActions}>
+                            {updateResult.releaseNotes && (
+                              <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
+                                {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
+                              </Text>
+                            )}
+                            <TouchableRipple
+                              onPress={async () => {
+                                await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+                                closeSubPanel();
+                                onClose();
+                                startDownload(updateResult.downloadUrl, {
+                                  onError: () => {
+                                    showDialog(
+                                      t('error') || 'Error',
+                                      t('update_download_failed') || 'Could not download the update. Please try again.',
+                                      [{ text: t('ok') || 'OK' }],
+                                    );
+                                  },
+                                });
+                              }}
+                              style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
+                            >
+                              <Text style={styles.importConfirmButtonText}>
+                                {t('update_now') || 'Update now'}
+                              </Text>
+                            </TouchableRipple>
+                          </View>
+                        </>
+                      )}
+                      {updateResult.type === 'up_to_date' && (
+                        <View style={styles.importConfirmContent}>
+                          <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
+                          <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                            {t('up_to_date') || 'You already have the latest version installed.'}
+                          </Text>
                         </View>
-                      </>
-                    )}
-                    {updateResult.type === 'up_to_date' && (
-                      <View style={styles.importConfirmContent}>
-                        <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
-                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                          {t('up_to_date') || 'You already have the latest version installed.'}
-                        </Text>
-                      </View>
-                    )}
-                    {updateResult.type === 'error' && (
-                      <View style={styles.importConfirmContent}>
-                        <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
-                        <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                          {updateResult.errorCode === 'releases_without_apks'
-                            ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
-                            : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
-                        </Text>
-                      </View>
-                    )}
-                  </Animated.View>
-                )
+                      )}
+                      {updateResult.type === 'error' && (
+                        <View style={styles.importConfirmContent}>
+                          <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
+                          <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                            {updateResult.errorCode === 'releases_without_apks'
+                              ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
+                              : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
+                          </Text>
+                        </View>
+                      )}
+                    </Animated.View>
+                  )}
+                  {downloadedApks.length > 0 && (
+                    <View style={styles.downloadedApksSection}>
+                      <Divider />
+                      <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
+                        {t('downloaded_apks') || 'Downloaded'}
+                      </Text>
+                      <FlatList
+                        horizontal
+                        data={downloadedApks}
+                        keyExtractor={(item) => item.uri}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity
+                            onPress={() => handleInstallApk(item.uri)}
+                            style={styles.apkChip}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Install version ${item.version || item.filename}`}
+                          >
+                            <Ionicons name="archive-outline" size={28} color={colors.primary} />
+                            <Text style={[styles.apkChipVersion, { color: colors.text }]}>
+                              {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+                            </Text>
+                            <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
+                              {formatApkDate(item.modificationTime)}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.apkListContent}
+                      />
+                    </View>
+                  )}
+                </View>
               )}
 
             </Animated.View>
@@ -1249,6 +1308,25 @@ const centeredModal = {
 };
 
 const styles = StyleSheet.create({
+  apkChip: {
+    alignItems: 'center',
+    gap: SPACING.xs,
+    minWidth: 72,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  apkChipDate: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  apkChipVersion: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  apkListContent: {
+    paddingHorizontal: SPACING.sm,
+  },
   backButton: {
     alignItems: 'center',
     height: 40,
@@ -1343,6 +1421,18 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: SPACING.xs,
+  },
+  downloadedApksSection: {
+    paddingBottom: SPACING.md,
+  },
+  downloadedApksTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: SPACING.md,
+    textTransform: 'uppercase',
   },
   filterChip: {
     borderRadius: 16,
@@ -1632,6 +1722,9 @@ const styles = StyleSheet.create({
   updateNewVersion: {
     fontSize: 20,
     fontWeight: '600',
+  },
+  updatePanelWrapper: {
+    flex: 1,
   },
   updateResultContainer: {
     flex: 1,

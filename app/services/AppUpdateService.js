@@ -235,6 +235,41 @@ export const cleanupOldApks = async (cacheDir = FileSystem.cacheDirectory, keep 
   console.log(`[AppUpdate] apk cleanup: ${apkFiles.length} apk(s) found, ${toDelete.length} deleted (limit: ${keep})`);
 };
 
+export const listDownloadedApks = async (cacheDir = FileSystem.cacheDirectory) => {
+  try {
+    const files = await FileSystem.readDirectoryAsync(cacheDir);
+    const apkFiles = files.filter((f) => f.toLowerCase().endsWith('.apk'));
+
+    const withInfo = await Promise.all(
+      apkFiles.map(async (name) => {
+        const uri = `${cacheDir}${name}`;
+        const info = await FileSystem.getInfoAsync(uri);
+        const match = name.match(/(\d+)\.(\d+)\.(\d+)/);
+        const version = match ? `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}` : null;
+        return {
+          uri,
+          filename: name,
+          version,
+          modificationTime: info.modificationTime || 0,
+        };
+      }),
+    );
+
+    return withInfo.sort((a, b) => b.modificationTime - a.modificationTime);
+  } catch {
+    return [];
+  }
+};
+
+export const installApk = async (localUri) => {
+  const contentUri = await FileSystem.getContentUriAsync(localUri);
+  await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+    data: contentUri,
+    flags: 1 | 268435456, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
+    type: 'application/vnd.android.package-archive',
+  });
+};
+
 export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
   const filename = (downloadUrl.split('/').pop().split('?')[0]) || 'penny-update.apk';
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
