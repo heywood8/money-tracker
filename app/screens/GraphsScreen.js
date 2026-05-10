@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform, Animated, Easing } from 'react-native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { TOP_CONTENT_SPACING } from '../styles/layout';
 import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -14,10 +15,15 @@ import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
-import ChartModal from '../components/graphs/ChartModal';
+import IncomePieChart from '../components/graphs/IncomePieChart';
+import ExpensePieChart from '../components/graphs/ExpensePieChart';
 import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
@@ -40,9 +46,11 @@ const GraphsScreen = () => {
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
 
-  // Modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
+  // Inline chart expansion state
+  const [incomeChartExpanded, setIncomeChartExpanded] = useState(false);
+  const [expenseChartExpanded, setExpenseChartExpanded] = useState(false);
+  const incomeChartAnim = useRef(new Animated.Value(0)).current;
+  const expenseChartAnim = useRef(new Animated.Value(0)).current;
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -349,20 +357,82 @@ const GraphsScreen = () => {
     return selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
   }, [selectedYear, selectedMonth]);
 
-  // Handlers for opening modals
-  const openExpenseModal = useCallback(() => {
-    setModalType('expense');
-    setModalVisible(true);
-  }, []);
+  // Shared category parent lookup
+  const getParentCategoryId = useCallback((categoryId) => {
+    if (categoryId === 'all') return 'all';
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return 'all';
+    if (category.parentId === null) return 'all';
+    return category.parentId;
+  }, [categories]);
 
-  const openIncomeModal = useCallback(() => {
-    setModalType('income');
-    setModalVisible(true);
-  }, []);
+  // Income chart inline expansion
+  const toggleIncomeChart = useCallback(() => {
+    if (incomeChartExpanded) {
+      Animated.timing(incomeChartAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setIncomeChartExpanded(false);
+      });
+    } else {
+      incomeChartAnim.setValue(0);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setIncomeChartExpanded(true);
+    }
+  }, [incomeChartExpanded, incomeChartAnim]);
 
-  const closeModal = useCallback(() => {
-    setModalVisible(false);
-  }, []);
+  useEffect(() => {
+    if (incomeChartExpanded) {
+      Animated.timing(incomeChartAnim, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [incomeChartExpanded, incomeChartAnim]);
+
+  const handleBackToIncomeParent = useCallback(() => {
+    setSelectedIncomeCategory(prev => getParentCategoryId(prev));
+  }, [getParentCategoryId]);
+
+  // Expense chart inline expansion
+  const toggleExpenseChart = useCallback(() => {
+    if (expenseChartExpanded) {
+      Animated.timing(expenseChartAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpenseChartExpanded(false);
+      });
+    } else {
+      expenseChartAnim.setValue(0);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setExpenseChartExpanded(true);
+    }
+  }, [expenseChartExpanded, expenseChartAnim]);
+
+  useEffect(() => {
+    if (expenseChartExpanded) {
+      Animated.timing(expenseChartAnim, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [expenseChartExpanded, expenseChartAnim]);
+
+  const handleBackToExpenseParent = useCallback(() => {
+    setSelectedCategory(prev => getParentCategoryId(prev));
+  }, [getParentCategoryId]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -393,24 +463,115 @@ const GraphsScreen = () => {
             </View>
           </View>
 
-          {/* Income and Expenses Summary Cards - side by side */}
+          {/* Summary Cards Row — one or both cards; expanded card goes full-width */}
           <View style={styles.summaryCardsRow}>
-            <IncomeSummaryCard
-              colors={colors}
-              t={t}
-              loadingIncome={loadingIncome}
-              totalIncome={totalIncome}
-              selectedCurrency={selectedCurrency}
-              onPress={openIncomeModal}
-            />
-            <ExpenseSummaryCard
-              colors={colors}
-              t={t}
-              loading={loading}
-              totalExpenses={totalExpenses}
-              selectedCurrency={selectedCurrency}
-              onPress={openExpenseModal}
-            />
+            {/* Income card + chart (hidden when expense is expanded) */}
+            {!expenseChartExpanded && (
+              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <IncomeSummaryCard
+                  colors={colors}
+                  t={t}
+                  loadingIncome={loadingIncome}
+                  totalIncome={totalIncome}
+                  selectedCurrency={selectedCurrency}
+                  onPress={toggleIncomeChart}
+                  expanded={incomeChartExpanded}
+                />
+                {incomeChartExpanded && (
+                  <Animated.View style={[
+                    styles.chartContent,
+                    {
+                      opacity: incomeChartAnim,
+                      transform: [{ translateY: incomeChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                    },
+                  ]}>
+                    {selectedIncomeCategory !== 'all' && (
+                      <View style={styles.chartNavRow}>
+                        <TouchableOpacity
+                          onPress={handleBackToIncomeParent}
+                          style={styles.chartNavBack}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('back')}
+                        >
+                          <Icon name="arrow-left" size={20} color={colors.primary} />
+                        </TouchableOpacity>
+                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <SimplePicker
+                            value={selectedIncomeCategory}
+                            onValueChange={setSelectedIncomeCategory}
+                            items={incomeCategoryItems}
+                            colors={colors}
+                          />
+                        </View>
+                      </View>
+                    )}
+                    <IncomePieChart
+                      colors={colors}
+                      t={t}
+                      loadingIncome={loadingIncome}
+                      incomeChartData={incomeChartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleIncomeLegendItemPress}
+                      selectedIncomeCategory={selectedIncomeCategory}
+                    />
+                  </Animated.View>
+                )}
+              </View>
+            )}
+
+            {/* Expense card + chart (hidden when income is expanded) */}
+            {!incomeChartExpanded && (
+              <View style={[styles.summaryCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <ExpenseSummaryCard
+                  colors={colors}
+                  t={t}
+                  loading={loading}
+                  totalExpenses={totalExpenses}
+                  selectedCurrency={selectedCurrency}
+                  onPress={toggleExpenseChart}
+                  expanded={expenseChartExpanded}
+                />
+                {expenseChartExpanded && (
+                  <Animated.View style={[
+                    styles.chartContent,
+                    {
+                      opacity: expenseChartAnim,
+                      transform: [{ translateY: expenseChartAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                    },
+                  ]}>
+                    {selectedCategory !== 'all' && (
+                      <View style={styles.chartNavRow}>
+                        <TouchableOpacity
+                          onPress={handleBackToExpenseParent}
+                          style={styles.chartNavBack}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('back')}
+                        >
+                          <Icon name="arrow-left" size={20} color={colors.primary} />
+                        </TouchableOpacity>
+                        <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <SimplePicker
+                            value={selectedCategory}
+                            onValueChange={setSelectedCategory}
+                            items={categoryItems}
+                            colors={colors}
+                          />
+                        </View>
+                      </View>
+                    )}
+                    <ExpensePieChart
+                      colors={colors}
+                      t={t}
+                      loading={loading}
+                      chartData={chartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleExpenseLegendItemPress}
+                      selectedCategory={selectedCategory}
+                    />
+                  </Animated.View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Balance History Card */}
@@ -452,34 +613,32 @@ const GraphsScreen = () => {
         </View>
       </ScrollView>
 
-      {/* Chart Modal */}
-      <ChartModal
-        visible={modalVisible}
-        modalType={modalType}
-        colors={colors}
-        t={t}
-        onClose={closeModal}
-        selectedCategory={selectedCategory}
-        selectedIncomeCategory={selectedIncomeCategory}
-        categoryItems={categoryItems}
-        incomeCategoryItems={incomeCategoryItems}
-        onCategoryChange={setSelectedCategory}
-        onIncomeCategoryChange={setSelectedIncomeCategory}
-        categories={categories}
-        loading={loading}
-        chartData={chartData}
-        selectedCurrency={selectedCurrency}
-        onExpenseLegendItemPress={handleExpenseLegendItemPress}
-        loadingIncome={loadingIncome}
-        incomeChartData={incomeChartData}
-        onIncomeLegendItemPress={handleIncomeLegendItemPress}
-      />
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  chartContent: {
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+  },
+  chartNavBack: {
+    marginRight: 8,
+    padding: 4,
+  },
+  chartNavPicker: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
+  },
+  chartNavRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+    marginTop: 4,
+  },
   container: {
     flex: 1,
   },
@@ -511,6 +670,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  summaryCardContainer: {
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    overflow: 'hidden',
   },
   summaryCardsRow: {
     flexDirection: 'row',

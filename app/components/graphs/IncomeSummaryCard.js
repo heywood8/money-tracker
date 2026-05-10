@@ -26,12 +26,13 @@ const IncomeSummaryCard = ({
   totalIncome,
   selectedCurrency,
   onPress,
+  expanded = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
     <TouchableOpacity
       testID="income-summary-card"
-      style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={styles.summaryCard}
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -46,6 +47,7 @@ const IncomeSummaryCard = ({
           {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
         </Text>
       </View>
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
     </TouchableOpacity>
   );
 };
@@ -57,6 +59,7 @@ IncomeSummaryCard.propTypes = {
   totalIncome: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
+  expanded: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
@@ -79,8 +82,6 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
