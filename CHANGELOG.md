@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.104.0](https://github.com/heywood8/money-tracker/compare/penny-v0.103.4...penny-v0.104.0) (2026-05-10)
+
+
+### Features
+
+* replace month and currency pickers on GraphsScreen with WheelPicker ([#550](https://github.com/heywood8/money-tracker/issues/550)) ([d0107d3](https://github.com/heywood8/money-tracker/commit/d0107d3e5970ef58a7af0e8ed5a1765da9f89b34))
+
 ## [0.103.4](https://github.com/heywood8/money-tracker/compare/penny-v0.103.3...penny-v0.103.4) (2026-05-10)
 
 
