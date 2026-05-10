@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
@@ -14,10 +15,15 @@ import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
+import IncomePieChart from '../components/graphs/IncomePieChart';
 import ChartModal from '../components/graphs/ChartModal';
 import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
 const GraphsScreen = () => {
   const { colors } = useThemeColors();
@@ -40,9 +46,12 @@ const GraphsScreen = () => {
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
 
-  // Modal state
+  // Modal state (expense chart only)
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState('expense'); // 'expense' or 'income'
+  const [modalType, setModalType] = useState('expense');
+
+  // Inline income chart expansion state
+  const [incomeChartExpanded, setIncomeChartExpanded] = useState(false);
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -355,14 +364,27 @@ const GraphsScreen = () => {
     setModalVisible(true);
   }, []);
 
-  const openIncomeModal = useCallback(() => {
-    setModalType('income');
-    setModalVisible(true);
-  }, []);
-
   const closeModal = useCallback(() => {
     setModalVisible(false);
   }, []);
+
+  // Income chart inline expansion
+  const toggleIncomeChart = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIncomeChartExpanded(prev => !prev);
+  }, []);
+
+  const getParentCategoryId = useCallback((categoryId) => {
+    if (categoryId === 'all') return 'all';
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return 'all';
+    if (category.parentId === null) return 'all';
+    return category.parentId;
+  }, [categories]);
+
+  const handleBackToIncomeParent = useCallback(() => {
+    setSelectedIncomeCategory(prev => getParentCategoryId(prev));
+  }, [getParentCategoryId]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -401,7 +423,8 @@ const GraphsScreen = () => {
               loadingIncome={loadingIncome}
               totalIncome={totalIncome}
               selectedCurrency={selectedCurrency}
-              onPress={openIncomeModal}
+              onPress={toggleIncomeChart}
+              expanded={incomeChartExpanded}
             />
             <ExpenseSummaryCard
               colors={colors}
@@ -412,6 +435,41 @@ const GraphsScreen = () => {
               onPress={openExpenseModal}
             />
           </View>
+
+          {/* Inline Income Pie Chart (expands on card tap) */}
+          {incomeChartExpanded && (
+            <View style={[styles.incomeChartPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {selectedIncomeCategory !== 'all' && (
+                <View style={styles.incomePanelHeader}>
+                  <TouchableOpacity
+                    onPress={handleBackToIncomeParent}
+                    style={styles.incomePanelBackButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back')}
+                  >
+                    <Icon name="arrow-left" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  <View style={[styles.incomePanelPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedIncomeCategory}
+                      onValueChange={setSelectedIncomeCategory}
+                      items={incomeCategoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                </View>
+              )}
+              <IncomePieChart
+                colors={colors}
+                t={t}
+                loadingIncome={loadingIncome}
+                incomeChartData={incomeChartData}
+                selectedCurrency={selectedCurrency}
+                onLegendItemPress={handleIncomeLegendItemPress}
+                selectedIncomeCategory={selectedIncomeCategory}
+              />
+            </View>
+          )}
 
           {/* Balance History Card */}
           {selectedMonth !== null && selectedAccount && (
@@ -516,6 +574,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+  },
+  incomeChartPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 12,
+  },
+  incomePanelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  incomePanelBackButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  incomePanelPicker: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
   },
 });
 

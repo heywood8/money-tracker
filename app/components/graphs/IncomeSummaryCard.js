@@ -26,6 +26,7 @@ const IncomeSummaryCard = ({
   totalIncome,
   selectedCurrency,
   onPress,
+  expanded,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
@@ -46,6 +47,7 @@ const IncomeSummaryCard = ({
           {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
         </Text>
       </View>
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
     </TouchableOpacity>
   );
 };
@@ -57,6 +59,11 @@ IncomeSummaryCard.propTypes = {
   totalIncome: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
+  expanded: PropTypes.bool,
+};
+
+IncomeSummaryCard.defaultProps = {
+  expanded: false,
 };
 
 const styles = StyleSheet.create({
