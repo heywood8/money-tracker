@@ -26,6 +26,7 @@ const ExpenseSummaryCard = ({
   totalExpenses,
   selectedCurrency,
   onPress,
+  expanded,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
@@ -46,6 +47,7 @@ const ExpenseSummaryCard = ({
           {hideBalances ? '••••' : (loading ? '...' : formatCurrency(totalExpenses, selectedCurrency))}
         </Text>
       </View>
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
     </TouchableOpacity>
   );
 };
@@ -57,6 +59,11 @@ ExpenseSummaryCard.propTypes = {
   totalExpenses: PropTypes.number.isRequired,
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
+  expanded: PropTypes.bool,
+};
+
+ExpenseSummaryCard.defaultProps = {
+  expanded: false,
 };
 
 const styles = StyleSheet.create({

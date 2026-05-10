@@ -4,7 +4,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING } from '../styles/layout';
+import { TOP_CONTENT_SPACING } from '../styles/layout';
 import { getAvailableMonths } from '../services/OperationsDB';
 import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -16,7 +16,7 @@ import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
 import IncomeSummaryCard from '../components/graphs/IncomeSummaryCard';
 import IncomePieChart from '../components/graphs/IncomePieChart';
-import ChartModal from '../components/graphs/ChartModal';
+import ExpensePieChart from '../components/graphs/ExpensePieChart';
 import useExpenseData from '../hooks/useExpenseData';
 import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
@@ -46,12 +46,9 @@ const GraphsScreen = () => {
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
 
-  // Modal state (expense chart only)
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState('expense');
-
-  // Inline income chart expansion state
+  // Inline chart expansion state
   const [incomeChartExpanded, setIncomeChartExpanded] = useState(false);
+  const [expenseChartExpanded, setExpenseChartExpanded] = useState(false);
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -358,22 +355,7 @@ const GraphsScreen = () => {
     return selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
   }, [selectedYear, selectedMonth]);
 
-  // Handlers for opening modals
-  const openExpenseModal = useCallback(() => {
-    setModalType('expense');
-    setModalVisible(true);
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setModalVisible(false);
-  }, []);
-
-  // Income chart inline expansion
-  const toggleIncomeChart = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIncomeChartExpanded(prev => !prev);
-  }, []);
-
+  // Shared category parent lookup
   const getParentCategoryId = useCallback((categoryId) => {
     if (categoryId === 'all') return 'all';
     const category = categories.find(cat => cat.id === categoryId);
@@ -382,8 +364,24 @@ const GraphsScreen = () => {
     return category.parentId;
   }, [categories]);
 
+  // Income chart inline expansion
+  const toggleIncomeChart = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIncomeChartExpanded(prev => !prev);
+  }, []);
+
   const handleBackToIncomeParent = useCallback(() => {
     setSelectedIncomeCategory(prev => getParentCategoryId(prev));
+  }, [getParentCategoryId]);
+
+  // Expense chart inline expansion
+  const toggleExpenseChart = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpenseChartExpanded(prev => !prev);
+  }, []);
+
+  const handleBackToExpenseParent = useCallback(() => {
+    setSelectedCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
   return (
@@ -432,7 +430,8 @@ const GraphsScreen = () => {
               loading={loading}
               totalExpenses={totalExpenses}
               selectedCurrency={selectedCurrency}
-              onPress={openExpenseModal}
+              onPress={toggleExpenseChart}
+              expanded={expenseChartExpanded}
             />
           </View>
 
@@ -467,6 +466,41 @@ const GraphsScreen = () => {
                 selectedCurrency={selectedCurrency}
                 onLegendItemPress={handleIncomeLegendItemPress}
                 selectedIncomeCategory={selectedIncomeCategory}
+              />
+            </View>
+          )}
+
+          {/* Inline Expense Pie Chart (expands on card tap) */}
+          {expenseChartExpanded && (
+            <View style={[styles.expenseChartPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {selectedCategory !== 'all' && (
+                <View style={styles.expensePanelHeader}>
+                  <TouchableOpacity
+                    onPress={handleBackToExpenseParent}
+                    style={styles.expensePanelBackButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('back')}
+                  >
+                    <Icon name="arrow-left" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  <View style={[styles.expensePanelPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                      items={categoryItems}
+                      colors={colors}
+                    />
+                  </View>
+                </View>
+              )}
+              <ExpensePieChart
+                colors={colors}
+                t={t}
+                loading={loading}
+                chartData={chartData}
+                selectedCurrency={selectedCurrency}
+                onLegendItemPress={handleExpenseLegendItemPress}
+                selectedCategory={selectedCategory}
               />
             </View>
           )}
@@ -509,29 +543,6 @@ const GraphsScreen = () => {
           />
         </View>
       </ScrollView>
-
-      {/* Chart Modal */}
-      <ChartModal
-        visible={modalVisible}
-        modalType={modalType}
-        colors={colors}
-        t={t}
-        onClose={closeModal}
-        selectedCategory={selectedCategory}
-        selectedIncomeCategory={selectedIncomeCategory}
-        categoryItems={categoryItems}
-        incomeCategoryItems={incomeCategoryItems}
-        onCategoryChange={setSelectedCategory}
-        onIncomeCategoryChange={setSelectedIncomeCategory}
-        categories={categories}
-        loading={loading}
-        chartData={chartData}
-        selectedCurrency={selectedCurrency}
-        onExpenseLegendItemPress={handleExpenseLegendItemPress}
-        loadingIncome={loadingIncome}
-        incomeChartData={incomeChartData}
-        onIncomeLegendItemPress={handleIncomeLegendItemPress}
-      />
 
     </View>
   );
@@ -591,6 +602,28 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   incomePanelPicker: {
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 40,
+    overflow: 'hidden',
+  },
+  expenseChartPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 12,
+  },
+  expensePanelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  expensePanelBackButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  expensePanelPicker: {
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
