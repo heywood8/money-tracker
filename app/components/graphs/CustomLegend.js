@@ -19,8 +19,9 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
     <View style={styles.legendContainer}>
       {data.map((item, index) => {
         const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
-        const ItemWrapper = isClickable && item.categoryId ? TouchableOpacity : View;
-        const wrapperProps = isClickable && item.categoryId ? {
+        const isExpandable = isClickable && item.categoryId && item.hasChildren;
+        const ItemWrapper = isExpandable ? TouchableOpacity : View;
+        const wrapperProps = isExpandable ? {
           onPress: () => onItemPress(item.categoryId),
           activeOpacity: 0.7,
           accessibilityRole: 'button',
@@ -34,7 +35,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             style={[
               styles.legendItem,
               { borderBottomColor: colors.border },
-              isClickable && item.categoryId && styles.legendItemClickable,
+              isExpandable && styles.legendItemClickable,
             ]}
             {...wrapperProps}
           >
@@ -52,7 +53,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
-              {isClickable && item.categoryId && (
+              {isExpandable && (
                 <Icon
                   name="chevron-right"
                   size={16}
@@ -93,6 +94,7 @@ CustomLegend.propTypes = {
       color: PropTypes.string,
       icon: PropTypes.string,
       categoryId: PropTypes.string,
+      hasChildren: PropTypes.bool,
     }),
   ).isRequired,
   currency: PropTypes.string.isRequired,

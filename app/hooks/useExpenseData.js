@@ -160,6 +160,7 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
 
       // Transform aggregated data for pie chart
       const data = Object.values(aggregatedSpending).map((item, index) => {
+        const hasChildren = categories.some(cat => cat.parentId === item.category.id);
         return {
           name: item.category.name,
           amount: item.total,
@@ -167,7 +168,8 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
           legendFontColor: colors.text,
           legendFontSize: 13,
           icon: item.category.icon || null,
-          categoryId: item.category.id, // For clickable legend navigation
+          categoryId: item.category.id,
+          hasChildren,
         };
       });
 
