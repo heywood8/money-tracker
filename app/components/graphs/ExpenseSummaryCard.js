@@ -27,28 +27,48 @@ const ExpenseSummaryCard = ({
   selectedCurrency,
   onPress,
   expanded = false,
+  categoryName = null,
+  onBack = null,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
-    <TouchableOpacity
-      testID="expense-summary-card"
-      style={styles.summaryCard}
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={t('expenses_by_category')}
-    >
-      <View style={styles.iconBadge}>
-        <Icon name="arrow-top-right" size={16} color="#d93025" />
-      </View>
-      <View style={styles.textContent}>
-        <Text style={[styles.label, { color: colors.mutedText }]}>{t('expense').toUpperCase()}</Text>
-        <Text style={[styles.amount, { color: colors.text }]}>
-          {hideBalances ? '••••' : (loading ? '...' : formatCurrency(totalExpenses, selectedCurrency))}
-        </Text>
-      </View>
-      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-    </TouchableOpacity>
+    <View style={styles.summaryCard}>
+      {categoryName && onBack && (
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon name="arrow-left" size={18} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        testID="expense-summary-card"
+        style={styles.summaryCardInner}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={t('expenses_by_category')}
+      >
+        <View style={styles.iconBadge}>
+          <Icon name="arrow-top-right" size={16} color="#d93025" />
+        </View>
+        <View style={styles.textContent}>
+          <Text style={[styles.label, { color: colors.mutedText }]}>{t('expense').toUpperCase()}</Text>
+          <Text style={[styles.amount, { color: colors.text }]}>
+            {hideBalances ? '••••' : (loading ? '...' : formatCurrency(totalExpenses, selectedCurrency))}
+          </Text>
+        </View>
+        {categoryName && (
+          <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+            {categoryName}
+          </Text>
+        )}
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
+      </TouchableOpacity>
+    </View>
   );
 };
 
@@ -60,6 +80,8 @@ ExpenseSummaryCard.propTypes = {
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
+  categoryName: PropTypes.string,
+  onBack: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -68,6 +90,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.3,
     marginTop: 1,
+  },
+  backButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 10,
+    paddingRight: 4,
+  },
+  categoryName: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    marginRight: 4,
+    maxWidth: 80,
   },
   iconBadge: {
     alignItems: 'center',
@@ -81,6 +116,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   summaryCard: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+  },
+  summaryCardInner: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
