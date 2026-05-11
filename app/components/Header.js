@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
@@ -7,9 +7,6 @@ import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { getDatabaseVersion } from '../services/db';
-import { appEvents } from '../services/eventEmitter';
-import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
 import FilterBadge from './search/FilterBadge';
@@ -28,7 +25,6 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters } = useSearch();
   console.debug('[Header] openSearch exists:', !!openSearch);
   console.debug('[Header] searchMode:', searchMode);
-  const [dbVersion, setDbVersion] = useState(null);
   const downloadArrowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -67,33 +63,6 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
     };
     updateSearchFilters(clearValues[groupKey]);
   }, [updateSearchFilters]);
-
-  const fetchDbVersion = useCallback(async () => {
-    try {
-      const version = await getDatabaseVersion();
-      setDbVersion(version);
-    } catch (error) {
-      console.error('Failed to fetch database version:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDbVersion();
-
-    // Listen for import completion to refresh DB version
-    const handleImportProgress = (event) => {
-      if (event.stepId === 'complete' && event.status === 'completed') {
-        console.debug('Import completed, refreshing DB version...');
-        fetchDbVersion();
-      }
-    };
-
-    appEvents.on(IMPORT_PROGRESS_EVENT, handleImportProgress);
-
-    return () => {
-      appEvents.off(IMPORT_PROGRESS_EVENT, handleImportProgress);
-    };
-  }, [fetchDbVersion]);
 
   const toggleTheme = () => {
     const newTheme = colorScheme === 'dark' ? 'light' : 'dark';
@@ -136,12 +105,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
               style={styles.icon}
               accessibilityLabel="Penny app icon"
             />
-            <View>
-              <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
-              <Text style={[styles.version, { color: colors.mutedText }]}>
-                v{APP_VERSION} | DB v{dbVersion || '?'}
-              </Text>
-            </View>
+            <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
           </View>
           <View style={styles.buttonContainer}>
             {rightContent || (
@@ -295,9 +259,5 @@ const styles = StyleSheet.create({
   titleContainer: {
     alignItems: 'center',
     flexDirection: 'row',
-  },
-  version: {
-    fontSize: 10,
-    marginTop: 2,
   },
 });

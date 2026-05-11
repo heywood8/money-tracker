@@ -811,7 +811,12 @@ export default function SettingsModal({ visible, onClose }) {
                     {t('check_updates') || 'Check for updates'}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                <View style={styles.updateRowRight}>
+                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
+                    {`v${require('../../package.json').version}`}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                </View>
               </View>
             </TouchableRipple>
 
@@ -1306,18 +1311,6 @@ export default function SettingsModal({ visible, onClose }) {
                     <Animated.View style={[styles.updateResultContainer, { opacity: updateContentAnim }]}>
                       {updateResult.type === 'available' && (
                         <>
-                          <View style={styles.updateAvailableHeader}>
-                            <Ionicons name="download-outline" size={36} color={colors.primary} />
-                            <View style={styles.updateVersionInfo}>
-                              <Text style={[styles.updateNewVersion, { color: colors.text }]}>
-                                v{updateResult.latestVersion}
-                              </Text>
-                              <Text style={[styles.updateCurrentVersion, { color: colors.mutedText }]}>
-                                {(t('update_from_version') || 'installed: v{currentVersion}')
-                                  .replace('{currentVersion}', updateResult.currentVersion)}
-                              </Text>
-                            </View>
-                          </View>
                           {updateResult.releaseNotes ? (
                             <>
                               <Divider style={styles.updateDivider} />
@@ -1879,12 +1872,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  updateAvailableHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
   updateBottomRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -1919,16 +1906,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
   },
-  updateCurrentVersion: {
-    fontSize: 13,
-    marginTop: 2,
-  },
   updateDivider: {
     marginTop: SPACING.sm,
-  },
-  updateNewVersion: {
-    fontSize: 20,
-    fontWeight: '600',
   },
   updatePanelWrapper: {
     flex: 1,
@@ -1938,13 +1917,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
   },
-  updateVersionInfo: {
-    flex: 1,
+  updateRowRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   updateVersionText: {
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  versionLabel: {
+    fontSize: 13,
   },
 });
 
