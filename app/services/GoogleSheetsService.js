@@ -238,14 +238,14 @@ export const importFromSheets = async (accessToken, onProgress) => {
   // Build lookup maps: id->id (direct) and name->id (fallback)
   const accountIdMap = new Map();
   accountRows.forEach(a => {
-    if (a.id !== '' && a.id != null) accountIdMap.set(String(a.id), String(a.id));
     if (a.name) accountIdMap.set(a.name, String(a.id));
+    if (a.id !== '' && a.id != null) accountIdMap.set(String(a.id), String(a.id));
   });
 
   const categoryIdMap = new Map();
   categoryRows.forEach(c => {
-    if (c.id !== '' && c.id != null) categoryIdMap.set(String(c.id), String(c.id));
     if (c.name) categoryIdMap.set(c.name, String(c.id));
+    if (c.id !== '' && c.id != null) categoryIdMap.set(String(c.id), String(c.id));
   });
 
   // Resolve a foreign key: prefer the ID column value, fall back to name column
