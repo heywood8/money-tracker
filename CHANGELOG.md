@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.111.0](https://github.com/heywood8/money-tracker/compare/penny-v0.110.1...penny-v0.111.0) (2026-05-11)
+
+
+### Features
+
+* **ui:** move version display from header to update button in Settings ([#577](https://github.com/heywood8/money-tracker/issues/577)) ([b2acae5](https://github.com/heywood8/money-tracker/commit/b2acae51457833c44cc67f2d075c0cdabf89aeff))
+
 ## [0.110.1](https://github.com/heywood8/money-tracker/compare/penny-v0.110.0...penny-v0.110.1) (2026-05-11)
 
 
