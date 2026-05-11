@@ -23,7 +23,7 @@ import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const CARD_HEADER_HEIGHT = 56;
-const CHART_HEIGHT = 300;
+const MAX_CHART_HEIGHT = 500;
 const CARD_GAP = 8;
 
 const GraphsScreen = () => {
@@ -68,6 +68,11 @@ const GraphsScreen = () => {
   // Dimension values updated on orientation change
   const halfWidthSV = useSharedValue(halfWidth);
   const rowWidthSV = useSharedValue(rowWidth);
+  // Dynamic chart heights — updated by onContentSizeChange on each chart's ScrollView
+  const expenseChartHeightSV = useSharedValue(0);
+  const incomeChartHeightSV = useSharedValue(0);
+  const expenseHeightInitialized = useRef(false);
+  const incomeHeightInitialized = useRef(false);
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -454,10 +459,11 @@ const GraphsScreen = () => {
     const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
+    const chartH = incomeChartHeightSV.value;
     if (ev === 1) {
       return {
         width: interpolate(wp, [0, 1], [hw, rw]),
-        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + chartH]),
         opacity: 1,
       };
     }
@@ -477,10 +483,11 @@ const GraphsScreen = () => {
     const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
+    const chartH = expenseChartHeightSV.value;
     if (ev === 2) {
       return {
         width: interpolate(wp, [0, 1], [hw, rw]),
-        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + chartH]),
         opacity: 1,
       };
     }
@@ -542,6 +549,15 @@ const GraphsScreen = () => {
                   contentContainerStyle={styles.chartScrollContent}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => {
+                    const target = Math.min(h, MAX_CHART_HEIGHT);
+                    if (!incomeHeightInitialized.current) {
+                      incomeChartHeightSV.value = target;
+                      incomeHeightInitialized.current = true;
+                    } else {
+                      incomeChartHeightSV.value = withTiming(target, { duration: 280, easing: Easing.out(Easing.cubic) });
+                    }
+                  }}
                 >
                   <IncomePieChart
                     colors={colors}
@@ -589,6 +605,15 @@ const GraphsScreen = () => {
                   contentContainerStyle={styles.chartScrollContent}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => {
+                    const target = Math.min(h, MAX_CHART_HEIGHT);
+                    if (!expenseHeightInitialized.current) {
+                      expenseChartHeightSV.value = target;
+                      expenseHeightInitialized.current = true;
+                    } else {
+                      expenseChartHeightSV.value = withTiming(target, { duration: 280, easing: Easing.out(Easing.cubic) });
+                    }
+                  }}
                 >
                   <ExpensePieChart
                     colors={colors}
