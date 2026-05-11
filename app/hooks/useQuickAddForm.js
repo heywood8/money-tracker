@@ -158,12 +158,15 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
       .filter(acc => acc && acc.id !== sourceId)
       .slice(0, 8);
 
-    if (fromHistory.length > 0) return fromHistory;
+    if (fromHistory.length >= 8) return fromHistory;
 
-    // Fallback: first 8 visible accounts excluding current source
-    return visibleAccounts
-      .filter(acc => acc.id !== sourceId)
-      .slice(0, 8);
+    // Fill remaining slots from visible accounts excluding source and already-included
+    const historyIds = new Set(fromHistory.map(acc => acc.id));
+    const fillers = visibleAccounts
+      .filter(acc => acc.id !== sourceId && !historyIds.has(acc.id))
+      .slice(0, 8 - fromHistory.length);
+
+    return [...fromHistory, ...fillers];
   }, [topTransferTargets, accounts, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
 
   // Reset form but keep account and type
