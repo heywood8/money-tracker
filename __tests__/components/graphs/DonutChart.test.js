@@ -76,7 +76,7 @@ describe('computeSegments', () => {
     expect(segs[0].dashOffset).toBe(0);
   });
 
-  it('icon at top (midAngle≈0) maps to x≈CENTER, y≈CENTER−RADIUS', () => {
+  it('icon position math: full-circle segment midAngle=π maps to bottom (x≈CENTER, y≈CENTER+RADIUS)', () => {
     const segs = computeSegments([{ amount: 1, color: '#f00', icon: 'food' }]);
     // midAngle = (0 + CIRCUMFERENCE/2) / RADIUS = π
     expect(segs[0].iconX).toBeCloseTo(CENTER, 1);         // sin(π) ≈ 0
@@ -102,9 +102,9 @@ describe('DonutChart', () => {
   });
 
   it('renders icons for segments at or above threshold', () => {
-    const { queryByTestId } = render(<DonutChart data={mockData} />);
-    expect(queryByTestId('icon-food')).not.toBeNull();
-    expect(queryByTestId('icon-car')).not.toBeNull();
+    const { queryAllByTestId } = render(<DonutChart data={mockData} />);
+    expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
+    expect(queryAllByTestId('icon-car').length).toBeGreaterThan(0);
   });
 
   it('does not render icon for segment below threshold', () => {
@@ -125,7 +125,7 @@ describe('DonutChart', () => {
 
   it('renders a single icon for a single above-threshold item', () => {
     const data = [{ amount: 100, color: '#7c83fd', icon: 'food' }];
-    const { queryByTestId } = render(<DonutChart data={data} />);
-    expect(queryByTestId('icon-food')).not.toBeNull();
+    const { queryAllByTestId } = render(<DonutChart data={data} />);
+    expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
   });
 });

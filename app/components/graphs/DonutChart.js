@@ -62,6 +62,7 @@ const DonutChart = ({ data }) => {
         .map((seg, i) => (
           <View
             key={i}
+            testID={`icon-${seg.icon}`}
             style={[
               styles.iconWrapper,
               {
