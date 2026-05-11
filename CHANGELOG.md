@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.109.1](https://github.com/heywood8/money-tracker/compare/penny-v0.109.0...penny-v0.109.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **graphs:** guard WheelPicker against empty data to prevent launch crash ([#570](https://github.com/heywood8/money-tracker/issues/570)) ([c1daee1](https://github.com/heywood8/money-tracker/commit/c1daee13b33efcfb927cdfdf56f86b91d63cc650))
+
 ## [0.109.0](https://github.com/heywood8/money-tracker/compare/penny-v0.108.0...penny-v0.109.0) (2026-05-11)
 
 
