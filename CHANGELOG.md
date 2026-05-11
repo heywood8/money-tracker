@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.108.0](https://github.com/heywood8/money-tracker/compare/penny-v0.107.2...penny-v0.108.0) (2026-05-11)
+
+
+### Features
+
+* **graphs:** floating wheel FABs for currency and period selection ([#566](https://github.com/heywood8/money-tracker/issues/566)) ([bcff60e](https://github.com/heywood8/money-tracker/commit/bcff60ef58e34ea05e85f854c70d83e520f209d8))
+
 ## [0.107.2](https://github.com/heywood8/money-tracker/compare/penny-v0.107.1...penny-v0.107.2) (2026-05-11)
 
 
