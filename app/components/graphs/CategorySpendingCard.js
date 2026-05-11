@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   card: {
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 16,
     padding: 16,

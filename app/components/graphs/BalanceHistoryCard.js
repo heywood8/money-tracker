@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   balanceHistoryCard: {
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 16,
     overflow: 'hidden',
