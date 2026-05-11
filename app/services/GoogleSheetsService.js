@@ -1,5 +1,6 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
+import { queryAll } from './db';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -348,6 +349,9 @@ export const importFromSheets = async (accessToken, onProgress) => {
     created_at: now,
   }));
 
+  // Preserve current app preferences (language, theme, etc.) so they survive the restore
+  const app_metadata = await queryAll('SELECT * FROM app_metadata WHERE key != ?', ['db_version']).catch(() => []);
+
   report('parse', 'completed');
 
   return {
@@ -359,7 +363,7 @@ export const importFromSheets = async (accessToken, onProgress) => {
       categories,
       operations,
       budgets,
-      app_metadata: [],
+      app_metadata,
       balance_history,
       planned_operations,
     },
