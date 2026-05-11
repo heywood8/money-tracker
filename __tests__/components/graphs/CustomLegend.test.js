@@ -158,8 +158,8 @@ describe('CustomLegend', () => {
   describe('Icons', () => {
     it('renders icons when provided', () => {
       const { getByTestId } = render(<CustomLegend {...defaultProps} />);
-      expect(getByTestId('icon-food')).toBeTruthy();
-      expect(getByTestId('icon-car')).toBeTruthy();
+      expect(getByTestId('legend-icon-food')).toBeTruthy();
+      expect(getByTestId('legend-icon-car')).toBeTruthy();
     });
 
     it('does not render icons when not provided', () => {

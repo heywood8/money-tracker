@@ -58,7 +58,7 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
                   name={item.icon}
                   size={18}
                   color={colors.text}
-                  style={styles.legendIcon}
+                  testID={`legend-icon-${item.icon}`}
                 />
               )}
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
@@ -145,9 +145,6 @@ const styles = StyleSheet.create({
   },
   legendContainer: {
     marginTop: 16,
-  },
-  legendIcon: {
-    marginLeft: 4,
   },
   legendItem: {
     alignItems: 'center',
