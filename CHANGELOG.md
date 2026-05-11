@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.107.1](https://github.com/heywood8/money-tracker/compare/penny-v0.107.0...penny-v0.107.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* transfer target accounts not showing all available options in QuickAdd ([#561](https://github.com/heywood8/money-tracker/issues/561)) ([6788fb6](https://github.com/heywood8/money-tracker/commit/6788fb66a0bbb86244214c2fa6bbfd67e204e88c))
+
 ## [0.107.0](https://github.com/heywood8/money-tracker/compare/penny-v0.106.0...penny-v0.107.0) (2026-05-11)
 
 
