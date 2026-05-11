@@ -689,34 +689,38 @@ const GraphsScreen = () => {
       </ScrollView>
 
       {/* Floating currency wheel FAB */}
-      <View style={[styles.fabWheel, styles.fabWheelLeft, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-        <WheelPicker
-          data={currencyItems}
-          value={selectedCurrency}
-          onValueChanged={({ item }) => setSelectedCurrency(item.value)}
-          itemHeight={28}
-          visibleItemCount={3}
-          itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-          overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-          enableScrollByTapOnItem
-          keyExtractor={(item, index) => `currency-${index}`}
-        />
-      </View>
+      {currencyItems.length > 0 && (
+        <View style={[styles.fabWheel, styles.fabWheelLeft, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+          <WheelPicker
+            data={currencyItems}
+            value={selectedCurrency}
+            onValueChanged={({ item }) => item && setSelectedCurrency(item.value)}
+            itemHeight={28}
+            visibleItemCount={3}
+            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+            enableScrollByTapOnItem
+            keyExtractor={(item, index) => `currency-${index}`}
+          />
+        </View>
+      )}
 
       {/* Floating period wheel FAB */}
-      <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
-        <WheelPicker
-          data={periodItems}
-          value={selectedPeriod}
-          onValueChanged={({ item }) => setSelectedPeriod(item.value)}
-          itemHeight={28}
-          visibleItemCount={3}
-          itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-          overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-          enableScrollByTapOnItem
-          keyExtractor={(item, index) => `period-${index}`}
-        />
-      </View>
+      {periodItems.length > 0 && (
+        <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+          <WheelPicker
+            data={periodItems}
+            value={selectedPeriod}
+            onValueChanged={({ item }) => item && setSelectedPeriod(item.value)}
+            itemHeight={28}
+            visibleItemCount={3}
+            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+            enableScrollByTapOnItem
+            keyExtractor={(item, index) => `period-${index}`}
+          />
+        </View>
+      )}
 
     </View>
   );
