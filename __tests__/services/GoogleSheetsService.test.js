@@ -5,6 +5,7 @@ import {
   signOut,
   buildSheetsData,
   exportToSheets,
+  importFromSheets,
 } from '../../app/services/GoogleSheetsService';
 
 jest.mock('../../app/services/PreferencesDB', () => ({
@@ -403,6 +404,201 @@ describe('GoogleSheetsService', () => {
       });
 
       await expect(exportToSheets('access-token', mockBackup)).rejects.toThrow('quota_exceeded');
+    });
+  });
+
+  describe('importFromSheets', () => {
+    const { getPreference } = require('../../app/services/PreferencesDB');
+
+    const makeBatchGetResponse = (overrides = {}) => ({
+      valueRanges: [
+        {
+          range: 'Accounts!A1:G3',
+          values: [
+            ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target'],
+            ['1', 'Checking', '500', 'USD', '0', '0', ''],
+            ['2', 'Savings', '1000', 'USD', '1', '0', '200'],
+          ],
+        },
+        {
+          range: 'Operations!A1:O3',
+          values: [
+            ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency'],
+            ['10', '2024-01-15', 'expense', '50', 'USD', 'Food', 'Checking', '', 'Lunch', '1', 'cat-1', '', '', '', ''],
+            ['11', '2024-01-16', 'transfer', '100', 'USD', '', 'Checking', 'Savings', '', '1', '', '2', '', '', ''],
+          ],
+        },
+        {
+          range: 'Categories!A1:I2',
+          values: [
+            ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+            ['cat-1', 'Food', 'entry', 'expense', 'fast-food', '', '#ff0000', '0'],
+          ],
+        },
+        {
+          range: 'Budgets!A1:J1',
+          values: [
+            ['id', 'category', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'category_id'],
+          ],
+        },
+        {
+          range: 'Planned Operations!A1:L1',
+          values: [
+            ['id', 'name', 'type', 'amount', 'account', 'category', 'to_account', 'description', 'is_recurring', 'account_id', 'category_id', 'to_account_id'],
+          ],
+        },
+        {
+          range: 'Balance History!A1:D2',
+          values: [
+            ['account', 'date', 'balance', 'account_id'],
+            ['Checking', '2024-01-15', '500', '1'],
+          ],
+        },
+        ...(overrides.extraRanges || []),
+      ],
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      getPreference.mockResolvedValue('sheet-id-123');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeBatchGetResponse(),
+      });
+    });
+
+    it('throws no_spreadsheet_configured when no spreadsheet ID saved', async () => {
+      getPreference.mockResolvedValue(null);
+      await expect(importFromSheets('token')).rejects.toThrow('no_spreadsheet_configured');
+    });
+
+    it('throws spreadsheet_not_found on 404', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: { message: 'Spreadsheet not found.' } }),
+      });
+      await expect(importFromSheets('token')).rejects.toThrow('spreadsheet_not_found');
+    });
+
+    it('signs out and throws refresh_failed on 401', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { message: 'Unauthorized' } }),
+      });
+      await expect(importFromSheets('token')).rejects.toThrow('refresh_failed');
+      expect(GoogleSignin.signOut).toHaveBeenCalled();
+    });
+
+    it('returns a valid backup object on success', async () => {
+      const backup = await importFromSheets('token');
+      expect(backup.version).toBe(1);
+      expect(backup.data.accounts).toHaveLength(2);
+      expect(backup.data.categories).toHaveLength(1);
+      expect(backup.data.operations).toHaveLength(2);
+      expect(backup.data.balance_history).toHaveLength(1);
+      expect(backup.data.app_metadata).toEqual([]);
+    });
+
+    it('resolves account FK by account_id column (ID-first)', async () => {
+      const backup = await importFromSheets('token');
+      // Operation row has account_id='1', which maps to account id '1'
+      expect(backup.data.operations[0].account_id).toBe('1');
+    });
+
+    it('resolves account FK by name when account_id column is absent', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            {
+              range: 'Accounts!A1:D2',
+              values: [
+                ['id', 'name', 'balance', 'currency'],
+                ['1', 'Checking', '500', 'USD'],
+              ],
+            },
+            {
+              range: 'Operations!A1:I2',
+              values: [
+                ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description'],
+                ['10', '2024-01-15', 'expense', '50', 'USD', '', 'Checking', '', ''],
+              ],
+            },
+            { range: 'Categories!A1:A1', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow']] },
+            { range: 'Budgets!A1:A1', values: [['id']] },
+            { range: 'Planned Operations!A1:A1', values: [['id']] },
+            { range: 'Balance History!A1:A1', values: [['account', 'date', 'balance']] },
+          ],
+        }),
+      });
+      const backup = await importFromSheets('token');
+      expect(backup.data.operations[0].account_id).toBe('1');
+    });
+
+    it('sets FK to null when neither ID nor name resolves', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D1', values: [['id', 'name', 'balance', 'currency']] },
+            {
+              range: 'Operations!A1:I2',
+              values: [
+                ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description'],
+                ['10', '2024-01-15', 'expense', '50', 'USD', '', 'UnknownAccount', '', ''],
+              ],
+            },
+            { range: 'Categories!A1:A1', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow']] },
+            { range: 'Budgets!A1:A1', values: [['id']] },
+            { range: 'Planned Operations!A1:A1', values: [['id']] },
+            { range: 'Balance History!A1:A1', values: [['account', 'date', 'balance']] },
+          ],
+        }),
+      });
+      const backup = await importFromSheets('token');
+      expect(backup.data.operations[0].account_id).toBeNull();
+    });
+
+    it('treats missing sheet tab as empty array', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          valueRanges: [
+            { range: 'Accounts!A1:D2', values: [['id', 'name', 'balance', 'currency'], ['1', 'Checking', '500', 'USD']] },
+            // Operations tab entirely missing from response
+            { range: 'Categories!A1:A1', values: [['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow']] },
+            { range: 'Budgets!A1:A1', values: [['id']] },
+            { range: 'Planned Operations!A1:A1', values: [['id']] },
+            { range: 'Balance History!A1:A1', values: [['account', 'date', 'balance', 'account_id']] },
+          ],
+        }),
+      });
+      const backup = await importFromSheets('token');
+      expect(backup.data.operations).toEqual([]);
+    });
+
+    it('calls onProgress with connect and parse steps', async () => {
+      const onProgress = jest.fn();
+      await importFromSheets('token', onProgress);
+      expect(onProgress).toHaveBeenCalledWith({ step: 'connect', status: 'in_progress' });
+      expect(onProgress).toHaveBeenCalledWith({ step: 'connect', status: 'completed' });
+      expect(onProgress).toHaveBeenCalledWith({ step: 'parse', status: 'in_progress' });
+      expect(onProgress).toHaveBeenCalledWith({ step: 'parse', status: 'completed' });
+    });
+
+    it('maps category fields correctly', async () => {
+      const backup = await importFromSheets('token');
+      const cat = backup.data.categories[0];
+      expect(cat.id).toBe('cat-1');
+      expect(cat.color).toBe('#ff0000');
+      expect(cat.is_shadow).toBe(0);
+    });
+
+    it('maps balance_history account_id by ID column', async () => {
+      const backup = await importFromSheets('token');
+      expect(backup.data.balance_history[0].account_id).toBe('1');
     });
   });
 });
