@@ -32,43 +32,39 @@ const IncomeSummaryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
-    <View style={styles.summaryCard}>
+    <TouchableOpacity
+      testID="income-summary-card"
+      style={styles.summaryCard}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={t('income_by_category')}
+    >
+      <View style={styles.iconBadge}>
+        <Icon name="arrow-bottom-left" size={16} color={colors.income} />
+      </View>
+      <View style={styles.textContent}>
+        <Text style={[styles.label, { color: colors.mutedText }]}>{t('income').toUpperCase()}</Text>
+        <Text style={[styles.amount, { color: colors.text }]}>
+          {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
+        </Text>
+      </View>
       {categoryName && onBack && (
         <TouchableOpacity
           onPress={onBack}
-          style={styles.backButton}
+          style={styles.categoryBack}
           accessibilityRole="button"
           accessibilityLabel={t('back')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Icon name="arrow-left" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        testID="income-summary-card"
-        style={styles.summaryCardInner}
-        onPress={onPress}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={t('income_by_category')}
-      >
-        <View style={styles.iconBadge}>
-          <Icon name="arrow-bottom-left" size={16} color={colors.income} />
-        </View>
-        <View style={styles.textContent}>
-          <Text style={[styles.label, { color: colors.mutedText }]}>{t('income').toUpperCase()}</Text>
-          <Text style={[styles.amount, { color: colors.text }]}>
-            {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
-          </Text>
-        </View>
-        {categoryName && (
+          <Icon name="chevron-left" size={16} color={colors.mutedText} />
           <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
             {categoryName}
           </Text>
-        )}
-        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-      </TouchableOpacity>
-    </View>
+        </TouchableOpacity>
+      )}
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
+    </TouchableOpacity>
   );
 };
 
@@ -91,18 +87,18 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     marginTop: 1,
   },
-  backButton: {
+  categoryBack: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 10,
-    paddingRight: 4,
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 2,
+    marginRight: 4,
   },
   categoryName: {
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '600',
-    marginRight: 4,
-    maxWidth: 80,
+    maxWidth: 90,
   },
   iconBadge: {
     alignItems: 'center',
@@ -116,11 +112,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   summaryCard: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-  },
-  summaryCardInner: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
