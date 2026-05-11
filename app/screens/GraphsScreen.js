@@ -831,6 +831,13 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
+  currencyPopover: {
+    borderRadius: 12,
+    borderWidth: 1,
+    elevation: 8,
+    overflow: 'hidden',
+    position: 'absolute',
+  },
   currencySymbol: {
     fontSize: 15,
     fontWeight: '600',
@@ -879,20 +886,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  pickerPopoverOverlay: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  currencyPopover: {
-    borderRadius: 12,
-    borderWidth: 1,
-    elevation: 8,
-    overflow: 'hidden',
-    position: 'absolute',
-  },
   pickerModalSheet: {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -901,6 +894,13 @@ const styles = StyleSheet.create({
   pickerModalTitle: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  pickerPopoverOverlay: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   pickerWrapper: {
     borderRadius: 12,
