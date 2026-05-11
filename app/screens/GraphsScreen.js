@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryCardBase: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
   },
