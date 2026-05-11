@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -73,8 +73,10 @@ const GraphsScreen = () => {
   const incomeChartHeightSV = useSharedValue(0);
   const expenseHeightInitialized = useRef(false);
   const incomeHeightInitialized = useRef(false);
-  const expenseDrillDirection = useRef('in'); // 'in' | 'back'
-  const incomeDrillDirection = useRef('in');
+  // dir + target bundled so a single setState triggers a render that refreshes
+  // the exiting prop on the old component BEFORE the key changes in the next render
+  const [expenseDrillReq, setExpenseDrillReq] = useState({ dir: 'in', target: null });
+  const [incomeDrillReq, setIncomeDrillReq] = useState({ dir: 'in', target: null });
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -114,15 +116,29 @@ const GraphsScreen = () => {
     handleDeleteBalance,
   } = useBalanceHistory(selectedAccount, selectedYear, selectedMonth);
 
+  // Phase 2: apply the pending category change after the old component has
+  // re-rendered with the correct exiting prop (useLayoutEffect fires before paint)
+  useLayoutEffect(() => {
+    if (expenseDrillReq.target !== null) {
+      setSelectedCategory(expenseDrillReq.target);
+      setExpenseDrillReq(prev => ({ ...prev, target: null }));
+    }
+  }, [expenseDrillReq]);
+
+  useLayoutEffect(() => {
+    if (incomeDrillReq.target !== null) {
+      setSelectedIncomeCategory(incomeDrillReq.target);
+      setIncomeDrillReq(prev => ({ ...prev, target: null }));
+    }
+  }, [incomeDrillReq]);
+
   // Handlers for legend item clicks
   const handleExpenseLegendItemPress = useCallback((categoryId) => {
-    expenseDrillDirection.current = 'in';
-    setSelectedCategory(categoryId);
+    setExpenseDrillReq({ dir: 'in', target: categoryId });
   }, []);
 
   const handleIncomeLegendItemPress = useCallback((categoryId) => {
-    incomeDrillDirection.current = 'in';
-    setSelectedIncomeCategory(categoryId);
+    setIncomeDrillReq({ dir: 'in', target: categoryId });
   }, []);
 
   const handleShowCalendar = useCallback(async () => {
@@ -396,17 +412,15 @@ const GraphsScreen = () => {
   }, [categories]);
 
   const handleBackToIncomeParent = useCallback(() => {
-    incomeDrillDirection.current = 'back';
-    setSelectedIncomeCategory(prev => getParentCategoryId(prev));
-  }, [getParentCategoryId]);
+    setIncomeDrillReq({ dir: 'back', target: getParentCategoryId(selectedIncomeCategory) });
+  }, [getParentCategoryId, selectedIncomeCategory]);
 
   const handleBackToExpenseParent = useCallback(() => {
-    expenseDrillDirection.current = 'back';
-    setSelectedCategory(prev => getParentCategoryId(prev));
-  }, [getParentCategoryId]);
+    setExpenseDrillReq({ dir: 'back', target: getParentCategoryId(selectedCategory) });
+  }, [getParentCategoryId, selectedCategory]);
 
-  const resetExpenseCategory = useCallback(() => setSelectedCategory('all'), []);
-  const resetIncomeCategory = useCallback(() => setSelectedIncomeCategory('all'), []);
+  const resetExpenseCategory = useCallback(() => setExpenseDrillReq({ dir: 'none', target: 'all' }), []);
+  const resetIncomeCategory = useCallback(() => setIncomeDrillReq({ dir: 'none', target: 'all' }), []);
 
   const toggleCard = useCallback((card) => {
     if (expandedCard === card) {
@@ -569,8 +583,8 @@ const GraphsScreen = () => {
                 >
                   <Animated.View
                     key={selectedIncomeCategory}
-                    entering={incomeDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
-                    exiting={incomeDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                    entering={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={incomeDrillReq.dir === 'none' ? undefined : incomeDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
                   >
                     <IncomePieChart
                       colors={colors}
@@ -631,8 +645,8 @@ const GraphsScreen = () => {
                 >
                   <Animated.View
                     key={selectedCategory}
-                    entering={expenseDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
-                    exiting={expenseDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                    entering={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={expenseDrillReq.dir === 'none' ? undefined : expenseDrillReq.dir === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
                   >
                     <ExpensePieChart
                       colors={colors}
