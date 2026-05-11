@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import PropTypes from 'prop-types';
-import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Rect, Text as SvgText, Path } from 'react-native-svg';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import currencies from '../../../assets/currencies.json';
 import useCategoryMonthlySpending from '../../hooks/useCategoryMonthlySpending';
@@ -29,6 +29,8 @@ const formatYTick = (value) => {
   if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
   return value.toFixed(0);
 };
+
+const formatPctTick = (value) => value + '%';
 
 const BarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
   const hasVs = vsData != null && vsData.length === data.length;
@@ -210,6 +212,135 @@ const BarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedInd
   );
 };
 
+// Build an SVG path for a rect with rounded top corners only
+const roundedTopPath = (x, y, w, h, r) => {
+  const cr = Math.min(r, w / 2, Math.max(h, 0));
+  return `M ${x + cr},${y} L ${x + w - cr},${y} Q ${x + w},${y} ${x + w},${y + cr} L ${x + w},${y + h} L ${x},${y + h} L ${x},${y + cr} Q ${x},${y} ${x + cr},${y} Z`;
+};
+
+// Build an SVG path for a rect with rounded bottom corners only
+const roundedBottomPath = (x, y, w, h, r) => {
+  const cr = Math.min(r, w / 2, Math.max(h, 0));
+  return `M ${x},${y} L ${x + w},${y} L ${x + w},${y + h - cr} Q ${x + w},${y + h} ${x + w - cr},${y + h} L ${x + cr},${y + h} Q ${x},${y + h} ${x},${y + h - cr} Z`;
+};
+
+const StackedBarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
+  const count = data.length;
+  const chartW = width - Y_AXIS_WIDTH;
+  const slotW = chartW / count;
+  const totalHeight = TOP_PADDING + BAR_HEIGHT + LABEL_HEIGHT;
+  const barW = slotW * 0.6;
+  const barPad = (slotW - barW) / 2;
+  const RADIUS = 3;
+
+  const yTicks = [0, 25, 50, 75, 100].map(pct => ({
+    value: pct,
+    y: TOP_PADDING + BAR_HEIGHT - (pct / 100) * BAR_HEIGHT,
+  }));
+
+  return (
+    <Svg width={width} height={totalHeight} style={styles.barChartSvg}>
+      {yTicks.map(({ value, y }) => (
+        <SvgText
+          key={value}
+          x={Y_AXIS_WIDTH - 4}
+          y={y + 3.5}
+          fontSize={8}
+          fontFamily="Inter"
+          fill={colors.mutedText}
+          textAnchor="end"
+          opacity={0.7}
+        >
+          {formatPctTick(value)}
+        </SvgText>
+      ))}
+
+      {data.map((d, i) => {
+        const vsD = vsData[i];
+        const totalAmt = d.total + vsD.total;
+        const isSelected = i === selectedIndex;
+        const label = monthAbbreviations[d.month];
+        const barX = Y_AXIS_WIDTH + i * slotW + barPad;
+        const opacity = isSelected ? 1 : 0.3;
+
+        let vsH = 0;
+        let primaryH = 0;
+        if (totalAmt > 0) {
+          vsH = (vsD.total / totalAmt) * BAR_HEIGHT;
+          primaryH = BAR_HEIGHT - vsH;
+        }
+
+        return (
+          <React.Fragment key={i}>
+            <Rect
+              x={Y_AXIS_WIDTH + i * slotW}
+              y={TOP_PADDING}
+              width={slotW}
+              height={BAR_HEIGHT}
+              fill="transparent"
+              onPress={() => onBarPress(i)}
+            />
+            {totalAmt === 0 ? (
+              <Rect
+                x={barX}
+                y={TOP_PADDING}
+                width={barW}
+                height={BAR_HEIGHT}
+                rx={RADIUS}
+                fill={colors.mutedText}
+                fillOpacity={0.12}
+              />
+            ) : vsH === 0 ? (
+              <Rect
+                x={barX}
+                y={TOP_PADDING}
+                width={barW}
+                height={BAR_HEIGHT}
+                rx={RADIUS}
+                fill={colors.primary}
+                fillOpacity={opacity}
+              />
+            ) : primaryH === 0 ? (
+              <Rect
+                x={barX}
+                y={TOP_PADDING}
+                width={barW}
+                height={BAR_HEIGHT}
+                rx={RADIUS}
+                fill={VS_COLOR}
+                fillOpacity={opacity}
+              />
+            ) : (
+              <>
+                <Path
+                  d={roundedTopPath(barX, TOP_PADDING, barW, vsH, RADIUS)}
+                  fill={VS_COLOR}
+                  fillOpacity={opacity}
+                />
+                <Path
+                  d={roundedBottomPath(barX, TOP_PADDING + vsH, barW, primaryH, RADIUS)}
+                  fill={colors.primary}
+                  fillOpacity={opacity}
+                />
+              </>
+            )}
+            <SvgText
+              x={Y_AXIS_WIDTH + i * slotW + slotW / 2}
+              y={TOP_PADDING + BAR_HEIGHT + 13}
+              fontSize={9.5}
+              fontFamily="Inter"
+              fill={colors.mutedText}
+              textAnchor="middle"
+            >
+              {label}
+            </SvgText>
+          </React.Fragment>
+        );
+      })}
+    </Svg>
+  );
+};
+
 const CategorySpendingCard = ({
   colors,
   t,
@@ -223,6 +354,7 @@ const CategorySpendingCard = ({
   const [vsCategory, setVsCategory] = useState(null);
   const [expandedParents, setExpandedParents] = useState(new Set());
   const [selectedBarIndex, setSelectedBarIndex] = useState(null);
+  const [showStackedBar, setShowStackedBar] = useState(false);
 
   const allExpenseCategories = useMemo(() => {
     return categories.filter(cat =>
@@ -299,7 +431,10 @@ const CategorySpendingCard = ({
     setPickerMode(null);
   }, [pickerMode, onCategoryChange]);
 
-  const clearVsCategory = useCallback(() => setVsCategory(null), []);
+  const clearVsCategory = useCallback(() => {
+    setVsCategory(null);
+    setShowStackedBar(false);
+  }, []);
 
   const { monthlyData, loading } = useCategoryMonthlySpending(selectedCurrency, effectiveCategory, categories);
   const { monthlyData: vsMonthlyData, loading: vsLoading } = useCategoryMonthlySpending(selectedCurrency, effectiveVsCategory, categories);
@@ -449,8 +584,22 @@ const CategorySpendingCard = ({
           </View>
         </View>
 
-        {/* Right: amount(s) + month label */}
+        {/* Right: stacked toggle (vs mode only) + amount(s) + month label */}
         <View style={styles.headerRight}>
+          {hasVsData && (
+            <TouchableOpacity
+              style={styles.stackedToggleBtn}
+              onPress={() => setShowStackedBar(v => !v)}
+              activeOpacity={0.7}
+              testID="stacked-bar-toggle-btn"
+            >
+              <Icon
+                name={showStackedBar ? 'chart-bar' : 'chart-bar-stacked'}
+                size={20}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
           {!hideBalances && (
             <>
               <Text style={[styles.currentAmount, { color: effectiveVsCategory ? colors.primary : colors.text }]}>
@@ -502,6 +651,16 @@ const CategorySpendingCard = ({
             {t('no_spending_data')}
           </Text>
         </View>
+      ) : showStackedBar && hasVsData ? (
+        <StackedBarChart
+          data={monthlyData}
+          vsData={vsMonthlyData}
+          monthAbbreviations={monthAbbreviations}
+          colors={colors}
+          width={screenWidth - 64}
+          selectedIndex={effectiveBarIndex}
+          onBarPress={setSelectedBarIndex}
+        />
       ) : (
         <BarChart
           data={monthlyData}
@@ -524,6 +683,16 @@ BarChart.propTypes = {
   onBarPress: PropTypes.func.isRequired,
   selectedIndex: PropTypes.number,
   vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })),
+  width: PropTypes.number.isRequired,
+};
+
+StackedBarChart.propTypes = {
+  colors: PropTypes.object.isRequired,
+  data: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
+  monthAbbreviations: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onBarPress: PropTypes.func.isRequired,
+  selectedIndex: PropTypes.number,
+  vsData: PropTypes.arrayOf(PropTypes.shape({ total: PropTypes.number, month: PropTypes.number })).isRequired,
   width: PropTypes.number.isRequired,
 };
 
@@ -637,6 +806,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
+  },
+  stackedToggleBtn: {
+    alignSelf: 'flex-end',
+    height: 28,
+    justifyContent: 'center',
+    marginBottom: 2,
+    width: 28,
   },
   thisMonthLabel: {
     fontSize: 11,
