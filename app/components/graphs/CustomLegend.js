@@ -120,13 +120,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
     minWidth: 0,
   },
   colorIndicator: {
-    borderRadius: 6,
-    height: 12,
-    width: 12,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   legendAmount: {
     fontSize: 12,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     paddingVertical: 12,
   },
   legendItemClickable: {
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     backgroundColor: 'rgba(120,120,120,0.13)',
     height: '70%',
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     width: 1,
   },
 });
