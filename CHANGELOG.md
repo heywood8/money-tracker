@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.0](https://github.com/heywood8/money-tracker/compare/penny-v0.109.1...penny-v0.110.0) (2026-05-11)
+
+
+### Features
+
+* **graphs:** refine expense/income card category drill-down UX ([#572](https://github.com/heywood8/money-tracker/issues/572)) ([c219c97](https://github.com/heywood8/money-tracker/commit/c219c9726470a727dc2150ff9a08732466dc35fa))
+
 ## [0.109.1](https://github.com/heywood8/money-tracker/compare/penny-v0.109.0...penny-v0.109.1) (2026-05-11)
 
 
