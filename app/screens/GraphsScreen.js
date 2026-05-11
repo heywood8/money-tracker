@@ -404,6 +404,12 @@ const GraphsScreen = () => {
 
   const toggleCard = useCallback((card) => {
     if (expandedCard === card) {
+      // Reset category first, then collapse
+      if (card === 'expense') {
+        resetExpenseCategory();
+      } else {
+        resetIncomeCategory();
+      }
       // Collapse: fade chart + shrink height first (180ms), then restore width (200ms)
       chartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
       heightProgress.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.quad) }, (finished) => {
@@ -412,11 +418,6 @@ const GraphsScreen = () => {
             if (done) {
               expandingCard.value = 0;
               runOnJS(setExpandedCard)(null);
-              if (card === 'expense') {
-                runOnJS(resetExpenseCategory)();
-              } else {
-                runOnJS(resetIncomeCategory)();
-              }
             }
           });
         }
@@ -435,7 +436,8 @@ const GraphsScreen = () => {
         }
       });
     }
-  }, [expandedCard, widthProgress, heightProgress, chartProgress, expandingCard, resetExpenseCategory, resetIncomeCategory]);
+  }, [expandedCard, widthProgress, heightProgress, chartProgress, expandingCard,
+    resetExpenseCategory, resetIncomeCategory]);
 
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
