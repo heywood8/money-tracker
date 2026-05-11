@@ -30,6 +30,8 @@ const formatYTick = (value) => {
   return value.toFixed(0);
 };
 
+const formatPctTick = (value) => value + '%';
+
 const BarChart = ({ data, vsData, monthAbbreviations, colors, width, selectedIndex, onBarPress }) => {
   const hasVs = vsData != null && vsData.length === data.length;
   const max = Math.max(
@@ -249,7 +251,7 @@ const StackedBarChart = ({ data, vsData, monthAbbreviations, colors, width, sele
           textAnchor="end"
           opacity={0.7}
         >
-          {`${value}%`}
+          {formatPctTick(value)}
         </SvgText>
       ))}
 
