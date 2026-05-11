@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.107.2](https://github.com/heywood8/money-tracker/compare/penny-v0.107.1...penny-v0.107.2) (2026-05-11)
+
+
+### Miscellaneous Chores
+
+* **main:** release penny 0.107.1 ([#564](https://github.com/heywood8/money-tracker/issues/564)) ([cf0786a](https://github.com/heywood8/money-tracker/commit/cf0786a8df16422ed322e7f3733b6efd09ce9d1e))
+
 ## [0.107.1](https://github.com/heywood8/money-tracker/compare/penny-v0.107.0...penny-v0.107.1) (2026-05-11)
 
 
