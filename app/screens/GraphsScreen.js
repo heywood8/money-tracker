@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, Modal, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import WheelPicker from '@quidone/react-native-wheel-picker';
@@ -49,10 +49,6 @@ const GraphsScreen = () => {
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedCategoryForTrend, setSelectedCategoryForTrend] = useState(null);
 
-  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
-  const currencyPickerRef = useRef(null);
-  const [currencyPickerLayout, setCurrencyPickerLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -429,16 +425,6 @@ const GraphsScreen = () => {
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
 
-  const handleOpenCurrencyPicker = useCallback(() => {
-    if (currencyPickerRef.current) {
-      currencyPickerRef.current.measureInWindow((x, y, width, height) => {
-        setCurrencyPickerLayout({ x, y, width, height });
-        setShowCurrencyPicker(true);
-      });
-    } else {
-      setShowCurrencyPicker(true);
-    }
-  }, []);
 
   // Reset expansion and update dimension shared values on orientation change
   useEffect(() => {
@@ -514,40 +500,6 @@ const GraphsScreen = () => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          {/* Filters Row */}
-          <View style={styles.filtersRow}>
-            {/* Currency Picker */}
-            <TouchableOpacity
-              ref={currencyPickerRef}
-              style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={handleOpenCurrencyPicker}
-              activeOpacity={0.7}
-            >
-              <View style={styles.periodPickerButton}>
-                <Text style={[styles.currencySymbol, { color: colors.primary }]}>{selectedCurrencySymbol}</Text>
-                <Text style={[styles.periodPickerText, { color: colors.text }]} numberOfLines={1}>
-                  {selectedCurrency}
-                </Text>
-                <Icon name="chevron-down" size={18} color={colors.mutedText} />
-              </View>
-            </TouchableOpacity>
-
-            {/* Period Picker (Combined Month + Year) */}
-            <TouchableOpacity
-              style={[styles.periodPickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => setShowPeriodPicker(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.periodPickerButton}>
-                <Icon name="calendar-month" size={18} color={colors.primary} style={styles.periodPickerIcon} />
-                <Text style={[styles.periodPickerText, { color: colors.text }]} numberOfLines={1}>
-                  {periodItems.find(item => item.value === selectedPeriod)?.label ?? ''}
-                </Text>
-                <Icon name="chevron-down" size={18} color={colors.mutedText} />
-              </View>
-            </TouchableOpacity>
-          </View>
-
           {/* Summary Cards Row — always-mounted, width/height driven by Animated */}
           <View style={styles.summaryCardsRow}>
             {/* Income card */}
@@ -717,74 +669,35 @@ const GraphsScreen = () => {
         </View>
       </ScrollView>
 
-      <Modal
-        visible={showCurrencyPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCurrencyPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerPopoverOverlay}
-          activeOpacity={1}
-          onPress={() => setShowCurrencyPicker(false)}
+      {/* Floating currency wheel FAB */}
+      <View style={[styles.fabWheel, styles.fabWheelLeft, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+        <WheelPicker
+          data={currencyItems}
+          value={selectedCurrency}
+          onValueChanged={({ item }) => setSelectedCurrency(item.value)}
+          itemHeight={28}
+          visibleItemCount={3}
+          itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+          overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+          enableScrollByTapOnItem
+          keyExtractor={(item, index) => `currency-${index}`}
         />
-        <View style={[
-          styles.currencyPopover,
-          {
-            top: currencyPickerLayout.y + currencyPickerLayout.height / 2 - 5 * 48 / 2,
-            left: currencyPickerLayout.x,
-            width: currencyPickerLayout.width,
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-        ]}>
-          <WheelPicker
-            data={currencyItems}
-            value={selectedCurrency}
-            onValueChanged={({ item }) => setSelectedCurrency(item.value)}
-            itemHeight={48}
-            visibleItemCount={5}
-            cyclic
-            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-            enableScrollByTapOnItem
-            keyExtractor={(item, index) => `currency-${index}`}
-          />
-        </View>
-      </Modal>
+      </View>
 
-      <Modal
-        visible={showPeriodPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPeriodPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerModalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowPeriodPicker(false)}
-        >
-          <TouchableOpacity activeOpacity={1} style={[styles.pickerModalSheet, { backgroundColor: colors.surface }]}>
-            <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.pickerModalTitle, { color: colors.text }]}>{t('select_month')}</Text>
-              <TouchableOpacity onPress={() => setShowPeriodPicker(false)}>
-                <Text style={[styles.pickerModalDone, { color: colors.primary }]}>{t('done')}</Text>
-              </TouchableOpacity>
-            </View>
-            <WheelPicker
-              data={periodItems}
-              value={selectedPeriod}
-              onValueChanged={({ item }) => setSelectedPeriod(item.value)}
-              itemHeight={48}
-              visibleItemCount={5}
-              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-              enableScrollByTapOnItem
-              keyExtractor={(item, index) => `period-${index}`}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      {/* Floating period wheel FAB */}
+      <View style={[styles.fabWheel, styles.fabWheelRight, { backgroundColor: colors.surface + 'DE', borderColor: colors.border + '80' }]}>
+        <WheelPicker
+          data={periodItems}
+          value={selectedPeriod}
+          onValueChanged={({ item }) => setSelectedPeriod(item.value)}
+          itemHeight={28}
+          visibleItemCount={3}
+          itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+          overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+          enableScrollByTapOnItem
+          keyExtractor={(item, index) => `period-${index}`}
+        />
+      </View>
 
     </View>
   );
@@ -832,84 +745,27 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
-  currencyPopover: {
-    borderRadius: 12,
+  fabWheel: {
+    borderRadius: 16,
     borderWidth: 1,
+    bottom: 116,
     elevation: 8,
     overflow: 'hidden',
     position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  currencySymbol: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginRight: 6,
+  fabWheelLeft: {
+    borderRadius: 40,
+    right: 152,
+    width: 80,
   },
-  filtersRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  periodPickerButton: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-  },
-  periodPickerIcon: {
-    marginRight: 6,
-  },
-  periodPickerText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  periodPickerWrapper: {
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  pickerModalDone: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  pickerModalHeader: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  pickerModalOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  pickerModalSheet: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 32,
-  },
-  pickerModalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  pickerPopoverOverlay: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  pickerWrapper: {
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    minWidth: 110,
-    overflow: 'hidden',
+  fabWheelRight: {
+    borderRadius: 40,
+    right: 16,
+    width: 120,
   },
   scrollContent: {
     paddingBottom: 180,
@@ -927,7 +783,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   wheelItemText: {
-    fontSize: 16,
+    fontSize: 14,
   },
   wheelOverlayItem: {
     borderRadius: 8,
