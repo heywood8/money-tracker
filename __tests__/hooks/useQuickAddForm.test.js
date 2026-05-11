@@ -621,6 +621,39 @@ describe('useQuickAddForm', () => {
       expect(ids).not.toContain('acc-1');
     });
 
+    it('should fill remaining slots from visible accounts when history is partial', async () => {
+      const extraAccounts = [
+        ...mockAccounts,
+        { id: 'acc-4', name: 'Investment', currency: 'USD', balance: '5000' },
+        { id: 'acc-5', name: 'Wallet', currency: 'USD', balance: '50' },
+      ];
+
+      mockGetTopTransferTargets.mockResolvedValue([
+        { accountId: 'acc-2', count: 5 },
+      ]);
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(extraAccounts, extraAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopTransferTargets).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(prev => ({ ...prev, type: 'transfer', accountId: 'acc-1' }));
+      });
+
+      // Should have acc-2 from history + acc-3, acc-4, acc-5 as fillers (4 total, not just 1)
+      const ids = result.current.topTransferAccountsForForm.map(a => a.id);
+      expect(ids).toContain('acc-2'); // from history
+      expect(ids).toContain('acc-3'); // filler
+      expect(ids).toContain('acc-4'); // filler
+      expect(ids).toContain('acc-5'); // filler
+      expect(ids).not.toContain('acc-1'); // source excluded
+      expect(result.current.topTransferAccountsForForm).toHaveLength(4);
+    });
+
     it('should filter out accounts that no longer exist', async () => {
       mockGetTopTransferTargets.mockResolvedValue([
         { accountId: 'deleted-acc', count: 10 },
