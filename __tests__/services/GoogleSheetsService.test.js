@@ -147,19 +147,34 @@ describe('GoogleSheetsService', () => {
     it('maps Accounts sheet with correct headers and data row', () => {
       const sheets = buildSheetsData(mockBackup);
       const accounts = sheets.find(s => s.range.startsWith('Accounts'));
-      expect(accounts.values[0]).toEqual(['id', 'name', 'balance', 'currency']);
-      expect(accounts.values[1]).toEqual([1, 'Checking', '1000', 'USD']);
+      expect(accounts.values[0]).toContain('id');
+      expect(accounts.values[0]).toContain('name');
+      expect(accounts.values[0]).toContain('balance');
+      expect(accounts.values[0]).toContain('currency');
+      expect(accounts.values[1]).toContain(1);
+      expect(accounts.values[1]).toContain('Checking');
+      expect(accounts.values[1]).toContain('1000');
+      expect(accounts.values[1]).toContain('USD');
     });
 
     it('maps Operations sheet with human-readable account and category names', () => {
       const sheets = buildSheetsData(mockBackup);
       const ops = sheets.find(s => s.range.startsWith('Operations'));
-      expect(ops.values[0]).toEqual([
-        'id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description',
-      ]);
-      expect(ops.values[1][5]).toBe('Food');
-      expect(ops.values[1][6]).toBe('Checking');
-      expect(ops.values[1][7]).toBe('');
+      expect(ops.values[0]).toContain('id');
+      expect(ops.values[0]).toContain('date');
+      expect(ops.values[0]).toContain('type');
+      expect(ops.values[0]).toContain('amount');
+      expect(ops.values[0]).toContain('currency');
+      expect(ops.values[0]).toContain('category');
+      expect(ops.values[0]).toContain('account');
+      expect(ops.values[0]).toContain('to_account');
+      expect(ops.values[0]).toContain('description');
+      const idxCategory = ops.values[0].indexOf('category');
+      const idxAccount = ops.values[0].indexOf('account');
+      const idxToAccount = ops.values[0].indexOf('to_account');
+      expect(ops.values[1][idxCategory]).toBe('Food');
+      expect(ops.values[1][idxAccount]).toBe('Checking');
+      expect(ops.values[1][idxToAccount]).toBe('');
     });
 
     it('includes all categories including shadow ones', () => {
@@ -185,8 +200,94 @@ describe('GoogleSheetsService', () => {
     it('maps Balance History with account name instead of id', () => {
       const sheets = buildSheetsData(mockBackup);
       const history = sheets.find(s => s.range.startsWith('Balance History'));
-      expect(history.values[0]).toEqual(['account', 'date', 'balance']);
+      expect(history.values[0]).toContain('account');
+      expect(history.values[0]).toContain('date');
+      expect(history.values[0]).toContain('balance');
       expect(history.values[1][0]).toBe('Checking');
+    });
+  });
+
+  describe('buildSheetsData — new columns', () => {
+    const mockBackup = {
+      data: {
+        accounts: [
+          { id: 1, name: 'Checking', balance: '100', currency: 'USD', display_order: 0, hidden: 0, monthly_target: '500' },
+        ],
+        categories: [
+          { id: 'cat-1', name: 'Food', type: 'entry', category_type: 'expense', icon: 'fast-food', parent_id: 'cat-root', color: '#ff0000', is_shadow: 0 },
+        ],
+        operations: [
+          { id: 5, date: '2024-01-15', type: 'expense', amount: '50', source_currency: 'USD', category_id: 'cat-1', account_id: 1, to_account_id: null, description: 'Lunch', exchange_rate: null, destination_amount: null, destination_currency: null },
+        ],
+        budgets: [
+          { id: 'bud-1', category_id: 'cat-1', amount: '200', currency: 'USD', period_type: 'monthly', start_date: '2024-01-01', end_date: null, is_recurring: 1, rollover_enabled: 0 },
+        ],
+        planned_operations: [
+          { id: 'plan-1', name: 'Rent', type: 'expense', amount: '1000', account_id: 1, category_id: 'cat-1', to_account_id: null, description: 'Monthly rent', is_recurring: 1 },
+        ],
+        balance_history: [
+          { account_id: 1, date: '2024-01-15', balance: '100' },
+        ],
+      },
+    };
+
+    it('Accounts sheet includes display_order, hidden, monthly_target', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const accounts = sheets.find(s => s.range === 'Accounts!A1');
+      expect(accounts.values[0]).toContain('display_order');
+      expect(accounts.values[0]).toContain('hidden');
+      expect(accounts.values[0]).toContain('monthly_target');
+      expect(accounts.values[1]).toContain(0);   // display_order value
+      expect(accounts.values[1]).toContain(0);   // hidden value
+      expect(accounts.values[1]).toContain('500'); // monthly_target value
+    });
+
+    it('Categories sheet includes parent_id, color, is_shadow', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const cats = sheets.find(s => s.range === 'Categories!A1');
+      expect(cats.values[0]).toContain('parent_id');
+      expect(cats.values[0]).toContain('color');
+      expect(cats.values[0]).toContain('is_shadow');
+      expect(cats.values[1]).toContain('cat-root');
+      expect(cats.values[1]).toContain('#ff0000');
+      expect(cats.values[1]).toContain(0);
+    });
+
+    it('Operations sheet includes account_id, category_id, to_account_id, exchange_rate, destination_amount, destination_currency', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const ops = sheets.find(s => s.range === 'Operations!A1');
+      expect(ops.values[0]).toContain('account_id');
+      expect(ops.values[0]).toContain('category_id');
+      expect(ops.values[0]).toContain('to_account_id');
+      expect(ops.values[0]).toContain('exchange_rate');
+      expect(ops.values[0]).toContain('destination_amount');
+      expect(ops.values[0]).toContain('destination_currency');
+      expect(ops.values[1]).toContain(1);       // account_id value
+      expect(ops.values[1]).toContain('cat-1'); // category_id value
+    });
+
+    it('Budgets sheet includes category_id', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const budgets = sheets.find(s => s.range === 'Budgets!A1');
+      expect(budgets.values[0]).toContain('category_id');
+      expect(budgets.values[1]).toContain('cat-1');
+    });
+
+    it('Planned Operations sheet includes account_id, category_id, to_account_id', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const planned = sheets.find(s => s.range === 'Planned Operations!A1');
+      expect(planned.values[0]).toContain('account_id');
+      expect(planned.values[0]).toContain('category_id');
+      expect(planned.values[0]).toContain('to_account_id');
+      expect(planned.values[1]).toContain(1);
+      expect(planned.values[1]).toContain('cat-1');
+    });
+
+    it('Balance History sheet includes account_id', () => {
+      const sheets = buildSheetsData(mockBackup);
+      const history = sheets.find(s => s.range === 'Balance History!A1');
+      expect(history.values[0]).toContain('account_id');
+      expect(history.values[1]).toContain(1);
     });
   });
 
