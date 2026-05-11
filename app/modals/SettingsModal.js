@@ -418,6 +418,11 @@ export default function SettingsModal({ visible, onClose }) {
         setImportStep('source');
         return;
       }
+      if (error.message === 'no_spreadsheet_configured') {
+        setImportStep('source');
+        setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
+        return;
+      }
       let msg;
       if (error.message === 'refresh_failed') msg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
       else if (error.message === 'spreadsheet_not_found') msg = t('google_sheets_not_found') || 'Spreadsheet not found. Try exporting first.';
@@ -437,7 +442,7 @@ export default function SettingsModal({ visible, onClose }) {
       cancelImport();
       console.error('[SheetsImport] restore error:', restoreError);
     }
-  }, [t, closeSubPanel, onClose, startImport, restoreBackup, completeImport, cancelImport]);
+  }, [t, closeSubPanel, onClose, startImport, completeImport, cancelImport]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
