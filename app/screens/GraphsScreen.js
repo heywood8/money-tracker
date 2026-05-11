@@ -735,8 +735,8 @@ const styles = StyleSheet.create({
   },
   chartScrollContent: {
     paddingBottom: 24,
-    paddingLeft: 6,
-    paddingRight: 6,
+    paddingLeft: 3,
+    paddingRight: 9,
     paddingTop: 4,
   },
   chartScrollView: {
