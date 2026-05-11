@@ -571,4 +571,121 @@ describe('CategorySpendingCard', () => {
       expect(queryByText('Groceries')).toBeFalsy();
     });
   });
+
+  describe('Stacked Bar Toggle', () => {
+    const selectVsCategory = ({ getByText, getAllByText }) => {
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+    };
+
+    it('does not show stacked toggle button when no vs category is selected', () => {
+      const { queryByTestId } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
+    });
+
+    it('shows stacked toggle button when vs category is active', () => {
+      const { getByText, getAllByText, getByTestId } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+
+      expect(getByTestId('stacked-bar-toggle-btn')).toBeTruthy();
+    });
+
+    it('toggle button uses chart-bar-stacked icon when in side-by-side mode', () => {
+      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+
+      const btn = getByTestId('stacked-bar-toggle-btn');
+      expect(btn).toBeTruthy();
+
+      const icons = UNSAFE_getAllByType('Icon');
+      const stackedIcon = icons.find(i => i.props.name === 'chart-bar-stacked');
+      expect(stackedIcon).toBeTruthy();
+    });
+
+    it('switches to chart-bar icon after toggling to stacked mode', () => {
+      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+
+      const icons = UNSAFE_getAllByType('Icon');
+      expect(icons.find(i => i.props.name === 'chart-bar')).toBeTruthy();
+      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeFalsy();
+    });
+
+    it('pressing toggle again returns to side-by-side mode', () => {
+      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+
+      const icons = UNSAFE_getAllByType('Icon');
+      expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
+    });
+
+    it('clearing vs category hides the toggle button', () => {
+      const { getByText, getAllByText, UNSAFE_getAllByType, queryByTestId } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+      expect(queryByTestId('stacked-bar-toggle-btn')).toBeTruthy();
+
+      const icons = UNSAFE_getAllByType('Icon');
+      const closeIcon = icons.find(i => i.props.name === 'close');
+      fireEvent.press(closeIcon.parent);
+
+      expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
+    });
+
+    it('clearing vs category resets stacked mode so toggle shows chart-bar-stacked next time', () => {
+      const { getByText, getAllByText, getByTestId, queryByTestId, UNSAFE_getAllByType } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      // Select vs, toggle to stacked, then clear vs
+      selectVsCategory({ getByText, getAllByText });
+      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      const icons = UNSAFE_getAllByType('Icon');
+      const closeIcon = icons.find(i => i.props.name === 'close');
+      fireEvent.press(closeIcon.parent);
+
+      // Re-select vs category
+      fireEvent.press(getByText('vs'));
+      const transportItems = getAllByText('Transport');
+      fireEvent.press(transportItems[transportItems.length - 1]);
+
+      // Toggle should show chart-bar-stacked (stacked mode was reset on clear)
+      const updatedIcons = UNSAFE_getAllByType('Icon');
+      expect(updatedIcons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
+    });
+
+    it('renders percentage y-axis labels (0%, 25%, 50%, 75%, 100%) in stacked mode', () => {
+      const { getByText, getAllByText, getByTestId, queryByText } = render(
+        <CategorySpendingCard {...defaultProps} />,
+      );
+
+      selectVsCategory({ getByText, getAllByText });
+      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+
+      expect(queryByText('0%')).toBeTruthy();
+      expect(queryByText('50%')).toBeTruthy();
+      expect(queryByText('100%')).toBeTruthy();
+    });
+  });
 });
