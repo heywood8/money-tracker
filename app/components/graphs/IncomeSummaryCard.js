@@ -27,6 +27,8 @@ const IncomeSummaryCard = ({
   selectedCurrency,
   onPress,
   expanded = false,
+  categoryName = null,
+  onBack = null,
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
@@ -47,6 +49,22 @@ const IncomeSummaryCard = ({
           {hideBalances ? '••••' : (loadingIncome ? '...' : formatCurrency(totalIncome, selectedCurrency))}
         </Text>
       </View>
+      {categoryName && onBack && (
+        <View style={styles.categoryBackOverlay} pointerEvents="box-none">
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.categoryBack}
+            accessibilityRole="button"
+            accessibilityLabel={t('back')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="chevron-left" size={18} color={colors.mutedText} />
+            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+              {categoryName}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
     </TouchableOpacity>
   );
@@ -60,6 +78,8 @@ IncomeSummaryCard.propTypes = {
   selectedCurrency: PropTypes.string.isRequired,
   onPress: PropTypes.func.isRequired,
   expanded: PropTypes.bool,
+  categoryName: PropTypes.string,
+  onBack: PropTypes.func,
 };
 
 const styles = StyleSheet.create({
@@ -68,6 +88,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.3,
     marginTop: 1,
+  },
+  categoryBack: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 2,
+  },
+  categoryBackOverlay: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  categoryName: {
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    maxWidth: 120,
   },
   iconBadge: {
     alignItems: 'center',

@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import PropTypes from 'prop-types';
-import { PieChart } from 'react-native-chart-kit';
+import DonutChart from './DonutChart';
 import CustomLegend from './CustomLegend';
-
-const screenWidth = Dimensions.get('window').width;
 
 const IncomePieChart = ({
   colors,
@@ -15,46 +13,38 @@ const IncomePieChart = ({
   onLegendItemPress,
   selectedIncomeCategory,
 }) => {
-  return (
-    <>
-      {loadingIncome ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.mutedText }]}>
-            {t('loading_operations')}
-          </Text>
-        </View>
-      ) : incomeChartData.length > 0 ? (
-        <>
-          <View style={styles.chartContainer}>
-            <PieChart
-              data={incomeChartData}
-              width={screenWidth - 64}
-              height={220}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              center={[0, 0]}
-              hasLegend={false}
-            />
-          </View>
-          <CustomLegend
-            data={incomeChartData}
-            currency={selectedCurrency}
-            colors={colors}
-            onItemPress={onLegendItemPress}
-            isClickable={selectedIncomeCategory === 'all'}
-          />
-        </>
-      ) : (
-        <Text style={[styles.noData, { color: colors.mutedText }]}>
-          {t('no_income_data')}
+  if (loadingIncome) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+          {t('loading_operations')}
         </Text>
-      )}
-    </>
+      </View>
+    );
+  }
+
+  if (incomeChartData.length === 0) {
+    return (
+      <Text style={[styles.noData, { color: colors.mutedText }]}>
+        {t('no_income_data')}
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.row}>
+      <DonutChart data={incomeChartData} />
+      <View style={styles.legendWrapper}>
+        <CustomLegend
+          data={incomeChartData}
+          currency={selectedCurrency}
+          colors={colors}
+          onItemPress={onLegendItemPress}
+          isClickable={selectedIncomeCategory === 'all'}
+        />
+      </View>
+    </View>
   );
 };
 
@@ -69,9 +59,8 @@ IncomePieChart.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  chartContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
+  legendWrapper: {
+    flex: 1,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -85,6 +74,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 32,
     textAlign: 'center',
+  },
+  row: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
   },
 });
 

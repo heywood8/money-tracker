@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -12,7 +12,6 @@ import { getAllCategories } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { formatAmount } from '../services/currency';
 import currenciesJson from '../../assets/currencies.json';
-import SimplePicker from '../components/SimplePicker';
 import BalanceHistoryCard from '../components/graphs/BalanceHistoryCard';
 import CategorySpendingCard from '../components/graphs/CategorySpendingCard';
 import ExpenseSummaryCard from '../components/graphs/ExpenseSummaryCard';
@@ -24,7 +23,7 @@ import useIncomeData from '../hooks/useIncomeData';
 import useBalanceHistory from '../hooks/useBalanceHistory';
 
 const CARD_HEADER_HEIGHT = 56;
-const CHART_HEIGHT = 300;
+const MAX_CHART_HEIGHT = 500;
 const CARD_GAP = 8;
 
 const GraphsScreen = () => {
@@ -69,6 +68,13 @@ const GraphsScreen = () => {
   // Dimension values updated on orientation change
   const halfWidthSV = useSharedValue(halfWidth);
   const rowWidthSV = useSharedValue(rowWidth);
+  // Dynamic chart heights — updated by onContentSizeChange on each chart's ScrollView
+  const expenseChartHeightSV = useSharedValue(0);
+  const incomeChartHeightSV = useSharedValue(0);
+  const expenseHeightInitialized = useRef(false);
+  const incomeHeightInitialized = useRef(false);
+  const expenseDrillDirection = useRef('in'); // 'in' | 'back'
+  const incomeDrillDirection = useRef('in');
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -110,10 +116,12 @@ const GraphsScreen = () => {
 
   // Handlers for legend item clicks
   const handleExpenseLegendItemPress = useCallback((categoryId) => {
+    expenseDrillDirection.current = 'in';
     setSelectedCategory(categoryId);
   }, []);
 
   const handleIncomeLegendItemPress = useCallback((categoryId) => {
+    incomeDrillDirection.current = 'in';
     setSelectedIncomeCategory(categoryId);
   }, []);
 
@@ -246,16 +254,6 @@ const GraphsScreen = () => {
   );
 
   // Prepare picker items
-  const categoryItems = useMemo(() => [
-    { label: t('all'), value: 'all' },
-    ...topLevelCategories.map(cat => ({ label: cat.name, value: cat.id })),
-  ], [topLevelCategories, t]);
-
-  const incomeCategoryItems = useMemo(() => [
-    { label: t('all'), value: 'all' },
-    ...topLevelIncomeCategories.map(cat => ({ label: cat.name, value: cat.id })),
-  ], [topLevelIncomeCategories, t]);
-
   const currencyItems = useMemo(() =>
     currencies.map(cur => ({ label: cur, value: cur })),
   [currencies],
@@ -375,6 +373,19 @@ const GraphsScreen = () => {
     return selectedYear === now.getFullYear() && selectedMonth === now.getMonth();
   }, [selectedYear, selectedMonth]);
 
+  // Derive display name for selected category (null when 'all')
+  const selectedCategoryName = useMemo(() => {
+    if (selectedCategory === 'all') return null;
+    const cat = categories.find(c => c.id === selectedCategory);
+    return cat ? cat.name : null;
+  }, [selectedCategory, categories]);
+
+  const selectedIncomeCategoryName = useMemo(() => {
+    if (selectedIncomeCategory === 'all') return null;
+    const cat = categories.find(c => c.id === selectedIncomeCategory);
+    return cat ? cat.name : null;
+  }, [selectedIncomeCategory, categories]);
+
   // Shared category parent lookup
   const getParentCategoryId = useCallback((categoryId) => {
     if (categoryId === 'all') return 'all';
@@ -385,15 +396,26 @@ const GraphsScreen = () => {
   }, [categories]);
 
   const handleBackToIncomeParent = useCallback(() => {
+    incomeDrillDirection.current = 'back';
     setSelectedIncomeCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
   const handleBackToExpenseParent = useCallback(() => {
+    expenseDrillDirection.current = 'back';
     setSelectedCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
+  const resetExpenseCategory = useCallback(() => setSelectedCategory('all'), []);
+  const resetIncomeCategory = useCallback(() => setSelectedIncomeCategory('all'), []);
+
   const toggleCard = useCallback((card) => {
     if (expandedCard === card) {
+      // Reset category first, then collapse
+      if (card === 'expense') {
+        resetExpenseCategory();
+      } else {
+        resetIncomeCategory();
+      }
       // Collapse: fade chart + shrink height first (180ms), then restore width (200ms)
       chartProgress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) });
       heightProgress.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.quad) }, (finished) => {
@@ -420,7 +442,8 @@ const GraphsScreen = () => {
         }
       });
     }
-  }, [expandedCard, widthProgress, heightProgress, chartProgress, expandingCard]);
+  }, [expandedCard, widthProgress, heightProgress, chartProgress, expandingCard,
+    resetExpenseCategory, resetIncomeCategory]);
 
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
@@ -444,10 +467,11 @@ const GraphsScreen = () => {
     const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
+    const chartH = incomeChartHeightSV.value;
     if (ev === 1) {
       return {
         width: interpolate(wp, [0, 1], [hw, rw]),
-        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + chartH]),
         opacity: 1,
       };
     }
@@ -467,10 +491,11 @@ const GraphsScreen = () => {
     const hp = heightProgress.value;
     const hw = halfWidthSV.value;
     const rw = rowWidthSV.value;
+    const chartH = expenseChartHeightSV.value;
     if (ev === 2) {
       return {
         width: interpolate(wp, [0, 1], [hw, rw]),
-        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + CHART_HEIGHT]),
+        height: interpolate(hp, [0, 1], [CARD_HEADER_HEIGHT, CARD_HEADER_HEIGHT + chartH]),
         opacity: 1,
       };
     }
@@ -519,6 +544,8 @@ const GraphsScreen = () => {
                   selectedCurrency={selectedCurrency}
                   onPress={handleToggleIncome}
                   expanded={expandedCard === 'income'}
+                  categoryName={selectedIncomeCategoryName}
+                  onBack={handleBackToIncomeParent}
                 />
               </View>
               <Animated.View
@@ -530,36 +557,31 @@ const GraphsScreen = () => {
                   contentContainerStyle={styles.chartScrollContent}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => {
+                    const target = Math.min(h, MAX_CHART_HEIGHT);
+                    if (!incomeHeightInitialized.current) {
+                      incomeChartHeightSV.value = target;
+                      incomeHeightInitialized.current = true;
+                    } else {
+                      incomeChartHeightSV.value = withTiming(target, { duration: 280, easing: Easing.out(Easing.cubic) });
+                    }
+                  }}
                 >
-                  {selectedIncomeCategory !== 'all' && (
-                    <View style={styles.chartNavRow}>
-                      <TouchableOpacity
-                        onPress={handleBackToIncomeParent}
-                        style={styles.chartNavBack}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('back')}
-                      >
-                        <Icon name="arrow-left" size={20} color={colors.primary} />
-                      </TouchableOpacity>
-                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                        <SimplePicker
-                          value={selectedIncomeCategory}
-                          onValueChange={setSelectedIncomeCategory}
-                          items={incomeCategoryItems}
-                          colors={colors}
-                        />
-                      </View>
-                    </View>
-                  )}
-                  <IncomePieChart
-                    colors={colors}
-                    t={t}
-                    loadingIncome={loadingIncome}
-                    incomeChartData={incomeChartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleIncomeLegendItemPress}
-                    selectedIncomeCategory={selectedIncomeCategory}
-                  />
+                  <Animated.View
+                    key={selectedIncomeCategory}
+                    entering={incomeDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={incomeDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <IncomePieChart
+                      colors={colors}
+                      t={t}
+                      loadingIncome={loadingIncome}
+                      incomeChartData={incomeChartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleIncomeLegendItemPress}
+                      selectedIncomeCategory={selectedIncomeCategory}
+                    />
+                  </Animated.View>
                 </ScrollView>
               </Animated.View>
             </Animated.View>
@@ -584,6 +606,8 @@ const GraphsScreen = () => {
                   selectedCurrency={selectedCurrency}
                   onPress={handleToggleExpense}
                   expanded={expandedCard === 'expense'}
+                  categoryName={selectedCategoryName}
+                  onBack={handleBackToExpenseParent}
                 />
               </View>
               <Animated.View
@@ -595,36 +619,31 @@ const GraphsScreen = () => {
                   contentContainerStyle={styles.chartScrollContent}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
+                  onContentSizeChange={(_, h) => {
+                    const target = Math.min(h, MAX_CHART_HEIGHT);
+                    if (!expenseHeightInitialized.current) {
+                      expenseChartHeightSV.value = target;
+                      expenseHeightInitialized.current = true;
+                    } else {
+                      expenseChartHeightSV.value = withTiming(target, { duration: 280, easing: Easing.out(Easing.cubic) });
+                    }
+                  }}
                 >
-                  {selectedCategory !== 'all' && (
-                    <View style={styles.chartNavRow}>
-                      <TouchableOpacity
-                        onPress={handleBackToExpenseParent}
-                        style={styles.chartNavBack}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('back')}
-                      >
-                        <Icon name="arrow-left" size={20} color={colors.primary} />
-                      </TouchableOpacity>
-                      <View style={[styles.chartNavPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                        <SimplePicker
-                          value={selectedCategory}
-                          onValueChange={setSelectedCategory}
-                          items={categoryItems}
-                          colors={colors}
-                        />
-                      </View>
-                    </View>
-                  )}
-                  <ExpensePieChart
-                    colors={colors}
-                    t={t}
-                    loading={loading}
-                    chartData={chartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleExpenseLegendItemPress}
-                    selectedCategory={selectedCategory}
-                  />
+                  <Animated.View
+                    key={selectedCategory}
+                    entering={expenseDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={expenseDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <ExpensePieChart
+                      colors={colors}
+                      t={t}
+                      loading={loading}
+                      chartData={chartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleExpenseLegendItemPress}
+                      selectedCategory={selectedCategory}
+                    />
+                  </Animated.View>
                 </ScrollView>
               </Animated.View>
             </Animated.View>
@@ -714,26 +733,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: CARD_HEADER_HEIGHT,
   },
-  chartNavBack: {
-    marginRight: 8,
-    padding: 4,
-  },
-  chartNavPicker: {
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    height: 40,
-    overflow: 'hidden',
-  },
-  chartNavRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-    marginTop: 4,
-  },
   chartScrollContent: {
-    paddingBottom: 8,
-    paddingHorizontal: 12,
+    paddingBottom: 24,
+    paddingLeft: 3,
+    paddingRight: 9,
+    paddingTop: 4,
   },
   chartScrollView: {
     flex: 1,
@@ -774,7 +778,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryCardBase: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
   },

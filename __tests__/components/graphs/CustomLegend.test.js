@@ -156,20 +156,10 @@ describe('CustomLegend', () => {
   });
 
   describe('Icons', () => {
-    it('renders icons when provided', () => {
-      const { getByTestId } = render(<CustomLegend {...defaultProps} />);
-      expect(getByTestId('icon-food')).toBeTruthy();
-      expect(getByTestId('icon-car')).toBeTruthy();
-    });
-
-    it('does not render icons when not provided', () => {
-      const dataWithoutIcons = [
-        { name: 'No Icon', amount: 100, color: '#000', categoryId: 'cat-1' },
-      ];
-      const { queryByTestId } = render(
-        <CustomLegend {...defaultProps} data={dataWithoutIcons} />,
-      );
-      expect(queryByTestId('icon-undefined')).toBeNull();
+    it('does not render icons in legend rows (icons shown on donut arc instead)', () => {
+      const { queryByTestId } = render(<CustomLegend {...defaultProps} />);
+      expect(queryByTestId('legend-icon-food')).toBeNull();
+      expect(queryByTestId('legend-icon-car')).toBeNull();
     });
   });
 

@@ -53,14 +53,6 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             {/* Category column (flexible width) */}
             <View style={styles.categoryColumn}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-              {item.icon && (
-                <Icon
-                  name={item.icon}
-                  size={18}
-                  color={colors.text}
-                  style={styles.legendIcon}
-                />
-              )}
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
@@ -122,38 +114,35 @@ const styles = StyleSheet.create({
   amountColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    width: 100,
+    width: 62,
   },
   categoryColumn: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
     minWidth: 0,
   },
   colorIndicator: {
-    borderRadius: 6,
-    height: 12,
-    width: 12,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   legendAmount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   legendChevron: {
     marginLeft: 4,
   },
   legendContainer: {
-    marginTop: 16,
-  },
-  legendIcon: {
-    marginLeft: 4,
+    marginTop: 4,
   },
   legendItem: {
     alignItems: 'center',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     paddingVertical: 12,
   },
   legendItemClickable: {
@@ -161,22 +150,22 @@ const styles = StyleSheet.create({
   },
   legendName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
   },
   legendPercentage: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   percentageColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    width: 50,
+    width: 38,
   },
   verticalDivider: {
     alignSelf: 'center',
     backgroundColor: 'rgba(120,120,120,0.13)',
     height: '70%',
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     width: 1,
   },
 });

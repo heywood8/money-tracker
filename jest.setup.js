@@ -600,12 +600,13 @@ jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
   const PropTypes = require('prop-types');
 
-  const MockIcon = ({ name, size, color, ...props }) =>
-    React.createElement(Text, { ...props, testID: `icon-${name}` }, name);
+  const MockIcon = ({ name, size, color, testID, ...props }) =>
+    React.createElement(Text, { ...props, testID: testID || `icon-${name}` }, name);
   MockIcon.propTypes = {
     name: PropTypes.string,
     size: PropTypes.number,
     color: PropTypes.string,
+    testID: PropTypes.string,
   };
 
   return {
@@ -705,6 +706,10 @@ jest.mock('react-native-reanimated', () => {
       delay(ms) { return this; }
       withCallback(callback) { return this; }
     },
+    SlideInRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideInLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideOutLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideOutRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
     SharedValue: class SharedValue {
       constructor(value) { this.value = value; }
     },
