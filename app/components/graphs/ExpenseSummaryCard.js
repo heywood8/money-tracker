@@ -50,18 +50,20 @@ const ExpenseSummaryCard = ({
         </Text>
       </View>
       {categoryName && onBack && (
-        <TouchableOpacity
-          onPress={onBack}
-          style={styles.categoryBack}
-          accessibilityRole="button"
-          accessibilityLabel={t('back')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name="chevron-left" size={16} color={colors.mutedText} />
-          <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
-            {categoryName}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.categoryBackOverlay} pointerEvents="box-none">
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.categoryBack}
+            accessibilityRole="button"
+            accessibilityLabel={t('back')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="chevron-left" size={18} color={colors.mutedText} />
+            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+              {categoryName}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
       <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
     </TouchableOpacity>
@@ -90,15 +92,22 @@ const styles = StyleSheet.create({
   categoryBack: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexShrink: 1,
     gap: 2,
-    marginRight: 4,
+  },
+  categoryBackOverlay: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   categoryName: {
     flexShrink: 1,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
-    maxWidth: 90,
+    maxWidth: 120,
   },
   iconBadge: {
     alignItems: 'center',
