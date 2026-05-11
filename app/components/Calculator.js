@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from '
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import { BORDER_RADIUS, SPACING, HEIGHTS } from '../styles/designTokens';
+import { SPACING, HEIGHTS } from '../styles/designTokens';
 import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } from '../utils/calculatorUtils';
 
 /**
@@ -483,7 +483,7 @@ Calculator.defaultProps = {
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: HEIGHTS.calculator / 2,
     elevation: 2,
     flex: 1,
     height: HEIGHTS.calculator,
