@@ -32,13 +32,9 @@ const ExpenseSummaryCard = ({
 }) => {
   const { hideBalances } = useDisplaySettings();
   return (
-    <TouchableOpacity
+    <View
       testID="expense-summary-card"
       style={styles.summaryCard}
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={t('expenses_by_category')}
     >
       <View style={styles.iconBadge}>
         <Icon name="arrow-top-right" size={16} color="#d93025" />
@@ -53,20 +49,28 @@ const ExpenseSummaryCard = ({
         <View style={styles.categoryBackOverlay} pointerEvents="box-none">
           <TouchableOpacity
             onPress={onBack}
-            style={styles.categoryBack}
+            style={[styles.filterChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+            activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={t('back')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Icon name="chevron-left" size={18} color={colors.mutedText} />
-            <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={1}>
+            <Text style={[styles.filterChipText, { color: colors.text }]} numberOfLines={1}>
               {categoryName}
             </Text>
+            <Icon name="close-circle" size={14} color={colors.mutedText} />
           </TouchableOpacity>
         </View>
       )}
-      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
-    </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.collapseButton}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={t('expenses_by_category')}
+      >
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
+      </TouchableOpacity>
+    </View>
   );
 };
 
@@ -89,11 +93,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     marginTop: 1,
   },
-  categoryBack: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 2,
-  },
   categoryBackOverlay: {
     alignItems: 'center',
     bottom: 0,
@@ -103,11 +102,26 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  categoryName: {
+  collapseButton: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    width: '15%',
+  },
+  filterChip: {
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    maxWidth: '75%',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  filterChipText: {
     flexShrink: 1,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
-    maxWidth: 120,
   },
   iconBadge: {
     alignItems: 'center',
