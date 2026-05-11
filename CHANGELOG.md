@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.105.1](https://github.com/heywood8/money-tracker/compare/penny-v0.105.0...penny-v0.105.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* currency picker to show as popover anchored to button ([#554](https://github.com/heywood8/money-tracker/issues/554)) ([831aef4](https://github.com/heywood8/money-tracker/commit/831aef4a0e14102b3aa9ac180f3227bdf33fb1cc))
+
 ## [0.105.0](https://github.com/heywood8/money-tracker/compare/penny-v0.104.0...penny-v0.105.0) (2026-05-10)
 
 
