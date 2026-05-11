@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Modal, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -51,6 +51,8 @@ const GraphsScreen = () => {
 
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const currencyPickerRef = useRef(null);
+  const [currencyPickerLayout, setCurrencyPickerLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   // Account selection state
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -427,6 +429,17 @@ const GraphsScreen = () => {
   const handleToggleIncome = useCallback(() => toggleCard('income'), [toggleCard]);
   const handleToggleExpense = useCallback(() => toggleCard('expense'), [toggleCard]);
 
+  const handleOpenCurrencyPicker = useCallback(() => {
+    if (currencyPickerRef.current) {
+      currencyPickerRef.current.measureInWindow((x, y, width, height) => {
+        setCurrencyPickerLayout({ x, y, width, height });
+        setShowCurrencyPicker(true);
+      });
+    } else {
+      setShowCurrencyPicker(true);
+    }
+  }, []);
+
   // Reset expansion and update dimension shared values on orientation change
   useEffect(() => {
     halfWidthSV.value = halfWidth;
@@ -505,8 +518,9 @@ const GraphsScreen = () => {
           <View style={styles.filtersRow}>
             {/* Currency Picker */}
             <TouchableOpacity
+              ref={currencyPickerRef}
               style={[styles.pickerWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => setShowCurrencyPicker(true)}
+              onPress={handleOpenCurrencyPicker}
               activeOpacity={0.7}
             >
               <View style={styles.periodPickerButton}>
@@ -706,34 +720,36 @@ const GraphsScreen = () => {
       <Modal
         visible={showCurrencyPicker}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowCurrencyPicker(false)}
       >
         <TouchableOpacity
-          style={styles.pickerModalOverlay}
+          style={styles.pickerPopoverOverlay}
           activeOpacity={1}
           onPress={() => setShowCurrencyPicker(false)}
-        >
-          <TouchableOpacity activeOpacity={1} style={[styles.pickerModalSheet, { backgroundColor: colors.surface }]}>
-            <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.pickerModalTitle, { color: colors.text }]}>{t('select_currency')}</Text>
-              <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-                <Text style={[styles.pickerModalDone, { color: colors.primary }]}>{t('done')}</Text>
-              </TouchableOpacity>
-            </View>
-            <WheelPicker
-              data={currencyItems}
-              value={selectedCurrency}
-              onValueChanged={({ item }) => setSelectedCurrency(item.value)}
-              itemHeight={48}
-              visibleItemCount={5}
-              itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
-              overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
-              enableScrollByTapOnItem
-              keyExtractor={(item, index) => `currency-${index}`}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
+        />
+        <View style={[
+          styles.currencyPopover,
+          {
+            top: currencyPickerLayout.y + currencyPickerLayout.height + 4,
+            left: currencyPickerLayout.x,
+            width: Math.max(currencyPickerLayout.width, 160),
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}>
+          <WheelPicker
+            data={currencyItems}
+            value={selectedCurrency}
+            onValueChanged={({ item }) => setSelectedCurrency(item.value)}
+            itemHeight={48}
+            visibleItemCount={5}
+            itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
+            overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
+            enableScrollByTapOnItem
+            keyExtractor={(item, index) => `currency-${index}`}
+          />
+        </View>
       </Modal>
 
       <Modal
@@ -815,6 +831,13 @@ const styles = StyleSheet.create({
     padding: TOP_CONTENT_SPACING,
     paddingTop: TOP_CONTENT_SPACING + 4,
   },
+  currencyPopover: {
+    borderRadius: 12,
+    borderWidth: 1,
+    elevation: 8,
+    overflow: 'hidden',
+    position: 'absolute',
+  },
   currencySymbol: {
     fontSize: 15,
     fontWeight: '600',
@@ -871,6 +894,13 @@ const styles = StyleSheet.create({
   pickerModalTitle: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  pickerPopoverOverlay: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   pickerWrapper: {
     borderRadius: 12,
