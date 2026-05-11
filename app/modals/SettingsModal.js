@@ -16,11 +16,11 @@ import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk } from '../services/AppUpdateService';
-import { setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
-import { getValidAccessToken, signIn as googleSignIn, exportToSheets } from '../services/GoogleSheetsService';
+import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 
 const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
@@ -29,6 +29,11 @@ const SHEETS_STEPS = [
   { id: 'clear', label: 'Clearing existing data' },
   { id: 'write', label: 'Uploading data' },
   { id: 'complete', label: 'Export complete' },
+];
+
+const SHEETS_IMPORT_STEPS = [
+  { id: 'connect', label: 'Connecting to spreadsheet' },
+  { id: 'parse', label: 'Reading sheet data' },
 ];
 
 const LOG_LEVEL_COLORS = {
@@ -73,10 +78,12 @@ export default function SettingsModal({ visible, onClose }) {
   const [sheetsSteps, setSheetsSteps] = useState(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
   const [sheetsSuccessUrl, setSheetsSuccessUrl] = useState(null);
   const [sheetsError, setSheetsError] = useState(null);
+  const [sheetsImportSteps, setSheetsImportSteps] = useState(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
+  const [sheetsImportError, setSheetsImportError] = useState(null);
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
-  const [importStep, setImportStep] = useState('source'); // 'source' | 'local-list' | 'confirm-file' | 'confirm-local' | 'cloud'
+  const [importStep, setImportStep] = useState('source'); // 'source' | 'local-list' | 'confirm-file' | 'confirm-local' | 'sheets-progress'
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
   const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
@@ -169,6 +176,8 @@ export default function SettingsModal({ visible, onClose }) {
       setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
       setSheetsSuccessUrl(null);
       setSheetsError(null);
+      setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
+      setSheetsImportError(null);
       setDownloadedApks([]);
     });
   }, [settingsAnim, subPanelAnim]);
@@ -381,6 +390,55 @@ export default function SettingsModal({ visible, onClose }) {
     }
   }, []);
 
+  const handleGoogleSheetsImport = useCallback(async () => {
+    setSheetsImportError(null);
+
+    const spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
+    if (!spreadsheetId) {
+      setSheetsImportError(t('google_sheets_not_configured') || 'Export to Google Sheets first to set up your spreadsheet.');
+      return;
+    }
+
+    setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
+    setImportStep('sheets-progress');
+
+    let backup;
+    try {
+      let accessToken;
+      try {
+        accessToken = await getValidAccessToken();
+      } catch {
+        accessToken = await googleSignIn();
+      }
+      backup = await importFromSheets(accessToken, ({ step, status }) => {
+        setSheetsImportSteps(prev => prev.map(s => s.id === step ? { ...s, status } : s));
+      });
+    } catch (error) {
+      if (error.message === 'sign_in_cancelled') {
+        setImportStep('source');
+        return;
+      }
+      let msg;
+      if (error.message === 'refresh_failed') msg = t('google_sheets_access_revoked') || 'Google access was revoked. Please sign in again.';
+      else if (error.message === 'spreadsheet_not_found') msg = t('google_sheets_not_found') || 'Spreadsheet not found. Try exporting first.';
+      else msg = t('google_sheets_import_failed') || 'Import failed. Please try again.';
+      setSheetsImportSteps(prev => prev.map(s => s.status === 'in_progress' ? { ...s, status: 'error' } : s));
+      setSheetsImportError(msg);
+      return;
+    }
+
+    closeSubPanel();
+    onClose();
+    startImport();
+    try {
+      await restoreBackup(backup);
+      completeImport();
+    } catch (restoreError) {
+      cancelImport();
+      console.error('[SheetsImport] restore error:', restoreError);
+    }
+  }, [t, closeSubPanel, onClose, startImport, restoreBackup, completeImport, cancelImport]);
+
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
     setImportStep('confirm-local');
@@ -396,6 +454,9 @@ export default function SettingsModal({ visible, onClose }) {
     } else if (importStep === 'confirm-local') {
       setImportStep('local-list');
       setImportSelectedBackup(null);
+    } else if (importStep === 'sheets-progress') {
+      setImportStep('source');
+      setSheetsImportError(null);
     }
   }, [importStep, closeSubPanel]);
 
@@ -524,6 +585,8 @@ export default function SettingsModal({ visible, onClose }) {
       setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
       setSheetsSuccessUrl(null);
       setSheetsError(null);
+      setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
+      setSheetsImportError(null);
       settingsAnim.setValue(0);
       subPanelAnim.setValue(0);
     }
@@ -777,7 +840,10 @@ export default function SettingsModal({ visible, onClose }) {
                   }
                   style={styles.backButton}
                   testID="settings-subpanel-back"
-                  disabled={activeSubPanel === 'export' && exportStep === 'sheets-progress' && sheetsSteps.some(s => s.status === 'in_progress')}
+                  disabled={
+                    (activeSubPanel === 'export' && exportStep === 'sheets-progress' && sheetsSteps.some(s => s.status === 'in_progress')) ||
+                    (activeSubPanel === 'import' && importStep === 'sheets-progress' && sheetsImportSteps.some(s => s.status === 'in_progress'))
+                  }
                 >
                   <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -791,9 +857,11 @@ export default function SettingsModal({ visible, onClose }) {
                   {activeSubPanel === 'import' && (
                     importStep === 'source'
                       ? (t('import') || 'Import')
-                      : importStep === 'local-list'
-                        ? (t('local_backups') || 'Local Backups')
-                        : (t('restore_database') || 'Restore Database')
+                      : importStep === 'sheets-progress'
+                        ? (t('google_sheets_import') || 'Import from Sheets')
+                        : importStep === 'local-list'
+                          ? (t('local_backups') || 'Local Backups')
+                          : (t('restore_database') || 'Restore Database')
                   )}
                   {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
                   {activeSubPanel === 'update' && (
@@ -1038,6 +1106,35 @@ export default function SettingsModal({ visible, onClose }) {
                       <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                     </View>
                   </TouchableRipple>
+
+                  <TouchableRipple
+                    onPress={handleGoogleSheetsImport}
+                    style={styles.languageItem}
+                    testID="settings-import-google-sheets"
+                  >
+                    <View style={styles.languageItemContent}>
+                      <View style={styles.formatItemRow}>
+                        <Ionicons name="logo-google" size={24} color={colors.text} />
+                        <View style={styles.formatTextContainer}>
+                          <Text style={[styles.languageItemText, { color: colors.text }]}>
+                            {t('import_from_google_sheets') || 'From Google Sheets'}
+                          </Text>
+                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                            {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    </View>
+                  </TouchableRipple>
+                  {sheetsImportError && importStep === 'source' && (
+                    <Text
+                      testID="settings-import-no-spreadsheet"
+                      style={styles.sheetsImportErrorInline}
+                    >
+                      {sheetsImportError}
+                    </Text>
+                  )}
                 </ScrollView>
               )}
 
@@ -1092,6 +1189,39 @@ export default function SettingsModal({ visible, onClose }) {
                       {t('restore_database') || 'Restore'}
                     </Text>
                   </TouchableRipple>
+                </View>
+              )}
+
+              {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
+                <View style={styles.sheetsProgressContent}>
+                  {sheetsImportSteps.map(step => (
+                    <View key={step.id} style={styles.sheetsProgressStep}>
+                      <View style={styles.sheetsProgressStepIcon}>
+                        {step.status === 'pending' && (
+                          <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />
+                        )}
+                        {step.status === 'in_progress' && (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        )}
+                        {step.status === 'completed' && (
+                          <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                        )}
+                        {step.status === 'error' && (
+                          <Ionicons name="close-circle" size={22} color="#c44" />
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.sheetsProgressStepLabel,
+                        step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                          { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                      ]}>
+                        {step.label}
+                      </Text>
+                    </View>
+                  ))}
+                  {sheetsImportError && (
+                    <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>
+                  )}
                 </View>
               )}
 
@@ -1673,6 +1803,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: SPACING.lg,
     textAlign: 'center',
+  },
+  sheetsImportErrorInline: {
+    color: '#c44',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+    marginHorizontal: 16,
   },
   sheetsOpenButton: {
     alignItems: 'center',
