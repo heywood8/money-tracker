@@ -689,9 +689,10 @@ const styles = StyleSheet.create({
     top: CARD_HEADER_HEIGHT,
   },
   chartScrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 24,
     paddingLeft: 12,
     paddingRight: 4,
+    paddingTop: 4,
   },
   chartScrollView: {
     flex: 1,

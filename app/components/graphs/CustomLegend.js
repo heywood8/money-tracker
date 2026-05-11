@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   legendContainer: {
-    marginTop: 16,
+    marginTop: 4,
   },
   legendItem: {
     alignItems: 'center',
