@@ -706,6 +706,10 @@ jest.mock('react-native-reanimated', () => {
       delay(ms) { return this; }
       withCallback(callback) { return this; }
     },
+    SlideInRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideInLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideOutLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    SlideOutRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
     SharedValue: class SharedValue {
       constructor(value) { this.value = value; }
     },

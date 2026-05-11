@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, runOnJS, Easing, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import WheelPicker from '@quidone/react-native-wheel-picker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -73,6 +73,8 @@ const GraphsScreen = () => {
   const incomeChartHeightSV = useSharedValue(0);
   const expenseHeightInitialized = useRef(false);
   const incomeHeightInitialized = useRef(false);
+  const expenseDrillDirection = useRef('in'); // 'in' | 'back'
+  const incomeDrillDirection = useRef('in');
 
   // Derive selectedYear and selectedMonth from combined selectedPeriod
   // This must be defined before the hooks that use these values
@@ -114,10 +116,12 @@ const GraphsScreen = () => {
 
   // Handlers for legend item clicks
   const handleExpenseLegendItemPress = useCallback((categoryId) => {
+    expenseDrillDirection.current = 'in';
     setSelectedCategory(categoryId);
   }, []);
 
   const handleIncomeLegendItemPress = useCallback((categoryId) => {
+    incomeDrillDirection.current = 'in';
     setSelectedIncomeCategory(categoryId);
   }, []);
 
@@ -392,10 +396,12 @@ const GraphsScreen = () => {
   }, [categories]);
 
   const handleBackToIncomeParent = useCallback(() => {
+    incomeDrillDirection.current = 'back';
     setSelectedIncomeCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
   const handleBackToExpenseParent = useCallback(() => {
+    expenseDrillDirection.current = 'back';
     setSelectedCategory(prev => getParentCategoryId(prev));
   }, [getParentCategoryId]);
 
@@ -561,15 +567,21 @@ const GraphsScreen = () => {
                     }
                   }}
                 >
-                  <IncomePieChart
-                    colors={colors}
-                    t={t}
-                    loadingIncome={loadingIncome}
-                    incomeChartData={incomeChartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleIncomeLegendItemPress}
-                    selectedIncomeCategory={selectedIncomeCategory}
-                  />
+                  <Animated.View
+                    key={selectedIncomeCategory}
+                    entering={incomeDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={incomeDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <IncomePieChart
+                      colors={colors}
+                      t={t}
+                      loadingIncome={loadingIncome}
+                      incomeChartData={incomeChartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleIncomeLegendItemPress}
+                      selectedIncomeCategory={selectedIncomeCategory}
+                    />
+                  </Animated.View>
                 </ScrollView>
               </Animated.View>
             </Animated.View>
@@ -617,15 +629,21 @@ const GraphsScreen = () => {
                     }
                   }}
                 >
-                  <ExpensePieChart
-                    colors={colors}
-                    t={t}
-                    loading={loading}
-                    chartData={chartData}
-                    selectedCurrency={selectedCurrency}
-                    onLegendItemPress={handleExpenseLegendItemPress}
-                    selectedCategory={selectedCategory}
-                  />
+                  <Animated.View
+                    key={selectedCategory}
+                    entering={expenseDrillDirection.current === 'in' ? SlideInRight.duration(280) : SlideInLeft.duration(280)}
+                    exiting={expenseDrillDirection.current === 'in' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)}
+                  >
+                    <ExpensePieChart
+                      colors={colors}
+                      t={t}
+                      loading={loading}
+                      chartData={chartData}
+                      selectedCurrency={selectedCurrency}
+                      onLegendItemPress={handleExpenseLegendItemPress}
+                      selectedCategory={selectedCategory}
+                    />
+                  </Animated.View>
                 </ScrollView>
               </Animated.View>
             </Animated.View>
