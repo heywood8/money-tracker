@@ -253,8 +253,8 @@ const OperationFormFields = memo(({
         }
       };
 
-      // Show "all" button only when there are more than 8 categories (not all fit in two rows)
-      const showAllButton = categories.length > 8;
+      // Count only leaf categories — folders inflate the length but never appear as chips
+      const showAllButton = categories.filter(c => c.type !== 'folder').length > 8;
       const firstRowCats = showAllButton ? topCategoriesForType.slice(0, 3) : topCategoriesForType.slice(0, 4);
       const secondRowCats = showAllButton ? topCategoriesForType.slice(3) : topCategoriesForType.slice(4);
 
