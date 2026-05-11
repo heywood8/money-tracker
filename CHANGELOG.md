@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.110.1](https://github.com/heywood8/money-tracker/compare/penny-v0.110.0...penny-v0.110.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* remove border styling from calculator buttons ([#575](https://github.com/heywood8/money-tracker/issues/575)) ([877b747](https://github.com/heywood8/money-tracker/commit/877b747aff6b6a665a4c5fb378b97c75f47ae3a4))
+
 ## [0.110.0](https://github.com/heywood8/money-tracker/compare/penny-v0.109.1...penny-v0.110.0) (2026-05-11)
 
 
