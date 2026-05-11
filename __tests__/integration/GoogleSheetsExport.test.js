@@ -9,6 +9,7 @@ jest.mock('../../app/services/GoogleSheetsService', () => ({
   signIn: jest.fn(),
   signOut: jest.fn(),
   exportToSheets: jest.fn(),
+  importFromSheets: jest.fn(),
 }));
 
 jest.mock('../../app/services/BackupRestore', () => ({
@@ -78,6 +79,7 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
 
 const { getValidAccessToken, signIn, exportToSheets } =
   require('../../app/services/GoogleSheetsService');
+
 
 describe('GoogleSheetsExport integration', () => {
   beforeEach(() => {
@@ -173,6 +175,62 @@ describe('GoogleSheetsExport integration', () => {
 
     await waitFor(() => {
       expect(mockShowDialog).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('From Google Sheets import', () => {
+  const { getValidAccessToken, importFromSheets } = require('../../app/services/GoogleSheetsService');
+  const { restoreBackup } = require('../../app/services/BackupRestore');
+  const { getPreference } = require('../../app/services/PreferencesDB');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders From Google Sheets row in import subpanel', async () => {
+    const { getByText, getByTestId } = render(
+      <SettingsModal visible={true} onClose={jest.fn()} />,
+    );
+    fireEvent.press(getByText('import'));
+    await waitFor(() => {
+      expect(getByTestId('settings-import-google-sheets')).toBeTruthy();
+    });
+  });
+
+  it('shows no-spreadsheet message when no spreadsheet ID is saved', async () => {
+    getPreference.mockResolvedValue(null);
+    const { getByText, getByTestId } = render(
+      <SettingsModal visible={true} onClose={jest.fn()} />,
+    );
+    fireEvent.press(getByText('import'));
+    await waitFor(() => getByTestId('settings-import-google-sheets'));
+    fireEvent.press(getByTestId('settings-import-google-sheets'));
+    await waitFor(() => {
+      expect(getByTestId('settings-import-no-spreadsheet')).toBeTruthy();
+    });
+  });
+
+  it('calls importFromSheets when tapped and spreadsheet is configured', async () => {
+    getPreference.mockResolvedValue('sheet-id-123');
+    getValidAccessToken.mockResolvedValue('token');
+    importFromSheets.mockResolvedValue({
+      version: 1,
+      timestamp: new Date().toISOString(),
+      platform: 'native',
+      data: { accounts: [], categories: [], operations: [], budgets: [], app_metadata: [], balance_history: [], planned_operations: [] },
+    });
+    restoreBackup.mockResolvedValue();
+
+    const { getByText, getByTestId } = render(
+      <SettingsModal visible={true} onClose={jest.fn()} />,
+    );
+    fireEvent.press(getByText('import'));
+    await waitFor(() => getByTestId('settings-import-google-sheets'));
+    fireEvent.press(getByTestId('settings-import-google-sheets'));
+
+    await waitFor(() => {
+      expect(importFromSheets).toHaveBeenCalledWith('token', expect.any(Function));
     });
   });
 });

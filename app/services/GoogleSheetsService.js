@@ -1,5 +1,6 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { getPreference, setPreference, PREF_KEYS } from './PreferencesDB';
+import { queryAll } from './db';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -79,80 +80,294 @@ export const buildSheetsData = (backup) => {
     {
       range: 'Accounts!A1',
       values: [
-        ['id', 'name', 'balance', 'currency'],
-        ...accounts.map(a => [a.id, a.name, a.balance, a.currency]),
+        ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target'],
+        ...accounts.map(a => [
+          a.id, a.name, a.balance, a.currency,
+          a.display_order ?? '', a.hidden ?? 0, a.monthly_target ?? '',
+        ]),
       ],
     },
     {
       range: 'Operations!A1',
       values: [
-        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description'],
+        ['id', 'date', 'type', 'amount', 'currency', 'category', 'account', 'to_account', 'description', 'account_id', 'category_id', 'to_account_id', 'exchange_rate', 'destination_amount', 'destination_currency'],
         ...operations.map(o => [
-          o.id,
-          o.date,
-          o.type,
-          o.amount,
+          o.id, o.date, o.type, o.amount,
           o.source_currency || '',
           categoryNames.get(o.category_id) || '',
           accountNames.get(o.account_id) || '',
           o.to_account_id ? (accountNames.get(o.to_account_id) || '') : '',
           o.description || '',
+          o.account_id,
+          o.category_id || '',
+          o.to_account_id || '',
+          o.exchange_rate || '',
+          o.destination_amount || '',
+          o.destination_currency || '',
         ]),
       ],
     },
     {
       range: 'Categories!A1',
       values: [
-        ['id', 'name', 'type', 'category_type', 'icon'],
-        ...categories.map(c => [c.id, c.name, c.type, c.category_type, c.icon || '']),
+        ['id', 'name', 'type', 'category_type', 'icon', 'parent_id', 'color', 'is_shadow'],
+        ...categories.map(c => [
+          c.id, c.name, c.type, c.category_type, c.icon || '',
+          c.parent_id || '', c.color || '', c.is_shadow ?? 0,
+        ]),
       ],
     },
     {
       range: 'Budgets!A1',
       values: [
-        ['id', 'category', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled'],
+        ['id', 'category', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'category_id'],
         ...(budgets || []).map(b => [
           b.id,
           categoryNames.get(b.category_id) || '',
-          b.amount,
-          b.currency,
-          b.period_type,
-          b.start_date,
-          b.end_date || '',
-          b.is_recurring,
-          b.rollover_enabled,
+          b.amount, b.currency, b.period_type, b.start_date, b.end_date || '',
+          b.is_recurring, b.rollover_enabled,
+          b.category_id || '',
         ]),
       ],
     },
     {
       range: 'Planned Operations!A1',
       values: [
-        ['id', 'name', 'type', 'amount', 'account', 'category', 'to_account', 'description', 'is_recurring'],
+        ['id', 'name', 'type', 'amount', 'account', 'category', 'to_account', 'description', 'is_recurring', 'account_id', 'category_id', 'to_account_id'],
         ...(planned_operations || []).map(p => [
-          p.id,
-          p.name,
-          p.type,
-          p.amount,
+          p.id, p.name, p.type, p.amount,
           accountNames.get(p.account_id) || '',
           categoryNames.get(p.category_id) || '',
           p.to_account_id ? (accountNames.get(p.to_account_id) || '') : '',
           p.description || '',
           p.is_recurring,
+          p.account_id,
+          p.category_id || '',
+          p.to_account_id || '',
         ]),
       ],
     },
     {
       range: 'Balance History!A1',
       values: [
-        ['account', 'date', 'balance'],
+        ['account', 'date', 'balance', 'account_id'],
         ...(balance_history || []).map(h => [
           accountNames.get(h.account_id) || '',
-          h.date,
-          h.balance,
+          h.date, h.balance,
+          h.account_id,
         ]),
       ],
     },
   ];
+};
+
+/**
+ * Parse a Sheets API valueRange into an array of row objects.
+ * Row 0 is the header; subsequent rows become key/value objects.
+ * @param {Object|undefined} valueRange
+ * @returns {Array<Object>}
+ */
+const parseSheet = (valueRange) => {
+  const rows = valueRange?.values || [];
+  if (rows.length < 2) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+    return obj;
+  });
+};
+
+/**
+ * Import all app data from the saved Google Sheets spreadsheet.
+ * Fetches all 6 sheets in one batchGet call, resolves foreign keys
+ * (ID-first, name fallback), and returns a backup object compatible
+ * with restoreBackup(). Does NOT call restoreBackup itself.
+ *
+ * @param {string} accessToken - Valid Google OAuth access token
+ * @param {Function} [onProgress] - Optional callback({ step, status })
+ *   Steps: 'connect' | 'parse'. Statuses: 'in_progress' | 'completed'.
+ * @returns {Promise<Object>} Backup object matching createBackup() format
+ */
+export const importFromSheets = async (accessToken, onProgress) => {
+  const report = (step, status) => onProgress?.({ step, status });
+
+  // ── Step 1: connect ────────────────────────────────────────────────
+  report('connect', 'in_progress');
+
+  const spreadsheetId = await getPreference(PREF_KEYS.GOOGLE_SHEETS_SPREADSHEET_ID);
+  if (!spreadsheetId) {
+    throw new Error('no_spreadsheet_configured');
+  }
+
+  const sheetNames = ['Accounts', 'Operations', 'Categories', 'Budgets', 'Planned Operations', 'Balance History'];
+  const rangesParam = sheetNames.map(n => `ranges=${encodeURIComponent(n)}`).join('&');
+  const response = await fetch(
+    `${SHEETS_API}/${spreadsheetId}/values:batchGet?${rangesParam}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+
+  if (!response.ok) {
+    const data = await response.json();
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('refresh_failed');
+    }
+    if (response.status === 404) throw new Error('spreadsheet_not_found');
+    throw new Error(data.error?.message || 'fetch_sheets_failed');
+  }
+
+  const { valueRanges = [] } = await response.json();
+  report('connect', 'completed');
+
+  // ── Step 2: parse ──────────────────────────────────────────────────
+  report('parse', 'in_progress');
+
+  // Find a sheet's valueRange by matching the tab name prefix
+  const findSheet = (name) => {
+    const vr = valueRanges.find(r => r.range?.startsWith(`${name}!`));
+    return parseSheet(vr);
+  };
+
+  const accountRows = findSheet('Accounts');
+  const categoryRows = findSheet('Categories');
+  const operationRows = findSheet('Operations');
+  const budgetRows = findSheet('Budgets');
+  const plannedRows = findSheet('Planned Operations');
+  const historyRows = findSheet('Balance History');
+
+  // Build lookup maps: id->id (direct) and name->id (fallback)
+  const accountIdMap = new Map();
+  accountRows.forEach(a => {
+    if (a.name) accountIdMap.set(a.name, String(a.id));
+    if (a.id !== '' && a.id != null) accountIdMap.set(String(a.id), String(a.id));
+  });
+
+  const categoryIdMap = new Map();
+  categoryRows.forEach(c => {
+    if (c.name) categoryIdMap.set(c.name, String(c.id));
+    if (c.id !== '' && c.id != null) categoryIdMap.set(String(c.id), String(c.id));
+  });
+
+  // Resolve a foreign key: prefer the ID column value, fall back to name column
+  const resolveAccountId = (row, idCol, nameCol) => {
+    if (row[idCol] !== '' && row[idCol] != null) {
+      const byId = accountIdMap.get(String(row[idCol]));
+      if (byId != null) return byId;
+    }
+    return row[nameCol] ? (accountIdMap.get(row[nameCol]) ?? null) : null;
+  };
+
+  const resolveCategoryId = (row, idCol, nameCol) => {
+    if (row[idCol] !== '' && row[idCol] != null) {
+      const byId = categoryIdMap.get(String(row[idCol]));
+      if (byId != null) return byId;
+    }
+    return row[nameCol] ? (categoryIdMap.get(row[nameCol]) ?? null) : null;
+  };
+
+  const now = new Date().toISOString();
+
+  const accounts = accountRows.map(a => ({
+    id: a.id !== '' ? a.id : undefined,
+    name: a.name,
+    balance: a.balance || '0',
+    currency: a.currency || 'USD',
+    display_order: a.display_order !== '' ? Number(a.display_order) : null,
+    hidden: a.hidden !== '' ? Number(a.hidden) : 0,
+    monthly_target: a.monthly_target || null,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const categories = categoryRows.map(c => ({
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    category_type: c.category_type,
+    parent_id: c.parent_id || null,
+    icon: c.icon || null,
+    color: c.color || null,
+    is_shadow: c.is_shadow !== '' ? Number(c.is_shadow) : 0,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const operations = operationRows.map(o => ({
+    type: o.type,
+    amount: o.amount,
+    account_id: resolveAccountId(o, 'account_id', 'account'),
+    category_id: resolveCategoryId(o, 'category_id', 'category'),
+    to_account_id: (o.to_account || o.to_account_id)
+      ? resolveAccountId(o, 'to_account_id', 'to_account')
+      : null,
+    date: o.date,
+    created_at: now,
+    description: o.description || null,
+    exchange_rate: o.exchange_rate || null,
+    destination_amount: o.destination_amount || null,
+    source_currency: o.currency || null,
+    destination_currency: o.destination_currency || null,
+  }));
+
+  const budgets = budgetRows.map(b => ({
+    id: b.id,
+    category_id: resolveCategoryId(b, 'category_id', 'category'),
+    amount: b.amount,
+    currency: b.currency,
+    period_type: b.period_type,
+    start_date: b.start_date,
+    end_date: b.end_date || null,
+    is_recurring: b.is_recurring !== '' ? Number(b.is_recurring) : 1,
+    rollover_enabled: b.rollover_enabled !== '' ? Number(b.rollover_enabled) : 0,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const planned_operations = plannedRows.map(p => ({
+    id: p.id,
+    name: p.name,
+    type: p.type,
+    amount: p.amount,
+    account_id: resolveAccountId(p, 'account_id', 'account'),
+    category_id: resolveCategoryId(p, 'category_id', 'category'),
+    to_account_id: (p.to_account || p.to_account_id)
+      ? resolveAccountId(p, 'to_account_id', 'to_account')
+      : null,
+    description: p.description || null,
+    is_recurring: p.is_recurring !== '' ? Number(p.is_recurring) : 1,
+    last_executed_month: null,
+    display_order: null,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const balance_history = historyRows.map(h => ({
+    account_id: resolveAccountId(h, 'account_id', 'account'),
+    date: h.date,
+    balance: h.balance,
+    created_at: now,
+  }));
+
+  // Preserve current app preferences (language, theme, etc.) so they survive the restore
+  const app_metadata = await queryAll('SELECT * FROM app_metadata WHERE key != ?', ['db_version']).catch(() => []);
+
+  report('parse', 'completed');
+
+  return {
+    version: 1,
+    timestamp: now,
+    platform: 'native',
+    data: {
+      accounts,
+      categories,
+      operations,
+      budgets,
+      app_metadata,
+      balance_history,
+      planned_operations,
+    },
+  };
 };
 
 const createSpreadsheet = async (accessToken) => {
