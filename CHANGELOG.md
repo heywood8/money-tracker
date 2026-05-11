@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.109.0](https://github.com/heywood8/money-tracker/compare/penny-v0.108.0...penny-v0.109.0) (2026-05-11)
+
+
+### Features
+
+* **graphs:** donut chart with arc icons and side legend ([#568](https://github.com/heywood8/money-tracker/issues/568)) ([c9eb0a8](https://github.com/heywood8/money-tracker/commit/c9eb0a814dd900acb97176d3b5ec6e0cb606e828))
+
 ## [0.108.0](https://github.com/heywood8/money-tracker/compare/penny-v0.107.2...penny-v0.108.0) (2026-05-11)
 
 
