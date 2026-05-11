@@ -1209,33 +1209,68 @@ export default function SettingsModal({ visible, onClose }) {
                               {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
                             </Text>
                           )}
-                          <View style={styles.updateActions}>
-                            {updateResult.releaseNotes && (
-                              <Text style={[styles.updateHintText, { color: colors.mutedText }]}>
-                                {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-                              </Text>
+                          <Divider style={styles.updateDivider} />
+                          <View style={styles.updateBottomRow}>
+                            {downloadedApks.length > 0 && (
+                              <View style={styles.downloadedApksCompact}>
+                                <Text style={[styles.downloadedApksTitleCompact, { color: colors.mutedText }]}>
+                                  {t('downloaded_apks') || 'Downloaded APKs'}
+                                </Text>
+                                <FlatList
+                                  horizontal
+                                  data={downloadedApks}
+                                  keyExtractor={(item) => item.uri}
+                                  renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                      onPress={() => handleInstallApk(item.uri)}
+                                      style={styles.apkChipCompact}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Install version ${item.version || item.filename}`}
+                                    >
+                                      <Ionicons name="archive-outline" size={22} color={colors.primary} />
+                                      <Text style={[styles.apkChipVersion, { color: colors.text }]}>
+                                        {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+                                      </Text>
+                                      <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
+                                        {formatApkDate(item.modificationTime)}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                  showsHorizontalScrollIndicator={false}
+                                  contentContainerStyle={styles.apkListContent}
+                                />
+                              </View>
                             )}
-                            <TouchableRipple
-                              onPress={async () => {
-                                await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                                closeSubPanel();
-                                onClose();
-                                startDownload(updateResult.downloadUrl, {
-                                  onError: () => {
-                                    showDialog(
-                                      t('error') || 'Error',
-                                      t('update_download_failed') || 'Could not download the update. Please try again.',
-                                      [{ text: t('ok') || 'OK' }],
-                                    );
-                                  },
-                                });
-                              }}
-                              style={[styles.importConfirmButton, { backgroundColor: colors.primary }]}
-                            >
-                              <Text style={styles.importConfirmButtonText}>
-                                {t('update_now') || 'Update now'}
+                            <View style={styles.updateActionColumn}>
+                              <Text style={[styles.updateButtonVersion, { color: colors.text }]}>
+                                v{updateResult.latestVersion}
                               </Text>
-                            </TouchableRipple>
+                              <Text style={[styles.updateButtonCurrentVersion, { color: colors.mutedText }]}>
+                                {(t('update_from_version') || 'installed: v{currentVersion}')
+                                  .replace('{currentVersion}', updateResult.currentVersion)}
+                              </Text>
+                              <TouchableRipple
+                                onPress={async () => {
+                                  await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+                                  closeSubPanel();
+                                  onClose();
+                                  startDownload(updateResult.downloadUrl, {
+                                    onError: () => {
+                                      showDialog(
+                                        t('error') || 'Error',
+                                        t('update_download_failed') || 'Could not download the update. Please try again.',
+                                        [{ text: t('ok') || 'OK' }],
+                                      );
+                                    },
+                                  });
+                                }}
+                                style={[styles.updateButtonCompact, { backgroundColor: colors.primary }]}
+                              >
+                                <Text style={styles.importConfirmButtonText}>
+                                  {t('update_now') || 'Update now'}
+                                </Text>
+                              </TouchableRipple>
+                            </View>
                           </View>
                         </>
                       )}
@@ -1259,7 +1294,7 @@ export default function SettingsModal({ visible, onClose }) {
                       )}
                     </Animated.View>
                   )}
-                  {downloadedApks.length > 0 && (
+                  {downloadedApks.length > 0 && updateResult?.type !== 'available' && (
                     <View style={styles.downloadedApksSection}>
                       <Divider />
                       <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
@@ -1313,6 +1348,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     minWidth: 72,
     paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  apkChipCompact: {
+    alignItems: 'center',
+    gap: SPACING.xs,
+    minWidth: 44,
+    paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.sm,
   },
   apkChipDate: {
@@ -1422,6 +1464,10 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: SPACING.xs,
   },
+  downloadedApksCompact: {
+    flex: 1,
+    overflow: 'hidden',
+  },
   downloadedApksSection: {
     paddingBottom: SPACING.md,
   },
@@ -1432,6 +1478,13 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingTop: SPACING.md,
+    textTransform: 'uppercase',
+  },
+  downloadedApksTitleCompact: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    paddingBottom: SPACING.sm,
     textTransform: 'uppercase',
   },
   filterChip: {
@@ -1476,12 +1529,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: '600',
-  },
-  importConfirmButton: {
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
   },
   importConfirmButtonDestructive: {
     backgroundColor: '#c44',
@@ -1685,14 +1732,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  updateActions: {
-    paddingTop: SPACING.md,
+  updateActionColumn: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   updateAvailableHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: SPACING.md,
     paddingBottom: SPACING.sm,
+  },
+  updateBottomRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingTop: SPACING.sm,
+  },
+  updateButtonCompact: {
+    alignSelf: 'stretch',
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  updateButtonCurrentVersion: {
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  updateButtonVersion: {
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   updateCheckingContainer: {
     alignItems: 'center',
@@ -1712,12 +1783,6 @@ const styles = StyleSheet.create({
   },
   updateDivider: {
     marginTop: SPACING.sm,
-  },
-  updateHintText: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: SPACING.md,
-    textAlign: 'center',
   },
   updateNewVersion: {
     fontSize: 20,

@@ -148,9 +148,9 @@ export const checkForAppUpdate = async ({
         break; // reached current or older — stop
       }
 
-      newerReleases.push({ version: releaseVersion, notes: release.body || null });
-
       const apkAsset = extractApkAsset(release.assets);
+      newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset });
+
       if (apkAsset && !bestRelease) {
         bestRelease = {
           version: releaseVersion,
@@ -183,7 +183,7 @@ export const checkForAppUpdate = async ({
     }
 
     const releaseNotes = newerReleases
-      .filter((r) => r.notes)
+      .filter((r) => r.notes && r.hasApk)
       .map((r) => ({ version: r.version, notes: r.notes }));
 
     return {
