@@ -53,14 +53,6 @@ const CustomLegend = ({ data, currency, colors, onItemPress, isClickable }) => {
             {/* Category column (flexible width) */}
             <View style={styles.categoryColumn}>
               <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-              {item.icon && (
-                <Icon
-                  name={item.icon}
-                  size={18}
-                  color={colors.text}
-                  testID={`legend-icon-${item.icon}`}
-                />
-              )}
               <Text style={[styles.legendName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
@@ -122,7 +114,7 @@ const styles = StyleSheet.create({
   amountColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    width: 100,
+    width: 62,
   },
   categoryColumn: {
     alignItems: 'center',
@@ -137,7 +129,7 @@ const styles = StyleSheet.create({
     width: 12,
   },
   legendAmount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   legendChevron: {
@@ -158,16 +150,16 @@ const styles = StyleSheet.create({
   },
   legendName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
   },
   legendPercentage: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   percentageColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    width: 50,
+    width: 38,
   },
   verticalDivider: {
     alignSelf: 'center',

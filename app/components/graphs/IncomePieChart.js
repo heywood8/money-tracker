@@ -35,13 +35,15 @@ const IncomePieChart = ({
   return (
     <View style={styles.row}>
       <DonutChart data={incomeChartData} />
-      <CustomLegend
-        data={incomeChartData}
-        currency={selectedCurrency}
-        colors={colors}
-        onItemPress={onLegendItemPress}
-        isClickable={selectedIncomeCategory === 'all'}
-      />
+      <View style={styles.legendWrapper}>
+        <CustomLegend
+          data={incomeChartData}
+          currency={selectedCurrency}
+          colors={colors}
+          onItemPress={onLegendItemPress}
+          isClickable={selectedIncomeCategory === 'all'}
+        />
+      </View>
     </View>
   );
 };
@@ -57,6 +59,9 @@ IncomePieChart.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  legendWrapper: {
+    flex: 1,
+  },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 32,

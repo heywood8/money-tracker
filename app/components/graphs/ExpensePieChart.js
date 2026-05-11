@@ -35,13 +35,15 @@ const ExpensePieChart = ({
   return (
     <View style={styles.row}>
       <DonutChart data={chartData} />
-      <CustomLegend
-        data={chartData}
-        currency={selectedCurrency}
-        colors={colors}
-        onItemPress={onLegendItemPress}
-        isClickable={selectedCategory === 'all'}
-      />
+      <View style={styles.legendWrapper}>
+        <CustomLegend
+          data={chartData}
+          currency={selectedCurrency}
+          colors={colors}
+          onItemPress={onLegendItemPress}
+          isClickable={selectedCategory === 'all'}
+        />
+      </View>
     </View>
   );
 };
@@ -57,6 +59,9 @@ ExpensePieChart.propTypes = {
 };
 
 const styles = StyleSheet.create({
+  legendWrapper: {
+    flex: 1,
+  },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 32,
