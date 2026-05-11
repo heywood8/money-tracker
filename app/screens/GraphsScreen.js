@@ -731,9 +731,9 @@ const GraphsScreen = () => {
         <View style={[
           styles.currencyPopover,
           {
-            top: currencyPickerLayout.y + currencyPickerLayout.height + 4,
+            top: currencyPickerLayout.y + currencyPickerLayout.height / 2 - 5 * 48 / 2,
             left: currencyPickerLayout.x,
-            width: Math.max(currencyPickerLayout.width, 160),
+            width: currencyPickerLayout.width,
             backgroundColor: colors.surface,
             borderColor: colors.border,
           },
@@ -744,6 +744,7 @@ const GraphsScreen = () => {
             onValueChanged={({ item }) => setSelectedCurrency(item.value)}
             itemHeight={48}
             visibleItemCount={5}
+            cyclic
             itemTextStyle={[styles.wheelItemText, { color: colors.text }]}
             overlayItemStyle={[styles.wheelOverlayItem, { backgroundColor: colors.selected }]}
             enableScrollByTapOnItem
