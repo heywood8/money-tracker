@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.107.0](https://github.com/heywood8/money-tracker/compare/penny-v0.106.0...penny-v0.107.0) (2026-05-11)
+
+
+### Features
+
+* redesign update dialog with compact downloaded APKs display ([#560](https://github.com/heywood8/money-tracker/issues/560)) ([65568f9](https://github.com/heywood8/money-tracker/commit/65568f99dc6b7514dc9f84401b69b51aa0d711b8))
+
 ## [0.106.0](https://github.com/heywood8/money-tracker/compare/penny-v0.105.2...penny-v0.106.0) (2026-05-11)
 
 
