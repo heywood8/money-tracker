@@ -109,9 +109,8 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
 
   const buttonStyle = useMemo(() => [
     styles.button,
-    { borderColor: colors.border },
     style,
-  ], [colors.border, style]);
+  ], [style]);
 
   const finalTextStyle = useMemo(() => [
     styles.buttonText,
@@ -444,7 +443,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
               style={[
                 styles.button,
                 sharedButtonStyle,
-                { backgroundColor: colors.selected, borderColor: colors.border },
+                { backgroundColor: colors.selected },
               ]}
               onPress={() => onAdd()}
               accessibilityRole="button"
@@ -485,7 +484,6 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
     elevation: 2,
     flex: 1,
     height: HEIGHTS.calculator,
