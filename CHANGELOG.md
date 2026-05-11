@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.106.0](https://github.com/heywood8/money-tracker/compare/penny-v0.105.2...penny-v0.106.0) (2026-05-11)
+
+
+### Features
+
+* add percentage stacked bar view to category spending trend VS mode ([#558](https://github.com/heywood8/money-tracker/issues/558)) ([fc6e5a1](https://github.com/heywood8/money-tracker/commit/fc6e5a1bd668bd776817550750330a93d73460fa))
+
 ## [0.105.2](https://github.com/heywood8/money-tracker/compare/penny-v0.105.1...penny-v0.105.2) (2026-05-11)
 
 
