@@ -1795,14 +1795,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  updateRowRight: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  versionLabel: {
-    fontSize: 13,
-  },
   sheetsErrorText: {
     color: '#c44',
     fontSize: 14,
@@ -1925,10 +1917,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
   },
+  updateRowRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
   updateVersionText: {
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  versionLabel: {
+    fontSize: 13,
   },
 });
 
