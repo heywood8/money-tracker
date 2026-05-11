@@ -1123,15 +1123,33 @@ describe('OperationsDB Service', () => {
       expect(params).toContain('%coffee%');
     });
 
-    it('lowercases search text for case-insensitive matching', async () => {
+    it('includes both lowercase and original-case search terms for Unicode support', async () => {
       queryAll.mockResolvedValue([]);
 
       const filters = { searchText: 'GROCERY' };
       await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
 
       const params = queryAll.mock.calls[0][1];
+      // Lowercase term for ASCII case-insensitive matching
       expect(params).toContain('%grocery%');
-      expect(params).not.toContain('%GROCERY%');
+      // Original-case term so SQLite LIKE matches non-ASCII text (e.g. Cyrillic) verbatim,
+      // since SQLite's LOWER() only handles ASCII characters.
+      expect(params).toContain('%GROCERY%');
+    });
+
+    it('matches non-ASCII category names with original-case term', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: 'Газ' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-01-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      const params = queryAll.mock.calls[0][1];
+      // Must include original-case match for Cyrillic (SQLite LOWER doesn't handle non-ASCII)
+      expect(sqlCall).toContain('c.name LIKE ?');
+      expect(params).toContain('%Газ%');
+      // Lowercase variant is also included for completeness
+      expect(params).toContain('%газ%');
     });
 
     it('combines all filters correctly', async () => {

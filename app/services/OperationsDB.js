@@ -241,15 +241,16 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ?
+        LOWER(o.description) LIKE ? OR o.description LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ?
-        OR LOWER(to_a.name) LIKE ?
-        OR LOWER(c.name) LIKE ?
+        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
+        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
+        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
       )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
@@ -1049,15 +1050,16 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ?
+        LOWER(o.description) LIKE ? OR o.description LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ?
-        OR LOWER(to_a.name) LIKE ?
-        OR LOWER(c.name) LIKE ?
+        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
+        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
+        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
       )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
@@ -1142,15 +1144,16 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ?
+        LOWER(o.description) LIKE ? OR o.description LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ?
-        OR LOWER(to_a.name) LIKE ?
-        OR LOWER(c.name) LIKE ?
+        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
+        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
+        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
       )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC LIMIT 1';
@@ -1304,15 +1307,16 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ?
+        LOWER(o.description) LIKE ? OR o.description LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ?
-        OR LOWER(to_a.name) LIKE ?
-        OR LOWER(c.name) LIKE ?
+        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
+        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
+        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
       )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
     }
 
     sql += ' ORDER BY o.date ASC, o.created_at ASC LIMIT 1';
@@ -1409,15 +1413,16 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ?
+        LOWER(o.description) LIKE ? OR o.description LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ?
-        OR LOWER(to_a.name) LIKE ?
-        OR LOWER(c.name) LIKE ?
+        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
+        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
+        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
       )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
