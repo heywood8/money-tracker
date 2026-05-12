@@ -171,7 +171,7 @@ CalcButton.defaultProps = {
  * - Shows "=" button when expression contains operations
  * - Evaluates expression and replaces with result
  */
-export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null, compact = false }) {
+export default function Calculator({ value, onValueChange, colors, placeholder = '0', onAdd, containerBackground = null, compact = false, currencyCode, onCurrencyPress }) {
   const [expression, setExpression] = useState(value || '');
   const syncedFromPropRef = useRef(false);
 
@@ -292,7 +292,19 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     <View style={[styles.container, compact && styles.containerCompact, { backgroundColor: containerBackground || colors.altRow }]}>
       {/* Display */}
       <View style={styles.display}>
-        <View style={styles.displayLeftSpacer} />
+        {onCurrencyPress ? (
+          <Pressable
+            onPress={onCurrencyPress}
+            style={[styles.currencyChip, { backgroundColor: colors.selected }]}
+            accessibilityRole="button"
+            accessibilityLabel={currencyCode}
+          >
+            <Text style={[styles.currencyChipText, { color: colors.text }]}>{currencyCode}</Text>
+            <Icon name="chevron-down" size={12} color={colors.mutedText} />
+          </Pressable>
+        ) : (
+          <View style={styles.displayLeftSpacer} />
+        )}
         <Text style={displayTextStyle} numberOfLines={1}>
           {expression}
         </Text>
@@ -470,6 +482,8 @@ Calculator.propTypes = {
   onAdd: PropTypes.func,
   containerBackground: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
   compact: PropTypes.bool,
+  currencyCode: PropTypes.string,
+  onCurrencyPress: PropTypes.func,
 };
 
 Calculator.defaultProps = {
@@ -527,6 +541,20 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     justifyContent: 'flex-end',
     width: 80,
+  },
+  currencyChip: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    flexDirection: 'row',
+    gap: 2,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    width: 80,
+  },
+  currencyChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   displayLeftSpacer: {
     width: 80,

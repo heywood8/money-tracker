@@ -6,6 +6,12 @@ import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
+import currencies from '../../../assets/currencies.json';
+
+const getForeignSymbol = (currencyCode) => {
+  if (!currencyCode) return '';
+  return currencies[currencyCode]?.symbol || currencyCode;
+};
 
 const OperationListItem = ({
   operation,
@@ -27,6 +33,14 @@ const OperationListItem = ({
   const isTransfer = operation.type === 'transfer';
 
   const isMultiCurrencyTransfer = isTransfer && operation.exchangeRate && operation.destinationAmount;
+
+  // Foreign currency expense/income: has exchange metadata but is NOT a transfer
+  const isForeignCurrencyOp = !isTransfer
+    && operation.sourceCurrency
+    && operation.destinationCurrency
+    && operation.sourceCurrency !== operation.destinationCurrency
+    && operation.exchangeRate
+    && operation.destinationAmount;
 
   const categoryInfo = isTransfer
     ? { icon: 'swap-horizontal' }
@@ -110,6 +124,11 @@ const OperationListItem = ({
                 </Text>
               )}
             </Text>
+            {isForeignCurrencyOp && (
+              <Text style={[styles.foreignAmount, { color: colors.mutedText }]} numberOfLines={1}>
+                {getForeignSymbol(operation.sourceCurrency)}{operation.destinationAmount}
+              </Text>
+            )}
           </View>
         </View>
       </TouchableRipple>
@@ -139,8 +158,10 @@ OperationListItem.propTypes = {
     amount: PropTypes.string.isRequired,
     date: PropTypes.string.isRequired,
     toAccountId: PropTypes.string,
-    exchangeRate: PropTypes.number,
+    exchangeRate: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     destinationAmount: PropTypes.string,
+    sourceCurrency: PropTypes.string,
+    destinationCurrency: PropTypes.string,
     description: PropTypes.string,
   }).isRequired,
   colors: PropTypes.object.isRequired,
@@ -179,6 +200,12 @@ const styles = StyleSheet.create({
   destinationAmount: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.regular,
+  },
+  foreignAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.regular,
+    marginTop: 2,
+    textAlign: 'right',
   },
   iconContainer: {
     alignItems: 'center',

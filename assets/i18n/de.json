@@ -395,5 +395,8 @@
   "pending_in": "Pending in",
   "done_this_month": "Done this month",
   "done": "Fertig",
-  "remaining": "remaining"
+  "remaining": "remaining",
+  "offline_rate": "offline",
+  "rate_unavailable": "Rate unavailable",
+  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again."
 }

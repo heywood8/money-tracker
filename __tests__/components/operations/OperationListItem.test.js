@@ -242,6 +242,102 @@ describe('OperationListItem', () => {
     });
   });
 
+  describe('Foreign Currency Operations', () => {
+    it('renders foreign currency amount for foreign currency expense', () => {
+      const { getByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'expense',
+            amount: '54.00',
+            sourceCurrency: 'EUR',
+            destinationCurrency: 'USD',
+            exchangeRate: '1.08',
+            destinationAmount: '50.00',
+          }}
+          formatCurrency={(_, amount) => `$${amount}`}
+        />,
+      );
+      // Should show the foreign amount in parentheses
+      expect(getByText(/€50\.00/)).toBeTruthy();
+    });
+
+    it('renders foreign currency amount for foreign currency income', () => {
+      const { getByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'income',
+            amount: '54.00',
+            sourceCurrency: 'EUR',
+            destinationCurrency: 'USD',
+            exchangeRate: '1.08',
+            destinationAmount: '50.00',
+          }}
+          formatCurrency={(_, amount) => `$${amount}`}
+        />,
+      );
+      expect(getByText(/€50\.00/)).toBeTruthy();
+    });
+
+    it('does NOT render foreign amount for regular same-currency expense', () => {
+      const { queryByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'expense',
+            amount: '50.00',
+          }}
+          formatCurrency={(_, amount) => `$${amount}`}
+        />,
+      );
+      // No foreign amount line
+      expect(queryByText(/€/)).toBeNull();
+    });
+
+    it('does NOT render foreign amount for transfer even with exchange metadata', () => {
+      const { queryByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'transfer',
+            toAccountId: 'acc2',
+            sourceCurrency: 'EUR',
+            destinationCurrency: 'USD',
+            exchangeRate: '1.08',
+            destinationAmount: '50.00',
+          }}
+          formatCurrency={(id, amount) => (id === 'acc2' ? `$${amount}` : `€${amount}`)}
+        />,
+      );
+      // Transfer shows → destination, not the foreign-currency line
+      expect(queryByText(/€50\.00/)).toBeNull();
+    });
+
+    it('uses currency code as fallback when symbol not in currencies.json', () => {
+      const { getByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            type: 'expense',
+            amount: '100.00',
+            sourceCurrency: 'XYZ',
+            destinationCurrency: 'USD',
+            exchangeRate: '2.00',
+            destinationAmount: '50.00',
+          }}
+          formatCurrency={(_, amount) => `$${amount}`}
+        />,
+      );
+      expect(getByText(/XYZ50\.00/)).toBeTruthy();
+    });
+  });
+
   describe('Transfer Operations', () => {
     it('renders transfer icon and type label', () => {
       const { getByText } = render(

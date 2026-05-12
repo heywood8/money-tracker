@@ -39,6 +39,9 @@ const QuickAddForm = memo(({
   onAutoAddWithAccount,
   TYPES,
   rateSource,
+  onOperationCurrencyChange,
+  foreignRateSource,
+  foreignExchangeRate,
 }) => {
   const containerThemed = React.useMemo(() => ({
     backgroundColor: colors.background,
@@ -80,6 +83,9 @@ const QuickAddForm = memo(({
           onAutoAddWithAccount={onAutoAddWithAccount}
           rateSource={rateSource}
           compact={true}
+          onOperationCurrencyChange={onOperationCurrencyChange}
+          foreignRateSource={foreignRateSource}
+          foreignExchangeRate={foreignExchangeRate}
         />
       </View>
     </View>
@@ -110,6 +116,9 @@ QuickAddForm.propTypes = {
   onAutoAddWithAccount: PropTypes.func,
   TYPES: PropTypes.array.isRequired,
   rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
+  onOperationCurrencyChange: PropTypes.func,
+  foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
+  foreignExchangeRate: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
