@@ -732,6 +732,16 @@ const styles = StyleSheet.create({
   invisible: {
     opacity: 0,
   },
+  ratePreviewRow: {
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+    marginTop: -SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+  },
+  ratePreviewText: {
+    fontSize: FONT_SIZE.sm,
+    textAlign: 'center',
+  },
   typeButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -746,16 +756,6 @@ const styles = StyleSheet.create({
   typeButtonText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  ratePreviewRow: {
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-    marginTop: -SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-  },
-  ratePreviewText: {
-    fontSize: FONT_SIZE.sm,
-    textAlign: 'center',
   },
   typeSelector: {
     flexDirection: 'row',
