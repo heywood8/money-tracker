@@ -295,7 +295,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
         {onCurrencyPress ? (
           <Pressable
             onPress={onCurrencyPress}
-            style={[styles.currencyChip, { backgroundColor: colors.selected }]}
+            style={styles.currencyChip}
             accessibilityRole="button"
             accessibilityLabel={currencyCode}
           >

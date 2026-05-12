@@ -1,12 +1,13 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, useEffect, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, Modal, Pressable, TextInput } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import currencies from '../../../assets/currencies.json';
 import ModalBlurOverlay from '../ModalBlurOverlay';
+import { getTopSourceCurrencies } from '../../services/OperationsDB';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
 
-const currencyList = Object.entries(currencies).map(([code, data]) => ({
+const alphabeticalList = Object.entries(currencies).map(([code, data]) => ({
   code,
   name: data.name,
   symbol: data.symbol,
@@ -14,14 +15,34 @@ const currencyList = Object.entries(currencies).map(([code, data]) => ({
 
 const CurrencyPickerModal = memo(({ visible, onClose, onSelect, selectedCurrency, colors, t }) => {
   const [query, setQuery] = useState('');
+  const [popularCodes, setPopularCodes] = useState([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    getTopSourceCurrencies(5)
+      .then(codes => setPopularCodes(codes))
+      .catch(() => setPopularCodes([]));
+  }, [visible]);
+
+  // Currencies sorted by popularity (pinned top), then alphabetically
+  const sortedList = useMemo(() => {
+    if (popularCodes.length === 0) return alphabeticalList;
+    const popularSet = new Set(popularCodes);
+    const popular = popularCodes
+      .map(code => alphabeticalList.find(c => c.code === code))
+      .filter(Boolean);
+    const rest = alphabeticalList.filter(c => !popularSet.has(c.code));
+    return [...popular, ...rest];
+  }, [popularCodes]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return currencyList;
+    const base = query.trim() ? alphabeticalList : sortedList;
+    if (!query.trim()) return base;
     const q = query.trim().toLowerCase();
-    return currencyList.filter(c =>
+    return alphabeticalList.filter(c =>
       c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, sortedList]);
 
   const handleClose = () => {
     setQuery('');

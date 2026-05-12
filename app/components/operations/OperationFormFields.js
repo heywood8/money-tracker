@@ -7,6 +7,9 @@ import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
 import CurrencyPickerModal from './CurrencyPickerModal';
 import * as Currency from '../../services/currency';
+import currencies from '../../../assets/currencies.json';
+
+const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
@@ -522,7 +525,7 @@ const OperationFormFields = memo(({
           onAdd={onAdd}
           containerBackground={containerBackground}
           compact={compact}
-          currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? values.operationCurrency : undefined}
+          currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? getCurrencySymbol(values.operationCurrency) : undefined}
           onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
         />
       </View>
