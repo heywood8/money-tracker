@@ -1403,11 +1403,13 @@ export default function SettingsModal({ visible, onClose }) {
                         </>
                       )}
                       {updateResult.type === 'up_to_date' && (
-                        <View style={styles.importConfirmContent}>
-                          <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
-                          <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                            {t('up_to_date') || 'You already have the latest version installed.'}
-                          </Text>
+                        <View style={styles.upToDateContent}>
+                          <View style={styles.upToDateHeader}>
+                            <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
+                            <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                              {t('up_to_date') || 'You already have the latest version installed.'}
+                            </Text>
+                          </View>
                           {downloadedApks.length > 0 && (
                             <View style={styles.downloadedApksSection}>
                               <Divider />
@@ -1866,6 +1868,15 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 44,
+  },
+  upToDateContent: {
+    flex: 1,
+    paddingVertical: SPACING.xl,
+  },
+  upToDateHeader: {
+    alignItems: 'center',
+    paddingBottom: SPACING.lg,
+    paddingHorizontal: HORIZONTAL_PADDING * 2,
   },
   updateActionColumn: {
     alignItems: 'center',
