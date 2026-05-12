@@ -1869,6 +1869,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  upToDateContent: {
+    flex: 1,
+    paddingVertical: SPACING.xl,
+  },
+  upToDateHeader: {
+    alignItems: 'center',
+    paddingBottom: SPACING.lg,
+    paddingHorizontal: HORIZONTAL_PADDING * 2,
+  },
   updateActionColumn: {
     alignItems: 'center',
     flex: 1,
@@ -1928,15 +1937,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
-  },
-  upToDateContent: {
-    flex: 1,
-    paddingVertical: SPACING.xl,
-  },
-  upToDateHeader: {
-    alignItems: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-    paddingBottom: SPACING.lg,
   },
   versionLabel: {
     fontSize: 13,
