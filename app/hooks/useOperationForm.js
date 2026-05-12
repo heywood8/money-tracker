@@ -47,10 +47,16 @@ const useOperationForm = ({
   const [lastEditedField, setLastEditedField] = useState(null);
   const [rateSource, setRateSource] = useState('offline');
 
-  // Track if form has been modified to prevent re-initialization from overwriting changes
-  // This is needed because split operations trigger context updates (reloadAccounts)
-  // which would cause the initialization useEffect to re-run with stale operation data
+  // Track if form has been initialized to prevent re-initialization from overwriting user changes.
+  // Set to true right after first initialization; reset to false when the modal closes.
+  // This guards against accounts/operation prop getting a new reference from a context update
+  // while the user is actively editing (e.g. typing description while accounts reload).
   const formModifiedRef = useRef(false);
+
+  // Keep a stable ref to the latest accounts so the initialization effect can read the
+  // current list without depending on it — preventing a re-run when accounts changes.
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
 
   // Check if operation belongs to a shadow category
   const isShadowOperation = useMemo(() => {
@@ -184,25 +190,28 @@ const useOperationForm = ({
   // Initialize form values when modal opens
   useEffect(() => {
     if (!visible) {
-      // Reset the modified flag when modal closes so next open will initialize properly
+      // Reset the guard when modal closes so next open will initialize properly
       formModifiedRef.current = false;
       return;
     }
 
-    // Skip re-initialization if form has been modified (e.g., after a split operation)
-    // This prevents context updates (reloadAccounts) from overwriting user changes
+    // Once initialized, skip any re-runs caused by prop reference changes (e.g. accounts
+    // getting a new array reference after a context update while the user is editing).
     if (formModifiedRef.current) {
       return;
     }
 
     let cancelled = false;
     async function setDefaultAccount() {
+      // Read accounts via ref so this effect does not depend on the accounts array —
+      // preventing re-initialization whenever the context emits a new reference.
+      const currentAccounts = accountsRef.current;
       if (operation && !isNew) {
         // Normalize values when editing an existing operation
         setValues({
           type: operation.type || 'expense',
           amount: String(operation.amount || ''),
-          accountId: operation.accountId || accounts[0]?.id || '',
+          accountId: operation.accountId || currentAccounts[0]?.id || '',
           categoryId: operation.categoryId || '',
           description: operation.description || '',
           date: operation.date || formatDate(new Date()),
@@ -212,14 +221,14 @@ const useOperationForm = ({
         });
       } else if (isNew) {
         let defaultAccountId = '';
-        if (accounts.length === 1) {
-          defaultAccountId = accounts[0].id;
-        } else if (accounts.length > 1) {
+        if (currentAccounts.length === 1) {
+          defaultAccountId = currentAccounts[0].id;
+        } else if (currentAccounts.length > 1) {
           const lastId = await getLastAccessedAccount();
-          if (lastId && accounts.some(acc => acc.id === lastId)) {
+          if (lastId && currentAccounts.some(acc => acc.id === lastId)) {
             defaultAccountId = lastId;
           } else {
-            defaultAccountId = accounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
+            defaultAccountId = currentAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
           }
         }
         if (!cancelled) {
@@ -236,11 +245,16 @@ const useOperationForm = ({
           });
         }
       }
-      if (!cancelled) setErrors({});
+      if (!cancelled) {
+        setErrors({});
+        // Mark as initialized so that any subsequent dep-change (new object reference for
+        // operation or accounts from a context update) does not wipe the user's edits.
+        formModifiedRef.current = true;
+      }
     }
     setDefaultAccount();
     return () => { cancelled = true; };
-  }, [operation, isNew, visible, accounts]);
+  }, [operation, isNew, visible]); // accounts intentionally omitted — accessed via accountsRef
 
   // Validate form fields
   const validateFields = useCallback((valuesToValidate = null) => {
@@ -430,9 +444,9 @@ const useOperationForm = ({
       // Calculate new amount for original operation
       const newAmount = String(numOriginalAmount - numSplitAmount);
 
-      // Mark form as modified BEFORE context operations run
-      // This prevents the initialization useEffect from re-running and
-      // overwriting our changes when reloadAccounts triggers a re-render
+      // formModifiedRef is already true (set during initialization) so the
+      // initialization effect won't re-run when reloadAccounts triggers a re-render.
+      // Set it explicitly here as a safety measure in case split is called very early.
       formModifiedRef.current = true;
 
       // 1. FIRST update original operation in database (reduces amount)

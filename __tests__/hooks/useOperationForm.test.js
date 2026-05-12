@@ -808,6 +808,103 @@ describe('useOperationForm', () => {
       });
     });
 
+    it('should preserve multicurrency exchange rate when accounts prop gets a new reference', async () => {
+      // Regression: accounts getting a new array reference (from a context update) while the
+      // user is editing (e.g. typing description) used to re-trigger initialization and wipe
+      // the exchange rate that had been auto-populated or manually entered.
+      const multicurrencyOperation = {
+        id: 'op-mc',
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+        exchangeRate: '1.2',
+        destinationAmount: '60',
+        date: '2024-01-15',
+      };
+
+      const { result, rerender } = renderHook(
+        (props) => useOperationForm(props),
+        { initialProps: { ...defaultProps, operation: multicurrencyOperation, isNew: false } },
+      );
+
+      await waitFor(() => {
+        expect(result.current.values.exchangeRate).toBe('1.2');
+        expect(result.current.values.destinationAmount).toBe('60');
+      });
+
+      // Simulate the accounts context emitting a new array reference with the same data
+      const newAccountsRef = [...mockAccounts];
+      rerender({ ...defaultProps, operation: multicurrencyOperation, isNew: false, accounts: newAccountsRef });
+
+      // Exchange rate and destination amount must NOT reset
+      await waitFor(() => {
+        expect(result.current.values.exchangeRate).toBe('1.2');
+        expect(result.current.values.destinationAmount).toBe('60');
+      });
+    });
+
+    it('should preserve exchange rate set by auto-populate when accounts ref changes', async () => {
+      // Regression: when operation has no stored exchange rate, auto-populate fetches one.
+      // A subsequent accounts reference change must not wipe the auto-populated value.
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.85', source: 'live' });
+
+      const multicurrencyOperation = {
+        id: 'op-mc2',
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+        exchangeRate: null, // no stored rate — auto-populate will fetch one
+        destinationAmount: null,
+        date: '2024-01-15',
+      };
+
+      const { result, rerender } = renderHook(
+        (props) => useOperationForm(props),
+        { initialProps: { ...defaultProps, operation: multicurrencyOperation, isNew: false } },
+      );
+
+      // Wait for auto-populate to set the fetched rate
+      await waitFor(() => {
+        expect(result.current.values.exchangeRate).toBe('0.85');
+      }, { timeout: 3000 });
+
+      // Simulate accounts context emitting a new array reference
+      const newAccountsRef = [...mockAccounts];
+      rerender({ ...defaultProps, operation: multicurrencyOperation, isNew: false, accounts: newAccountsRef });
+
+      // Auto-populated rate must survive the accounts reference change
+      await waitFor(() => {
+        expect(result.current.values.exchangeRate).toBe('0.85');
+      });
+    });
+
+    it('should treat stored exchangeRate of 0 as empty so auto-populate can provide a valid rate', async () => {
+      // 0 is not a valid exchange rate; if it somehow got persisted (e.g. DB default), we
+      // should treat it as "not set" so auto-populate can fetch a real rate.
+      const operationWithZeroRate = {
+        id: 'op-zero',
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+        exchangeRate: 0,    // stored as numeric 0
+        destinationAmount: 0,
+        date: '2024-01-15',
+      };
+
+      const { result } = renderHook(() =>
+        useOperationForm({ ...defaultProps, operation: operationWithZeroRate, isNew: false }),
+      );
+
+      await waitFor(() => {
+        // String(0 || '') === '' — zero is treated as falsy so auto-populate can kick in
+        expect(result.current.values.exchangeRate).toBe('');
+        expect(result.current.values.destinationAmount).toBe('');
+      });
+    });
+
     it('should handle string amounts correctly', async () => {
       const { result } = renderHook(() => useOperationForm(defaultProps));
 
