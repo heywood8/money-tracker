@@ -18,6 +18,8 @@ jest.mock('../../app/services/LastAccount', () => ({
 
 jest.mock('../../app/services/currency', () => ({
   formatAmount: jest.fn((amount) => String(amount)),
+  fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: '1.08', source: 'live' }),
+  getExchangeRate: jest.fn().mockReturnValue('1.08'),
 }));
 
 jest.mock('../../assets/currencies.json', () => ({
@@ -57,6 +59,8 @@ describe('useQuickAddForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     Currency.formatAmount.mockImplementation((amount) => String(amount));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.08', source: 'live' });
+    Currency.getExchangeRate.mockReturnValue('1.08');
   });
 
   describe('Initialization', () => {
@@ -73,6 +77,30 @@ describe('useQuickAddForm', () => {
         toAccountId: '',
         exchangeRate: '',
         destinationAmount: '',
+      });
+    });
+
+    it('should set operationCurrency to account currency on default account load', async () => {
+      const singleAccount = [mockAccounts[0]]; // USD account
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.operationCurrency).toBe('USD');
+      });
+    });
+
+    it('should set operationCurrency to last accessed account currency', async () => {
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2'); // EUR account
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.operationCurrency).toBe('EUR');
       });
     });
 
@@ -716,6 +744,161 @@ describe('useQuickAddForm', () => {
       });
 
       expect(result.current.topTransferAccountsForForm).toHaveLength(8);
+    });
+  });
+
+  describe('operationCurrency (foreign currency expense/income)', () => {
+    it('should reset operationCurrency to new account currency when accountId changes', async () => {
+      const { result } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      // Start with acc-1 (USD)
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, accountId: 'acc-1', operationCurrency: 'USD' }));
+      });
+
+      // Switch to acc-2 (EUR)
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, accountId: 'acc-2' }));
+      });
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.operationCurrency).toBe('EUR');
+      });
+    });
+
+    it('should not fetch exchange rate when operationCurrency matches account currency', async () => {
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should fetch exchange rate when operationCurrency differs from account currency', async () => {
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      // Wait for account initialization
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      // Change operation currency to EUR
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'EUR' }));
+      });
+
+      await waitFor(() => {
+        expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('EUR', 'USD');
+      });
+    });
+
+    it('should expose foreignRateSource and foreignExchangeRate after fetch', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.08', source: 'live' });
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'EUR' }));
+      });
+
+      await waitFor(() => {
+        expect(result.current.foreignRateSource).toBe('live');
+        expect(result.current.foreignExchangeRate).toBe('1.08');
+      });
+    });
+
+    it('should fall back to offline rate when live fetch fails', async () => {
+      Currency.fetchLiveExchangeRate.mockRejectedValue(new Error('network'));
+      Currency.getExchangeRate.mockReturnValue(1.05);
+
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'EUR' }));
+      });
+
+      await waitFor(() => {
+        expect(result.current.foreignRateSource).toBe('offline');
+        expect(result.current.foreignExchangeRate).toBe('1.05');
+      });
+    });
+
+    it('should clear foreign rate state when switching back to same currency', async () => {
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      // Set foreign currency
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'EUR' }));
+      });
+      await waitFor(() => expect(result.current.foreignRateSource).toBe('live'));
+
+      // Revert to same currency
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'USD' }));
+      });
+
+      await waitFor(() => {
+        expect(result.current.foreignRateSource).toBeNull();
+        expect(result.current.foreignExchangeRate).toBe('');
+      });
+    });
+
+    it('should reset operationCurrency to account currency on resetForm', async () => {
+      const singleAccount = [mockAccounts[0]]; // USD
+
+      const { result } = renderHook(() =>
+        useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+
+      // Change to foreign currency and add amount
+      await act(async () => {
+        result.current.setQuickAddValues(v => ({ ...v, operationCurrency: 'EUR', amount: '50' }));
+      });
+
+      // Reset
+      await act(async () => {
+        result.current.resetForm();
+      });
+
+      expect(result.current.quickAddValues.operationCurrency).toBe('USD');
+      expect(result.current.quickAddValues.amount).toBe('');
     });
   });
 

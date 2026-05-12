@@ -1,10 +1,16 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
 import MultiCurrencyFields from '../modals/MultiCurrencyFields';
+import CurrencyPickerModal from './CurrencyPickerModal';
+import * as Currency from '../../services/currency';
+import currencies from '../../../assets/currencies.json';
+
+const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
+import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
 
@@ -79,8 +85,14 @@ const OperationFormFields = memo(({
   onAutoAddWithAccount,
   rateSource,
   compact = false,
+  onOperationCurrencyChange,
+  foreignRateSource,
+  foreignExchangeRate,
 }) => {
   const { hideBalances } = useDisplaySettings();
+
+  // Local state for currency picker visibility
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -111,6 +123,33 @@ const OperationFormFields = memo(({
     if (!sourceAccount || !destinationAccount) return false;
     return sourceAccount.currency !== destinationAccount.currency;
   }, [values.type, sourceAccount, destinationAccount]);
+
+  // Detect foreign currency expense/income
+  const isForeignCurrencyOp = useMemo(() => {
+    if (values.type === 'transfer') return false;
+    if (!values.operationCurrency || !sourceAccount) return false;
+    return values.operationCurrency !== sourceAccount.currency;
+  }, [values.type, values.operationCurrency, sourceAccount]);
+
+  // Compute live preview of home-currency amount for foreign currency ops
+  const foreignPreviewAmount = useMemo(() => {
+    if (!isForeignCurrencyOp || !foreignExchangeRate || !sourceAccount) return null;
+    let numericAmount = values.amount;
+    if (!numericAmount) return null;
+    if (checkHasOperation(numericAmount)) {
+      const ev = evaluateExpression(numericAmount);
+      if (ev !== null) numericAmount = String(ev);
+      else return null;
+    }
+    const converted = Currency.convertAmount(
+      numericAmount,
+      values.operationCurrency,
+      sourceAccount.currency,
+      foreignExchangeRate,
+    );
+    if (!converted) return null;
+    return converted;
+  }, [isForeignCurrencyOp, foreignExchangeRate, values.amount, values.operationCurrency, sourceAccount]);
 
   // Render type selector buttons
   const renderTypeSelector = () => (
@@ -486,8 +525,21 @@ const OperationFormFields = memo(({
           onAdd={onAdd}
           containerBackground={containerBackground}
           compact={compact}
+          currencyCode={compact && values.type !== 'transfer' && onOperationCurrencyChange ? getCurrencySymbol(values.operationCurrency) : undefined}
+          onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
         />
       </View>
+      {isForeignCurrencyOp && sourceAccount && (
+        <View style={styles.ratePreviewRow}>
+          <Text style={[styles.ratePreviewText, { color: colors.mutedText }]}>
+            {foreignRateSource === 'loading'
+              ? t('fetching_rate')
+              : foreignPreviewAmount
+                ? `≈ ${foreignPreviewAmount} ${sourceAccount.currency}${foreignRateSource === 'offline' ? ` (${t('offline_rate')})` : ''}`
+                : t('rate_unavailable')}
+          </Text>
+        </View>
+      )}
       {isMultiCurrencyTransfer && sourceAccount && destinationAccount && onExchangeRateChange && onDestinationAmountChange && (
         <MultiCurrencyFields
           colors={colors}
@@ -503,6 +555,17 @@ const OperationFormFields = memo(({
         />
       )}
       {values.type === 'transfer' ? (hideTransferTargetPicker ? null : renderTransferTargetPicker()) : renderCategoryPicker()}
+      <CurrencyPickerModal
+        visible={showCurrencyPicker}
+        onClose={() => setShowCurrencyPicker(false)}
+        onSelect={(code) => {
+          setShowCurrencyPicker(false);
+          if (onOperationCurrencyChange) onOperationCurrencyChange(code);
+        }}
+        selectedCurrency={values.operationCurrency}
+        colors={colors}
+        t={t}
+      />
     </>
   );
 });
@@ -520,6 +583,7 @@ OperationFormFields.propTypes = {
     categoryId: PropTypes.string,
     exchangeRate: PropTypes.string,
     destinationAmount: PropTypes.string,
+    operationCurrency: PropTypes.string,
   }).isRequired,
   setValues: PropTypes.func.isRequired,
   accounts: PropTypes.array.isRequired,
@@ -548,6 +612,9 @@ OperationFormFields.propTypes = {
   onAutoAddWithAccount: PropTypes.func,
   rateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   compact: PropTypes.bool,
+  onOperationCurrencyChange: PropTypes.func,
+  foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
+  foreignExchangeRate: PropTypes.string,
 };
 
 const styles = StyleSheet.create({
@@ -664,6 +731,16 @@ const styles = StyleSheet.create({
   },
   invisible: {
     opacity: 0,
+  },
+  ratePreviewRow: {
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+    marginTop: -SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+  },
+  ratePreviewText: {
+    fontSize: FONT_SIZE.sm,
+    textAlign: 'center',
   },
   typeButton: {
     alignItems: 'center',

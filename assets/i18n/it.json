@@ -155,5 +155,8 @@
   "save_local_backup": "Save local backup",
   "save_local_backup_description": "Save a backup to local device storage",
   "save_local_backup_saving": "Saving…",
-  "save_local_backup_success": "Backup saved"
+  "save_local_backup_success": "Backup saved",
+  "offline_rate": "offline",
+  "rate_unavailable": "Rate unavailable",
+  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again."
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getLastAccessedAccount } from '../services/LastAccount';
 import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils';
 import * as Currency from '../services/currency';
@@ -29,25 +29,86 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     toAccountId: '',
     exchangeRate: '',
     destinationAmount: '',
+    operationCurrency: '',
   });
+
+  // Foreign currency preview state
+  const [foreignRateSource, setForeignRateSource] = useState(null);
+  const [foreignExchangeRate, setForeignExchangeRate] = useState('');
 
   // Set default account on mount
   useEffect(() => {
     async function setDefaultAccount() {
       if (visibleAccounts.length === 1) {
-        setQuickAddValues(v => ({ ...v, accountId: visibleAccounts[0].id }));
+        const acc = visibleAccounts[0];
+        setQuickAddValues(v => ({ ...v, accountId: acc.id, operationCurrency: acc.currency || v.operationCurrency }));
       } else if (visibleAccounts.length > 1) {
         const lastId = await getLastAccessedAccount();
+        let resolvedAcc;
         if (lastId && visibleAccounts.some(acc => acc.id === lastId)) {
-          setQuickAddValues(v => ({ ...v, accountId: lastId }));
+          resolvedAcc = visibleAccounts.find(acc => acc.id === lastId);
         } else {
-          const defaultId = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0].id;
-          setQuickAddValues(v => ({ ...v, accountId: defaultId }));
+          resolvedAcc = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0];
         }
+        setQuickAddValues(v => ({ ...v, accountId: resolvedAcc.id, operationCurrency: resolvedAcc.currency || v.operationCurrency }));
       }
     }
     setDefaultAccount();
   }, [visibleAccounts]);
+
+  // Track previous accountId to reset operationCurrency on account switch
+  const prevAccountIdRef = useRef(null);
+  useEffect(() => {
+    if (!quickAddValues.accountId) return;
+    if (prevAccountIdRef.current === quickAddValues.accountId) return;
+    prevAccountIdRef.current = quickAddValues.accountId;
+    const account = accounts.find(a => a.id === quickAddValues.accountId);
+    if (!account) return;
+    setQuickAddValues(v => ({ ...v, operationCurrency: account.currency }));
+    setForeignRateSource(null);
+    setForeignExchangeRate('');
+  }, [quickAddValues.accountId, accounts]);
+
+  // Pre-fetch exchange rate when operationCurrency differs from account currency
+  useEffect(() => {
+    const account = accounts.find(a => a.id === quickAddValues.accountId);
+    if (!account || !quickAddValues.operationCurrency) return;
+    if (quickAddValues.operationCurrency === account.currency) {
+      setForeignRateSource(null);
+      setForeignExchangeRate('');
+      return;
+    }
+    let cancelled = false;
+    setForeignRateSource('loading');
+    setForeignExchangeRate('');
+    Currency.fetchLiveExchangeRate(quickAddValues.operationCurrency, account.currency)
+      .then(({ rate, source }) => {
+        if (cancelled) return;
+        if (rate) {
+          setForeignExchangeRate(rate);
+          setForeignRateSource(source);
+        } else {
+          const offlineRate = Currency.getExchangeRate(quickAddValues.operationCurrency, account.currency);
+          if (offlineRate) {
+            setForeignExchangeRate(String(offlineRate));
+            setForeignRateSource('offline');
+          } else {
+            setForeignRateSource(null);
+          }
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const offlineRate = Currency.getExchangeRate(quickAddValues.operationCurrency, account.currency);
+        if (offlineRate) {
+          setForeignExchangeRate(String(offlineRate));
+          setForeignRateSource('offline');
+        } else {
+          setForeignRateSource(null);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [quickAddValues.operationCurrency, quickAddValues.accountId, accounts]);
 
   // Get account name
   const getAccountName = useCallback((accountId) => {
@@ -169,19 +230,25 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return [...fromHistory, ...fillers];
   }, [topTransferTargets, accounts, visibleAccounts, quickAddValues.type, quickAddValues.accountId]);
 
-  // Reset form but keep account and type
+  // Reset form but keep account and type; restore operationCurrency to account currency
   const resetForm = useCallback(() => {
-    setQuickAddValues(prev => ({
-      type: prev.type,
-      amount: '',
-      accountId: prev.accountId,
-      categoryId: '',
-      description: '',
-      toAccountId: '',
-      exchangeRate: '',
-      destinationAmount: '',
-    }));
-  }, []);
+    setQuickAddValues(prev => {
+      const acc = accounts.find(a => a.id === prev.accountId);
+      return {
+        type: prev.type,
+        amount: '',
+        accountId: prev.accountId,
+        categoryId: '',
+        description: '',
+        toAccountId: '',
+        exchangeRate: '',
+        destinationAmount: '',
+        operationCurrency: acc?.currency || prev.operationCurrency,
+      };
+    });
+    setForeignRateSource(null);
+    setForeignExchangeRate('');
+  }, [accounts]);
 
   return {
     quickAddValues,
@@ -194,6 +261,8 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     topCategoriesForType,
     topTransferAccountsForForm,
     resetForm,
+    foreignRateSource,
+    foreignExchangeRate,
   };
 };
 

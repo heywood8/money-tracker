@@ -1567,6 +1567,27 @@ export const getTopTransferTargetAccounts = async (limit = 3) => {
   }
 };
 
+export const getTopSourceCurrencies = async (limit = 5) => {
+  try {
+    const results = await queryAll(
+      `SELECT source_currency, COUNT(*) as count
+       FROM operations
+       WHERE source_currency IS NOT NULL
+         AND destination_currency IS NOT NULL
+         AND source_currency != destination_currency
+         AND type != 'transfer'
+       GROUP BY source_currency
+       ORDER BY count DESC
+       LIMIT ?`,
+      [limit],
+    );
+    return (results || []).map(row => row.source_currency);
+  } catch (error) {
+    console.error('Failed to get top source currencies:', error);
+    return [];
+  }
+};
+
 export const getTopCategoriesFromLastMonth = async (limitPerType = 3) => {
   try {
     // Calculate date range for last 90 days (includes today)

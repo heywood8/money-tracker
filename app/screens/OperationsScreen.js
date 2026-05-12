@@ -111,6 +111,8 @@ const OperationsScreen = () => {
     topCategoriesForType,
     topTransferAccountsForForm,
     resetForm,
+    foreignRateSource,
+    foreignExchangeRate,
   } = useQuickAddForm(visibleAccounts, accounts, categories, t);
 
   const {
@@ -412,10 +414,56 @@ const OperationsScreen = () => {
       if (operationData.destinationAmount) {
         operationData.destinationAmount = Currency.formatAmount(operationData.destinationAmount, effectiveDestAccount.currency);
       }
-    } else if (effectiveSourceAccount) {
-      // Format amount for same-currency operations
-      operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
+    } else {
+      // Check if this is a foreign currency expense/income
+      const opCurrency = operationData.operationCurrency;
+      const isForeignCurrencyOp = opCurrency
+        && effectiveSourceAccount
+        && opCurrency !== effectiveSourceAccount.currency;
+
+      if (isForeignCurrencyOp) {
+        const foreignCurrency = opCurrency;
+        const homeCurrency = effectiveSourceAccount.currency;
+        const foreignAmount = Currency.formatAmount(operationData.amount, foreignCurrency);
+
+        // Fetch live rate with offline fallback
+        let rateToUse = null;
+        try {
+          const { rate } = await Currency.fetchLiveExchangeRate(foreignCurrency, homeCurrency);
+          rateToUse = rate;
+        } catch {
+          // fall through to offline
+        }
+        if (!rateToUse) {
+          const offlineRate = Currency.getExchangeRate(foreignCurrency, homeCurrency);
+          if (offlineRate) rateToUse = String(offlineRate);
+        }
+
+        if (!rateToUse) {
+          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: 'OK' }]);
+          return;
+        }
+
+        const homeAmount = Currency.convertAmount(foreignAmount, foreignCurrency, homeCurrency, rateToUse);
+        if (!homeAmount) {
+          showDialog(t('error'), t('exchange_rate_unavailable'), [{ text: 'OK' }]);
+          return;
+        }
+
+        // Store home-currency amount as the account deduction; foreign amount as destinationAmount
+        operationData.amount = Currency.formatAmount(homeAmount, homeCurrency);
+        operationData.sourceCurrency = foreignCurrency;
+        operationData.destinationCurrency = homeCurrency;
+        operationData.exchangeRate = rateToUse;
+        operationData.destinationAmount = foreignAmount;
+      } else if (effectiveSourceAccount) {
+        // Format amount for same-currency operations
+        operationData.amount = Currency.formatAmount(operationData.amount, effectiveSourceAccount.currency);
+      }
     }
+
+    // Strip operationCurrency — not a DB field
+    delete operationData.operationCurrency;
 
     const error = validateOperation(operationData, t);
     if (error) {
@@ -555,6 +603,10 @@ const OperationsScreen = () => {
     setRateSource('manual');
   }, [setRateSource]);
 
+  const handleOperationCurrencyChange = useCallback((currencyCode) => {
+    setQuickAddValues(v => ({ ...v, operationCurrency: currencyCode }));
+  }, []);
+
   const handleAmountChange = useCallback((text) => {
     setQuickAddValues(v => ({ ...v, amount: text }));
     setLastEditedField('amount');
@@ -603,11 +655,14 @@ const OperationsScreen = () => {
           onAutoAddWithAccount={handleAutoAddWithAccount}
           TYPES={TYPES}
           rateSource={rateSource}
+          onOperationCurrencyChange={handleOperationCurrencyChange}
+          foreignRateSource={foreignRateSource}
+          foreignExchangeRate={foreignExchangeRate}
         />
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, filterPanelHeight, filtersExpanded]);
+  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
