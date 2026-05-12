@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.1](https://github.com/heywood8/money-tracker/compare/penny-v0.112.0...penny-v0.112.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* preserve multicurrency exchange rate when editing description in OperationModal ([#610](https://github.com/heywood8/money-tracker/issues/610)) ([7191c02](https://github.com/heywood8/money-tracker/commit/7191c02d02828334c98a9b033be55af97fe002d6))
+
 ## [0.112.0](https://github.com/heywood8/money-tracker/compare/penny-v0.111.1...penny-v0.112.0) (2026-05-12)
 
 
