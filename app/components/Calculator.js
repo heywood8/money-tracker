@@ -9,7 +9,7 @@ import { hasOperation as checkHasOperation, evaluateExpression as evalExpr } fro
  * Calculator button component - Memoized for performance
  * Executes on press down and repeats during long holds
  */
-const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => {
+const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors, compact, circleBackground }) => {
   const timeoutRef = useRef(null);
   const intervalRef = useRef(null);
   const isPressedRef = useRef(false);
@@ -107,7 +107,7 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
     }, 100); // Repeat every 100ms
   }, [onPress, value]);
 
-  const buttonStyle = useMemo(() => [
+  const buttonOuterStyle = useMemo(() => [
     styles.button,
     style,
   ], [style]);
@@ -117,10 +117,35 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
     textStyle,
   ], [textStyle]);
 
+  const circleSize = compact ? 38 : HEIGHTS.calculator;
+
+  const circleStyle = useMemo(() => {
+    if (!circleBackground) return null;
+    return {
+      alignItems: 'center',
+      borderRadius: circleSize / 2,
+      elevation: 2,
+      height: circleSize,
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      width: circleSize,
+      backgroundColor: circleBackground,
+    };
+  }, [circleBackground, circleSize]);
+
+  const content = icon ? (
+    <Icon name={icon} size={24} color={textStyle?.color || colors.text} />
+  ) : (
+    <Text style={finalTextStyle}>{value}</Text>
+  );
+
   return (
     <Pressable
       style={({ pressed }) => [
-        buttonStyle,
+        buttonOuterStyle,
         pressed && { opacity: 0.7 },
       ]}
       onPressIn={handlePressIn}
@@ -133,11 +158,9 @@ const CalcButton = memo(({ value, onPress, style, textStyle, icon, colors }) => 
       accessibilityLabel={value}
       testID={`calc-btn-${value}`}
     >
-      {icon ? (
-        <Icon name={icon} size={24} color={textStyle?.color || colors.text} />
-      ) : (
-        <Text style={finalTextStyle}>{value}</Text>
-      )}
+      {circleBackground ? (
+        <View style={circleStyle}>{content}</View>
+      ) : content}
     </Pressable>
   );
 });
@@ -150,6 +173,8 @@ CalcButton.propTypes = {
   textStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
   icon: PropTypes.string,
   colors: PropTypes.object,
+  compact: PropTypes.bool,
+  circleBackground: PropTypes.string,
 };
 
 CalcButton.defaultProps = {
@@ -159,6 +184,8 @@ CalcButton.defaultProps = {
   textStyle: null,
   icon: null,
   colors: {},
+  compact: false,
+  circleBackground: null,
 };
 
 /**
@@ -188,7 +215,7 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
       syncedFromPropRef.current = false;
       return;
     }
-    
+
     const propValue = value || '';
     if (expression !== propValue) {
       onValueChange(expression);
@@ -261,14 +288,22 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     { color: colors.text },
   ], [colors.text]);
 
-  // Memoize button styles for better performance
   // Use a single background for all calculator buttons
   const buttonBackground = colors.calcButtonBackground || colors.inputBackground || colors.background;
 
+  // Layout-only style applied to the outer Pressable; background lives on the inner circle
   const sharedButtonStyle = useMemo(() => ({
-    backgroundColor: buttonBackground,
     ...(compact && { height: 38 }),
-  }), [buttonBackground, compact]);
+  }), [compact]);
+
+  // Shared props spread onto every keypad CalcButton
+  const sharedButtonProps = useMemo(() => ({
+    onPress: handlePress,
+    style: sharedButtonStyle,
+    colors,
+    compact,
+    circleBackground: buttonBackground,
+  }), [handlePress, sharedButtonStyle, colors, compact, buttonBackground]);
 
   const operationTextStyle = useMemo(() => ({
     color: colors.mutedText,
@@ -286,6 +321,21 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
     fontSize: 24,
     fontWeight: 'bold',
   }), [colors.text]);
+
+  const checkCircleSize = compact ? 38 : HEIGHTS.calculator;
+  const checkCircleStyle = useMemo(() => ({
+    alignItems: 'center',
+    borderRadius: checkCircleSize / 2,
+    elevation: 2,
+    height: checkCircleSize,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    width: checkCircleSize,
+    backgroundColor: colors.selected,
+  }), [checkCircleSize, colors.selected]);
 
   return (
     // Use provided containerBackground or fallback to altRow for compatibility
@@ -321,135 +371,43 @@ export default function Calculator({ value, onValueChange, colors, placeholder =
       <View style={styles.keypad}>
         {/* Row 1: + 1 2 3 */}
         <View style={styles.row}>
-          <CalcButton
-            value="+"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={operationTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="1"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="2"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="3"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
+          <CalcButton {...sharedButtonProps} value="+" textStyle={operationTextStyle} />
+          <CalcButton {...sharedButtonProps} value="1" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="2" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="3" textStyle={numberTextStyle} />
         </View>
 
         {/* Row 2: - 4 5 6 */}
         <View style={styles.row}>
-          <CalcButton
-            value="-"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={operationTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="4"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="5"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="6"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
+          <CalcButton {...sharedButtonProps} value="-" textStyle={operationTextStyle} />
+          <CalcButton {...sharedButtonProps} value="4" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="5" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="6" textStyle={numberTextStyle} />
         </View>
 
         {/* Row 3: × 7 8 9 */}
         <View style={styles.row}>
-          <CalcButton
-            value="×"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={operationTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="7"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="8"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="9"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
+          <CalcButton {...sharedButtonProps} value="×" textStyle={operationTextStyle} />
+          <CalcButton {...sharedButtonProps} value="7" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="8" textStyle={numberTextStyle} />
+          <CalcButton {...sharedButtonProps} value="9" textStyle={numberTextStyle} />
         </View>
 
         {/* Row 4: ÷ . 0 ✓ */}
         <View style={styles.row}>
-          <CalcButton
-            value="÷"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={operationTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="."
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={decimalTextStyle}
-            colors={colors}
-          />
-          <CalcButton
-            value="0"
-            onPress={handlePress}
-            style={sharedButtonStyle}
-            textStyle={numberTextStyle}
-            colors={colors}
-          />
+          <CalcButton {...sharedButtonProps} value="÷" textStyle={operationTextStyle} />
+          <CalcButton {...sharedButtonProps} value="." textStyle={decimalTextStyle} />
+          <CalcButton {...sharedButtonProps} value="0" textStyle={numberTextStyle} />
           {onAdd ? (
             <Pressable
-              style={[
-                styles.button,
-                sharedButtonStyle,
-                { backgroundColor: colors.selected },
-              ]}
+              style={[styles.button, sharedButtonStyle]}
               onPress={() => onAdd()}
               accessibilityRole="button"
               accessibilityLabel="add"
             >
-              <Icon name="check" size={24} color={colors.text} />
+              <View style={checkCircleStyle}>
+                <Icon name="check" size={24} color={colors.text} />
+              </View>
             </Pressable>
           ) : (
             <View style={styles.emptySpace} />
@@ -483,15 +441,9 @@ Calculator.defaultProps = {
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: HEIGHTS.calculator / 2,
-    elevation: 2,
     flex: 1,
     height: HEIGHTS.calculator,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   buttonText: {
     fontSize: 16,
