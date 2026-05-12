@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.111.1](https://github.com/heywood8/money-tracker/compare/penny-v0.111.0...penny-v0.111.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* "up to date" layout in Check for updates panel ([#580](https://github.com/heywood8/money-tracker/issues/580)) ([e8c0f37](https://github.com/heywood8/money-tracker/commit/e8c0f37f66c11bb1ae570472fa8584759e545b78))
+
 ## [0.111.0](https://github.com/heywood8/money-tracker/compare/penny-v0.110.1...penny-v0.111.0) (2026-05-11)
 
 
