@@ -747,14 +747,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  typeSelector: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  typeSelectorCompact: {
-    marginBottom: SPACING.sm,
-  },
   ratePreviewRow: {
     alignItems: 'center',
     marginBottom: SPACING.xs,
@@ -764,6 +756,14 @@ const styles = StyleSheet.create({
   ratePreviewText: {
     fontSize: FONT_SIZE.sm,
     textAlign: 'center',
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  typeSelectorCompact: {
+    marginBottom: SPACING.sm,
   },
 });
 
