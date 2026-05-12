@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.0](https://github.com/heywood8/money-tracker/compare/penny-v0.111.1...penny-v0.112.0) (2026-05-12)
+
+
+### Features
+
+* add foreign currency expense/income support with live exchange rates ([#582](https://github.com/heywood8/money-tracker/issues/582)) ([4858067](https://github.com/heywood8/money-tracker/commit/48580673eeba0afbe847c393c34765bbe4b838f9))
+
 ## [0.111.1](https://github.com/heywood8/money-tracker/compare/penny-v0.111.0...penny-v0.111.1) (2026-05-12)
 
 
