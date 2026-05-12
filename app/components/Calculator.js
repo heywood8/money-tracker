@@ -518,6 +518,20 @@ const styles = StyleSheet.create({
   containerCompact: {
     marginBottom: SPACING.xs,
   },
+  currencyChip: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    flexDirection: 'row',
+    gap: 2,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    width: 80,
+  },
+  currencyChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   deleteButtonInDisplay: {
     backgroundColor: 'transparent',
     borderWidth: 0,
@@ -541,20 +555,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     justifyContent: 'flex-end',
     width: 80,
-  },
-  currencyChip: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    flexDirection: 'row',
-    gap: 2,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    width: 80,
-  },
-  currencyChipText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   displayLeftSpacer: {
     width: 80,
