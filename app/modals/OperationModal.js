@@ -81,8 +81,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     sourceAccount,
     destinationAccount,
     isMultiCurrencyTransfer,
+    isForeignCurrencyOp,
     rateSource,
     setRateSource,
+    foreignExchangeRate,
+    foreignRateSource,
     handleSave,
     handleClose,
     handleDelete,
@@ -180,6 +183,13 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
       setRateSource('manual');
     }
   }, [isShadowOperation, setValues, setLastEditedField, setRateSource]);
+
+  // Handler for operation currency changes (foreign currency expense/income)
+  const handleOperationCurrencyChange = useCallback((code) => {
+    if (!isShadowOperation) {
+      setValues(v => ({ ...v, operationCurrency: code }));
+    }
+  }, [isShadowOperation, setValues]);
 
   // Handler for description changes
   const handleDescriptionChange = useCallback((text) => {
@@ -403,6 +413,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           onExchangeRateChange={handleExchangeRateChange}
           onDestinationAmountChange={handleDestinationAmountChange}
           rateSource={rateSource}
+          onOperationCurrencyChange={handleOperationCurrencyChange}
+          foreignExchangeRate={foreignExchangeRate}
+          foreignRateSource={foreignRateSource}
         />
 
         {/* Category / To Account + Date row */}
