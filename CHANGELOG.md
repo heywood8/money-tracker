@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.2](https://github.com/heywood8/money-tracker/compare/penny-v0.112.1...penny-v0.112.2) (2026-05-13)
+
+
+### Bug Fixes
+
+* multicurrency operation data resets when editing description in OperationModal ([#612](https://github.com/heywood8/money-tracker/issues/612)) ([6d765fa](https://github.com/heywood8/money-tracker/commit/6d765fa4f1fe66df02291314afff7212791d262c))
+
 ## [0.112.1](https://github.com/heywood8/money-tracker/compare/penny-v0.112.0...penny-v0.112.1) (2026-05-12)
 
 
