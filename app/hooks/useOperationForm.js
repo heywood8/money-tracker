@@ -41,11 +41,16 @@ const useOperationForm = ({
     toAccountId: '',
     exchangeRate: '',
     destinationAmount: '',
+    operationCurrency: '',
   });
   const [errors, setErrors] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [lastEditedField, setLastEditedField] = useState(null);
   const [rateSource, setRateSource] = useState('offline');
+
+  // Foreign currency expense/income state
+  const [foreignExchangeRate, setForeignExchangeRate] = useState('');
+  const [foreignRateSource, setForeignRateSource] = useState(null);
 
   // Track if form has been initialized to prevent re-initialization from overwriting user changes.
   // Set to true right after first initialization; reset to false when the modal closes.
@@ -91,6 +96,13 @@ const useOperationForm = ({
     if (!sourceAccount || !destinationAccount) return false;
     return sourceAccount.currency !== destinationAccount.currency;
   }, [values.type, sourceAccount, destinationAccount]);
+
+  // Foreign currency expense/income: op entered in a currency different from the account currency
+  const isForeignCurrencyOp = useMemo(() => {
+    if (values.type === 'transfer') return false;
+    if (!values.operationCurrency || !sourceAccount) return false;
+    return values.operationCurrency !== sourceAccount.currency;
+  }, [values.type, values.operationCurrency, sourceAccount]);
 
   // Auto-populate exchange rate when accounts change (async with live rate)
   useEffect(() => {
@@ -169,6 +181,50 @@ const useOperationForm = ({
     }
   }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, values.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
 
+  // Auto-fetch exchange rate for foreign currency expense/income ops
+  useEffect(() => {
+    if (!isForeignCurrencyOp || !values.operationCurrency || !values.accountId) {
+      setForeignRateSource(null);
+      setForeignExchangeRate('');
+      return;
+    }
+
+    const account = accountsRef.current.find(a => a.id === values.accountId);
+    if (!account) return;
+
+    let cancelled = false;
+    setForeignRateSource('loading');
+
+    Currency.fetchLiveExchangeRate(values.operationCurrency, account.currency)
+      .then(({ rate, source }) => {
+        if (cancelled) return;
+        if (rate) {
+          setForeignExchangeRate(rate);
+          setForeignRateSource(source === 'live' ? 'live' : 'offline');
+        } else {
+          const offlineRate = Currency.getExchangeRate(values.operationCurrency, account.currency);
+          if (offlineRate) {
+            setForeignExchangeRate(String(offlineRate));
+            setForeignRateSource('offline');
+          } else {
+            setForeignRateSource(null);
+          }
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const offlineRate = Currency.getExchangeRate(values.operationCurrency, account.currency);
+        if (offlineRate) {
+          setForeignExchangeRate(String(offlineRate));
+          setForeignRateSource('offline');
+        } else {
+          setForeignRateSource(null);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [isForeignCurrencyOp, values.operationCurrency, values.accountId]);
+
   // Clear category when switching between expense and income to avoid mismatched categories
   useEffect(() => {
     // Only run when modal is visible (avoid interfering while modal closed)
@@ -192,6 +248,8 @@ const useOperationForm = ({
     if (!visible) {
       // Reset the guard when modal closes so next open will initialize properly
       formModifiedRef.current = false;
+      setForeignExchangeRate('');
+      setForeignRateSource(null);
       return;
     }
 
@@ -218,6 +276,7 @@ const useOperationForm = ({
           toAccountId: operation.toAccountId || '',
           exchangeRate: String(operation.exchangeRate || ''),
           destinationAmount: String(operation.destinationAmount || ''),
+          operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
         });
       } else if (isNew) {
         let defaultAccountId = '';
@@ -303,6 +362,9 @@ const useOperationForm = ({
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
+    } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
+      data.sourceCurrency = values.operationCurrency;
+      data.destinationCurrency = sourceAccount.currency;
     }
 
     // Ensure amount is preserved when editing
@@ -320,7 +382,7 @@ const useOperationForm = ({
     }
 
     return data;
-  }, [values, isMultiCurrencyTransfer, sourceAccount, destinationAccount, isNew, operation]);
+  }, [values, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, isNew, operation]);
 
   // Save operation (add or update)
   const handleSave = useCallback(async () => {
@@ -496,8 +558,11 @@ const useOperationForm = ({
     sourceAccount,
     destinationAccount,
     isMultiCurrencyTransfer,
+    isForeignCurrencyOp,
     rateSource,
     setRateSource,
+    foreignExchangeRate,
+    foreignRateSource,
 
     // Handlers
     handleSave,

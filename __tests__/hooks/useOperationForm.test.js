@@ -1172,4 +1172,132 @@ describe('useOperationForm', () => {
       expect(result.current.values.amount).toBe('100.00');
     });
   });
+
+  describe('Foreign Currency Expense/Income', () => {
+    const foreignCurrencyExpense = {
+      id: 'op-fx',
+      type: 'expense',
+      amount: '244',
+      accountId: 'acc-1',       // account currency is USD
+      categoryId: 'cat-1',
+      date: '2024-01-15',
+      sourceCurrency: 'EUR',    // entered in EUR (foreign)
+      destinationCurrency: 'USD',
+      exchangeRate: '1.08',
+      destinationAmount: '263.52',
+    };
+
+    it('should load operationCurrency from sourceCurrency when editing foreign currency expense', async () => {
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.operationCurrency).toBe('EUR');
+      });
+    });
+
+    it('should set isForeignCurrencyOp true when operationCurrency differs from account currency', async () => {
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.isForeignCurrencyOp).toBe(true);
+      });
+    });
+
+    it('should fetch foreignExchangeRate when isForeignCurrencyOp is true', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
+
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.foreignExchangeRate).toBe('1.09');
+        expect(result.current.foreignRateSource).toBe('live');
+      });
+    });
+
+    it('should fall back to offline rate when live fetch fails', async () => {
+      Currency.fetchLiveExchangeRate.mockRejectedValue(new Error('network'));
+      Currency.getExchangeRate.mockReturnValue('1.07');
+
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.foreignExchangeRate).toBe('1.07');
+        expect(result.current.foreignRateSource).toBe('offline');
+      });
+    });
+
+    it('should not set isForeignCurrencyOp for transfer operations', async () => {
+      const transferOp = {
+        id: 'op-tr',
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+        sourceCurrency: 'EUR',
+        destinationCurrency: 'USD',
+        exchangeRate: '1.08',
+        date: '2024-01-15',
+      };
+
+      const props = { ...defaultProps, operation: transferOp, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.type).toBe('transfer');
+        expect(result.current.isForeignCurrencyOp).toBe(false);
+        // transfer ops use values.operationCurrency = '' (never loaded from sourceCurrency)
+        expect(result.current.values.operationCurrency).toBe('');
+      });
+    });
+
+    it('should include sourceCurrency and destinationCurrency when saving foreign currency expense', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
+      mockUpdateOperation.mockResolvedValue();
+
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.operationCurrency).toBe('EUR');
+        expect(result.current.isForeignCurrencyOp).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(mockUpdateOperation).toHaveBeenCalledWith(
+        'op-fx',
+        expect.objectContaining({
+          sourceCurrency: 'EUR',
+          destinationCurrency: 'USD',
+        }),
+      );
+    });
+
+    it('should reset foreignExchangeRate and foreignRateSource when modal closes', async () => {
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
+
+      const { result, rerender } = renderHook(
+        (props) => useOperationForm(props),
+        { initialProps: { ...defaultProps, operation: foreignCurrencyExpense, isNew: false } },
+      );
+
+      await waitFor(() => {
+        expect(result.current.foreignExchangeRate).toBe('1.09');
+      });
+
+      // Close modal
+      rerender({ ...defaultProps, operation: foreignCurrencyExpense, isNew: false, visible: false });
+
+      await waitFor(() => {
+        expect(result.current.foreignExchangeRate).toBe('');
+        expect(result.current.foreignRateSource).toBeNull();
+      });
+    });
+  });
 });
