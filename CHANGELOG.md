@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.3](https://github.com/heywood8/money-tracker/compare/penny-v0.112.2...penny-v0.112.3) (2026-05-13)
+
+
+### Bug Fixes
+
+* show editable exchange rate fields for foreign currency ops in OperationModal ([#614](https://github.com/heywood8/money-tracker/issues/614)) ([5349715](https://github.com/heywood8/money-tracker/commit/5349715404e98585bd1de023257e26385b9e68c1))
+
 ## [0.112.2](https://github.com/heywood8/money-tracker/compare/penny-v0.112.1...penny-v0.112.2) (2026-05-13)
 
 
