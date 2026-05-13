@@ -1205,28 +1205,44 @@ describe('useOperationForm', () => {
       });
     });
 
-    it('should fetch foreignExchangeRate when isForeignCurrencyOp is true', async () => {
-      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
-
+    it('should preserve stored exchangeRate and not clear it for foreign currency ops', async () => {
+      // The critical regression: auto-calculate used to clear values.exchangeRate for any
+      // non-transfer op. For foreign currency ops it must be preserved.
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
       const { result } = renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
-        expect(result.current.foreignExchangeRate).toBe('1.09');
-        expect(result.current.foreignRateSource).toBe('live');
+        expect(result.current.values.exchangeRate).toBe('1.08');
+        expect(result.current.values.destinationAmount).toBe('263.52');
       });
     });
 
-    it('should fall back to offline rate when live fetch fails', async () => {
-      Currency.fetchLiveExchangeRate.mockRejectedValue(new Error('network'));
-      Currency.getExchangeRate.mockReturnValue('1.07');
+    it('should auto-populate exchangeRate via rateSource when no stored rate exists', async () => {
+      // For new foreign currency ops (no stored rate), auto-populate fetches and sets
+      // values.exchangeRate, and updates rateSource accordingly.
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
 
-      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const noRateOp = { ...foreignCurrencyExpense, exchangeRate: null, destinationAmount: null };
+      const props = { ...defaultProps, operation: noRateOp, isNew: false };
       const { result } = renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
-        expect(result.current.foreignExchangeRate).toBe('1.07');
-        expect(result.current.foreignRateSource).toBe('offline');
+        expect(result.current.values.exchangeRate).toBe('1.09');
+        expect(result.current.rateSource).toBe('live');
+      });
+    });
+
+    it('should fall back to offline rate when live fetch fails for foreign op', async () => {
+      Currency.fetchLiveExchangeRate.mockRejectedValue(new Error('network'));
+      Currency.getExchangeRate.mockReturnValue('1.07');
+
+      const noRateOp = { ...foreignCurrencyExpense, exchangeRate: null, destinationAmount: null };
+      const props = { ...defaultProps, operation: noRateOp, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
+
+      await waitFor(() => {
+        expect(result.current.values.exchangeRate).toBe('1.07');
+        expect(result.current.rateSource).toBe('offline');
       });
     });
 
@@ -1279,24 +1295,24 @@ describe('useOperationForm', () => {
       );
     });
 
-    it('should reset foreignExchangeRate and foreignRateSource when modal closes', async () => {
-      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
+    it('should recalculate destinationAmount when amount changes for foreign currency op', async () => {
+      // When the user edits the amount, the destinationAmount should update automatically.
+      Currency.convertAmount.mockReturnValue('291.60');
 
-      const { result, rerender } = renderHook(
-        (props) => useOperationForm(props),
-        { initialProps: { ...defaultProps, operation: foreignCurrencyExpense, isNew: false } },
-      );
+      const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
+      const { result } = renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
-        expect(result.current.foreignExchangeRate).toBe('1.09');
+        expect(result.current.values.exchangeRate).toBe('1.08');
       });
 
-      // Close modal
-      rerender({ ...defaultProps, operation: foreignCurrencyExpense, isNew: false, visible: false });
+      await act(async () => {
+        result.current.setValues(v => ({ ...v, amount: '270' }));
+        result.current.setLastEditedField('amount');
+      });
 
       await waitFor(() => {
-        expect(result.current.foreignExchangeRate).toBe('');
-        expect(result.current.foreignRateSource).toBeNull();
+        expect(result.current.values.destinationAmount).toBe('291.60');
       });
     });
   });

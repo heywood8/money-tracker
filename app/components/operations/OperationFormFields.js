@@ -88,6 +88,7 @@ const OperationFormFields = memo(({
   onOperationCurrencyChange,
   foreignRateSource,
   foreignExchangeRate,
+  foreignCurrencyEditable = false,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
@@ -529,7 +530,7 @@ const OperationFormFields = memo(({
           onCurrencyPress={compact && values.type !== 'transfer' && onOperationCurrencyChange ? () => setShowCurrencyPicker(true) : undefined}
         />
       </View>
-      {isForeignCurrencyOp && sourceAccount && (
+      {isForeignCurrencyOp && sourceAccount && !foreignCurrencyEditable && (
         <View style={styles.ratePreviewRow}>
           <Text style={[styles.ratePreviewText, { color: colors.mutedText }]}>
             {foreignRateSource === 'loading'
@@ -539,6 +540,20 @@ const OperationFormFields = memo(({
                 : t('rate_unavailable')}
           </Text>
         </View>
+      )}
+      {isForeignCurrencyOp && sourceAccount && foreignCurrencyEditable && onExchangeRateChange && onDestinationAmountChange && (
+        <MultiCurrencyFields
+          colors={colors}
+          t={t}
+          sourceAccount={{ currency: values.operationCurrency }}
+          destinationAccount={{ currency: sourceAccount.currency }}
+          exchangeRate={values.exchangeRate || ''}
+          destinationAmount={values.destinationAmount || ''}
+          isShadowOperation={disabled}
+          onExchangeRateChange={onExchangeRateChange}
+          onDestinationAmountChange={onDestinationAmountChange}
+          rateSource={rateSource || 'offline'}
+        />
       )}
       {isMultiCurrencyTransfer && sourceAccount && destinationAccount && onExchangeRateChange && onDestinationAmountChange && (
         <MultiCurrencyFields
@@ -615,6 +630,7 @@ OperationFormFields.propTypes = {
   onOperationCurrencyChange: PropTypes.func,
   foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   foreignExchangeRate: PropTypes.string,
+  foreignCurrencyEditable: PropTypes.bool,
 };
 
 const styles = StyleSheet.create({
