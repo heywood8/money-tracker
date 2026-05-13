@@ -48,9 +48,7 @@ const useOperationForm = ({
   const [lastEditedField, setLastEditedField] = useState(null);
   const [rateSource, setRateSource] = useState('offline');
 
-  // Foreign currency expense/income state
-  const [foreignExchangeRate, setForeignExchangeRate] = useState('');
-  const [foreignRateSource, setForeignRateSource] = useState(null);
+  // rateSource is shared for both multicurrency transfers and foreign currency ops
 
   // Track if form has been initialized to prevent re-initialization from overwriting user changes.
   // Set to true right after first initialization; reset to false when the modal closes.
@@ -104,16 +102,24 @@ const useOperationForm = ({
     return values.operationCurrency !== sourceAccount.currency;
   }, [values.type, values.operationCurrency, sourceAccount]);
 
-  // Auto-populate exchange rate when accounts change (async with live rate)
+  // Auto-populate exchange rate when a multicurrency pair is detected and no rate is set yet.
+  // Handles both multicurrency transfers and foreign currency expense/income ops.
   useEffect(() => {
-    if (!isMultiCurrencyTransfer || !sourceAccount || !destinationAccount || values.exchangeRate) {
+    const forTransfer = isMultiCurrencyTransfer && sourceAccount && destinationAccount;
+    const forForeignOp = isForeignCurrencyOp && sourceAccount && values.operationCurrency;
+
+    if ((!forTransfer && !forForeignOp) || values.exchangeRate) {
       return;
     }
+
+    const fromCurrency = forForeignOp ? values.operationCurrency : sourceAccount.currency;
+    const toCurrency = forForeignOp ? sourceAccount.currency : destinationAccount?.currency;
+    if (!fromCurrency || !toCurrency) return;
 
     let cancelled = false;
     setRateSource('loading');
 
-    Currency.fetchLiveExchangeRate(sourceAccount.currency, destinationAccount.currency)
+    Currency.fetchLiveExchangeRate(fromCurrency, toCurrency)
       .then(({ rate, source }) => {
         if (cancelled) return;
         if (rate) {
@@ -124,8 +130,7 @@ const useOperationForm = ({
       })
       .catch(() => {
         if (cancelled) return;
-        // Fallback to offline
-        const rate = Currency.getExchangeRate(sourceAccount.currency, destinationAccount.currency);
+        const rate = Currency.getExchangeRate(fromCurrency, toCurrency);
         if (rate) {
           setValues(v => ({ ...v, exchangeRate: rate }));
           setLastEditedField('exchangeRate');
@@ -134,12 +139,13 @@ const useOperationForm = ({
       });
 
     return () => { cancelled = true; };
-  }, [isMultiCurrencyTransfer, sourceAccount, destinationAccount, values.exchangeRate]);
+  }, [isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, values.exchangeRate, values.operationCurrency]);
 
-  // Auto-calculate based on which field was last edited
+  // Auto-calculate exchange rate / destination amount based on which field was last edited.
+  // Handles both multicurrency transfers and foreign currency expense/income ops.
   useEffect(() => {
-    if (!isMultiCurrencyTransfer) {
-      // Clear exchange rate fields for same-currency transfers
+    if (!isMultiCurrencyTransfer && !isForeignCurrencyOp) {
+      // Clear exchange rate fields only for plain same-currency ops
       if (values.exchangeRate || values.destinationAmount) {
         setValues(v => ({ ...v, exchangeRate: '', destinationAmount: '' }));
         setLastEditedField(null);
@@ -147,9 +153,12 @@ const useOperationForm = ({
       return;
     }
 
-    if (!sourceAccount || !destinationAccount) return;
+    // Determine currency pair
+    const fromCurrency = isForeignCurrencyOp ? values.operationCurrency : sourceAccount?.currency;
+    const toCurrency = isForeignCurrencyOp ? sourceAccount?.currency : destinationAccount?.currency;
+    if (!fromCurrency || !toCurrency) return;
 
-    // If user edited destination amount, calculate the rate
+    // If user edited destination amount, back-calculate the rate
     if (lastEditedField === 'destinationAmount') {
       if (values.amount && values.destinationAmount) {
         const sourceAmount = parseFloat(values.amount);
@@ -170,8 +179,8 @@ const useOperationForm = ({
       if (values.amount && values.exchangeRate) {
         const converted = Currency.convertAmount(
           values.amount,
-          sourceAccount.currency,
-          destinationAccount.currency,
+          fromCurrency,
+          toCurrency,
           values.exchangeRate,
         );
         if (converted && converted !== values.destinationAmount) {
@@ -179,51 +188,7 @@ const useOperationForm = ({
         }
       }
     }
-  }, [isMultiCurrencyTransfer, values.amount, values.exchangeRate, values.destinationAmount, sourceAccount, destinationAccount, lastEditedField]);
-
-  // Auto-fetch exchange rate for foreign currency expense/income ops
-  useEffect(() => {
-    if (!isForeignCurrencyOp || !values.operationCurrency || !values.accountId) {
-      setForeignRateSource(null);
-      setForeignExchangeRate('');
-      return;
-    }
-
-    const account = accountsRef.current.find(a => a.id === values.accountId);
-    if (!account) return;
-
-    let cancelled = false;
-    setForeignRateSource('loading');
-
-    Currency.fetchLiveExchangeRate(values.operationCurrency, account.currency)
-      .then(({ rate, source }) => {
-        if (cancelled) return;
-        if (rate) {
-          setForeignExchangeRate(rate);
-          setForeignRateSource(source === 'live' ? 'live' : 'offline');
-        } else {
-          const offlineRate = Currency.getExchangeRate(values.operationCurrency, account.currency);
-          if (offlineRate) {
-            setForeignExchangeRate(String(offlineRate));
-            setForeignRateSource('offline');
-          } else {
-            setForeignRateSource(null);
-          }
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        const offlineRate = Currency.getExchangeRate(values.operationCurrency, account.currency);
-        if (offlineRate) {
-          setForeignExchangeRate(String(offlineRate));
-          setForeignRateSource('offline');
-        } else {
-          setForeignRateSource(null);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [isForeignCurrencyOp, values.operationCurrency, values.accountId]);
+  }, [isMultiCurrencyTransfer, isForeignCurrencyOp, values.amount, values.exchangeRate, values.destinationAmount, values.operationCurrency, sourceAccount, destinationAccount, lastEditedField]);
 
   // Clear category when switching between expense and income to avoid mismatched categories
   useEffect(() => {
@@ -248,8 +213,6 @@ const useOperationForm = ({
     if (!visible) {
       // Reset the guard when modal closes so next open will initialize properly
       formModifiedRef.current = false;
-      setForeignExchangeRate('');
-      setForeignRateSource(null);
       return;
     }
 
@@ -561,8 +524,6 @@ const useOperationForm = ({
     isForeignCurrencyOp,
     rateSource,
     setRateSource,
-    foreignExchangeRate,
-    foreignRateSource,
 
     // Handlers
     handleSave,

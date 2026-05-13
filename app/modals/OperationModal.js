@@ -84,8 +84,6 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     isForeignCurrencyOp,
     rateSource,
     setRateSource,
-    foreignExchangeRate,
-    foreignRateSource,
     handleSave,
     handleClose,
     handleDelete,
@@ -414,8 +412,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           onDestinationAmountChange={handleDestinationAmountChange}
           rateSource={rateSource}
           onOperationCurrencyChange={handleOperationCurrencyChange}
-          foreignExchangeRate={foreignExchangeRate}
-          foreignRateSource={foreignRateSource}
+          foreignCurrencyEditable={true}
         />
 
         {/* Category / To Account + Date row */}
