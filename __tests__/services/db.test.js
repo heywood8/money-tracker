@@ -29,6 +29,7 @@ describe('Database Service', () => {
       getAllAsync: jest.fn(() => Promise.resolve([])),
       closeAsync: jest.fn(() => Promise.resolve()),
       withTransactionAsync: jest.fn((callback) => callback()),
+      createCustomFunctionAsync: jest.fn(() => Promise.resolve()),
       createFunctionAsync: jest.fn(() => Promise.resolve()),
     };
 
@@ -229,24 +230,25 @@ describe('Database Service', () => {
     it('registers UNICODE_LOWER during database initialization', async () => {
       await getDatabase();
 
-      expect(mockDb.createFunctionAsync).toHaveBeenCalledWith(
+      // expo-sqlite 16.x API: createCustomFunctionAsync(name, callback, options)
+      expect(mockDb.createCustomFunctionAsync).toHaveBeenCalledWith(
         'UNICODE_LOWER',
-        { deterministic: true },
         expect.any(Function),
+        { deterministic: true },
       );
     });
 
     it('registers UNICODE_LOWER with deterministic: true option', async () => {
       await getDatabase();
 
-      const [, options] = mockDb.createFunctionAsync.mock.calls[0];
+      const [,, options] = mockDb.createCustomFunctionAsync.mock.calls[0];
       expect(options).toEqual({ deterministic: true });
     });
 
     it('registers UNICODE_LOWER before first runAsync call', async () => {
       await getDatabase();
 
-      const createFunctionOrder = mockDb.createFunctionAsync.mock.invocationCallOrder[0];
+      const createFunctionOrder = mockDb.createCustomFunctionAsync.mock.invocationCallOrder[0];
       const firstRunAsyncOrder = mockDb.runAsync.mock.invocationCallOrder[0];
       expect(createFunctionOrder).toBeLessThan(firstRunAsyncOrder);
     });
@@ -254,21 +256,21 @@ describe('Database Service', () => {
     it('UNICODE_LOWER callback returns null for null input', async () => {
       await getDatabase();
 
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback(null)).toBeNull();
     });
 
     it('UNICODE_LOWER callback returns null for undefined input', async () => {
       await getDatabase();
 
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback(undefined)).toBeNull();
     });
 
     it('UNICODE_LOWER callback lowercases ASCII text', async () => {
       await getDatabase();
 
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback('COFFEE')).toBe('coffee');
       expect(callback('Grocery')).toBe('grocery');
       expect(callback('TEST123')).toBe('test123');
@@ -278,7 +280,7 @@ describe('Database Service', () => {
       await getDatabase();
 
       // SQLite's built-in LOWER() leaves Cyrillic unchanged; this custom function must handle it
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback('Транспорт')).toBe('транспорт');
       expect(callback('САМОЛЕТ')).toBe('самолет');
       expect(callback('Путешествия')).toBe('путешествия');
@@ -287,7 +289,7 @@ describe('Database Service', () => {
     it('UNICODE_LOWER callback lowercases mixed-script and accented text', async () => {
       await getDatabase();
 
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback('Café')).toBe('café');
       expect(callback('München')).toBe('münchen');
     });
@@ -295,7 +297,7 @@ describe('Database Service', () => {
     it('UNICODE_LOWER callback preserves numeric strings', async () => {
       await getDatabase();
 
-      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback('12345')).toBe('12345');
       expect(callback('3.14')).toBe('3.14');
     });
