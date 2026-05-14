@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.5](https://github.com/heywood8/money-tracker/compare/penny-v0.112.4...penny-v0.112.5) (2026-05-14)
+
+
+### Bug Fixes
+
+* expense graph now aggregates all accounts for selected currency ([#618](https://github.com/heywood8/money-tracker/issues/618)) ([16d31c0](https://github.com/heywood8/money-tracker/commit/16d31c0705209fa5d9a1d8f1e7cffd552eb8a13e))
+
 ## [0.112.4](https://github.com/heywood8/money-tracker/compare/penny-v0.112.3...penny-v0.112.4) (2026-05-14)
 
 
