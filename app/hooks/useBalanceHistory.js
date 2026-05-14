@@ -65,6 +65,9 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       const prevHistory = await getBalanceHistory(selectedAccount, prevStartDateStr, prevEndDateStr);
       const prevMonthTotalExpenses = await getTotalExpenses(selectedAccount, prevStartDateStr, prevEndDateStr);
 
+      // Get current month's total expenses for the selected account (used for spending prediction)
+      const currentMonthTotalExpenses = await getTotalExpenses(selectedAccount, startDateStr, endDateStr);
+
       // Transform history data for chart
       const dataPoints = history.map(item => ({
         date: item.date,
@@ -196,6 +199,7 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
         prevMonth: prevMonthData,
         prevMonthTotalExpenses,
         prevMonthDaysCount: prevMonthDays,
+        currentMonthTotalExpenses,
         labels: allDays,
       });
     } catch (error) {

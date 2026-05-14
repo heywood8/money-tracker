@@ -326,9 +326,14 @@ const GraphsScreen = () => {
     return items;
   }, [availableYears, availableMonths, t, monthKeys]);
 
+  // Use account-specific expenses from balance history for the prediction.
+  // totalExpenses from useExpenseData covers all accounts in the currency (by design),
+  // but the forecast line on the balance history chart must reflect only the selected account.
+  const accountTotalExpenses = balanceHistoryData.currentMonthTotalExpenses ?? 0;
+
   // Calculate spending prediction
   const spendingPrediction = useMemo(() => {
-    if (totalExpenses === 0) {
+    if (accountTotalExpenses === 0) {
       return null; // No spending data yet
     }
 
@@ -364,7 +369,7 @@ const GraphsScreen = () => {
     }
 
     // Calculate daily average
-    const dailyAverage = totalExpenses / daysElapsed;
+    const dailyAverage = accountTotalExpenses / daysElapsed;
 
     // Predict total spending by month end
     const predictedTotal = dailyAverage * daysInMonth;
@@ -373,15 +378,15 @@ const GraphsScreen = () => {
     const percentElapsed = (daysElapsed / daysInMonth) * 100;
 
     return {
-      currentSpending: totalExpenses,
+      currentSpending: accountTotalExpenses,
       predictedTotal,
-      predictedRemaining: predictedTotal - totalExpenses,
+      predictedRemaining: predictedTotal - accountTotalExpenses,
       dailyAverage,
       daysElapsed,
       daysInMonth,
       percentElapsed,
     };
-  }, [totalExpenses, selectedYear, selectedMonth]);
+  }, [accountTotalExpenses, selectedYear, selectedMonth]);
 
   // Calculate if the selected period is the current month
   const isCurrentMonth = useMemo(() => {
