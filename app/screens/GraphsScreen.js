@@ -329,7 +329,7 @@ const GraphsScreen = () => {
   // Use account-specific expenses from balance history for the prediction.
   // totalExpenses from useExpenseData covers all accounts in the currency (by design),
   // but the forecast line on the balance history chart must reflect only the selected account.
-  const accountTotalExpenses = balanceHistoryData.currentMonthTotalExpenses ?? 0;
+  const accountTotalExpenses = parseFloat(balanceHistoryData.currentMonthTotalExpenses ?? 0) || 0;
 
   // Calculate spending prediction
   const spendingPrediction = useMemo(() => {

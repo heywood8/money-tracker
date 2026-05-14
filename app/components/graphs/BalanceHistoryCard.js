@@ -514,7 +514,7 @@ const BalanceHistoryCard = ({
                   // Daily avg = total expenses / days in month (negated: spending reduces balance)
                   const prevTotalExpenses = balanceHistoryData.prevMonthTotalExpenses;
                   if (prevTotalExpenses != null && prevMonthDaysCount > 0) {
-                    prevMonthDailyAvg = -prevTotalExpenses / prevMonthDaysCount;
+                    prevMonthDailyAvg = -parseFloat(prevTotalExpenses) / prevMonthDaysCount;
                   }
                 }
 
@@ -596,7 +596,7 @@ BalanceHistoryCard.propTypes = {
     actualForChart: PropTypes.array,
     burndown: PropTypes.array,
     prevMonth: PropTypes.array,
-    prevMonthTotalExpenses: PropTypes.number,
+    prevMonthTotalExpenses: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     prevMonthDaysCount: PropTypes.number,
   }).isRequired,
   selectedYear: PropTypes.number.isRequired,
