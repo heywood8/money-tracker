@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.10](https://github.com/heywood8/money-tracker/compare/penny-v0.112.9...penny-v0.112.10) (2026-05-14)
+
+
+### Bug Fixes
+
+* eliminate float precision loss and transfer desync in financial ops ([#628](https://github.com/heywood8/money-tracker/issues/628)) ([bdb0669](https://github.com/heywood8/money-tracker/commit/bdb0669c25ce624e9300c4fdf2fee6756e036e8c))
+
 ## [0.112.9](https://github.com/heywood8/money-tracker/compare/penny-v0.112.8...penny-v0.112.9) (2026-05-14)
 
 
