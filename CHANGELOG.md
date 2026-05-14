@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.12](https://github.com/heywood8/money-tracker/compare/penny-v0.112.11...penny-v0.112.12) (2026-05-14)
+
+
+### Bug Fixes
+
+* cyrillic text search and improve search UX ([#632](https://github.com/heywood8/money-tracker/issues/632)) ([87d028d](https://github.com/heywood8/money-tracker/commit/87d028d57195327d0b62a5c803cf3e2489188825))
+
 ## [0.112.11](https://github.com/heywood8/money-tracker/compare/penny-v0.112.10...penny-v0.112.11) (2026-05-14)
 
 
