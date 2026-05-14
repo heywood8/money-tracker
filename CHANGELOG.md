@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.113.0](https://github.com/heywood8/money-tracker/compare/penny-v0.112.13...penny-v0.113.0) (2026-05-14)
+
+
+### Features
+
+* scan all releases for updates instead of stopping at first non-newer ([#636](https://github.com/heywood8/money-tracker/issues/636)) ([f0ab4b1](https://github.com/heywood8/money-tracker/commit/f0ab4b1a239ddcaaf1651b26993420231689cc17))
+
 ## [0.112.13](https://github.com/heywood8/money-tracker/compare/penny-v0.112.12...penny-v0.112.13) (2026-05-14)
 
 
