@@ -272,6 +272,70 @@ describe('AppUpdateService', () => {
       expect(result.errorCode).toBe('invalid_release_data');
     });
 
+    it('finds a newer release even when a same-version release appears first in the list', async () => {
+      // GitHub orders by publication date, not version. If 0.112.9 was re-published after
+      // 0.112.12, it appears first and must not cause the scan to stop early.
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v0.112.9',
+            assets: [],
+          },
+          {
+            tag_name: 'v0.112.12',
+            assets: [{ name: 'penny-v0.112.12.apk', browser_download_url: 'https://example.com/penny-v0.112.12.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.112.12',
+            published_at: '2026-04-01T08:00:00Z',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.112.9',
+        fetchImpl,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.isUpdateAvailable).toBe(true);
+      expect(result.latestVersion).toBe('0.112.12');
+      expect(result.downloadUrl).toContain('penny-v0.112.12.apk');
+    });
+
+    it('picks the highest-version APK when newer releases are out of date order', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v0.113.1',
+            assets: [{ name: 'penny-v0.113.1.apk', browser_download_url: 'https://example.com/penny-v0.113.1.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.113.1',
+            published_at: '2026-05-01T08:00:00Z',
+          },
+          {
+            tag_name: 'v0.112.9',
+            assets: [],
+          },
+          {
+            tag_name: 'v0.113.5',
+            assets: [{ name: 'penny-v0.113.5.apk', browser_download_url: 'https://example.com/penny-v0.113.5.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.113.5',
+            published_at: '2026-04-15T08:00:00Z',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.112.9',
+        fetchImpl,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.isUpdateAvailable).toBe(true);
+      expect(result.latestVersion).toBe('0.113.5');
+      expect(result.downloadUrl).toContain('penny-v0.113.5.apk');
+    });
+
     it('uses releases endpoint with per_page=20', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: true,
