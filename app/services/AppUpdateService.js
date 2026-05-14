@@ -132,9 +132,9 @@ export const checkForAppUpdate = async ({
       };
     }
 
-    // Collect all releases newer than current (GitHub returns newest first).
-    // Stop as soon as we reach a release that is not newer — everything after is older.
-    let bestRelease = null; // first (newest) release with a downloadable APK
+    // Collect all releases newer than current. GitHub orders by publication date, not version,
+    // so we scan all fetched releases rather than stopping at the first non-newer one.
+    let bestRelease = null; // highest-version release with a downloadable APK
     let foundReleasesWithoutApk = false;
     const newerReleases = []; // all releases with version > current, for changelog
 
@@ -145,13 +145,13 @@ export const checkForAppUpdate = async ({
       }
 
       if (compareVersions(releaseVersion, currentNormalized) <= 0) {
-        break; // reached current or older — stop
+        continue; // not newer than current — skip
       }
 
       const apkAsset = extractApkAsset(release.assets);
       newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset });
 
-      if (apkAsset && !bestRelease) {
+      if (apkAsset && (!bestRelease || compareVersions(releaseVersion, bestRelease.version) > 0)) {
         bestRelease = {
           version: releaseVersion,
           downloadUrl: apkAsset.browser_download_url,
