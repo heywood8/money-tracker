@@ -29,6 +29,7 @@ describe('Database Service', () => {
       getAllAsync: jest.fn(() => Promise.resolve([])),
       closeAsync: jest.fn(() => Promise.resolve()),
       withTransactionAsync: jest.fn((callback) => callback()),
+      createFunctionAsync: jest.fn(() => Promise.resolve()),
     };
 
     SQLite.openDatabaseAsync.mockResolvedValue(mockDb);

@@ -36,6 +36,14 @@ export const getDatabase = async () => {
         throw new Error('Database instance is null after opening');
       }
 
+      // Register Unicode-aware LOWER function — SQLite's built-in LOWER() only handles ASCII,
+      // so Cyrillic (and other non-ASCII) characters are left unchanged. This custom function
+      // delegates to JS String.prototype.toLowerCase() which handles all Unicode correctly.
+      await dbInstance.createFunctionAsync('UNICODE_LOWER', { deterministic: true }, (value) => {
+        if (value == null) return null;
+        return String(value).toLowerCase();
+      });
+
       drizzleInstance = drizzle(dbInstance, { schema });
       console.log('Drizzle instance created');
 
