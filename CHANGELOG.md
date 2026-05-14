@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.8](https://github.com/heywood8/money-tracker/compare/penny-v0.112.7...penny-v0.112.8) (2026-05-14)
+
+
+### Bug Fixes
+
+* **#588:** make split operation atomic and use precise arithmetic ([#624](https://github.com/heywood8/money-tracker/issues/624)) ([78c5484](https://github.com/heywood8/money-tracker/commit/78c54848794185b4b028956d139236572f10a1cd))
+
 ## [0.112.7](https://github.com/heywood8/money-tracker/compare/penny-v0.112.6...penny-v0.112.7) (2026-05-14)
 
 
