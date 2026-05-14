@@ -1205,15 +1205,19 @@ describe('useOperationForm', () => {
       });
     });
 
-    it('should preserve stored exchangeRate and not clear it for foreign currency ops', async () => {
-      // The critical regression: auto-calculate used to clear values.exchangeRate for any
-      // non-transfer op. For foreign currency ops it must be preserved.
+    it('should load foreign currency op with foreign amount as primary and inverted rate', async () => {
+      // The form shows the foreign currency amount (what was spent) as the primary calculator
+      // value, and the account currency amount (what was deducted) as the destination field.
+      // The exchange rate is inverted so it points foreign→account (e.g. EUR→USD).
+      // DB has: amount=244(USD), destinationAmount=263.52(EUR), exchangeRate=1.08 (USD→EUR).
+      // Form shows: amount=263.52(EUR), destinationAmount=244(USD), exchangeRate=0.925926 (EUR→USD).
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
       const { result } = renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
-        expect(result.current.values.exchangeRate).toBe('1.08');
-        expect(result.current.values.destinationAmount).toBe('263.52');
+        expect(result.current.values.amount).toBe('263.52');          // foreign currency (EUR)
+        expect(result.current.values.destinationAmount).toBe('244'); // account currency (USD)
+        expect(result.current.values.exchangeRate).toBe('0.925926'); // inverted: EUR→USD
       });
     });
 
@@ -1291,6 +1295,8 @@ describe('useOperationForm', () => {
         expect.objectContaining({
           sourceCurrency: 'EUR',
           destinationCurrency: 'USD',
+          amount: '244',               // account currency (USD) swapped back for DB
+          destinationAmount: '263.52', // foreign currency (EUR) swapped back for DB
         }),
       );
     });
@@ -1303,7 +1309,8 @@ describe('useOperationForm', () => {
       const { result } = renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
-        expect(result.current.values.exchangeRate).toBe('1.08');
+        // Rate is inverted on load: EUR→USD = 1/1.08 = 0.925926
+        expect(result.current.values.exchangeRate).toBe('0.925926');
       });
 
       await act(async () => {
