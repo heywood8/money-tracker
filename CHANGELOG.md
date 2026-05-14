@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.6](https://github.com/heywood8/money-tracker/compare/penny-v0.112.5...penny-v0.112.6) (2026-05-14)
+
+
+### Bug Fixes
+
+* **search:** resolve TDZ crash, lazy-load gap, and stale-state bugs ([#620](https://github.com/heywood8/money-tracker/issues/620)) ([1a0a44d](https://github.com/heywood8/money-tracker/commit/1a0a44d08b4390b2520e94089b5bc334fc2591ad))
+
 ## [0.112.5](https://github.com/heywood8/money-tracker/compare/penny-v0.112.4...penny-v0.112.5) (2026-05-14)
 
 
