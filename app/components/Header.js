@@ -22,7 +22,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress } = useUpdateDownload();
-  const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters } = useSearch();
+  const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters, filtersExpanded } = useSearch();
   console.debug('[Header] openSearch exists:', !!openSearch);
   console.debug('[Header] searchMode:', searchMode);
   const downloadArrowAnim = useRef(new Animated.Value(0)).current;
@@ -55,6 +55,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
 
   const handleClearFilterGroup = useCallback((groupKey) => {
     const clearValues = {
+      text: { text: '' },
       types: { types: [] },
       dateRange: { dateRange: { startDate: null, endDate: null } },
       amountRange: { amountRange: { min: null, max: null } },
@@ -131,18 +132,21 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                       onPress={() => {
                         console.debug('[Header] Search button pressed, mode:', searchMode);
                         if (searchMode === 'collapsed') {
-                          // Reopen with smart logic
-                          const hasTextOnly = (searchState?.text !== '') &&
-                            (searchState?.types?.length === 0) &&
-                            (searchState?.accountIds?.length === 0) &&
-                            (searchState?.categoryIds?.length === 0) &&
-                            (!searchState?.dateRange?.startDate) &&
-                            (!searchState?.amountRange?.min);
-                          const hasOtherFilters = !hasTextOnly && hasActiveSearch;
+                          // Reopen with smart logic: auto-expand the filter panel when
+                          // any non-text filter is active.
+                          const hasOtherFilters =
+                            (searchState?.types?.length > 0) ||
+                            (searchState?.accountIds?.length > 0) ||
+                            (searchState?.categoryIds?.length > 0) ||
+                            !!searchState?.dateRange?.startDate ||
+                            !!searchState?.dateRange?.endDate ||
+                            (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||
+                            (searchState?.amountRange?.max !== null && searchState?.amountRange?.max !== undefined);
 
                           reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
-                            console.debug('[Header] Should expand filters:', shouldExpand);
-                            // This callback will be handled by SearchOverlay in task 10
+                            if (shouldExpand !== filtersExpanded) {
+                              toggleFilters();
+                            }
                           });
                         } else {
                           openSearch();

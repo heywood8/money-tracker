@@ -134,6 +134,44 @@ const OperationsScreen = () => {
     setRateSource,
   } = useMultiCurrencyTransfer(quickAddValues, accounts);
 
+  // Group operations by date into date-group objects for the list.
+  // Declared here (not after the unrelated effects below) because several hooks
+  // reference it in their dependency arrays; declaring later would put it in
+  // the Temporal Dead Zone when those arrays are evaluated during render.
+  const groupedOperations = useMemo(() => {
+    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const groups = [];
+    let currentGroup = null;
+
+    sorted.forEach((operation) => {
+      if (!currentGroup || operation.date !== currentGroup.date) {
+        currentGroup = {
+          type: 'dateGroup',
+          id: `group-${operation.date}`,
+          date: operation.date,
+          spendingSums: {},
+          operations: [],
+        };
+        groups.push(currentGroup);
+      }
+
+      currentGroup.operations.push(operation);
+
+      if (operation.type === 'expense') {
+        const account = accounts.find(acc => acc.id === operation.accountId);
+        if (account) {
+          const currency = account.currency || 'USD';
+          const amount = parseFloat(operation.amount);
+          if (!isNaN(amount)) {
+            currentGroup.spendingSums[currency] = (currentGroup.spendingSums[currency] || 0) + amount;
+          }
+        }
+      }
+    });
+
+    return groups;
+  }, [operations, accounts]);
+
   // Scroll to date after operations are loaded
   useEffect(() => {
     if (scrollToDateString && !operationsLoading) {
@@ -547,42 +585,6 @@ const OperationsScreen = () => {
       setPendingSuggestions([]);
     }
   }, [operations, pendingSuggestionId]);
-
-  // Group operations by date into date-group objects for the list
-  const groupedOperations = useMemo(() => {
-    const sorted = [...operations].sort((a, b) => new Date(b.date) - new Date(a.date));
-    const groups = [];
-    let currentGroup = null;
-
-    sorted.forEach((operation) => {
-      if (!currentGroup || operation.date !== currentGroup.date) {
-        currentGroup = {
-          type: 'dateGroup',
-          id: `group-${operation.date}`,
-          date: operation.date,
-          spendingSums: {},
-          operations: [],
-        };
-        groups.push(currentGroup);
-      }
-
-      currentGroup.operations.push(operation);
-
-      // Accumulate spending sums for expenses
-      if (operation.type === 'expense') {
-        const account = accounts.find(acc => acc.id === operation.accountId);
-        if (account) {
-          const currency = account.currency || 'USD';
-          const amount = parseFloat(operation.amount);
-          if (!isNaN(amount)) {
-            currentGroup.spendingSums[currency] = (currentGroup.spendingSums[currency] || 0) + amount;
-          }
-        }
-      }
-    });
-
-    return groups;
-  }, [operations, accounts]);
 
   const TYPES = useMemo(() => [
     { key: 'expense', label: t('expense'), icon: 'minus-circle' },

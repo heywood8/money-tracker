@@ -95,6 +95,7 @@ describe('ExpandableFilters', () => {
     const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
     fireEvent.press(getByTestId('clear-all-button'));
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
+      text: '',
       types: [],
       accountIds: [],
       categoryIds: [],

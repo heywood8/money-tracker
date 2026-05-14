@@ -6,8 +6,14 @@ import { HORIZONTAL_PADDING } from '../../styles/layout';
 
 const formatDateLabel = (dateRange) => {
   const { startDate, endDate } = dateRange;
-  const fmt = (d) =>
-    new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  // Parse "YYYY-MM-DD" as local time so the displayed day doesn't shift in
+  // timezones west of UTC (where new Date("YYYY-MM-DD") yields the previous day).
+  const fmt = (d) => {
+    if (!d) return '';
+    const [y, m, day] = d.split('-').map(Number);
+    if (!y || !m || !day) return '';
+    return new Date(y, m - 1, day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
   if (startDate && endDate) return `${fmt(startDate)} – ${fmt(endDate)}`;
   if (startDate) return `${fmt(startDate)} –`;
   if (endDate) return `– ${fmt(endDate)}`;
@@ -24,6 +30,12 @@ const formatAmountLabel = (amountRange) => {
 
 const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
   const chips = [];
+
+  if (searchState.text && searchState.text.trim().length > 0) {
+    const trimmed = searchState.text.trim();
+    const display = trimmed.length > 24 ? `${trimmed.slice(0, 24)}…` : trimmed;
+    chips.push({ key: 'text', label: `"${display}"` });
+  }
 
   if (searchState.types.length > 0) {
     const label =
@@ -81,6 +93,7 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
 
 FilterChipStrip.propTypes = {
   searchState: PropTypes.shape({
+    text: PropTypes.string,
     types: PropTypes.array.isRequired,
     accountIds: PropTypes.array.isRequired,
     categoryIds: PropTypes.array.isRequired,

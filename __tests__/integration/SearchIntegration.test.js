@@ -193,6 +193,7 @@ describe('Search Integration', () => {
       );
       fireEvent.press(getByTestId('clear-all-button'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({
+        text: '',
         types: [],
         accountIds: [],
         categoryIds: [],
