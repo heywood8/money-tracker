@@ -36,6 +36,9 @@ const mockCategories = [
   { id: 'cat-2', name: 'Salary', nameKey: 'category.salary', type: 'income', parentId: null },
   { id: 'cat-3', name: 'Transport', nameKey: 'category.transport', type: 'expense', parentId: null },
   { id: 'cat-4', name: 'Restaurants', nameKey: null, type: 'expense', parentId: 'cat-1' },
+  // Cyrillic categories for Unicode search tests
+  { id: 'cat-5', name: 'Транспорт', nameKey: null, type: 'expense', parentId: 'cat-6' },
+  { id: 'cat-6', name: 'Путешествия', nameKey: null, type: 'expense', parentId: null },
 ];
 
 const mockOperations = [
@@ -809,6 +812,142 @@ describe('OperationsDataContext - Search API', () => {
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(0);
+        });
+      });
+    });
+
+    describe('Cyrillic text search filtering', () => {
+      const cyrillicOperations = [
+        {
+          id: 'op-cyr-1',
+          type: 'expense',
+          accountId: 'acc-1',
+          categoryId: 'cat-3',
+          amount: '250',
+          description: 'Самолет Москва-Лондон',
+          date: '2026-04-18',
+        },
+        {
+          id: 'op-cyr-2',
+          type: 'expense',
+          accountId: 'acc-1',
+          categoryId: 'cat-5', // Транспорт (child of Путешествия)
+          amount: '30',
+          description: 'Автобус',
+          date: '2026-04-19',
+        },
+        {
+          id: 'op-cyr-3',
+          type: 'expense',
+          accountId: 'acc-2',
+          categoryId: 'cat-6', // Путешествия (parent category)
+          amount: '500',
+          description: 'Отель',
+          date: '2026-04-20',
+        },
+      ];
+
+      const setupWithCyrillicOperations = () => {
+        OperationsDB.getOperationsByWeekOffset.mockResolvedValue(cyrillicOperations);
+
+        const { result } = renderHook(
+          () => ({
+            data: useOperationsData(),
+            actions: useOperationsActions(),
+          }),
+          { wrapper },
+        );
+
+        return result;
+      };
+
+      it('matches Cyrillic description case-insensitively (uppercase search finds lowercase data)', async () => {
+        const result = setupWithCyrillicOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(3);
+        });
+
+        act(() => {
+          result.current.actions.setSearchText('САМОЛЕТ');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(1);
+          expect(result.current.data.operations[0].id).toBe('op-cyr-1');
+        });
+      });
+
+      it('matches Cyrillic description case-insensitively (lowercase search finds mixed-case data)', async () => {
+        const result = setupWithCyrillicOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(3);
+        });
+
+        act(() => {
+          result.current.actions.setSearchText('самолет');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(1);
+          expect(result.current.data.operations[0].id).toBe('op-cyr-1');
+        });
+      });
+
+      it('matches Cyrillic category name case-insensitively', async () => {
+        const result = setupWithCyrillicOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(3);
+        });
+
+        // Search for category name "Транспорт" using uppercase
+        act(() => {
+          result.current.actions.setSearchText('ТРАНСПОРТ');
+        });
+
+        await waitFor(() => {
+          const filtered = result.current.data.operations;
+          // op-cyr-2 has category Транспорт (cat-5)
+          expect(filtered.some(op => op.id === 'op-cyr-2')).toBe(true);
+        });
+      });
+
+      it('matches Cyrillic parent category name via hierarchy traversal', async () => {
+        const result = setupWithCyrillicOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(3);
+        });
+
+        // "путешествия" is the parent of "Транспорт"; searching for it should find op-cyr-2
+        act(() => {
+          result.current.actions.setSearchText('путешествия');
+        });
+
+        await waitFor(() => {
+          const filtered = result.current.data.operations;
+          // op-cyr-2 has cat-5 (Транспорт, child of Путешествия)
+          // op-cyr-3 has cat-6 (Путешествия directly)
+          expect(filtered.map(op => op.id).sort()).toEqual(['op-cyr-2', 'op-cyr-3']);
+        });
+      });
+
+      it('matches partial Cyrillic text in description', async () => {
+        const result = setupWithCyrillicOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(3);
+        });
+
+        act(() => {
+          result.current.actions.setSearchText('моск');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(1);
+          expect(result.current.data.operations[0].id).toBe('op-cyr-1');
         });
       });
     });
