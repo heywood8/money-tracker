@@ -331,6 +331,16 @@ const useOperationForm = ({
       newErrors.categoryId = t('category_required');
     }
 
+    // For multi-currency transfers and foreign currency ops, require a valid exchange rate
+    // to prevent race conditions where the user saves before the async rate fetch resolves.
+    const srcAcc = accounts.find(a => a.id === vals.accountId);
+    const dstAcc = accounts.find(a => a.id === vals.toAccountId);
+    const isMultiCurrency = vals.type === 'transfer' && srcAcc && dstAcc && srcAcc.currency !== dstAcc.currency;
+    const isForeignOp = vals.type !== 'transfer' && vals.operationCurrency && srcAcc && vals.operationCurrency !== srcAcc.currency;
+    if ((isMultiCurrency || isForeignOp) && (!vals.exchangeRate || parseFloat(vals.exchangeRate) <= 0)) {
+      newErrors.exchangeRate = t('exchange_rate_required');
+    }
+
     if (!vals.date) {
       newErrors.date = t('date_required');
     }

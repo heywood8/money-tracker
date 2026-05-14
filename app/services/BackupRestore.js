@@ -260,6 +260,41 @@ export const exportBackup = async (format = 'json') => {
   }
 };
 
+const VALID_OPERATION_TYPES = ['expense', 'income', 'transfer'];
+const VALID_CATEGORY_TYPES = ['folder', 'item'];
+const VALID_CATEGORY_EXPENSE_TYPES = ['expense', 'income'];
+const VALID_BUDGET_PERIOD_TYPES = ['monthly', 'weekly', 'yearly'];
+
+/**
+ * Validate enum fields in backup rows to prevent poisoned data from corrupting the DB.
+ * Throws with a descriptive message on the first invalid value found.
+ */
+const validateBackupEnums = (data) => {
+  for (const [i, op] of (data.operations || []).entries()) {
+    if (op.type && !VALID_OPERATION_TYPES.includes(op.type)) {
+      throw new Error(`Invalid operation type "${op.type}" at index ${i}`);
+    }
+  }
+  for (const [i, cat] of (data.categories || []).entries()) {
+    if (cat.type && !VALID_CATEGORY_TYPES.includes(cat.type)) {
+      throw new Error(`Invalid category type "${cat.type}" at index ${i}`);
+    }
+    if (cat.category_type && !VALID_CATEGORY_EXPENSE_TYPES.includes(cat.category_type)) {
+      throw new Error(`Invalid category_type "${cat.category_type}" at index ${i}`);
+    }
+  }
+  for (const [i, budget] of (data.budgets || []).entries()) {
+    if (budget.period_type && !VALID_BUDGET_PERIOD_TYPES.includes(budget.period_type)) {
+      throw new Error(`Invalid budget period_type "${budget.period_type}" at index ${i}`);
+    }
+  }
+  for (const [i, planned] of (data.planned_operations || []).entries()) {
+    if (planned.type && !VALID_OPERATION_TYPES.includes(planned.type)) {
+      throw new Error(`Invalid planned_operation type "${planned.type}" at index ${i}`);
+    }
+  }
+};
+
 /**
  * Validate backup data structure
  * @param {Object} backup - Backup object to validate
@@ -291,6 +326,9 @@ const validateBackup = (backup) => {
       throw new Error(`Invalid backup format: missing or invalid ${table} data`);
     }
   }
+
+  // Validate enum fields to reject poisoned backups before any DB writes
+  validateBackupEnums(backup.data);
 
   return true;
 };
