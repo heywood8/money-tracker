@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.7](https://github.com/heywood8/money-tracker/compare/penny-v0.112.6...penny-v0.112.7) (2026-05-14)
+
+
+### Bug Fixes
+
+* use account-specific expenses for balance history spending prediction ([#622](https://github.com/heywood8/money-tracker/issues/622)) ([c735648](https://github.com/heywood8/money-tracker/commit/c735648108961c1b9017f5a99fad91bb49905a46))
+
 ## [0.112.6](https://github.com/heywood8/money-tracker/compare/penny-v0.112.5...penny-v0.112.6) (2026-05-14)
 
 
