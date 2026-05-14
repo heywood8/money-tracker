@@ -93,7 +93,7 @@ const GraphsScreen = () => {
     loading,
     loadExpenseData,
     totalExpenses,
-  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, selectedAccount);
+  } = useExpenseData(selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t);
 
   const {
     incomeChartData,

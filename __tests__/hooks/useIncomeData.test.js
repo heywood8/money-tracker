@@ -424,5 +424,55 @@ describe('useIncomeData', () => {
         expect(result.current.totalIncome).toBe(7000);
       });
     });
+
+    it('should query all accounts for the currency without an account ID filter', async () => {
+      OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+
+      expect(OperationsDB.getIncomeByCategoryAndCurrency).toHaveBeenCalledWith(
+        mockCurrency,
+        expect.any(String),
+        expect.any(String),
+      );
+      expect(OperationsDB.getIncomeByCategoryAndCurrency).toHaveBeenCalledTimes(1);
+      const callArgs = OperationsDB.getIncomeByCategoryAndCurrency.mock.calls[0];
+      expect(callArgs).toHaveLength(3);
+    });
+
+    it('should include income from multiple accounts in the same currency', async () => {
+      // Simulates the DB returning rows that span multiple accounts for the currency
+      const mockIncome = [
+        { category_id: 'cat-2', total: '3000' }, // from account A
+        { category_id: 'cat-2', total: '2000' }, // from account B, same category
+        { category_id: 'cat-3', total: '1500' },
+      ];
+
+      OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+
+      await waitFor(() => {
+        expect(result.current.loadingIncome).toBe(false);
+      });
+
+      const salaryItem = result.current.incomeChartData.find(item => item.name === 'Salary');
+      expect(salaryItem).toBeDefined();
+      expect(salaryItem.amount).toBe(5000); // 3000 + 2000 aggregated across accounts
+
+      expect(result.current.totalIncome).toBe(6500);
+    });
   });
 });

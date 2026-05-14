@@ -91,7 +91,6 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-01-31',
-        null,
       );
       expect(result.current.chartData.length).toBeGreaterThan(0);
     });
@@ -119,7 +118,6 @@ describe('useExpenseData', () => {
         mockCurrency,
         '2024-01-01',
         '2024-12-31',
-        null,
       );
     });
 
@@ -416,6 +414,56 @@ describe('useExpenseData', () => {
         expect(result.current.loading).toBe(false);
         expect(result.current.totalExpenses).toBeCloseTo(191.34, 2);
       });
+    });
+
+    it('should query all accounts for the currency without an account ID filter', async () => {
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue([]);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      expect(OperationsDB.getSpendingByCategoryAndCurrency).toHaveBeenCalledWith(
+        mockCurrency,
+        expect.any(String),
+        expect.any(String),
+      );
+      expect(OperationsDB.getSpendingByCategoryAndCurrency).toHaveBeenCalledTimes(1);
+      const callArgs = OperationsDB.getSpendingByCategoryAndCurrency.mock.calls[0];
+      expect(callArgs).toHaveLength(3);
+    });
+
+    it('should include expenses from multiple accounts in the same currency', async () => {
+      // Simulates the DB returning rows that span multiple accounts for the currency
+      const mockSpending = [
+        { category_id: 'cat-2', total: '400' }, // from account A
+        { category_id: 'cat-2', total: '600' }, // from account B, same category
+        { category_id: 'cat-3', total: '200' },
+      ];
+
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const foodItem = result.current.chartData.find(item => item.name === 'Food');
+      expect(foodItem).toBeDefined();
+      expect(foodItem.amount).toBe(1000); // 400 + 600 aggregated across accounts
+
+      expect(result.current.totalExpenses).toBe(1200);
     });
   });
 });

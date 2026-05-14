@@ -14,7 +14,7 @@ const CHART_COLORS = [
  * DB is queried once per period/currency/account change. Category switches
  * re-aggregate the cached raw data synchronously (no DB hit).
  */
-const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t, selectedAccountId = null) => {
+const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t) => {
   const [rawSpending, setRawSpending] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +37,6 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
         selectedCurrency,
         formatDate(startDate),
         formatDate(endDate),
-        selectedAccountId,
       );
 
       setRawSpending(spending);
@@ -46,7 +45,7 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMonth, selectedCurrency, selectedAccountId]);
+  }, [selectedYear, selectedMonth, selectedCurrency]);
 
   // Aggregate cached raw spending for the current category — no DB hit
   const chartData = useMemo(() => {
