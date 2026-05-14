@@ -351,9 +351,31 @@ const useOperationForm = ({
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
+      // Recompute synchronously so a save before the async useEffect resolves
+      // never stores a destinationAmount that is inconsistent with amount × rate.
+      if (data.amount && data.exchangeRate) {
+        const recomputed = Currency.convertAmount(
+          data.amount,
+          sourceAccount.currency,
+          destinationAccount.currency,
+          data.exchangeRate,
+        );
+        if (recomputed) data.destinationAmount = recomputed;
+      }
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
       data.destinationCurrency = sourceAccount.currency;
+      // Recompute destinationAmount (account currency) from foreign amount × rate
+      // before the swap so stale form state is never persisted.
+      if (data.amount && data.exchangeRate) {
+        const recomputed = Currency.convertAmount(
+          data.amount,
+          values.operationCurrency,
+          sourceAccount.currency,
+          data.exchangeRate,
+        );
+        if (recomputed) data.destinationAmount = recomputed;
+      }
       // Form model: amount = foreign currency, destinationAmount = account currency,
       //             exchangeRate = foreign→account rate
       // DB model:   amount = account currency, destinationAmount = foreign currency,
