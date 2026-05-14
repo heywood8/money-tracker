@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.9](https://github.com/heywood8/money-tracker/compare/penny-v0.112.8...penny-v0.112.9) (2026-05-14)
+
+
+### Bug Fixes
+
+* add missing i18n mappings for Armenian, Japanese, Korean, and Portuguese ([#626](https://github.com/heywood8/money-tracker/issues/626)) ([cc7f32a](https://github.com/heywood8/money-tracker/commit/cc7f32a144cfa1bb26864232ed649747b2b9321d))
+
 ## [0.112.8](https://github.com/heywood8/money-tracker/compare/penny-v0.112.7...penny-v0.112.8) (2026-05-14)
 
 
