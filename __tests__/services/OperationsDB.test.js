@@ -5,7 +5,7 @@
 
 import * as OperationsDB from '../../app/services/OperationsDB';
 import * as Currency from '../../app/services/currency';
-import { executeQuery, queryAll, queryFirst, executeTransaction } from '../../app/services/db';
+import { executeQuery, queryAll, queryFirst, executeTransaction, isUnicodeLowerAvailable } from '../../app/services/db';
 
 // Mock dependencies
 jest.mock('../../app/services/db');
@@ -41,6 +41,9 @@ describe('OperationsDB Service', () => {
     Currency.add.mockImplementation((a, b) => String(parseFloat(a) + parseFloat(b)));
     Currency.subtract.mockImplementation((a, b) => String(parseFloat(a) - parseFloat(b)));
     Currency.isZero.mockImplementation((a) => parseFloat(a) === 0);
+
+    // UNICODE_LOWER is available in tests so search SQL uses UNICODE_LOWER(...)
+    isUnicodeLowerAvailable.mockReturnValue(true);
   });
 
   describe('Query Operations', () => {

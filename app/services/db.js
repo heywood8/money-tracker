@@ -9,6 +9,9 @@ const DB_NAME = 'penny.db';
 let dbInstance = null;
 let drizzleInstance = null;
 let initPromise = null;
+let unicodeLowerAvailable = false;
+
+export const isUnicodeLowerAvailable = () => unicodeLowerAvailable;
 
 /**
  * Get or create the database instance
@@ -39,10 +42,24 @@ export const getDatabase = async () => {
       // Register Unicode-aware LOWER function — SQLite's built-in LOWER() only handles ASCII,
       // so Cyrillic (and other non-ASCII) characters are left unchanged. This custom function
       // delegates to JS String.prototype.toLowerCase() which handles all Unicode correctly.
-      await dbInstance.createFunctionAsync('UNICODE_LOWER', { deterministic: true }, (value) => {
+      // expo-sqlite 16.x uses createCustomFunctionAsync(name, callback, options).
+      const unicodeLowerCallback = (value) => {
         if (value == null) return null;
         return String(value).toLowerCase();
-      });
+      };
+      try {
+        if (typeof dbInstance.createCustomFunctionAsync === 'function') {
+          await dbInstance.createCustomFunctionAsync('UNICODE_LOWER', unicodeLowerCallback, { deterministic: true });
+          unicodeLowerAvailable = true;
+        } else if (typeof dbInstance.createFunctionAsync === 'function') {
+          await dbInstance.createFunctionAsync('UNICODE_LOWER', unicodeLowerCallback, { deterministic: true });
+          unicodeLowerAvailable = true;
+        } else {
+          console.warn('UNICODE_LOWER: no custom function API found, Cyrillic search will use LOWER()');
+        }
+      } catch (fnError) {
+        console.warn('UNICODE_LOWER registration failed, Cyrillic search will use LOWER():', fnError.message);
+      }
 
       drizzleInstance = drizzle(dbInstance, { schema });
       console.log('Drizzle instance created');
@@ -55,6 +72,7 @@ export const getDatabase = async () => {
       dbInstance = null;
       drizzleInstance = null;
       initPromise = null;
+      unicodeLowerAvailable = false;
       throw error;
     }
   })();
@@ -335,6 +353,7 @@ export const closeDatabase = async () => {
     } finally {
       dbInstance = null;
       drizzleInstance = null;
+      unicodeLowerAvailable = false;
     }
   }
 };
