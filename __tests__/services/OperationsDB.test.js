@@ -536,31 +536,31 @@ describe('OperationsDB Service', () => {
 
   describe('Aggregation Queries', () => {
     it('gets total expenses for account in date range', async () => {
-      queryFirst.mockResolvedValue({ total: '500.50' });
+      queryAll.mockResolvedValue([{ amount: '300.25' }, { amount: '200.25' }]);
 
       const result = await OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31');
 
-      expect(queryFirst).toHaveBeenCalledWith(
-        expect.stringContaining('SUM'),
+      expect(queryAll).toHaveBeenCalledWith(
+        expect.stringContaining("type = 'expense'"),
         ['acc1', '2025-12-01', '2025-12-31'],
       );
-      expect(result).toBe(500.50);
+      expect(result).toBe('500.5');
     });
 
-    it('returns 0 for no expenses', async () => {
-      queryFirst.mockResolvedValue({ total: null });
+    it('returns 0 string for no expenses', async () => {
+      queryAll.mockResolvedValue([]);
 
       const result = await OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31');
 
-      expect(result).toBe(0);
+      expect(result).toBe('0');
     });
 
     it('gets total income for account in date range', async () => {
-      queryFirst.mockResolvedValue({ total: '1200.00' });
+      queryAll.mockResolvedValue([{ amount: '1200.00' }]);
 
       const result = await OperationsDB.getTotalIncome('acc1', '2025-12-01', '2025-12-31');
 
-      expect(result).toBe(1200.00);
+      expect(result).toBe('1200');
     });
 
     it('gets spending by category', async () => {
@@ -1503,7 +1503,7 @@ describe('OperationsDB Service', () => {
     });
 
     it('getTotalExpenses throws error on failure', async () => {
-      queryFirst.mockRejectedValue(new Error('Query failed'));
+      queryAll.mockRejectedValue(new Error('Query failed'));
 
       await expect(
         OperationsDB.getTotalExpenses('acc1', '2025-12-01', '2025-12-31'),
@@ -1511,7 +1511,7 @@ describe('OperationsDB Service', () => {
     });
 
     it('getTotalIncome throws error on failure', async () => {
-      queryFirst.mockRejectedValue(new Error('Query failed'));
+      queryAll.mockRejectedValue(new Error('Query failed'));
 
       await expect(
         OperationsDB.getTotalIncome('acc1', '2025-12-01', '2025-12-31'),
@@ -2100,11 +2100,13 @@ describe('OperationsDB Service', () => {
   });
 
   describe('getMonthlySpendingByCategories', () => {
-    it('returns monthly totals for given categories', async () => {
+    it('returns monthly totals as Decimal-safe strings, aggregated in app code', async () => {
+      // DB returns individual rows with month + amount (no SQL-level GROUP BY/SUM)
       const mockResults = [
-        { month: 1, total: 150.5 },
-        { month: 3, total: 200.0 },
-        { month: 6, total: 75.25 },
+        { month: 1, amount: '100.25' },
+        { month: 1, amount: '50.25' },
+        { month: 3, amount: '200.0' },
+        { month: 6, amount: '75.25' },
       ];
       queryAll.mockResolvedValue(mockResults);
 
@@ -2112,9 +2114,9 @@ describe('OperationsDB Service', () => {
 
       expect(queryAll).toHaveBeenCalled();
       expect(result).toEqual([
-        { month: 1, total: 150.5 },
-        { month: 3, total: 200.0 },
-        { month: 6, total: 75.25 },
+        { month: 1, total: '150.5' },
+        { month: 3, total: '200' },
+        { month: 6, total: '75.25' },
       ]);
     });
 
@@ -2146,7 +2148,7 @@ describe('OperationsDB Service', () => {
     });
 
     it('handles multiple category IDs', async () => {
-      queryAll.mockResolvedValue([{ month: 5, total: 100 }]);
+      queryAll.mockResolvedValue([{ month: 5, amount: '100' }]);
 
       await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1', 'cat2', 'cat3']);
 
@@ -2158,11 +2160,11 @@ describe('OperationsDB Service', () => {
       expect(params).toContain('cat3');
     });
 
-    it('groups by month correctly', async () => {
+    it('groups by month correctly using app-side accumulation', async () => {
       const mockResults = [
-        { month: 1, total: 100 },
-        { month: 2, total: 200 },
-        { month: 12, total: 300 },
+        { month: 1, amount: '100' },
+        { month: 2, amount: '200' },
+        { month: 12, amount: '300' },
       ];
       queryAll.mockResolvedValue(mockResults);
 
@@ -2203,16 +2205,21 @@ describe('OperationsDB Service', () => {
       ).rejects.toThrow('Database error');
     });
 
-    it('parses total as float correctly', async () => {
+    it('accumulates per-month totals using Currency.add for Decimal-safe arithmetic', async () => {
       queryAll.mockResolvedValue([
-        { month: 1, total: '123.45' },
-        { month: 2, total: null },
+        { month: 1, amount: '100' },
+        { month: 1, amount: '50.5' },
+        { month: 2, amount: '200' },
       ]);
 
       const result = await OperationsDB.getMonthlySpendingByCategories('USD', 2024, ['cat1']);
 
-      expect(result[0].total).toBe(123.45);
-      expect(result[1].total).toBe(0); // null becomes 0
+      // Two rows for month 1 are accumulated; month 2 stays separate
+      expect(result).toHaveLength(2);
+      expect(result[0].month).toBe(1);
+      expect(result[1].month).toBe(2);
+      // Verify Currency.add was called for accumulation (precision comes from real Decimal.js impl)
+      expect(Currency.add).toHaveBeenCalled();
     });
 
     it('uses correct SQL query structure', async () => {
@@ -2224,7 +2231,6 @@ describe('OperationsDB Service', () => {
       expect(sql).toContain("o.type = 'expense'");
       expect(sql).toContain('a.currency = ?');
       expect(sql).toContain('o.category_id IN');
-      expect(sql).toContain('GROUP BY');
       expect(sql).toContain('ORDER BY month ASC');
     });
   });

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getLast12MonthsSpendingByCategories } from '../services/OperationsDB';
+import * as Currency from '../services/currency';
 import { getAllDescendants } from '../services/CategoriesDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 
@@ -59,11 +60,13 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
       });
 
       // Build array of 12 months (fill 0 for missing months)
+      // totals arrive as Decimal-safe strings from the DB layer; convert to float here
+      // since chart components need numeric values for bar height arithmetic.
       const fullYearData = last12Months.map(monthInfo => ({
         yearMonth: monthInfo.yearMonth,
         year: monthInfo.year,
         month: monthInfo.month,
-        total: spendingMap.get(monthInfo.yearMonth) || 0,
+        total: parseFloat(spendingMap.get(monthInfo.yearMonth) || '0') || 0,
       }));
 
       setMonthlyData(fullYearData);
@@ -75,9 +78,13 @@ const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, catego
     }
   }, [selectedCurrency, selectedCategoryId, last12Months]);
 
-  // Calculate total yearly spending
+  // Calculate total yearly spending using Decimal-safe addition before the final float conversion
   const totalYearlySpending = useMemo(() => {
-    return monthlyData.reduce((sum, item) => sum + item.total, 0);
+    const total = monthlyData.reduce(
+      (sum, item) => Currency.add(sum, String(item.total || '0')),
+      '0',
+    );
+    return parseFloat(total) || 0;
   }, [monthlyData]);
 
   // Listen for operation changes and reload data

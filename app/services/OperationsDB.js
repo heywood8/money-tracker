@@ -783,17 +783,17 @@ export const deleteOperation = async (id) => {
  * @param {string} accountId
  * @param {string} startDate
  * @param {string} endDate
- * @returns {Promise<number>}
+ * @returns {Promise<string>} Decimal-safe string representation of total
  */
 export const getTotalExpenses = async (accountId, startDate, endDate) => {
   try {
-    const result = await queryFirst(
-      `SELECT SUM(CAST(amount AS REAL)) as total
-       FROM operations
+    const results = await queryAll(
+      `SELECT amount FROM operations
        WHERE account_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
       [accountId, startDate, endDate],
     );
-    return result && result.total ? parseFloat(result.total) : 0;
+    if (!results || results.length === 0) return '0';
+    return results.reduce((sum, row) => Currency.add(sum, String(row.amount || '0')), '0');
   } catch (error) {
     console.error('Failed to get total expenses:', error);
     throw error;
@@ -805,17 +805,17 @@ export const getTotalExpenses = async (accountId, startDate, endDate) => {
  * @param {string} accountId
  * @param {string} startDate
  * @param {string} endDate
- * @returns {Promise<number>}
+ * @returns {Promise<string>} Decimal-safe string representation of total
  */
 export const getTotalIncome = async (accountId, startDate, endDate) => {
   try {
-    const result = await queryFirst(
-      `SELECT SUM(CAST(amount AS REAL)) as total
-       FROM operations
+    const results = await queryAll(
+      `SELECT amount FROM operations
        WHERE account_id = ? AND type = 'income' AND date >= ? AND date <= ?`,
       [accountId, startDate, endDate],
     );
-    return result && result.total ? parseFloat(result.total) : 0;
+    if (!results || results.length === 0) return '0';
+    return results.reduce((sum, row) => Currency.add(sum, String(row.amount || '0')), '0');
   } catch (error) {
     console.error('Failed to get total income:', error);
     throw error;
@@ -1587,7 +1587,7 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
  * @param {string} currency - Currency code (e.g., 'USD', 'AMD')
  * @param {number} year - Year to query (e.g., 2024)
  * @param {string[]} categoryIds - Array of category IDs to include
- * @returns {Promise<Array<{month: number, total: number}>>} Monthly totals (month is 1-12)
+ * @returns {Promise<Array<{month: number, total: string}>>} Monthly totals (month is 1-12), total as Decimal-safe string
  */
 export const getMonthlySpendingByCategories = async (currency, year, categoryIds) => {
   try {
@@ -1602,7 +1602,7 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
     const results = await queryAll(
       `SELECT
          CAST(strftime('%m', o.date) AS INTEGER) as month,
-         SUM(CAST(o.amount AS REAL)) as total
+         o.amount
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'expense'
@@ -1610,15 +1610,19 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
          AND o.date >= ?
          AND o.date <= ?
          AND o.category_id IN (${placeholders})
-       GROUP BY strftime('%m', o.date)
        ORDER BY month ASC`,
       [currency, startDate, endDate, ...categoryIds],
     );
 
-    return (results || []).map(row => ({
-      month: row.month,
-      total: parseFloat(row.total) || 0,
-    }));
+    const monthTotals = new Map();
+    for (const row of results || []) {
+      const prev = monthTotals.get(row.month) || '0';
+      monthTotals.set(row.month, Currency.add(prev, String(row.amount || '0')));
+    }
+
+    return Array.from(monthTotals.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([month, total]) => ({ month, total }));
   } catch (error) {
     console.error('Failed to get monthly spending by categories:', error);
     throw error;
@@ -1629,7 +1633,7 @@ export const getMonthlySpendingByCategories = async (currency, year, categoryIds
  * Get spending by categories for the last 12 months (rolling)
  * @param {string} currency - Currency code
  * @param {Array<string>} categoryIds - Category IDs to include
- * @returns {Promise<Array<{yearMonth: string, total: number}>>} Array of {yearMonth: 'YYYY-MM', total}
+ * @returns {Promise<Array<{yearMonth: string, total: string}>>} Array of {yearMonth: 'YYYY-MM', total as Decimal-safe string}
  */
 export const getLast12MonthsSpendingByCategories = async (currency, categoryIds) => {
   try {
@@ -1648,7 +1652,7 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
     const results = await queryAll(
       `SELECT
          strftime('%Y-%m', o.date) as year_month,
-         SUM(CAST(o.amount AS REAL)) as total
+         o.amount
        FROM operations o
        JOIN accounts a ON o.account_id = a.id
        WHERE o.type = 'expense'
@@ -1656,15 +1660,19 @@ export const getLast12MonthsSpendingByCategories = async (currency, categoryIds)
          AND o.date >= ?
          AND o.date <= ?
          AND o.category_id IN (${placeholders})
-       GROUP BY strftime('%Y-%m', o.date)
        ORDER BY year_month ASC`,
       [currency, startDateStr, endDateStr, ...categoryIds],
     );
 
-    return (results || []).map(row => ({
-      yearMonth: row.year_month,
-      total: parseFloat(row.total) || 0,
-    }));
+    const monthTotals = new Map();
+    for (const row of results || []) {
+      const prev = monthTotals.get(row.year_month) || '0';
+      monthTotals.set(row.year_month, Currency.add(prev, String(row.amount || '0')));
+    }
+
+    return Array.from(monthTotals.entries())
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([yearMonth, total]) => ({ yearMonth, total }));
   } catch (error) {
     console.error('Failed to get last 12 months spending by categories:', error);
     throw error;
