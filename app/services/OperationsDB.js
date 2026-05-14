@@ -193,6 +193,7 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
       LEFT JOIN accounts a ON o.account_id = a.id
       LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
       LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
       WHERE o.date >= ? AND o.date <= ?
     `;
 
@@ -246,15 +247,15 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
       const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ? OR o.description LIKE ?
+        UNICODE_LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
-        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
-        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
+        OR UNICODE_LOWER(a.name) LIKE ?
+        OR UNICODE_LOWER(to_a.name) LIKE ?
+        OR UNICODE_LOWER(c.name) LIKE ?
+        OR UNICODE_LOWER(pc.name) LIKE ?
       )`;
-      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
@@ -1139,6 +1140,7 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
       LEFT JOIN accounts a ON o.account_id = a.id
       LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
       LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
       WHERE o.date >= ? AND o.date <= ?
     `;
 
@@ -1192,15 +1194,15 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
       const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ? OR o.description LIKE ?
+        UNICODE_LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
-        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
-        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
+        OR UNICODE_LOWER(a.name) LIKE ?
+        OR UNICODE_LOWER(to_a.name) LIKE ?
+        OR UNICODE_LOWER(c.name) LIKE ?
+        OR UNICODE_LOWER(pc.name) LIKE ?
       )`;
-      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
@@ -1233,6 +1235,7 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
       LEFT JOIN accounts a ON o.account_id = a.id
       LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
       LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
       WHERE o.date < ?
     `;
 
@@ -1286,15 +1289,15 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
       const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ? OR o.description LIKE ?
+        UNICODE_LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
-        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
-        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
+        OR UNICODE_LOWER(a.name) LIKE ?
+        OR UNICODE_LOWER(to_a.name) LIKE ?
+        OR UNICODE_LOWER(c.name) LIKE ?
+        OR UNICODE_LOWER(pc.name) LIKE ?
       )`;
-      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC LIMIT 1';
@@ -1396,6 +1399,7 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
       LEFT JOIN accounts a ON o.account_id = a.id
       LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
       LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
       WHERE o.date > ?
     `;
 
@@ -1449,15 +1453,15 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
       const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ? OR o.description LIKE ?
+        UNICODE_LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
-        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
-        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
+        OR UNICODE_LOWER(a.name) LIKE ?
+        OR UNICODE_LOWER(to_a.name) LIKE ?
+        OR UNICODE_LOWER(c.name) LIKE ?
+        OR UNICODE_LOWER(pc.name) LIKE ?
       )`;
-      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
 
     sql += ' ORDER BY o.date ASC, o.created_at ASC LIMIT 1';
@@ -1502,6 +1506,7 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
       LEFT JOIN accounts a ON o.account_id = a.id
       LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
       LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
       WHERE o.date >= ? AND o.date <= ?
     `;
 
@@ -1555,15 +1560,15 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
       const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const searchOrig = `%${filters.searchText.trim()}%`;
       sql += ` AND (
-        LOWER(o.description) LIKE ? OR o.description LIKE ?
+        UNICODE_LOWER(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR LOWER(a.name) LIKE ? OR a.name LIKE ?
-        OR LOWER(to_a.name) LIKE ? OR to_a.name LIKE ?
-        OR LOWER(c.name) LIKE ? OR c.name LIKE ?
+        OR UNICODE_LOWER(a.name) LIKE ?
+        OR UNICODE_LOWER(to_a.name) LIKE ?
+        OR UNICODE_LOWER(c.name) LIKE ?
+        OR UNICODE_LOWER(pc.name) LIKE ?
       )`;
-      params.push(searchLower, searchOrig, searchOrig, searchLower, searchOrig, searchLower, searchOrig, searchLower, searchOrig);
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';

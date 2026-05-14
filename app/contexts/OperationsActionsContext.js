@@ -269,17 +269,34 @@ export const OperationsActionsProvider = ({ children }) => {
     loadInitialOperations();
   }, [loadInitialOperations]);
 
-  // Reload operations from DB whenever search/filter state changes via the new search API.
-  // The mount effect above handles the initial load; skip the first run here.
-  // The legacy updateFilters/clearFilters path also calls loadInitialOperations directly;
-  // a duplicate call from this effect is harmless because loadRequestIdRef discards stale results.
+  // Reload operations from DB when structural filters change (account, type, category, date,
+  // amount). Text search is intentionally excluded: it is handled entirely by the in-memory
+  // filteredOperations computation, so typing does not replace the lazy-loaded history.
   const isFirstSearchEffectRef = useRef(true);
+  const prevStructuralRef = useRef(null);
   useEffect(() => {
     if (isFirstSearchEffectRef.current) {
       isFirstSearchEffectRef.current = false;
+      prevStructuralRef.current = activeFilters;
       return;
     }
-    loadInitialOperations(activeFilters, false);
+
+    const prev = prevStructuralRef.current;
+    prevStructuralRef.current = activeFilters;
+
+    // Compare structural fields by reference — React never mutates arrays in place,
+    // so reference equality is sufficient to detect changes.
+    const structuralChanged = !prev
+      || prev.types !== activeFilters.types
+      || prev.accountIds !== activeFilters.accountIds
+      || prev.categoryIds !== activeFilters.categoryIds
+      || prev.dateRange !== activeFilters.dateRange
+      || prev.amountRange !== activeFilters.amountRange;
+
+    if (structuralChanged) {
+      loadInitialOperations(activeFilters, false);
+    }
+
     setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, activeFilters).catch(err => {
       console.error('Failed to persist filters:', err);
     });
