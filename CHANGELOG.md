@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.4](https://github.com/heywood8/money-tracker/compare/penny-v0.112.3...penny-v0.112.4) (2026-05-14)
+
+
+### Bug Fixes
+
+* show foreign currency amount as primary in operation modal ([#616](https://github.com/heywood8/money-tracker/issues/616)) ([511a59c](https://github.com/heywood8/money-tracker/commit/511a59c41690734543603fbef9841e3c2185a26a))
+
 ## [0.112.3](https://github.com/heywood8/money-tracker/compare/penny-v0.112.2...penny-v0.112.3) (2026-05-13)
 
 
