@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.113.1](https://github.com/heywood8/money-tracker/compare/penny-v0.113.0...penny-v0.113.1) (2026-05-14)
+
+
+### Bug Fixes
+
+* replace createFunctionAsync with createCustomFunctionAsync (expo-sqlite 16.x API) ([#638](https://github.com/heywood8/money-tracker/issues/638)) ([114ef15](https://github.com/heywood8/money-tracker/commit/114ef15c0ec70b287ef5ba9056af2379eeb7f149))
+
 ## [0.113.0](https://github.com/heywood8/money-tracker/compare/penny-v0.112.13...penny-v0.113.0) (2026-05-14)
 
 
