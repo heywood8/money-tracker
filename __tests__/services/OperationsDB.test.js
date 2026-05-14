@@ -39,6 +39,8 @@ describe('OperationsDB Service', () => {
 
     // Currency mock defaults
     Currency.add.mockImplementation((a, b) => String(parseFloat(a) + parseFloat(b)));
+    Currency.subtract.mockImplementation((a, b) => String(parseFloat(a) - parseFloat(b)));
+    Currency.isZero.mockImplementation((a) => parseFloat(a) === 0);
   });
 
   describe('Query Operations', () => {
@@ -183,7 +185,7 @@ describe('OperationsDB Service', () => {
         'SELECT balance FROM accounts WHERE id = ?',
         ['acc1'],
       );
-      expect(Currency.add).toHaveBeenCalledWith('1000', -100);
+      expect(Currency.add).toHaveBeenCalledWith('1000', '-100');
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
         expect.any(Array),
@@ -204,7 +206,7 @@ describe('OperationsDB Service', () => {
       await OperationsDB.createOperation(operation);
 
       // Should update account balance (income increases balance)
-      expect(Currency.add).toHaveBeenCalledWith('1000', 200);
+      expect(Currency.add).toHaveBeenCalledWith('1000', '200');
     });
 
     it('creates transfer operation and updates both account balances', async () => {
@@ -227,9 +229,9 @@ describe('OperationsDB Service', () => {
       expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(2);
 
       // Source account should be reduced
-      expect(Currency.add).toHaveBeenCalledWith('1000', -300);
+      expect(Currency.add).toHaveBeenCalledWith('1000', '-300');
       // Destination account should be increased
-      expect(Currency.add).toHaveBeenCalledWith('500', 300);
+      expect(Currency.add).toHaveBeenCalledWith('500', '300');
 
       expect(mockDb.runAsync).toHaveBeenCalledTimes(5); // INSERT + 2 UPDATEs + 2 balance history inserts
     });
@@ -255,9 +257,9 @@ describe('OperationsDB Service', () => {
       await OperationsDB.createOperation(operation);
 
       // Source: -100 USD
-      expect(Currency.add).toHaveBeenCalledWith('1000', -100);
+      expect(Currency.add).toHaveBeenCalledWith('1000', '-100');
       // Destination: +370 AMD (using destination_amount)
-      expect(Currency.add).toHaveBeenCalledWith('50000', 370);
+      expect(Currency.add).toHaveBeenCalledWith('50000', '370');
     });
 
     it('skips balance update when account not found', async () => {
@@ -498,7 +500,7 @@ describe('OperationsDB Service', () => {
       );
 
       // Should reverse balance change (expense was -100, so reverse is +100)
-      expect(Currency.add).toHaveBeenCalledWith('900', 100);
+      expect(Currency.add).toHaveBeenCalledWith('900', '100');
     });
 
     it('reverses transfer balance changes on delete', async () => {
@@ -519,8 +521,8 @@ describe('OperationsDB Service', () => {
       await OperationsDB.deleteOperation(1);
 
       // Should reverse both account changes
-      expect(Currency.add).toHaveBeenCalledWith('700', 300);   // Restore source
-      expect(Currency.add).toHaveBeenCalledWith('800', -300);  // Reverse destination
+      expect(Currency.add).toHaveBeenCalledWith('700', '300');   // Restore source
+      expect(Currency.add).toHaveBeenCalledWith('800', '-300');  // Reverse destination
     });
 
     it('throws error when operation not found', async () => {
@@ -947,7 +949,7 @@ describe('OperationsDB Service', () => {
       await OperationsDB.createOperation(operation);
 
       // Currency module should handle precision
-      expect(Currency.add).toHaveBeenCalledWith('100.50', -0.01);
+      expect(Currency.add).toHaveBeenCalledWith('100.50', '-0.01');
     });
 
     it('handles operations without optional fields', async () => {

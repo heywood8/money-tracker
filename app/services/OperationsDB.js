@@ -294,29 +294,29 @@ export const getOperationsByType = async (type) => {
  * Calculate balance changes for an operation
  * Handles multi-currency transfers by using destination_amount when available
  * @param {Object} operation
- * @returns {Map<string, number>}
+ * @returns {Map<string, string>} Map of accountId → string delta (Decimal-safe)
  */
 const calculateBalanceChanges = (operation) => {
   const balanceChanges = new Map();
-  const amount = parseFloat(operation.amount) || 0;
+  const amount = String(operation.amount || '0');
 
   if (operation.type === 'expense') {
-    balanceChanges.set(operation.account_id, -amount);
+    balanceChanges.set(operation.account_id, Currency.subtract('0', amount));
   } else if (operation.type === 'income') {
     balanceChanges.set(operation.account_id, amount);
   } else if (operation.type === 'transfer') {
     // Deduct from source account
-    balanceChanges.set(operation.account_id, -amount);
+    balanceChanges.set(operation.account_id, Currency.subtract('0', amount));
 
     if (operation.to_account_id) {
       // For multi-currency transfers, use destination_amount if available
       // Otherwise fall back to source amount (same currency transfer)
       const destinationAmount = operation.destination_amount
-        ? parseFloat(operation.destination_amount)
+        ? String(operation.destination_amount)
         : amount;
 
-      const toChange = balanceChanges.get(operation.to_account_id) || 0;
-      balanceChanges.set(operation.to_account_id, toChange + destinationAmount);
+      const toChange = balanceChanges.get(operation.to_account_id) || '0';
+      balanceChanges.set(operation.to_account_id, Currency.add(toChange, destinationAmount));
     }
   }
 
@@ -403,7 +403,7 @@ export const createOperation = async (operation) => {
       const updateTime = new Date().toISOString();
 
       for (const [accountId, delta] of balanceChanges.entries()) {
-        if (delta === 0) continue;
+        if (Currency.isZero(delta)) continue;
 
         // Get current balance
         const account = await db.getFirstAsync(
@@ -534,19 +534,19 @@ export const updateOperation = async (id, updates) => {
       // Reverse old operation
       const oldChanges = calculateBalanceChanges(oldOperation);
       for (const [accountId, delta] of oldChanges.entries()) {
-        balanceChanges.set(accountId, (balanceChanges.get(accountId) || 0) - delta);
+        balanceChanges.set(accountId, Currency.subtract(balanceChanges.get(accountId) || '0', delta));
       }
 
       // Apply new operation
       const newChanges = calculateBalanceChanges(newOperation);
       for (const [accountId, delta] of newChanges.entries()) {
-        balanceChanges.set(accountId, (balanceChanges.get(accountId) || 0) + delta);
+        balanceChanges.set(accountId, Currency.add(balanceChanges.get(accountId) || '0', delta));
       }
 
       // Update account balances within the same transaction
       const updateTime = new Date().toISOString();
       for (const [accountId, delta] of balanceChanges.entries()) {
-        if (delta === 0) continue;
+        if (Currency.isZero(delta)) continue;
 
         // Get current balance
         const account = await db.getFirstAsync(
@@ -668,20 +668,24 @@ export const splitOperation = async (id, updates, newOperationData) => {
       // Net effect on any account: reverse(old) + apply(updated) + apply(new)
       const balanceChanges = new Map();
 
-      const applyChanges = (changes, sign) => {
+      const applyChanges = (changes, negate) => {
         for (const [accountId, delta] of changes.entries()) {
-          balanceChanges.set(accountId, (balanceChanges.get(accountId) || 0) + sign * delta);
+          const existing = balanceChanges.get(accountId) || '0';
+          balanceChanges.set(
+            accountId,
+            negate ? Currency.subtract(existing, delta) : Currency.add(existing, delta),
+          );
         }
       };
 
-      applyChanges(calculateBalanceChanges(oldOperation), -1);
-      applyChanges(calculateBalanceChanges(updatedOperation), +1);
-      applyChanges(calculateBalanceChanges(createdOperation), +1);
+      applyChanges(calculateBalanceChanges(oldOperation), true);
+      applyChanges(calculateBalanceChanges(updatedOperation), false);
+      applyChanges(calculateBalanceChanges(createdOperation), false);
 
       // Step 5: update account balances and balance history
       const updateTime = new Date().toISOString();
       for (const [accountId, delta] of balanceChanges.entries()) {
-        if (delta === 0) continue;
+        if (Currency.isZero(delta)) continue;
 
         const account = await db.getFirstAsync(
           'SELECT balance FROM accounts WHERE id = ?',
@@ -736,13 +740,13 @@ export const deleteOperation = async (id) => {
       const balanceChanges = calculateBalanceChanges(operation);
       const reverseChanges = new Map();
       for (const [accountId, delta] of balanceChanges.entries()) {
-        reverseChanges.set(accountId, -delta);
+        reverseChanges.set(accountId, Currency.subtract('0', delta));
       }
 
       // Update account balances within the same transaction
       const updateTime = new Date().toISOString();
       for (const [accountId, delta] of reverseChanges.entries()) {
-        if (delta === 0) continue;
+        if (Currency.isZero(delta)) continue;
 
         // Get current balance
         const account = await db.getFirstAsync(

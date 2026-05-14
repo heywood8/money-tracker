@@ -1277,6 +1277,9 @@ describe('useOperationForm', () => {
 
     it('should include sourceCurrency and destinationCurrency when saving foreign currency expense', async () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.09', source: 'live' });
+      // convertAmount is called synchronously in prepareOperationData to recompute
+      // destinationAmount from the form's foreign amount × rate (263.52 EUR × 0.925926 ≈ 244 USD)
+      Currency.convertAmount.mockReturnValue('244');
       mockUpdateOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
