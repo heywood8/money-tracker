@@ -7,6 +7,10 @@ import esTranslations from '../../assets/i18n/es.json';
 import frTranslations from '../../assets/i18n/fr.json';
 import zhTranslations from '../../assets/i18n/zh.json';
 import deTranslations from '../../assets/i18n/de.json';
+import hyTranslations from '../../assets/i18n/hy.json';
+import jaTranslations from '../../assets/i18n/ja.json';
+import koTranslations from '../../assets/i18n/ko.json';
+import ptTranslations from '../../assets/i18n/pt.json';
 
 // Map language codes to their translation data
 const i18nData = {
@@ -17,6 +21,10 @@ const i18nData = {
   fr: frTranslations,
   zh: zhTranslations,
   de: deTranslations,
+  hy: hyTranslations,
+  ja: jaTranslations,
+  ko: koTranslations,
+  pt: ptTranslations,
 };
 
 /**
