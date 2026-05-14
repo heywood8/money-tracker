@@ -228,17 +228,42 @@ const useOperationForm = ({
       // preventing re-initialization whenever the context emits a new reference.
       const currentAccounts = accountsRef.current;
       if (operation && !isNew) {
-        // Normalize values when editing an existing operation
+        // For foreign currency expense/income ops the DB stores:
+        //   amount = account currency (e.g. AMD 244)
+        //   destinationAmount = foreign currency (e.g. TRY 30)
+        //   exchangeRate = account→foreign rate (e.g. 0.122951 AMD→TRY)
+        // The form should show the intuitive ordering:
+        //   calculator = foreign currency (what was spent, e.g. 30 TRY)
+        //   destinationAmount field = account currency (what was deducted, e.g. 244 AMD)
+        //   exchangeRate = foreign→account rate (e.g. 8.13 TRY→AMD)
+        // So we swap amount↔destinationAmount and invert the rate on load.
+        const acct = currentAccounts.find(a => a.id === (operation.accountId || currentAccounts[0]?.id || ''));
+        const isForeignOp = operation.type !== 'transfer'
+          && operation.sourceCurrency
+          && acct
+          && operation.sourceCurrency !== acct.currency;
+
+        const storedRate = parseFloat(String(operation.exchangeRate || '0'));
+        const loadExchangeRate = isForeignOp && storedRate > 0
+          ? String((1 / storedRate).toFixed(6))
+          : String(operation.exchangeRate || '');
+        const loadAmount = isForeignOp
+          ? String(operation.destinationAmount || '')
+          : String(operation.amount || '');
+        const loadDestAmount = isForeignOp
+          ? String(operation.amount || '')
+          : String(operation.destinationAmount || '');
+
         setValues({
           type: operation.type || 'expense',
-          amount: String(operation.amount || ''),
+          amount: loadAmount,
           accountId: operation.accountId || currentAccounts[0]?.id || '',
           categoryId: operation.categoryId || '',
           description: operation.description || '',
           date: operation.date || formatDate(new Date()),
           toAccountId: operation.toAccountId || '',
-          exchangeRate: String(operation.exchangeRate || ''),
-          destinationAmount: String(operation.destinationAmount || ''),
+          exchangeRate: loadExchangeRate,
+          destinationAmount: loadDestAmount,
           operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
         });
       } else if (isNew) {
@@ -328,6 +353,19 @@ const useOperationForm = ({
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
       data.destinationCurrency = sourceAccount.currency;
+      // Form model: amount = foreign currency, destinationAmount = account currency,
+      //             exchangeRate = foreign→account rate
+      // DB model:   amount = account currency, destinationAmount = foreign currency,
+      //             exchangeRate = account→foreign rate
+      // Swap back and invert the rate before persisting.
+      const formForeignAmount = data.amount;
+      const formAccountAmount = data.destinationAmount;
+      data.amount = formAccountAmount;        // account currency — formatted below
+      data.destinationAmount = formForeignAmount;  // foreign currency
+      const displayRate = parseFloat(data.exchangeRate || '0');
+      if (displayRate > 0) {
+        data.exchangeRate = String((1 / displayRate).toFixed(6));
+      }
     }
 
     // Ensure amount is preserved when editing
