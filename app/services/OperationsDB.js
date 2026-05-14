@@ -4,6 +4,10 @@ import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
 import getDefaultOperations from '../defaults/defaultOperations';
 
+// Operation types currently supported. Used as the upper bound for the
+// "all types selected → no type filter" optimization.
+const OPERATION_TYPES = ['expense', 'income', 'transfer'];
+
 /**
  * Map database field names to camelCase for application use
  * @param {Object} dbOperation - Operation object from database with snake_case fields
@@ -195,7 +199,7 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
     const params = [startDate, endDate];
 
     // Apply type filters
-    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
       const placeholders = filters.types.map(() => '?').join(',');
       sql += ` AND o.type IN (${placeholders})`;
       params.push(...filters.types);
@@ -1004,7 +1008,7 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
     const params = [startDateStr, endDateStr];
 
     // Apply type filters
-    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
       const placeholders = filters.types.map(() => '?').join(',');
       sql += ` AND o.type IN (${placeholders})`;
       params.push(...filters.types);
@@ -1098,7 +1102,7 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
     const params = [beforeDate];
 
     // Apply type filters
-    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
       const placeholders = filters.types.map(() => '?').join(',');
       sql += ` AND o.type IN (${placeholders})`;
       params.push(...filters.types);
@@ -1261,7 +1265,7 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
     const params = [afterDate];
 
     // Apply type filters
-    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
       const placeholders = filters.types.map(() => '?').join(',');
       sql += ` AND o.type IN (${placeholders})`;
       params.push(...filters.types);
@@ -1367,7 +1371,7 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
     const params = [startDateStr, endDateStr];
 
     // Apply type filters
-    if (filters.types && filters.types.length > 0 && filters.types.length < 3) {
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
       const placeholders = filters.types.map(() => '?').join(',');
       sql += ` AND o.type IN (${placeholders})`;
       params.push(...filters.types);

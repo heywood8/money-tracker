@@ -135,8 +135,9 @@ export const OperationsDataProvider = ({ children }) => {
     let result = operations;
 
     // text search - match description, account name, category name, amount, type
-    if (searchState.text) {
-      const searchLower = searchState.text.toLowerCase();
+    const trimmedText = searchState.text ? searchState.text.trim() : '';
+    if (trimmedText) {
+      const searchLower = trimmedText.toLowerCase();
       result = result.filter(op => {
         // match description
         if (op.description && op.description.toLowerCase().includes(searchLower)) {
@@ -190,33 +191,18 @@ export const OperationsDataProvider = ({ children }) => {
       result = result.filter(op => searchState.categoryIds.includes(op.categoryId));
     }
 
-    // date range filter
+    // date range filter — string compare YYYY-MM-DD to avoid timezone issues from new Date(...)
     if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
+      // Extract just the date portion (in case op.date includes a time component)
+      const dateOnly = (d) => (typeof d === 'string' ? d.slice(0, 10) : d);
+      let { startDate, endDate } = searchState.dateRange;
+      if (startDate && endDate && startDate > endDate) {
+        [startDate, endDate] = [endDate, startDate];
+      }
       result = result.filter(op => {
-        const opDate = new Date(op.date);
-
-        // handle case when both dates are present
-        if (searchState.dateRange.startDate && searchState.dateRange.endDate) {
-          let start = new Date(searchState.dateRange.startDate);
-          let end = new Date(searchState.dateRange.endDate);
-
-          // swap if start > end
-          if (start > end) {
-            [start, end] = [end, start];
-          }
-
-          // filter to include operations within range
-          if (opDate < start || opDate > end) return false;
-        } else if (searchState.dateRange.startDate) {
-          // only start date
-          const startDate = new Date(searchState.dateRange.startDate);
-          if (opDate < startDate) return false;
-        } else if (searchState.dateRange.endDate) {
-          // only end date
-          const endDate = new Date(searchState.dateRange.endDate);
-          if (opDate > endDate) return false;
-        }
-
+        const opDate = dateOnly(op.date);
+        if (startDate && opDate < startDate) return false;
+        if (endDate && opDate > endDate) return false;
         return true;
       });
     }

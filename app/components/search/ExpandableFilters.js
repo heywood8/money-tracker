@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -23,9 +23,36 @@ const ExpandableFilters = ({
     filters.amountRange.max !== null ? String(filters.amountRange.max) : '',
   );
 
+  // Sync local amount inputs when filters change externally (Clear all, chip clear, etc.)
+  useEffect(() => {
+    const newMin = filters.amountRange.min !== null ? String(filters.amountRange.min) : '';
+    const parsedLocalMin = localMinAmount === '' ? null : parseFloat(localMinAmount.replace(',', '.'));
+    if ((filters.amountRange.min === null && localMinAmount !== '')
+      || (filters.amountRange.min !== null && parsedLocalMin !== filters.amountRange.min)) {
+      setLocalMinAmount(newMin);
+    }
+  }, [filters.amountRange.min]);
+
+  useEffect(() => {
+    const newMax = filters.amountRange.max !== null ? String(filters.amountRange.max) : '';
+    const parsedLocalMax = localMaxAmount === '' ? null : parseFloat(localMaxAmount.replace(',', '.'));
+    if ((filters.amountRange.max === null && localMaxAmount !== '')
+      || (filters.amountRange.max !== null && parsedLocalMax !== filters.amountRange.max)) {
+      setLocalMaxAmount(newMax);
+    }
+  }, [filters.amountRange.max]);
+
   if (!isExpanded) {
     return null;
   }
+
+  // Locale-tolerant parse: accept "1,5" as 1.5; reject NaN and negatives.
+  const parseAmount = (str) => {
+    if (str === '' || str === '-' || str === '.') return null;
+    const value = parseFloat(str.replace(',', '.'));
+    if (isNaN(value) || value < 0) return null;
+    return value;
+  };
 
   const toggleType = (type) => {
     const newTypes = filters.types.includes(type)
@@ -63,8 +90,10 @@ const ExpandableFilters = ({
 
   const formatDateDisplay = (dateStr) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString();
+    // Parse "YYYY-MM-DD" as local time to avoid timezone shift on display.
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return '';
+    return new Date(y, m - 1, d).toLocaleDateString();
   };
 
   return (
@@ -152,8 +181,7 @@ const ExpandableFilters = ({
               value={localMinAmount}
               onChangeText={setLocalMinAmount}
               onBlur={() => {
-                const value = localMinAmount === '' ? null : parseFloat(localMinAmount);
-                onFilterChange({ amountRange: { ...filters.amountRange, min: isNaN(value) ? null : value } });
+                onFilterChange({ amountRange: { ...filters.amountRange, min: parseAmount(localMinAmount) } });
               }}
               placeholder={t('min_amount')}
               placeholderTextColor={colors.mutedText}
@@ -165,8 +193,7 @@ const ExpandableFilters = ({
               value={localMaxAmount}
               onChangeText={setLocalMaxAmount}
               onBlur={() => {
-                const value = localMaxAmount === '' ? null : parseFloat(localMaxAmount);
-                onFilterChange({ amountRange: { ...filters.amountRange, max: isNaN(value) ? null : value } });
+                onFilterChange({ amountRange: { ...filters.amountRange, max: parseAmount(localMaxAmount) } });
               }}
               placeholder={t('max_amount')}
               placeholderTextColor={colors.mutedText}
@@ -206,6 +233,7 @@ const ExpandableFilters = ({
           testID="clear-all-button"
           style={styles.clearAllButton}
           onPress={() => onFilterChange({
+            text: '',
             types: [],
             accountIds: [],
             categoryIds: [],

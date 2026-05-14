@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Dimensions,
@@ -28,6 +28,14 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
       onHeightChange(event.nativeEvent.layout.height);
     }
   }, [onHeightChange]);
+
+  // Reset reported height when the overlay hides so parents don't keep a phantom
+  // spacer once search is closed.
+  useEffect(() => {
+    if (!visible && onHeightChange) {
+      onHeightChange(0);
+    }
+  }, [visible, onHeightChange]);
 
   if (!visible) {
     return null;

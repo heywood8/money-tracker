@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
@@ -14,16 +14,51 @@ const SearchBar = ({
   t,
 }) => {
   const [localText, setLocalText] = useState(searchText);
+  // Track the last value we sent to the parent so we can distinguish
+  // "the parent just received our debounced update" (no-op) from
+  // "the parent changed searchText externally" (e.g. clear-all).
+  const lastSentRef = useRef(searchText);
+  const localTextRef = useRef(localText);
+  localTextRef.current = localText;
+  const onChangeRef = useRef(onSearchTextChange);
+  onChangeRef.current = onSearchTextChange;
 
+  // Debounce local text into parent state.
+  // Skip the initial mount call — there's nothing new to send.
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return undefined;
+    }
     const timer = setTimeout(() => {
+      lastSentRef.current = localText;
       onSearchTextChange(localText);
     }, 300);
     return () => clearTimeout(timer);
   }, [localText, onSearchTextChange]);
 
+  // Sync local text when searchText changes externally (e.g. clear-all from outside).
+  useEffect(() => {
+    if (searchText !== lastSentRef.current) {
+      lastSentRef.current = searchText;
+      setLocalText(searchText);
+    }
+  }, [searchText]);
+
+  // Flush any pending debounced change on unmount so closing the search bar
+  // mid-typing doesn't discard the last keystrokes.
+  useEffect(() => {
+    return () => {
+      if (lastSentRef.current !== localTextRef.current) {
+        onChangeRef.current(localTextRef.current);
+      }
+    };
+  }, []);
+
   const handleClear = useCallback(() => {
     setLocalText('');
+    lastSentRef.current = '';
     onSearchTextChange('');
   }, [onSearchTextChange]);
 
@@ -107,7 +142,6 @@ SearchBar.propTypes = {
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,
-    inputBorder: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
     mutedText: PropTypes.string.isRequired,

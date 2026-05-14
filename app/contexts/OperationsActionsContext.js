@@ -269,6 +269,22 @@ export const OperationsActionsProvider = ({ children }) => {
     loadInitialOperations();
   }, [loadInitialOperations]);
 
+  // Reload operations from DB whenever search/filter state changes via the new search API.
+  // The mount effect above handles the initial load; skip the first run here.
+  // The legacy updateFilters/clearFilters path also calls loadInitialOperations directly;
+  // a duplicate call from this effect is harmless because loadRequestIdRef discards stale results.
+  const isFirstSearchEffectRef = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchEffectRef.current) {
+      isFirstSearchEffectRef.current = false;
+      return;
+    }
+    loadInitialOperations(activeFilters, false);
+    setJsonPreference(PREF_KEYS.OPERATIONS_FILTERS, activeFilters).catch(err => {
+      console.error('Failed to persist filters:', err);
+    });
+  }, [activeFilters, loadInitialOperations]);
+
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
