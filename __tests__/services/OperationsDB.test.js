@@ -1154,6 +1154,27 @@ describe('OperationsDB Service', () => {
       expect(params).not.toContain('%Газ%');
     });
 
+    it('includes parent category JOIN for hierarchy-aware text search', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: 'transport' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+      expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+    });
+
+    it('parent JOIN is present even without search text (to support future use)', async () => {
+      queryAll.mockResolvedValue([]);
+
+      const filters = { types: ['expense'] };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+    });
+
     it('combines all filters correctly', async () => {
       queryAll.mockResolvedValue([]);
 
@@ -1957,6 +1978,28 @@ describe('OperationsDB Service', () => {
 
         const sqlCall = queryAll.mock.calls[0][0];
         expect(sqlCall).toContain('SELECT DISTINCT o.*');
+      });
+
+      it('includes parent category JOIN for hierarchy-aware text search', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: 'путешествия' };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const sqlCall = queryAll.mock.calls[0][0];
+        expect(sqlCall).toContain('LEFT JOIN categories c ON o.category_id = c.id');
+        expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
+      });
+
+      it('Cyrillic parent category name search passes lowercase term to UNICODE_LOWER', async () => {
+        queryAll.mockResolvedValue([]);
+
+        const filters = { searchText: 'Транспорт' };
+        await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
+
+        const params = queryAll.mock.calls[0][1];
+        expect(params).toContain('%транспорт%');
+        expect(params).not.toContain('%Транспорт%');
       });
 
       it('orders results by date DESC and created_at DESC', async () => {

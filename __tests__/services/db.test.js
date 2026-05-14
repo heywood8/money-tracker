@@ -224,4 +224,80 @@ describe('Database Service', () => {
       expect(mockDb.closeAsync).toHaveBeenCalled();
     });
   });
+
+  describe('UNICODE_LOWER custom function', () => {
+    it('registers UNICODE_LOWER during database initialization', async () => {
+      await getDatabase();
+
+      expect(mockDb.createFunctionAsync).toHaveBeenCalledWith(
+        'UNICODE_LOWER',
+        { deterministic: true },
+        expect.any(Function),
+      );
+    });
+
+    it('registers UNICODE_LOWER with deterministic: true option', async () => {
+      await getDatabase();
+
+      const [, options] = mockDb.createFunctionAsync.mock.calls[0];
+      expect(options).toEqual({ deterministic: true });
+    });
+
+    it('registers UNICODE_LOWER before first runAsync call', async () => {
+      await getDatabase();
+
+      const createFunctionOrder = mockDb.createFunctionAsync.mock.invocationCallOrder[0];
+      const firstRunAsyncOrder = mockDb.runAsync.mock.invocationCallOrder[0];
+      expect(createFunctionOrder).toBeLessThan(firstRunAsyncOrder);
+    });
+
+    it('UNICODE_LOWER callback returns null for null input', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback(null)).toBeNull();
+    });
+
+    it('UNICODE_LOWER callback returns null for undefined input', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback(undefined)).toBeNull();
+    });
+
+    it('UNICODE_LOWER callback lowercases ASCII text', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback('COFFEE')).toBe('coffee');
+      expect(callback('Grocery')).toBe('grocery');
+      expect(callback('TEST123')).toBe('test123');
+    });
+
+    it('UNICODE_LOWER callback correctly lowercases Cyrillic text', async () => {
+      await getDatabase();
+
+      // SQLite's built-in LOWER() leaves Cyrillic unchanged; this custom function must handle it
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback('Транспорт')).toBe('транспорт');
+      expect(callback('САМОЛЕТ')).toBe('самолет');
+      expect(callback('Путешествия')).toBe('путешествия');
+    });
+
+    it('UNICODE_LOWER callback lowercases mixed-script and accented text', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback('Café')).toBe('café');
+      expect(callback('München')).toBe('münchen');
+    });
+
+    it('UNICODE_LOWER callback preserves numeric strings', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createFunctionAsync.mock.calls[0][2];
+      expect(callback('12345')).toBe('12345');
+      expect(callback('3.14')).toBe('3.14');
+    });
+  });
 });
