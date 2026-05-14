@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.112.11](https://github.com/heywood8/money-tracker/compare/penny-v0.112.10...penny-v0.112.11) (2026-05-14)
+
+
+### Bug Fixes
+
+* eliminate parseFloat in aggregation queries, use Currency.add end-to-end ([#630](https://github.com/heywood8/money-tracker/issues/630)) ([ab9abd1](https://github.com/heywood8/money-tracker/commit/ab9abd1bdbab2840bd57651b645463ae27c7fcce))
+
 ## [0.112.10](https://github.com/heywood8/money-tracker/compare/penny-v0.112.9...penny-v0.112.10) (2026-05-14)
 
 
