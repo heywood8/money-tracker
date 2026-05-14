@@ -62,7 +62,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { addOperation, updateOperation, validateOperation } = useOperationsActions();
+  const { addOperation, splitOperation, updateOperation, validateOperation } = useOperationsActions();
   const { visibleAccounts: accounts } = useAccountsData();
   const { categories } = useCategories();
 
@@ -100,6 +100,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     categories,
     t,
     addOperation,
+    splitOperation,
     updateOperation,
     validateOperation,
     showDialog,

@@ -579,6 +579,139 @@ export const updateOperation = async (id, updates) => {
 };
 
 /**
+ * Atomically reduce the original operation's amount and insert a new sibling
+ * operation for the split portion. Both the UPDATE and INSERT run inside a
+ * single executeTransaction so a partial failure cannot corrupt the database.
+ *
+ * @param {number} id - ID of the operation to reduce
+ * @param {Object} updates - Fields to apply to the original (camelCase, same shape as updateOperation)
+ * @param {Object} newOperationData - Data for the new split sibling (camelCase, same shape as createOperation)
+ * @returns {Promise<Object>} The newly created split operation
+ */
+export const splitOperation = async (id, updates, newOperationData) => {
+  try {
+    const now = new Date().toISOString();
+
+    const extractId = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      if (typeof value === 'object' && value.id !== undefined) return value.id;
+      return value;
+    };
+
+    let createdOperation;
+
+    await executeTransaction(async (db) => {
+      // Step 1: fetch old operation for balance reversal
+      const oldOperation = await db.getFirstAsync(
+        'SELECT * FROM operations WHERE id = ?',
+        [id],
+      );
+
+      if (!oldOperation) {
+        throw new Error(`Operation ${id} not found`);
+      }
+
+      // Step 2: apply updates to original operation
+      const fields = [];
+      const vals = [];
+
+      if (updates.type !== undefined) { fields.push('type = ?'); vals.push(updates.type); }
+      if (updates.amount !== undefined) { fields.push('amount = ?'); vals.push(updates.amount); }
+      if (updates.accountId !== undefined) { fields.push('account_id = ?'); vals.push(extractId(updates.accountId)); }
+      if (updates.categoryId !== undefined) { fields.push('category_id = ?'); vals.push(extractId(updates.categoryId)); }
+      if (updates.toAccountId !== undefined) { fields.push('to_account_id = ?'); vals.push(extractId(updates.toAccountId)); }
+      if (updates.date !== undefined) { fields.push('date = ?'); vals.push(updates.date); }
+      if (updates.description !== undefined) { fields.push('description = ?'); vals.push(updates.description || null); }
+      if (updates.exchangeRate !== undefined) { fields.push('exchange_rate = ?'); vals.push(updates.exchangeRate || null); }
+      if (updates.destinationAmount !== undefined) { fields.push('destination_amount = ?'); vals.push(updates.destinationAmount || null); }
+      if (updates.sourceCurrency !== undefined) { fields.push('source_currency = ?'); vals.push(updates.sourceCurrency || null); }
+      if (updates.destinationCurrency !== undefined) { fields.push('destination_currency = ?'); vals.push(updates.destinationCurrency || null); }
+
+      if (fields.length > 0) {
+        vals.push(id);
+        await db.runAsync(`UPDATE operations SET ${fields.join(', ')} WHERE id = ?`, vals);
+      }
+
+      const updatedOperation = await db.getFirstAsync(
+        'SELECT * FROM operations WHERE id = ?',
+        [id],
+      );
+
+      // Step 3: insert new (split) operation
+      const newRow = {
+        type: newOperationData.type,
+        amount: newOperationData.amount,
+        account_id: extractId(newOperationData.accountId),
+        category_id: extractId(newOperationData.categoryId),
+        to_account_id: extractId(newOperationData.toAccountId) || null,
+        date: newOperationData.date,
+        created_at: now,
+        description: newOperationData.description || null,
+        exchange_rate: newOperationData.exchangeRate || null,
+        destination_amount: newOperationData.destinationAmount || null,
+        source_currency: newOperationData.sourceCurrency || null,
+        destination_currency: newOperationData.destinationCurrency || null,
+      };
+
+      const result = await db.runAsync(
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          newRow.type, newRow.amount, newRow.account_id, newRow.category_id,
+          newRow.to_account_id, newRow.date, newRow.created_at, newRow.description,
+          newRow.exchange_rate, newRow.destination_amount, newRow.source_currency, newRow.destination_currency,
+        ],
+      );
+
+      createdOperation = { ...newRow, id: result.lastInsertRowId };
+
+      // Step 4: compute net balance changes across all three operations
+      // Net effect on any account: reverse(old) + apply(updated) + apply(new)
+      const balanceChanges = new Map();
+
+      const applyChanges = (changes, sign) => {
+        for (const [accountId, delta] of changes.entries()) {
+          balanceChanges.set(accountId, (balanceChanges.get(accountId) || 0) + sign * delta);
+        }
+      };
+
+      applyChanges(calculateBalanceChanges(oldOperation), -1);
+      applyChanges(calculateBalanceChanges(updatedOperation), +1);
+      applyChanges(calculateBalanceChanges(createdOperation), +1);
+
+      // Step 5: update account balances and balance history
+      const updateTime = new Date().toISOString();
+      for (const [accountId, delta] of balanceChanges.entries()) {
+        if (delta === 0) continue;
+
+        const account = await db.getFirstAsync(
+          'SELECT balance FROM accounts WHERE id = ?',
+          [accountId],
+        );
+
+        if (!account) {
+          console.warn(`Account ${accountId} not found, skipping balance update`);
+          continue;
+        }
+
+        const newBalance = Currency.add(account.balance, delta);
+
+        await db.runAsync(
+          'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+          [newBalance, updateTime, accountId],
+        );
+
+        await updateTodayBalance(accountId, newBalance, db);
+      }
+    });
+
+    return createdOperation;
+  } catch (error) {
+    console.error('Failed to split operation:', error);
+    throw error;
+  }
+};
+
+/**
  * Delete an operation
  * @param {number} id
  * @returns {Promise<void>}

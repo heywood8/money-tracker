@@ -341,6 +341,29 @@ export const OperationsActionsProvider = ({ children }) => {
     }
   }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError]);
 
+  const splitOperation = useCallback(async (id, updates, newOperationData) => {
+    try {
+      await OperationsDB.splitOperation(id, updates, newOperationData);
+
+      await loadInitialOperations(activeFilters, false);
+
+      _setSaveError(null);
+
+      await reloadAccounts();
+
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
+    } catch (error) {
+      console.error('Failed to split operation:', error);
+      _setSaveError(error.message);
+      showDialog(
+        'Error',
+        'Failed to split operation. Please try again.',
+        [{ text: 'OK' }],
+      );
+      throw error;
+    }
+  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError]);
+
   const updateOperation = useCallback(async (id, updates) => {
     try {
       // Update operation in DB (handles balance updates automatically)
@@ -549,6 +572,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     addOperation,
+    splitOperation,
     updateOperation,
     deleteOperation,
     validateOperation,
@@ -569,6 +593,7 @@ export const OperationsActionsProvider = ({ children }) => {
     clearAllSearch: _clearAllSearch,
   }), [
     addOperation,
+    splitOperation,
     updateOperation,
     deleteOperation,
     validateOperation,

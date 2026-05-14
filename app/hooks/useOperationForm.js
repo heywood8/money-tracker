@@ -25,6 +25,7 @@ const useOperationForm = ({
   categories,
   t,
   addOperation,
+  splitOperation,
   updateOperation,
   validateOperation,
   showDialog,
@@ -485,7 +486,7 @@ const useOperationForm = ({
     });
   }, [categories, values.type]);
 
-  // Split operation: create new operation with split amount and reduce original
+  // Split operation: atomically reduce original and insert sibling in one transaction
   const handleSplit = useCallback(async (splitAmount, newCategoryId) => {
     if (!operation || isNew) {
       return { success: false, error: 'Cannot split new operations' };
@@ -494,7 +495,7 @@ const useOperationForm = ({
     const numSplitAmount = parseFloat(splitAmount);
     const numOriginalAmount = parseFloat(values.amount);
 
-    // Validate split amount
+    // Validate split amount (parseFloat is acceptable here: validation only, not arithmetic)
     if (isNaN(numSplitAmount) || numSplitAmount <= 0) {
       return { success: false, error: t('valid_amount_required') };
     }
@@ -504,35 +505,25 @@ const useOperationForm = ({
     }
 
     try {
-      // Calculate new amount for original operation
-      const newAmount = String(numOriginalAmount - numSplitAmount);
+      // Use Currency.subtract for precision-safe arithmetic
+      const newAmount = Currency.subtract(values.amount, splitAmount);
 
-      // formModifiedRef is already true (set during initialization) so the
-      // initialization effect won't re-run when reloadAccounts triggers a re-render.
-      // Set it explicitly here as a safety measure in case split is called very early.
       formModifiedRef.current = true;
 
-      // 1. FIRST update original operation in database (reduces amount)
-      // This must happen before addOperation, because addOperation calls
-      // loadInitialOperations() which would reload the old amount otherwise
-      await updateOperation(operation.id, {
-        ...values,
-        amount: newAmount,
-      });
-
-      // 2. THEN create new operation with split amount
-      // When addOperation reloads operations, the original will already have reduced amount
+      const updates = { ...values, amount: newAmount };
       const newOperation = {
         type: values.type,
-        amount: String(numSplitAmount),
+        amount: splitAmount,
         accountId: values.accountId,
         categoryId: newCategoryId,
         date: values.date,
         description: values.description || null,
       };
-      await addOperation(newOperation);
 
-      // 3. Update local form state AFTER both DB operations succeed
+      // Single atomic call: both DB writes succeed or neither does
+      await splitOperation(operation.id, updates, newOperation);
+
+      // Update local form state only after the atomic DB operation succeeds
       setValues(v => ({ ...v, amount: newAmount }));
 
       return { success: true, newAmount };
@@ -540,7 +531,7 @@ const useOperationForm = ({
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
     }
-  }, [operation, isNew, values, addOperation, updateOperation, t, setValues]);
+  }, [operation, isNew, values, splitOperation, t, setValues]);
 
   return {
     // State
