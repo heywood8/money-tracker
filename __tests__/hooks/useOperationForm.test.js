@@ -1174,6 +1174,117 @@ describe('useOperationForm', () => {
     });
   });
 
+  describe('Regression: destinationAmount race condition (issue #587)', () => {
+    it('should use user-entered destinationAmount when lastEditedField is destinationAmount (multi-currency transfer)', async () => {
+      // Race condition: user edits destinationAmount but saves before the back-calc useEffect
+      // runs. prepareOperationData must not overwrite the user-entered value with amount × stale rate.
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
+      mockAddOperation.mockResolvedValue();
+
+      const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
+
+      await act(async () => {
+        result.current.setValues(prev => ({
+          ...prev,
+          type: 'transfer',
+          accountId: 'acc-1',
+          toAccountId: 'acc-2',
+          amount: '100',
+          exchangeRate: '0.85',
+          destinationAmount: '90', // user overrode the auto-calculated 85
+        }));
+        result.current.setLastEditedField('destinationAmount');
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          destinationAmount: '90',
+          // rate should be back-calculated: 90/100 = 0.9
+          exchangeRate: '0.900000',
+        }),
+      );
+    });
+
+    it('should still forward-calculate destinationAmount when lastEditedField is amount (multi-currency transfer)', async () => {
+      // Existing forward-calc behaviour must not regress.
+      Currency.convertAmount.mockReturnValue('170.00');
+      mockAddOperation.mockResolvedValue();
+
+      const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
+
+      await act(async () => {
+        result.current.setValues(prev => ({
+          ...prev,
+          type: 'transfer',
+          accountId: 'acc-1',
+          toAccountId: 'acc-2',
+          amount: '200',
+          exchangeRate: '0.85',
+          destinationAmount: '85', // stale value from previous state
+        }));
+        result.current.setLastEditedField('amount');
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(Currency.convertAmount).toHaveBeenCalledWith('200', 'USD', 'EUR', '0.85');
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ destinationAmount: '170.00' }),
+      );
+    });
+
+    it('should use user-entered destinationAmount when lastEditedField is destinationAmount (foreign currency op)', async () => {
+      // Same race condition for foreign currency expense/income.
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
+      mockAddOperation.mockResolvedValue();
+
+      const { result } = renderHook(() => useOperationForm(defaultProps));
+
+      await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
+
+      // Form model for foreign currency op: amount=foreign, destinationAmount=account currency.
+      await act(async () => {
+        result.current.setValues(prev => ({
+          ...prev,
+          type: 'expense',
+          accountId: 'acc-1',
+          categoryId: 'cat-1',
+          date: '2024-01-15',
+          operationCurrency: 'EUR',
+          amount: '100',       // EUR (foreign)
+          exchangeRate: '1.08', // EUR→USD
+          destinationAmount: '105', // user overrode the auto-calculated 108
+        }));
+        result.current.setLastEditedField('destinationAmount');
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      // DB model swaps: amount=account(USD), destinationAmount=foreign(EUR).
+      // back-calc rate EUR→USD: 105/100 = 1.05; inverted to USD→EUR: 1/1.05 ≈ 0.952381
+      expect(mockAddOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: '105',       // account currency (USD) — swapped
+          destinationAmount: '100', // foreign currency (EUR) — swapped
+          sourceCurrency: 'EUR',
+          destinationCurrency: 'USD',
+        }),
+      );
+    });
+  });
+
   describe('Foreign Currency Expense/Income', () => {
     const foreignCurrencyExpense = {
       id: 'op-fx',

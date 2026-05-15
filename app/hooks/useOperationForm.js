@@ -351,9 +351,17 @@ const useOperationForm = ({
     if (isMultiCurrencyTransfer && sourceAccount && destinationAccount) {
       data.sourceCurrency = sourceAccount.currency;
       data.destinationCurrency = destinationAccount.currency;
-      // Recompute synchronously so a save before the async useEffect resolves
-      // never stores a destinationAmount that is inconsistent with amount × rate.
-      if (data.amount && data.exchangeRate) {
+      if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
+        // User edited destination amount directly; back-calculate the rate synchronously
+        // so the saved record is self-consistent even if the useEffect hasn't run yet.
+        const srcAmt = parseFloat(data.amount);
+        const dstAmt = parseFloat(data.destinationAmount);
+        if (!isNaN(srcAmt) && !isNaN(dstAmt) && srcAmt > 0) {
+          data.exchangeRate = String((dstAmt / srcAmt).toFixed(6));
+        }
+      } else if (data.amount && data.exchangeRate) {
+        // Recompute synchronously so a save before the async useEffect resolves
+        // never stores a destinationAmount that is inconsistent with amount × rate.
         const recomputed = Currency.convertAmount(
           data.amount,
           sourceAccount.currency,
@@ -365,9 +373,17 @@ const useOperationForm = ({
     } else if (isForeignCurrencyOp && sourceAccount && values.operationCurrency) {
       data.sourceCurrency = values.operationCurrency;
       data.destinationCurrency = sourceAccount.currency;
-      // Recompute destinationAmount (account currency) from foreign amount × rate
-      // before the swap so stale form state is never persisted.
-      if (data.amount && data.exchangeRate) {
+      if (lastEditedField === 'destinationAmount' && data.amount && data.destinationAmount) {
+        // User edited the account-currency destination amount directly; back-calculate rate
+        // synchronously so the saved record is self-consistent even if the useEffect hasn't run.
+        const srcAmt = parseFloat(data.amount);       // foreign currency
+        const dstAmt = parseFloat(data.destinationAmount);  // account currency
+        if (!isNaN(srcAmt) && !isNaN(dstAmt) && srcAmt > 0) {
+          data.exchangeRate = String((dstAmt / srcAmt).toFixed(6));  // foreign→account
+        }
+      } else if (data.amount && data.exchangeRate) {
+        // Recompute destinationAmount (account currency) from foreign amount × rate
+        // before the swap so stale form state is never persisted.
         const recomputed = Currency.convertAmount(
           data.amount,
           values.operationCurrency,
@@ -406,7 +422,7 @@ const useOperationForm = ({
     }
 
     return data;
-  }, [values, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, isNew, operation]);
+  }, [values, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, isNew, operation, lastEditedField]);
 
   // Save operation (add or update)
   const handleSave = useCallback(async () => {
