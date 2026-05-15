@@ -279,6 +279,90 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 };
 
 /**
+ * Get all operations matching the given filters across all dates (no date-window limit).
+ * Used for text search so results are not confined to a 7-day window.
+ * @param {Object} filters - Filter object with types, accountIds, categoryIds, searchText, dateRange, amountRange
+ * @returns {Promise<Array>}
+ */
+export const getFilteredOperationsAllDates = async (filters = {}) => {
+  try {
+    let sql = `
+      SELECT DISTINCT o.*
+      FROM operations o
+      LEFT JOIN accounts a ON o.account_id = a.id
+      LEFT JOIN accounts to_a ON o.to_account_id = to_a.id
+      LEFT JOIN categories c ON o.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    if (filters.types && filters.types.length > 0 && filters.types.length < OPERATION_TYPES.length) {
+      const placeholders = filters.types.map(() => '?').join(',');
+      sql += ` AND o.type IN (${placeholders})`;
+      params.push(...filters.types);
+    }
+
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const placeholders = filters.accountIds.map(() => '?').join(',');
+      sql += ` AND (o.account_id IN (${placeholders}) OR o.to_account_id IN (${placeholders}))`;
+      params.push(...filters.accountIds, ...filters.accountIds);
+    }
+
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND o.category_id IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    }
+
+    if (filters.amountRange) {
+      if (filters.amountRange.min !== null && filters.amountRange.min !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) >= ?';
+        params.push(filters.amountRange.min);
+      }
+      if (filters.amountRange.max !== null && filters.amountRange.max !== undefined) {
+        sql += ' AND CAST(o.amount AS REAL) <= ?';
+        params.push(filters.amountRange.max);
+      }
+    }
+
+    if (filters.dateRange) {
+      if (filters.dateRange.startDate) {
+        sql += ' AND o.date >= ?';
+        params.push(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        sql += ' AND o.date <= ?';
+        params.push(filters.dateRange.endDate);
+      }
+    }
+
+    if (filters.searchText && filters.searchText.trim()) {
+      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
+      const lower = lowerFn();
+      sql += ` AND (
+        ${lower}(o.description) LIKE ?
+        OR o.amount LIKE ?
+        OR ${lower}(a.name) LIKE ?
+        OR ${lower}(to_a.name) LIKE ?
+        OR ${lower}(c.name) LIKE ?
+        OR ${lower}(pc.name) LIKE ?
+      )`;
+      params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
+    }
+
+    sql += ' ORDER BY o.date DESC, o.created_at DESC';
+
+    const operations = await queryAll(sql, params);
+    return (operations || []).map(mapOperationFields);
+  } catch (error) {
+    console.error('Failed to get filtered operations (all dates):', error);
+    throw error;
+  }
+};
+
+/**
  * Get operations by type
  * @param {string} type - 'expense', 'income', or 'transfer'
  * @returns {Promise<Array>}
