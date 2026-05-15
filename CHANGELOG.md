@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.2](https://github.com/heywood8/money-tracker/compare/penny-v0.114.1...penny-v0.114.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* **transfer:** fix race condition in multi-currency destination amount on save ([#644](https://github.com/heywood8/money-tracker/issues/644)) ([b020a45](https://github.com/heywood8/money-tracker/commit/b020a45b4d0d31b2ca919eaacb7aba1ee10718e2))
+
 ## [0.114.1](https://github.com/heywood8/money-tracker/compare/penny-v0.114.0...penny-v0.114.1) (2026-05-15)
 
 
