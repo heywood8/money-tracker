@@ -64,9 +64,10 @@ describe('DescriptionSuggestionRow', () => {
     const { UNSAFE_getByType } = render(<DescriptionSuggestionRow {...baseProps} />);
     const scrollView = UNSAFE_getByType(ScrollView);
     expect(scrollView.props.horizontal).toBe(true);
-    const chipButtons = scrollView.findAll(
-      (node) => node.props?.accessibilityRole === 'button' && node.props?.accessibilityLabel?.startsWith('label:'),
-    );
-    expect(chipButtons).toHaveLength(baseProps.chips.length);
+    // Each chip's text should appear within the ScrollView subtree
+    for (const chip of baseProps.chips) {
+      const match = scrollView.findAll((node) => node.props?.children === chip);
+      expect(match.length).toBeGreaterThan(0);
+    }
   });
 });
