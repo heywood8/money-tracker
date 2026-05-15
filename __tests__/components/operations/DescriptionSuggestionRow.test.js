@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScrollView } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import DescriptionSuggestionRow from '../../../app/components/operations/DescriptionSuggestionRow';
 
@@ -57,5 +58,15 @@ describe('DescriptionSuggestionRow', () => {
     );
     fireEvent.press(getByText('Metro card'));
     expect(onApply).toHaveBeenCalledWith('Metro card');
+  });
+
+  it('renders chips inside a horizontal ScrollView', () => {
+    const { UNSAFE_getByType } = render(<DescriptionSuggestionRow {...baseProps} />);
+    const scrollView = UNSAFE_getByType(ScrollView);
+    expect(scrollView.props.horizontal).toBe(true);
+    const chipButtons = scrollView.findAll(
+      (node) => node.props?.accessibilityRole === 'button' && node.props?.accessibilityLabel?.startsWith('label:'),
+    );
+    expect(chipButtons).toHaveLength(baseProps.chips.length);
   });
 });
