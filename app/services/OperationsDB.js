@@ -344,15 +344,15 @@ export const getFilteredOperationsAllDates = async (filters = {}) => {
     }
 
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
