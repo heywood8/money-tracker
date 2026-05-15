@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.1](https://github.com/heywood8/money-tracker/compare/penny-v0.114.0...penny-v0.114.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **search:** fold Russian ё/е so keyboard autocomplete doesn't break search ([#642](https://github.com/heywood8/money-tracker/issues/642)) ([cfbd098](https://github.com/heywood8/money-tracker/commit/cfbd09805f23141087ea3f8b0f3d159a4922024c))
+
 ## [0.114.0](https://github.com/heywood8/money-tracker/compare/penny-v0.113.1...penny-v0.114.0) (2026-05-15)
 
 
