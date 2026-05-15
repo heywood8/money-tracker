@@ -93,6 +93,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     jest.clearAllMocks();
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
     OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([]);
+    OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
     const PreferencesDB = require('../../app/services/PreferencesDB');
     mockSetJsonPreference = PreferencesDB.setJsonPreference;
   });
@@ -110,8 +111,12 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       { wrapper },
     );
 
-  describe('text-only changes do not trigger DB reload', () => {
-    it('does not call getOperationsByWeekOffset again when only searchText changes', async () => {
+  describe('text search triggers all-dates DB query', () => {
+    beforeEach(() => {
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
+    });
+
+    it('calls getFilteredOperationsAllDates (not week-offset) when searchText is set', async () => {
       const { result } = setupHook();
 
       await waitFor(() => {
@@ -122,37 +127,36 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
         result.current.actions.setSearchText('coffee');
       });
 
-      // Allow any pending async work to settle
       await waitFor(() => {
-        expect(result.current.data.searchState.text).toBe('coffee');
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
 
-      // No additional DB call beyond the initial mount
+      // Week-offset queries are not used for text search
       expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       expect(OperationsDB.getFilteredOperationsByWeekOffset).not.toHaveBeenCalled();
     });
 
-    it('does not trigger DB reload when searchText changes multiple times', async () => {
+    it('calls getFilteredOperationsAllDates with the search text in filters', async () => {
       const { result } = setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => { result.current.actions.setSearchText('c'); });
-      act(() => { result.current.actions.setSearchText('co'); });
-      act(() => { result.current.actions.setSearchText('cof'); });
-      act(() => { result.current.actions.setSearchText('coffee'); });
-
-      await waitFor(() => {
-        expect(result.current.data.searchState.text).toBe('coffee');
+      act(() => {
+        result.current.actions.setSearchText('Самолет');
       });
 
-      expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
-      expect(OperationsDB.getFilteredOperationsByWeekOffset).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
+      });
+
+      const [filters] = OperationsDB.getFilteredOperationsAllDates.mock.calls[0];
+      expect(filters.searchText).toBe('Самолет');
     });
 
-    it('does not trigger reload when searchText changes from non-empty to empty', async () => {
+    it('calls getOperationsByWeekOffset when searchText is cleared', async () => {
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
       const { result } = setupHook();
 
       await waitFor(() => {
@@ -160,13 +164,15 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       act(() => { result.current.actions.setSearchText('coffee'); });
+      await waitFor(() => {
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
+      });
+
       act(() => { result.current.actions.setSearchText(''); });
-
       await waitFor(() => {
-        expect(result.current.data.searchState.text).toBe('');
+        // Clearing text restores unfiltered week-based load
+        expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(2);
       });
-
-      expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -277,29 +283,31 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
   });
 
   describe('text + structural change combination', () => {
-    it('combined update with structural change triggers exactly one reload', async () => {
+    it('text change calls getFilteredOperationsAllDates; adding structural filter also uses it', async () => {
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
       const { result } = setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      // Set text first (no reload)
+      // Text triggers all-dates query
       act(() => { result.current.actions.setSearchText('grocery'); });
 
       await waitFor(() => {
-        expect(result.current.data.searchState.text).toBe('grocery');
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
       expect(OperationsDB.getFilteredOperationsByWeekOffset).not.toHaveBeenCalled();
 
-      // Then set structural (one reload)
+      // Adding a structural filter with text still uses all-dates query (text present)
       act(() => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(2);
       });
+      expect(OperationsDB.getFilteredOperationsByWeekOffset).not.toHaveBeenCalled();
     });
   });
 
