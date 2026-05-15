@@ -65,6 +65,7 @@ export const operations = sqliteTable('operations', {
   destinationAmount: text('destination_amount'),
   sourceCurrency: text('source_currency'),
   destinationCurrency: text('destination_currency'),
+  originalBalance: text('original_balance'),
 }, (table) => ({
   dateIdx: index('idx_operations_date').on(table.date),
   accountIdx: index('idx_operations_account').on(table.accountId),

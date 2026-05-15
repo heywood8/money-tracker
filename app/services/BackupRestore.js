@@ -260,8 +260,15 @@ export const exportBackup = async (format = 'json') => {
   }
 };
 
+const VALID_OPERATION_TYPES = ['expense', 'income', 'transfer'];
+const VALID_CATEGORY_TYPES = ['folder', 'entry'];
+const VALID_CATEGORY_KINDS = ['expense', 'income'];
+const VALID_BUDGET_PERIODS = ['weekly', 'monthly', 'yearly'];
+
 /**
- * Validate backup data structure
+ * Validate backup data structure and enum fields.
+ * Throws on structural errors; rows with invalid enum values are flagged so
+ * the caller can skip them rather than poisoning the database.
  * @param {Object} backup - Backup object to validate
  * @returns {boolean} True if valid, throws error if invalid
  */
@@ -290,6 +297,55 @@ const validateBackup = (backup) => {
     if (!Array.isArray(backup.data[table])) {
       throw new Error(`Invalid backup format: missing or invalid ${table} data`);
     }
+  }
+
+  // Validate enum fields across all rows — collect all violations before throwing
+  const errors = [];
+
+  for (let i = 0; i < backup.data.operations.length; i++) {
+    const op = backup.data.operations[i];
+    const t = op.type || 'expense';
+    if (!VALID_OPERATION_TYPES.includes(t)) {
+      errors.push(`operations[${i}] has invalid type "${t}"`);
+    }
+  }
+
+  for (let i = 0; i < backup.data.categories.length; i++) {
+    const cat = backup.data.categories[i];
+    const t = cat.type || 'folder';
+    const k = cat.category_type || 'expense';
+    if (!VALID_CATEGORY_TYPES.includes(t)) {
+      errors.push(`categories[${i}] has invalid type "${t}"`);
+    }
+    if (!VALID_CATEGORY_KINDS.includes(k)) {
+      errors.push(`categories[${i}] has invalid category_type "${k}"`);
+    }
+  }
+
+  if (Array.isArray(backup.data.budgets)) {
+    for (let i = 0; i < backup.data.budgets.length; i++) {
+      const b = backup.data.budgets[i];
+      const p = b.period_type || 'monthly';
+      if (!VALID_BUDGET_PERIODS.includes(p)) {
+        errors.push(`budgets[${i}] has invalid period_type "${p}"`);
+      }
+    }
+  }
+
+  if (Array.isArray(backup.data.planned_operations)) {
+    for (let i = 0; i < backup.data.planned_operations.length; i++) {
+      const po = backup.data.planned_operations[i];
+      const t = po.type || 'expense';
+      if (!VALID_OPERATION_TYPES.includes(t)) {
+        errors.push(`planned_operations[${i}] has invalid type "${t}"`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Backup contains invalid enum values:\n${errors.join('\n')}`,
+    );
   }
 
   return true;
@@ -409,13 +465,15 @@ export const restoreBackup = async (backup) => {
           continue;
         }
 
+        const catType = VALID_CATEGORY_TYPES.includes(category.type) ? category.type : 'folder';
+        const catKind = VALID_CATEGORY_KINDS.includes(category.category_type) ? category.category_type : 'expense';
         await db.runAsync(
           'INSERT INTO categories (id, name, type, category_type, parent_id, icon, color, is_shadow, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             category.id,
             category.name,
-            category.type || 'folder',
-            category.category_type || 'expense',
+            catType,
+            catKind,
             category.parent_id || null,
             category.icon || null,
             category.color || null,
@@ -461,10 +519,11 @@ export const restoreBackup = async (backup) => {
         }
 
         // Note: id is omitted as it's now auto-increment integer
+        const opType = VALID_OPERATION_TYPES.includes(operation.type) ? operation.type : 'expense';
         await db.runAsync(
           'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
-            operation.type || 'expense',
+            opType,
             operation.amount || '0',
             mappedAccountId,
             operation.category_id || null,
@@ -536,6 +595,7 @@ export const restoreBackup = async (backup) => {
             continue;
           }
 
+          const budgetPeriod = VALID_BUDGET_PERIODS.includes(budget.period_type) ? budget.period_type : 'monthly';
           await db.runAsync(
             'INSERT INTO budgets (id, category_id, amount, currency, period_type, start_date, end_date, is_recurring, rollover_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
@@ -543,7 +603,7 @@ export const restoreBackup = async (backup) => {
               budget.category_id,
               budget.amount,
               budget.currency,
-              budget.period_type || 'monthly',
+              budgetPeriod,
               budget.start_date || new Date().toISOString(),
               budget.end_date || null,
               budget.is_recurring ?? 1,
@@ -625,12 +685,13 @@ export const restoreBackup = async (backup) => {
             mappedToAccountId = accountIdMapping.get(planned.to_account_id) ?? planned.to_account_id;
           }
 
+          const plannedType = VALID_OPERATION_TYPES.includes(planned.type) ? planned.type : 'expense';
           await db.runAsync(
             'INSERT INTO planned_operations (id, name, type, amount, account_id, category_id, to_account_id, description, is_recurring, last_executed_month, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               planned.id,
               planned.name,
-              planned.type || 'expense',
+              plannedType,
               planned.amount || '0',
               mappedAccountId,
               planned.category_id || null,
