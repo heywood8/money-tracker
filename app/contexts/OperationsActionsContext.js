@@ -84,9 +84,21 @@ export const OperationsActionsProvider = ({ children }) => {
         _setLoading(true);
       }
       const isFiltered = _hasActiveFilters(effectiveFilters);
-      let operationsData = isFiltered
-        ? await OperationsDB.getFilteredOperationsByWeekOffset(0, effectiveFilters)
-        : await OperationsDB.getOperationsByWeekOffset(0);
+      const hasTextSearch = effectiveFilters.searchText && effectiveFilters.searchText.trim();
+
+      let operationsData;
+      let allDatesLoaded = false;
+
+      if (hasTextSearch) {
+        // Text search queries all dates so every matching operation is found regardless
+        // of how far back in history it is.
+        operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
+        allDatesLoaded = true;
+      } else {
+        operationsData = isFiltered
+          ? await OperationsDB.getFilteredOperationsByWeekOffset(0, effectiveFilters)
+          : await OperationsDB.getOperationsByWeekOffset(0);
+      }
 
       // Check if this request is still the latest (ignore stale results)
       if (requestId !== loadRequestIdRef.current) {
@@ -102,7 +114,6 @@ export const OperationsActionsProvider = ({ children }) => {
         const oldestOp = operationsData[operationsData.length - 1];
         _setNewestLoadedDate(newestOp.date);
         _setOldestLoadedDate(oldestOp.date);
-        // When loading initial (current week), there are no newer operations
         _setHasNewerOperations(false);
       } else {
         _setNewestLoadedDate(null);
@@ -110,8 +121,9 @@ export const OperationsActionsProvider = ({ children }) => {
         _setHasNewerOperations(false);
       }
 
-      // Always assume there might be more operations initially
-      _setHasMoreOperations(true);
+      // Text searches load all matching results at once — no further pagination needed.
+      // Week-based pagination always starts with hasMore=true.
+      _setHasMoreOperations(!allDatesLoaded);
       _setDataLoaded(true);
     } catch (error) {
       console.error('Failed to load initial operations:', error);
@@ -269,9 +281,8 @@ export const OperationsActionsProvider = ({ children }) => {
     loadInitialOperations();
   }, [loadInitialOperations]);
 
-  // Reload operations from DB when structural filters change (account, type, category, date,
-  // amount). Text search is intentionally excluded: it is handled entirely by the in-memory
-  // filteredOperations computation, so typing does not replace the lazy-loaded history.
+  // Reload operations from DB when filters change. Text search also triggers a reload so
+  // that results are fetched across all dates (not just the lazily-loaded window).
   const isFirstSearchEffectRef = useRef(true);
   const prevStructuralRef = useRef(null);
   useEffect(() => {
@@ -284,16 +295,17 @@ export const OperationsActionsProvider = ({ children }) => {
     const prev = prevStructuralRef.current;
     prevStructuralRef.current = activeFilters;
 
-    // Compare structural fields by reference — React never mutates arrays in place,
+    // Compare all filter fields by reference — React never mutates arrays in place,
     // so reference equality is sufficient to detect changes.
-    const structuralChanged = !prev
+    const filtersChanged = !prev
       || prev.types !== activeFilters.types
       || prev.accountIds !== activeFilters.accountIds
       || prev.categoryIds !== activeFilters.categoryIds
       || prev.dateRange !== activeFilters.dateRange
-      || prev.amountRange !== activeFilters.amountRange;
+      || prev.amountRange !== activeFilters.amountRange
+      || prev.searchText !== activeFilters.searchText;
 
-    if (structuralChanged) {
+    if (filtersChanged) {
       loadInitialOperations(activeFilters, false);
     }
 

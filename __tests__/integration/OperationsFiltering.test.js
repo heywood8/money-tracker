@@ -105,6 +105,7 @@ describe('Operations Filtering Integration', () => {
     // Default mock implementations
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
     OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([]);
+    OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
     OperationsDB.getNextOldestOperation.mockResolvedValue(null);
     OperationsDB.getNextOldestFilteredOperation.mockResolvedValue(null);
   });

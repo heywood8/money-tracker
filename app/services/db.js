@@ -3,15 +3,16 @@ import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as SQLite from 'expo-sqlite';
 import * as schema from '../db/schema';
 import migrations from '../../drizzle/migrations';
+import { normalizeSearchText } from './searchNormalize';
 
 const DB_NAME = 'penny.db';
 
 let dbInstance = null;
 let drizzleInstance = null;
 let initPromise = null;
-let unicodeLowerAvailable = false;
+let searchNormAvailable = false;
 
-export const isUnicodeLowerAvailable = () => unicodeLowerAvailable;
+export const isSearchNormAvailable = () => searchNormAvailable;
 
 /**
  * Get or create the database instance
@@ -39,26 +40,23 @@ export const getDatabase = async () => {
         throw new Error('Database instance is null after opening');
       }
 
-      // Register Unicode-aware LOWER function — SQLite's built-in LOWER() only handles ASCII,
-      // so Cyrillic (and other non-ASCII) characters are left unchanged. This custom function
-      // delegates to JS String.prototype.toLowerCase() which handles all Unicode correctly.
+      // Register search-normalization function — SQLite's built-in LOWER() is ASCII-only,
+      // so Cyrillic case-folding (and Russian ё/е equivalence) has to be done in JS. The
+      // callback delegates to normalizeSearchText() which is the same normalizer applied
+      // to the query on the JS side, so SQL-side and in-memory results stay consistent.
       // expo-sqlite 16.x uses createCustomFunctionAsync(name, callback, options).
-      const unicodeLowerCallback = (value) => {
-        if (value == null) return null;
-        return String(value).toLowerCase();
-      };
       try {
         if (typeof dbInstance.createCustomFunctionAsync === 'function') {
-          await dbInstance.createCustomFunctionAsync('UNICODE_LOWER', unicodeLowerCallback, { deterministic: true });
-          unicodeLowerAvailable = true;
+          await dbInstance.createCustomFunctionAsync('SEARCH_NORM', normalizeSearchText, { deterministic: true });
+          searchNormAvailable = true;
         } else if (typeof dbInstance.createFunctionAsync === 'function') {
-          await dbInstance.createFunctionAsync('UNICODE_LOWER', unicodeLowerCallback, { deterministic: true });
-          unicodeLowerAvailable = true;
+          await dbInstance.createFunctionAsync('SEARCH_NORM', normalizeSearchText, { deterministic: true });
+          searchNormAvailable = true;
         } else {
-          console.warn('UNICODE_LOWER: no custom function API found, Cyrillic search will use LOWER()');
+          console.warn('SEARCH_NORM: no custom function API found, Cyrillic/yo search will use LOWER()');
         }
       } catch (fnError) {
-        console.warn('UNICODE_LOWER registration failed, Cyrillic search will use LOWER():', fnError.message);
+        console.warn('SEARCH_NORM registration failed, Cyrillic/yo search will use LOWER():', fnError.message);
       }
 
       drizzleInstance = drizzle(dbInstance, { schema });
@@ -72,7 +70,7 @@ export const getDatabase = async () => {
       dbInstance = null;
       drizzleInstance = null;
       initPromise = null;
-      unicodeLowerAvailable = false;
+      searchNormAvailable = false;
       throw error;
     }
   })();
@@ -353,7 +351,7 @@ export const closeDatabase = async () => {
     } finally {
       dbInstance = null;
       drizzleInstance = null;
-      unicodeLowerAvailable = false;
+      searchNormAvailable = false;
     }
   }
 };

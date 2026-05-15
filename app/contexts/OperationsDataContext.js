@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { normalizeSearchText } from '../services/searchNormalize';
 import { useAccountsData } from './AccountsDataContext';
 import { useCategories } from './CategoriesContext';
 import { useLocalization } from './LocalizationContext';
@@ -134,27 +135,31 @@ export const OperationsDataProvider = ({ children }) => {
   const filteredOperations = useMemo(() => {
     let result = operations;
 
-    // text search - match description, account name, category name, amount, type
+    // text search - match description, account name, category name, amount, type.
+    // Both query and field values are run through normalizeSearchText so the match is
+    // case-insensitive AND treats Russian ё/е as equivalent (a Russian keyboard's
+    // autocomplete frequently swaps one for the other, so "Самолет" must find "Самолёт"
+    // and vice versa). This is the same normalization SEARCH_NORM applies in SQL.
     const trimmedText = searchState.text ? searchState.text.trim() : '';
     if (trimmedText) {
-      const searchLower = trimmedText.toLowerCase();
+      const searchLower = normalizeSearchText(trimmedText);
       result = result.filter(op => {
         // match description
-        if (op.description && op.description.toLowerCase().includes(searchLower)) {
+        if (op.description && normalizeSearchText(op.description).includes(searchLower)) {
           return true;
         }
 
         // match type (localized)
         if (op.type) {
           const typeName = t(op.type);
-          if (typeName.toLowerCase().includes(searchLower)) {
+          if (normalizeSearchText(typeName).includes(searchLower)) {
             return true;
           }
         }
 
         // match account name
         const account = accounts.find(acc => acc.id === op.accountId);
-        if (account && account.name.toLowerCase().includes(searchLower)) {
+        if (account && normalizeSearchText(account.name).includes(searchLower)) {
           return true;
         }
 
@@ -162,12 +167,13 @@ export const OperationsDataProvider = ({ children }) => {
         const categoryPath = getCategoryPath(op.categoryId);
         if (categoryPath.some(cat => {
           const name = cat.nameKey ? t(cat.nameKey) : cat.name;
-          return name && name.toLowerCase().includes(searchLower);
+          return name && normalizeSearchText(name).includes(searchLower);
         })) {
           return true;
         }
 
-        // match amount (as string)
+        // match amount (digits and dot only — normalization is a no-op but keeps the
+        // path uniform).
         if (op.amount && String(op.amount).includes(searchLower)) {
           return true;
         }

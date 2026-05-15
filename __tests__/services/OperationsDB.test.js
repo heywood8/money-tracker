@@ -5,7 +5,7 @@
 
 import * as OperationsDB from '../../app/services/OperationsDB';
 import * as Currency from '../../app/services/currency';
-import { executeQuery, queryAll, queryFirst, executeTransaction, isUnicodeLowerAvailable } from '../../app/services/db';
+import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from '../../app/services/db';
 
 // Mock dependencies
 jest.mock('../../app/services/db');
@@ -42,8 +42,8 @@ describe('OperationsDB Service', () => {
     Currency.subtract.mockImplementation((a, b) => String(parseFloat(a) - parseFloat(b)));
     Currency.isZero.mockImplementation((a) => parseFloat(a) === 0);
 
-    // UNICODE_LOWER is available in tests so search SQL uses UNICODE_LOWER(...)
-    isUnicodeLowerAvailable.mockReturnValue(true);
+    // SEARCH_NORM is available in tests so search SQL uses SEARCH_NORM(...)
+    isSearchNormAvailable.mockReturnValue(true);
   });
 
   describe('Query Operations', () => {
@@ -1112,11 +1112,11 @@ describe('OperationsDB Service', () => {
       await OperationsDB.getFilteredOperationsByDateRange('2025-12-01', '2025-12-31', filters);
 
       const sqlCall = queryAll.mock.calls[0][0];
-      expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
-      expect(sqlCall).toContain('UNICODE_LOWER(a.name) LIKE ?');
-      expect(sqlCall).toContain('UNICODE_LOWER(to_a.name) LIKE ?');
-      expect(sqlCall).toContain('UNICODE_LOWER(c.name) LIKE ?');
-      expect(sqlCall).toContain('UNICODE_LOWER(pc.name) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(a.name) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(to_a.name) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(c.name) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(pc.name) LIKE ?');
     });
 
     it('trims search text before searching', async () => {
@@ -1129,7 +1129,7 @@ describe('OperationsDB Service', () => {
       expect(params).toContain('%coffee%');
     });
 
-    it('passes only the lowercased search term — UNICODE_LOWER handles all scripts', async () => {
+    it('passes only the lowercased search term — SEARCH_NORM handles all scripts', async () => {
       queryAll.mockResolvedValue([]);
 
       const filters = { searchText: 'GROCERY' };
@@ -1137,12 +1137,12 @@ describe('OperationsDB Service', () => {
 
       const params = queryAll.mock.calls[0][1];
       expect(params).toContain('%grocery%');
-      // Only the lowercase variant is needed — UNICODE_LOWER() on the DB side
+      // Only the lowercase variant is needed — SEARCH_NORM() on the DB side
       // converts stored values via JS toLowerCase(), which handles all Unicode.
       expect(params).not.toContain('%GROCERY%');
     });
 
-    it('matches non-ASCII (Cyrillic) category names via UNICODE_LOWER', async () => {
+    it('matches non-ASCII (Cyrillic) category names via SEARCH_NORM', async () => {
       queryAll.mockResolvedValue([]);
 
       const filters = { searchText: 'Газ' };
@@ -1150,9 +1150,9 @@ describe('OperationsDB Service', () => {
 
       const sqlCall = queryAll.mock.calls[0][0];
       const params = queryAll.mock.calls[0][1];
-      // UNICODE_LOWER on the DB side means we only need the lowercase JS-normalised term.
-      expect(sqlCall).toContain('UNICODE_LOWER(c.name) LIKE ?');
-      expect(sqlCall).toContain('UNICODE_LOWER(pc.name) LIKE ?');
+      // SEARCH_NORM on the DB side means we only need the lowercase JS-normalised term.
+      expect(sqlCall).toContain('SEARCH_NORM(c.name) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(pc.name) LIKE ?');
       expect(params).toContain('%газ%');
       expect(params).not.toContain('%Газ%');
     });
@@ -1197,7 +1197,7 @@ describe('OperationsDB Service', () => {
       expect(sqlCall).toContain('o.category_id IN');
       expect(sqlCall).toContain('CAST(o.amount AS REAL) >=');
       expect(sqlCall).toContain('CAST(o.amount AS REAL) <=');
-      expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE');
+      expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE');
     });
 
     it('handles null result from query', async () => {
@@ -1384,7 +1384,7 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getNextNewestFilteredOperation('2025-12-05', filters);
 
         const sqlCall = queryFirst.mock.calls[0][0];
-        expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
       });
 
       it('throws error on query failure', async () => {
@@ -1470,7 +1470,7 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getFilteredOperationsByWeekToDate('2025-12-05', filters);
 
         const sqlCall = queryAll.mock.calls[0][0];
-        expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
       });
 
       it('returns empty array when no operations match', async () => {
@@ -1776,7 +1776,7 @@ describe('OperationsDB Service', () => {
       await OperationsDB.getNextOldestFilteredOperation('2025-12-05', filters);
 
       const sqlCall = queryFirst.mock.calls[0][0];
-      expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+      expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
     });
 
     it('applies category filters to getNextOldestFilteredOperation', async () => {
@@ -1894,11 +1894,11 @@ describe('OperationsDB Service', () => {
         await OperationsDB.getFilteredOperationsByWeekFromDate('2025-12-05', filters);
 
         const sqlCall = queryAll.mock.calls[0][0];
-        expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
         expect(sqlCall).toContain('o.amount LIKE ?');
-        expect(sqlCall).toContain('UNICODE_LOWER(a.name) LIKE ?');
-        expect(sqlCall).toContain('UNICODE_LOWER(c.name) LIKE ?');
-        expect(sqlCall).toContain('UNICODE_LOWER(pc.name) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(a.name) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(c.name) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(pc.name) LIKE ?');
       });
 
       it('filters by amount range (min and max)', async () => {
@@ -1948,7 +1948,7 @@ describe('OperationsDB Service', () => {
         const sqlCall = queryAll.mock.calls[0][0];
         expect(sqlCall).toContain('o.type IN (?)');
         expect(sqlCall).toContain('o.account_id IN (?)');
-        expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
         expect(sqlCall).toContain('CAST(o.amount AS REAL) >= ?');
         expect(sqlCall).toContain('CAST(o.amount AS REAL) <= ?');
       });
@@ -1994,7 +1994,7 @@ describe('OperationsDB Service', () => {
         expect(sqlCall).toContain('LEFT JOIN categories pc ON c.parent_id = pc.id');
       });
 
-      it('Cyrillic parent category name search passes lowercase term to UNICODE_LOWER', async () => {
+      it('Cyrillic parent category name search passes lowercase term to SEARCH_NORM', async () => {
         queryAll.mockResolvedValue([]);
 
         const filters = { searchText: 'Транспорт' };
@@ -2059,7 +2059,7 @@ describe('OperationsDB Service', () => {
         const sqlCall = queryFirst.mock.calls[0][0];
         expect(sqlCall).toContain('o.type IN (?)');
         expect(sqlCall).toContain('o.account_id IN (?)');
-        expect(sqlCall).toContain('UNICODE_LOWER(o.description) LIKE ?');
+        expect(sqlCall).toContain('SEARCH_NORM(o.description) LIKE ?');
       });
     });
 
