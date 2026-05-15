@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.0](https://github.com/heywood8/money-tracker/compare/penny-v0.113.1...penny-v0.114.0) (2026-05-15)
+
+
+### Features
+
+* make description suggestion chips horizontally scrollable ([#640](https://github.com/heywood8/money-tracker/issues/640)) ([6141461](https://github.com/heywood8/money-tracker/commit/61414611f4332bc71cb57a899466f71a88ebe188))
+
 ## [0.113.1](https://github.com/heywood8/money-tracker/compare/penny-v0.113.0...penny-v0.113.1) (2026-05-14)
 
 
