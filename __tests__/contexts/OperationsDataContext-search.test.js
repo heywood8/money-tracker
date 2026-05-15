@@ -951,5 +951,98 @@ describe('OperationsDataContext - Search API', () => {
         });
       });
     });
+
+    describe('Russian ё/е equivalence (yo-folding) — regression for keyboard autocomplete bug', () => {
+      // The screenshot bug: user typed "Самолет" (with е); Russian keyboard autocomplete
+      // submitted "Самолёт" (with ё), and the visible "Самолет" transaction in the list
+      // no longer matched. The fix folds ё → е so both spellings normalize to the same
+      // string. Same behaviour as Elasticsearch's russian analyzer.
+      const yoOperations = [
+        {
+          id: 'op-yo-plain',
+          type: 'expense',
+          accountId: 'acc-1',
+          categoryId: 'cat-3',
+          amount: '252000',
+          description: 'Самолет', // plain е
+          date: '2026-04-11',
+        },
+        {
+          id: 'op-yo-dot',
+          type: 'expense',
+          accountId: 'acc-1',
+          categoryId: 'cat-3',
+          amount: '200',
+          description: 'Покупка Самолёт', // with ё
+          date: '2019-07-10',
+        },
+      ];
+
+      const setupWithYoOperations = () => {
+        OperationsDB.getOperationsByWeekOffset.mockResolvedValue(yoOperations);
+        const { result } = renderHook(
+          () => ({
+            data: useOperationsData(),
+            actions: useOperationsActions(),
+          }),
+          { wrapper },
+        );
+        return result;
+      };
+
+      it('search with е finds descriptions written with ё', async () => {
+        const result = setupWithYoOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(2);
+        });
+
+        // Type with plain е — should find BOTH the plain and the ё version.
+        act(() => {
+          result.current.actions.setSearchText('Самолет');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations.map(op => op.id).sort())
+            .toEqual(['op-yo-dot', 'op-yo-plain']);
+        });
+      });
+
+      it('search with ё finds descriptions written with е', async () => {
+        const result = setupWithYoOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(2);
+        });
+
+        // Type with ё (or keyboard autocomplete supplies it) — should still match plain е.
+        act(() => {
+          result.current.actions.setSearchText('Самолёт');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations.map(op => op.id).sort())
+            .toEqual(['op-yo-dot', 'op-yo-plain']);
+        });
+      });
+
+      it('yo-fold combines with case-folding', async () => {
+        const result = setupWithYoOperations();
+
+        await waitFor(() => {
+          expect(result.current.data.operations).toHaveLength(2);
+        });
+
+        // ALL-CAPS with ё — should still match both.
+        act(() => {
+          result.current.actions.setSearchText('САМОЛЁТ');
+        });
+
+        await waitFor(() => {
+          expect(result.current.data.operations.map(op => op.id).sort())
+            .toEqual(['op-yo-dot', 'op-yo-plain']);
+        });
+      });
+    });
   });
 });

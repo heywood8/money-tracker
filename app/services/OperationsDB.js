@@ -1,8 +1,13 @@
-import { executeQuery, queryAll, queryFirst, executeTransaction, isUnicodeLowerAvailable } from './db';
+import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from './db';
+import { normalizeSearchText } from './searchNormalize';
 
-// Returns 'UNICODE_LOWER' when the custom function was registered successfully,
-// otherwise falls back to SQLite's built-in LOWER() (ASCII-only but safe).
-const lowerFn = () => (isUnicodeLowerAvailable() ? 'UNICODE_LOWER' : 'LOWER');
+// Returns 'SEARCH_NORM' when the custom function was registered successfully (full
+// Cyrillic case-folding + ё/е equivalence), otherwise falls back to SQLite's built-in
+// LOWER() (ASCII-only but safe). The JS-side query passed in is normalized with the
+// matching function so both halves of the LIKE comparison use the same alphabet.
+const searchFn = () => (isSearchNormAvailable() ? 'SEARCH_NORM' : 'LOWER');
+const normalizeSearchQuery = (text) =>
+  isSearchNormAvailable() ? normalizeSearchText(text) : String(text).toLowerCase();
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
@@ -250,15 +255,15 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1198,15 +1203,15 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1294,15 +1299,15 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1459,15 +1464,15 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1567,15 +1572,15 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const searchLower = `%${filters.searchText.trim().toLowerCase()}%`;
-      const lower = lowerFn();
+      const norm = searchFn();
+      const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${lower}(o.description) LIKE ?
+        ${norm}(o.description) LIKE ?
         OR o.amount LIKE ?
-        OR ${lower}(a.name) LIKE ?
-        OR ${lower}(to_a.name) LIKE ?
-        OR ${lower}(c.name) LIKE ?
-        OR ${lower}(pc.name) LIKE ?
+        OR ${norm}(a.name) LIKE ?
+        OR ${norm}(to_a.name) LIKE ?
+        OR ${norm}(c.name) LIKE ?
+        OR ${norm}(pc.name) LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }

@@ -226,26 +226,26 @@ describe('Database Service', () => {
     });
   });
 
-  describe('UNICODE_LOWER custom function', () => {
-    it('registers UNICODE_LOWER during database initialization', async () => {
+  describe('SEARCH_NORM custom function', () => {
+    it('registers SEARCH_NORM during database initialization', async () => {
       await getDatabase();
 
       // expo-sqlite 16.x API: createCustomFunctionAsync(name, callback, options)
       expect(mockDb.createCustomFunctionAsync).toHaveBeenCalledWith(
-        'UNICODE_LOWER',
+        'SEARCH_NORM',
         expect.any(Function),
         { deterministic: true },
       );
     });
 
-    it('registers UNICODE_LOWER with deterministic: true option', async () => {
+    it('registers SEARCH_NORM with deterministic: true option', async () => {
       await getDatabase();
 
       const [,, options] = mockDb.createCustomFunctionAsync.mock.calls[0];
       expect(options).toEqual({ deterministic: true });
     });
 
-    it('registers UNICODE_LOWER before first runAsync call', async () => {
+    it('registers SEARCH_NORM before first runAsync call', async () => {
       await getDatabase();
 
       const createFunctionOrder = mockDb.createCustomFunctionAsync.mock.invocationCallOrder[0];
@@ -253,21 +253,21 @@ describe('Database Service', () => {
       expect(createFunctionOrder).toBeLessThan(firstRunAsyncOrder);
     });
 
-    it('UNICODE_LOWER callback returns null for null input', async () => {
+    it('SEARCH_NORM callback returns null for null input', async () => {
       await getDatabase();
 
       const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback(null)).toBeNull();
     });
 
-    it('UNICODE_LOWER callback returns null for undefined input', async () => {
+    it('SEARCH_NORM callback returns null for undefined input', async () => {
       await getDatabase();
 
       const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback(undefined)).toBeNull();
     });
 
-    it('UNICODE_LOWER callback lowercases ASCII text', async () => {
+    it('SEARCH_NORM callback lowercases ASCII text', async () => {
       await getDatabase();
 
       const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
@@ -276,7 +276,7 @@ describe('Database Service', () => {
       expect(callback('TEST123')).toBe('test123');
     });
 
-    it('UNICODE_LOWER callback correctly lowercases Cyrillic text', async () => {
+    it('SEARCH_NORM callback correctly lowercases Cyrillic text', async () => {
       await getDatabase();
 
       // SQLite's built-in LOWER() leaves Cyrillic unchanged; this custom function must handle it
@@ -286,7 +286,7 @@ describe('Database Service', () => {
       expect(callback('Путешествия')).toBe('путешествия');
     });
 
-    it('UNICODE_LOWER callback lowercases mixed-script and accented text', async () => {
+    it('SEARCH_NORM callback lowercases mixed-script and accented text', async () => {
       await getDatabase();
 
       const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
@@ -294,12 +294,35 @@ describe('Database Service', () => {
       expect(callback('München')).toBe('münchen');
     });
 
-    it('UNICODE_LOWER callback preserves numeric strings', async () => {
+    it('SEARCH_NORM callback preserves numeric strings', async () => {
       await getDatabase();
 
       const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
       expect(callback('12345')).toBe('12345');
       expect(callback('3.14')).toBe('3.14');
+    });
+
+    it('SEARCH_NORM folds Russian ё → е (regression: keyboard autocomplete bug)', async () => {
+      await getDatabase();
+
+      // The screenshot bug: user types "Самолет" but the Russian keyboard autocompletes
+      // to "Самолёт"; both should normalize to the same string so the search matches.
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
+      expect(callback('Самолёт')).toBe('самолет');
+      expect(callback('Самолет')).toBe('самолет');
+      expect(callback('САМОЛЁТ')).toBe('самолет');
+      expect(callback('ёжик')).toBe('ежик');
+      expect(callback('Ёлка')).toBe('елка');
+    });
+
+    it('SEARCH_NORM normalizes decomposed ё (е + combining diaeresis) to the same form', async () => {
+      await getDatabase();
+
+      const callback = mockDb.createCustomFunctionAsync.mock.calls[0][1];
+      // Decomposed form: е (U+0435) + combining diaeresis (U+0308)
+      const decomposed = 'Самолёт'; // "Самолё̈т" decomposed
+      // After NFC + lowercase + ё→е fold, should match the simple form
+      expect(callback(decomposed)).toBe('самолет');
     });
   });
 });
