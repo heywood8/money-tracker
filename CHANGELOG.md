@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.114.9](https://github.com/heywood8/money-tracker/compare/penny-v0.114.8...penny-v0.114.9) (2026-05-16)
+
+
+### Bug Fixes
+
+* harden APK download against path traversal and missing checksum verification ([#662](https://github.com/heywood8/money-tracker/issues/662)) ([a5ec4a0](https://github.com/heywood8/money-tracker/commit/a5ec4a03516e9ccb2d8f6edcceabef9276d9c0dc))
+* replace new Function() with safe expression parser in calculatorUtils ([#661](https://github.com/heywood8/money-tracker/issues/661)) ([4cb8d58](https://github.com/heywood8/money-tracker/commit/4cb8d58b831b01212a79346090944acb582b084c))
+
 ## [0.114.8](https://github.com/heywood8/money-tracker/compare/penny-v0.114.7...penny-v0.114.8) (2026-05-16)
 
 
