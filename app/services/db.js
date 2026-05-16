@@ -53,7 +53,7 @@ export const getDatabase = async () => {
           await dbInstance.createFunctionAsync('SEARCH_NORM', normalizeSearchText, { deterministic: true });
           searchNormAvailable = true;
         } else {
-          console.warn('SEARCH_NORM: no custom function API found, Cyrillic/yo search will use LOWER()');
+          console.log('SEARCH_NORM: no custom function API found, Cyrillic/yo search will use LOWER()');
         }
       } catch (fnError) {
         console.warn('SEARCH_NORM registration failed, Cyrillic/yo search will use LOWER():', fnError.message);
