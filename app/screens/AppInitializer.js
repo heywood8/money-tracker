@@ -58,6 +58,7 @@ const AppInitializer = () => {
             latestVersion: result.latestVersion,
             currentVersion: result.currentVersion,
             downloadUrl: result.downloadUrl,
+            checksumUrl: result.checksumUrl || null,
             releaseNotes: result.releaseNotes || null,
           });
         } catch (error) {
@@ -84,8 +85,10 @@ const AppInitializer = () => {
     if (pendingUpdate) {
       await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, pendingUpdate.latestVersion);
     }
+    const checksumUrl = pendingUpdate?.checksumUrl || null;
     setPendingUpdate(null);
     startDownload(downloadUrl, {
+      checksumUrl,
       onError: () => {
         showDialog(
           t('error') || 'Error',

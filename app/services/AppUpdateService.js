@@ -9,6 +9,14 @@ const DEFAULT_GITHUB_REPO = 'money-tracker';
 const GITHUB_API_VERSION = '2022-11-28';
 const UPDATE_CHECK_TIMEOUT_MS = 8000;
 
+// Only allow safe characters in filenames downloaded to the cache directory.
+// Prevents path traversal attacks (e.g. "../../../data/data/com.pkg/databases/penny.db").
+export const sanitizeFilename = (raw) => {
+  if (!raw || typeof raw !== 'string') return 'penny-update.apk';
+  const safe = raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return safe.toLowerCase().endsWith('.apk') && safe.length > 4 ? safe : 'penny-update.apk';
+};
+
 const normalizeVersion = (value) => {
   if (!value || typeof value !== 'string') {
     return null;
@@ -59,6 +67,19 @@ export const extractApkAsset = (assets = []) => {
       return false;
     }
     return asset.name.toLowerCase().endsWith('.apk') && !!asset.browser_download_url;
+  }) || null;
+};
+
+// Finds a SHA-256 checksum asset matching the APK filename.
+// The release pipeline uploads "<apkName>.sha256" produced by sha256sum.
+export const extractChecksumAsset = (assets = [], apkFilename) => {
+  if (!Array.isArray(assets) || !apkFilename) {
+    return null;
+  }
+  const expected = `${apkFilename}.sha256`;
+  return assets.find((asset) => {
+    if (!asset || typeof asset.name !== 'string') return false;
+    return asset.name === expected && !!asset.browser_download_url;
   }) || null;
 };
 
@@ -152,9 +173,11 @@ export const checkForAppUpdate = async ({
       newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset });
 
       if (apkAsset && (!bestRelease || compareVersions(releaseVersion, bestRelease.version) > 0)) {
+        const checksumAsset = extractChecksumAsset(release.assets, apkAsset.name);
         bestRelease = {
           version: releaseVersion,
           downloadUrl: apkAsset.browser_download_url,
+          checksumUrl: checksumAsset ? checksumAsset.browser_download_url : null,
           releaseUrl: release.html_url || apkAsset.browser_download_url,
           publishedAt: release.published_at || null,
           releaseName: release.name || release.tag_name || null,
@@ -192,6 +215,7 @@ export const checkForAppUpdate = async ({
       currentVersion: currentNormalized,
       latestVersion: bestRelease.version,
       downloadUrl: bestRelease.downloadUrl,
+      checksumUrl: bestRelease.checksumUrl,
       releaseUrl: bestRelease.releaseUrl,
       publishedAt: bestRelease.publishedAt,
       releaseName: bestRelease.releaseName,
@@ -262,12 +286,51 @@ export const listDownloadedApks = async (cacheDir = FileSystem.cacheDirectory) =
 };
 
 export const checkAlreadyDownloaded = async (downloadUrl, cacheDir = FileSystem.cacheDirectory) => {
-  const filename = (downloadUrl.split('/').pop().split('?')[0]) || null;
-  if (!filename || !filename.toLowerCase().endsWith('.apk')) return null;
+  const raw = (downloadUrl.split('/').pop().split('?')[0]) || null;
+  const filename = sanitizeFilename(raw);
+  if (filename === 'penny-update.apk' && raw && !raw.toLowerCase().endsWith('.apk')) return null;
   const localUri = `${cacheDir}${filename}`;
   try {
     const info = await FileSystem.getInfoAsync(localUri);
     return (info.exists && info.size > 0) ? localUri : null;
+  } catch {
+    return null;
+  }
+};
+
+// Compute the SHA-256 hex digest of a local file using the Web Crypto API (Hermes).
+export const computeSha256 = async (fileUri) => {
+  const base64 = await FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes.buffer);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+// Downloads the sha256sum-format checksum file and returns the expected hex hash for apkFilename.
+// Returns null if the checksum cannot be fetched or parsed.
+export const fetchExpectedChecksum = async (checksumUrl, apkFilename, fetchImpl = fetch) => {
+  try {
+    const response = await fetchImpl(checksumUrl);
+    if (!response.ok) return null;
+    const text = await response.text();
+    for (const line of text.trim().split('\n')) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 2) continue;
+      const hash = parts[0];
+      const name = parts[parts.length - 1].replace(/^\*/, ''); // strip binary-mode indicator
+      if ((name === apkFilename || name.endsWith(`/${apkFilename}`)) && /^[0-9a-f]{64}$/i.test(hash)) {
+        return hash.toLowerCase();
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -282,8 +345,9 @@ export const installApk = async (localUri) => {
   });
 };
 
-export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
-  const filename = (downloadUrl.split('/').pop().split('?')[0]) || 'penny-update.apk';
+export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumUrl = null } = {}) => {
+  const raw = (downloadUrl.split('/').pop().split('?')[0]) || null;
+  const filename = sanitizeFilename(raw);
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
 
   const downloadResumable = FileSystem.createDownloadResumable(
@@ -300,6 +364,19 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress) => {
   const result = await downloadResumable.downloadAsync();
   if (!result?.uri) {
     throw new Error('Download failed');
+  }
+
+  if (checksumUrl) {
+    const expectedHash = await fetchExpectedChecksum(checksumUrl, filename);
+    if (expectedHash) {
+      const actualHash = await computeSha256(result.uri);
+      if (actualHash !== expectedHash) {
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        throw new Error('APK checksum mismatch — file deleted');
+      }
+    } else {
+      console.warn('[AppUpdate] checksum file unavailable; skipping verification');
+    }
   }
 
   await cleanupOldApks();
