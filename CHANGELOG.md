@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.5](https://github.com/heywood8/money-tracker/compare/penny-v0.114.4...penny-v0.114.5) (2026-05-16)
+
+
+### Bug Fixes
+
+* check if update APK was already downloaded before re-downloading ([#653](https://github.com/heywood8/money-tracker/issues/653)) ([e13921d](https://github.com/heywood8/money-tracker/commit/e13921ddff54bcd3af4a51e10229e6e6b20ad23f))
+
 ## [0.114.4](https://github.com/heywood8/money-tracker/compare/penny-v0.114.3...penny-v0.114.4) (2026-05-16)
 
 
