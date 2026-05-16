@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.6](https://github.com/heywood8/money-tracker/compare/penny-v0.114.5...penny-v0.114.6) (2026-05-16)
+
+
+### Bug Fixes
+
+* wrap reorderAccounts updates in a single transaction ([#652](https://github.com/heywood8/money-tracker/issues/652)) ([b197925](https://github.com/heywood8/money-tracker/commit/b197925dd7baf0b45d8953530c191f6271be2fe8))
+
 ## [0.114.5](https://github.com/heywood8/money-tracker/compare/penny-v0.114.4...penny-v0.114.5) (2026-05-16)
 
 
