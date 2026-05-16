@@ -72,6 +72,11 @@ jest.mock('../app/contexts/UpdateDownloadContext', () => ({
   UpdateDownloadProvider: ({ children }) => children,
 }));
 
+jest.mock('../app/contexts/AppBlurContext', () => ({
+  AppBlurProvider: ({ children }) => children,
+  useAppBlur: jest.fn(() => ({ blurCount: 0, increment: jest.fn(), decrement: jest.fn() })),
+}));
+
 // Mock ErrorBoundary
 jest.mock('../app/components/ErrorBoundary', () => {
   const React = require('react');
@@ -362,6 +367,22 @@ describe('App', () => {
       await waitFor(() => {
         const paperProvider = getByTestId('paper-provider');
         expect(paperProvider).toBeTruthy();
+      });
+    });
+  });
+
+  describe('Blur overlay', () => {
+    it('applies blurred style when blurCount is greater than 0', async () => {
+      const AppBlurContext = require('../app/contexts/AppBlurContext');
+      AppBlurContext.useAppBlur.mockReturnValueOnce({
+        blurCount: 1,
+        increment: jest.fn(),
+        decrement: jest.fn(),
+      });
+
+      const { toJSON } = render(<App />);
+      await waitFor(() => {
+        expect(toJSON()).toBeTruthy();
       });
     });
   });

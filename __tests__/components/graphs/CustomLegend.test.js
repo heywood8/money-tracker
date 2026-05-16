@@ -334,10 +334,16 @@ describe('CustomLegend', () => {
       expect(getByText('100.0%')).toBeTruthy();
     });
 
-    it('handles very large amounts', () => {
+    it('handles very large amounts (millions)', () => {
       const largeData = [{ name: 'Big', amount: 1000000, color: '#000', categoryId: 'cat-1' }];
       const { getByText } = render(<CustomLegend {...defaultProps} data={largeData} />);
       expect(getByText('$1.0M')).toBeTruthy();
+    });
+
+    it('handles billions', () => {
+      const billionData = [{ name: 'Huge', amount: 2000000000, color: '#000', categoryId: 'cat-1' }];
+      const { getByText } = render(<CustomLegend {...defaultProps} data={billionData} />);
+      expect(getByText('$2.0B')).toBeTruthy();
     });
 
     it('handles items with missing optional fields', () => {

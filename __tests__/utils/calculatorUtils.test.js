@@ -157,4 +157,15 @@ describe('calculatorUtils', () => {
       expect(badFormatted).toBe('0'); // This is why we need to evaluate first!
     });
   });
+
+  describe('Edge cases - uncovered branches', () => {
+    it('handles unary plus prefix (+5 evaluates to 5)', () => {
+      expect(evaluateExpression('+5')).toBe('5');
+    });
+
+    it('returns null for expression with unexpected token', () => {
+      // A lone ')' causes primary() to throw "Unexpected token: )"
+      expect(evaluateExpression(')')).toBeNull();
+    });
+  });
 });

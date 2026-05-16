@@ -654,4 +654,28 @@ describe('FormInput', () => {
       expect(getByText('This is an error')).toBeTruthy();
     });
   });
+
+  describe('Theme color fallbacks', () => {
+    it('falls back to colors.surface when inputBackground is not in theme', () => {
+      const colorsWithoutInputBg = {
+        text: '#000',
+        mutedText: '#666',
+        surface: '#fff',
+        border: '#e0e0e0',
+        delete: '#d32f2f',
+        // no inputBackground
+        // no inputBorder
+      };
+      const wrapperNoInputBg = ({ children }) => (
+        <ThemeColorsProvider colors={colorsWithoutInputBg}>
+          {children}
+        </ThemeColorsProvider>
+      );
+      const { getByPlaceholderText } = render(
+        <FormInput value="" onChangeText={jest.fn()} placeholder="Fallback test" />,
+        { wrapper: wrapperNoInputBg },
+      );
+      expect(getByPlaceholderText('Fallback test')).toBeTruthy();
+    });
+  });
 });

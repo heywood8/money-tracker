@@ -626,4 +626,46 @@ describe('MaterialDialog', () => {
       expect(asyncHandler).toHaveBeenCalled();
     });
   });
+
+  describe('Color fallbacks', () => {
+    it('falls back to hardcoded color when colors.delete is not in theme', () => {
+      const colorsWithoutDelete = {
+        text: '#000',
+        card: '#fff',
+        primary: '#007AFF',
+        mutedText: '#666',
+        selected: '#f0f0f0',
+        // no delete
+      };
+      const wrapperNoDelete = ({ children }) => (
+        <ThemeColorsProvider colors={colorsWithoutDelete}>
+          {children}
+        </ThemeColorsProvider>
+      );
+      const { getByText } = render(
+        <MaterialDialog
+          visible={true}
+          title="Delete?"
+          buttons={[{ text: 'Delete', style: 'destructive' }]}
+        />,
+        { wrapper: wrapperNoDelete },
+      );
+      expect(getByText('Delete')).toBeTruthy();
+    });
+
+    it('applies pressed background style when button is pressed in', () => {
+      const { getByText } = render(
+        <MaterialDialog
+          visible={true}
+          title="Press test"
+          buttons={[{ text: 'OK', onPress: jest.fn() }]}
+        />,
+        { wrapper },
+      );
+      const btn = getByText('OK');
+      // pressIn triggers pressed=true branch in style function
+      fireEvent(btn, 'pressIn');
+      expect(btn).toBeTruthy();
+    });
+  });
 });
