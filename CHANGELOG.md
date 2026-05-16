@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.7](https://github.com/heywood8/money-tracker/compare/penny-v0.114.6...penny-v0.114.7) (2026-05-16)
+
+
+### Bug Fixes
+
+* rewrite getAllPreferences to use queryAll instead of deprecated WebSQL API ([#656](https://github.com/heywood8/money-tracker/issues/656)) ([2cb4819](https://github.com/heywood8/money-tracker/commit/2cb4819816d1dbc984ee13e9e2fe458dfd9dad81))
+
 ## [0.114.6](https://github.com/heywood8/money-tracker/compare/penny-v0.114.5...penny-v0.114.6) (2026-05-16)
 
 
