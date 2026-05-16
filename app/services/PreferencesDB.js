@@ -1,4 +1,4 @@
-import { queryFirst, executeQuery } from './db';
+import { queryFirst, executeQuery, queryAll } from './db';
 
 // Preference keys
 export const PREF_KEYS = {
@@ -123,13 +123,10 @@ export const deletePreference = async (key) => {
  */
 export const getAllPreferences = async () => {
   try {
-    const results = await executeQuery('SELECT key, value FROM app_metadata');
+    const rows = await queryAll('SELECT key, value FROM app_metadata');
     const preferences = {};
-    if (results && results.rows) {
-      for (let i = 0; i < results.rows.length; i++) {
-        const row = results.rows.item(i);
-        preferences[row.key] = row.value;
-      }
+    for (const row of rows) {
+      preferences[row.key] = row.value;
     }
     return preferences;
   } catch (error) {

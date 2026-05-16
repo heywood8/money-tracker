@@ -15,12 +15,13 @@ import {
   deletePreference,
   getAllPreferences,
 } from '../../app/services/PreferencesDB';
-import { queryFirst, executeQuery } from '../../app/services/db';
+import { queryFirst, executeQuery, queryAll } from '../../app/services/db';
 
 // Mock the database module
 jest.mock('../../app/services/db', () => ({
   queryFirst: jest.fn(),
   executeQuery: jest.fn(),
+  queryAll: jest.fn(),
 }));
 
 describe('PreferencesDB', () => {
@@ -396,16 +397,10 @@ describe('PreferencesDB', () => {
 
   describe('getAllPreferences', () => {
     it('returns all preferences as object', async () => {
-      const mockRows = {
-        rows: {
-          length: 2,
-          item: (i) => [
-            { key: 'theme', value: 'dark' },
-            { key: 'language', value: 'en' },
-          ][i],
-        },
-      };
-      executeQuery.mockResolvedValue(mockRows);
+      queryAll.mockResolvedValue([
+        { key: 'theme', value: 'dark' },
+        { key: 'language', value: 'en' },
+      ]);
 
       const result = await getAllPreferences();
 
@@ -413,32 +408,11 @@ describe('PreferencesDB', () => {
         theme: 'dark',
         language: 'en',
       });
+      expect(queryAll).toHaveBeenCalledWith('SELECT key, value FROM app_metadata');
     });
 
     it('returns empty object when no preferences exist', async () => {
-      const mockRows = {
-        rows: {
-          length: 0,
-          item: () => null,
-        },
-      };
-      executeQuery.mockResolvedValue(mockRows);
-
-      const result = await getAllPreferences();
-
-      expect(result).toEqual({});
-    });
-
-    it('returns empty object when results is null', async () => {
-      executeQuery.mockResolvedValue(null);
-
-      const result = await getAllPreferences();
-
-      expect(result).toEqual({});
-    });
-
-    it('returns empty object when results.rows is undefined', async () => {
-      executeQuery.mockResolvedValue({});
+      queryAll.mockResolvedValue([]);
 
       const result = await getAllPreferences();
 
@@ -446,7 +420,7 @@ describe('PreferencesDB', () => {
     });
 
     it('returns empty object when database query fails', async () => {
-      executeQuery.mockRejectedValue(new Error('Query failed'));
+      queryAll.mockRejectedValue(new Error('Query failed'));
 
       const result = await getAllPreferences();
 
@@ -454,7 +428,7 @@ describe('PreferencesDB', () => {
     });
 
     it('logs error when query fails', async () => {
-      executeQuery.mockRejectedValue(new Error('Query error'));
+      queryAll.mockRejectedValue(new Error('Query error'));
 
       await getAllPreferences();
 
@@ -469,13 +443,7 @@ describe('PreferencesDB', () => {
       for (let i = 0; i < 10; i++) {
         prefs.push({ key: `key_${i}`, value: `value_${i}` });
       }
-      const mockRows = {
-        rows: {
-          length: prefs.length,
-          item: (i) => prefs[i],
-        },
-      };
-      executeQuery.mockResolvedValue(mockRows);
+      queryAll.mockResolvedValue(prefs);
 
       const result = await getAllPreferences();
 
