@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, ScrollView, Keyboard, FlatList, TouchableOpacity, Pressable, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, Keyboard, FlatList, TouchableOpacity, Pressable, Animated, Dimensions } from 'react-native';
 import ModalShell from '../components/ModalShell';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, Switch } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
 import LoadingView from '../components/LoadingView';
 import EmptyState from '../components/EmptyState';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import { NestableScrollContainer, NestableDraggableFlatList } from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
@@ -761,7 +761,7 @@ export default function AccountsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <NestableScrollContainer
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -775,13 +775,12 @@ export default function AccountsScreen() {
           {enhancedAccounts.length === 0 ? (
             <EmptyState icon="bank-outline" message={t('no_accounts') || 'No accounts yet.'} />
           ) : (
-            <DraggableFlatList
+            <NestableDraggableFlatList
               data={enhancedAccounts}
               renderItem={renderItem}
               keyExtractor={keyExtractor}
               onDragEnd={handleDragEnd}
               activationDistance={20}
-              scrollEnabled={false}
               ItemSeparatorComponent={renderItemSeparator}
             />
           )}
@@ -808,7 +807,7 @@ export default function AccountsScreen() {
             </View>
           </Pressable>
         )}
-      </ScrollView>
+      </NestableScrollContainer>
 
       <AddFAB
         testID="accounts-add-fab"
