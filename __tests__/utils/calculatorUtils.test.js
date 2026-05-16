@@ -88,6 +88,29 @@ describe('calculatorUtils', () => {
     });
   });
 
+  describe('currency-aware rounding (decimalDigits parameter)', () => {
+    it('rounds to 0 decimal places for zero-decimal currencies (JPY, KRW, AMD)', () => {
+      expect(evaluateExpression('100÷3', 0)).toBe('33');
+      expect(evaluateExpression('50.75+0', 0)).toBe('51');
+      expect(evaluateExpression('10÷3', 0)).toBe('3');
+    });
+
+    it('rounds to 2 decimal places by default', () => {
+      expect(evaluateExpression('10÷3')).toBe('3.33');
+      expect(evaluateExpression('10÷3', 2)).toBe('3.33');
+    });
+
+    it('rounds to 8 decimal places for high-precision currencies', () => {
+      expect(evaluateExpression('1÷3', 8)).toBe('0.33333333');
+      expect(evaluateExpression('0.00000001+0.00000001', 8)).toBe('0.00000002');
+    });
+
+    it('does not add trailing zeros when fewer decimals are needed', () => {
+      expect(evaluateExpression('7÷2', 2)).toBe('3.5');
+      expect(evaluateExpression('10+5', 2)).toBe('15');
+    });
+  });
+
   describe('Regression Tests', () => {
     it('should evaluate expression before saving operation', () => {
       // Simulate user entering "10+5" and clicking category

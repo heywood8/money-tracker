@@ -386,7 +386,7 @@ const OperationsScreen = () => {
     let finalAmount = quickAddValues.amount;
 
     if (hasOperation(finalAmount)) {
-      const evaluated = evaluateExpression(finalAmount);
+      const evaluated = evaluateExpression(finalAmount, Currency.getDecimalPlaces(sourceAccount?.currency));
       if (evaluated !== null) {
         finalAmount = evaluated;
       }

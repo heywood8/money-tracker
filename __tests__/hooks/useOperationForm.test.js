@@ -39,6 +39,7 @@ jest.mock('../../app/services/currency', () => ({
   formatAmount: jest.fn((amount) => String(amount)),
   subtract: jest.fn((a, b) => String(parseFloat(a) - parseFloat(b))),
   fetchLiveExchangeRate: jest.fn().mockResolvedValue({ rate: null, source: 'none' }),
+  getDecimalPlaces: jest.fn(() => 2),
 }));
 
 jest.mock('../../app/utils/categoryUtils', () => ({

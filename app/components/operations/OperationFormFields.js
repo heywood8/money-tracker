@@ -138,7 +138,7 @@ const OperationFormFields = memo(({
     let numericAmount = values.amount;
     if (!numericAmount) return null;
     if (checkHasOperation(numericAmount)) {
-      const ev = evaluateExpression(numericAmount);
+      const ev = evaluateExpression(numericAmount, Currency.getDecimalPlaces(values.operationCurrency));
       if (ev !== null) numericAmount = String(ev);
       else return null;
     }

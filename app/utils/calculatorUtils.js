@@ -1,45 +1,108 @@
-/**
- * Utility functions for calculator operations
- */
+import Decimal from 'decimal.js';
 
-/**
- * Check if a string contains a mathematical operation
- * @param {string} expr - Expression to check
- * @returns {boolean} True if expression contains +, -, ×, or ÷
- */
 export function hasOperation(expr) {
   if (!expr || typeof expr !== 'string') return false;
   return /[+\-×÷]/.test(expr);
 }
 
-/**
- * Evaluate a mathematical expression
- * @param {string} expr - Expression to evaluate (e.g., "10+5", "100-20")
- * @returns {string|null} Evaluated result as string, or null if invalid
- */
-export function evaluateExpression(expr) {
+function tokenize(expr) {
+  const tokens = [];
+  let i = 0;
+  while (i < expr.length) {
+    if (expr[i] === ' ') { i++; continue; }
+    if (/[\d.]/.test(expr[i])) {
+      let num = '';
+      while (i < expr.length && /[\d.]/.test(expr[i])) num += expr[i++];
+      tokens.push({ type: 'number', value: num });
+    } else if (['+', '-', '*', '/', '(', ')'].includes(expr[i])) {
+      tokens.push({ type: 'op', value: expr[i++] });
+    } else {
+      throw new Error('Invalid character: ' + expr[i]);
+    }
+  }
+  return tokens;
+}
+
+class ExprParser {
+  constructor(tokens) {
+    this.tokens = tokens;
+    this.pos = 0;
+  }
+
+  peek() { return this.tokens[this.pos]; }
+  consume() { return this.tokens[this.pos++]; }
+
+  parse() {
+    if (this.tokens.length === 0) throw new Error('Empty expression');
+    const result = this.addSub();
+    if (this.pos < this.tokens.length) throw new Error('Unexpected token');
+    return result;
+  }
+
+  addSub() {
+    let left = this.mulDiv();
+    while (this.peek()?.value === '+' || this.peek()?.value === '-') {
+      const op = this.consume().value;
+      const right = this.mulDiv();
+      left = op === '+' ? left.plus(right) : left.minus(right);
+    }
+    return left;
+  }
+
+  mulDiv() {
+    let left = this.unary();
+    while (this.peek()?.value === '*' || this.peek()?.value === '/') {
+      const op = this.consume().value;
+      const right = this.unary();
+      if (op === '/' && right.isZero()) throw new Error('Division by zero');
+      left = op === '*' ? left.times(right) : left.dividedBy(right);
+    }
+    return left;
+  }
+
+  unary() {
+    if (this.peek()?.value === '-') {
+      this.consume();
+      return this.primary().negated();
+    }
+    if (this.peek()?.value === '+') {
+      this.consume();
+    }
+    return this.primary();
+  }
+
+  primary() {
+    const token = this.peek();
+    if (!token) throw new Error('Unexpected end of expression');
+    if (token.type === 'number') {
+      this.consume();
+      return new Decimal(token.value);
+    }
+    if (token.value === '(') {
+      this.consume();
+      const result = this.addSub();
+      if (this.peek()?.value !== ')') throw new Error('Missing closing parenthesis');
+      this.consume();
+      return result;
+    }
+    throw new Error('Unexpected token: ' + token.value);
+  }
+}
+
+function stripTrailingZeros(str) {
+  if (!str.includes('.')) return str;
+  return str.replace(/\.?0+$/, '');
+}
+
+export function evaluateExpression(expr, decimalDigits = 2) {
   if (!expr || expr.trim() === '') return null;
-
   try {
-    // Replace '×' with '*' for multiplication and '÷' with '/' for division
-    let sanitized = expr.replace(/×/g, '*').replace(/÷/g, '/');
-
-    // Validate expression (only allow numbers, operators, and decimal points)
-    if (!/^[0-9+\-*/.() ]+$/.test(sanitized)) {
-      return null;
-    }
-
-    // Use Function constructor to safely evaluate (no access to external scope)
-    // Note: This is safer than eval() but still requires validation above
-    const result = Function('"use strict"; return (' + sanitized + ')')();
-
-    if (isNaN(result) || !isFinite(result)) {
-      return null;
-    }
-
-    // Round to 2 decimal places to avoid floating point issues
-    return String(Math.round(result * 100) / 100);
-  } catch (error) {
+    const sanitized = expr.replace(/×/g, '*').replace(/÷/g, '/');
+    const tokens = tokenize(sanitized);
+    const result = new ExprParser(tokens).parse();
+    if (!result.isFinite()) return null;
+    return stripTrailingZeros(result.toDecimalPlaces(decimalDigits).toFixed(decimalDigits));
+  } catch {
     return null;
   }
 }
