@@ -14,6 +14,10 @@ import { getPreference, setPreference } from './PreferencesDB';
 const LAST_DAILY_BACKUP_DATE_KEY = 'last_daily_backup_date';
 const LAST_WEEKLY_BACKUP_WEEK_KEY = 'last_weekly_backup_week';
 
+// KNOWN ISSUE (won't fix): backup files are stored unencrypted under documentDirectory/daily_backups/
+// and are therefore inherited by Google Auto-Backup, making them accessible to an attacker with
+// device access. Encrypting via expo-secure-store or Android Keystore was considered but ruled out
+// (see https://github.com/heywood8/money-tracker/issues/593).
 export const DAILY_BACKUP_DIR = `${FileSystem.documentDirectory}daily_backups/`;
 export const MAX_DAILY_BACKUPS = 7;
 export const MAX_WEEKLY_BACKUPS = 15;
