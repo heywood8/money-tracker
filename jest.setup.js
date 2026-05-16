@@ -759,13 +759,6 @@ jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn(),
 }));
 
-// Mock expo-secure-store
-jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-}));
-
 // Mock expo-local-authentication
 jest.mock('expo-local-authentication', () => ({
   hasHardwareAsync: jest.fn(() => Promise.resolve(true)),
