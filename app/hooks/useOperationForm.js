@@ -429,7 +429,7 @@ const useOperationForm = ({
     // Automatically evaluate any pending math operation before saving
     let finalAmount = values.amount;
     if (hasOperation(values.amount)) {
-      const evaluated = evaluateExpression(values.amount);
+      const evaluated = evaluateExpression(values.amount, Currency.getDecimalPlaces(sourceAccount?.currency));
       if (evaluated !== null) {
         finalAmount = evaluated;
       }
