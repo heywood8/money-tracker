@@ -103,7 +103,7 @@ export const initializeDefaultOperations = async () => {
     // Create each operation (this also updates account balances and balance history)
     for (const op of defaultOps) {
       await createOperation(op);
-      console.debug(`[OperationsDB] Created default operation: ${op.type} - ${op.amount}`);
+      console.debug(`[OperationsDB] Created default operation: ${op.type}`);
     }
 
     console.log(`[OperationsDB] Successfully initialized ${defaultOps.length} default operations`);
@@ -270,7 +270,7 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.debug(`Loading filtered operations from ${startDate} to ${endDate}`, filters);
+    console.debug(`Loading filtered operations from ${startDate} to ${endDate}`);
 
     const operations = await queryAll(sql, params);
 
@@ -425,31 +425,21 @@ const calculateBalanceChanges = (operation) => {
  */
 export const createOperation = async (operation) => {
   try {
-    console.debug('[OperationsDB] createOperation - type:', operation.type, 'amount:', operation.amount, typeof operation.amount, 'accountId:', operation.accountId, typeof operation.accountId, 'toAccountId:', operation.toAccountId, typeof operation.toAccountId, 'categoryId:', operation.categoryId, typeof operation.categoryId, 'date:', operation.date);
-    
     const now = new Date().toISOString();
-    
+
     // Safely extract primitive IDs (handle case where objects might be passed)
-    const extractId = (value, fieldName) => {
-      if (value === null || value === undefined || value === '') {
-        console.debug(`[OperationsDB] ${fieldName}: null/undefined/empty`);
-        return null;
-      }
-      if (typeof value === 'object' && value !== null) {
-        console.debug(`[OperationsDB] ${fieldName}: object with id=${value.id} (${typeof value.id})`);
-        if (value.id !== undefined) {
-          return value.id;
-        }
-      }
+    const extractId = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      if (typeof value === 'object' && value !== null && value.id !== undefined) return value.id;
       return value;
     };
     
     const operationData = {
       type: operation.type,
       amount: operation.amount,
-      account_id: extractId(operation.accountId, 'accountId'),
-      category_id: extractId(operation.categoryId, 'categoryId'),
-      to_account_id: extractId(operation.toAccountId, 'toAccountId'),
+      account_id: extractId(operation.accountId),
+      category_id: extractId(operation.categoryId),
+      to_account_id: extractId(operation.toAccountId),
       date: operation.date,
       created_at: now,
       description: operation.description || null,
@@ -458,8 +448,6 @@ export const createOperation = async (operation) => {
       source_currency: operation.sourceCurrency || null,
       destination_currency: operation.destinationCurrency || null,
     };
-    
-    console.debug('[OperationsDB] operationData - account_id:', operationData.account_id, typeof operationData.account_id, 'to_account_id:', operationData.to_account_id, typeof operationData.to_account_id, 'category_id:', operationData.category_id, typeof operationData.category_id);
 
     let newOperationId;
 
@@ -479,11 +467,7 @@ export const createOperation = async (operation) => {
         operationData.source_currency,
         operationData.destination_currency,
       ];
-      
-      console.debug('[OperationsDB] INSERT params:', insertParams.map((p, i) =>
-        `[${i}]: ${JSON.stringify(p)} (${typeof p})`,
-      ).join(', '));
-      
+
       const result = await db.runAsync(
         'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         insertParams,
@@ -1302,7 +1286,7 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
+    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`);
 
     const operations = await queryAll(sql, params);
 
@@ -1671,7 +1655,7 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
-    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`, filters);
+    console.debug(`Loading filtered week from ${startDateStr} to ${endDateStr}`);
 
     const operations = await queryAll(sql, params);
 
