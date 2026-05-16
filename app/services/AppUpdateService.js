@@ -261,6 +261,18 @@ export const listDownloadedApks = async (cacheDir = FileSystem.cacheDirectory) =
   }
 };
 
+export const checkAlreadyDownloaded = async (downloadUrl, cacheDir = FileSystem.cacheDirectory) => {
+  const filename = (downloadUrl.split('/').pop().split('?')[0]) || null;
+  if (!filename || !filename.toLowerCase().endsWith('.apk')) return null;
+  const localUri = `${cacheDir}${filename}`;
+  try {
+    const info = await FileSystem.getInfoAsync(localUri);
+    return (info.exists && info.size > 0) ? localUri : null;
+  } catch {
+    return null;
+  }
+};
+
 export const installApk = async (localUri) => {
   const contentUri = await FileSystem.getContentUriAsync(localUri);
   await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {

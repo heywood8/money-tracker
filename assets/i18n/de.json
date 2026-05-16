@@ -377,6 +377,7 @@
   "update_available_message": "A newer app version ({latestVersion}) is available. Download and install the APK from GitHub.",
   "update_install_hint": "If installation is blocked, allow \"Install unknown apps\" for your browser or file manager in Android settings.",
   "update_now": "Update now",
+  "update_install_now": "Jetzt installieren",
   "downloaded_apks": "Heruntergeladene APKs",
   "later": "Later",
   "local_backups": "Lokale Backups",

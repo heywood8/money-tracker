@@ -4,6 +4,7 @@ import {
   extractApkAsset,
   checkForAppUpdate,
   cleanupOldApks,
+  checkAlreadyDownloaded,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -145,6 +146,75 @@ describe('AppUpdateService', () => {
 
     it('returns null when no apk assets exist', () => {
       expect(extractApkAsset([{ name: 'archive.zip', browser_download_url: 'https://example.com/archive.zip' }])).toBeNull();
+    });
+  });
+
+  describe('checkAlreadyDownloaded', () => {
+    it('returns local URI when APK file exists and has content', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345678 });
+
+      const uri = await checkAlreadyDownloaded(
+        'https://github.com/heywood8/money-tracker/releases/download/v1.2.3/penny-v1.2.3.apk',
+        'file:///cache/',
+      );
+
+      expect(uri).toBe('file:///cache/penny-v1.2.3.apk');
+      expect(FileSystem.getInfoAsync).toHaveBeenCalledWith('file:///cache/penny-v1.2.3.apk');
+    });
+
+    it('returns null when APK file does not exist', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: false, size: 0 });
+
+      const uri = await checkAlreadyDownloaded(
+        'https://github.com/heywood8/money-tracker/releases/download/v1.2.3/penny-v1.2.3.apk',
+        'file:///cache/',
+      );
+
+      expect(uri).toBeNull();
+    });
+
+    it('returns null when file exists but has zero size (incomplete download)', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 0 });
+
+      const uri = await checkAlreadyDownloaded(
+        'https://github.com/heywood8/money-tracker/releases/download/v1.2.3/penny-v1.2.3.apk',
+        'file:///cache/',
+      );
+
+      expect(uri).toBeNull();
+    });
+
+    it('returns null when download URL has no APK filename', async () => {
+      const uri = await checkAlreadyDownloaded(
+        'https://github.com/heywood8/money-tracker/releases/tag/v1.2.3',
+        'file:///cache/',
+      );
+
+      expect(uri).toBeNull();
+      expect(FileSystem.getInfoAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns null when getInfoAsync throws', async () => {
+      FileSystem.getInfoAsync.mockRejectedValue(new Error('filesystem error'));
+
+      const uri = await checkAlreadyDownloaded(
+        'https://github.com/heywood8/money-tracker/releases/download/v1.2.3/penny-v1.2.3.apk',
+        'file:///cache/',
+      );
+
+      expect(uri).toBeNull();
+    });
+
+    it('strips query params from URL when building local path', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5000000 });
+
+      const uri = await checkAlreadyDownloaded(
+        'https://example.com/penny-v1.2.3.apk?sig=abc123',
+        'file:///cache/',
+      );
+
+      expect(FileSystem.getInfoAsync).toHaveBeenCalledWith('file:///cache/penny-v1.2.3.apk');
+      expect(uri).toBe('file:///cache/penny-v1.2.3.apk');
     });
   });
 
