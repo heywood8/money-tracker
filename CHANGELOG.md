@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.8](https://github.com/heywood8/money-tracker/compare/penny-v0.114.7...penny-v0.114.8) (2026-05-16)
+
+
+### Documentation
+
+* mark issue [#593](https://github.com/heywood8/money-tracker/issues/593) (unencrypted backups at rest) as known won't fix ([#659](https://github.com/heywood8/money-tracker/issues/659)) ([116304f](https://github.com/heywood8/money-tracker/commit/116304f864043bfc9ffb26174b0bf1c0d082bf7b))
+
 ## [0.114.7](https://github.com/heywood8/money-tracker/compare/penny-v0.114.6...penny-v0.114.7) (2026-05-16)
 
 
