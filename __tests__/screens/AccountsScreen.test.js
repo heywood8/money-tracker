@@ -39,10 +39,13 @@ jest.mock('react-native-paper', () => {
 
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');
-  const { FlatList } = require('react-native');
+  const { FlatList, ScrollView } = require('react-native');
+  const Draggable = (props) => React.createElement(FlatList, props);
   return {
     __esModule: true,
-    default: (props) => React.createElement(FlatList, props),
+    default: Draggable,
+    NestableDraggableFlatList: Draggable,
+    NestableScrollContainer: (props) => React.createElement(ScrollView, props),
   };
 });
 
