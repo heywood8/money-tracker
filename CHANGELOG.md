@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.3](https://github.com/heywood8/money-tracker/compare/penny-v0.114.2...penny-v0.114.3) (2026-05-16)
+
+
+### Bug Fixes
+
+* rewrite parseCSV to handle multiline quoted values ([#647](https://github.com/heywood8/money-tracker/issues/647)) ([3ef0451](https://github.com/heywood8/money-tracker/commit/3ef04516cebece136d281b3aa80949f2d261e160))
+
 ## [0.114.2](https://github.com/heywood8/money-tracker/compare/penny-v0.114.1...penny-v0.114.2) (2026-05-15)
 
 
