@@ -86,11 +86,21 @@ jobs:
           echo "Renamed to: $NEW_NAME"
           ls -lh "$NEW_NAME"
 
-      - name: 📤 Upload APK to Release
+      - name: 🔒 Generate SHA-256 checksum
+        id: checksum
+        run: |
+          APK="${{ steps.find_apk.outputs.apk_path }}"
+          sha256sum "$APK" > "${APK}.sha256"
+          echo "checksum_path=${APK}.sha256" >> $GITHUB_OUTPUT
+          echo "SHA-256: $(cat ${APK}.sha256)"
+
+      - name: 📤 Upload APK and checksum to Release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
-          files: ${{ steps.find_apk.outputs.apk_path }}
+          files: |
+            ${{ steps.find_apk.outputs.apk_path }}
+            ${{ steps.checksum.outputs.checksum_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post build summary
@@ -101,3 +111,4 @@ jobs:
           echo "**Profile:** preview" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**APK:** ${{ steps.find_apk.outputs.apk_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA-256:** $(cat ${{ steps.checksum.outputs.checksum_path }})" >> $GITHUB_STEP_SUMMARY

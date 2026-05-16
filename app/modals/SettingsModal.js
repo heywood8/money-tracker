@@ -567,6 +567,7 @@ export default function SettingsModal({ visible, onClose }) {
           latestVersion: result.latestVersion,
           currentVersion: result.currentVersion,
           downloadUrl: result.downloadUrl,
+          checksumUrl: result.checksumUrl || null,
           releaseNotes: result.releaseNotes || null,
           alreadyDownloaded: !!alreadyDownloadedUri,
           localUri: alreadyDownloadedUri,
@@ -1389,6 +1390,7 @@ export default function SettingsModal({ visible, onClose }) {
                                     closeSubPanel();
                                     onClose();
                                     startDownload(updateResult.downloadUrl, {
+                                      checksumUrl: updateResult.checksumUrl || null,
                                       onError: () => {
                                         showDialog(
                                           t('error') || 'Error',

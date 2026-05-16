@@ -8,12 +8,12 @@ export function UpdateDownloadProvider({ children }) {
   const [downloadProgress, setDownloadProgress] = useState(null);
   const isDownloadingRef = useRef(false);
 
-  const startDownload = useCallback(async (downloadUrl, { onError } = {}) => {
+  const startDownload = useCallback(async (downloadUrl, { onError, checksumUrl = null } = {}) => {
     if (isDownloadingRef.current) return;
     isDownloadingRef.current = true;
     setDownloadProgress(0);
     try {
-      await downloadAndInstallApk(downloadUrl, setDownloadProgress);
+      await downloadAndInstallApk(downloadUrl, setDownloadProgress, { checksumUrl });
     } catch (e) {
       onError?.(e);
     } finally {

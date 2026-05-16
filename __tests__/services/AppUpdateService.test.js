@@ -2,9 +2,13 @@ import {
   parseVersionFromRelease,
   compareVersions,
   extractApkAsset,
+  extractChecksumAsset,
   checkForAppUpdate,
   cleanupOldApks,
   checkAlreadyDownloaded,
+  sanitizeFilename,
+  fetchExpectedChecksum,
+  computeSha256,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -14,6 +18,8 @@ jest.mock('expo-file-system/legacy', () => ({
   deleteAsync: jest.fn(),
   createDownloadResumable: jest.fn(),
   getContentUriAsync: jest.fn(),
+  readAsStringAsync: jest.fn(),
+  EncodingType: { Base64: 'base64' },
 }));
 
 const FileSystem = require('expo-file-system/legacy');
@@ -452,6 +458,159 @@ describe('AppUpdateService', () => {
         expect.stringContaining('/releases?per_page=20'),
         expect.any(Object),
       );
+    });
+
+    it('includes checksumUrl in result when checksum asset is present', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v1.0.0',
+            assets: [
+              { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny-v1.0.0.apk' },
+              { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny-v1.0.0.apk.sha256' },
+            ],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v1.0.0',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+
+      expect(result.checksumUrl).toBe('https://example.com/penny-v1.0.0.apk.sha256');
+    });
+
+    it('returns checksumUrl null when no checksum asset present', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v1.0.0',
+            assets: [{ name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny-v1.0.0.apk' }],
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+
+      expect(result.checksumUrl).toBeNull();
+    });
+  });
+
+  describe('sanitizeFilename', () => {
+    it('passes through a safe APK filename unchanged', () => {
+      expect(sanitizeFilename('penny-v1.2.3.apk')).toBe('penny-v1.2.3.apk');
+    });
+
+    it('removes path separators preventing traversal outside the cache directory', () => {
+      const result = sanitizeFilename('../../../evil.apk');
+      // The slash is stripped so the result is a flat filename, not a traversal path.
+      expect(result).not.toContain('/');
+      // The sanitized name is still a valid (if ugly) flat filename within the cache directory.
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('replaces path separators in filenames', () => {
+      const result = sanitizeFilename('foo/bar.apk');
+      expect(result).not.toContain('/');
+      expect(result).toBe('foo_bar.apk');
+    });
+
+    it('returns default when result has no .apk extension', () => {
+      expect(sanitizeFilename('malicious')).toBe('penny-update.apk');
+    });
+
+    it('returns default for null input', () => {
+      expect(sanitizeFilename(null)).toBe('penny-update.apk');
+    });
+
+    it('returns default for empty string', () => {
+      expect(sanitizeFilename('')).toBe('penny-update.apk');
+    });
+  });
+
+  describe('extractChecksumAsset', () => {
+    it('finds a checksum asset matching the APK filename', () => {
+      const assets = [
+        { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
+        { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny.apk.sha256' },
+      ];
+      const asset = extractChecksumAsset(assets, 'penny-v1.0.0.apk');
+      expect(asset.browser_download_url).toBe('https://example.com/penny.apk.sha256');
+    });
+
+    it('returns null when no checksum asset is present', () => {
+      const assets = [{ name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' }];
+      expect(extractChecksumAsset(assets, 'penny-v1.0.0.apk')).toBeNull();
+    });
+
+    it('returns null when apkFilename is missing', () => {
+      expect(extractChecksumAsset([], null)).toBeNull();
+    });
+  });
+
+  describe('fetchExpectedChecksum', () => {
+    it('parses sha256sum output and returns the hash for a matching filename', async () => {
+      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n';
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBe('abc123def456abc123def456abc123def456abc123def456abc123def456abcd');
+    });
+
+    it('handles binary-mode indicator (*) in sha256sum output', async () => {
+      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd *penny-v1.0.0.apk\n';
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBe('abc123def456abc123def456abc123def456abc123def456abc123def456abcd');
+    });
+
+    it('returns null when filename does not match', async () => {
+      const checksumText = 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  other-file.apk\n';
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, text: async () => checksumText });
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBeNull();
+    });
+
+    it('returns null when fetch fails', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBeNull();
+    });
+
+    it('returns null when network error occurs', async () => {
+      const fetchImpl = jest.fn().mockRejectedValue(new Error('network error'));
+      const hash = await fetchExpectedChecksum('https://example.com/checksum.sha256', 'penny-v1.0.0.apk', fetchImpl);
+      expect(hash).toBeNull();
+    });
+  });
+
+  describe('checkAlreadyDownloaded - path traversal prevention', () => {
+    it('sanitizes path traversal in URL filename before checking cache', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5000000 });
+
+      const uri = await checkAlreadyDownloaded(
+        'https://example.com/../../../evil.apk',
+        'file:///cache/',
+      );
+
+      // getInfoAsync must be called with a sanitized path that stays within the cache
+      const calledWith = FileSystem.getInfoAsync.mock.calls[0]?.[0] || '';
+      expect(calledWith).not.toContain('../');
+      expect(calledWith).toMatch(/^file:\/\/\/cache\//);
+      expect(uri).not.toBeNull();
+    });
+
+    it('uses sanitized filename even when URL has encoded separators replaced', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: false });
+
+      await checkAlreadyDownloaded(
+        'https://example.com/foo%2Fbar.apk',
+        'file:///cache/',
+      );
+
+      const calledWith = FileSystem.getInfoAsync.mock.calls[0]?.[0] || '';
+      expect(calledWith).not.toContain('/bar.apk');
     });
   });
 });
