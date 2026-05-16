@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 import PropTypes from 'prop-types';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccountsActions } from './AccountsActionsContext';
@@ -64,6 +65,10 @@ export const OperationsActionsProvider = ({ children }) => {
   // Request ID counter to handle race conditions in loadInitialOperations
   const loadRequestIdRef = useRef(0);
 
+  // In-memory cache of all operations for instant text search
+  const allOpsCacheRef = useRef(null);   // null = not loaded, Array = all operations
+  const cacheLoadingRef = useRef(false); // prevents concurrent loads
+
   // Ref so loadInitialOperations can read latest filters without depending on them
   // (prevents the function from changing on every filter edit, which would re-trigger the
   // mount effect and show a loading spinner on every keystroke or filter tap)
@@ -71,6 +76,21 @@ export const OperationsActionsProvider = ({ children }) => {
   useEffect(() => {
     activeFiltersRef.current = activeFilters;
   }, [activeFilters]);
+
+  const _loadCache = useCallback(async () => {
+    if (cacheLoadingRef.current || Array.isArray(allOpsCacheRef.current)) return;
+    cacheLoadingRef.current = true;
+    try {
+      const result = await OperationsDB.getAllOperations();
+      if (Array.isArray(result)) {
+        allOpsCacheRef.current = result;
+      }
+    } catch {
+      // silent: cache stays null, text search falls back to DB
+    } finally {
+      cacheLoadingRef.current = false;
+    }
+  }, []);
 
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
@@ -90,9 +110,14 @@ export const OperationsActionsProvider = ({ children }) => {
       let allDatesLoaded = false;
 
       if (hasTextSearch) {
-        // Text search queries all dates so every matching operation is found regardless
-        // of how far back in history it is.
-        operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
+        if (Array.isArray(allOpsCacheRef.current)) {
+          // Cache ready: pass full list; useMemo in OperationsDataContext handles filtering
+          operationsData = allOpsCacheRef.current;
+        } else {
+          // Cache not ready: fall back to DB and build cache in background for next time
+          operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
+          _loadCache();
+        }
         allDatesLoaded = true;
       } else {
         operationsData = isFiltered
@@ -125,6 +150,11 @@ export const OperationsActionsProvider = ({ children }) => {
       // Week-based pagination always starts with hasMore=true.
       _setHasMoreOperations(!allDatesLoaded);
       _setDataLoaded(true);
+
+      // Pre-warm cache after first non-text load so subsequent text searches are instant
+      if (!hasTextSearch && !Array.isArray(allOpsCacheRef.current)) {
+        InteractionManager.runAfterInteractions(() => { _loadCache(); });
+      }
     } catch (error) {
       console.error('Failed to load initial operations:', error);
     } finally {
@@ -141,6 +171,7 @@ export const OperationsActionsProvider = ({ children }) => {
     _setHasNewerOperations,
     _setHasMoreOperations,
     _setDataLoaded,
+    _loadCache,
   ]);
 
   // Load more operations (next week with operations)
@@ -318,12 +349,21 @@ export const OperationsActionsProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
       console.log('Reloading operations due to RELOAD_ALL event');
-      // Use loadInitialOperations to load the current week's operations
+      allOpsCacheRef.current = null; // data may have changed; rebuild on next text search
       loadInitialOperations();
     });
 
     return unsubscribe;
   }, [loadInitialOperations]);
+
+  // Clear cache on database reset so stale data is never served
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, () => {
+      allOpsCacheRef.current = null;
+      cacheLoadingRef.current = false;
+    });
+    return unsubscribe;
+  }, []);
 
   // Note: Default operations are now created directly in AccountsDataContext
   // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
@@ -344,6 +384,11 @@ export const OperationsActionsProvider = ({ children }) => {
       const createdOperation = await OperationsDB.createOperation(operation);
 
       console.debug('[OperationsContext] Operation created successfully:', createdOperation?.id);
+
+      // Keep cache in sync so text search reflects the new operation immediately
+      if (allOpsCacheRef.current !== null && createdOperation) {
+        allOpsCacheRef.current = [createdOperation, ...allOpsCacheRef.current];
+      }
 
       // Reload operations to include the new one (without showing loading spinner)
       // Note: We reload to ensure consistency with lazy-loaded week ranges
@@ -374,6 +419,10 @@ export const OperationsActionsProvider = ({ children }) => {
     try {
       await OperationsDB.splitOperation(id, updates, newOperationData);
 
+      // Invalidate cache — can't reconstruct the new split operations without a DB read
+      allOpsCacheRef.current = null;
+      _loadCache();
+
       await loadInitialOperations(activeFilters, false);
 
       _setSaveError(null);
@@ -391,7 +440,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError, _loadCache]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {
@@ -406,6 +455,13 @@ export const OperationsActionsProvider = ({ children }) => {
           return op;
         });
       });
+
+      // Mirror the update into the cache
+      if (allOpsCacheRef.current !== null) {
+        allOpsCacheRef.current = allOpsCacheRef.current.map(op =>
+          op.id === id ? { ...op, ...updates } : op,
+        );
+      }
       _setSaveError(null);
 
       // Reload accounts to reflect balance changes
@@ -431,6 +487,11 @@ export const OperationsActionsProvider = ({ children }) => {
       await OperationsDB.deleteOperation(id);
 
       _setOperations(ops => ops.filter(op => op.id !== id));
+
+      // Mirror the deletion into the cache
+      if (allOpsCacheRef.current !== null) {
+        allOpsCacheRef.current = allOpsCacheRef.current.filter(op => op.id !== id);
+      }
       _setSaveError(null);
 
       // Reload accounts to reflect balance changes
