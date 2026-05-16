@@ -791,42 +791,72 @@ export const restoreBackup = async (backup) => {
  * @returns {Array} Array of objects
  */
 const parseCSV = (csvContent) => {
-  const lines = csvContent.trim().split('\n');
-  if (lines.length === 0) return [];
+  const content = csvContent.trim();
+  if (!content) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim());
-  const data = [];
+  // Parse the entire content character-by-character so that quoted fields
+  // containing newlines are treated as a single value rather than split into
+  // separate rows (the pre-split-by-newline approach broke multiline values).
+  const rows = [];
+  let currentRow = [];
+  let currentValue = '';
+  let insideQuotes = false;
+  let i = 0;
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim()) continue;
+  while (i < content.length) {
+    const char = content[i];
 
-    const values = [];
-    let currentValue = '';
-    let insideQuotes = false;
-
-    // Parse CSV considering quoted values
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      const nextChar = line[j + 1];
-
+    if (insideQuotes) {
       if (char === '"') {
-        if (insideQuotes && nextChar === '"') {
+        if (content[i + 1] === '"') {
           currentValue += '"';
-          j++; // Skip next quote
+          i += 2;
         } else {
-          insideQuotes = !insideQuotes;
+          insideQuotes = false;
+          i++;
         }
-      } else if (char === ',' && !insideQuotes) {
-        values.push(currentValue);
-        currentValue = '';
       } else {
         currentValue += char;
+        i++;
+      }
+    } else {
+      if (char === '"') {
+        insideQuotes = true;
+        i++;
+      } else if (char === ',') {
+        currentRow.push(currentValue);
+        currentValue = '';
+        i++;
+      } else if (char === '\r' || char === '\n') {
+        currentRow.push(currentValue);
+        currentValue = '';
+        rows.push(currentRow);
+        currentRow = [];
+        i++;
+        // Consume the \n of a \r\n pair
+        if (char === '\r' && content[i] === '\n') i++;
+      } else {
+        currentValue += char;
+        i++;
       }
     }
-    values.push(currentValue); // Add last value
+  }
 
-    // Create object from headers and values
+  // Flush the final field and row
+  currentRow.push(currentValue);
+  if (currentRow.some(v => v.trim() !== '')) {
+    rows.push(currentRow);
+  }
+
+  if (rows.length === 0) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  const data = [];
+
+  for (let r = 1; r < rows.length; r++) {
+    const values = rows[r];
+    if (values.every(v => v.trim() === '')) continue;
+
     const obj = {};
     headers.forEach((header, index) => {
       const value = values[index]?.trim() || '';

@@ -798,6 +798,36 @@ op-1,"Mom's ""special"" food"`;
       expect(backup.data.operations[0].description).toBe('Mom\'s "special" food');
     });
 
+    it('parses CSV with multiline quoted values (regression #590)', async () => {
+      const csvContent = `# Money Tracker Backup
+# Version: 1
+
+[OPERATIONS]
+id,description
+op-1,"line one
+line two"
+op-2,normal`;
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
+          getAllAsync: jest.fn().mockResolvedValue([]),
+        });
+      });
+
+      const backup = await BackupRestore.importBackup();
+
+      expect(backup.data.operations).toHaveLength(2);
+      expect(backup.data.operations[0].description).toBe('line one\nline two');
+      expect(backup.data.operations[1].description).toBe('normal');
+    });
+
     it('handles empty CSV sections', async () => {
       const csvContent = `# Money Tracker Backup
 # Version: 1
