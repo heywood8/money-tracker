@@ -365,18 +365,18 @@ export const reorderAccounts = async (orderedAccounts) => {
       seenIds.add(item.id);
     }
 
-    const db = await getDrizzle();
     const now = new Date().toISOString();
 
-    // Use Drizzle for updates instead of raw SQL in transaction
-    for (const { id, display_order } of orderedAccounts) {
-      await db.update(accounts)
-        .set({
-          displayOrder: display_order,
-          updatedAt: now,
-        })
-        .where(eq(accounts.id, id));
-    }
+    await executeTransaction(async (db) => {
+      for (const { id, display_order } of orderedAccounts) {
+        await db.update(accounts)
+          .set({
+            displayOrder: display_order,
+            updatedAt: now,
+          })
+          .where(eq(accounts.id, id));
+      }
+    });
   } catch (error) {
     console.error('Failed to reorder accounts:', error);
     throw error;
