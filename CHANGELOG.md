@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.4](https://github.com/heywood8/money-tracker/compare/penny-v0.114.3...penny-v0.114.4) (2026-05-16)
+
+
+### Bug Fixes
+
+* redact sensitive financial data from debug logs ([#649](https://github.com/heywood8/money-tracker/issues/649)) ([bc32db8](https://github.com/heywood8/money-tracker/commit/bc32db8a8e9718e1efd8a67635cfaf9eaad76378))
+
 ## [0.114.3](https://github.com/heywood8/money-tracker/compare/penny-v0.114.2...penny-v0.114.3) (2026-05-16)
 
 
