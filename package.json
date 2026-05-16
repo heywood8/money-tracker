@@ -1,6 +1,6 @@
 {
   "name": "penny",
-  "version": "0.114.2",
+  "version": "0.114.3",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -29,6 +29,7 @@
     "expo-file-system": "^19.0.21",
     "expo-intent-launcher": "~13.0.8",
     "expo-local-authentication": "~17.0.8",
+    "expo-secure-store": "~15.0.8",
     "expo-sharing": "~14.0.8",
     "expo-sqlite": "~16.0.10",
     "expo-updates": "~29.0.15",
