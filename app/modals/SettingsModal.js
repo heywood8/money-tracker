@@ -15,7 +15,7 @@ import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { checkForAppUpdate, listDownloadedApks, installApk } from '../services/AppUpdateService';
+import { checkForAppUpdate, listDownloadedApks, installApk, checkAlreadyDownloaded } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
@@ -561,12 +561,15 @@ export default function SettingsModal({ visible, onClose }) {
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({ type: 'up_to_date' });
       } else {
+        const alreadyDownloadedUri = await checkAlreadyDownloaded(result.downloadUrl);
         setUpdateResult({
           type: 'available',
           latestVersion: result.latestVersion,
           currentVersion: result.currentVersion,
           downloadUrl: result.downloadUrl,
           releaseNotes: result.releaseNotes || null,
+          alreadyDownloaded: !!alreadyDownloadedUri,
+          localUri: alreadyDownloadedUri,
         });
       }
     } catch (error) {
@@ -1380,22 +1383,28 @@ export default function SettingsModal({ visible, onClose }) {
                               <TouchableRipple
                                 onPress={async () => {
                                   await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                                  closeSubPanel();
-                                  onClose();
-                                  startDownload(updateResult.downloadUrl, {
-                                    onError: () => {
-                                      showDialog(
-                                        t('error') || 'Error',
-                                        t('update_download_failed') || 'Could not download the update. Please try again.',
-                                        [{ text: t('ok') || 'OK' }],
-                                      );
-                                    },
-                                  });
+                                  if (updateResult.alreadyDownloaded) {
+                                    await handleInstallApk(updateResult.localUri);
+                                  } else {
+                                    closeSubPanel();
+                                    onClose();
+                                    startDownload(updateResult.downloadUrl, {
+                                      onError: () => {
+                                        showDialog(
+                                          t('error') || 'Error',
+                                          t('update_download_failed') || 'Could not download the update. Please try again.',
+                                          [{ text: t('ok') || 'OK' }],
+                                        );
+                                      },
+                                    });
+                                  }
                                 }}
                                 style={[styles.updateButtonCompact, { backgroundColor: colors.primary }]}
                               >
                                 <Text style={styles.importConfirmButtonText}>
-                                  {t('update_now') || 'Update now'}
+                                  {updateResult.alreadyDownloaded
+                                    ? (t('update_install_now') || 'Install now')
+                                    : (t('update_now') || 'Update now')}
                                 </Text>
                               </TouchableRipple>
                             </View>
