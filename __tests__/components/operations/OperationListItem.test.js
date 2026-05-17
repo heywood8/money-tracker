@@ -374,5 +374,22 @@ describe('OperationListItem', () => {
       );
       expect(getByText(/→ €13\.20/)).toBeTruthy();
     });
+
+    it('shows parentName · accountName subtitle when no description but category has parent', () => {
+      const categoriesWithParent = [
+        { id: 'parent1', name: 'Food', icon: 'food', parentId: null },
+        { id: 'cat2', name: 'Groceries', icon: 'cart', parentId: 'parent1' },
+      ];
+      const { getByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{ ...baseOperation, categoryId: 'cat2', description: null }}
+          categories={categoriesWithParent}
+          getCategoryInfo={() => ({ name: 'Groceries', icon: 'cart' })}
+        />,
+      );
+      // subtitle should be "Food · Checking" (parentName · accountName)
+      expect(getByText(/Food · Checking/)).toBeTruthy();
+    });
   });
 });

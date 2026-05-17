@@ -287,5 +287,190 @@ describe('PlannedOperationsContext', () => {
         expect(appEvents.on).toHaveBeenCalledWith(EVENTS.DATABASE_RESET, expect.any(Function));
       });
     });
+
+    it('RELOAD_ALL callback triggers reload of planned operations', async () => {
+      let reloadCallback;
+      appEvents.on.mockImplementation((event, cb) => {
+        if (event === EVENTS.RELOAD_ALL) reloadCallback = cb;
+        return jest.fn();
+      });
+
+      const reloaded = [{ id: 'new-1', name: 'After Reload', type: 'expense', amount: '100', accountId: 1 }];
+      PlannedOperationsDB.getAllPlannedOperations
+        .mockResolvedValueOnce([]) // initial load
+        .mockResolvedValueOnce(reloaded); // after RELOAD_ALL
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(reloadCallback).toBeDefined();
+
+      await act(async () => {
+        await reloadCallback();
+      });
+
+      await waitFor(() => {
+        expect(result.current.plannedOperations).toHaveLength(1);
+        expect(result.current.plannedOperations[0].name).toBe('After Reload');
+      });
+    });
+
+    it('DATABASE_RESET callback clears planned operations', async () => {
+      let resetCallback;
+      appEvents.on.mockImplementation((event, cb) => {
+        if (event === EVENTS.DATABASE_RESET) resetCallback = cb;
+        return jest.fn();
+      });
+
+      const initial = [{ id: '1', name: 'Op', type: 'expense', amount: '100', accountId: 1 }];
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue(initial);
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.plannedOperations).toHaveLength(1));
+
+      expect(resetCallback).toBeDefined();
+
+      act(() => {
+        resetCallback();
+      });
+
+      expect(result.current.plannedOperations).toHaveLength(0);
+    });
+
+    it('usePlannedOperations throws when used outside provider', () => {
+      expect(() => {
+        renderHook(() => usePlannedOperations());
+      }).toThrow('usePlannedOperations must be used within a PlannedOperationsProvider');
+    });
+  });
+
+  describe('reloadPlannedOperations error handling', () => {
+    it('sets saveError and empty operations when DB fails', async () => {
+      PlannedOperationsDB.getAllPlannedOperations.mockRejectedValue(new Error('DB down'));
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.plannedOperations).toEqual([]);
+      expect(result.current.saveError).toBe('DB down');
+    });
+  });
+
+  describe('addPlannedOperation error handling', () => {
+    it('shows dialog and re-throws when DB create fails', async () => {
+      PlannedOperationsDB.createPlannedOperation.mockRejectedValue(new Error('create failed'));
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.addPlannedOperation({ name: 'Test', type: 'expense', amount: '100', accountId: 1 });
+        } catch (e) {
+          caughtError = e;
+        }
+      });
+
+      expect(caughtError?.message).toBe('create failed');
+      expect(result.current.saveError).toBe('create failed');
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+
+    it('shows dialog and re-throws when validation fails', async () => {
+      PlannedOperationsDB.validatePlannedOperation.mockReturnValue('name_required');
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.addPlannedOperation({ name: '', type: 'expense', amount: '100', accountId: 1 });
+        } catch (e) {
+          caughtError = e;
+        }
+      });
+
+      expect(caughtError).toBeDefined();
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+  });
+
+  describe('updatePlannedOperation error handling', () => {
+    it('shows dialog and re-throws when DB update fails', async () => {
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([
+        { id: '1', name: 'Op', type: 'expense', amount: '100', accountId: 1 },
+      ]);
+      PlannedOperationsDB.updatePlannedOperation.mockRejectedValue(new Error('update failed'));
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.updatePlannedOperation('1', { amount: '200' });
+        } catch (e) {
+          caughtError = e;
+        }
+      });
+
+      expect(caughtError?.message).toBe('update failed');
+      expect(result.current.saveError).toBe('update failed');
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+  });
+
+  describe('deletePlannedOperation error handling', () => {
+    it('shows dialog and re-throws when DB delete fails', async () => {
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([
+        { id: '1', name: 'Op', type: 'expense', amount: '100', accountId: 1 },
+      ]);
+      PlannedOperationsDB.deletePlannedOperation.mockRejectedValue(new Error('delete failed'));
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.deletePlannedOperation('1');
+        } catch (e) {
+          caughtError = e;
+        }
+      });
+
+      expect(caughtError?.message).toBe('delete failed');
+      expect(result.current.saveError).toBe('delete failed');
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+  });
+
+  describe('executePlannedOperation error handling', () => {
+    it('shows dialog and re-throws when addOperation fails', async () => {
+      mockAddOperation.mockRejectedValue(new Error('add failed'));
+
+      const plannedOp = {
+        id: '1', name: 'Test', type: 'expense', amount: '100',
+        accountId: 1, isRecurring: true,
+      };
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.executePlannedOperation(plannedOp);
+        } catch (e) {
+          caughtError = e;
+        }
+      });
+
+      expect(caughtError?.message).toBe('add failed');
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
   });
 });

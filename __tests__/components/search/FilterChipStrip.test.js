@@ -152,4 +152,14 @@ describe('FilterChipStrip', () => {
     expect(getByTestId('chip-types')).toBeTruthy();
     expect(getByTestId('chip-accountIds')).toBeTruthy();
   });
+
+  it('renders endDate-only date chip when only endDate is set', () => {
+    const { getByTestId } = render(
+      <FilterChipStrip
+        {...defaultProps}
+        searchState={{ ...emptySearchState, dateRange: { startDate: null, endDate: '2024-04-30' } }}
+      />,
+    );
+    expect(getByTestId('chip-dateRange')).toBeTruthy();
+  });
 });

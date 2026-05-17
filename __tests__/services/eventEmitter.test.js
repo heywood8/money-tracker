@@ -573,8 +573,42 @@ describe('EventEmitter', () => {
         const unsubscribe = emitter.on('test-event', listener);
         unsubscribe();
       }
-      
+
       expect(emitter.events['test-event']).toHaveLength(0);
+    });
+  });
+
+  describe('appEvents singleton - uncovered paths', () => {
+    it('appEvents.emit catches and logs listener errors without stopping other listeners', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const throwingListener = jest.fn(() => { throw new Error('boom'); });
+      const normalListener = jest.fn();
+
+      appEvents.on('err-test', throwingListener);
+      appEvents.on('err-test', normalListener);
+
+      expect(() => appEvents.emit('err-test')).not.toThrow();
+
+      expect(throwingListener).toHaveBeenCalled();
+      expect(normalListener).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error in event listener for err-test:'),
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('appEvents.off on a non-existent event does not throw', () => {
+      expect(() => appEvents.off('does-not-exist', jest.fn())).not.toThrow();
+    });
+
+    it('appEvents.off removes a specific listener from the singleton', () => {
+      const listener = jest.fn();
+      appEvents.on('off-test', listener);
+      appEvents.off('off-test', listener);
+      appEvents.emit('off-test');
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 });

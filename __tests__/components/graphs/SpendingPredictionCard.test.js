@@ -246,5 +246,23 @@ describe('SpendingPredictionCard', () => {
         ]),
       );
     });
+
+    it('renders with selectedAccount and accounts provided (true branch of account lookup)', () => {
+      const accounts = [
+        { id: 'acc-1', name: 'Savings', currency: 'USD' },
+        { id: 'acc-2', name: 'Checking', currency: 'EUR' },
+      ];
+      const { getByText } = render(
+        <SpendingPredictionCard
+          colors={defaultColors}
+          t={defaultT}
+          spendingPrediction={defaultPrediction}
+          selectedCurrency="USD"
+          selectedAccount="acc-1"
+          accounts={accounts}
+        />,
+      );
+      expect(getByText('spending_prediction')).toBeTruthy();
+    });
   });
 });

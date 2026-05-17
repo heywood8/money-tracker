@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import LanguageSelectionScreen from '../../app/screens/LanguageSelectionScreen';
 
 // Mock individual i18n language files
@@ -273,6 +273,88 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('Please select your preferred language')).toBeTruthy();
       expect(getByText('Русский')).toBeTruthy();
       expect(getByText('Continue')).toBeTruthy();
+    });
+  });
+
+  describe('Interaction - language selection', () => {
+    it('calls onLanguageSelected when a language is selected and Continue is pressed', () => {
+      const { getByText, getByLabelText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // Select English via accessibility label (nativeName == name, both 'English')
+      fireEvent.press(getByLabelText('Select English'));
+
+      // Press continue
+      fireEvent.press(getByText('Continue'));
+
+      expect(mockOnLanguageSelected).toHaveBeenCalledWith('en');
+    });
+
+    it('does not call onLanguageSelected when Continue is pressed without selection', () => {
+      const { getByText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      fireEvent.press(getByText('Continue'));
+
+      expect(mockOnLanguageSelected).not.toHaveBeenCalled();
+    });
+
+    it('shows checkmark after selecting a language', () => {
+      const { getByText, queryByText, getByLabelText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // No checkmark initially
+      expect(queryByText('✓')).toBeNull();
+
+      // Select English
+      fireEvent.press(getByLabelText('Select English'));
+
+      // Checkmark should appear
+      expect(getByText('✓')).toBeTruthy();
+    });
+
+    it('calls onLanguageSelected with Russian when Russian is selected', () => {
+      const { getByText, getByLabelText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      fireEvent.press(getByLabelText('Select Russian'));
+      fireEvent.press(getByText('Продолжить'));
+
+      expect(mockOnLanguageSelected).toHaveBeenCalledWith('ru');
+    });
+
+    it('switches selection when another language is pressed', () => {
+      const { getByText, getAllByText, getByLabelText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // Select English first
+      fireEvent.press(getByLabelText('Select English'));
+      expect(getAllByText('✓')).toHaveLength(1);
+
+      // Select Russian
+      fireEvent.press(getByLabelText('Select Russian'));
+      expect(getAllByText('✓')).toHaveLength(1);
+
+      // Continue uses the latest selection
+      fireEvent.press(getByText('Продолжить'));
+      expect(mockOnLanguageSelected).toHaveBeenCalledWith('ru');
+    });
+
+    it('t() falls back to key when translation is missing', () => {
+      const { getByText, getByLabelText } = render(
+        <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
+      );
+
+      // Select German (mocked with empty translations)
+      fireEvent.press(getByLabelText('Select German'));
+
+      // 'welcome_title' is not in the de.json mock → key is returned as-is
+      expect(getByText('welcome_title')).toBeTruthy();
     });
   });
 });

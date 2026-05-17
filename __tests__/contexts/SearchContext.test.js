@@ -197,6 +197,25 @@ describe('SearchContext', () => {
       expect(result.current.searchMode).toBe('open');
       expect(mockCallback).toHaveBeenCalledWith(true); // should auto-expand filters
     });
+
+    it('reopens search without onShouldExpandFilters callback (no-op branch)', () => {
+      const { result } = renderHook(() => useSearch(), {
+        wrapper: SearchProvider,
+      });
+
+      act(() => {
+        result.current.setSearchMode('collapsed');
+      });
+
+      // Call without third argument — onShouldExpandFilters is undefined, branch is skipped
+      expect(() => {
+        act(() => {
+          result.current.reopenSearch(false, true);
+        });
+      }).not.toThrow();
+
+      expect(result.current.searchMode).toBe('open');
+    });
   });
 
   describe('Filters Expansion State', () => {
