@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.11](https://github.com/heywood8/money-tracker/compare/penny-v0.114.10...penny-v0.114.11) (2026-05-17)
+
+
+### Bug Fixes
+
+* use precise string arithmetic in budget spending calculations ([#669](https://github.com/heywood8/money-tracker/issues/669)) ([ff064e9](https://github.com/heywood8/money-tracker/commit/ff064e9574790e8c3c0867cea0d3e4810c4482fa))
+
 ## [0.114.10](https://github.com/heywood8/money-tracker/compare/penny-v0.114.9...penny-v0.114.10) (2026-05-16)
 
 
