@@ -770,7 +770,7 @@ describe('BudgetsDB Service', () => {
           false,
         );
 
-        expect(result).toBe(250.50);
+        expect(result).toBe('250.5');
       });
 
       it('includes child categories when requested', async () => {
@@ -807,7 +807,7 @@ describe('BudgetsDB Service', () => {
           false,
         );
 
-        expect(result).toBe(0);
+        expect(result).toBe('0');
       });
     });
 
@@ -838,8 +838,8 @@ describe('BudgetsDB Service', () => {
 
         expect(result.budgetId).toBe('budget1');
         expect(result.amount).toBe('500.00');
-        expect(result.spent).toBe(300);
-        expect(result.remaining).toBe(200);
+        expect(result.spent).toBe('300');
+        expect(result.remaining).toBe('200.00');
         expect(result.percentage).toBe(60);
         expect(result.isExceeded).toBe(false);
         expect(result.status).toBe('safe');

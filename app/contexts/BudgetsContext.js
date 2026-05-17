@@ -259,7 +259,7 @@ export const BudgetsProvider = ({ children }) => {
    */
   const getRemainingBudget = useCallback((budgetId) => {
     const status = budgetStatuses.get(budgetId);
-    return status ? status.remaining : 0;
+    return status ? status.remaining : '0';
   }, [budgetStatuses]);
 
   /**

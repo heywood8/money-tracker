@@ -767,7 +767,7 @@ describe('BudgetsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.getRemainingBudget('non-existent')).toBe(0);
+      expect(result.current.getRemainingBudget('non-existent')).toBe('0');
     });
   });
 
@@ -1048,7 +1048,7 @@ describe('BudgetsContext', () => {
       expect(result.current.getBudgetStatus('any-id')).toBeNull();
       expect(result.current.isBudgetExceeded('any-id')).toBe(false);
       expect(result.current.getBudgetProgress('any-id')).toBe(0);
-      expect(result.current.getRemainingBudget('any-id')).toBe(0);
+      expect(result.current.getRemainingBudget('any-id')).toBe('0');
     });
   });
 });

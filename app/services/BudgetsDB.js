@@ -1,5 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
 import * as CategoriesDB from './CategoriesDB';
+import * as Currency from './currency';
 
 /**
  * Map database field names to camelCase for application use
@@ -513,7 +514,7 @@ export const calculateSpendingForBudget = async (
     const params = [...categoryIds, currency, startDate, endDate];
     const result = await queryFirst(query, params);
 
-    return result && result.total ? parseFloat(result.total) : 0;
+    return result && result.total != null ? String(result.total) : '0';
   } catch (error) {
     console.error('Failed to calculate spending:', error);
     throw error;
@@ -548,10 +549,10 @@ export const calculateBudgetStatus = async (budgetId, referenceDate = new Date()
     );
 
     // Calculate metrics
-    const budgetAmount = parseFloat(budget.amount);
-    const remaining = budgetAmount - spent;
-    const percentage = budgetAmount > 0 ? (spent / budgetAmount) * 100 : 0;
-    const isExceeded = spent > budgetAmount;
+    const remaining = Currency.subtract(budget.amount, spent);
+    const isExceeded = Currency.compare(spent, budget.amount) > 0;
+    const budgetAmountNum = parseFloat(budget.amount);
+    const percentage = budgetAmountNum > 0 ? (parseFloat(spent) / budgetAmountNum) * 100 : 0;
 
     // Determine status
     let status;
