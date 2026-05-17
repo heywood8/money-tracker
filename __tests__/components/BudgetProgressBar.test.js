@@ -41,7 +41,8 @@ jest.mock('../../app/contexts/BudgetsContext', () => ({
 
 // Mock Currency service
 jest.mock('../../app/services/currency', () => ({
-  formatAmount: (amount, currency) => `${currency} ${amount.toFixed(2)}`,
+  formatAmount: (amount, currency) => `${currency} ${parseFloat(amount).toFixed(2)}`,
+  abs: (amount) => Math.abs(parseFloat(amount)).toFixed(2),
 }));
 
 describe('BudgetProgressBar', () => {

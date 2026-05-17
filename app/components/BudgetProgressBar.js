@@ -69,7 +69,7 @@ const BudgetProgressBar = ({ budgetId, compact = false, showDetails = true, styl
             ]}
           >
             {status.isExceeded
-              ? `${t('over_budget_by')} ${formatAmount(Math.abs(status.remaining))}`
+              ? `${t('over_budget_by')} ${formatAmount(Currency.abs(status.remaining))}`
               : `${t('remaining_budget')}: ${formatAmount(status.remaining)}`
             }
           </Text>
