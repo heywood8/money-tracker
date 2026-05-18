@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.14](https://github.com/heywood8/money-tracker/compare/penny-v0.114.13...penny-v0.114.14) (2026-05-18)
+
+
+### Bug Fixes
+
+* wrap deleteCategory and deleteAccount check-then-delete in single transaction ([#677](https://github.com/heywood8/money-tracker/issues/677)) ([3e2a4e6](https://github.com/heywood8/money-tracker/commit/3e2a4e66c3895c5d11d139a296a2b94a93b2c4e9))
+
 ## [0.114.13](https://github.com/heywood8/money-tracker/compare/penny-v0.114.12...penny-v0.114.13) (2026-05-18)
 
 
