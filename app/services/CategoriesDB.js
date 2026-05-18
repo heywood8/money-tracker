@@ -301,32 +301,31 @@ export const updateCategory = async (id, updates) => {
  */
 export const deleteCategory = async (id) => {
   try {
-    // Check if category has child categories
-    const childCheck = await queryFirst(
-      'SELECT COUNT(*) as count FROM categories WHERE parent_id = ?',
-      [id],
-    );
-
-    if (childCheck && childCheck.count > 0) {
-      throw new Error(
-        `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`,
+    await executeTransaction(async (db) => {
+      const childCheck = await db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM categories WHERE parent_id = ?',
+        [id],
       );
-    }
 
-    // Check if category is used in any operations
-    const operationCheck = await queryFirst(
-      'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
-      [id],
-    );
+      if (childCheck && childCheck.count > 0) {
+        throw new Error(
+          `Cannot delete category: ${childCheck.count} subcategory(ies) exist. Please delete or reassign the subcategories first.`,
+        );
+      }
 
-    if (operationCheck && operationCheck.count > 0) {
-      throw new Error(
-        `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`,
+      const operationCheck = await db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM operations WHERE category_id = ?',
+        [id],
       );
-    }
 
-    // Safe to delete - no child categories or operations are linked
-    await executeQuery('DELETE FROM categories WHERE id = ?', [id]);
+      if (operationCheck && operationCheck.count > 0) {
+        throw new Error(
+          `Cannot delete category: ${operationCheck.count} transaction(s) use this category. Please reassign or delete the transactions first.`,
+        );
+      }
+
+      await db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
+    });
   } catch (error) {
     console.error('Failed to delete category:', error);
     throw error;
