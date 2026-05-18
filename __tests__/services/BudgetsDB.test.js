@@ -272,6 +272,52 @@ describe('BudgetsDB Service', () => {
           expect.arrayContaining([1]), // rollover_enabled set to 1
         );
       });
+
+      it('throws error when duplicate budget exists', async () => {
+        const existingBudget = {
+          id: 'budget-existing',
+          category_id: 'cat1',
+          amount: '300.00',
+          currency: 'USD',
+          period_type: 'monthly',
+          start_date: '2025-01-01',
+          end_date: null,
+          is_recurring: 1,
+          rollover_enabled: 0,
+          created_at: '2025-01-01T00:00:00Z',
+          updated_at: '2025-01-01T00:00:00Z',
+        };
+        queryFirst.mockResolvedValue(existingBudget);
+
+        const budget = {
+          id: 'budget-new',
+          categoryId: 'cat1',
+          amount: '500.00',
+          currency: 'USD',
+          periodType: 'monthly',
+          startDate: '2025-02-01',
+        };
+
+        await expect(BudgetsDB.createBudget(budget))
+          .rejects.toThrow('A budget for this category, currency, and period already exists');
+
+        expect(executeQuery).not.toHaveBeenCalled();
+      });
+
+      it('does not check for duplicates when validation fails', async () => {
+        const invalidBudget = {
+          categoryId: 'cat1',
+          currency: 'USD',
+          periodType: 'monthly',
+          startDate: '2025-01-01',
+          // Missing amount
+        };
+
+        await expect(BudgetsDB.createBudget(invalidBudget))
+          .rejects.toThrow('Amount must be greater than zero');
+
+        expect(queryFirst).not.toHaveBeenCalled();
+      });
     });
 
     describe('getBudgetById', () => {
