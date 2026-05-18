@@ -770,7 +770,7 @@ describe('OperationsDB Service', () => {
   describe('Pagination Queries', () => {
     it('gets operations by week offset', async () => {
       const mockOps = [
-        { id: 1, date: '2025-12-05', account_id: 'acc1' },
+        { id: 1, type: 'expense', date: '2025-12-05', account_id: 'acc1' },
       ];
       queryAll.mockResolvedValue(mockOps);
 
@@ -787,6 +787,7 @@ describe('OperationsDB Service', () => {
     it('gets next oldest operation before date', async () => {
       const mockOp = {
         id: 1,
+        type: 'expense',
         date: '2025-11-28',
         account_id: 'acc1',
       };
@@ -803,8 +804,8 @@ describe('OperationsDB Service', () => {
 
     it('gets operations by week from date', async () => {
       const mockOps = [
-        { id: 1, date: '2025-12-05', account_id: 'acc1' },
-        { id: 2, date: '2025-11-30', account_id: 'acc2' },
+        { id: 1, type: 'expense', date: '2025-12-05', account_id: 'acc1' },
+        { id: 2, type: 'income', date: '2025-11-30', account_id: 'acc2' },
       ];
       queryAll.mockResolvedValue(mockOps);
 
@@ -2623,6 +2624,79 @@ describe('OperationsDB Service', () => {
       const [sql, params] = queryAll.mock.calls[0];
       expect(sql).not.toContain('CASE WHEN');
       expect(params).toEqual([100]);
+    });
+  });
+
+  describe('Enum validation in mapOperationFields', () => {
+    const validRow = (overrides = {}) => ({
+      id: 1,
+      type: 'expense',
+      amount: '50',
+      account_id: 10,
+      category_id: 'cat-1',
+      to_account_id: null,
+      date: '2026-01-01',
+      created_at: '2026-01-01T00:00:00Z',
+      description: null,
+      exchange_rate: null,
+      destination_amount: null,
+      source_currency: null,
+      destination_currency: null,
+      ...overrides,
+    });
+
+    it('returns mapped operation for each valid type', async () => {
+      for (const type of ['expense', 'income', 'transfer']) {
+        queryAll.mockResolvedValue([validRow({ type })]);
+        const result = await OperationsDB.getAllOperations();
+        expect(result).toHaveLength(1);
+        expect(result[0].type).toBe(type);
+      }
+    });
+
+    it('filters out operations with an invalid type from array results', async () => {
+      queryAll.mockResolvedValue([
+        validRow({ id: 1, type: 'expense' }),
+        validRow({ id: 2, type: 'invalid_type' }),
+        validRow({ id: 3, type: 'income' }),
+      ]);
+
+      const result = await OperationsDB.getAllOperations();
+
+      expect(result).toHaveLength(2);
+      expect(result.map(op => op.id)).toEqual([1, 3]);
+    });
+
+    it('returns null for a single operation with an invalid type', async () => {
+      queryFirst.mockResolvedValue(validRow({ type: 'bad_type' }));
+
+      const result = await OperationsDB.getOperationById(99);
+
+      expect(result).toBeNull();
+    });
+
+    it('filters out all operations when all have invalid types', async () => {
+      queryAll.mockResolvedValue([
+        validRow({ id: 1, type: '' }),
+        validRow({ id: 2, type: 'EXPENSE' }),
+        validRow({ id: 3, type: null }),
+      ]);
+
+      const result = await OperationsDB.getAllOperations();
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('preserves all operations when all have valid types', async () => {
+      queryAll.mockResolvedValue([
+        validRow({ id: 1, type: 'expense' }),
+        validRow({ id: 2, type: 'income' }),
+        validRow({ id: 3, type: 'transfer' }),
+      ]);
+
+      const result = await OperationsDB.getAllOperations();
+
+      expect(result).toHaveLength(3);
     });
   });
 });
