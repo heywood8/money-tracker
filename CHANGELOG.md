@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.12](https://github.com/heywood8/money-tracker/compare/penny-v0.114.11...penny-v0.114.12) (2026-05-18)
+
+
+### Bug Fixes
+
+* validate live FX rate values before caching (issue [#595](https://github.com/heywood8/money-tracker/issues/595)) ([#672](https://github.com/heywood8/money-tracker/issues/672)) ([c04ab11](https://github.com/heywood8/money-tracker/commit/c04ab11611b5c9fb3dcfb3bb9dab63ecf0fcf00b))
+
 ## [0.114.11](https://github.com/heywood8/money-tracker/compare/penny-v0.114.10...penny-v0.114.11) (2026-05-17)
 
 
