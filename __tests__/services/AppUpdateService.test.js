@@ -9,6 +9,7 @@ import {
   sanitizeFilename,
   fetchExpectedChecksum,
   computeSha256,
+  downloadAndInstallApk,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -20,6 +21,10 @@ jest.mock('expo-file-system/legacy', () => ({
   getContentUriAsync: jest.fn(),
   readAsStringAsync: jest.fn(),
   EncodingType: { Base64: 'base64' },
+}));
+
+jest.mock('expo-intent-launcher', () => ({
+  startActivityAsync: jest.fn(),
 }));
 
 const FileSystem = require('expo-file-system/legacy');
@@ -611,6 +616,110 @@ describe('AppUpdateService', () => {
 
       const calledWith = FileSystem.getInfoAsync.mock.calls[0]?.[0] || '';
       expect(calledWith).not.toContain('/bar.apk');
+    });
+  });
+
+  describe('computeSha256', () => {
+    beforeEach(() => {
+      global.atob = jest.fn((b64) => Buffer.from(b64, 'base64').toString('binary'));
+      global.crypto = {
+        subtle: {
+          digest: jest.fn(),
+        },
+      };
+    });
+
+    it('returns the hex SHA-256 digest of file contents', async () => {
+      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8='); // base64 of "hello"
+      const hashBytes = new Uint8Array(32).fill(0xab);
+      global.crypto.subtle.digest.mockResolvedValue(hashBytes.buffer);
+
+      const result = await computeSha256('file:///cache/penny.apk');
+
+      expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(
+        'file:///cache/penny.apk',
+        { encoding: 'base64' },
+      );
+      expect(result).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('propagates read errors to the caller', async () => {
+      FileSystem.readAsStringAsync.mockRejectedValue(new Error('read failed'));
+
+      await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('read failed');
+    });
+  });
+
+  describe('downloadAndInstallApk - checksum error handling', () => {
+    const IntentLauncher = require('expo-intent-launcher');
+
+    beforeEach(() => {
+      global.atob = jest.fn((b64) => Buffer.from(b64, 'base64').toString('binary'));
+      global.crypto = {
+        subtle: {
+          digest: jest.fn(),
+        },
+      };
+      FileSystem.readDirectoryAsync.mockResolvedValue([]);
+      FileSystem.getContentUriAsync.mockResolvedValue('content://penny.apk');
+      IntentLauncher.startActivityAsync.mockResolvedValue();
+    });
+
+    it('proceeds to install when computeSha256 throws (OOM / Hermes limitation)', async () => {
+      const mockDownload = {
+        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
+      };
+      FileSystem.createDownloadResumable.mockReturnValue(mockDownload);
+      FileSystem.readAsStringAsync.mockRejectedValue(new RangeError('Array buffer allocation failed'));
+
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        text: async () => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n',
+      });
+
+      // Should NOT throw — computation error is treated as "skip verification"
+      await expect(
+        downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+        ),
+      ).resolves.toBeUndefined();
+
+      // File must NOT be deleted when the error is a computation failure, not a mismatch
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+      // Install must still be attempted
+      expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
+    });
+
+    it('deletes the file and throws when checksum does not match', async () => {
+      const mockDownload = {
+        downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
+      };
+      FileSystem.createDownloadResumable.mockReturnValue(mockDownload);
+      FileSystem.deleteAsync.mockResolvedValue();
+
+      // computeSha256 returns a hash that does NOT match the expected one
+      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
+      global.crypto.subtle.digest.mockResolvedValue(new Uint8Array(32).fill(0x00).buffer);
+
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        text: async () => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  penny-v1.0.0.apk\n',
+      });
+
+      await expect(
+        downloadAndInstallApk(
+          'https://example.com/penny-v1.0.0.apk',
+          null,
+          { checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256', fetchImpl },
+        ),
+      ).rejects.toThrow('APK checksum mismatch — file deleted');
+
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+        'file:///cache/penny-v1.0.0.apk',
+        { idempotent: true },
+      );
     });
   });
 });

@@ -345,7 +345,7 @@ export const installApk = async (localUri) => {
   });
 };
 
-export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumUrl = null } = {}) => {
+export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumUrl = null, fetchImpl = fetch } = {}) => {
   const raw = (downloadUrl.split('/').pop().split('?')[0]) || null;
   const filename = sanitizeFilename(raw);
   const localUri = `${FileSystem.cacheDirectory}${filename}`;
@@ -367,12 +367,19 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
   }
 
   if (checksumUrl) {
-    const expectedHash = await fetchExpectedChecksum(checksumUrl, filename);
+    const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
     if (expectedHash) {
-      const actualHash = await computeSha256(result.uri);
-      if (actualHash !== expectedHash) {
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-        throw new Error('APK checksum mismatch — file deleted');
+      try {
+        const actualHash = await computeSha256(result.uri);
+        if (actualHash !== expectedHash) {
+          await FileSystem.deleteAsync(result.uri, { idempotent: true });
+          throw new Error('APK checksum mismatch — file deleted');
+        }
+      } catch (e) {
+        if (e.message === 'APK checksum mismatch — file deleted') throw e;
+        // computeSha256 can OOM on large APKs (reads entire file into JS heap).
+        // Treat computation failures as "unable to verify" rather than download failure.
+        console.warn('[AppUpdate] checksum computation failed; skipping verification', e.message);
       }
     } else {
       console.warn('[AppUpdate] checksum file unavailable; skipping verification');
