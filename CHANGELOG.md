@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.0](https://github.com/heywood8/money-tracker/compare/penny-v0.114.15...penny-v0.115.0) (2026-05-18)
+
+
+### Features
+
+* serve lazy-load chunks from in-memory cache instead of DB ([#681](https://github.com/heywood8/money-tracker/issues/681)) ([417dc69](https://github.com/heywood8/money-tracker/commit/417dc69545fc0b038d8f9a45a48541b4e5436726))
+
 ## [0.114.15](https://github.com/heywood8/money-tracker/compare/penny-v0.114.14...penny-v0.114.15) (2026-05-18)
 
 
