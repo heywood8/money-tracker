@@ -37,14 +37,19 @@ export const AccountsDataProvider = ({ children }) => {
     }
   }, []);
 
+  const isLoadingRef = useRef(false);
+
   // Reusable function to load accounts
   const loadAccounts = useCallback(async (createDefaultsIfEmpty = true) => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     try {
       setLoading(true);
       // Load accounts from SQLite
       let accountsData = await AccountsDB.getAllAccounts();
       console.debug(`[AccountsDataContext] loadAccounts: found ${accountsData.length} accounts, createDefaultsIfEmpty=${createDefaultsIfEmpty}`);
 
+      let defaultsCreated = false;
       // If no accounts exist and we should create defaults, create default ones
       if (accountsData.length === 0 && createDefaultsIfEmpty) {
         console.log('[AccountsDataContext] No accounts found, creating defaults...');
@@ -65,16 +70,18 @@ export const AccountsDataProvider = ({ children }) => {
 
         // Reload accounts to reflect balance changes from operations
         accountsData = await AccountsDB.getAllAccounts();
-
-        // Emit RELOAD_ALL to refresh all screens with new data
-        setTimeout(() => {
-          console.debug('Emitting RELOAD_ALL after default data creation');
-          appEvents.emit(EVENTS.RELOAD_ALL);
-        }, 100);
+        defaultsCreated = true;
       }
 
       setAccounts(accountsData);
       setError(null);
+
+      if (defaultsCreated) {
+        // Emit synchronously after state is updated so other screens see fresh data immediately.
+        // The isLoadingRef guard above prevents the RELOAD_ALL listener from re-entering loadAccounts.
+        console.debug('Emitting RELOAD_ALL after default data creation');
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      }
     } catch (err) {
       console.error('Failed to load accounts:', err);
       setError(err.message);
@@ -85,6 +92,7 @@ export const AccountsDataProvider = ({ children }) => {
       );
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, [initializeDefaultAccounts, showDialog]);
 
