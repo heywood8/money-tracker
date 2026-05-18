@@ -5,7 +5,138 @@
  * They prevent regressions where invalid data types cause foreign key constraint errors.
  */
 
+jest.mock('../../app/services/db', () => ({
+  executeQuery: jest.fn(),
+  queryAll: jest.fn(),
+  queryFirst: jest.fn(),
+  executeTransaction: jest.fn(),
+  isSearchNormAvailable: jest.fn(() => false),
+}));
+jest.mock('../../app/services/BalanceHistoryDB', () => ({
+  formatDate: jest.fn(() => '2026-01-01'),
+  updateTodayBalance: jest.fn(),
+}));
+jest.mock('../../app/services/AccountsDB', () => ({
+  getAllAccounts: jest.fn(),
+}));
+jest.mock('../../app/defaults/defaultOperations', () => jest.fn(() => []));
+jest.mock('../../app/services/searchNormalize', () => ({
+  normalizeSearchText: jest.fn(t => t),
+}));
+jest.mock('../../app/services/currency', () => ({
+  add: jest.fn((a, b) => String(parseFloat(a) + parseFloat(b))),
+  subtract: jest.fn((a, b) => String(parseFloat(a) - parseFloat(b))),
+  isZero: jest.fn(v => parseFloat(v) === 0),
+}));
+
 describe('OperationsDB Data Type Validation', () => {
+  describe('operation type validation', () => {
+    let createOperation;
+    let updateOperation;
+    let executeTransaction;
+
+    beforeEach(() => {
+      jest.resetModules();
+      jest.clearAllMocks();
+
+      const db = require('../../app/services/db');
+      executeTransaction = db.executeTransaction;
+
+      const opsDB = require('../../app/services/OperationsDB');
+      createOperation = opsDB.createOperation;
+      updateOperation = opsDB.updateOperation;
+    });
+
+    it('should reject createOperation with an invalid type', async () => {
+      await expect(
+        createOperation({ type: 'refund', amount: '10', accountId: 1, date: '2026-01-01' }),
+      ).rejects.toThrow('Invalid operation type: "refund"');
+    });
+
+    it('should reject createOperation when type is undefined', async () => {
+      await expect(
+        createOperation({ type: undefined, amount: '10', accountId: 1, date: '2026-01-01' }),
+      ).rejects.toThrow('Invalid operation type');
+    });
+
+    it('should reject createOperation when type is an empty string', async () => {
+      await expect(
+        createOperation({ type: '', amount: '10', accountId: 1, date: '2026-01-01' }),
+      ).rejects.toThrow('Invalid operation type');
+    });
+
+    it('should accept createOperation with type "expense"', async () => {
+      executeTransaction.mockImplementation(async (fn) => {
+        const mockDb = {
+          runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1 }),
+          getFirstAsync: jest.fn().mockResolvedValue({ balance: '0' }),
+        };
+        await fn(mockDb);
+      });
+
+      await expect(
+        createOperation({ type: 'expense', amount: '10', accountId: 1, categoryId: 2, date: '2026-01-01' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should accept createOperation with type "income"', async () => {
+      executeTransaction.mockImplementation(async (fn) => {
+        const mockDb = {
+          runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 2 }),
+          getFirstAsync: jest.fn().mockResolvedValue({ balance: '0' }),
+        };
+        await fn(mockDb);
+      });
+
+      await expect(
+        createOperation({ type: 'income', amount: '50', accountId: 1, categoryId: 2, date: '2026-01-01' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should accept createOperation with type "transfer"', async () => {
+      executeTransaction.mockImplementation(async (fn) => {
+        const mockDb = {
+          runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 3 }),
+          getFirstAsync: jest.fn().mockResolvedValue({ balance: '100' }),
+        };
+        await fn(mockDb);
+      });
+
+      await expect(
+        createOperation({ type: 'transfer', amount: '10', accountId: 1, toAccountId: 2, date: '2026-01-01' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should reject updateOperation with an invalid type in updates', async () => {
+      executeTransaction.mockImplementation(async (fn) => {
+        const mockDb = {
+          getFirstAsync: jest.fn().mockResolvedValue({ id: 1, type: 'expense', amount: '10', account_id: 1, to_account_id: null }),
+          runAsync: jest.fn(),
+        };
+        await fn(mockDb);
+      });
+
+      await expect(updateOperation(1, { type: 'invalid' })).rejects.toThrow(
+        'Invalid operation type: "invalid"',
+      );
+    });
+
+    it('should not throw for updateOperation when type is not in updates', async () => {
+      executeTransaction.mockImplementation(async (fn) => {
+        const mockDb = {
+          getFirstAsync: jest.fn()
+            .mockResolvedValueOnce({ id: 1, type: 'expense', amount: '10', account_id: 1, to_account_id: null })
+            .mockResolvedValueOnce({ id: 1, type: 'expense', amount: '20', account_id: 1, to_account_id: null })
+            .mockResolvedValue({ balance: '100' }),
+          runAsync: jest.fn().mockResolvedValue({}),
+        };
+        await fn(mockDb);
+      });
+
+      await expect(updateOperation(1, { amount: '20' })).resolves.toBeUndefined();
+    });
+  });
+
   describe('accountId validation', () => {
     it('should identify when accountId is a string instead of number', () => {
       const operation = {

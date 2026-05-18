@@ -425,6 +425,10 @@ const calculateBalanceChanges = (operation) => {
  */
 export const createOperation = async (operation) => {
   try {
+    if (!OPERATION_TYPES.includes(operation.type)) {
+      throw new Error(`Invalid operation type: "${operation.type}". Must be one of: ${OPERATION_TYPES.join(', ')}`);
+    }
+
     const now = new Date().toISOString();
 
     // Safely extract primitive IDs (handle case where objects might be passed)
@@ -547,6 +551,9 @@ export const updateOperation = async (id, updates) => {
       const values = [];
 
       if (updates.type !== undefined) {
+        if (!OPERATION_TYPES.includes(updates.type)) {
+          throw new Error(`Invalid operation type: "${updates.type}". Must be one of: ${OPERATION_TYPES.join(', ')}`);
+        }
         fields.push('type = ?');
         values.push(updates.type);
       }
