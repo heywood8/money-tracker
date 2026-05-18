@@ -10,6 +10,7 @@ import {
   fetchExpectedChecksum,
   computeSha256,
   downloadAndInstallApk,
+  IncrementalSha256,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -619,31 +620,80 @@ describe('AppUpdateService', () => {
     });
   });
 
-  describe('computeSha256', () => {
-    beforeEach(() => {
-      global.atob = jest.fn((b64) => Buffer.from(b64, 'base64').toString('binary'));
-      global.crypto = {
-        subtle: {
-          digest: jest.fn(),
-        },
-      };
+  describe('IncrementalSha256', () => {
+    const hexOf = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const encode = (str) => new TextEncoder().encode(str);
+
+    it('matches SHA-256("") — NIST FIPS 180-4 test vector', () => {
+      const hash = new IncrementalSha256().digest();
+      expect(hexOf(hash)).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
     });
 
-    it('returns the hex SHA-256 digest of file contents', async () => {
-      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8='); // base64 of "hello"
-      const hashBytes = new Uint8Array(32).fill(0xab);
-      global.crypto.subtle.digest.mockResolvedValue(hashBytes.buffer);
+    it('matches SHA-256("hello") — known vector', () => {
+      const hash = new IncrementalSha256().update(encode('hello')).digest();
+      expect(hexOf(hash)).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+    });
+
+    it('matches SHA-256("abc") — NIST FIPS 180-4 test vector', () => {
+      const hash = new IncrementalSha256().update(encode('abc')).digest();
+      expect(hexOf(hash)).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    });
+
+    it('gives the same result whether data arrives in one call or many', () => {
+      const data = encode('the quick brown fox jumps over the lazy dog');
+      const single = hexOf(new IncrementalSha256().update(data).digest());
+      const multi = hexOf(
+        new IncrementalSha256()
+          .update(data.subarray(0, 10))
+          .update(data.subarray(10, 25))
+          .update(data.subarray(25))
+          .digest(),
+      );
+      expect(single).toBe(multi);
+    });
+
+    it('correctly handles input that spans multiple 64-byte compression blocks', () => {
+      // 200 bytes of data → 4 full 64-byte blocks during padding
+      const data = new Uint8Array(200).fill(0x61); // 200 × 'a'
+      const hash = new IncrementalSha256().update(data).digest();
+      expect(hexOf(hash)).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+
+  describe('computeSha256', () => {
+    it('reads the file in chunks and returns the real SHA-256 hex digest', async () => {
+      // 'aGVsbG8=' is base64("hello"), SHA-256("hello") is a known constant
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
+      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
 
       const result = await computeSha256('file:///cache/penny.apk');
 
       expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(
         'file:///cache/penny.apk',
-        { encoding: 'base64' },
+        { encoding: 'base64', position: 0, length: 5 },
       );
-      expect(result).toMatch(/^[0-9a-f]{64}$/);
+      expect(result).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+    });
+
+    it('issues multiple readAsStringAsync calls for files larger than the chunk size', async () => {
+      const MB = 1024 * 1024;
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: MB + 5 });
+      // Both chunks decode to 'hello' — we only care that two calls were made
+      FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
+
+      await computeSha256('file:///cache/large.apk');
+
+      expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
+      expect(FileSystem.readAsStringAsync).toHaveBeenNthCalledWith(
+        1, 'file:///cache/large.apk', { encoding: 'base64', position: 0, length: MB },
+      );
+      expect(FileSystem.readAsStringAsync).toHaveBeenNthCalledWith(
+        2, 'file:///cache/large.apk', { encoding: 'base64', position: MB, length: 5 },
+      );
     });
 
     it('propagates read errors to the caller', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
       FileSystem.readAsStringAsync.mockRejectedValue(new Error('read failed'));
 
       await expect(computeSha256('file:///cache/penny.apk')).rejects.toThrow('read failed');
@@ -654,22 +704,17 @@ describe('AppUpdateService', () => {
     const IntentLauncher = require('expo-intent-launcher');
 
     beforeEach(() => {
-      global.atob = jest.fn((b64) => Buffer.from(b64, 'base64').toString('binary'));
-      global.crypto = {
-        subtle: {
-          digest: jest.fn(),
-        },
-      };
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 5 });
       FileSystem.readDirectoryAsync.mockResolvedValue([]);
       FileSystem.getContentUriAsync.mockResolvedValue('content://penny.apk');
       IntentLauncher.startActivityAsync.mockResolvedValue();
     });
 
-    it('proceeds to install when computeSha256 throws (OOM / Hermes limitation)', async () => {
-      const mockDownload = {
+    it('proceeds to install when computeSha256 throws (OOM / read error)', async () => {
+      FileSystem.createDownloadResumable.mockReturnValue({
         downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      };
-      FileSystem.createDownloadResumable.mockReturnValue(mockDownload);
+      });
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 50_000_000 });
       FileSystem.readAsStringAsync.mockRejectedValue(new RangeError('Array buffer allocation failed'));
 
       const fetchImpl = jest.fn().mockResolvedValue({
@@ -677,7 +722,6 @@ describe('AppUpdateService', () => {
         text: async () => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd  penny-v1.0.0.apk\n',
       });
 
-      // Should NOT throw — computation error is treated as "skip verification"
       await expect(
         downloadAndInstallApk(
           'https://example.com/penny-v1.0.0.apk',
@@ -686,22 +730,17 @@ describe('AppUpdateService', () => {
         ),
       ).resolves.toBeUndefined();
 
-      // File must NOT be deleted when the error is a computation failure, not a mismatch
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
-      // Install must still be attempted
       expect(IntentLauncher.startActivityAsync).toHaveBeenCalled();
     });
 
     it('deletes the file and throws when checksum does not match', async () => {
-      const mockDownload = {
+      FileSystem.createDownloadResumable.mockReturnValue({
         downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
-      };
-      FileSystem.createDownloadResumable.mockReturnValue(mockDownload);
+      });
       FileSystem.deleteAsync.mockResolvedValue();
-
-      // computeSha256 returns a hash that does NOT match the expected one
+      // 'aGVsbG8=' = base64("hello"); real SHA-256 ≠ 'ffff...'
       FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
-      global.crypto.subtle.digest.mockResolvedValue(new Uint8Array(32).fill(0x00).buffer);
 
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: true,
