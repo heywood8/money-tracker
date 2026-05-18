@@ -2,9 +2,13 @@
  * Migration 0007: Add CHECK constraint to operations.type enum column
  *
  * Drizzle enums are not backed by SQLite CHECK constraints, so invalid values
- * from corrupted backups or manual edits can be inserted. This migration
- * recreates the operations table with an explicit CHECK constraint and silently
- * drops any rows whose type is not one of the three valid values.
+ * from corrupted backups or manual edits can be inserted undetected.
+ *
+ * This migration recreates the operations table with an explicit CHECK constraint.
+ * It copies ALL rows — it does NOT silently drop invalid ones. If any row has an
+ * invalid type the INSERT will fail due to the CHECK constraint, aborting the
+ * migration. The pre-migration guard in db.js detects this situation first and
+ * skips the migration with a warning so the app can still start.
  */
 
 export default `PRAGMA foreign_keys=OFF;--> statement-breakpoint
@@ -29,7 +33,7 @@ CREATE TABLE \`__new_operations\` (
 	FOREIGN KEY (\`to_account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade
 );--> statement-breakpoint
 
-INSERT INTO \`__new_operations\` SELECT * FROM \`operations\` WHERE \`type\` IN ('expense', 'income', 'transfer');--> statement-breakpoint
+INSERT INTO \`__new_operations\` SELECT * FROM \`operations\`;--> statement-breakpoint
 
 DROP TABLE \`operations\`;--> statement-breakpoint
 

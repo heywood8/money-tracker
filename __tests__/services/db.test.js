@@ -325,4 +325,80 @@ describe('Database Service', () => {
       expect(callback(decomposed)).toBe('самолет');
     });
   });
+
+  describe('Migration 0007 pre-migration guard', () => {
+    const validOpsSchema = {
+      sql: 'CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL)',
+    };
+    const checkedOpsSchema = {
+      sql: "CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL CHECK (`type` IN ('expense', 'income', 'transfer')), `amount` text NOT NULL)",
+    };
+
+    it('calls migrate with full config when no invalid operation types exist', async () => {
+      // isDatabaseCorrupted uses getAllAsync; first getFirstAsync is the opsSchema check
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(validOpsSchema) // opsSchema: no CHECK yet
+        .mockResolvedValueOnce(null);          // invalid op check -> none found
+
+      await getDatabase();
+
+      expect(migrate).toHaveBeenCalled();
+      const migrationsArg = migrate.mock.calls[0][1];
+      expect(migrationsArg).toHaveProperty('migrations');
+    });
+
+    it('skips migration 0007 and warns when invalid operation types are found', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(validOpsSchema)             // opsSchema: no CHECK yet
+        .mockResolvedValueOnce({ id: 42, type: 'bogus' }); // invalid op found
+
+      await getDatabase();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping migration 0007'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('bogus'),
+      );
+      const migrationsArg = migrate.mock.calls[0][1];
+      const tags = (migrationsArg.journal.entries || []).map(e => e.tag);
+      expect(tags).not.toContain('0007_add_enum_check_constraints');
+      expect(migrationsArg.migrations).not.toHaveProperty('m0007');
+
+      warnSpy.mockRestore();
+    });
+
+    it('skips the invalid-type check when CHECK constraint is already present', async () => {
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(null)            // isDatabaseCorrupted
+        .mockResolvedValueOnce(checkedOpsSchema); // opsSchema: CHECK present
+
+      await getDatabase();
+
+      const invalidOpCheckCalls = mockDb.getFirstAsync.mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes('NOT IN'),
+      );
+      expect(invalidOpCheckCalls).toHaveLength(0);
+      expect(migrate).toHaveBeenCalled();
+    });
+
+    it('skips the pre-check when operations table does not exist yet', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(null) // isDatabaseCorrupted
+        .mockResolvedValueOnce(null); // opsSchema: table absent
+
+      await getDatabase();
+
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Skipping migration 0007'),
+      );
+      expect(migrate).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+  });
 });
