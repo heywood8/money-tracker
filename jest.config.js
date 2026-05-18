@@ -1,5 +1,6 @@
 module.exports = {
   preset: 'jest-expo',
+  testEnvironment: '<rootDir>/jest-env.js',
   setupFilesAfterEnv: [
     '<rootDir>/jest.setup.js',
   ],

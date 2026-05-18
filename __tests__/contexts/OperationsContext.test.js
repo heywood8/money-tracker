@@ -565,23 +565,24 @@ describe('OperationsContext', () => {
   });
 
   describe('Lazy Loading', () => {
-    it('loads more operations when available', async () => {
+    it('loads more operations from cache when available', async () => {
       const initialOps = [
         { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
+      const olderOps = [
+        { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' },
+        { id: 3, date: '2025-11-27', type: 'expense', amount: '50', accountId: 'acc1' },
+      ];
+
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
+      // Cache contains all operations (initial + older)
+      OperationsDB.getAllOperations.mockResolvedValue([...initialOps, ...olderOps]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-
-      const nextOldestOp = { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
-      const moreOps = [nextOldestOp, { id: 3, date: '2025-11-27', type: 'expense', amount: '50', accountId: 'acc1' }];
-
-      OperationsDB.getNextOldestOperation.mockResolvedValue(nextOldestOp);
-      OperationsDB.getOperationsByWeekFromDate.mockResolvedValue(moreOps);
 
       await act(async () => {
         await result.current.loadMoreOperations();
@@ -589,21 +590,24 @@ describe('OperationsContext', () => {
 
       expect(result.current.operations).toHaveLength(3);
       expect(result.current.loadingMore).toBe(false);
+      // DB pagination queries should not be called — cache handles it
+      expect(OperationsDB.getNextOldestOperation).not.toHaveBeenCalled();
+      expect(OperationsDB.getOperationsByWeekFromDate).not.toHaveBeenCalled();
     });
 
-    it('sets hasMoreOperations to false when no more data', async () => {
+    it('sets hasMoreOperations to false when cache has no older data', async () => {
       const initialOps = [
         { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
+      // Cache only has the already-loaded op — nothing older
+      OperationsDB.getAllOperations.mockResolvedValue(initialOps);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-
-      OperationsDB.getNextOldestOperation.mockResolvedValue(null);
 
       await act(async () => {
         await result.current.loadMoreOperations();
@@ -612,11 +616,13 @@ describe('OperationsContext', () => {
       expect(result.current.hasMoreOperations).toBe(false);
     });
 
-    it('deduplicates operations when loading more', async () => {
-      const initialOps = [
-        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
-      ];
-      OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
+    it('deduplicates operations when loading more from cache', async () => {
+      const op1 = { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' };
+      const op2 = { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
+
+      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([op1]);
+      // Cache has op1 and op2; op1 is on the boundary so only op2 is "older"
+      OperationsDB.getAllOperations.mockResolvedValue([op1, op2]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -624,20 +630,11 @@ describe('OperationsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const nextOldestOp = { id: 2, date: '2025-11-28', type: 'income', amount: '200', accountId: 'acc2' };
-      const moreOps = [
-        { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' }, // Duplicate
-        nextOldestOp,
-      ];
-
-      OperationsDB.getNextOldestOperation.mockResolvedValue(nextOldestOp);
-      OperationsDB.getOperationsByWeekFromDate.mockResolvedValue(moreOps);
-
       await act(async () => {
         await result.current.loadMoreOperations();
       });
 
-      // Should have 2 unique operations (op1 + op2)
+      // op1 stays, op2 is added — no duplicates
       expect(result.current.operations).toHaveLength(2);
       const ids = result.current.operations.map(op => op.id);
       expect(new Set(ids).size).toBe(2);
@@ -648,6 +645,7 @@ describe('OperationsContext', () => {
         { id: 1, date: '2025-12-05', type: 'expense', amount: '100', accountId: 'acc1' },
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
+      OperationsDB.getAllOperations.mockResolvedValue(initialOps); // no older data
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -655,24 +653,21 @@ describe('OperationsContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // First load more should set hasMoreOperations to false (no more data)
-      OperationsDB.getNextOldestOperation.mockResolvedValue(null);
-
+      // First call sets hasMoreOperations to false (cache shows no older ops)
       await act(async () => {
         await result.current.loadMoreOperations();
       });
 
       expect(result.current.hasMoreOperations).toBe(false);
 
-      // Reset the mock call count
-      OperationsDB.getNextOldestOperation.mockClear();
+      OperationsDB.getAllOperations.mockClear();
 
-      // Second load more should return early without calling DB
+      // Second call should return early without touching DB or cache
       await act(async () => {
         await result.current.loadMoreOperations();
       });
 
-      expect(OperationsDB.getNextOldestOperation).not.toHaveBeenCalled();
+      expect(OperationsDB.getAllOperations).not.toHaveBeenCalled();
     });
   });
 
@@ -919,13 +914,12 @@ describe('OperationsContext', () => {
       expect(OperationsDB.createOperation).toHaveBeenCalledTimes(2);
     });
 
-    it('loads older operations when current week is empty but older operations exist', async () => {
-      // Initially no operations in current week
-      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      // But there are older operations
+    it('loads older operations from cache when current week is empty but older operations exist', async () => {
       const olderOp = { id: 2, type: 'expense', amount: '50', date: '2025-12-15', accountId: 'acc1', categoryId: 'cat1' };
-      OperationsDB.getNextOldestOperation.mockResolvedValue(olderOp);
-      OperationsDB.getOperationsByWeekFromDate.mockResolvedValue([olderOp]);
+
+      // Current week is empty; cache has an older op
+      OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
+      OperationsDB.getAllOperations.mockResolvedValue([olderOp]);
 
       const { result } = renderHook(() => useOperations(), { wrapper });
 
@@ -937,10 +931,11 @@ describe('OperationsContext', () => {
         await result.current.loadMoreOperations();
       });
 
-      // Should call getNextOldestOperation to find older operations
-      expect(OperationsDB.getNextOldestOperation).toHaveBeenCalled();
-      // Should then load those operations
-      expect(OperationsDB.getOperationsByWeekFromDate).toHaveBeenCalledWith(olderOp.date);
+      // Older op loaded from cache — no DB pagination queries needed
+      expect(result.current.operations).toHaveLength(1);
+      expect(result.current.operations[0].id).toBe(2);
+      expect(OperationsDB.getNextOldestOperation).not.toHaveBeenCalled();
+      expect(OperationsDB.getOperationsByWeekFromDate).not.toHaveBeenCalled();
     });
 
     it('preserves operation IDs across operations', async () => {
