@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.114.15](https://github.com/heywood8/money-tracker/compare/penny-v0.114.14...penny-v0.114.15) (2026-05-18)
+
+
+### Bug Fixes
+
+* catch computeSha256 OOM errors so download succeeds rather than failing ([#682](https://github.com/heywood8/money-tracker/issues/682)) ([a9cba57](https://github.com/heywood8/money-tracker/commit/a9cba57269003d7e58f471dcba27e7e6af805283))
+
 ## [0.114.14](https://github.com/heywood8/money-tracker/compare/penny-v0.114.13...penny-v0.114.14) (2026-05-18)
 
 
