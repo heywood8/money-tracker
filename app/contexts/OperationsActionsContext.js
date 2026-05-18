@@ -178,46 +178,74 @@ export const OperationsActionsProvider = ({ children }) => {
   const loadMoreOperations = useCallback(async () => {
     if (loadingMore || !hasMoreOperations) return;
 
+    _setLoadingMore(true);
     try {
-      _setLoadingMore(true);
+      if (Array.isArray(allOpsCacheRef.current)) {
+        // Cache is ready — serve from it to avoid an extra DB round-trip.
+        // Cache is sorted DESC (newest first), same as getAllOperations.
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const boundary = _oldestLoadedDate ?? todayStr;
 
-      const isFiltered = _hasActiveFilters(activeFilters);
+        const olderOps = allOpsCacheRef.current.filter(op => op.date < boundary);
 
-      // If we don't have any operations loaded yet, find the most recent operation
-      // and load its week. This handles the case where the current week has no operations.
-      let nextOp;
-      if (!_oldestLoadedDate) {
-        // No operations loaded - find the most recent operation in the database
-        nextOp = isFiltered
-          ? await OperationsDB.getNextOldestFilteredOperation(new Date().toISOString().split('T')[0], activeFilters)
-          : await OperationsDB.getNextOldestOperation(new Date().toISOString().split('T')[0]);
-      } else {
-        // Find the next oldest operation before our current oldest date
-        nextOp = isFiltered
-          ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, activeFilters)
-          : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
-      }
+        if (olderOps.length === 0) {
+          _setHasMoreOperations(false);
+          return;
+        }
 
-      if (!nextOp) {
-        // No more operations found
-        _setHasMoreOperations(false);
-      } else {
-        // Load a week of operations starting from this operation's date
-        const moreOperations = isFiltered
-          ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, activeFilters)
-          : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
+        // Take a 7-day window anchored at the most recent of the older ops.
+        const chunkEnd = olderOps[0].date;
+        const chunkEndDate = new Date(chunkEnd + 'T00:00:00');
+        const chunkStartDate = new Date(chunkEndDate);
+        chunkStartDate.setDate(chunkStartDate.getDate() - 6);
+        const chunkStart = `${chunkStartDate.getFullYear()}-${String(chunkStartDate.getMonth() + 1).padStart(2, '0')}-${String(chunkStartDate.getDate()).padStart(2, '0')}`;
 
-        // Merge and deduplicate operations by ID
+        const chunk = olderOps.filter(op => op.date >= chunkStart);
+
         _setOperations(prevOps => {
           const existingIds = new Set(prevOps.map(op => op.id));
-          const newOps = moreOperations.filter(op => !existingIds.has(op.id));
+          const newOps = chunk.filter(op => !existingIds.has(op.id));
           return [...prevOps, ...newOps];
         });
 
-        // Update the oldest loaded date (newest stays the same)
-        if (moreOperations.length > 0) {
-          const oldestOp = moreOperations[moreOperations.length - 1];
-          _setOldestLoadedDate(oldestOp.date);
+        if (chunk.length > 0) {
+          _setOldestLoadedDate(chunk[chunk.length - 1].date);
+        }
+
+        _setHasMoreOperations(olderOps.some(op => op.date < chunkStart));
+      } else {
+        // Cache not ready yet — fall back to DB queries.
+        const isFiltered = _hasActiveFilters(activeFilters);
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        let nextOp;
+        if (!_oldestLoadedDate) {
+          nextOp = isFiltered
+            ? await OperationsDB.getNextOldestFilteredOperation(todayStr, activeFilters)
+            : await OperationsDB.getNextOldestOperation(todayStr);
+        } else {
+          nextOp = isFiltered
+            ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, activeFilters)
+            : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
+        }
+
+        if (!nextOp) {
+          _setHasMoreOperations(false);
+        } else {
+          const moreOperations = isFiltered
+            ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, activeFilters)
+            : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
+
+          _setOperations(prevOps => {
+            const existingIds = new Set(prevOps.map(op => op.id));
+            const newOps = moreOperations.filter(op => !existingIds.has(op.id));
+            return [...prevOps, ...newOps];
+          });
+
+          if (moreOperations.length > 0) {
+            _setOldestLoadedDate(moreOperations[moreOperations.length - 1].date);
+          }
         }
       }
     } catch (error) {
