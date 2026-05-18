@@ -75,6 +75,12 @@ export const createBudget = async (budget) => {
       throw new Error(validationError);
     }
 
+    // Prevent duplicate budgets (same category + currency + period_type)
+    const duplicate = await findDuplicateBudget(budget.categoryId, budget.currency, budget.periodType);
+    if (duplicate) {
+      throw new Error('A budget for this category, currency, and period already exists');
+    }
+
     const now = new Date().toISOString();
     const budgetData = {
       id: budget.id,
