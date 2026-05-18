@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.114.13](https://github.com/heywood8/money-tracker/compare/penny-v0.114.12...penny-v0.114.13) (2026-05-18)
+
+
+### Bug Fixes
+
+* emit RELOAD_ALL synchronously after default data creation (issue [#605](https://github.com/heywood8/money-tracker/issues/605)) ([#675](https://github.com/heywood8/money-tracker/issues/675)) ([5d02ed5](https://github.com/heywood8/money-tracker/commit/5d02ed5a03780b15fa9c8c09f546ad0adff0ee81))
+* validate operation type enum in createOperation and updateOperation ([#674](https://github.com/heywood8/money-tracker/issues/674)) ([ad5f5dd](https://github.com/heywood8/money-tracker/commit/ad5f5dda587ea42ed655d2cb6bc1254c5e03bee0))
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump jest from 30.3.0 to 30.4.2 ([#671](https://github.com/heywood8/money-tracker/issues/671)) ([24687b6](https://github.com/heywood8/money-tracker/commit/24687b6fb674f1e7a3e59b339a6c152117515865))
+
 ## [0.114.12](https://github.com/heywood8/money-tracker/compare/penny-v0.114.11...penny-v0.114.12) (2026-05-18)
 
 
