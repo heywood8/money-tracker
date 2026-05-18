@@ -543,7 +543,7 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
   const cached = liveRateCache.get(fromLower);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     const rate = cached.rates[toLower];
-    if (rate !== undefined) {
+    if (typeof rate === 'number' && rate > 0 && isFinite(rate)) {
       return { rate: rate.toString(), source: 'live' };
     }
   }
@@ -567,13 +567,18 @@ export const fetchLiveExchangeRate = async (fromCurrency, toCurrency) => {
       const data = await response.json();
       const rates = data[fromLower];
       if (rates && typeof rates === 'object') {
-        // Cache the full response
+        const validatedRates = {};
+        for (const [key, value] of Object.entries(rates)) {
+          if (typeof value === 'number' && value > 0 && isFinite(value)) {
+            validatedRates[key] = value;
+          }
+        }
         liveRateCache.set(fromLower, {
-          rates,
+          rates: validatedRates,
           timestamp: Date.now(),
         });
 
-        const rate = rates[toLower];
+        const rate = validatedRates[toLower];
         if (rate !== undefined) {
           return { rate: rate.toString(), source: 'live' };
         }
