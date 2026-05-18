@@ -254,32 +254,38 @@ describe('AccountsDB', () => {
 
   describe('deleteAccount', () => {
     it('deletes account when no operations are associated', async () => {
-      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 0 });
-      mockDrizzle.where.mockResolvedValue(undefined);
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
 
       await AccountsDB.deleteAccount('1');
 
-      expect(db.queryFirst).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT COUNT(*) as count FROM operations'),
-        ['1', '1'],
+      expect(db.executeTransaction).toHaveBeenCalled();
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'DELETE FROM accounts WHERE id = ?',
+        ['1'],
       );
-      expect(mockDrizzle.delete).toHaveBeenCalled();
-      expect(mockDrizzle.where).toHaveBeenCalled();
     });
 
     it('throws error when account has associated operations', async () => {
-      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 5 });
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValue({ count: 5 }),
+        runAsync: jest.fn(),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account: 5 transaction(s) are associated with this account',
       );
 
-      expect(mockDrizzle.delete).not.toHaveBeenCalled();
+      expect(mockTxDb.runAsync).not.toHaveBeenCalled();
     });
 
     it('throws error when database query fails', async () => {
       const error = new Error('Query failed');
-      jest.spyOn(db, 'queryFirst').mockRejectedValue(error);
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(error);
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow('Query failed');
     });
@@ -611,29 +617,32 @@ describe('AccountsDB', () => {
 
   describe('deleteAccount with transfer', () => {
     it('transfers operations before deleting account', async () => {
-      // Mock getOperationCount
-      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 3 });
-
-      // Mock transferOperations transaction
-      const mockDb = {
+      const mockTxDb = {
         getFirstAsync: jest.fn()
-          .mockResolvedValueOnce({ id: 'to-delete', currency: 'USD' })
-          .mockResolvedValueOnce({ id: 'transfer-to', currency: 'USD' }),
-        runAsync: jest.fn()
-          .mockResolvedValueOnce({ changes: 2 })
-          .mockResolvedValueOnce({ changes: 1 }),
+          .mockResolvedValueOnce({ count: 3 }) // operation count
+          .mockResolvedValueOnce({ id: 'to-delete', currency: 'USD' }) // fromAccount
+          .mockResolvedValueOnce({ id: 'transfer-to', currency: 'USD' }), // toAccount
+        runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       };
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
-        return await callback(mockDb);
+        return await callback(mockTxDb);
       });
-
-      // Mock delete operation
-      mockDrizzle.where.mockResolvedValue(undefined);
 
       await AccountsDB.deleteAccount('to-delete', 'transfer-to');
 
       expect(db.executeTransaction).toHaveBeenCalled();
-      expect(mockDrizzle.delete).toHaveBeenCalled();
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE operations SET account_id = ? WHERE account_id = ?',
+        ['transfer-to', 'to-delete'],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE operations SET to_account_id = ? WHERE to_account_id = ?',
+        ['transfer-to', 'to-delete'],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'DELETE FROM accounts WHERE id = ?',
+        ['to-delete'],
+      );
     });
   });
 
@@ -962,7 +971,11 @@ describe('AccountsDB', () => {
   // Regression tests for data integrity
   describe('Regression Tests - Data Integrity', () => {
     it('prevents deletion of accounts with operations', async () => {
-      jest.spyOn(db, 'queryFirst').mockResolvedValue({ count: 1 });
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValue({ count: 1 }),
+        runAsync: jest.fn(),
+      };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(AccountsDB.deleteAccount('1')).rejects.toThrow(
         'Cannot delete account',

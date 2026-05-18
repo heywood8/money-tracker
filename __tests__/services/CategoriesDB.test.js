@@ -532,58 +532,75 @@ describe('CategoriesDB', () => {
 
   describe('deleteCategory', () => {
     it('deletes category when no children or operations exist', async () => {
-      mockDb.queryFirst
-        .mockResolvedValueOnce({ count: 0 }) // No child categories
-        .mockResolvedValueOnce({ count: 0 }); // No operations
-      mockDb.executeQuery.mockResolvedValue();
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 0 }) // No child categories
+          .mockResolvedValueOnce({ count: 0 }), // No operations
+        runAsync: jest.fn().mockResolvedValue(undefined),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
 
       await CategoriesDB.deleteCategory('cat-1');
 
-      expect(db.executeQuery).toHaveBeenCalledWith(
+      expect(db.executeTransaction).toHaveBeenCalled();
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
         'DELETE FROM categories WHERE id = ?',
         ['cat-1'],
       );
     });
 
     it('throws error when category has child categories', async () => {
-      mockDb.queryFirst.mockResolvedValueOnce({ count: 3 }); // Has 3 children
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValueOnce({ count: 3 }),
+        runAsync: jest.fn(),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow(
         'Cannot delete category: 3 subcategory(ies) exist',
       );
 
-      expect(db.executeQuery).not.toHaveBeenCalled();
+      expect(mockTxDb.runAsync).not.toHaveBeenCalled();
     });
 
     it('throws error when category has associated operations', async () => {
-      mockDb.queryFirst
-        .mockResolvedValueOnce({ count: 0 }) // No children
-        .mockResolvedValueOnce({ count: 5 }); // Has 5 operations
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 0 }) // No children
+          .mockResolvedValueOnce({ count: 5 }), // Has 5 operations
+        runAsync: jest.fn(),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow(
         'Cannot delete category: 5 transaction(s) use this category',
       );
 
-      expect(db.executeQuery).not.toHaveBeenCalled();
+      expect(mockTxDb.runAsync).not.toHaveBeenCalled();
     });
 
     it('checks children before checking operations', async () => {
-      mockDb.queryFirst
-        .mockResolvedValueOnce({ count: 2 }) // Has children
-        .mockResolvedValueOnce({ count: 0 }); // Has no operations (not reached)
+      const mockTxDb = {
+        getFirstAsync: jest.fn().mockResolvedValueOnce({ count: 2 }),
+        runAsync: jest.fn(),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow('subcategory');
 
       // Should only check children, not operations
-      expect(db.queryFirst).toHaveBeenCalledTimes(1);
+      expect(mockTxDb.getFirstAsync).toHaveBeenCalledTimes(1);
     });
 
     it('throws error when database delete fails', async () => {
-      mockDb.queryFirst
-        .mockResolvedValueOnce({ count: 0 })
-        .mockResolvedValueOnce({ count: 0 });
       const error = new Error('Database error');
-      mockDb.executeQuery.mockRejectedValue(error);
+      const mockTxDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 0 }),
+        runAsync: jest.fn().mockRejectedValue(error),
+      };
+      mockDb.executeTransaction.mockImplementation(async (callback) => callback(mockTxDb));
 
       await expect(CategoriesDB.deleteCategory('cat-1')).rejects.toThrow('Database error');
     });

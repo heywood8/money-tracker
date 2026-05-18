@@ -199,25 +199,53 @@ export const getOperationCount = async (id) => {
  */
 export const deleteAccount = async (id, transferToAccountId = null) => {
   try {
-    // Check if account has any operations (expense, income, or transfers)
-    const operationCount = await getOperationCount(id);
+    await executeTransaction(async (db) => {
+      const result = await db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM operations WHERE account_id = ? OR to_account_id = ?',
+        [id, id],
+      );
+      const operationCount = result ? result.count : 0;
 
-    if (operationCount > 0) {
-      if (!transferToAccountId) {
-        // No transfer account specified, throw error with count
-        throw new Error(
-          `Cannot delete account: ${operationCount} transaction(s) are associated with this account. Please delete or reassign the transactions first.`,
+      if (operationCount > 0) {
+        if (!transferToAccountId) {
+          throw new Error(
+            `Cannot delete account: ${operationCount} transaction(s) are associated with this account. Please delete or reassign the transactions first.`,
+          );
+        }
+
+        const fromAccount = await db.getFirstAsync(
+          'SELECT id, currency FROM accounts WHERE id = ?',
+          [id],
+        );
+        const toAccount = await db.getFirstAsync(
+          'SELECT id, currency FROM accounts WHERE id = ?',
+          [transferToAccountId],
+        );
+
+        if (!fromAccount) {
+          throw new Error(`Source account ${id} not found`);
+        }
+        if (!toAccount) {
+          throw new Error(`Destination account ${transferToAccountId} not found`);
+        }
+        if (fromAccount.currency !== toAccount.currency) {
+          throw new Error(
+            `Cannot transfer operations: accounts have different currencies (${fromAccount.currency} → ${toAccount.currency})`,
+          );
+        }
+
+        await db.runAsync(
+          'UPDATE operations SET account_id = ? WHERE account_id = ?',
+          [transferToAccountId, id],
+        );
+        await db.runAsync(
+          'UPDATE operations SET to_account_id = ? WHERE to_account_id = ?',
+          [transferToAccountId, id],
         );
       }
 
-      // Transfer operations to the specified account
-      await transferOperations(id, transferToAccountId);
-      console.log(`Transferred ${operationCount} operations before deleting account ${id}`);
-    }
-
-    // Safe to delete - no operations are linked or they've been transferred
-    const db = await getDrizzle();
-    await db.delete(accounts).where(eq(accounts.id, id));
+      await db.runAsync('DELETE FROM accounts WHERE id = ?', [id]);
+    });
   } catch (error) {
     console.error('Failed to delete account:', error);
     throw error;
