@@ -447,19 +447,23 @@ export const OperationsActionsProvider = ({ children }) => {
       // Update operation in DB (handles balance updates automatically)
       await OperationsDB.updateOperation(id, updates);
 
+      // Refetch the persisted form so local state matches what the DB stored
+      // (DB may normalize/format fields, e.g. dates, amounts, types).
+      const persisted = await OperationsDB.getOperationById(id);
+
       _setOperations(ops => {
         return ops.map(op => {
           if (op.id === id) {
-            return { ...op, ...updates };
+            return persisted ?? { ...op, ...updates };
           }
           return op;
         });
       });
 
-      // Mirror the update into the cache
+      // Mirror the persisted form into the cache
       if (allOpsCacheRef.current !== null) {
         allOpsCacheRef.current = allOpsCacheRef.current.map(op =>
-          op.id === id ? { ...op, ...updates } : op,
+          op.id === id ? (persisted ?? { ...op, ...updates }) : op,
         );
       }
       _setSaveError(null);
