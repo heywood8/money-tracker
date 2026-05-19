@@ -388,7 +388,7 @@ describe('Database Service', () => {
       // Guard against the regression where includes('CHECK') would falsely match any
       // CHECK constraint (e.g. on amount) and skip the invalid-type validation.
       const otherCheckSchema = {
-        sql: "CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL CHECK (`amount` >= 0))",
+        sql: 'CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL CHECK (`amount` >= 0))',
       };
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
