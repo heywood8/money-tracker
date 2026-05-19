@@ -8,6 +8,7 @@ import m0003, { postMigration as m0003PostMigration } from './0003_slow_grandmas
 import m0004 from './0004_remove_exclude_from_forecast.js';
 import m0005 from './0005_planned_operations.js';
 import m0006 from './0006_add_original_balance.js';
+import m0007 from './0007_add_enum_check_constraints.js';
 
 export default {
   journal,
@@ -19,6 +20,7 @@ export default {
     m0004,
     m0005,
     m0006,
+    m0007,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

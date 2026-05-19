@@ -16,14 +16,21 @@ import getDefaultOperations from '../defaults/defaultOperations';
 // Operation types currently supported. Used as the upper bound for the
 // "all types selected → no type filter" optimization.
 const OPERATION_TYPES = ['expense', 'income', 'transfer'];
+const VALID_OPERATION_TYPES = new Set(OPERATION_TYPES);
 
 /**
- * Map database field names to camelCase for application use
+ * Map database field names to camelCase for application use.
+ * Returns null for rows with an invalid type so callers can filter them out.
  * @param {Object} dbOperation - Operation object from database with snake_case fields
- * @returns {Object} Operation object with camelCase fields
+ * @returns {Object|null} Operation object with camelCase fields, or null if type is invalid
  */
 const mapOperationFields = (dbOperation) => {
   if (!dbOperation) return null;
+
+  if (!VALID_OPERATION_TYPES.has(dbOperation.type)) {
+    console.warn(`[OperationsDB] Dropping operation id=${dbOperation.id} with invalid type: "${dbOperation.type}"`);
+    return null;
+  }
 
   return {
     id: dbOperation.id,
@@ -51,7 +58,7 @@ export const getAllOperations = async () => {
     const operations = await queryAll(
       'SELECT * FROM operations ORDER BY date DESC, created_at DESC',
     );
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations:', error);
     throw error;
@@ -142,7 +149,7 @@ export const getOperationsByAccount = async (accountId) => {
       'SELECT * FROM operations WHERE account_id = ? OR to_account_id = ? ORDER BY date DESC, created_at DESC',
       [accountId, accountId],
     );
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by account:', error);
     throw error;
@@ -160,7 +167,7 @@ export const getOperationsByCategory = async (categoryId) => {
       'SELECT * FROM operations WHERE category_id = ? ORDER BY date DESC, created_at DESC',
       [categoryId],
     );
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by category:', error);
     throw error;
@@ -179,7 +186,7 @@ export const getOperationsByDateRange = async (startDate, endDate) => {
       'SELECT * FROM operations WHERE date >= ? AND date <= ? ORDER BY date DESC, created_at DESC',
       [startDate, endDate],
     );
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by date range:', error);
     throw error;
@@ -276,7 +283,7 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     console.debug(`Filtered operations loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get filtered operations by date range:', error);
     throw error;
@@ -360,7 +367,7 @@ export const getFilteredOperationsAllDates = async (filters = {}) => {
     sql += ' ORDER BY o.date DESC, o.created_at DESC';
 
     const operations = await queryAll(sql, params);
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get filtered operations (all dates):', error);
     throw error;
@@ -378,7 +385,7 @@ export const getOperationsByType = async (type) => {
       'SELECT * FROM operations WHERE type = ? ORDER BY date DESC, created_at DESC',
       [type],
     );
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by type:', error);
     throw error;
@@ -1137,7 +1144,7 @@ export const getOperationsByWeekOffset = async (weekOffset) => {
 
     console.debug(`Week ${weekOffset} loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by week offset:', error);
     throw error;
@@ -1188,7 +1195,7 @@ export const getOperationsByWeekFromDate = async (endDate) => {
 
     console.debug(`Week loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by week from date:', error);
     throw error;
@@ -1299,7 +1306,7 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     console.debug(`Filtered week loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get filtered operations by week from date:', error);
     throw error;
@@ -1464,7 +1471,7 @@ export const getOperationsByWeekToDate = async (startDate) => {
 
     console.debug(`Week loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get operations by week to date:', error);
     throw error;
@@ -1668,7 +1675,7 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     console.debug(`Filtered week loaded: ${operations?.length || 0} operations`);
 
-    return (operations || []).map(mapOperationFields);
+    return (operations || []).map(mapOperationFields).filter(Boolean);
   } catch (error) {
     console.error('Failed to get filtered operations by week to date:', error);
     throw error;

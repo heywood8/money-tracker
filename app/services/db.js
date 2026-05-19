@@ -175,8 +175,43 @@ const initializeDatabase = async (rawDb, db) => {
     const migrationsBefore = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
     const appliedHashesBefore = new Set((migrationsBefore || []).map(m => m.hash));
 
+    // Pre-migration guard for migration 0007 (CHECK constraint on operations.type).
+    // If invalid types exist we warn and exclude 0007 from this run so the app can
+    // still start. The migration stays pending and will be retried on the next
+    // launch after the user has fixed or removed the offending rows.
+    let migrationsConfig = migrations;
+    const opsSchema = await rawDb.getFirstAsync(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='operations'",
+    ).catch(() => null);
+    const m0007Tag = '0007_add_enum_check_constraints';
+    // Look specifically for the type-column CHECK so a future CHECK on a different
+    // column (e.g. CHECK (amount >= 0)) cannot mask whether 0007 has run.
+    const m0007AlreadyApplied =
+      !!opsSchema?.sql && /CHECK\s*\(\s*[`"]?type[`"]?\s+IN\s*\(/i.test(opsSchema.sql);
+    if (opsSchema && !m0007AlreadyApplied) {
+      const invalidOp = await rawDb.getFirstAsync(
+        "SELECT id, type FROM operations WHERE type NOT IN ('expense', 'income', 'transfer') LIMIT 1",
+      ).catch(() => null);
+      if (invalidOp) {
+        console.warn(
+          `[DB] Skipping migration 0007: operation id=${invalidOp.id} has invalid type "${invalidOp.type}". ` +
+          'All operation types must be expense, income, or transfer. ' +
+          'Fix the invalid operations and restart the app to apply this migration.',
+        );
+        const { m0007: _skip, ...migsWithout0007 } = migrations.migrations;
+        migrationsConfig = {
+          ...migrations,
+          journal: {
+            ...migrations.journal,
+            entries: migrations.journal.entries.filter(e => e.tag !== m0007Tag),
+          },
+          migrations: migsWithout0007,
+        };
+      }
+    }
+
     // Run Drizzle migrations
-    await migrate(db, migrations);
+    await migrate(db, migrationsConfig);
 
     // Defensive: ensure planned_operations table exists after migrations.
     // The beta Drizzle migrator can silently fail to apply a migration (transaction
