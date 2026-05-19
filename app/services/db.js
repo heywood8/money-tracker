@@ -184,7 +184,10 @@ const initializeDatabase = async (rawDb, db) => {
       "SELECT sql FROM sqlite_master WHERE type='table' AND name='operations'",
     ).catch(() => null);
     const m0007Tag = '0007_add_enum_check_constraints';
-    const m0007AlreadyApplied = opsSchema?.sql?.includes('CHECK');
+    // Look specifically for the type-column CHECK so a future CHECK on a different
+    // column (e.g. CHECK (amount >= 0)) cannot mask whether 0007 has run.
+    const m0007AlreadyApplied =
+      !!opsSchema?.sql && /CHECK\s*\(\s*[`"]?type[`"]?\s+IN\s*\(/i.test(opsSchema.sql);
     if (opsSchema && !m0007AlreadyApplied) {
       const invalidOp = await rawDb.getFirstAsync(
         "SELECT id, type FROM operations WHERE type NOT IN ('expense', 'income', 'transfer') LIMIT 1",

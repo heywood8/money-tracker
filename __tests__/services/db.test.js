@@ -384,6 +384,29 @@ describe('Database Service', () => {
       expect(migrate).toHaveBeenCalled();
     });
 
+    it('still runs the invalid-type check when a non-type CHECK constraint is present', async () => {
+      // Guard against the regression where includes('CHECK') would falsely match any
+      // CHECK constraint (e.g. on amount) and skip the invalid-type validation.
+      const otherCheckSchema = {
+        sql: "CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL CHECK (`amount` >= 0))",
+      };
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(otherCheckSchema)           // opsSchema: CHECK on amount, not type
+        .mockResolvedValueOnce({ id: 7, type: 'garbage' }); // invalid op found
+
+      await getDatabase();
+
+      // Should detect that 0007 has NOT been applied (despite the unrelated CHECK)
+      // and run the invalid-type check, finding the bad row and warning.
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping migration 0007'),
+      );
+
+      warnSpy.mockRestore();
+    });
+
     it('skips the pre-check when operations table does not exist yet', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
