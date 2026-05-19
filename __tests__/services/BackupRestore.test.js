@@ -1042,4 +1042,202 @@ op-2,normal`;
       expect(typeof backup.data.accounts[0].balance).toBe('string');
     });
   });
+
+  describe('Regression Tests — Issue #686 (account ID remapping)', () => {
+    const makeDbInstance = () => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() =>
+          Promise.resolve({ lastInsertRowId: ++insertCount }),
+        ),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-adjustment-expense' },
+          { id: 'shadow-adjustment-income' },
+        ]),
+      };
+    };
+
+    it('aborts before clearing data when an operation references an account not in the backup', async () => {
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ id: 'acc-1', name: 'Cash', balance: '0', currency: 'USD' }],
+          categories: [],
+          operations: [
+            { id: 'op-1', type: 'expense', amount: '10', account_id: 'unknown-uuid' },
+          ],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      await expect(BackupRestore.restoreBackup(backup)).rejects.toThrow(
+        /account IDs not found in the backup.*Restore aborted/,
+      );
+
+      // The transaction must NOT have run — no DELETE calls should have happened
+      expect(mockDb.executeTransaction).not.toHaveBeenCalled();
+    });
+
+    it('includes all unmapped account IDs in the error message', async () => {
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [],
+          categories: [],
+          operations: [
+            { id: 'op-1', type: 'expense', amount: '10', account_id: 'uuid-A' },
+            { id: 'op-2', type: 'expense', amount: '5', account_id: 'uuid-B' },
+          ],
+        },
+      };
+
+      await expect(BackupRestore.restoreBackup(backup)).rejects.toThrow(/uuid-A/);
+    });
+
+    it('does not abort when operation.account_id is null (counted as skip instead)', async () => {
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ id: 'acc-1', name: 'Cash', balance: '0', currency: 'USD' }],
+          categories: [],
+          operations: [
+            { id: 'op-1', type: 'expense', amount: '10', account_id: null },
+          ],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      // Should resolve, not throw
+      await expect(BackupRestore.restoreBackup(backup)).resolves.toBeUndefined();
+    });
+
+    it('emits complete event with skippedOperations count when operations are null-skipped', async () => {
+      const appEvents = require('../../app/services/eventEmitter').appEvents;
+      const emitSpy = jest.spyOn(appEvents, 'emit');
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ id: 'acc-1', name: 'Cash', balance: '0', currency: 'USD' }],
+          categories: [],
+          operations: [
+            { id: 'op-1', type: 'expense', amount: '10', account_id: null },
+            { id: 'op-2', type: 'expense', amount: '5', account_id: null },
+          ],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      await BackupRestore.restoreBackup(backup);
+
+      const completeCall = emitSpy.mock.calls.find(
+        ([, payload]) => payload?.stepId === 'complete' && payload?.status === 'completed',
+      );
+      expect(completeCall).toBeDefined();
+      expect(completeCall[1].data.skippedOperations).toBe(2);
+    });
+
+    it('creates a pre-restore snapshot file before clearing live data', async () => {
+      // Make createBackup return mock data so it can write the snapshot
+      mockDb.queryAll.mockResolvedValue([]);
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [],
+          categories: [],
+          operations: [],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      await BackupRestore.restoreBackup(backup);
+
+      // writeAsStringAsync should have been called at least once for the snapshot
+      const snapshotWrite = mockFileSystem.writeAsStringAsync.mock.calls.find(
+        ([uri]) => uri.includes('pre_restore_'),
+      );
+      expect(snapshotWrite).toBeDefined();
+    });
+
+    it('snapshot URI is included in the complete event data', async () => {
+      const appEvents = require('../../app/services/eventEmitter').appEvents;
+      const emitSpy = jest.spyOn(appEvents, 'emit');
+
+      mockDb.queryAll.mockResolvedValue([]);
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [],
+          categories: [],
+          operations: [],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      await BackupRestore.restoreBackup(backup);
+
+      const completeCall = emitSpy.mock.calls.find(
+        ([, payload]) => payload?.stepId === 'complete' && payload?.status === 'completed',
+      );
+      expect(completeCall).toBeDefined();
+      expect(completeCall[1].data.snapshotUri).toContain('pre_restore_');
+    });
+
+    it('proceeds with restore even if snapshot creation fails', async () => {
+      mockFileSystem.writeAsStringAsync.mockRejectedValueOnce(new Error('disk full'));
+
+      const backup = {
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [],
+          categories: [],
+          operations: [],
+        },
+      };
+
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback(dbInstance);
+      });
+
+      // Should still succeed despite snapshot failure
+      await expect(BackupRestore.restoreBackup(backup)).resolves.toBeUndefined();
+    });
+  });
 });

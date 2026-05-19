@@ -64,6 +64,9 @@ export const ImportProgressProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = appEvents.on(IMPORT_PROGRESS_EVENT, ({ stepId, status, data }) => {
       updateStep(stepId, status, data);
+      if (stepId === 'complete' && status === 'completed') {
+        setCurrentStep('complete');
+      }
     });
 
     return unsubscribe;

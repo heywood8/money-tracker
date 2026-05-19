@@ -79,6 +79,13 @@ export default function ImportProgressModal() {
         return `Restored ${step.data} budgets`;
       case 'metadata':
         return `Restored ${step.data} metadata entries`;
+      case 'complete': {
+        const skipped = step.data?.skippedOperations;
+        if (skipped > 0) {
+          return `Database restored successfully (${skipped} operation${skipped === 1 ? '' : 's'} skipped — see logs)`;
+        }
+        return step.label;
+      }
       default:
         return step.label;
       }
