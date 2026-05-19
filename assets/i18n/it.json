@@ -159,5 +159,6 @@
   "save_local_backup_success": "Backup saved",
   "offline_rate": "offline",
   "rate_unavailable": "Rate unavailable",
-  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again."
+  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again.",
+  "exchange_rate_required": "Il tasso di cambio è obbligatorio per le operazioni in valuta estera"
 }
