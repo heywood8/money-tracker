@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.2](https://github.com/heywood8/money-tracker/compare/penny-v0.115.1...penny-v0.115.2) (2026-05-19)
+
+
+### Bug Fixes
+
+* make planned-operation execution atomic to prevent duplicate charges ([#697](https://github.com/heywood8/money-tracker/issues/697)) ([18bc1d8](https://github.com/heywood8/money-tracker/commit/18bc1d8dea6622492482e74a6983d32267688fb1))
+
 ## [0.115.1](https://github.com/heywood8/money-tracker/compare/penny-v0.115.0...penny-v0.115.1) (2026-05-19)
 
 
