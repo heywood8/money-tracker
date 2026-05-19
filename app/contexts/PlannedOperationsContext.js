@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import uuid from 'react-native-uuid';
 import * as PlannedOperationsDB from '../services/PlannedOperationsDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
-import { useOperationsActions } from './OperationsActionsContext';
 import { useDialog } from './DialogContext';
 import { useLocalization } from './LocalizationContext';
 import { formatDate } from '../services/BalanceHistoryDB';
@@ -29,7 +28,6 @@ const getCurrentMonth = () => {
 export const PlannedOperationsProvider = ({ children }) => {
   const { showDialog } = useDialog();
   const { t } = useLocalization();
-  const { addOperation } = useOperationsActions();
   const [plannedOperations, setPlannedOperations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState(null);
@@ -135,13 +133,15 @@ export const PlannedOperationsProvider = ({ children }) => {
   }, [showDialog, t]);
 
   /**
-   * Execute a planned operation — create a real operation with today's date
+   * Execute a planned operation — create a real operation with today's date.
+   * All DB writes (operation insert, balance updates, markExecuted, optional delete)
+   * run in a single transaction so a crash mid-way cannot leave the operation
+   * created but the planned-op still showing as pending.
    */
   const executePlannedOperation = useCallback(async (plannedOp) => {
     try {
       const currentMonth = getCurrentMonth();
 
-      // Build operation data from planned operation template
       const operationData = {
         type: plannedOp.type,
         amount: plannedOp.amount,
@@ -152,25 +152,25 @@ export const PlannedOperationsProvider = ({ children }) => {
         description: plannedOp.name || plannedOp.description || null,
       };
 
-      // Create the real operation
-      const createdOperation = await addOperation(operationData);
+      // Single atomic transaction: insert operation + mark executed + optional delete
+      const createdOperation = await PlannedOperationsDB.executeAndMark(
+        plannedOp, operationData, currentMonth,
+      );
 
-      // Mark as executed
-      await PlannedOperationsDB.markExecuted(plannedOp.id, currentMonth);
-
-      // Update local state
+      // Update local React state after the DB commit succeeds
       if (plannedOp.isRecurring) {
-        // For recurring: update lastExecutedMonth
         setPlannedOperations(prev =>
           prev.map(op => op.id === plannedOp.id
             ? { ...op, lastExecutedMonth: currentMonth }
             : op),
         );
       } else {
-        // For one-time: remove from list after execution
-        await PlannedOperationsDB.deletePlannedOperation(plannedOp.id);
         setPlannedOperations(prev => prev.filter(op => op.id !== plannedOp.id));
       }
+
+      // Trigger reloads in other contexts (operations list, account balances, budgets)
+      appEvents.emit(EVENTS.OPERATION_CHANGED);
+      appEvents.emit(EVENTS.RELOAD_ALL);
 
       return createdOperation;
     } catch (error) {
@@ -178,7 +178,7 @@ export const PlannedOperationsProvider = ({ children }) => {
       showDialog(t('error'), error.message, [{ text: t('ok') }]);
       throw error;
     }
-  }, [addOperation, showDialog, t]);
+  }, [showDialog, t]);
 
   /**
    * Check if a planned operation has been executed this month
