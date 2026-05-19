@@ -426,6 +426,82 @@ const calculateBalanceChanges = (operation) => {
 };
 
 /**
+ * Insert a new operation and update account balances within an existing transaction.
+ * Callers that need to combine this work with other SQL (e.g. marking a planned
+ * operation as executed) should call this inside their own executeTransaction so
+ * all writes are committed or rolled back together.
+ *
+ * @param {Object} db - The transaction-scoped database instance
+ * @param {Object} operation - Operation data (camelCase, same shape as createOperation)
+ * @returns {Promise<Object>} Created operation data with snake_case fields and auto-generated id
+ */
+export const createOperationInTx = async (db, operation) => {
+  if (!OPERATION_TYPES.includes(operation.type)) {
+    throw new Error(`Invalid operation type: "${operation.type}". Must be one of: ${OPERATION_TYPES.join(', ')}`);
+  }
+
+  const now = new Date().toISOString();
+
+  const extractId = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'object' && value !== null && value.id !== undefined) return value.id;
+    return value;
+  };
+
+  const operationData = {
+    type: operation.type,
+    amount: operation.amount,
+    account_id: extractId(operation.accountId),
+    category_id: extractId(operation.categoryId),
+    to_account_id: extractId(operation.toAccountId),
+    date: operation.date,
+    created_at: now,
+    description: operation.description || null,
+    exchange_rate: operation.exchangeRate || null,
+    destination_amount: operation.destinationAmount || null,
+    source_currency: operation.sourceCurrency || null,
+    destination_currency: operation.destinationCurrency || null,
+  };
+
+  const result = await db.runAsync(
+    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      operationData.type, operationData.amount, operationData.account_id,
+      operationData.category_id, operationData.to_account_id, operationData.date,
+      operationData.created_at, operationData.description, operationData.exchange_rate,
+      operationData.destination_amount, operationData.source_currency, operationData.destination_currency,
+    ],
+  );
+
+  operationData.id = result.lastInsertRowId;
+
+  const balanceChanges = calculateBalanceChanges(operationData);
+  const updateTime = new Date().toISOString();
+
+  for (const [accountId, delta] of balanceChanges.entries()) {
+    if (Currency.isZero(delta)) continue;
+
+    const account = await db.getFirstAsync('SELECT balance FROM accounts WHERE id = ?', [accountId]);
+
+    if (!account) {
+      console.warn(`Account ${accountId} not found, skipping balance update`);
+      continue;
+    }
+
+    const newBalance = Currency.add(account.balance, delta);
+
+    await db.runAsync(
+      'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+      [newBalance, updateTime, accountId],
+    );
+
+    await updateTodayBalance(accountId, newBalance, db);
+  }
+
+  return operationData;
+};
+
+/**
  * Create a new operation
  * @param {Object} operation - Operation data (ID will be auto-generated)
  * @returns {Promise<Object>}
@@ -435,91 +511,10 @@ export const createOperation = async (operation) => {
     if (!OPERATION_TYPES.includes(operation.type)) {
       throw new Error(`Invalid operation type: "${operation.type}". Must be one of: ${OPERATION_TYPES.join(', ')}`);
     }
-
-    const now = new Date().toISOString();
-
-    // Safely extract primitive IDs (handle case where objects might be passed)
-    const extractId = (value) => {
-      if (value === null || value === undefined || value === '') return null;
-      if (typeof value === 'object' && value !== null && value.id !== undefined) return value.id;
-      return value;
-    };
-    
-    const operationData = {
-      type: operation.type,
-      amount: operation.amount,
-      account_id: extractId(operation.accountId),
-      category_id: extractId(operation.categoryId),
-      to_account_id: extractId(operation.toAccountId),
-      date: operation.date,
-      created_at: now,
-      description: operation.description || null,
-      exchange_rate: operation.exchangeRate || null,
-      destination_amount: operation.destinationAmount || null,
-      source_currency: operation.sourceCurrency || null,
-      destination_currency: operation.destinationCurrency || null,
-    };
-
-    let newOperationId;
-
+    let operationData;
     await executeTransaction(async (db) => {
-      // Insert operation (ID will be auto-generated)
-      const insertParams = [
-        operationData.type,
-        operationData.amount,
-        operationData.account_id,
-        operationData.category_id,
-        operationData.to_account_id,
-        operationData.date,
-        operationData.created_at,
-        operationData.description,
-        operationData.exchange_rate,
-        operationData.destination_amount,
-        operationData.source_currency,
-        operationData.destination_currency,
-      ];
-
-      const result = await db.runAsync(
-        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        insertParams,
-      );
-
-      // Store the auto-generated ID
-      newOperationId = result.lastInsertRowId;
-      operationData.id = newOperationId;
-
-      // Update account balances within the same transaction
-      const balanceChanges = calculateBalanceChanges(operationData);
-      const updateTime = new Date().toISOString();
-
-      for (const [accountId, delta] of balanceChanges.entries()) {
-        if (Currency.isZero(delta)) continue;
-
-        // Get current balance
-        const account = await db.getFirstAsync(
-          'SELECT balance FROM accounts WHERE id = ?',
-          [accountId],
-        );
-
-        if (!account) {
-          console.warn(`Account ${accountId} not found, skipping balance update`);
-          continue;
-        }
-
-        // Use Currency utilities for precise arithmetic
-        const newBalance = Currency.add(account.balance, delta);
-
-        // Update balance
-        await db.runAsync(
-          'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
-          [newBalance, updateTime, accountId],
-        );
-
-        // Update today's balance history
-        await updateTodayBalance(accountId, newBalance, db);
-      }
+      operationData = await createOperationInTx(db, operation);
     });
-
     return operationData;
   } catch (error) {
     console.error('Failed to create operation:', error);

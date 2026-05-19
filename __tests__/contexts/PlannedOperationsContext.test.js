@@ -13,6 +13,7 @@ jest.mock('../../app/services/PlannedOperationsDB');
 jest.mock('../../app/services/BalanceHistoryDB', () => ({
   formatDate: jest.fn((date) => date.toISOString().split('T')[0]),
 }));
+
 jest.mock('../../app/services/eventEmitter', () => ({
   appEvents: {
     on: jest.fn(() => jest.fn()),
@@ -21,6 +22,7 @@ jest.mock('../../app/services/eventEmitter', () => ({
   EVENTS: {
     RELOAD_ALL: 'RELOAD_ALL',
     DATABASE_RESET: 'DATABASE_RESET',
+    OPERATION_CHANGED: 'OPERATION_CHANGED',
   },
 }));
 
@@ -41,13 +43,6 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
   }),
 }));
 
-const mockAddOperation = jest.fn();
-jest.mock('../../app/contexts/OperationsActionsContext', () => ({
-  useOperationsActions: () => ({
-    addOperation: mockAddOperation,
-  }),
-}));
-
 let mockUuidCounter = 0;
 jest.mock('react-native-uuid', () => ({
   v4: jest.fn(() => `test-uuid-${++mockUuidCounter}`),
@@ -57,7 +52,6 @@ describe('PlannedOperationsContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowDialog.mockClear();
-    mockAddOperation.mockClear();
     mockUuidCounter = 0;
 
     PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([]);
@@ -65,6 +59,7 @@ describe('PlannedOperationsContext', () => {
     PlannedOperationsDB.updatePlannedOperation.mockResolvedValue(undefined);
     PlannedOperationsDB.deletePlannedOperation.mockResolvedValue(undefined);
     PlannedOperationsDB.markExecuted.mockResolvedValue(undefined);
+    PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100, type: 'expense' });
     PlannedOperationsDB.validatePlannedOperation.mockReturnValue(null);
   });
 
@@ -170,7 +165,7 @@ describe('PlannedOperationsContext', () => {
   });
 
   describe('Execute Planned Operation', () => {
-    it('creates a real operation and marks as executed for recurring', async () => {
+    it('calls executeAndMark atomically and updates state for recurring', async () => {
       const plannedOp = {
         id: '1',
         name: 'Rent',
@@ -182,7 +177,7 @@ describe('PlannedOperationsContext', () => {
         lastExecutedMonth: null,
       };
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
-      mockAddOperation.mockResolvedValue({ id: 100 });
+      PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100, type: 'expense' });
 
       const { result } = renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -191,24 +186,47 @@ describe('PlannedOperationsContext', () => {
         await result.current.executePlannedOperation(plannedOp);
       });
 
-      // Should have created a real operation
-      expect(mockAddOperation).toHaveBeenCalledWith(
+      // Should have used the atomic executeAndMark, not separate calls
+      expect(PlannedOperationsDB.executeAndMark).toHaveBeenCalledWith(
+        plannedOp,
         expect.objectContaining({
           type: 'expense',
           amount: '500',
           accountId: 1,
           categoryId: 'cat1',
         }),
+        expect.stringMatching(/^\d{4}-\d{2}$/),
       );
 
-      // Should have marked as executed
-      expect(PlannedOperationsDB.markExecuted).toHaveBeenCalledWith('1', expect.stringMatching(/^\d{4}-\d{2}$/));
+      // markExecuted and deletePlannedOperation should NOT be called separately
+      expect(PlannedOperationsDB.markExecuted).not.toHaveBeenCalled();
+      expect(PlannedOperationsDB.deletePlannedOperation).not.toHaveBeenCalled();
 
-      // Recurring should stay in list
+      // Recurring should stay in list with updated lastExecutedMonth
       expect(result.current.plannedOperations).toHaveLength(1);
+      expect(result.current.plannedOperations[0].lastExecutedMonth).toMatch(/^\d{4}-\d{2}$/);
     });
 
-    it('removes one-time planned operation after execution', async () => {
+    it('emits OPERATION_CHANGED and RELOAD_ALL after successful execution', async () => {
+      const plannedOp = {
+        id: '1', name: 'Rent', type: 'expense', amount: '500',
+        accountId: 1, categoryId: 'cat1', isRecurring: true, lastExecutedMonth: null,
+      };
+      PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+      PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100 });
+
+      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.executePlannedOperation(plannedOp);
+      });
+
+      expect(appEvents.emit).toHaveBeenCalledWith('OPERATION_CHANGED');
+      expect(appEvents.emit).toHaveBeenCalledWith('RELOAD_ALL');
+    });
+
+    it('removes one-time planned operation from state after execution', async () => {
       const plannedOp = {
         id: '2',
         name: 'One-time',
@@ -220,7 +238,7 @@ describe('PlannedOperationsContext', () => {
         lastExecutedMonth: null,
       };
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
-      mockAddOperation.mockResolvedValue({ id: 101 });
+      PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 101 });
 
       const { result } = renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -229,8 +247,12 @@ describe('PlannedOperationsContext', () => {
         await result.current.executePlannedOperation(plannedOp);
       });
 
-      // One-time should be removed from list
-      expect(PlannedOperationsDB.deletePlannedOperation).toHaveBeenCalledWith('2');
+      // executeAndMark handles the DB delete atomically; context removes from local state
+      expect(PlannedOperationsDB.executeAndMark).toHaveBeenCalledWith(
+        plannedOp, expect.any(Object), expect.any(String),
+      );
+      // No separate deletePlannedOperation call
+      expect(PlannedOperationsDB.deletePlannedOperation).not.toHaveBeenCalled();
       expect(result.current.plannedOperations).toHaveLength(0);
     });
 
@@ -247,6 +269,7 @@ describe('PlannedOperationsContext', () => {
         lastExecutedMonth: currentMonth,
       };
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
+      PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100 });
 
       const { result } = renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -256,7 +279,7 @@ describe('PlannedOperationsContext', () => {
         expect(returned).not.toBeNull();
       });
 
-      expect(mockAddOperation).toHaveBeenCalled();
+      expect(PlannedOperationsDB.executeAndMark).toHaveBeenCalled();
     });
   });
 
@@ -448,8 +471,8 @@ describe('PlannedOperationsContext', () => {
   });
 
   describe('executePlannedOperation error handling', () => {
-    it('shows dialog and re-throws when addOperation fails', async () => {
-      mockAddOperation.mockRejectedValue(new Error('add failed'));
+    it('shows dialog and re-throws when executeAndMark fails', async () => {
+      PlannedOperationsDB.executeAndMark.mockRejectedValue(new Error('atomic transaction failed'));
 
       const plannedOp = {
         id: '1', name: 'Test', type: 'expense', amount: '100',
@@ -469,8 +492,12 @@ describe('PlannedOperationsContext', () => {
         }
       });
 
-      expect(caughtError?.message).toBe('add failed');
+      expect(caughtError?.message).toBe('atomic transaction failed');
       expect(mockShowDialog).toHaveBeenCalled();
+      // State must not be changed on failure
+      expect(result.current.plannedOperations).toHaveLength(1);
+      // No events should have been emitted
+      expect(appEvents.emit).not.toHaveBeenCalled();
     });
   });
 });

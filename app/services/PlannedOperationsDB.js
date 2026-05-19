@@ -1,4 +1,5 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction } from './db';
+import { createOperationInTx } from './OperationsDB';
 
 /**
  * Map database field names to camelCase for application use
@@ -256,6 +257,42 @@ export const markExecuted = async (id, monthStr) => {
     );
   } catch (error) {
     console.error('Failed to mark planned operation as executed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Atomically execute a planned operation in a single SQLite transaction:
+ * inserts the real operation, adjusts account balances, marks the planned
+ * operation as executed, and (for one-time plans) deletes it.
+ *
+ * This prevents the partial-failure window where a crash between any two of
+ * the formerly separate calls would leave the operation created but the
+ * planned-op still marked as pending, enabling a silent double-charge.
+ *
+ * @param {Object} plannedOp - The planned operation being executed
+ * @param {Object} operationData - Real operation to create (camelCase fields)
+ * @param {string} currentMonth - 'YYYY-MM' string for this execution
+ * @returns {Promise<Object>} The created operation (snake_case fields, auto-generated id)
+ */
+export const executeAndMark = async (plannedOp, operationData, currentMonth) => {
+  let createdOperation;
+  try {
+    await executeTransaction(async (db) => {
+      createdOperation = await createOperationInTx(db, operationData);
+
+      await db.runAsync(
+        'UPDATE planned_operations SET last_executed_month = ?, updated_at = ? WHERE id = ?',
+        [currentMonth, new Date().toISOString(), plannedOp.id],
+      );
+
+      if (!plannedOp.isRecurring) {
+        await db.runAsync('DELETE FROM planned_operations WHERE id = ?', [plannedOp.id]);
+      }
+    });
+    return createdOperation;
+  } catch (error) {
+    console.error('Failed to atomically execute planned operation:', error);
     throw error;
   }
 };
