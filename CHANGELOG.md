@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.1](https://github.com/heywood8/money-tracker/compare/penny-v0.115.0...penny-v0.115.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* enforce operations.type enum at SQLite and JS layers ([#695](https://github.com/heywood8/money-tracker/issues/695)) ([251cb3b](https://github.com/heywood8/money-tracker/commit/251cb3b845ef8514aeeb82c836b8903d6ffa1809))
+
 ## [0.115.0](https://github.com/heywood8/money-tracker/compare/penny-v0.114.15...penny-v0.115.0) (2026-05-18)
 
 
