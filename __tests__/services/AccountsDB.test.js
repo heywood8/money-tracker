@@ -966,6 +966,55 @@ describe('AccountsDB', () => {
       await expect(AccountsDB.adjustAccountBalance('acc-1', '100.00'))
         .rejects.toThrow('Adjustment failed');
     });
+
+    it('does nothing when balance is unchanged and no existing adjustment for today', async () => {
+      // Regression: calling adjustAccountBalance with the same balance (delta = 0) and
+      // no prior adjustment today used to attempt an INSERT with amount "0.00", which
+      // crashed with NativeDatabase.prepareAsync rejection.
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '896500.00' }) // current balance
+          .mockResolvedValueOnce(null), // no existing adjustment operation
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn(),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      // Same balance — no change
+      await AccountsDB.adjustAccountBalance('acc-1', '896500.00');
+
+      // No INSERT or UPDATE should have been issued
+      expect(mockDb.runAsync).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when balance string format differs but value is unchanged', async () => {
+      // Regression: "896500" vs "896500.00" — numerically the same, should not INSERT
+      const mockDb = {
+        getFirstAsync: jest.fn()
+          .mockResolvedValueOnce({ balance: '896500.00' }) // stored with decimals
+          .mockResolvedValueOnce(null),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-expense', category_type: 'expense', is_shadow: 1 },
+          { id: 'shadow-income', category_type: 'income', is_shadow: 1 },
+        ]),
+        runAsync: jest.fn(),
+      };
+
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
+        await callback(mockDb);
+      });
+
+      // Balance passed without decimals — same numeric value
+      await AccountsDB.adjustAccountBalance('acc-1', '896500');
+
+      expect(mockDb.runAsync).not.toHaveBeenCalled();
+    });
   });
 
   // Regression tests for data integrity

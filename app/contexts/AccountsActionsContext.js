@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import * as AccountsDB from '../services/AccountsDB';
+import * as Currency from '../services/currency';
 import { dropAllTables, getDatabase, closeDatabase } from '../services/db';
 import { forceDeleteDatabase } from '../utils/emergencyReset';
 import { appEvents, EVENTS } from '../services/eventEmitter';
@@ -64,8 +65,10 @@ export const AccountsActionsProvider = ({ children }) => {
         throw new Error('Account not found');
       }
 
-      // Check if balance is being changed
-      const balanceChanged = updated.balance !== undefined && currentAccount.balance !== String(updated.balance);
+      // Check if balance is being changed (numeric comparison avoids false positives
+      // when the string format differs, e.g. "100" vs "100.00" after Currency.add)
+      const balanceChanged = updated.balance !== undefined &&
+        Currency.compare(currentAccount.balance, updated.balance) !== 0;
 
       if (balanceChanged && createAdjustmentOperation) {
         // Use adjustAccountBalance for balance changes to create adjustment operations
@@ -78,6 +81,9 @@ export const AccountsActionsProvider = ({ children }) => {
         }
         if (updated.currency !== undefined && updated.currency !== currentAccount.currency) {
           nonBalanceUpdates.currency = updated.currency;
+        }
+        if (updated.hidden !== undefined && updated.hidden !== currentAccount.hidden) {
+          nonBalanceUpdates.hidden = updated.hidden;
         }
 
         if (Object.keys(nonBalanceUpdates).length > 0) {

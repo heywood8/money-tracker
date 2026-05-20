@@ -591,6 +591,14 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           await BalanceHistoryDB.updateTodayBalance(accountId, newBalanceValue, db);
         }
       } else {
+        // No existing adjustment for today — if delta is zero there is nothing to do.
+        // This guards against calling adjustAccountBalance when the balance hasn't
+        // actually changed (e.g. only a non-balance field like 'hidden' was edited)
+        // which would otherwise try to INSERT a zero-amount operation and crash.
+        if (Currency.isZero(totalDeltaStr)) {
+          return;
+        }
+
         // Create new adjustment operation, recording original_balance in its own column
         console.log('Creating new adjustment operation:', {
           type: operationType,
