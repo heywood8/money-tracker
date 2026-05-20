@@ -293,7 +293,7 @@ describe('AccountsActionsContext', () => {
       expect(mockShowDialog).toHaveBeenCalled();
     });
 
-    it('supports updating hidden field', async () => {
+    it('supports updating hidden field without balance', async () => {
       const { result } = renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
@@ -302,6 +302,39 @@ describe('AccountsActionsContext', () => {
       });
 
       expect(AccountsDB.updateAccount).toHaveBeenCalledWith('acc-1', { hidden: true });
+    });
+
+    it('propagates hidden field when balance also changes with createAdjustmentOperation=true', async () => {
+      // Regression: when balance changes AND createAdjustmentOperation=true, the hidden
+      // field was missing from nonBalanceUpdates, so it would never be saved.
+      const { result } = renderHook(() => useAccounts(), { wrapper });
+      await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.updateAccount('acc-1', { balance: '200', hidden: true }, true);
+      });
+
+      expect(AccountsDB.adjustAccountBalance).toHaveBeenCalledWith('acc-1', '200', '');
+      expect(AccountsDB.updateAccount).toHaveBeenCalledWith('acc-1', { hidden: true });
+    });
+
+    it('does not call adjustAccountBalance when balance is numerically unchanged (string format differs)', async () => {
+      // Regression: "100" vs "100.00" should be treated as equal — numeric comparison
+      // prevents a spurious adjustAccountBalance call that would try to INSERT a 0.00
+      // adjustment operation and crash with NativeDatabase.prepareAsync rejection.
+      const accountWithFormattedBalance = { id: 'acc-1', name: 'Old Name', balance: '100.00', currency: 'USD' };
+      AccountsDB.getAllAccounts.mockResolvedValue([accountWithFormattedBalance]);
+
+      const { result } = renderHook(() => useAccounts(), { wrapper });
+      await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+      await act(async () => {
+        // balance "100" is numerically equal to stored "100.00"
+        await result.current.updateAccount('acc-1', { balance: '100', hidden: true }, true);
+      });
+
+      expect(AccountsDB.adjustAccountBalance).not.toHaveBeenCalled();
+      expect(AccountsDB.updateAccount).toHaveBeenCalledWith('acc-1', expect.objectContaining({ hidden: true }));
     });
   });
 
