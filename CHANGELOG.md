@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.0](https://github.com/heywood8/money-tracker/compare/penny-v0.115.5...penny-v0.116.0) (2026-05-20)
+
+
+### Features
+
+* **currencies:** add Georgian Lari (GEL) ([#709](https://github.com/heywood8/money-tracker/issues/709)) ([67de578](https://github.com/heywood8/money-tracker/commit/67de5785f0ad1101321623ae32d8b4830909a859))
+
 ## [0.115.5](https://github.com/heywood8/money-tracker/compare/penny-v0.115.4...penny-v0.115.5) (2026-05-20)
 
 
