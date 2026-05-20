@@ -1831,6 +1831,16 @@ const styles = StyleSheet.create({
     ...centeredModal,
     overflow: 'hidden',
   },
+  moreReleasesLink: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+  },
+  moreReleasesLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   resetSpacer: {
     height: SPACING.sm,
   },
@@ -1936,16 +1946,6 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     width: 44,
-  },
-  moreReleasesLink: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-  },
-  moreReleasesLinkText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   upToDateContent: {
     flex: 1,
