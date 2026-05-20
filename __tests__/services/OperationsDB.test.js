@@ -41,6 +41,9 @@ describe('OperationsDB Service', () => {
     Currency.add.mockImplementation((a, b) => String(parseFloat(a) + parseFloat(b)));
     Currency.subtract.mockImplementation((a, b) => String(parseFloat(a) - parseFloat(b)));
     Currency.isZero.mockImplementation((a) => parseFloat(a) === 0);
+    Currency.convertAmount.mockImplementation((amount, _from, _to, rate) =>
+      String(parseFloat(amount) * parseFloat(rate)),
+    );
 
     // SEARCH_NORM is available in tests so search SQL uses SEARCH_NORM(...)
     isSearchNormAvailable.mockReturnValue(true);
@@ -223,13 +226,15 @@ describe('OperationsDB Service', () => {
       };
 
       mockDb.getFirstAsync
-        .mockResolvedValueOnce({ balance: '1000' }) // Source account
-        .mockResolvedValueOnce({ balance: '500' });  // Destination account
+        .mockResolvedValueOnce({ currency: null }) // acc1 currency (same-currency: no conversion)
+        .mockResolvedValueOnce({ currency: null }) // acc2 currency
+        .mockResolvedValueOnce({ balance: '1000' }) // Source account balance
+        .mockResolvedValueOnce({ balance: '500' });  // Destination account balance
 
       await OperationsDB.createOperation(operation);
 
       // Should update both accounts
-      expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(2);
+      expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(4);
 
       // Source account should be reduced
       expect(Currency.add).toHaveBeenCalledWith('1000', '-300');
@@ -301,6 +306,8 @@ describe('OperationsDB Service', () => {
       };
 
       mockDb.getFirstAsync
+        .mockResolvedValueOnce({ currency: null }) // acc1 currency (same-currency: no conversion)
+        .mockResolvedValueOnce({ currency: null }) // acc2 currency
         .mockResolvedValueOnce({ balance: '1000' })
         .mockResolvedValueOnce({ balance: '500' });
 
@@ -518,6 +525,8 @@ describe('OperationsDB Service', () => {
 
       mockDb.getFirstAsync
         .mockResolvedValueOnce(operation)
+        .mockResolvedValueOnce({ currency: null }) // acc1 currency (same-currency: no conversion)
+        .mockResolvedValueOnce({ currency: null }) // acc2 currency
         .mockResolvedValueOnce({ balance: '700' })  // acc1
         .mockResolvedValueOnce({ balance: '800' }); // acc2
 
@@ -996,6 +1005,75 @@ describe('OperationsDB Service', () => {
 
       // Both should use transactions
       expect(executeTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses exchange_rate to credit destination when destination_amount is null on cross-currency transfer', async () => {
+      const operation = {
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-usd',
+        toAccountId: 'acc-eur',
+        exchangeRate: '0.9',
+        date: '2025-12-05',
+        // destination_amount intentionally omitted (simulates data-loss scenario)
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce({ currency: 'USD' }) // source account currency
+        .mockResolvedValueOnce({ currency: 'EUR' }) // destination account currency
+        .mockResolvedValueOnce({ balance: '1000.00' }) // source account balance
+        .mockResolvedValueOnce({ balance: '500.00' });  // destination account balance
+
+      await OperationsDB.createOperation(operation);
+
+      // Source debited 100 USD
+      expect(Currency.add).toHaveBeenCalledWith('1000.00', '-100');
+      // Destination credited with convertAmount(100, USD, EUR, 0.9) = 90
+      expect(Currency.convertAmount).toHaveBeenCalledWith('100', 'USD', 'EUR', '0.9');
+      expect(Currency.add).toHaveBeenCalledWith('500.00', '90');
+    });
+
+    it('throws when destination_amount is null, currencies differ, and exchange_rate is missing', async () => {
+      const operation = {
+        type: 'transfer',
+        amount: '100',
+        accountId: 'acc-usd',
+        toAccountId: 'acc-eur',
+        // No exchangeRate and no destinationAmount
+        date: '2025-12-05',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce({ currency: 'USD' })
+        .mockResolvedValueOnce({ currency: 'EUR' });
+
+      await expect(OperationsDB.createOperation(operation)).rejects.toThrow(
+        'missing destination_amount and exchange_rate',
+      );
+    });
+
+    it('falls back to source amount for same-currency transfers missing destination_amount', async () => {
+      const operation = {
+        type: 'transfer',
+        amount: '200',
+        accountId: 'acc1',
+        toAccountId: 'acc2',
+        // No destinationAmount — both accounts share currency
+        date: '2025-12-05',
+      };
+
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce({ currency: 'USD' }) // source
+        .mockResolvedValueOnce({ currency: 'USD' }) // destination — same currency
+        .mockResolvedValueOnce({ balance: '1000.00' })
+        .mockResolvedValueOnce({ balance: '500.00' });
+
+      await OperationsDB.createOperation(operation);
+
+      // Destination receives the source amount unchanged
+      expect(Currency.add).toHaveBeenCalledWith('1000.00', '-200');
+      expect(Currency.add).toHaveBeenCalledWith('500.00', '200');
+      expect(Currency.convertAmount).not.toHaveBeenCalled();
     });
   });
 
@@ -1661,9 +1739,12 @@ describe('OperationsDB Service', () => {
       mockDb.getFirstAsync
         .mockResolvedValueOnce(oldOperation)
         .mockResolvedValueOnce(updatedOperation)
-        .mockResolvedValueOnce({ balance: '1000' })  // acc1
-        .mockResolvedValueOnce({ balance: '500' })   // acc2
-        .mockResolvedValueOnce({ balance: '800' });  // acc3
+        .mockResolvedValueOnce({ currency: null }) // old op acc1 currency (same-currency)
+        .mockResolvedValueOnce({ currency: null }) // old op acc2 currency
+        .mockResolvedValueOnce({ currency: null }) // new op acc1 currency
+        .mockResolvedValueOnce({ currency: null }) // new op acc3 currency
+        .mockResolvedValueOnce({ balance: '500' })  // acc2 balance (acc1 delta is zero, skipped)
+        .mockResolvedValueOnce({ balance: '800' }); // acc3 balance
 
       await OperationsDB.updateOperation(1, { toAccountId: 'acc3' });
 
@@ -1672,6 +1753,7 @@ describe('OperationsDB Service', () => {
         expect.stringContaining('to_account_id = ?'),
         expect.arrayContaining(['acc3', 1]),
       );
+      expect(mockDb.getFirstAsync).toHaveBeenCalledTimes(8);
     });
 
     it('extracts ID from object for toAccountId', async () => {
