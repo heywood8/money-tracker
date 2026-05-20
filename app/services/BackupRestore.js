@@ -361,8 +361,47 @@ export const restoreBackup = async (backup) => {
     console.log('Restoring database from backup...');
     appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'in_progress' });
 
-    // Validate backup
+    // Validate backup structure and enum fields
     validateBackup(backup);
+
+    // Pre-validate account ID references before touching live data.
+    // Build the set of account IDs that will actually be inserted (skipped accounts excluded).
+    const accountIdsInBackup = new Set();
+    for (const account of backup.data.accounts) {
+      if (!account.name) continue;
+      if (account.id != null) accountIdsInBackup.add(account.id);
+    }
+
+    const unmappedAccountIds = [];
+    for (const operation of backup.data.operations) {
+      if (operation.account_id == null) continue;
+      if (!accountIdsInBackup.has(operation.account_id)) {
+        unmappedAccountIds.push(operation.account_id);
+      }
+    }
+
+    if (unmappedAccountIds.length > 0) {
+      const uniqueIds = [...new Set(unmappedAccountIds.map(String))];
+      const sample = uniqueIds.slice(0, 3).join(', ');
+      const extra = uniqueIds.length > 3 ? ` (and ${uniqueIds.length - 3} more)` : '';
+      throw new Error(
+        `Backup references account IDs not found in the backup's accounts list: ${sample}${extra}. Restore aborted — your data has not been changed.`,
+      );
+    }
+
+    // Create a pre-restore snapshot so the user can recover if something goes wrong.
+    let snapshotUri = null;
+    try {
+      const snapshot = await createBackup();
+      const snapshotTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      snapshotUri = `${FileSystem.documentDirectory}pre_restore_${snapshotTimestamp}.json`;
+      await FileSystem.writeAsStringAsync(snapshotUri, JSON.stringify(snapshot, null, 2));
+      console.log('Pre-restore snapshot saved:', snapshotUri);
+    } catch (snapshotError) {
+      console.warn('Failed to create pre-restore snapshot:', snapshotError);
+    }
+
+    let skippedOperations = 0;
 
     await executeTransaction(async (db) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'completed' });
@@ -507,6 +546,7 @@ export const restoreBackup = async (backup) => {
         // Validate that account_id is not null/undefined
         if (mappedAccountId == null) {
           console.warn('Skipping operation with null account_id:', operation);
+          skippedOperations++;
           continue;
         }
 
@@ -778,7 +818,11 @@ export const restoreBackup = async (backup) => {
     });
 
     console.log('Database restored successfully');
-    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'complete', status: 'completed' });
+    appEvents.emit(IMPORT_PROGRESS_EVENT, {
+      stepId: 'complete',
+      status: 'completed',
+      data: { skippedOperations, snapshotUri },
+    });
   } catch (error) {
     console.error('Failed to restore backup:', error);
     throw error;
