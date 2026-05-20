@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.3](https://github.com/heywood8/money-tracker/compare/penny-v0.115.2...penny-v0.115.3) (2026-05-20)
+
+
+### Bug Fixes
+
+* abort restore early when backup has unmapped account IDs, add skip counter and pre-restore snapshot ([#700](https://github.com/heywood8/money-tracker/issues/700)) ([49ac338](https://github.com/heywood8/money-tracker/commit/49ac3381988b7b64945e5e147d11766bfb26ffd8))
+
 ## [0.115.2](https://github.com/heywood8/money-tracker/compare/penny-v0.115.1...penny-v0.115.2) (2026-05-19)
 
 
