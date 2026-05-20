@@ -100,6 +100,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = UPDATE_CHECK_TIME
 };
 
 const MAX_RELEASES_TO_CHECK = 20;
+const MAX_CHANGELOG_ENTRIES = 10;
 
 export const checkForAppUpdate = async ({
   currentVersion = APP_VERSION,
@@ -158,6 +159,7 @@ export const checkForAppUpdate = async ({
     let bestRelease = null; // highest-version release with a downloadable APK
     let foundReleasesWithoutApk = false;
     const newerReleases = []; // all releases with version > current, for changelog
+    const recentReleasesWithApk = []; // up to MAX_CHANGELOG_ENTRIES recent releases with APKs (any version)
 
     for (const release of releases) {
       const releaseVersion = parseVersionFromRelease(release);
@@ -165,11 +167,17 @@ export const checkForAppUpdate = async ({
         continue;
       }
 
+      const apkAsset = extractApkAsset(release.assets);
+
+      // Collect recent releases with APKs for changelog display regardless of version
+      if (apkAsset && release.body && recentReleasesWithApk.length < MAX_CHANGELOG_ENTRIES) {
+        recentReleasesWithApk.push({ version: releaseVersion, notes: release.body });
+      }
+
       if (compareVersions(releaseVersion, currentNormalized) <= 0) {
         continue; // not newer than current — skip
       }
 
-      const apkAsset = extractApkAsset(release.assets);
       newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset });
 
       if (apkAsset && (!bestRelease || compareVersions(releaseVersion, bestRelease.version) > 0)) {
@@ -187,12 +195,17 @@ export const checkForAppUpdate = async ({
       }
     }
 
+    const releasesUrl = `https://github.com/${owner}/${repo}/releases`;
+    const recentReleaseNotes = recentReleasesWithApk.length > 0 ? recentReleasesWithApk : null;
+
     if (newerReleases.length === 0) {
       // Nothing newer found at all — either up to date or all releases lacked versions
       return {
         success: true,
         isUpdateAvailable: false,
         currentVersion: currentNormalized,
+        releasesUrl,
+        recentReleaseNotes,
       };
     }
 
@@ -220,6 +233,8 @@ export const checkForAppUpdate = async ({
       publishedAt: bestRelease.publishedAt,
       releaseName: bestRelease.releaseName,
       releaseNotes: releaseNotes.length > 0 ? releaseNotes : null,
+      releasesUrl,
+      recentReleaseNotes,
     };
 
   } catch (error) {

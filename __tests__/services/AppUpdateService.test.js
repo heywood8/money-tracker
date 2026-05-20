@@ -275,6 +275,67 @@ describe('AppUpdateService', () => {
       expect(result.isUpdateAvailable).toBe(false);
     });
 
+    it('includes recentReleaseNotes with up to 10 APK releases when up to date', async () => {
+      const apk = (v) => ({ name: `penny-v${v}.apk`, browser_download_url: `https://example.com/penny-v${v}.apk` });
+      const releases = Array.from({ length: 12 }, (_, i) => ({
+        tag_name: `v0.50.${i + 1}`,
+        assets: [apk(`0.50.${i + 1}`)],
+        body: `Release notes for 0.50.${i + 1}`,
+      }));
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => releases,
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.50.12',
+        fetchImpl,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.isUpdateAvailable).toBe(false);
+      expect(result.recentReleaseNotes).not.toBeNull();
+      expect(result.recentReleaseNotes.length).toBe(10);
+      expect(result.releasesUrl).toBe('https://github.com/heywood8/money-tracker/releases');
+    });
+
+    it('includes recentReleaseNotes in available result and excludes releases without notes', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v0.50.5',
+            assets: [{ name: 'penny-v0.50.5.apk', browser_download_url: 'https://example.com/penny-v0.50.5.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.5',
+            body: 'New features in 0.50.5',
+          },
+          {
+            tag_name: 'v0.50.4',
+            assets: [{ name: 'penny-v0.50.4.apk', browser_download_url: 'https://example.com/penny-v0.50.4.apk' }],
+            // no body — should be excluded from recentReleaseNotes
+          },
+          {
+            tag_name: 'v0.50.3',
+            assets: [{ name: 'penny-v0.50.3.apk', browser_download_url: 'https://example.com/penny-v0.50.3.apk' }],
+            body: 'Fixes in 0.50.3',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.50.3',
+        fetchImpl,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.isUpdateAvailable).toBe(true);
+      expect(result.recentReleaseNotes).not.toBeNull();
+      expect(result.recentReleaseNotes.length).toBe(2); // 0.50.5 and 0.50.3 have bodies; 0.50.4 does not
+      expect(result.recentReleaseNotes[0].version).toBe('0.50.5');
+      expect(result.recentReleaseNotes[1].version).toBe('0.50.3');
+      expect(result.releasesUrl).toBe('https://github.com/heywood8/money-tracker/releases');
+    });
+
     it('handles GitHub rate limiting response gracefully', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: false,
