@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.2](https://github.com/heywood8/money-tracker/compare/penny-v0.116.1...penny-v0.116.2) (2026-05-20)
+
+
+### Bug Fixes
+
+* validate currencies before falling back on null destination_amount in transfers ([#708](https://github.com/heywood8/money-tracker/issues/708)) ([c4df4f6](https://github.com/heywood8/money-tracker/commit/c4df4f67aac79470b87ca24ead4410958c284494))
+
 ## [0.116.1](https://github.com/heywood8/money-tracker/compare/penny-v0.116.0...penny-v0.116.1) (2026-05-20)
 
 
