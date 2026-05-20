@@ -78,38 +78,47 @@ export const createAccount = async (account) => {
 };
 
 /**
- * Update an existing account using Drizzle
+ * Update an existing account using a single atomic transaction
  * @param {string} id
  * @param {Object} updates
  * @returns {Promise<void>}
  */
 export const updateAccount = async (id, updates) => {
   try {
-    const db = await getDrizzle();
     const updatedAt = new Date().toISOString();
-    const updateData = { updatedAt };
 
-    // Build update object based on provided fields
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.balance !== undefined) updateData.balance = updates.balance;
-    if (updates.currency !== undefined) updateData.currency = updates.currency;
-    if (updates.hidden !== undefined) updateData.hidden = updates.hidden ? 1 : 0;
+    // Build SET clause and params for raw SQL
+    const setClauses = [];
+    const params = [];
+
+    if (updates.name !== undefined) { setClauses.push('name = ?'); params.push(updates.name); }
+    if (updates.balance !== undefined) { setClauses.push('balance = ?'); params.push(updates.balance); }
+    if (updates.currency !== undefined) { setClauses.push('currency = ?'); params.push(updates.currency); }
+    if (updates.hidden !== undefined) { setClauses.push('hidden = ?'); params.push(updates.hidden ? 1 : 0); }
     if (updates.monthly_target !== undefined || updates.monthlyTarget !== undefined) {
-      updateData.monthlyTarget = updates.monthly_target ?? updates.monthlyTarget;
+      setClauses.push('monthly_target = ?');
+      params.push(updates.monthly_target ?? updates.monthlyTarget);
     }
 
-    if (Object.keys(updateData).length === 1) {
-      return; // Nothing to update besides updatedAt
+    if (setClauses.length === 0) {
+      return; // Nothing to update
     }
 
-    await db.update(accounts)
-      .set(updateData)
-      .where(eq(accounts.id, id));
+    setClauses.push('updated_at = ?');
+    params.push(updatedAt);
+    params.push(id);
 
-    // Update today's balance history if balance changed
-    if (updates.balance !== undefined) {
-      await BalanceHistoryDB.updateTodayBalance(id, updates.balance);
-    }
+    await executeTransaction(async (db) => {
+      await db.runAsync(
+        `UPDATE accounts SET ${setClauses.join(', ')} WHERE id = ?`,
+        params,
+      );
+
+      // Update today's balance history inside the same transaction
+      if (updates.balance !== undefined) {
+        await BalanceHistoryDB.updateTodayBalance(id, updates.balance, db);
+      }
+    });
   } catch (error) {
     console.error('Failed to update account:', error);
     throw error;

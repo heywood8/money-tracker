@@ -377,7 +377,10 @@ export const updateTodayBalance = async (accountId, balance, db = null) => {
     }
   } catch (error) {
     console.error('Failed to update today balance:', error);
-    // Don't throw - balance history is supplementary data
-    // We don't want to fail the main operation if history update fails
+    if (db) {
+      // Re-throw inside a caller-supplied transaction so it rolls back atomically
+      throw error;
+    }
+    // Swallow when called standalone — history is supplementary data
   }
 };

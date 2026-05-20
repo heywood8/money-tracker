@@ -191,64 +191,81 @@ describe('AccountsDB', () => {
   });
 
   describe('updateAccount', () => {
-    it('updates account name only', async () => {
-      const updates = { name: 'Updated Name' };
-      mockDrizzle.where.mockResolvedValue(undefined);
+    let mockTxDb;
 
-      await AccountsDB.updateAccount('1', updates);
-
-      expect(mockDrizzle.update).toHaveBeenCalled();
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Updated Name',
-          updatedAt: expect.any(String),
-        }),
-      );
-      expect(mockDrizzle.where).toHaveBeenCalled();
+    beforeEach(() => {
+      mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
     });
 
-    it('updates account balance only', async () => {
-      const updates = { balance: '200.00' };
-      mockDrizzle.where.mockResolvedValue(undefined);
+    it('uses a single transaction wrapping account update and history update', async () => {
+      await AccountsDB.updateAccount('1', { name: 'Updated Name' });
 
-      await AccountsDB.updateAccount('1', updates);
+      expect(db.executeTransaction).toHaveBeenCalledWith(expect.any(Function));
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE accounts SET'),
+        expect.arrayContaining(['Updated Name', expect.any(String), '1']),
+      );
+    });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          balance: '200.00',
-          updatedAt: expect.any(String),
-        }),
+    it('updates account name only', async () => {
+      await AccountsDB.updateAccount('1', { name: 'Updated Name' });
+
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('name = ?'),
+        expect.arrayContaining(['Updated Name']),
+      );
+      // No balance → only one runAsync call (account update, no history)
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates account balance and writes history in same transaction', async () => {
+      await AccountsDB.updateAccount('1', { balance: '200.00' });
+
+      // First call: UPDATE accounts; second call: INSERT OR REPLACE into balance history
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(2);
+      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('balance = ?'),
+        expect.arrayContaining(['200.00', '1']),
+      );
+      expect(mockTxDb.runAsync).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('accounts_balance_history'),
+        expect.arrayContaining(['200.00']),
       );
     });
 
     it('updates multiple fields', async () => {
-      const updates = { name: 'New Name', balance: '150.00', currency: 'EUR' };
-      mockDrizzle.where.mockResolvedValue(undefined);
+      await AccountsDB.updateAccount('1', { name: 'New Name', balance: '150.00', currency: 'EUR' });
 
-      await AccountsDB.updateAccount('1', updates);
-
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'New Name',
-          balance: '150.00',
-          currency: 'EUR',
-          updatedAt: expect.any(String),
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringMatching(/name = \?.*balance = \?.*currency = \?/s),
+        expect.arrayContaining(['New Name', '150.00', 'EUR', '1']),
       );
     });
 
     it('does nothing when no fields to update', async () => {
       await AccountsDB.updateAccount('1', {});
 
-      expect(mockDrizzle.update).not.toHaveBeenCalled();
+      expect(db.executeTransaction).not.toHaveBeenCalled();
     });
 
     it('throws error when database update fails', async () => {
-      const error = new Error('Update failed');
-      mockDrizzle.where.mockRejectedValue(error);
+      jest.spyOn(db, 'executeTransaction').mockRejectedValue(new Error('Update failed'));
 
       await expect(AccountsDB.updateAccount('1', { name: 'Test' }))
         .rejects.toThrow('Update failed');
+    });
+
+    it('rolls back history update when account update fails', async () => {
+      // Simulate account UPDATE succeeding but history INSERT failing
+      mockTxDb.runAsync
+        .mockResolvedValueOnce(undefined)        // account UPDATE OK
+        .mockRejectedValueOnce(new Error('history fail')); // history INSERT fails
+
+      await expect(AccountsDB.updateAccount('1', { balance: '300.00' }))
+        .rejects.toThrow('history fail');
     });
   });
 
@@ -715,51 +732,46 @@ describe('AccountsDB', () => {
   });
 
   describe('updateAccount additional cases', () => {
-    it('updates hidden field converting true to 1', async () => {
-      mockDrizzle.where.mockResolvedValue(undefined);
+    let mockTxDb;
 
+    beforeEach(() => {
+      mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
+    });
+
+    it('updates hidden field converting true to 1', async () => {
       await AccountsDB.updateAccount('1', { hidden: true });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hidden: 1,
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('hidden = ?'),
+        expect.arrayContaining([1]),
       );
     });
 
     it('updates hidden field converting false to 0', async () => {
-      mockDrizzle.where.mockResolvedValue(undefined);
-
       await AccountsDB.updateAccount('1', { hidden: false });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hidden: 0,
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('hidden = ?'),
+        expect.arrayContaining([0]),
       );
     });
 
-    it('updates monthly_target field', async () => {
-      mockDrizzle.where.mockResolvedValue(undefined);
-
+    it('updates monthly_target field (snake_case)', async () => {
       await AccountsDB.updateAccount('1', { monthly_target: '500' });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          monthlyTarget: '500',
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('monthly_target = ?'),
+        expect.arrayContaining(['500']),
       );
     });
 
     it('updates monthlyTarget field (camelCase)', async () => {
-      mockDrizzle.where.mockResolvedValue(undefined);
-
       await AccountsDB.updateAccount('1', { monthlyTarget: '1000' });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          monthlyTarget: '1000',
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('monthly_target = ?'),
+        expect.arrayContaining(['1000']),
       );
     });
   });
@@ -1049,14 +1061,14 @@ describe('AccountsDB', () => {
     });
 
     it('updates updated_at timestamp on every change', async () => {
-      mockDrizzle.where.mockResolvedValue(undefined);
+      const mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
+      jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => callback(mockTxDb));
 
       await AccountsDB.updateAccount('1', { name: 'Test' });
 
-      expect(mockDrizzle.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
-        }),
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('updated_at = ?'),
+        expect.arrayContaining([expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)]),
       );
     });
   });
