@@ -399,5 +399,6 @@
   "remaining": "remaining",
   "offline_rate": "offline",
   "rate_unavailable": "Rate unavailable",
-  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again."
+  "exchange_rate_unavailable": "Exchange rate not available. Please check your connection and try again.",
+  "exchange_rate_required": "外币操作需要提供汇率"
 }

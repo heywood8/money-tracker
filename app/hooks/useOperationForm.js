@@ -335,9 +335,22 @@ const useOperationForm = ({
       newErrors.date = t('date_required');
     }
 
+    // Foreign currency ops require a valid (finite, positive) exchange rate.
+    // Without it the swap+inversion in prepareOperationData would produce an
+    // internally inconsistent DB row (swapped amounts, un-inverted rate).
+    if (vals.type !== 'transfer' && vals.operationCurrency) {
+      const acct = accounts.find(a => a.id === vals.accountId);
+      if (acct && vals.operationCurrency !== acct.currency) {
+        const rate = parseFloat(vals.exchangeRate || '0');
+        if (!isFinite(rate) || rate <= 0) {
+          newErrors.exchangeRate = t('exchange_rate_required');
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [values, t]);
+  }, [values, accounts, t]);
 
   // Prepare operation data with currency information for saving
   const prepareOperationData = useCallback((customAmount = null) => {
@@ -397,12 +410,15 @@ const useOperationForm = ({
       // DB model:   amount = account currency, destinationAmount = foreign currency,
       //             exchangeRate = account→foreign rate
       // Swap back and invert the rate before persisting.
-      const formForeignAmount = data.amount;
-      const formAccountAmount = data.destinationAmount;
-      data.amount = formAccountAmount;        // account currency — formatted below
-      data.destinationAmount = formForeignAmount;  // foreign currency
+      // The swap and inversion are treated atomically: only execute both together
+      // when the rate is valid. Validation should have already blocked an invalid
+      // rate; this guard prevents a partially-swapped row if that path is bypassed.
       const displayRate = parseFloat(data.exchangeRate || '0');
-      if (displayRate > 0) {
+      if (isFinite(displayRate) && displayRate > 0) {
+        const formForeignAmount = data.amount;
+        const formAccountAmount = data.destinationAmount;
+        data.amount = formAccountAmount;        // account currency — formatted below
+        data.destinationAmount = formForeignAmount;  // foreign currency
         data.exchangeRate = String((1 / displayRate).toFixed(6));
       }
     }
