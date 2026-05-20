@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.4](https://github.com/heywood8/money-tracker/compare/penny-v0.115.3...penny-v0.115.4) (2026-05-20)
+
+
+### Bug Fixes
+
+* crash when saving account with createAdjustmentOperation checked but no balance change ([#702](https://github.com/heywood8/money-tracker/issues/702)) ([a5764a0](https://github.com/heywood8/money-tracker/commit/a5764a0d6e4bfc0cfffa7d5e1c2765bb44fdb222))
+
 ## [0.115.3](https://github.com/heywood8/money-tracker/compare/penny-v0.115.2...penny-v0.115.3) (2026-05-20)
 
 
