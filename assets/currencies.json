@@ -20,5 +20,6 @@
   "RUB": {"symbol": "₽", "name": "Russian Ruble", "symbol_native": "₽", "decimal_digits": 0, "rounding": 0, "code": "RUB", "name_plural": "Russian rubles"},
   "AMD": {"symbol": "֏", "name": "Armenian Dram", "symbol_native": "֏", "decimal_digits": 0, "rounding": 0, "code": "AMD", "name_plural": "Armenian drams"},
   "THB": {"symbol": "฿", "name": "Thai Baht", "symbol_native": "฿", "decimal_digits": 0, "rounding": 0, "code": "THB", "name_plural": "Thai baht"},
-  "TRY": {"symbol": "₺", "name": "Turkish Lira", "symbol_native": "₺", "decimal_digits": 0, "rounding": 0, "code": "TRY", "name_plural": "Turkish lira"}
+  "TRY": {"symbol": "₺", "name": "Turkish Lira", "symbol_native": "₺", "decimal_digits": 0, "rounding": 0, "code": "TRY", "name_plural": "Turkish lira"},
+  "GEL": {"symbol": "₾", "name": "Georgian Lari", "symbol_native": "₾", "decimal_digits": 2, "rounding": 0, "code": "GEL", "name_plural": "Georgian lari"}
 }
