@@ -127,6 +127,48 @@ const cleanupBackups = async (backups, maxToKeep) => {
 };
 
 /**
+ * Returns false when the snapshot looks like a silent DB read failure.
+ * If accounts is empty, we compare against the most recent backup on disk.
+ * A snapshot with zero accounts is rejected when any prior backup recorded
+ * real accounts — that pattern is the fingerprint of a locked/mid-migration DB
+ * returning empty arrays, not a user who deleted everything.
+ */
+const isSnapshotValid = async (backup) => {
+  const accountCount = backup?.data?.accounts?.length ?? 0;
+
+  // Snapshot has at least one account — no concern
+  if (accountCount > 0) return true;
+
+  // Zero accounts: compare against the most recent backup file on disk
+  const existingFiles = [
+    ...(await getDailyBackups()),
+    ...(await getWeeklyBackups()),
+  ].sort();
+
+  const latestUri = existingFiles[existingFiles.length - 1];
+  if (!latestUri) {
+    // No prior backup to compare against — allow writing (first-run / fresh install)
+    return true;
+  }
+
+  try {
+    const prevJson = await FileSystem.readAsStringAsync(latestUri);
+    const prev = JSON.parse(prevJson);
+    const prevAccounts = prev?.data?.accounts?.length ?? 0;
+    if (prevAccounts > 0) {
+      console.warn(
+        `[DailyBackup] Refusing empty snapshot: previous backup had ${prevAccounts} account(s) — skipping to protect existing backups`,
+      );
+      return false;
+    }
+  } catch {
+    // Can't read/parse the previous backup — allow writing rather than blocking indefinitely
+  }
+
+  return true;
+};
+
+/**
  * Create daily and/or weekly backups if not yet done for the current day/week.
  * Safe to call on every app open – no-ops when both are already up to date.
  * A single createBackup() snapshot is reused for both file types when both are needed.
@@ -155,6 +197,13 @@ export const performDailyBackupIfNeeded = async () => {
 
     // One snapshot serves both daily and weekly writes if both are needed
     const backup = await createBackup();
+
+    // Guard: never overwrite good backups with a snapshot that looks like a DB read failure
+    if (!(await isSnapshotValid(backup))) {
+      console.warn('[DailyBackup] Snapshot rejected; skipping write to protect existing backups');
+      return false;
+    }
+
     const backupJson = JSON.stringify(backup);
 
     if (needsDaily) {

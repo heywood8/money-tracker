@@ -34,6 +34,7 @@ jest.mock('expo-file-system/legacy', () => ({
   makeDirectoryAsync: jest.fn(),
   readDirectoryAsync: jest.fn(),
   writeAsStringAsync: jest.fn(),
+  readAsStringAsync: jest.fn(),
   deleteAsync: jest.fn(),
 }));
 
@@ -47,6 +48,20 @@ const TODAY = '2026-02-26';
 const THIS_WEEK = '2026-W09'; // ISO week containing 2026-02-26
 
 const makeSampleBackup = () => ({
+  version: 1,
+  timestamp: `${TODAY}T10:00:00.000Z`,
+  platform: 'native',
+  data: {
+    accounts: [{ id: 'acc-1', name: 'Checking', balance: '1000.00', currency: 'USD' }],
+    categories: [],
+    operations: [],
+    budgets: [],
+    app_metadata: [],
+    balance_history: [],
+  },
+});
+
+const makeEmptyBackup = () => ({
   version: 1,
   timestamp: `${TODAY}T10:00:00.000Z`,
   platform: 'native',
@@ -83,6 +98,7 @@ describe('DailyBackupService', () => {
     mockFileSystem.getInfoAsync.mockResolvedValue({ exists: true });
     mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
     mockFileSystem.writeAsStringAsync.mockResolvedValue(undefined);
+    mockFileSystem.readAsStringAsync.mockResolvedValue(JSON.stringify(makeSampleBackup()));
     mockFileSystem.deleteAsync.mockResolvedValue(undefined);
 
     mockBackupRestore.createBackup.mockResolvedValue(makeSampleBackup());
@@ -465,6 +481,102 @@ describe('DailyBackupService', () => {
         await performDailyBackupIfNeeded();
 
         expect(mockFileSystem.deleteAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('empty snapshot protection', () => {
+      beforeEach(() => mockPrefs({ daily: null, weekly: null }));
+
+      it('skips the write when the new snapshot has 0 accounts but a prior backup had data', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [{ id: 'acc-1' }, { id: 'acc-2' }] } }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(false);
+        expect(mockFileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+      });
+
+      it('does not update preferences when the snapshot is rejected', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [{ id: 'acc-1' }] } }),
+        );
+
+        await performDailyBackupIfNeeded();
+
+        expect(mockPreferencesDB.setPreference).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger cleanup when the snapshot is rejected', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [{ id: 'acc-1' }] } }),
+        );
+
+        await performDailyBackupIfNeeded();
+
+        expect(mockFileSystem.deleteAsync).not.toHaveBeenCalled();
+      });
+
+      it('allows the write when the new snapshot has 0 accounts and there are no prior backups', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('allows the write when the prior backup also had 0 accounts', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [] } }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('allows the write when the prior backup cannot be parsed', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue('not-valid-json{{{');
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('allows the write when readAsStringAsync throws', async () => {
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockRejectedValue(new Error('File not found'));
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('proceeds normally when the snapshot has real account data', async () => {
+        // makeSampleBackup has 1 account — isSnapshotValid returns true immediately
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+        // readAsStringAsync should NOT be called — the fast path (accountCount > 0) exits early
+        expect(mockFileSystem.readAsStringAsync).not.toHaveBeenCalled();
       });
     });
   });
