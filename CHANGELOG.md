@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.115.5](https://github.com/heywood8/money-tracker/compare/penny-v0.115.4...penny-v0.115.5) (2026-05-20)
+
+
+### Bug Fixes
+
+* **settings:** center up-to-date message in settings update modal ([#704](https://github.com/heywood8/money-tracker/issues/704)) ([b35922d](https://github.com/heywood8/money-tracker/commit/b35922d54eba6606ea990e0b56779e5a98865e3d))
+
 ## [0.115.4](https://github.com/heywood8/money-tracker/compare/penny-v0.115.3...penny-v0.115.4) (2026-05-20)
 
 
