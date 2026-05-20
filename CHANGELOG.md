@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.116.1](https://github.com/heywood8/money-tracker/compare/penny-v0.116.0...penny-v0.116.1) (2026-05-20)
+
+
+### Bug Fixes
+
+* refuse to write empty snapshots over real backup data (issue [#690](https://github.com/heywood8/money-tracker/issues/690)) ([#707](https://github.com/heywood8/money-tracker/issues/707)) ([e82cf20](https://github.com/heywood8/money-tracker/commit/e82cf203b077ae2cbdd1ac9b5a8d3fb25172bb4a))
+
 ## [0.116.0](https://github.com/heywood8/money-tracker/compare/penny-v0.115.5...penny-v0.116.0) (2026-05-20)
 
 
