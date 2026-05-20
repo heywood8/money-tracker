@@ -394,11 +394,14 @@ export const getOperationsByType = async (type) => {
 
 /**
  * Calculate balance changes for an operation
- * Handles multi-currency transfers by using destination_amount when available
+ * Handles multi-currency transfers by using destination_amount when available.
+ * When destination_amount is null on a transfer, queries account currencies to
+ * detect cross-currency transfers and recomputes the amount via exchange_rate.
  * @param {Object} operation
- * @returns {Map<string, string>} Map of accountId → string delta (Decimal-safe)
+ * @param {Object} db - Transaction-scoped database instance
+ * @returns {Promise<Map<string, string>>} Map of accountId → string delta (Decimal-safe)
  */
-const calculateBalanceChanges = (operation) => {
+const calculateBalanceChanges = async (operation, db) => {
   const balanceChanges = new Map();
   const amount = String(operation.amount || '0');
 
@@ -407,15 +410,43 @@ const calculateBalanceChanges = (operation) => {
   } else if (operation.type === 'income') {
     balanceChanges.set(operation.account_id, amount);
   } else if (operation.type === 'transfer') {
-    // Deduct from source account
     balanceChanges.set(operation.account_id, Currency.subtract('0', amount));
 
     if (operation.to_account_id) {
-      // For multi-currency transfers, use destination_amount if available
-      // Otherwise fall back to source amount (same currency transfer)
-      const destinationAmount = operation.destination_amount
-        ? String(operation.destination_amount)
-        : amount;
+      let destinationAmount;
+      if (operation.destination_amount) {
+        destinationAmount = String(operation.destination_amount);
+      } else {
+        // Query account currencies to detect cross-currency transfers where
+        // destination_amount was lost (old schema, import, or UI bug).
+        const fromAcc = await db.getFirstAsync(
+          'SELECT currency FROM accounts WHERE id = ?',
+          [operation.account_id],
+        );
+        const toAcc = await db.getFirstAsync(
+          'SELECT currency FROM accounts WHERE id = ?',
+          [operation.to_account_id],
+        );
+        const fromCurrency = fromAcc?.currency;
+        const toCurrency = toAcc?.currency;
+
+        if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
+          if (!operation.exchange_rate) {
+            throw new Error(
+              `Multi-currency transfer ${operation.id} is missing destination_amount and exchange_rate`,
+            );
+          }
+          const converted = Currency.convertAmount(amount, fromCurrency, toCurrency, operation.exchange_rate);
+          if (!converted) {
+            throw new Error(
+              `Failed to convert transfer ${operation.id} amount from ${fromCurrency} to ${toCurrency}`,
+            );
+          }
+          destinationAmount = converted;
+        } else {
+          destinationAmount = amount;
+        }
+      }
 
       const toChange = balanceChanges.get(operation.to_account_id) || '0';
       balanceChanges.set(operation.to_account_id, Currency.add(toChange, destinationAmount));
@@ -475,7 +506,7 @@ export const createOperationInTx = async (db, operation) => {
 
   operationData.id = result.lastInsertRowId;
 
-  const balanceChanges = calculateBalanceChanges(operationData);
+  const balanceChanges = await calculateBalanceChanges(operationData, db);
   const updateTime = new Date().toISOString();
 
   for (const [accountId, delta] of balanceChanges.entries()) {
@@ -620,13 +651,13 @@ export const updateOperation = async (id, updates) => {
       const balanceChanges = new Map();
 
       // Reverse old operation
-      const oldChanges = calculateBalanceChanges(oldOperation);
+      const oldChanges = await calculateBalanceChanges(oldOperation, db);
       for (const [accountId, delta] of oldChanges.entries()) {
         balanceChanges.set(accountId, Currency.subtract(balanceChanges.get(accountId) || '0', delta));
       }
 
       // Apply new operation
-      const newChanges = calculateBalanceChanges(newOperation);
+      const newChanges = await calculateBalanceChanges(newOperation, db);
       for (const [accountId, delta] of newChanges.entries()) {
         balanceChanges.set(accountId, Currency.add(balanceChanges.get(accountId) || '0', delta));
       }
@@ -766,9 +797,9 @@ export const splitOperation = async (id, updates, newOperationData) => {
         }
       };
 
-      applyChanges(calculateBalanceChanges(oldOperation), true);
-      applyChanges(calculateBalanceChanges(updatedOperation), false);
-      applyChanges(calculateBalanceChanges(createdOperation), false);
+      applyChanges(await calculateBalanceChanges(oldOperation, db), true);
+      applyChanges(await calculateBalanceChanges(updatedOperation, db), false);
+      applyChanges(await calculateBalanceChanges(createdOperation, db), false);
 
       // Step 5: update account balances and balance history
       const updateTime = new Date().toISOString();
@@ -825,7 +856,7 @@ export const deleteOperation = async (id) => {
       await db.runAsync('DELETE FROM operations WHERE id = ?', [id]);
 
       // Reverse balance changes
-      const balanceChanges = calculateBalanceChanges(operation);
+      const balanceChanges = await calculateBalanceChanges(operation, db);
       const reverseChanges = new Map();
       for (const [accountId, delta] of balanceChanges.entries()) {
         reverseChanges.set(accountId, Currency.subtract('0', delta));
