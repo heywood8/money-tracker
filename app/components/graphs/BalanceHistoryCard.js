@@ -362,12 +362,12 @@ const BalanceHistoryCard = ({
                       }}
                       decorator={() => {
                         // react-native-chart-kit places data using paddingRight (default 64) as
-                        // the left origin: x = paddingRight + i*(width-paddingRight)/(n-1)
+                        // the left origin: x = paddingRight + i*(width-paddingRight)/n
                         const chartWidth = screenWidth - 33; // must match width prop
                         const chartPaddingRight = 64; // library default, acts as left margin
                         const usableWidth = chartWidth - chartPaddingRight;
                         const dataLength = balanceHistoryData.labels.length;
-                        const xStep = usableWidth / (dataLength - 1);
+                        const xStep = usableWidth / dataLength;
                         const chartTop = 12;
                         const chartBottom = 181;
 
