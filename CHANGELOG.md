@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.117.0](https://github.com/heywood8/money-tracker/compare/penny-v0.116.2...penny-v0.117.0) (2026-05-21)
+
+
+### Features
+
+* always show 10 latest release changelogs on the update page ([05e629d](https://github.com/heywood8/money-tracker/commit/05e629d323fbb1563fb51e9cae31dd89116b9954))
+
 ## [0.116.2](https://github.com/heywood8/money-tracker/compare/penny-v0.116.1...penny-v0.116.2) (2026-05-20)
 
 
