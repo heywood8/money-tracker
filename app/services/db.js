@@ -213,6 +213,18 @@ const initializeDatabase = async (rawDb, db) => {
     // Run Drizzle migrations
     await migrate(db, migrationsConfig);
 
+    // Defensive: ensure original_balance column exists on operations table.
+    // Migration 0006 can silently fail on existing databases if the Drizzle
+    // migrator rolls back the transaction but records the hash, leaving the
+    // column absent. We detect and fix that here.
+    const opsColumns = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
+    const hasOriginalBalance = (opsColumns || []).some(col => col.name === 'original_balance');
+    if (!hasOriginalBalance) {
+      console.warn('original_balance column missing from operations — adding it directly');
+      await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
+      console.log('original_balance column added via fallback');
+    }
+
     // Defensive: ensure planned_operations table exists after migrations.
     // The beta Drizzle migrator can silently fail to apply a migration (transaction
     // rolls back, hash not recorded), so we create the table directly as a fallback.
