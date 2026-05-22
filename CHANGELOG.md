@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.118.0](https://github.com/heywood8/money-tracker/compare/penny-v0.117.0...penny-v0.118.0) (2026-05-22)
+
+
+### Features
+
+* tap to expand log entries, long-press to copy ([#717](https://github.com/heywood8/money-tracker/issues/717)) ([6d5bfee](https://github.com/heywood8/money-tracker/commit/6d5bfee4c2e6656dfa8bffc215dc3e322b3aea3e))
+
+
+### Bug Fixes
+
+* today marker x-position alignment in balance history chart ([#716](https://github.com/heywood8/money-tracker/issues/716)) ([596c98b](https://github.com/heywood8/money-tracker/commit/596c98bdd7841539a451036e45cdc2c61e8b8f12))
+
 ## [0.117.0](https://github.com/heywood8/money-tracker/compare/penny-v0.116.2...penny-v0.117.0) (2026-05-21)
 
 
