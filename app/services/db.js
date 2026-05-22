@@ -357,13 +357,20 @@ export const queryFirst = async (sqlStr, params = []) => {
  * Execute multiple statements in a transaction (legacy compatibility)
  * @param {Function} callback - Async function that receives the db instance
  * @returns {Promise<any>}
+ *
+ * Uses withExclusiveTransactionAsync so that:
+ *   1. No other async queries can interleave between statements in this
+ *      transaction (withTransactionAsync is non-exclusive and can be
+ *      interrupted, which corrupts multi-step operations like adjustAccountBalance).
+ *   2. The callback receives the transaction-bound `txn` object — callers
+ *      must use this object (not an outer db reference) for all queries.
  */
 export const executeTransaction = async (callback) => {
   const { raw } = await getDatabase();
   try {
     let result;
-    await raw.withTransactionAsync(async () => {
-      result = await callback(raw);
+    await raw.withExclusiveTransactionAsync(async (txn) => {
+      result = await callback(txn);
     });
     return result;
   } catch (error) {

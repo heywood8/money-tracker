@@ -406,12 +406,10 @@ export const reorderAccounts = async (orderedAccounts) => {
 
     await executeTransaction(async (db) => {
       for (const { id, display_order } of orderedAccounts) {
-        await db.update(accounts)
-          .set({
-            displayOrder: display_order,
-            updatedAt: now,
-          })
-          .where(eq(accounts.id, id));
+        await db.runAsync(
+          'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+          [display_order, now, id],
+        );
       }
     });
   } catch (error) {
