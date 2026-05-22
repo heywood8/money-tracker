@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.118.2](https://github.com/heywood8/money-tracker/compare/penny-v0.118.1...penny-v0.118.2) (2026-05-22)
+
+
+### Bug Fixes
+
+* restore downloaded APKs list in up-to-date changelog view ([843b844](https://github.com/heywood8/money-tracker/commit/843b84409671ea08da1c0c637178f2d363f30ed6))
+
 ## [0.118.1](https://github.com/heywood8/money-tracker/compare/penny-v0.118.0...penny-v0.118.1) (2026-05-22)
 
 
