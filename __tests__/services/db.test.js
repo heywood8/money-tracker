@@ -197,7 +197,7 @@ describe('Database Service', () => {
 
       const result = await executeTransaction(callback);
 
-      expect(mockDb.withExclusiveTransactionAsync).toHaveBeenCalled();
+      expect(mockDb.withTransactionAsync).toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(mockDb);
       expect(result).toBe('success');
     });
@@ -208,6 +208,43 @@ describe('Database Service', () => {
       });
 
       await expect(executeTransaction(callback)).rejects.toThrow('Transaction error');
+    });
+
+    it('does not block subsequent transactions after a failed one', async () => {
+      const failingCallback = jest.fn(async () => {
+        throw new Error('Deliberate failure');
+      });
+      const successCallback = jest.fn(async (db) => {
+        await db.runAsync('SELECT 1');
+        return 'recovered';
+      });
+
+      await expect(executeTransaction(failingCallback)).rejects.toThrow('Deliberate failure');
+      const result = await executeTransaction(successCallback);
+
+      expect(result).toBe('recovered');
+      expect(successCallback).toHaveBeenCalledWith(mockDb);
+    });
+
+    it('serializes concurrent transactions', async () => {
+      const order = [];
+      const first = jest.fn(async (db) => {
+        order.push('first');
+        await db.runAsync('SELECT 1');
+        return 'first';
+      });
+      const second = jest.fn(async (db) => {
+        order.push('second');
+        return 'second';
+      });
+
+      const [r1, r2] = await Promise.all([
+        executeTransaction(first),
+        executeTransaction(second),
+      ]);
+
+      expect(r1).toBe('first');
+      expect(r2).toBe('second');
     });
   });
 
