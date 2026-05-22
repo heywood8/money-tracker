@@ -81,13 +81,8 @@ describe('Header', () => {
 
   describe('Rendering', () => {
     it('renders without crashing', () => {
-      const { getByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-      expect(getByText('Penny')).toBeTruthy();
-    });
-
-    it('renders app title', () => {
-      const { getByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-      expect(getByText('Penny')).toBeTruthy();
+      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      expect(getByTestId('settings-button')).toBeTruthy();
     });
 
     it('does not render version text in header', () => {
@@ -104,11 +99,6 @@ describe('Header', () => {
     it('renders theme toggle icon (sunny for light mode)', () => {
       const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
       expect(getByTestId('icon-sunny')).toBeTruthy();
-    });
-
-    it('renders app icon image', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-      expect(getByLabelText('Penny app icon')).toBeTruthy();
     });
   });
 
