@@ -1487,6 +1487,37 @@ export default function SettingsModal({ visible, onClose }) {
                                   </TouchableOpacity>
                                 )}
                               </ScrollView>
+                              {downloadedApks.length > 0 && (
+                                <View style={styles.downloadedApksSection}>
+                                  <Divider />
+                                  <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
+                                    {t('downloaded_apks') || 'Downloaded'}
+                                  </Text>
+                                  <FlatList
+                                    horizontal
+                                    data={downloadedApks}
+                                    keyExtractor={(item) => item.uri}
+                                    renderItem={({ item }) => (
+                                      <TouchableOpacity
+                                        onPress={() => handleInstallApk(item.uri)}
+                                        style={styles.apkChip}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Install version ${item.version || item.filename}`}
+                                      >
+                                        <Ionicons name="archive-outline" size={28} color={colors.primary} />
+                                        <Text style={[styles.apkChipVersion, { color: colors.text }]}>
+                                          {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+                                        </Text>
+                                        <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
+                                          {formatApkDate(item.modificationTime)}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.apkListContent}
+                                  />
+                                </View>
+                              )}
                             </>
                           ) : (
                             <>
