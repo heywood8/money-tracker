@@ -532,7 +532,7 @@ export default function SettingsModal({ visible, onClose }) {
 
   const loadDownloadedApks = useCallback(async () => {
     const apks = await listDownloadedApks();
-    setDownloadedApks(apks);
+    setDownloadedApks(apks.slice().reverse());
   }, []);
 
   const handleInstallApk = useCallback(async (uri) => {
