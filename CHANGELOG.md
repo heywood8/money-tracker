@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.118.3](https://github.com/heywood8/money-tracker/compare/penny-v0.118.2...penny-v0.118.3) (2026-05-22)
+
+
+### Bug Fixes
+
+* replace withExclusiveTransactionAsync with serialized withTransactionAsync ([#723](https://github.com/heywood8/money-tracker/issues/723)) ([ca4c547](https://github.com/heywood8/money-tracker/commit/ca4c5477f17f3b5c30096548dbd0a1222f7a54f0))
+
 ## [0.118.2](https://github.com/heywood8/money-tracker/compare/penny-v0.118.1...penny-v0.118.2) (2026-05-22)
 
 
