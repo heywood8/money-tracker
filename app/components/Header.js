@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
@@ -13,8 +13,6 @@ import FilterBadge from './search/FilterBadge';
 import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
-
-const APP_VERSION = require('../../package.json').version;
 
 export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
   console.debug('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
@@ -100,14 +98,6 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
         </>
       ) : (
         <>
-          <View style={styles.titleContainer}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.icon}
-              accessibilityLabel="Penny app icon"
-            />
-            <Text style={[styles.title, { color: colors.text }]}>Penny</Text>
-          </View>
           <View style={styles.buttonContainer}>
             {rightContent || (
               <>
@@ -226,8 +216,9 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: 8,
   },
   containerSearchMode: {
     alignItems: 'stretch',
@@ -242,11 +233,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontVariant: ['tabular-nums'],
   },
-  icon: {
-    height: 50,
-    marginRight: 4,
-    width: 50,
-  },
   searchButton: {
     padding: 8,
   },
@@ -258,10 +244,5 @@ const styles = StyleSheet.create({
   },
   themeButton: {
     padding: 8,
-  },
-  title: { fontSize: 14, fontWeight: '700' },
-  titleContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
   },
 });
