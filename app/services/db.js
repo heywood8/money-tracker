@@ -371,17 +371,17 @@ let _lastTransaction = Promise.resolve();
 export const executeTransaction = async (callback) => {
   const { raw } = await getDatabase();
 
-  const txPromise = _lastTransaction
-    .catch(() => {}) // previous failure must not block the next transaction
-    .then(async () => {
-      let callbackResult;
-      await raw.withTransactionAsync(async () => {
-        callbackResult = await callback(raw);
-      });
-      return callbackResult;
+  // _lastTransaction is always resolved (tail .catch keeps it that way), so
+  // chaining with .then is safe and prevents concurrent callbacks from interleaving.
+  const txPromise = _lastTransaction.then(async () => {
+    let callbackResult;
+    await raw.withTransactionAsync(async () => {
+      callbackResult = await callback(raw);
     });
+    return callbackResult;
+  });
 
-  // Always store a non-rejecting tail so _lastTransaction never stays rejected.
+  // Swallow rejection so the next queued transaction always starts.
   _lastTransaction = txPromise.catch(() => {});
   return txPromise;
 };
