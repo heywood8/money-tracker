@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.118.4](https://github.com/heywood8/money-tracker/compare/penny-v0.118.3...penny-v0.118.4) (2026-05-22)
+
+
+### Bug Fixes
+
+* install correct expo-clipboard and expo-splash-screen for SDK 54 ([#725](https://github.com/heywood8/money-tracker/issues/725)) ([6466867](https://github.com/heywood8/money-tracker/commit/64668677724f17a1725974874295051a2cd9d7ae))
+
 ## [0.118.3](https://github.com/heywood8/money-tracker/compare/penny-v0.118.2...penny-v0.118.3) (2026-05-22)
 
 
