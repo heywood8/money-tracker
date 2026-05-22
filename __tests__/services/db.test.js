@@ -29,6 +29,7 @@ describe('Database Service', () => {
       getAllAsync: jest.fn(() => Promise.resolve([])),
       closeAsync: jest.fn(() => Promise.resolve()),
       withTransactionAsync: jest.fn((callback) => callback()),
+      withExclusiveTransactionAsync: jest.fn((callback) => callback(mockDb)),
       createCustomFunctionAsync: jest.fn(() => Promise.resolve()),
       createFunctionAsync: jest.fn(() => Promise.resolve()),
     };
@@ -196,7 +197,7 @@ describe('Database Service', () => {
 
       const result = await executeTransaction(callback);
 
-      expect(mockDb.withTransactionAsync).toHaveBeenCalled();
+      expect(mockDb.withExclusiveTransactionAsync).toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(mockDb);
       expect(result).toBe('success');
     });

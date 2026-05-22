@@ -665,10 +665,7 @@ describe('AccountsDB', () => {
 
   describe('reorderAccounts', () => {
     it('reorders accounts with new display orders', async () => {
-      const mockWhere = jest.fn().mockResolvedValue(undefined);
-      const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
-      const mockUpdate = jest.fn().mockReturnValue({ set: mockSet });
-      const mockTxDb = { update: mockUpdate };
+      const mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
 
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockTxDb);
@@ -683,17 +680,23 @@ describe('AccountsDB', () => {
       await AccountsDB.reorderAccounts(orderedAccounts);
 
       expect(db.executeTransaction).toHaveBeenCalledWith(expect.any(Function));
-      expect(mockUpdate).toHaveBeenCalledTimes(3);
-      expect(mockSet).toHaveBeenCalledTimes(3);
-      expect(mockWhere).toHaveBeenCalledTimes(3);
-      expect(mockSet).toHaveBeenCalledWith({
-        displayOrder: 0,
-        updatedAt: expect.any(String),
-      });
+      expect(mockTxDb.runAsync).toHaveBeenCalledTimes(3);
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+        [0, expect.any(String), 'acc-1'],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+        [1, expect.any(String), 'acc-2'],
+      );
+      expect(mockTxDb.runAsync).toHaveBeenCalledWith(
+        'UPDATE accounts SET display_order = ?, updated_at = ? WHERE id = ?',
+        [2, expect.any(String), 'acc-3'],
+      );
     });
 
     it('handles empty array', async () => {
-      const mockTxDb = { update: jest.fn() };
+      const mockTxDb = { runAsync: jest.fn().mockResolvedValue(undefined) };
 
       jest.spyOn(db, 'executeTransaction').mockImplementation(async (callback) => {
         await callback(mockTxDb);
@@ -701,7 +704,7 @@ describe('AccountsDB', () => {
 
       await AccountsDB.reorderAccounts([]);
 
-      expect(mockTxDb.update).not.toHaveBeenCalled();
+      expect(mockTxDb.runAsync).not.toHaveBeenCalled();
     });
 
     it('throws error when reorder fails', async () => {
