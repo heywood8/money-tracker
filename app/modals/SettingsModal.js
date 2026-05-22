@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native'; // FlatList used for backups list
+import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,6 +72,7 @@ export default function SettingsModal({ visible, onClose }) {
   const { startDownload } = useUpdateDownload();
   const [activeSubPanel, setActiveSubPanel] = useState(null); // 'language' | 'export' | 'logs' | 'backups' | null
   const [logFilter, setLogFilter] = useState('all');
+  const [expandedLogIds, setExpandedLogIds] = useState(new Set());
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
@@ -703,19 +705,39 @@ export default function SettingsModal({ visible, onClose }) {
     );
   }, [colors, t, formatBackupLabel, handleImportLocalBackupSelect, handleDeleteLocalBackup, handleConfirmDeleteLocalBackup, pendingDeleteUri]);
 
-  const renderLogEntry = useCallback(({ item }) => (
-    <View style={styles.logEntry}>
-      <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
-        {item.timestamp.substring(11, 19)}
-      </Text>
-      <Text style={[styles.logLevel, { color: LOG_LEVEL_COLORS[item.level] }]}>
-        {item.level.toUpperCase()}
-      </Text>
-      <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={3}>
-        {item.message}
-      </Text>
-    </View>
-  ), [colors]);
+  const toggleLogExpand = useCallback((id) => {
+    setExpandedLogIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const renderLogEntry = useCallback(({ item }) => {
+    const isExpanded = expandedLogIds.has(item.id);
+    return (
+      <TouchableOpacity
+        onPress={() => toggleLogExpand(item.id)}
+        onLongPress={() => Clipboard.setStringAsync(`${item.timestamp} [${item.level.toUpperCase()}] ${item.message}`)}
+        activeOpacity={0.7}
+        style={styles.logEntry}
+      >
+        <Text style={[styles.logTimestamp, { color: colors.mutedText }]}>
+          {item.timestamp.substring(11, 19)}
+        </Text>
+        <Text style={[styles.logLevel, { color: LOG_LEVEL_COLORS[item.level] }]}>
+          {item.level.toUpperCase()}
+        </Text>
+        <Text style={[styles.logMessage, { color: colors.text }]} numberOfLines={isExpanded ? undefined : 3}>
+          {item.message}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [colors, expandedLogIds, toggleLogExpand]);
 
 
   return (
