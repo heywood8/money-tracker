@@ -353,30 +353,37 @@ export const queryFirst = async (sqlStr, params = []) => {
   }
 };
 
+// Serializes executeTransaction calls so their async statements cannot interleave
+// on the shared SQLite connection. withTransactionAsync is used (same connection,
+// no new native open) to avoid the startup crash caused by withExclusiveTransactionAsync
+// opening a second connection during initialization.
+let _lastTransaction = Promise.resolve();
+
 /**
  * Execute multiple statements in a transaction (legacy compatibility)
  * @param {Function} callback - Async function that receives the db instance
  * @returns {Promise<any>}
  *
- * Uses withExclusiveTransactionAsync so that:
- *   1. No other async queries can interleave between statements in this
- *      transaction (withTransactionAsync is non-exclusive and can be
- *      interrupted, which corrupts multi-step operations like adjustAccountBalance).
- *   2. The callback receives the transaction-bound `txn` object — callers
- *      must use this object (not an outer db reference) for all queries.
+ * JS-level serialization ensures only one executeTransaction callback runs at a
+ * time, preventing async interleaving without the new-connection overhead of
+ * withExclusiveTransactionAsync (which caused startup crashes on Android).
  */
 export const executeTransaction = async (callback) => {
   const { raw } = await getDatabase();
-  try {
-    let result;
-    await raw.withExclusiveTransactionAsync(async (txn) => {
-      result = await callback(txn);
+
+  const txPromise = _lastTransaction
+    .catch(() => {}) // previous failure must not block the next transaction
+    .then(async () => {
+      let callbackResult;
+      await raw.withTransactionAsync(async () => {
+        callbackResult = await callback(raw);
+      });
+      return callbackResult;
     });
-    return result;
-  } catch (error) {
-    console.error('Transaction failed:', error);
-    throw error;
-  }
+
+  // Always store a non-rejecting tail so _lastTransaction never stays rejected.
+  _lastTransaction = txPromise.catch(() => {});
+  return txPromise;
 };
 
 /**

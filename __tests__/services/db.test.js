@@ -197,7 +197,7 @@ describe('Database Service', () => {
 
       const result = await executeTransaction(callback);
 
-      expect(mockDb.withExclusiveTransactionAsync).toHaveBeenCalled();
+      expect(mockDb.withTransactionAsync).toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(mockDb);
       expect(result).toBe('success');
     });
