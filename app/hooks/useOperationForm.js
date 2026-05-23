@@ -255,18 +255,20 @@ const useOperationForm = ({
           ? String(operation.amount || '')
           : String(operation.destinationAmount || '');
 
-        setValues({
-          type: operation.type || 'expense',
-          amount: loadAmount,
-          accountId: operation.accountId || currentAccounts[0]?.id || '',
-          categoryId: operation.categoryId || '',
-          description: operation.description || '',
-          date: operation.date || formatDate(new Date()),
-          toAccountId: operation.toAccountId || '',
-          exchangeRate: loadExchangeRate,
-          destinationAmount: loadDestAmount,
-          operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
-        });
+        if (!cancelled) {
+          setValues({
+            type: operation.type || 'expense',
+            amount: loadAmount,
+            accountId: operation.accountId || currentAccounts[0]?.id || '',
+            categoryId: operation.categoryId || '',
+            description: operation.description || '',
+            date: operation.date || formatDate(new Date()),
+            toAccountId: operation.toAccountId || '',
+            exchangeRate: loadExchangeRate,
+            destinationAmount: loadDestAmount,
+            operationCurrency: operation.type !== 'transfer' ? (operation.sourceCurrency || '') : '',
+          });
+        }
       } else if (isNew) {
         let defaultAccountId = '';
         if (currentAccounts.length === 1) {
@@ -370,7 +372,12 @@ const useOperationForm = ({
         const srcAmt = parseFloat(data.amount);
         const dstAmt = parseFloat(data.destinationAmount);
         if (!isNaN(srcAmt) && !isNaN(dstAmt) && srcAmt > 0) {
-          data.exchangeRate = String((dstAmt / srcAmt).toFixed(6));
+          const computedRate = dstAmt / srcAmt;
+          if (isFinite(computedRate) && computedRate > 0) {
+            data.exchangeRate = String(computedRate.toFixed(6));
+          } else {
+            data.exchangeRate = null;
+          }
         }
       } else if (data.amount && data.exchangeRate) {
         // Recompute synchronously so a save before the async useEffect resolves
@@ -392,7 +399,12 @@ const useOperationForm = ({
         const srcAmt = parseFloat(data.amount);       // foreign currency
         const dstAmt = parseFloat(data.destinationAmount);  // account currency
         if (!isNaN(srcAmt) && !isNaN(dstAmt) && srcAmt > 0) {
-          data.exchangeRate = String((dstAmt / srcAmt).toFixed(6));  // foreign→account
+          const computedRate = dstAmt / srcAmt;
+          if (isFinite(computedRate) && computedRate > 0) {
+            data.exchangeRate = String(computedRate.toFixed(6));  // foreign→account
+          } else {
+            data.exchangeRate = null;
+          }
         }
       } else if (data.amount && data.exchangeRate) {
         // Recompute destinationAmount (account currency) from foreign amount × rate
@@ -559,15 +571,22 @@ const useOperationForm = ({
     }
 
     try {
-      // Use Currency.subtract for precision-safe arithmetic
-      const newAmount = Currency.subtract(values.amount, splitAmount);
+      // Format both amounts to the account currency's decimal precision before persisting.
+      // splitAmount is a raw calculator string; the remainder must also be formatted so
+      // both DB rows are stored with correct decimal places (same as the non-split save path).
+      const currency = sourceAccount?.currency;
+      const formattedSplit = Currency.formatAmount(splitAmount, currency);
+      const formattedNew = Currency.formatAmount(
+        Currency.subtract(values.amount, formattedSplit),
+        currency,
+      );
 
       formModifiedRef.current = true;
 
-      const updates = { ...values, amount: newAmount };
+      const updates = { ...values, amount: formattedNew };
       const newOperation = {
         type: values.type,
-        amount: splitAmount,
+        amount: formattedSplit,
         accountId: values.accountId,
         categoryId: newCategoryId,
         date: values.date,
@@ -578,9 +597,9 @@ const useOperationForm = ({
       await splitOperation(operation.id, updates, newOperation);
 
       // Update local form state only after the atomic DB operation succeeds
-      setValues(v => ({ ...v, amount: newAmount }));
+      setValues(v => ({ ...v, amount: formattedNew }));
 
-      return { success: true, newAmount };
+      return { success: true, newAmount: formattedNew };
     } catch (error) {
       console.error('[useOperationForm] Failed to split operation:', error);
       return { success: false, error: t('error') };
