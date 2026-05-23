@@ -720,13 +720,64 @@ describe('BudgetsDB Service', () => {
   });
 
   describe('Period Date Calculations', () => {
+    describe('getWeekStartDay', () => {
+      it('returns 7 (Sunday) for en-US', () => {
+        expect(BudgetsDB.getWeekStartDay('en-US')).toBe(7);
+      });
+
+      it('returns 1 (Monday) for en-GB', () => {
+        expect(BudgetsDB.getWeekStartDay('en-GB')).toBe(1);
+      });
+
+      it('returns 1 (Monday) for ru', () => {
+        expect(BudgetsDB.getWeekStartDay('ru')).toBe(1);
+      });
+
+      it('returns 1 (Monday) for unknown locale (ISO 8601 default)', () => {
+        expect(BudgetsDB.getWeekStartDay('xx-UNKNOWN')).toBe(1);
+      });
+
+      it('returns 1 (Monday) for null locale (ISO 8601 default)', () => {
+        expect(BudgetsDB.getWeekStartDay(null)).toBe(1);
+      });
+
+      it('returns 1 (Monday) for undefined locale (ISO 8601 default)', () => {
+        expect(BudgetsDB.getWeekStartDay(undefined)).toBe(1);
+      });
+
+      it('returns locale-determined day for en (generic English, engine-dependent)', () => {
+        // 'en' without a region subtag is ambiguous — different JS engines may resolve
+        // it to en-US (Sunday=7) or en-001 (Monday=1). Just verify it returns a valid value.
+        const result = BudgetsDB.getWeekStartDay('en');
+        expect([1, 7]).toContain(result);
+      });
+
+      it('returns 1 (Monday) for fr', () => {
+        expect(BudgetsDB.getWeekStartDay('fr')).toBe(1);
+      });
+
+      it('returns 1 (Monday) for de', () => {
+        expect(BudgetsDB.getWeekStartDay('de')).toBe(1);
+      });
+    });
+
     describe('getCurrentPeriodDates', () => {
-      it('calculates weekly period dates', () => {
-        const referenceDate = new Date('2025-12-10'); // Wednesday
+      it('calculates weekly period dates defaulting to Monday start (ISO 8601)', () => {
+        // 2025-12-10 is a Wednesday; Monday of that week is Dec 8, Sunday is Dec 14
+        const referenceDate = new Date('2025-12-10');
         const { start, end } = BudgetsDB.getCurrentPeriodDates('weekly', referenceDate);
 
+        expect(start.getDay()).toBe(1); // Monday
+        expect(end.getDay()).toBe(0);   // Sunday
+      });
+
+      it('calculates weekly period dates with Sunday start for en-US locale', () => {
+        // 2025-12-10 is a Wednesday; Sunday of that week is Dec 7, Saturday is Dec 13
+        const referenceDate = new Date('2025-12-10');
+        const { start, end } = BudgetsDB.getCurrentPeriodDates('weekly', referenceDate, 'en-US');
+
         expect(start.getDay()).toBe(0); // Sunday
-        expect(end.getDay()).toBe(6); // Saturday
+        expect(end.getDay()).toBe(6);   // Saturday
       });
 
       it('calculates monthly period dates', () => {
@@ -755,11 +806,13 @@ describe('BudgetsDB Service', () => {
     });
 
     describe('getNextPeriodDates', () => {
-      it('calculates next weekly period', () => {
-        const currentStart = new Date('2025-12-07'); // Sunday
+      it('calculates next weekly period (Monday-start default)', () => {
+        // 2025-12-08 is a Monday — start of the week with ISO 8601 default
+        const currentStart = new Date('2025-12-08');
         const { start } = BudgetsDB.getNextPeriodDates('weekly', currentStart);
 
-        expect(start.getDate()).toBe(14); // Next Sunday
+        expect(start.getDate()).toBe(15); // Next Monday
+        expect(start.getDay()).toBe(1);
       });
 
       it('calculates next monthly period', () => {
@@ -779,11 +832,13 @@ describe('BudgetsDB Service', () => {
     });
 
     describe('getPreviousPeriodDates', () => {
-      it('calculates previous weekly period', () => {
-        const currentStart = new Date('2025-12-07'); // Sunday
+      it('calculates previous weekly period (Monday-start default)', () => {
+        // 2025-12-08 is a Monday; previous week's Monday is Dec 1
+        const currentStart = new Date('2025-12-08');
         const { start } = BudgetsDB.getPreviousPeriodDates('weekly', currentStart);
 
-        expect(start.getDate()).toBe(30); // Previous Sunday (Nov 30)
+        expect(start.getDate()).toBe(1);  // Dec 1
+        expect(start.getDay()).toBe(1);   // Monday
       });
 
       it('calculates previous monthly period', () => {

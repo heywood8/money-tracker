@@ -385,20 +385,91 @@ export const findDuplicateBudget = async (categoryId, currency, periodType, excl
 };
 
 /**
+ * Fallback lookup table for locales where Intl.Locale.weekInfo is unavailable.
+ * Values follow the weekInfo.firstDay convention: 1 = Monday, 7 = Sunday.
+ * All locales supported by the app are listed. Sources: CLDR / ISO 8601.
+ * en-US and a few others start on Sunday; the rest on Monday.
+ */
+const LOCALE_WEEK_START = {
+  // Sunday-start (7)
+  'en-US': 7,
+  'en-CA': 7, // Canada uses Sunday in many regions
+  'zh-TW': 7,
+  'ko-KR': 7,
+  'ja-JP': 7,
+  // Monday-start (1) — ISO 8601 default, covers most of the app's locales
+  'en':    1,
+  'en-GB': 1,
+  'it':    1,
+  'ru':    1,
+  'es':    1,
+  'fr':    1,
+  'zh':    1,
+  'de':    1,
+  'hy':    1,
+  'ja':    1,
+  'ko':    1,
+  'pt':    1,
+};
+
+/**
+ * Return the first day of the week for a given BCP-47 locale tag.
+ * Uses Intl.Locale.weekInfo when available (Android/Hermes may not support it),
+ * falls back to LOCALE_WEEK_START lookup, then defaults to Monday (1, ISO 8601).
+ *
+ * @param {string|null} locale - BCP-47 language tag (e.g. 'en-US', 'ru', 'fr')
+ * @returns {number} First day of week: 1 = Monday … 7 = Sunday
+ */
+export const getWeekStartDay = (locale) => {
+  if (locale) {
+    // Attempt Intl.Locale weekInfo (supported in V8 ≥ 9.9, Hermes experimental)
+    try {
+      const localeObj = new Intl.Locale(locale);
+      if (localeObj.weekInfo && typeof localeObj.weekInfo.firstDay === 'number') {
+        return localeObj.weekInfo.firstDay; // 1–7, Monday–Sunday
+      }
+    } catch (_e) {
+      // Intl.Locale constructor threw (invalid tag) — fall through
+    }
+
+    // Exact match first, then language-only prefix match
+    if (LOCALE_WEEK_START[locale] !== undefined) {
+      return LOCALE_WEEK_START[locale];
+    }
+    const lang = locale.split('-')[0];
+    if (LOCALE_WEEK_START[lang] !== undefined) {
+      return LOCALE_WEEK_START[lang];
+    }
+  }
+
+  // ISO 8601 default: Monday
+  return 1;
+};
+
+/**
  * Calculate current period dates for a given period type
  * @param {string} periodType - 'weekly' | 'monthly' | 'yearly'
  * @param {Date} referenceDate - Reference date (default: today)
+ * @param {string|null} locale - BCP-47 locale tag used to determine week start day (default: null → Monday)
  * @returns {Object} { start: Date, end: Date }
  */
-export const getCurrentPeriodDates = (periodType, referenceDate = new Date()) => {
+export const getCurrentPeriodDates = (periodType, referenceDate = new Date(), locale = null) => {
   const start = new Date(referenceDate);
   const end = new Date(referenceDate);
 
   switch (periodType) {
   case 'weekly': {
-    // Week starts on Sunday (0) and ends on Saturday (6)
-    const dayOfWeek = start.getDay();
-    start.setDate(start.getDate() - dayOfWeek);
+    // Determine the locale's first day of the week.
+    // weekInfo.firstDay: 1 = Monday … 7 = Sunday.
+    // JS getDay():        0 = Sunday … 6 = Saturday.
+    // Convert firstDay (1-7) → JS day index (0-6): Monday=1→0, …, Sunday=7→0 mod 7.
+    const firstDayRaw = getWeekStartDay(locale); // 1–7
+    const firstDayJS = firstDayRaw % 7; // Monday=1→1? No: 1%7=1, 7%7=0 ✓ Sunday→0
+
+    // Days since the week start (always 0–6)
+    const dayOfWeek = start.getDay(); // 0=Sun … 6=Sat
+    const diff = (dayOfWeek - firstDayJS + 7) % 7;
+    start.setDate(start.getDate() - diff);
     end.setDate(start.getDate() + 6);
     break;
   }
