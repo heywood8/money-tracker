@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.120.0](https://github.com/heywood8/money-tracker/compare/penny-v0.119.3...penny-v0.120.0) (2026-05-23)
+
+
+### Features
+
+* pre-restore snapshot for undo-able restore ([#734](https://github.com/heywood8/money-tracker/issues/734)) ([54e56ff](https://github.com/heywood8/money-tracker/commit/54e56ff5e5d37fa80cae2dfed7542ecadb34e536))
+
 ## [0.119.3](https://github.com/heywood8/money-tracker/compare/penny-v0.119.2...penny-v0.119.3) (2026-05-23)
 
 
