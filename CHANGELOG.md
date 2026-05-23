@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.119.3](https://github.com/heywood8/money-tracker/compare/penny-v0.119.2...penny-v0.119.3) (2026-05-23)
+
+
+### Bug Fixes
+
+* locale-aware week start for weekly budget periods ([#735](https://github.com/heywood8/money-tracker/issues/735)) ([96255fc](https://github.com/heywood8/money-tracker/commit/96255fc226573f4b759be2377ee19184d6577dac))
+
 ## [0.119.2](https://github.com/heywood8/money-tracker/compare/penny-v0.119.1...penny-v0.119.2) (2026-05-23)
 
 
