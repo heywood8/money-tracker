@@ -52,10 +52,12 @@ const toDecimal = (amount) => {
       const decimal = new Decimal(amount);
       // Check if the result is a valid finite number
       if (!decimal.isFinite()) {
+        console.warn(`[currency] toDecimal: non-finite value "${amount}" coerced to 0 — possible DB corruption`);
         return new Decimal(0);
       }
       return decimal;
     } catch (error) {
+      console.warn(`[currency] toDecimal: failed to parse "${amount}", coerced to 0 — possible DB corruption`);
       return new Decimal(0);
     }
   }
