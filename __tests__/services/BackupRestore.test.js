@@ -16,6 +16,7 @@ jest.mock('expo-file-system/legacy', () => ({
   getInfoAsync: jest.fn(),
   writeAsStringAsync: jest.fn(),
   readAsStringAsync: jest.fn(),
+  readDirectoryAsync: jest.fn(),
   copyAsync: jest.fn(),
   deleteAsync: jest.fn(),
   makeDirectoryAsync: jest.fn(),
@@ -140,6 +141,7 @@ describe('BackupRestore', () => {
     mockFileSystem.getInfoAsync.mockResolvedValue({ exists: true });
     mockFileSystem.writeAsStringAsync.mockResolvedValue();
     mockFileSystem.readAsStringAsync.mockResolvedValue('');
+    mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
     mockFileSystem.copyAsync.mockResolvedValue();
     mockFileSystem.deleteAsync.mockResolvedValue();
     mockFileSystem.makeDirectoryAsync.mockResolvedValue();

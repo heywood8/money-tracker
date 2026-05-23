@@ -95,18 +95,21 @@ const mockPickImportFile = jest.fn(() => Promise.resolve({ fileUri: '/mock/file.
 const mockImportBackupFromFile = jest.fn(() => Promise.resolve());
 const mockRestoreBackup = jest.fn(() => Promise.resolve());
 const mockCreateBackup = jest.fn(() => Promise.resolve({ version: 1, data: {} }));
+const mockGetPreRestoreSnapshots = jest.fn(() => Promise.resolve([]));
 jest.mock('../../app/services/BackupRestore', () => ({
   exportBackup: (...args) => mockExportBackup(...args),
   pickImportFile: (...args) => mockPickImportFile(...args),
   importBackupFromFile: (...args) => mockImportBackupFromFile(...args),
   restoreBackup: (...args) => mockRestoreBackup(...args),
   createBackup: (...args) => mockCreateBackup(...args),
+  getPreRestoreSnapshots: (...args) => mockGetPreRestoreSnapshots(...args),
 }));
 
 // Mock DailyBackupService
 const mockGetStoredBackups = jest.fn(() => Promise.resolve([]));
 jest.mock('../../app/services/DailyBackupService', () => ({
   getStoredBackups: (...args) => mockGetStoredBackups(...args),
+  DAILY_BACKUP_DIR: '/mock/docs/daily_backups/',
 }));
 
 // Mock expo-file-system/legacy
@@ -169,6 +172,7 @@ describe('SettingsModal Component', () => {
     mockRestoreBackup.mockClear();
     mockCreateBackup.mockClear();
     mockGetStoredBackups.mockClear();
+    mockGetPreRestoreSnapshots.mockClear();
     mockSetHideBalances.mockClear();
     mockAuthenticateWithBiometrics.mockClear();
     displaySettingsMockState.hideBalances = false;
