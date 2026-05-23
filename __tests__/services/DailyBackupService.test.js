@@ -79,10 +79,11 @@ const makeEmptyBackup = () => ({
  * Configure getPreference mock to return different values per key.
  * Pass null to simulate "no prior backup".
  */
-const mockPrefs = ({ daily = null, weekly = null } = {}) => {
+const mockPrefs = ({ daily = null, weekly = null, lastGood = null } = {}) => {
   mockPreferencesDB.getPreference.mockImplementation((key, defaultVal = null) => {
     if (key === 'last_daily_backup_date') return Promise.resolve(daily);
     if (key === 'last_weekly_backup_week') return Promise.resolve(weekly);
+    if (key === 'last_good_daily_backup_date') return Promise.resolve(lastGood);
     return Promise.resolve(defaultVal);
   });
 };
@@ -319,6 +320,16 @@ describe('DailyBackupService', () => {
           week,
         );
       });
+
+      it('updates last_good_daily_backup_date after a successful daily write', async () => {
+        const today = getTodayDateString();
+        await performDailyBackupIfNeeded();
+
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith(
+          'last_good_daily_backup_date',
+          today,
+        );
+      });
     });
 
     describe('when only the daily backup is needed (same week, new day)', () => {
@@ -343,6 +354,7 @@ describe('DailyBackupService', () => {
         await performDailyBackupIfNeeded();
         const calls = mockPreferencesDB.setPreference.mock.calls.map(c => c[0]);
         expect(calls).toContain('last_daily_backup_date');
+        expect(calls).toContain('last_good_daily_backup_date');
         expect(calls).not.toContain('last_weekly_backup_week');
       });
     });
@@ -571,13 +583,164 @@ describe('DailyBackupService', () => {
 
       it('proceeds normally when the snapshot has real account data', async () => {
         // makeSampleBackup has 1 account — isSnapshotValid returns true immediately
+        mockFileSystem.readDirectoryAsync.mockResolvedValue([]);
         const result = await performDailyBackupIfNeeded();
 
         expect(result).toBe(true);
         expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
-        // readAsStringAsync should NOT be called — the fast path (accountCount > 0) exits early
-        expect(mockFileSystem.readAsStringAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('row-count regression protection (layer 2)', () => {
+      beforeEach(() => mockPrefs({ daily: null, weekly: null }));
+
+      it('skips write when total rows drop by more than 50% vs prior backup', async () => {
+        // New snapshot: 1 account, 0 operations = 1 total row
+        // Prior backup: 1 account, 100 operations = 101 total rows — 1/101 < 50%
+        mockBackupRestore.createBackup.mockResolvedValue({
+          version: 1,
+          timestamp: `${TODAY}T10:00:00.000Z`,
+          platform: 'native',
+          data: {
+            accounts: [{ id: 'acc-1', name: 'Checking', balance: '1000.00', currency: 'USD' }],
+            categories: [],
+            operations: [],
+            budgets: [],
+            app_metadata: [],
+            balance_history: [],
+          },
+        });
+
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({
+            data: {
+              accounts: [{ id: 'acc-1' }],
+              operations: Array.from({ length: 100 }, (_, i) => ({ id: i })),
+            },
+          }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(false);
+        expect(mockFileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+        expect(mockFileSystem.deleteAsync).not.toHaveBeenCalled();
+      });
+
+      it('allows write when total rows drop by exactly 50% (boundary)', async () => {
+        // New: 1 account + 1 op = 2 total; Prior: 1 account + 3 ops = 4 total
+        // 2/4 = 50% — not strictly less than 50%, so allowed
+        mockBackupRestore.createBackup.mockResolvedValue({
+          version: 1,
+          timestamp: `${TODAY}T10:00:00.000Z`,
+          platform: 'native',
+          data: {
+            accounts: [{ id: 'acc-1', name: 'Checking', balance: '1000.00', currency: 'USD' }],
+            categories: [],
+            operations: [{ id: 'op-1' }],
+            budgets: [],
+            app_metadata: [],
+            balance_history: [],
+          },
+        });
+
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({
+            data: {
+              accounts: [{ id: 'acc-1' }],
+              operations: [{ id: 'op-1' }, { id: 'op-2' }, { id: 'op-3' }],
+            },
+          }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('allows write when prior backup is unreadable (fail-open)', async () => {
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockRejectedValue(new Error('File not found'));
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+
+      it('allows write when prior backup has 0 rows (fresh app)', async () => {
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [], operations: [] } }),
+        );
+
+        const result = await performDailyBackupIfNeeded();
+
+        expect(result).toBe(true);
+        expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalled();
+      });
+    });
+
+    describe('pinned last-good backup protection (layer 3)', () => {
+      it('pins the last-good backup date after a successful daily write', async () => {
+        mockPrefs({ daily: null, weekly: THIS_WEEK });
+        const today = getTodayDateString();
+
+        await performDailyBackupIfNeeded();
+
+        expect(mockPreferencesDB.setPreference).toHaveBeenCalledWith(
+          'last_good_daily_backup_date',
+          today,
+        );
+      });
+
+      it('does not update last-good backup date when snapshot is rejected', async () => {
+        mockPrefs({ daily: null, weekly: null });
+        mockBackupRestore.createBackup.mockResolvedValue(makeEmptyBackup());
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(['daily_2026-02-25.json']);
+        mockFileSystem.readAsStringAsync.mockResolvedValue(
+          JSON.stringify({ data: { accounts: [{ id: 'acc-1' }] } }),
+        );
+
+        await performDailyBackupIfNeeded();
+
+        const goodDateCalls = mockPreferencesDB.setPreference.mock.calls.filter(
+          c => c[0] === 'last_good_daily_backup_date',
+        );
+        expect(goodDateCalls).toHaveLength(0);
+      });
+
+      it('excludes pinned backup from cleanup even when over MAX_DAILY_BACKUPS', async () => {
+        const pinnedDate = '2026-02-18';
+        mockPrefs({ daily: null, weekly: THIS_WEEK, lastGood: pinnedDate });
+
+        const today = getTodayDateString();
+
+        // Simulate MAX_DAILY_BACKUPS files on disk after write, including pinned date at oldest slot
+        const filenames = [
+          `daily_${pinnedDate}.json`,
+          ...Array.from({ length: MAX_DAILY_BACKUPS - 1 }, (_, i) => {
+            const d = new Date('2026-02-19');
+            d.setDate(d.getDate() + i);
+            return `daily_${d.toISOString().split('T')[0]}.json`;
+          }),
+          `daily_${today}.json`,
+        ];
+
+        mockFileSystem.readDirectoryAsync.mockResolvedValue(filenames);
+
+        await performDailyBackupIfNeeded();
+
+        // deleteAsync should have been called, but NOT for the pinned backup
+        const deletedUris = mockFileSystem.deleteAsync.mock.calls.map(c => c[0]);
+        expect(deletedUris).not.toContain(
+          `${DAILY_BACKUP_DIR}daily_${pinnedDate}.json`,
+        );
       });
     });
   });
 });
+
