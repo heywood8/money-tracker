@@ -175,6 +175,37 @@ const initializeDatabase = async (rawDb, db) => {
     const migrationsBefore = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
     const appliedHashesBefore = new Set((migrationsBefore || []).map(m => m.hash));
 
+    // Pre-migration: log exact column list of operations table so we can see
+    // what state it is in before migrations run.
+    const opsColumnsPreMigration = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
+    if (opsColumnsPreMigration && opsColumnsPreMigration.length > 0) {
+      console.log('[DB] operations table columns before migrations:', opsColumnsPreMigration.map(c => `${c.cid}:${c.name}(${c.type})`).join(', '));
+    } else {
+      console.log('[DB] operations table does not exist yet (fresh database)');
+    }
+
+    // PRE-MIGRATION DEFENSIVE CHECK: ensure original_balance column exists BEFORE
+    // running migrations. If migration 0006 was recorded in __drizzle_migrations but
+    // its ALTER TABLE was rolled back (Drizzle/Expo SQLite bug), the column will be
+    // absent. Migration 0007 does `INSERT INTO __new_operations SELECT * FROM operations`
+    // which fails when the column counts mismatch (old=13, new=14) — causing migrate()
+    // to throw BEFORE the post-migration fallback below can run. Adding the column here
+    // breaks that infinite failure loop.
+    if (opsColumnsPreMigration && opsColumnsPreMigration.length > 0) {
+      const hasOriginalBalancePre = opsColumnsPreMigration.some(col => col.name === 'original_balance');
+      if (!hasOriginalBalancePre) {
+        console.warn('[DB] PRE-MIGRATION: original_balance column missing from operations table — adding it now so migration 0007 SELECT * column count matches');
+        try {
+          await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
+          console.log('[DB] PRE-MIGRATION: original_balance column added successfully');
+        } catch (preAddErr) {
+          console.error('[DB] PRE-MIGRATION: failed to add original_balance column:', preAddErr.message);
+        }
+      } else {
+        console.log('[DB] PRE-MIGRATION: original_balance column already present — no action needed');
+      }
+    }
+
     // Pre-migration guard for migration 0007 (CHECK constraint on operations.type).
     // If invalid types exist we warn and exclude 0007 from this run so the app can
     // still start. The migration stays pending and will be retried on the next
@@ -211,18 +242,34 @@ const initializeDatabase = async (rawDb, db) => {
     }
 
     // Run Drizzle migrations
-    await migrate(db, migrationsConfig);
+    console.log('[DB] calling migrate() with', migrationsConfig.journal.entries.length, 'journal entries:', migrationsConfig.journal.entries.map(e => e.tag).join(', '));
+    try {
+      await migrate(db, migrationsConfig);
+      console.log('[DB] migrate() completed without throwing');
+    } catch (migrateErr) {
+      console.error('[DB] migrate() threw an error:', migrateErr.message);
+      console.error('[DB] migrate() error cause:', migrateErr.cause?.message ?? '(no cause)');
+      throw migrateErr;
+    }
 
-    // Defensive: ensure original_balance column exists on operations table.
-    // Migration 0006 can silently fail on existing databases if the Drizzle
-    // migrator rolls back the transaction but records the hash, leaving the
-    // column absent. We detect and fix that here.
-    const opsColumns = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
-    const hasOriginalBalance = (opsColumns || []).some(col => col.name === 'original_balance');
+    // Post-migration verification: log the final column list and confirm
+    // original_balance is present. Acts as a last-resort fallback in case
+    // both the pre-migration guard and migrate() somehow left it absent.
+    const opsColumnsPostMigration = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
+    if (opsColumnsPostMigration && opsColumnsPostMigration.length > 0) {
+      console.log('[DB] operations table columns after migrations:', opsColumnsPostMigration.map(c => `${c.cid}:${c.name}(${c.type})`).join(', '));
+    }
+    const hasOriginalBalance = (opsColumnsPostMigration || []).some(col => col.name === 'original_balance');
     if (!hasOriginalBalance) {
-      console.warn('original_balance column missing from operations — adding it directly');
-      await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
-      console.log('original_balance column added via fallback');
+      console.warn('[DB] POST-MIGRATION: original_balance column still missing — adding it as last-resort fallback');
+      try {
+        await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
+        console.log('[DB] POST-MIGRATION: original_balance column added via fallback');
+      } catch (postAddErr) {
+        console.error('[DB] POST-MIGRATION: failed to add original_balance column:', postAddErr.message);
+      }
+    } else {
+      console.log('[DB] POST-MIGRATION: original_balance column confirmed present');
     }
 
     // Defensive: ensure planned_operations table exists after migrations.
