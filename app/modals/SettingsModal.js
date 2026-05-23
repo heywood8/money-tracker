@@ -10,7 +10,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup } from '../services/BackupRestore';
+import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots } from '../services/BackupRestore';
 import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
@@ -365,15 +365,19 @@ export default function SettingsModal({ visible, onClose }) {
   const loadStoredBackups = useCallback(async () => {
     setBackupsLoading(true);
     try {
-      const uris = await getStoredBackups();
+      const [regularUris, snapshotUris] = await Promise.all([
+        getStoredBackups(),
+        getPreRestoreSnapshots(),
+      ]);
+      const allUris = [...regularUris.reverse(), ...snapshotUris];
       const infos = await Promise.all(
-        uris.map(async (uri) => {
+        allUris.map(async (uri) => {
           const filename = uri.split('/').pop();
           const info = await LegacyFileSystem.getInfoAsync(uri);
           return { uri, filename, size: info.size || 0 };
         }),
       );
-      setStoredBackups(infos.reverse());
+      setStoredBackups(infos);
     } catch (error) {
       console.error('Failed to load stored backups:', error);
       setStoredBackups([]);
@@ -659,24 +663,49 @@ export default function SettingsModal({ visible, onClose }) {
         return dateLabel;
       }
     }
+    if (filename.startsWith('pre_restore_')) {
+      // filename: pre_restore_YYYY-MM-DDTHH-MM-SS.json
+      const inner = filename.replace('pre_restore_', '').replace('.json', '');
+      // inner looks like: 2024-01-15T14-30-00
+      const datePart = inner.split('T')[0];
+      const timePart = inner.split('T')[1];
+      if (datePart) {
+        const [year, month, day] = datePart.split('-').map(Number);
+        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric',
+        });
+        if (timePart) {
+          const parts = timePart.split('-');
+          const hh = parts[0] || '00';
+          const mm = parts[1] || '00';
+          return `${dateLabel} · ${hh}:${mm}`;
+        }
+        return dateLabel;
+      }
+    }
     return filename;
   }, [t]);
 
   const renderBackupItem = useCallback(({ item }) => {
     const isDaily = item.filename.startsWith('daily_');
     const isManual = item.filename.startsWith('manual_');
+    const isPreRestore = item.filename.startsWith('pre_restore_');
     const label = formatBackupLabel(item.filename);
-    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
+    const typeLabel = isPreRestore
+      ? (t('pre_restore_snapshot') || 'Pre-restore snapshot')
+      : isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
     const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
     const isPending = pendingDeleteUri === item.uri;
     return (
       <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
         <View style={styles.backupItemLeft}>
-          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
+          <Ionicons name={isPreRestore ? 'shield-checkmark-outline' : isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : isPreRestore ? colors.primary : colors.text} />
           <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
+            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : isPreRestore ? colors.primary : colors.text }]}>
+              {isPreRestore ? `${typeLabel} — ${label}` : label}
+            </Text>
             <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
+              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : isPreRestore ? sizeKB : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
             </Text>
           </View>
         </View>

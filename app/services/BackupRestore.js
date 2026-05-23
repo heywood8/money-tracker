@@ -397,6 +397,21 @@ export const restoreBackup = async (backup) => {
       snapshotUri = `${FileSystem.documentDirectory}pre_restore_${snapshotTimestamp}.json`;
       await FileSystem.writeAsStringAsync(snapshotUri, JSON.stringify(snapshot, null, 2));
       console.log('Pre-restore snapshot saved:', snapshotUri);
+
+      // Keep only the 3 most recent pre-restore snapshots.
+      try {
+        const allFiles = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
+        const snapshots = allFiles
+          .filter(name => name.startsWith('pre_restore_') && name.endsWith('.json'))
+          .sort(); // ISO timestamps sort lexicographically = chronologically
+        const excess = snapshots.slice(0, Math.max(0, snapshots.length - 3));
+        for (const name of excess) {
+          await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${name}`, { idempotent: true });
+          console.log('Deleted old pre-restore snapshot:', name);
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to clean up old pre-restore snapshots:', cleanupError);
+      }
     } catch (snapshotError) {
       console.warn('Failed to create pre-restore snapshot:', snapshotError);
     }
@@ -1203,6 +1218,25 @@ export const importBackupFromFile = async ({ fileUri, filename }) => {
 export const importBackup = async () => {
   const fileInfo = await pickImportFile();
   return importBackupFromFile(fileInfo);
+};
+
+/**
+ * List all pre-restore snapshot files stored in documentDirectory.
+ * Returns URIs sorted newest-first (filenames sort lexicographically by timestamp).
+ * @returns {Promise<string[]>} Array of file URIs
+ */
+export const getPreRestoreSnapshots = async () => {
+  try {
+    const allFiles = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
+    return allFiles
+      .filter(name => name.startsWith('pre_restore_') && name.endsWith('.json'))
+      .sort()
+      .reverse()
+      .map(name => `${FileSystem.documentDirectory}${name}`);
+  } catch (error) {
+    console.warn('Failed to list pre-restore snapshots:', error);
+    return [];
+  }
 };
 
 /**
