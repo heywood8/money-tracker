@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.119.0](https://github.com/heywood8/money-tracker/compare/penny-v0.118.5...penny-v0.119.0) (2026-05-23)
+
+
+### Features
+
+* remove logo and app name from header, slim header height ([#730](https://github.com/heywood8/money-tracker/issues/730)) ([ce2cca1](https://github.com/heywood8/money-tracker/commit/ce2cca17f0890e010fbbd4b0b4c219a79fc00cc8))
+
 ## [0.118.5](https://github.com/heywood8/money-tracker/compare/penny-v0.118.4...penny-v0.118.5) (2026-05-23)
 
 
