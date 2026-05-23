@@ -614,6 +614,20 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
           date: today,
         });
 
+        // Diagnostic: log the actual operations table columns so we can confirm
+        // original_balance is present before the INSERT. This catches the case
+        // where migrations ran but the column is still somehow missing.
+        try {
+          const cols = await db.getAllAsync('PRAGMA table_info(operations)');
+          const colNames = (cols || []).map(c => c.name);
+          console.log('[adjustAccountBalance] operations columns:', colNames.join(', '));
+          if (!colNames.includes('original_balance')) {
+            console.error('[adjustAccountBalance] MISSING original_balance column — INSERT will fail. Migration state may be broken.');
+          }
+        } catch (pragmaErr) {
+          console.warn('[adjustAccountBalance] could not read table_info(operations):', pragmaErr.message);
+        }
+
         const result = await db.runAsync(
           'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, original_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
