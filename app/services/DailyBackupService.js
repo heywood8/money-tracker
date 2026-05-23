@@ -13,6 +13,7 @@ import { getPreference, setPreference } from './PreferencesDB';
 
 const LAST_DAILY_BACKUP_DATE_KEY = 'last_daily_backup_date';
 const LAST_WEEKLY_BACKUP_WEEK_KEY = 'last_weekly_backup_week';
+const LAST_GOOD_DAILY_BACKUP_DATE_KEY = 'last_good_daily_backup_date';
 
 // KNOWN ISSUE (won't fix): backup files are stored unencrypted under documentDirectory/daily_backups/
 // and are therefore inherited by Google Auto-Backup, making them accessible to an attacker with
@@ -113,9 +114,12 @@ export const getStoredBackups = async () => {
 
 /**
  * Delete the oldest entries in `backups` until at most `maxToKeep` remain.
+ * The optional `pinnedUri` is never deleted even if it falls outside the window.
  */
-const cleanupBackups = async (backups, maxToKeep) => {
-  const excess = backups.slice(0, Math.max(0, backups.length - maxToKeep));
+const cleanupBackups = async (backups, maxToKeep, pinnedUri = null) => {
+  // Exclude the pinned file before computing excess so it is never deleted.
+  const deletable = pinnedUri ? backups.filter(uri => uri !== pinnedUri) : backups;
+  const excess = deletable.slice(0, Math.max(0, deletable.length - maxToKeep));
   for (const uri of excess) {
     try {
       await FileSystem.deleteAsync(uri, { idempotent: true });
@@ -128,41 +132,75 @@ const cleanupBackups = async (backups, maxToKeep) => {
 
 /**
  * Returns false when the snapshot looks like a silent DB read failure.
- * If accounts is empty, we compare against the most recent backup on disk.
- * A snapshot with zero accounts is rejected when any prior backup recorded
- * real accounts — that pattern is the fingerprint of a locked/mid-migration DB
- * returning empty arrays, not a user who deleted everything.
+ *
+ * Layer 1 — zero-account check:
+ *   A snapshot with zero accounts is rejected when any prior backup recorded
+ *   real accounts — that pattern is the fingerprint of a locked/mid-migration DB
+ *   returning empty arrays, not a user who deleted everything.
+ *
+ * Layer 2 — row-count regression check:
+ *   Even when accounts > 0, if total rows (accounts + operations) dropped by
+ *   more than 50% relative to the most recent backup, treat it as suspicious
+ *   and skip the write.  A 50% floor is generous enough to survive legitimate
+ *   mass-deletes while catching the all-empty / near-empty failure mode.
  */
 const isSnapshotValid = async (backup) => {
   const accountCount = backup?.data?.accounts?.length ?? 0;
+  const operationCount = backup?.data?.operations?.length ?? 0;
+  const newTotal = accountCount + operationCount;
 
-  // Snapshot has at least one account — no concern
-  if (accountCount > 0) return true;
-
-  // Zero accounts: compare against the most recent backup file on disk
+  // Resolve the most recent backup file (daily or weekly) once; reused for both layers.
   const existingFiles = [
     ...(await getDailyBackups()),
     ...(await getWeeklyBackups()),
   ].sort();
-
   const latestUri = existingFiles[existingFiles.length - 1];
-  if (!latestUri) {
-    // No prior backup to compare against — allow writing (first-run / fresh install)
+
+  // ── Layer 1: zero-account guard ───────────────────────────────────────────
+  if (accountCount === 0) {
+    if (!latestUri) {
+      // No prior backup — allow writing (first-run / fresh install)
+      return true;
+    }
+
+    try {
+      const prevJson = await FileSystem.readAsStringAsync(latestUri);
+      const prev = JSON.parse(prevJson);
+      const prevAccounts = prev?.data?.accounts?.length ?? 0;
+      if (prevAccounts > 0) {
+        console.warn(
+          `[DailyBackup] Refusing empty snapshot: previous backup had ${prevAccounts} account(s) — skipping to protect existing backups`,
+        );
+        return false;
+      }
+    } catch {
+      // Can't read/parse the previous backup — allow writing rather than blocking indefinitely
+    }
+
     return true;
   }
 
-  try {
-    const prevJson = await FileSystem.readAsStringAsync(latestUri);
-    const prev = JSON.parse(prevJson);
-    const prevAccounts = prev?.data?.accounts?.length ?? 0;
-    if (prevAccounts > 0) {
-      console.warn(
-        `[DailyBackup] Refusing empty snapshot: previous backup had ${prevAccounts} account(s) — skipping to protect existing backups`,
-      );
-      return false;
+  // ── Layer 2: row-count regression check ───────────────────────────────────
+  // Only meaningful when we have a prior backup to compare against.
+  if (latestUri) {
+    try {
+      const prevJson = await FileSystem.readAsStringAsync(latestUri);
+      const prev = JSON.parse(prevJson);
+      const prevAccounts = prev?.data?.accounts?.length ?? 0;
+      const prevOperations = prev?.data?.operations?.length ?? 0;
+      const prevTotal = prevAccounts + prevOperations;
+
+      // Only fire when the previous snapshot was substantial (>0 rows) and the
+      // new one has dropped by more than half.
+      if (prevTotal > 0 && newTotal < prevTotal * 0.5) {
+        console.warn(
+          `[DailyBackup] Suspicious row-count drop: ${prevTotal} → ${newTotal} rows (>${50}% reduction) — skipping write to protect existing backups`,
+        );
+        return false;
+      }
+    } catch {
+      // Unreadable prior file — don't block the write
     }
-  } catch {
-    // Can't read/parse the previous backup — allow writing rather than blocking indefinitely
   }
 
   return true;
@@ -180,9 +218,10 @@ export const performDailyBackupIfNeeded = async () => {
     const today = getTodayDateString();
     const currentWeek = getISOWeekString();
 
-    const [lastDailyDate, lastWeeklyWeek] = await Promise.all([
+    const [lastDailyDate, lastWeeklyWeek, lastGoodDailyDate] = await Promise.all([
       getPreference(LAST_DAILY_BACKUP_DATE_KEY, null),
       getPreference(LAST_WEEKLY_BACKUP_WEEK_KEY, null),
+      getPreference(LAST_GOOD_DAILY_BACKUP_DATE_KEY, null),
     ]);
 
     const needsDaily = lastDailyDate !== today;
@@ -206,12 +245,22 @@ export const performDailyBackupIfNeeded = async () => {
 
     const backupJson = JSON.stringify(backup);
 
+    // Layer 3: resolve the pinned URI for the last known-good daily backup so
+    // cleanupBackups never evicts it, even if it's outside the normal rotation window.
+    const pinnedDailyUri = lastGoodDailyDate
+      ? `${DAILY_BACKUP_DIR}daily_${lastGoodDailyDate}.json`
+      : null;
+
     if (needsDaily) {
       const uri = `${DAILY_BACKUP_DIR}daily_${today}.json`;
       await FileSystem.writeAsStringAsync(uri, backupJson);
       await setPreference(LAST_DAILY_BACKUP_DATE_KEY, today);
+      // This snapshot passed validation — advance the "last good" pin.
+      await setPreference(LAST_GOOD_DAILY_BACKUP_DATE_KEY, today);
       console.log(`[DailyBackup] Daily backup saved: daily_${today}.json`);
-      await cleanupBackups(await getDailyBackups(), MAX_DAILY_BACKUPS);
+      // Pass pinnedDailyUri from *before* this write so we protect the previous
+      // good backup during the transition (today's file is already within window).
+      await cleanupBackups(await getDailyBackups(), MAX_DAILY_BACKUPS, pinnedDailyUri);
     }
 
     if (needsWeekly) {
