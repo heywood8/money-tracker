@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.118.5](https://github.com/heywood8/money-tracker/compare/penny-v0.118.4...penny-v0.118.5) (2026-05-23)
+
+
+### Bug Fixes
+
+* move original_balance pre-migration check before migrate() to break infinite failure loop ([#728](https://github.com/heywood8/money-tracker/issues/728)) ([724e15d](https://github.com/heywood8/money-tracker/commit/724e15d180e57386da61546b470c8f77dddfdda1))
+
 ## [0.118.4](https://github.com/heywood8/money-tracker/compare/penny-v0.118.3...penny-v0.118.4) (2026-05-22)
 
 
