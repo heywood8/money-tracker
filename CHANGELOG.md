@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.119.2](https://github.com/heywood8/money-tracker/compare/penny-v0.119.1...penny-v0.119.2) (2026-05-23)
+
+
+### Bug Fixes
+
+* guard daily backup against empty/corrupt snapshots ([#733](https://github.com/heywood8/money-tracker/issues/733)) ([ef1b89e](https://github.com/heywood8/money-tracker/commit/ef1b89eed80b843eeb1320130689aedd9afa2709))
+
 ## [0.119.1](https://github.com/heywood8/money-tracker/compare/penny-v0.119.0...penny-v0.119.1) (2026-05-23)
 
 
