@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.119.1](https://github.com/heywood8/money-tracker/compare/penny-v0.119.0...penny-v0.119.1) (2026-05-23)
+
+
+### Bug Fixes
+
+* useOperationForm unmount guard, split formatting, exchange rate validation ([#732](https://github.com/heywood8/money-tracker/issues/732)) ([f904569](https://github.com/heywood8/money-tracker/commit/f904569558bad290a5a66b34d8567fd40c862f82))
+
 ## [0.119.0](https://github.com/heywood8/money-tracker/compare/penny-v0.118.5...penny-v0.119.0) (2026-05-23)
 
 
