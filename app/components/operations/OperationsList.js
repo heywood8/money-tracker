@@ -28,6 +28,7 @@ const OperationsList = forwardRef(({
   categories,
   colors,
   t,
+  initialLoading,
   loadingMore,
   hasMoreOperations,
   onLoadMore,
@@ -192,12 +193,18 @@ const OperationsList = forwardRef(({
       ListHeaderComponent={headerComponent}
       ListFooterComponent={renderFooter}
       ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Icon name="cash-multiple" size={64} color={colors.mutedText} />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('no_operations')}
-          </Text>
-        </View>
+        initialLoading ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Icon name="cash-multiple" size={64} color={colors.mutedText} />
+            <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+              {t('no_operations')}
+            </Text>
+          </View>
+        )
       }
       contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : styles.listContent}
       onScroll={onScroll}
@@ -227,6 +234,7 @@ OperationsList.propTypes = {
   categories: PropTypes.arrayOf(PropTypes.object).isRequired,
   colors: PropTypes.object.isRequired,
   t: PropTypes.func.isRequired,
+  initialLoading: PropTypes.bool,
   loadingMore: PropTypes.bool,
   hasMoreOperations: PropTypes.bool,
   onLoadMore: PropTypes.func.isRequired,
@@ -243,6 +251,7 @@ OperationsList.propTypes = {
 };
 
 OperationsList.defaultProps = {
+  initialLoading: false,
   loadingMore: false,
   hasMoreOperations: false,
   onScroll: () => {},
