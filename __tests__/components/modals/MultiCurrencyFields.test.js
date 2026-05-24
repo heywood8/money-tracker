@@ -91,6 +91,27 @@ describe('MultiCurrencyFields', () => {
       expect(getByText('offline_rate_info (2024-01-15 10:30)')).toBeTruthy();
     });
 
+    it('shows fetching_rate text when rateSource is loading', () => {
+      const { getByText } = render(
+        <MultiCurrencyFields {...defaultProps} rateSource="loading" />,
+      );
+      expect(getByText('fetching_rate')).toBeTruthy();
+    });
+
+    it('shows manual_rate_info text when rateSource is manual', () => {
+      const { getByText } = render(
+        <MultiCurrencyFields {...defaultProps} rateSource="manual" />,
+      );
+      expect(getByText('manual_rate_info')).toBeTruthy();
+    });
+
+    it('shows live_rate_info text when rateSource is live', () => {
+      const { getByText } = render(
+        <MultiCurrencyFields {...defaultProps} rateSource="live" />,
+      );
+      expect(getByText('live_rate_info')).toBeTruthy();
+    });
+
     it('uses custom translation function', () => {
       const customT = jest.fn((key) => `translated_${key}`);
       const { getByText } = render(

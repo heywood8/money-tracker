@@ -214,4 +214,21 @@ describe('ExpenseSummaryCard', () => {
       );
     });
   });
+
+  describe('categoryName / onBack overlay', () => {
+    it('shows category chip when both categoryName and onBack are provided', () => {
+      const onBack = jest.fn();
+      const { getByText } = render(
+        <ExpenseSummaryCard {...defaultProps} categoryName="Food" onBack={onBack} />,
+      );
+      expect(getByText('Food')).toBeTruthy();
+    });
+
+    it('does not show category chip when categoryName provided but onBack is null', () => {
+      const { queryByText } = render(
+        <ExpenseSummaryCard {...defaultProps} categoryName="Food" onBack={null} />,
+      );
+      expect(queryByText('Food')).toBeNull();
+    });
+  });
 });

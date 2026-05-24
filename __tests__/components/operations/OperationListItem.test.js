@@ -391,5 +391,22 @@ describe('OperationListItem', () => {
       // subtitle should be "Food · Checking" (parentName · accountName)
       expect(getByText(/Food · Checking/)).toBeTruthy();
     });
+
+    it('shows parentName / categoryName · accountName subtitle when description set and category has parent', () => {
+      const categoriesWithParent = [
+        { id: 'parent1', name: 'Food', icon: 'food', parentId: null },
+        { id: 'cat2', name: 'Groceries', icon: 'cart', parentId: 'parent1' },
+      ];
+      const { getByText } = render(
+        <OperationListItem
+          {...baseProps}
+          operation={{ ...baseOperation, categoryId: 'cat2', description: 'Weekly shop' }}
+          categories={categoriesWithParent}
+          getCategoryInfo={() => ({ name: 'Groceries', icon: 'cart' })}
+        />,
+      );
+      // title = description, subtitle = "Food / Groceries · Checking"
+      expect(getByText(/Food \/ Groceries · Checking/)).toBeTruthy();
+    });
   });
 });
