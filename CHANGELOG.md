@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.121.0](https://github.com/heywood8/money-tracker/compare/penny-v0.120.0...penny-v0.121.0) (2026-05-24)
+
+
+### Features
+
+* remove full-screen loading blocker on app startup ([#740](https://github.com/heywood8/money-tracker/issues/740)) ([37dab7b](https://github.com/heywood8/money-tracker/commit/37dab7ba4dd8ac8db096aac15e5fb43926c67124))
+
 ## [0.120.0](https://github.com/heywood8/money-tracker/compare/penny-v0.119.3...penny-v0.120.0) (2026-05-23)
 
 
