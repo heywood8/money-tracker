@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import LoadingView from '../components/LoadingView';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -51,8 +50,8 @@ const OperationsScreen = () => {
     loadMoreOperations,
     jumpToDate,
   } = useOperationsActions();
-  const { accounts, visibleAccounts, loading: accountsLoading } = useAccountsData();
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { accounts, visibleAccounts } = useAccountsData();
+  const { categories } = useCategories();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperation, setEditingOperation] = useState(null);
@@ -739,10 +738,6 @@ const OperationsScreen = () => {
     }, 100);
   }, []);
 
-  if (operationsLoading || accountsLoading || categoriesLoading) {
-    return <LoadingView message={t('loading_operations')} />;
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <OperationsList
@@ -752,6 +747,7 @@ const OperationsScreen = () => {
         categories={categories}
         colors={colors}
         t={t}
+        initialLoading={operationsLoading}
         loadingMore={loadingMore}
         hasMoreOperations={hasMoreOperations}
         onLoadMore={loadMoreOperations}

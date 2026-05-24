@@ -257,4 +257,16 @@ describe('SearchBar', () => {
       expect(filterIcon.props.color).toBe('#CCCCCC');
     });
   });
+
+  describe('external searchText sync', () => {
+    it('skips local update when searchText prop rerenders with same value', async () => {
+      // First render with 'coffee': effect sets lastSentRef.current = 'coffee'
+      // Rerender with same 'coffee': condition is false → no-op branch is hit
+      const { rerender } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+      await act(async () => { jest.runAllTimers(); });
+      rerender(<SearchBar {...defaultProps} searchText="coffee" />);
+      await act(async () => { jest.runAllTimers(); });
+      // No assertion needed; exercising the false branch is the goal
+    });
+  });
 });

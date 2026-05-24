@@ -110,6 +110,7 @@ jest.mock('../../app/components/operations/OperationsList', () => {
     return React.createElement('OperationsList', {
       testID: 'operations-list',
       ref: ref,
+      initialLoading: props.initialLoading,
       onEditOperation: props.onEditOperation,
       onDateSeparatorPress: props.onDateSeparatorPress,
       onScroll: props.onScroll,
@@ -1843,16 +1844,10 @@ describe('OperationsScreen', () => {
   });
 
   describe('Loading States', () => {
-    it('shows loading state when operations are loading', () => {
+    it('passes initialLoading=true to OperationsList when operations are loading', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-      const { useLocalization } = require('../../app/contexts/LocalizationContext');
-
-      useLocalization.mockReturnValue({
-        t: jest.fn((key) => key),
-        language: 'en',
-      });
 
       useOperationsData.mockReturnValue({
         operations: [],
@@ -1874,23 +1869,18 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { queryByTestId, getByText } = render(<OperationsScreen />);
+      const { getByTestId } = render(<OperationsScreen />);
+      const operationsList = getByTestId('operations-list');
 
-      // When loading, operations list should not be visible
-      expect(getByText('loading_operations')).toBeTruthy();
+      // Operations list is pre-rendered immediately; inline spinner shown via initialLoading
+      expect(operationsList.props.initialLoading).toBe(true);
     });
 
-    it('shows loading state when accounts are loading', () => {
+    it('pre-renders screen normally when accounts are loading', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-      const { useLocalization } = require('../../app/contexts/LocalizationContext');
-
-      useLocalization.mockReturnValue({
-        t: jest.fn((key) => key),
-        language: 'en',
-      });
 
       useAccountsData.mockReturnValue({
         accounts: [],
@@ -1918,22 +1908,17 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByText } = render(<OperationsScreen />);
+      const { getByTestId } = render(<OperationsScreen />);
 
-      expect(getByText('loading_operations')).toBeTruthy();
+      // Screen pre-renders; no full-screen loading blocker while accounts load
+      expect(getByTestId('operations-list')).toBeTruthy();
     });
 
-    it('shows loading state when categories are loading', () => {
+    it('pre-renders screen normally when categories are loading', () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
-      const { useLocalization } = require('../../app/contexts/LocalizationContext');
-
-      useLocalization.mockReturnValue({
-        t: jest.fn((key) => key),
-        language: 'en',
-      });
 
       useCategories.mockReturnValue({
         categories: [],
@@ -1960,9 +1945,10 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByText } = render(<OperationsScreen />);
+      const { getByTestId } = render(<OperationsScreen />);
 
-      expect(getByText('loading_operations')).toBeTruthy();
+      // Screen pre-renders; no full-screen loading blocker while categories load
+      expect(getByTestId('operations-list')).toBeTruthy();
     });
   });
 

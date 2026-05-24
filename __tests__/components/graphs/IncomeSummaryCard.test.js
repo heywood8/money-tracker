@@ -206,4 +206,21 @@ describe('IncomeSummaryCard', () => {
       );
     });
   });
+
+  describe('categoryName / onBack overlay', () => {
+    it('shows category chip when both categoryName and onBack are provided', () => {
+      const onBack = jest.fn();
+      const { getByText } = render(
+        <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={onBack} />,
+      );
+      expect(getByText('Salary')).toBeTruthy();
+    });
+
+    it('does not show category chip when categoryName provided but onBack is null', () => {
+      const { queryByText } = render(
+        <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={null} />,
+      );
+      expect(queryByText('Salary')).toBeNull();
+    });
+  });
 });
