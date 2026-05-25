@@ -674,6 +674,22 @@ describe('CategoriesDB', () => {
 
       await expect(CategoriesDB.getCategoryPath('cat-1')).rejects.toThrow('Database error');
     });
+
+    it('throws when category parents form a cycle', async () => {
+      mockDb.queryFirst
+        .mockResolvedValueOnce({ id: 'cat-a', name: 'A', parent_id: 'cat-b' })
+        .mockResolvedValueOnce({ id: 'cat-b', name: 'B', parent_id: 'cat-a' });
+
+      await expect(CategoriesDB.getCategoryPath('cat-a')).rejects.toThrow('Cycle detected');
+    });
+
+    it('cycle error message includes the offending id', async () => {
+      mockDb.queryFirst
+        .mockResolvedValueOnce({ id: 'cat-a', name: 'A', parent_id: 'cat-b' })
+        .mockResolvedValueOnce({ id: 'cat-b', name: 'B', parent_id: 'cat-a' });
+
+      await expect(CategoriesDB.getCategoryPath('cat-a')).rejects.toThrow('cat-a');
+    });
   });
 
   describe('moveCategory', () => {

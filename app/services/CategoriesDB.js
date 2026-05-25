@@ -359,8 +359,11 @@ export const getCategoryPath = async (id) => {
   try {
     const path = [];
     let currentId = id;
+    const visited = new Set();
 
     while (currentId) {
+      if (visited.has(currentId)) throw new Error('Cycle detected in category parents at id: ' + currentId);
+      visited.add(currentId);
       const category = await getCategoryById(currentId);
       if (!category) break;
 
