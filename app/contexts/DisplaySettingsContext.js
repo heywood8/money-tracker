@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 
@@ -13,13 +13,15 @@ export const DisplaySettingsProvider = ({ children }) => {
     });
   }, []);
 
-  const setHideBalances = async (value) => {
+  const setHideBalances = useCallback(async (value) => {
     setHideBalancesState(value);
     await setPreference(PREF_KEYS.HIDE_BALANCES, value ? 'true' : 'false');
-  };
+  }, []);
+
+  const ctxValue = useMemo(() => ({ hideBalances, setHideBalances }), [hideBalances, setHideBalances]);
 
   return (
-    <DisplaySettingsContext.Provider value={{ hideBalances, setHideBalances }}>
+    <DisplaySettingsContext.Provider value={ctxValue}>
       {children}
     </DisplaySettingsContext.Provider>
   );

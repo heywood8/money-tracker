@@ -63,12 +63,12 @@ const darkTheme = {
 export const ThemeColorsProvider = ({ children }) => {
   const { colorScheme } = useThemeConfig();
 
-  const colors = useMemo(() => {
-    return colorScheme === 'dark' ? darkTheme.colors : lightTheme.colors;
-  }, [colorScheme]);
+  const value = useMemo(() => ({
+    colors: colorScheme === 'dark' ? darkTheme.colors : lightTheme.colors,
+  }), [colorScheme]);
 
   return (
-    <ThemeColorsContext.Provider value={{ colors }}>
+    <ThemeColorsContext.Provider value={value}>
       {children}
     </ThemeColorsContext.Provider>
   );

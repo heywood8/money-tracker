@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import MaterialDialog from '../components/MaterialDialog';
 
@@ -29,8 +29,10 @@ export const DialogProvider = ({ children }) => {
     setDialog(null);
   }, []);
 
+  const value = useMemo(() => ({ showDialog, hideDialog }), [showDialog, hideDialog]);
+
   return (
-    <DialogContext.Provider value={{ showDialog, hideDialog }}>
+    <DialogContext.Provider value={value}>
       {children}
       {dialog && (
         <MaterialDialog
