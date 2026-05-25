@@ -3,6 +3,7 @@ import { getLastAccessedAccount } from '../services/LastAccount';
 import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils';
 import * as Currency from '../services/currency';
 import * as OperationsDB from '../services/OperationsDB';
+import { appEvents, EVENTS } from '../services/eventEmitter';
 import currencies from '../../assets/currencies.json';
 
 /**
@@ -150,29 +151,31 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
   // Top transfer target accounts from last 90 days
   const [topTransferTargets, setTopTransferTargets] = useState([]);
 
-  // Load top categories and transfer targets from last 3 months
-  useEffect(() => {
-    async function loadTopCategories() {
-      try {
-        const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
-        setTopCategories(topCats);
-      } catch (error) {
-        console.error('Failed to load top categories:', error);
-        setTopCategories([]);
-      }
+  const loadSuggestions = useCallback(async () => {
+    try {
+      const topCats = await OperationsDB.getTopCategoriesFromLastMonth(10);
+      setTopCategories(topCats);
+    } catch (error) {
+      console.error('Failed to load top categories:', error);
+      setTopCategories([]);
     }
-    async function loadTopTransferTargets() {
-      try {
-        const targets = await OperationsDB.getTopTransferTargetAccounts(10);
-        setTopTransferTargets(targets);
-      } catch (error) {
-        console.error('Failed to load top transfer targets:', error);
-        setTopTransferTargets([]);
-      }
+    try {
+      const targets = await OperationsDB.getTopTransferTargetAccounts(10);
+      setTopTransferTargets(targets);
+    } catch (error) {
+      console.error('Failed to load top transfer targets:', error);
+      setTopTransferTargets([]);
     }
-    loadTopCategories();
-    loadTopTransferTargets();
   }, []);
+
+  useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
+
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.OPERATION_CHANGED, loadSuggestions);
+    return unsubscribe;
+  }, [loadSuggestions]);
 
   // Filtered categories for quick add form (excluding shadow categories)
   const filteredCategories = useMemo(() => {
