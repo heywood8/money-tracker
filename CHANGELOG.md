@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.4](https://github.com/heywood8/money-tracker/compare/penny-v0.122.3...penny-v0.122.4) (2026-05-25)
+
+
+### Performance Improvements
+
+* memoize BalanceHistoryCard computation and hoist Dimensions.get ([#785](https://github.com/heywood8/money-tracker/issues/785)) ([4ec0193](https://github.com/heywood8/money-tracker/commit/4ec0193d79e9da5fa57d4b847397087274b19511))
+
 ## [0.122.3](https://github.com/heywood8/money-tracker/compare/penny-v0.122.2...penny-v0.122.3) (2026-05-25)
 
 
