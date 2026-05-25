@@ -80,6 +80,26 @@ describe('PlannedOperationsDB Service', () => {
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
+    it('rejects Infinity as amount', () => {
+      const op = { ...validOp, amount: 'Infinity' };
+      expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
+    });
+
+    it('rejects -Infinity as amount', () => {
+      const op = { ...validOp, amount: '-Infinity' };
+      expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
+    });
+
+    it('rejects NaN as amount', () => {
+      const op = { ...validOp, amount: 'NaN' };
+      expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
+    });
+
+    it('rejects amount above 1e12', () => {
+      const op = { ...validOp, amount: '2000000000000' };
+      expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
+    });
+
     it('rejects missing accountId', () => {
       const op = { ...validOp, accountId: null };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('account_required');
