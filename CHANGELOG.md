@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.1](https://github.com/heywood8/money-tracker/compare/penny-v0.122.0...penny-v0.122.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* reject Infinity and non-finite amounts in PlannedOperationsDB ([#778](https://github.com/heywood8/money-tracker/issues/778)) ([cc46a48](https://github.com/heywood8/money-tracker/commit/cc46a483e2448c6808f4e7b5e1c4c77f7d036a66))
+
 ## [0.122.0](https://github.com/heywood8/money-tracker/compare/penny-v0.121.0...penny-v0.122.0) (2026-05-25)
 
 
