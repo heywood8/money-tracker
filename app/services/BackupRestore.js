@@ -432,7 +432,7 @@ export const restoreBackup = async (backup) => {
       await db.runAsync('DELETE FROM app_metadata WHERE key != ?', ['db_version']);
 
       // Reset auto-increment counters to allow ID preservation
-      await db.runAsync('DELETE FROM sqlite_sequence WHERE name IN (?, ?)', ['accounts', 'operations']);
+      await db.runAsync('DELETE FROM sqlite_sequence WHERE name IN (?, ?, ?)', ['accounts', 'operations', 'accounts_balance_history']);
 
       console.log('Existing data cleared and auto-increment counters reset');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
