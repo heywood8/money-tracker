@@ -4,6 +4,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import DateSeparator from './DateSeparator';
 import OperationListItem from './OperationListItem';
+import OperationsListPlaceholder from './OperationsListPlaceholder';
 import currencies from '../../../assets/currencies.json';
 import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
 
@@ -194,9 +195,7 @@ const OperationsList = forwardRef(({
       ListFooterComponent={renderFooter}
       ListEmptyComponent={
         initialLoading ? (
-          <View style={styles.emptyContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <OperationsListPlaceholder colors={colors} />
         ) : (
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={colors.mutedText} />
@@ -206,7 +205,13 @@ const OperationsList = forwardRef(({
           </View>
         )
       }
-      contentContainerStyle={groupedOperations.length === 0 ? styles.emptyList : styles.listContent}
+      contentContainerStyle={
+        initialLoading
+          ? styles.listContent
+          : groupedOperations.length === 0
+            ? styles.emptyList
+            : styles.listContent
+      }
       onScroll={onScroll}
       scrollEventThrottle={16}
       onEndReached={handleEndReached}
