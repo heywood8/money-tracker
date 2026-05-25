@@ -17,6 +17,21 @@ jest.mock('../../app/services/BalanceHistoryDB', () => ({
   }),
 }));
 
+let capturedOperationChangedCallback = null;
+jest.mock('../../app/services/eventEmitter', () => ({
+  appEvents: {
+    on: jest.fn((event, cb) => {
+      if (event === 'OPERATION_CHANGED') {
+        capturedOperationChangedCallback = cb;
+      }
+      return jest.fn(); // unsubscribe no-op
+    }),
+  },
+  EVENTS: {
+    OPERATION_CHANGED: 'OPERATION_CHANGED',
+  },
+}));
+
 describe('useExpenseData', () => {
   const mockYear = 2024;
   const mockMonth = 0; // January
@@ -34,6 +49,7 @@ describe('useExpenseData', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedOperationChangedCallback = null;
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -464,6 +480,84 @@ describe('useExpenseData', () => {
       expect(foodItem.amount).toBe(1000); // 400 + 600 aggregated across accounts
 
       expect(result.current.totalExpenses).toBe(1200);
+    });
+
+    it('should show grandchild aggregated under immediate child when viewing subfolder', async () => {
+      // Deep hierarchy: Food > Groceries > Organic
+      // When viewing 'cat-1' (Food), 'cat-6' (Organic, grandchild) should roll up to Groceries
+      const deepCategories = [
+        { id: 'cat-1', name: 'Food', parentId: null, icon: 'food', categoryType: 'expense', isShadow: false },
+        { id: 'cat-2', name: 'Groceries', parentId: 'cat-1', icon: 'cart', categoryType: 'expense', isShadow: false },
+        { id: 'cat-6', name: 'Organic', parentId: 'cat-2', icon: 'leaf', categoryType: 'expense', isShadow: false },
+      ];
+      const mockSpending = [
+        { category_id: 'cat-6', total: '150' }, // Organic — grandchild of Food, child of Groceries
+      ];
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', deepCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // 'Organic' is not a direct child of 'Food', so the while-loop should roll it up to 'Groceries'
+      expect(result.current.chartData).toHaveLength(1);
+      expect(result.current.chartData[0].name).toBe('Groceries');
+      expect(result.current.chartData[0].amount).toBe(150);
+    });
+
+    it('should skip item in subfolder view when no ancestor matches selected category', async () => {
+      // 'Transport' is in a completely different tree from 'cat-1' (Food)
+      const mockSpending = [
+        { category_id: 'cat-3', total: '200' }, // Transport — not under Food at all
+      ];
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Transport has no ancestor matching Food; should produce empty chart
+      expect(result.current.chartData).toHaveLength(0);
+    });
+  });
+
+  describe('OPERATION_CHANGED event', () => {
+    it('should reload data when OPERATION_CHANGED fires', async () => {
+      OperationsDB.getSpendingByCategoryAndCurrency
+        .mockResolvedValueOnce([{ category_id: 'cat-3', total: '100' }])
+        .mockResolvedValueOnce([{ category_id: 'cat-3', total: '999' }]);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(capturedOperationChangedCallback).not.toBeNull();
+
+      await act(async () => {
+        await capturedOperationChangedCallback();
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(OperationsDB.getSpendingByCategoryAndCurrency).toHaveBeenCalledTimes(2);
+      const transportItem = result.current.chartData.find(item => item.name === 'Transport');
+      expect(transportItem?.amount).toBe(999);
     });
   });
 });

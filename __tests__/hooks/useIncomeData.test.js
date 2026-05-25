@@ -17,6 +17,21 @@ jest.mock('../../app/services/BalanceHistoryDB', () => ({
   }),
 }));
 
+let capturedOperationChangedCallback = null;
+jest.mock('../../app/services/eventEmitter', () => ({
+  appEvents: {
+    on: jest.fn((event, cb) => {
+      if (event === 'OPERATION_CHANGED') {
+        capturedOperationChangedCallback = cb;
+      }
+      return jest.fn(); // unsubscribe no-op
+    }),
+  },
+  EVENTS: {
+    OPERATION_CHANGED: 'OPERATION_CHANGED',
+  },
+}));
+
 describe('useIncomeData', () => {
   const mockYear = 2024;
   const mockMonth = 0; // January
@@ -32,6 +47,7 @@ describe('useIncomeData', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedOperationChangedCallback = null;
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -446,6 +462,54 @@ describe('useIncomeData', () => {
       expect(callArgs).toHaveLength(3);
     });
 
+    it('should roll up grandchild to immediate child when viewing subfolder', async () => {
+      // Hierarchy: Salary > Main Job > Bonus
+      // When viewing 'cat-1' (Salary), 'cat-4' (Bonus) should roll up to Main Job
+      const deepCategories = [
+        { id: 'cat-1', name: 'Salary', parentId: null, icon: 'money', categoryType: 'income' },
+        { id: 'cat-2', name: 'Main Job', parentId: 'cat-1', icon: 'briefcase', categoryType: 'income' },
+        { id: 'cat-4', name: 'Bonus', parentId: 'cat-2', icon: 'gift', categoryType: 'income' },
+      ];
+      const mockIncome = [
+        { category_id: 'cat-4', total: '2000' }, // Bonus — grandchild of Salary, child of Main Job
+      ];
+      OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-1', deepCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+      await waitFor(() => expect(result.current.loadingIncome).toBe(false));
+
+      // Bonus is not a direct child of Salary — while-loop should roll it up to Main Job
+      expect(result.current.incomeChartData).toHaveLength(1);
+      expect(result.current.incomeChartData[0].name).toBe('Main Job');
+      expect(result.current.incomeChartData[0].amount).toBe(2000);
+    });
+
+    it('should skip item in subfolder view when no ancestor matches selected category', async () => {
+      // Freelance is in a completely different tree from cat-1 (Salary)
+      const mockIncome = [
+        { category_id: 'cat-3', total: '500' }, // Freelance — not under Salary at all
+      ];
+      OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+      await waitFor(() => expect(result.current.loadingIncome).toBe(false));
+
+      // No ancestor of Freelance matches Salary; chart should be empty
+      expect(result.current.incomeChartData).toHaveLength(0);
+    });
+
     it('should include income from multiple accounts in the same currency', async () => {
       // Simulates the DB returning rows that span multiple accounts for the currency
       const mockIncome = [
@@ -473,6 +537,34 @@ describe('useIncomeData', () => {
       expect(salaryItem.amount).toBe(5000); // 3000 + 2000 aggregated across accounts
 
       expect(result.current.totalIncome).toBe(6500);
+    });
+  });
+
+  describe('OPERATION_CHANGED event', () => {
+    it('should reload data when OPERATION_CHANGED fires', async () => {
+      OperationsDB.getIncomeByCategoryAndCurrency
+        .mockResolvedValueOnce([{ category_id: 'cat-3', total: '100' }])
+        .mockResolvedValueOnce([{ category_id: 'cat-3', total: '888' }]);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+      await waitFor(() => expect(result.current.loadingIncome).toBe(false));
+
+      expect(capturedOperationChangedCallback).not.toBeNull();
+
+      await act(async () => {
+        await capturedOperationChangedCallback();
+      });
+
+      await waitFor(() => expect(result.current.loadingIncome).toBe(false));
+      expect(OperationsDB.getIncomeByCategoryAndCurrency).toHaveBeenCalledTimes(2);
+      const freelanceItem = result.current.incomeChartData.find(item => item.name === 'Freelance');
+      expect(freelanceItem?.amount).toBe(888);
     });
   });
 });
