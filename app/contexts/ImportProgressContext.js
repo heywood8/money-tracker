@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
@@ -78,7 +78,7 @@ export const ImportProgressProvider = ({ children }) => {
     setCurrentStep(null);
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     isImporting,
     steps,
     currentStep,
@@ -87,7 +87,7 @@ export const ImportProgressProvider = ({ children }) => {
     completeImport,
     cancelImport,
     finishImport,
-  };
+  }), [isImporting, steps, currentStep, startImport, updateStep, completeImport, cancelImport, finishImport]);
 
   return (
     <ImportProgressContext.Provider value={value}>

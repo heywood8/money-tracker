@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { downloadAndInstallApk } from '../services/AppUpdateService';
 
@@ -22,9 +22,15 @@ export function UpdateDownloadProvider({ children }) {
     }
   }, []);
 
+  const value = useMemo(() => ({
+    downloadProgress,
+    isDownloading: downloadProgress !== null,
+    startDownload,
+  }), [downloadProgress, startDownload]);
+
   return (
     <UpdateDownloadContext.Provider
-      value={{ downloadProgress, isDownloading: downloadProgress !== null, startDownload }}
+      value={value}
     >
       {children}
     </UpdateDownloadContext.Provider>
