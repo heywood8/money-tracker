@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.7](https://github.com/heywood8/money-tracker/compare/penny-v0.122.6...penny-v0.122.7) (2026-05-25)
+
+
+### Performance Improvements
+
+* speed up APK checksum verification and keep UI responsive ([#795](https://github.com/heywood8/money-tracker/issues/795)) ([7c548d6](https://github.com/heywood8/money-tracker/commit/7c548d6b2ee3c2389049702a5d373adb529aff53))
+
 ## [0.122.6](https://github.com/heywood8/money-tracker/compare/penny-v0.122.5...penny-v0.122.6) (2026-05-25)
 
 
