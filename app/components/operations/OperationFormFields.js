@@ -275,6 +275,53 @@ const OperationFormFields = memo(({
     }
   };
 
+  // Placeholder grid shown during initial load in QuickAdd context before categories are available
+  const renderCategoryPickerPlaceholder = () => {
+    const renderPlaceholderChip = (key) => (
+      <View
+        key={key}
+        style={[
+          styles.categoryShortcutButton,
+          compact && styles.categoryShortcutButtonCompact,
+          styles.placeholderChip,
+          {
+            backgroundColor: colors.inputBackground,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={[styles.placeholderDot, { backgroundColor: colors.mutedText }]} />
+        <View style={[styles.placeholderBar, { backgroundColor: colors.mutedText }]} />
+      </View>
+    );
+
+    return (
+      <View style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}>
+        <View style={styles.categoryButtonsContainer}>
+          <Pressable
+            style={[styles.categoryPickerButton, inputStyle, groupBorderStyle]}
+            onPress={() => !disabled && openPicker('category', categories)}
+            disabled={disabled}
+          >
+            <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
+            <Text style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]} numberOfLines={2}>
+              {t('all_categories')}
+            </Text>
+          </Pressable>
+          {renderPlaceholderChip('ph-0')}
+          {renderPlaceholderChip('ph-1')}
+          {renderPlaceholderChip('ph-2')}
+        </View>
+        <View style={styles.categoryButtonsContainer}>
+          {renderPlaceholderChip('ph-3')}
+          {renderPlaceholderChip('ph-4')}
+          {renderPlaceholderChip('ph-5')}
+          {renderPlaceholderChip('ph-6')}
+        </View>
+      </View>
+    );
+  };
+
   // Render category picker with shortcuts
   const renderCategoryPicker = () => {
     if (hideCategoryPicker) return null;
@@ -374,6 +421,11 @@ const OperationFormFields = memo(({
           </View>
         </View>
       );
+    }
+
+    // QuickAdd placeholder: categories not yet loaded — show blurred grid to match the loaded layout
+    if (onAutoAddWithCategory) {
+      return renderCategoryPickerPlaceholder();
     }
 
     // Fallback: render single full-width picker (for OperationModal or when no top categories)
@@ -747,6 +799,20 @@ const styles = StyleSheet.create({
   },
   invisible: {
     opacity: 0,
+  },
+  placeholderBar: {
+    borderRadius: 3,
+    height: 7,
+    marginTop: 3,
+    width: '55%',
+  },
+  placeholderChip: {
+    opacity: 0.35,
+  },
+  placeholderDot: {
+    borderRadius: 9,
+    height: 18,
+    width: 18,
   },
   ratePreviewRow: {
     alignItems: 'center',
