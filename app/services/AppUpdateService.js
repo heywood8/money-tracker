@@ -414,12 +414,37 @@ export class IncrementalSha256 {
   }
 }
 
-// Read the file in 1 MB chunks so we never hold the full APK in the JS heap.
-// Previously used crypto.subtle.digest() which required a single giant ArrayBuffer
-// and caused OOM on Android/Hermes for large APKs.
-const SHA256_CHUNK_BYTES = 1024 * 1024;
+// Pre-built lookup table for base64 → 6-bit value. Avoids atob() + charCodeAt loop.
+const BASE64_LOOKUP = (() => {
+  const t = new Uint8Array(256);
+  const s = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  for (let i = 0; i < 64; i++) t[s.charCodeAt(i)] = i;
+  return t;
+})();
 
-export const computeSha256 = async (fileUri) => {
+// Decode a base64 string directly into a Uint8Array without an intermediate binary string.
+const base64ToBytes = (b64) => {
+  const len = b64.length;
+  const padding = (b64[len - 1] === '=') + (b64[len - 2] === '=');
+  const byteLen = (len >>> 2) * 3 - padding;
+  const out = new Uint8Array(byteLen);
+  let j = 0;
+  for (let i = 0; i < len; i += 4) {
+    const v = (BASE64_LOOKUP[b64.charCodeAt(i    )] << 18) |
+              (BASE64_LOOKUP[b64.charCodeAt(i + 1)] << 12) |
+              (BASE64_LOOKUP[b64.charCodeAt(i + 2)] <<  6) |
+               BASE64_LOOKUP[b64.charCodeAt(i + 3)];
+    if (j < byteLen) out[j++] = v >>> 16;
+    if (j < byteLen) out[j++] = (v >>> 8) & 0xff;
+    if (j < byteLen) out[j++] = v & 0xff;
+  }
+  return out;
+};
+
+// 4 MB chunks: ~4× fewer I/O round-trips vs 1 MB while staying well within heap limits.
+const SHA256_CHUNK_BYTES = 4 * 1024 * 1024;
+
+export const computeSha256 = async (fileUri, onProgress) => {
   const info = await FileSystem.getInfoAsync(fileUri);
   const fileSize = info.size || 0;
   const hasher = new IncrementalSha256();
@@ -430,10 +455,10 @@ export const computeSha256 = async (fileUri) => {
       position: pos,
       length,
     });
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) { bytes[i] = bin.charCodeAt(i); }
-    hasher.update(bytes);
+    hasher.update(base64ToBytes(b64));
+    onProgress?.((pos + length) / fileSize);
+    // Yield to the event loop so the UI stays responsive between chunks.
+    await new Promise(r => setImmediate(r));
   }
   return Array.from(hasher.digest()).map((b) => b.toString(16).padStart(2, '0')).join('');
 };
@@ -494,7 +519,7 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
     const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
     if (expectedHash) {
       try {
-        const actualHash = await computeSha256(result.uri);
+        const actualHash = await computeSha256(result.uri, onProgress ? (p) => onProgress(1 + p) : undefined);
         if (actualHash !== expectedHash) {
           await FileSystem.deleteAsync(result.uri, { idempotent: true });
           throw new Error('APK checksum mismatch — file deleted');
