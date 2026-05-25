@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.3](https://github.com/heywood8/money-tracker/compare/penny-v0.122.2...penny-v0.122.3) (2026-05-25)
+
+
+### Performance Improvements
+
+* consolidate PlannedOperationsScreen filter passes into single useMemo ([#782](https://github.com/heywood8/money-tracker/issues/782)) ([2b42ee1](https://github.com/heywood8/money-tracker/commit/2b42ee11e063b6738556c3962bc025260b1fa876))
+
 ## [0.122.2](https://github.com/heywood8/money-tracker/compare/penny-v0.122.1...penny-v0.122.2) (2026-05-25)
 
 
