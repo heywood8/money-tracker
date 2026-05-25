@@ -58,15 +58,36 @@ export default function PlannedOperationsScreen() {
     });
   }, [isExecutedThisMonth]);
 
-  const recurringOps = useMemo(
-    () => sortByExecution(plannedOperations.filter(op => op.isRecurring)),
-    [plannedOperations, sortByExecution],
-  );
-
-  const oneTimeOps = useMemo(
-    () => sortByExecution(plannedOperations.filter(op => !op.isRecurring)),
-    [plannedOperations, sortByExecution],
-  );
+  const { recurringOps, oneTimeOps, summary } = useMemo(() => {
+    const recurring = [];
+    const oneTime = [];
+    let pendingOut = 0;
+    let pendingIn = 0;
+    let doneCount = 0;
+    for (const op of plannedOperations) {
+      if (op.isRecurring) {
+        recurring.push(op);
+      } else {
+        oneTime.push(op);
+      }
+      if (isExecutedThisMonth(op)) {
+        doneCount++;
+      } else {
+        const amount = parseFloat(op.amount || '0');
+        if (op.type === 'expense' || op.type === 'transfer') {
+          pendingOut += amount;
+        } else if (op.type === 'income') {
+          pendingIn += amount;
+        }
+      }
+    }
+    const total = plannedOperations.length;
+    return {
+      recurringOps: sortByExecution(recurring),
+      oneTimeOps: sortByExecution(oneTime),
+      summary: { pendingOut, pendingIn, doneCount, total, progressFraction: total > 0 ? doneCount / total : 0 },
+    };
+  }, [plannedOperations, isExecutedThisMonth, sortByExecution]);
 
   const sections = useMemo(() => {
     const result = [];
@@ -78,20 +99,6 @@ export default function PlannedOperationsScreen() {
     }
     return result;
   }, [recurringOps, oneTimeOps]);
-
-  const summary = useMemo(() => {
-    const pending = plannedOperations.filter(op => !isExecutedThisMonth(op));
-    const pendingOut = pending
-      .filter(op => op.type === 'expense' || op.type === 'transfer')
-      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
-    const pendingIn = pending
-      .filter(op => op.type === 'income')
-      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
-    const doneCount = plannedOperations.filter(op => isExecutedThisMonth(op)).length;
-    const total = plannedOperations.length;
-    const progressFraction = total > 0 ? doneCount / total : 0;
-    return { pendingOut, pendingIn, doneCount, total, progressFraction };
-  }, [plannedOperations, isExecutedThisMonth]);
 
   const formatSummaryAmount = useCallback((amount) => {
     if (amount === 0) return '0';
