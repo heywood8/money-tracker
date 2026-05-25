@@ -283,10 +283,10 @@ const OperationFormFields = memo(({
         style={[
           styles.categoryShortcutButton,
           compact && styles.categoryShortcutButtonCompact,
+          styles.placeholderChip,
           {
             backgroundColor: colors.inputBackground,
             borderColor: colors.border,
-            opacity: 0.35,
           },
         ]}
       >
@@ -805,6 +805,9 @@ const styles = StyleSheet.create({
     height: 7,
     marginTop: 3,
     width: '55%',
+  },
+  placeholderChip: {
+    opacity: 0.35,
   },
   placeholderDot: {
     borderRadius: 9,
