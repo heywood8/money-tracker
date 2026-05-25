@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useQuickAddForm from '../../app/hooks/useQuickAddForm';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
+import { appEvents, EVENTS } from '../../app/services/eventEmitter';
 
 // Mock OperationsDB
 const mockGetTopCategories = jest.fn().mockResolvedValue([]);
@@ -955,6 +956,49 @@ describe('useQuickAddForm', () => {
 
       expect(result.current.quickAddValues.amount).toBe('100');
       expect(result.current.quickAddValues.description).toBe('Test');
+    });
+  });
+
+  describe('event subscription', () => {
+    it('reloads suggestions when OPERATION_CHANGED fires', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+      mockGetTopTransferTargets.mockResolvedValue([]);
+
+      renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        appEvents.emit(EVENTS.OPERATION_CHANGED);
+      });
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('cleans up event subscription on unmount', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+      mockGetTopTransferTargets.mockResolvedValue([]);
+
+      const { unmount } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+      });
+
+      unmount();
+      mockGetTopCategories.mockClear();
+
+      await act(async () => {
+        appEvents.emit(EVENTS.OPERATION_CHANGED);
+      });
+
+      expect(mockGetTopCategories).not.toHaveBeenCalled();
     });
   });
 });
