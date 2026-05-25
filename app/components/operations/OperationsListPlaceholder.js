@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
+import PropTypes from 'prop-types';
 import { SPACING, BORDER_RADIUS, HEIGHTS } from '../../styles/designTokens';
 
 // Pre-defined widths so every row looks distinct from its neighbours
@@ -73,6 +74,13 @@ const OperationsListPlaceholder = ({ colors }) => {
       </View>
     </View>
   );
+};
+
+OperationsListPlaceholder.propTypes = {
+  colors: PropTypes.shape({
+    border: PropTypes.string.isRequired,
+    surface: PropTypes.string.isRequired,
+  }).isRequired,
 };
 
 const BAR_RADIUS = BORDER_RADIUS.sm;
