@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.122.3](https://github.com/heywood8/money-tracker/compare/penny-v0.122.2...penny-v0.122.3) (2026-05-25)
+
+
+### Performance Improvements
+
+* consolidate PlannedOperationsScreen filter passes into single useMemo ([#782](https://github.com/heywood8/money-tracker/issues/782)) ([2b42ee1](https://github.com/heywood8/money-tracker/commit/2b42ee11e063b6738556c3962bc025260b1fa876))
+
+## [0.122.2](https://github.com/heywood8/money-tracker/compare/penny-v0.122.1...penny-v0.122.2) (2026-05-25)
+
+
+### Bug Fixes
+
+* add cycle detection to getCategoryPath to prevent infinite loop ([#780](https://github.com/heywood8/money-tracker/issues/780)) ([cc9816c](https://github.com/heywood8/money-tracker/commit/cc9816cd68eb5541c822a624953de6ebfa91f6a7))
+
+## [0.122.1](https://github.com/heywood8/money-tracker/compare/penny-v0.122.0...penny-v0.122.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* reject Infinity and non-finite amounts in PlannedOperationsDB ([#778](https://github.com/heywood8/money-tracker/issues/778)) ([cc46a48](https://github.com/heywood8/money-tracker/commit/cc46a483e2448c6808f4e7b5e1c4c77f7d036a66))
+
+## [0.122.0](https://github.com/heywood8/money-tracker/compare/penny-v0.121.0...penny-v0.122.0) (2026-05-25)
+
+
+### Features
+
+* skeleton placeholder for operations list during initial load ([#743](https://github.com/heywood8/money-tracker/issues/743)) ([3088ad6](https://github.com/heywood8/money-tracker/commit/3088ad6d2daf7a7c68ba3d12a1d009b3fbe5a023))
+
+
+### Bug Fixes
+
+* restrict review agent tools to read-only set ([#742](https://github.com/heywood8/money-tracker/issues/742)) ([28e5dbb](https://github.com/heywood8/money-tracker/commit/28e5dbb0167089f7493a239fba3bf4dbefa63464))
+
 ## [0.121.0](https://github.com/heywood8/money-tracker/compare/penny-v0.120.0...penny-v0.121.0) (2026-05-24)
 
 

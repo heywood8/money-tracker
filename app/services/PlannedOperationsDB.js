@@ -38,7 +38,8 @@ export const validatePlannedOperation = (op) => {
     return 'operation_type_required';
   }
 
-  if (!op.amount || parseFloat(op.amount) <= 0) {
+  const n = parseFloat(op.amount);
+  if (!op.amount || !Number.isFinite(n) || n <= 0 || n > 1e12) {
     return 'valid_amount_required';
   }
 
