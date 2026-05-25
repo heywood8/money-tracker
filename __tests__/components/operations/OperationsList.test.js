@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { render, act } from '@testing-library/react-native';
-import { FlatList } from 'react-native';
+import { ActivityIndicator, FlatList } from 'react-native';
 import OperationsList from '../../../app/components/operations/OperationsList';
 
 jest.mock('../../../app/components/operations/DateSeparator', () => {
