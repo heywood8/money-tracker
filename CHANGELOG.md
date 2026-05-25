@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.0](https://github.com/heywood8/money-tracker/compare/penny-v0.122.7...penny-v0.123.0) (2026-05-25)
+
+
+### Features
+
+* show blurred category grid placeholder on initial load ([#797](https://github.com/heywood8/money-tracker/issues/797)) ([8e8dd87](https://github.com/heywood8/money-tracker/commit/8e8dd877cab9c86cdfbf8499f519cc152bc82de1))
+
 ## [0.122.7](https://github.com/heywood8/money-tracker/compare/penny-v0.122.6...penny-v0.122.7) (2026-05-25)
 
 
