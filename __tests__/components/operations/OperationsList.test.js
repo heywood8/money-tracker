@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { render, act } from '@testing-library/react-native';
-import { ActivityIndicator, FlatList } from 'react-native';
+import { FlatList } from 'react-native';
 import OperationsList from '../../../app/components/operations/OperationsList';
 
 jest.mock('../../../app/components/operations/DateSeparator', () => {
@@ -33,6 +33,13 @@ jest.mock('../../../app/components/operations/OperationListItem', () => {
     return React.createElement('View', { testID: `op-item-${operation.id}` });
   };
   /* eslint-enable react/prop-types */
+});
+
+jest.mock('../../../app/components/operations/OperationsListPlaceholder', () => {
+  const React = require('react');
+  return function MockOperationsListPlaceholder() {
+    return React.createElement('View', { testID: 'operations-list-placeholder' });
+  };
 });
 
 jest.mock('../../../assets/currencies.json', () => ({
@@ -105,10 +112,10 @@ describe('OperationsList', () => {
   // ── initialLoading: ListEmptyComponent branch ─────────────────────────────
 
   describe('initialLoading prop', () => {
-    it('ListEmptyComponent shows ActivityIndicator when initialLoading=true', () => {
+    it('ListEmptyComponent shows skeleton placeholder when initialLoading=true', () => {
       const { fp } = getFlatListProps({ initialLoading: true });
-      const { UNSAFE_getAllByType } = render(fp.ListEmptyComponent);
-      expect(UNSAFE_getAllByType(ActivityIndicator).length).toBeGreaterThan(0);
+      const { getByTestId } = render(fp.ListEmptyComponent);
+      expect(getByTestId('operations-list-placeholder')).toBeTruthy();
     });
 
     it('ListEmptyComponent shows empty-state text when initialLoading=false', () => {
