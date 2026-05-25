@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.5](https://github.com/heywood8/money-tracker/compare/penny-v0.122.4...penny-v0.122.5) (2026-05-25)
+
+
+### Tests
+
+* cover uncovered branches in useExpenseData and useIncomeData to… ([#792](https://github.com/heywood8/money-tracker/issues/792)) ([5d31dc4](https://github.com/heywood8/money-tracker/commit/5d31dc48dfccd115bee3a4b7ead4339c6253da28))
+
 ## [0.122.4](https://github.com/heywood8/money-tracker/compare/penny-v0.122.3...penny-v0.122.4) (2026-05-25)
 
 
