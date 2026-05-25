@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.122.0](https://github.com/heywood8/money-tracker/compare/penny-v0.121.0...penny-v0.122.0) (2026-05-25)
+
+
+### Features
+
+* skeleton placeholder for operations list during initial load ([#743](https://github.com/heywood8/money-tracker/issues/743)) ([3088ad6](https://github.com/heywood8/money-tracker/commit/3088ad6d2daf7a7c68ba3d12a1d009b3fbe5a023))
+
+
+### Bug Fixes
+
+* restrict review agent tools to read-only set ([#742](https://github.com/heywood8/money-tracker/issues/742)) ([28e5dbb](https://github.com/heywood8/money-tracker/commit/28e5dbb0167089f7493a239fba3bf4dbefa63464))
+
 ## [0.121.0](https://github.com/heywood8/money-tracker/compare/penny-v0.120.0...penny-v0.121.0) (2026-05-24)
 
 
