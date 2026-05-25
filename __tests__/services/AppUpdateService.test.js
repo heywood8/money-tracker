@@ -737,8 +737,8 @@ describe('AppUpdateService', () => {
     });
 
     it('issues multiple readAsStringAsync calls for files larger than the chunk size', async () => {
-      const MB = 1024 * 1024;
-      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: MB + 5 });
+      const CHUNK = 4 * 1024 * 1024;
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: CHUNK + 5 });
       // Both chunks decode to 'hello' — we only care that two calls were made
       FileSystem.readAsStringAsync.mockResolvedValue('aGVsbG8=');
 
@@ -746,10 +746,10 @@ describe('AppUpdateService', () => {
 
       expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
       expect(FileSystem.readAsStringAsync).toHaveBeenNthCalledWith(
-        1, 'file:///cache/large.apk', { encoding: 'base64', position: 0, length: MB },
+        1, 'file:///cache/large.apk', { encoding: 'base64', position: 0, length: CHUNK },
       );
       expect(FileSystem.readAsStringAsync).toHaveBeenNthCalledWith(
-        2, 'file:///cache/large.apk', { encoding: 'base64', position: MB, length: 5 },
+        2, 'file:///cache/large.apk', { encoding: 'base64', position: CHUNK, length: 5 },
       );
     });
 
