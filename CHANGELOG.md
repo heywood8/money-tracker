@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.122.6](https://github.com/heywood8/money-tracker/compare/penny-v0.122.5...penny-v0.122.6) (2026-05-25)
+
+
+### Bug Fixes
+
+* guard async setState calls after unmount in LocalizationContext and OperationsDataContext ([#784](https://github.com/heywood8/money-tracker/issues/784)) ([d2553d0](https://github.com/heywood8/money-tracker/commit/d2553d08e737bb98f5e7844ea4303a2ff4d642b2))
+* refresh quick-add suggestions when operations change ([#779](https://github.com/heywood8/money-tracker/issues/779)) ([3ad6134](https://github.com/heywood8/money-tracker/commit/3ad6134aa0cf43c2aef7443b01cac360db76e83e))
+* reset sqlite_sequence for all auto-increment tables on restore ([#786](https://github.com/heywood8/money-tracker/issues/786)) ([19d028a](https://github.com/heywood8/money-tracker/commit/19d028a96b7cf5412327cc8033bfcbbbbfefc76c))
+
+
+### Performance Improvements
+
+* wrap context values in useMemo to prevent cascade re-renders ([#781](https://github.com/heywood8/money-tracker/issues/781)) ([bbc4d56](https://github.com/heywood8/money-tracker/commit/bbc4d56721ed1ba345f20f4907087aab5c602233))
+
 ## [0.122.5](https://github.com/heywood8/money-tracker/compare/penny-v0.122.4...penny-v0.122.5) (2026-05-25)
 
 
