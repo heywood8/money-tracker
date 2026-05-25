@@ -49,9 +49,11 @@ export function LocalizationProvider({ children }) {
 
   // Load language from PreferencesDB on mount
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const storedLang = await getPreference(PREF_KEYS.LANGUAGE);
+        if (!mounted) return;
         if (storedLang && i18nData[storedLang]) {
           setLanguageState(storedLang);
           setIsFirstLaunch(false);
@@ -62,28 +64,31 @@ export function LocalizationProvider({ children }) {
       } catch (e) {
         // ignore
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     })();
+    return () => { mounted = false; };
   }, []);
 
   // Listen for DATABASE_RESET event to reset language preference
   useEffect(() => {
+    let mounted = true;
     const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, async () => {
       console.log('LocalizationContext: Database reset detected, clearing language preference');
       try {
         // Clear language preference from PreferencesDB
         await deletePreference(PREF_KEYS.LANGUAGE);
 
+        if (!mounted) return;
         // Reset to first launch state
         setIsFirstLaunch(true);
         setLanguageState(defaultLang);
       } catch (e) {
-        console.error('Failed to clear language preference:', e);
+        if (mounted) console.error('Failed to clear language preference:', e);
       }
     });
 
-    return unsubscribe;
+    return () => { mounted = false; unsubscribe(); };
   }, []);
 
   // Save language to PreferencesDB when it changes

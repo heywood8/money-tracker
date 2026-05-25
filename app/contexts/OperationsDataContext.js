@@ -245,9 +245,11 @@ export const OperationsDataProvider = ({ children }) => {
 
   // Load filters from PreferencesDB on mount
   useEffect(() => {
+    let mounted = true;
     const loadFilters = async () => {
       try {
         const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
+        if (!mounted) return;
         if (filters) {
           // convert legacy activeFilters format to searchState format
           setSearchState({
@@ -261,10 +263,11 @@ export const OperationsDataProvider = ({ children }) => {
           setFiltersActive(hasActiveFilters(filters));
         }
       } catch (error) {
-        console.error('Failed to load filters:', error);
+        if (mounted) console.error('Failed to load filters:', error);
       }
     };
     loadFilters();
+    return () => { mounted = false; };
   }, [hasActiveFilters]);
 
   // Listen for DATABASE_RESET event to clear operations state
