@@ -58,40 +58,51 @@ export default function PlannedOperationsScreen() {
     });
   }, [isExecutedThisMonth]);
 
-  const recurringOps = useMemo(
-    () => sortByExecution(plannedOperations.filter(op => op.isRecurring)),
-    [plannedOperations, sortByExecution],
-  );
+  const { sections, summary } = useMemo(() => {
+    const recurring = [];
+    const oneTime = [];
+    let pendingOut = 0;
+    let pendingIn = 0;
+    let doneCount = 0;
 
-  const oneTimeOps = useMemo(
-    () => sortByExecution(plannedOperations.filter(op => !op.isRecurring)),
-    [plannedOperations, sortByExecution],
-  );
-
-  const sections = useMemo(() => {
-    const result = [];
-    if (recurringOps.length > 0) {
-      result.push({ key: 'recurring', data: recurringOps });
+    for (const op of plannedOperations) {
+      const executed = isExecutedThisMonth(op);
+      if (executed) {
+        doneCount += 1;
+      } else {
+        const amt = parseFloat(op.amount || '0');
+        if (op.type === 'expense' || op.type === 'transfer') {
+          pendingOut += amt;
+        } else if (op.type === 'income') {
+          pendingIn += amt;
+        }
+      }
+      if (op.isRecurring) {
+        recurring.push(op);
+      } else {
+        oneTime.push(op);
+      }
     }
-    if (oneTimeOps.length > 0) {
-      result.push({ key: 'one_time', data: oneTimeOps });
-    }
-    return result;
-  }, [recurringOps, oneTimeOps]);
 
-  const summary = useMemo(() => {
-    const pending = plannedOperations.filter(op => !isExecutedThisMonth(op));
-    const pendingOut = pending
-      .filter(op => op.type === 'expense' || op.type === 'transfer')
-      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
-    const pendingIn = pending
-      .filter(op => op.type === 'income')
-      .reduce((sum, op) => sum + parseFloat(op.amount || '0'), 0);
-    const doneCount = plannedOperations.filter(op => isExecutedThisMonth(op)).length;
     const total = plannedOperations.length;
     const progressFraction = total > 0 ? doneCount / total : 0;
-    return { pendingOut, pendingIn, doneCount, total, progressFraction };
-  }, [plannedOperations, isExecutedThisMonth]);
+
+    const sortedRecurring = sortByExecution(recurring);
+    const sortedOneTime = sortByExecution(oneTime);
+
+    const result = [];
+    if (sortedRecurring.length > 0) {
+      result.push({ key: 'recurring', data: sortedRecurring });
+    }
+    if (sortedOneTime.length > 0) {
+      result.push({ key: 'one_time', data: sortedOneTime });
+    }
+
+    return {
+      sections: result,
+      summary: { pendingOut, pendingIn, doneCount, total, progressFraction },
+    };
+  }, [plannedOperations, isExecutedThisMonth, sortByExecution]);
 
   const formatSummaryAmount = useCallback((amount) => {
     if (amount === 0) return '0';
