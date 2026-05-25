@@ -330,4 +330,21 @@ describe('LocalizationContext', () => {
       expect(result.current.language).toBe('ru'); // Language should still change in memory
     });
   });
+
+  describe('unmount safety', () => {
+    it('does not update state after unmount when async load is pending', async () => {
+      let resolvePreference;
+      PreferencesDB.getPreference.mockImplementation(
+        () => new Promise(resolve => { resolvePreference = resolve; }),
+      );
+
+      const { unmount } = renderHook(() => useLocalization(), { wrapper });
+
+      unmount();
+
+      await act(async () => {
+        resolvePreference('fr');
+      });
+    });
+  });
 });
