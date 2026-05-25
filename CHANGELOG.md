@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.122.2](https://github.com/heywood8/money-tracker/compare/penny-v0.122.1...penny-v0.122.2) (2026-05-25)
+
+
+### Bug Fixes
+
+* add cycle detection to getCategoryPath to prevent infinite loop ([#780](https://github.com/heywood8/money-tracker/issues/780)) ([cc9816c](https://github.com/heywood8/money-tracker/commit/cc9816cd68eb5541c822a624953de6ebfa91f6a7))
+
 ## [0.122.1](https://github.com/heywood8/money-tracker/compare/penny-v0.122.0...penny-v0.122.1) (2026-05-25)
 
 
