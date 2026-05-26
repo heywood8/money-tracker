@@ -1,14 +1,14 @@
 /**
  * Tests for OperationsList component
  * Covers initialLoading, rendering with data, footer, and edge-case branches.
- * Note: FlatList's virtual renderer does not invoke renderItem in the test
- * environment, so we pull callbacks directly from the FlatList props and call
+ * Note: SectionList's virtual renderer does not invoke renderItem in the test
+ * environment, so we pull callbacks directly from the SectionList props and call
  * them explicitly to exercise those code branches.
  */
 
 import React from 'react';
 import { render, act } from '@testing-library/react-native';
-import { ActivityIndicator, FlatList } from 'react-native';
+import { ActivityIndicator, SectionList } from 'react-native';
 import OperationsList from '../../../app/components/operations/OperationsList';
 
 jest.mock('../../../app/components/operations/DateSeparator', () => {
@@ -77,6 +77,13 @@ const makeGroup = (date, ops) => ({
   operations: ops,
 });
 
+// Convert a makeGroup result into the SectionList section shape
+const toSection = (group) => ({
+  title: group.date,
+  spendingSums: group.spendingSums,
+  data: group.operations,
+});
+
 const defaultProps = {
   groupedOperations: [],
   accounts,
@@ -94,12 +101,13 @@ const defaultProps = {
   onDateSeparatorPress: jest.fn(),
 };
 
-// Render OperationsList and return the underlying FlatList's props so we can
-// invoke renderItem / ListFooterComponent without relying on FlatList scroll.
-function getFlatListProps(extraProps = {}) {
+// Render OperationsList and return the underlying SectionList's props so we can
+// invoke renderItem / renderSectionHeader / ListFooterComponent without relying
+// on SectionList scroll.
+function getSectionListProps(extraProps = {}) {
   const utils = render(<OperationsList {...defaultProps} {...extraProps} />);
-  const flatListEl = utils.UNSAFE_getByType(FlatList);
-  return { ...utils, fp: flatListEl.props };
+  const slEl = utils.UNSAFE_getByType(SectionList);
+  return { ...utils, sp: slEl.props };
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -113,14 +121,14 @@ describe('OperationsList', () => {
 
   describe('initialLoading prop', () => {
     it('ListEmptyComponent shows skeleton placeholder when initialLoading=true', () => {
-      const { fp } = getFlatListProps({ initialLoading: true });
-      const { getByTestId } = render(fp.ListEmptyComponent);
+      const { sp } = getSectionListProps({ initialLoading: true });
+      const { getByTestId } = render(sp.ListEmptyComponent);
       expect(getByTestId('operations-list-placeholder')).toBeTruthy();
     });
 
     it('ListEmptyComponent shows empty-state text when initialLoading=false', () => {
-      const { fp } = getFlatListProps({ initialLoading: false });
-      const { getByText } = render(fp.ListEmptyComponent);
+      const { sp } = getSectionListProps({ initialLoading: false });
+      const { getByText } = render(sp.ListEmptyComponent);
       expect(getByText('no_operations')).toBeTruthy();
     });
   });
@@ -132,24 +140,33 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-t', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      const item = section.data[0];
+      // render the section header to exercise formatDate
+      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
+      // render each item
+      expect(() => render(sp.renderItem({ item, index: 0, section }))).not.toThrow();
     });
 
     it('handles yesterday date', () => {
       const group = makeGroup(YESTERDAY, [
         { id: 'op-y', type: 'income', amount: '200.00', accountId: 'acc-usd', categoryId: 'cat-key' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('handles older date', () => {
       const group = makeGroup(OLD_DATE, [
         { id: 'op-o', type: 'expense', amount: '75.00', accountId: 'acc-usd', categoryId: 'cat-child' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
   });
 
@@ -158,32 +175,36 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-1', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('uses nameKey translation', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-2', type: 'income', amount: '100.00', accountId: 'acc-usd', categoryId: 'cat-key' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('builds parent / child category path', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-3', type: 'expense', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-child' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('falls back for unknown category', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-4', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'no-such' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
   });
 
@@ -192,40 +213,45 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-usd', type: 'expense', amount: '99.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('formats EUR amount', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-eur', type: 'expense', amount: '50.00', accountId: 'acc-eur', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('falls back for unknown account', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-na', type: 'expense', amount: '10.00', accountId: 'no-such', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('falls back for invalid amount', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-bad', type: 'expense', amount: 'NaN', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('handles account without currency field', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-nc', type: 'expense', amount: '5.00', accountId: 'acc-nc', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group] });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
   });
 
@@ -233,10 +259,10 @@ describe('OperationsList', () => {
 
   describe('ListFooterComponent', () => {
     it('shows ActivityIndicator when loadingMore=true', () => {
-      const { fp } = getFlatListProps({ loadingMore: true });
-      const footerEl = typeof fp.ListFooterComponent === 'function'
-        ? fp.ListFooterComponent()
-        : fp.ListFooterComponent;
+      const { sp } = getSectionListProps({ loadingMore: true });
+      const footerEl = typeof sp.ListFooterComponent === 'function'
+        ? sp.ListFooterComponent()
+        : sp.ListFooterComponent;
       if (footerEl) {
         const { UNSAFE_getAllByType } = render(footerEl);
         expect(UNSAFE_getAllByType(ActivityIndicator).length).toBeGreaterThan(0);
@@ -244,10 +270,10 @@ describe('OperationsList', () => {
     });
 
     it('returns null when loadingMore=false', () => {
-      const { fp } = getFlatListProps({ loadingMore: false });
-      const footerEl = typeof fp.ListFooterComponent === 'function'
-        ? fp.ListFooterComponent()
-        : fp.ListFooterComponent;
+      const { sp } = getSectionListProps({ loadingMore: false });
+      const footerEl = typeof sp.ListFooterComponent === 'function'
+        ? sp.ListFooterComponent()
+        : sp.ListFooterComponent;
       expect(footerEl).toBeNull();
     });
   });
@@ -257,22 +283,22 @@ describe('OperationsList', () => {
   describe('onEndReached', () => {
     it('calls onLoadMore when not loading and more ops exist', () => {
       const mockLoadMore = jest.fn();
-      const { fp } = getFlatListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: false });
-      act(() => { fp.onEndReached(); });
+      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: false });
+      act(() => { sp.onEndReached(); });
       expect(mockLoadMore).toHaveBeenCalledTimes(1);
     });
 
     it('does NOT call onLoadMore when loadingMore=true', () => {
       const mockLoadMore = jest.fn();
-      const { fp } = getFlatListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: true });
-      act(() => { fp.onEndReached(); });
+      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: true });
+      act(() => { sp.onEndReached(); });
       expect(mockLoadMore).not.toHaveBeenCalled();
     });
 
     it('does NOT call onLoadMore when hasMoreOperations=false', () => {
       const mockLoadMore = jest.fn();
-      const { fp } = getFlatListProps({ onLoadMore: mockLoadMore, hasMoreOperations: false, loadingMore: false });
-      act(() => { fp.onEndReached(); });
+      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: false, loadingMore: false });
+      act(() => { sp.onEndReached(); });
       expect(mockLoadMore).not.toHaveBeenCalled();
     });
   });
@@ -291,6 +317,15 @@ describe('OperationsList', () => {
       ];
       expect(() => render(<OperationsList {...defaultProps} groupedOperations={groups} />)).not.toThrow();
     });
+
+    it('renders section footer without crashing', () => {
+      const group = makeGroup(TODAY, [
+        { id: 'op-sf', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+      ]);
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      expect(() => render(sp.renderSectionFooter({ section }))).not.toThrow();
+    });
   });
 
   // ── additional branch coverage ────────────────────────────────────────────
@@ -302,8 +337,9 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-xyz', type: 'expense', amount: '10.00', accountId: 'acc-xyz', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group], accounts: accsWithUnknown });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group], accounts: accsWithUnknown });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
   });
 
@@ -316,8 +352,9 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-orphan', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-orphan' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group], categories: catsWithOrphan });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsWithOrphan });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('uses nameKey for parent category when parent has nameKey', () => {
@@ -329,8 +366,9 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-kp', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-child-of-key' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group], categories: catsWithKeyedParent });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsWithKeyedParent });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
 
     it('falls back icon to help-circle when category has no icon field', () => {
@@ -341,8 +379,9 @@ describe('OperationsList', () => {
       const group = makeGroup(TODAY, [
         { id: 'op-ni', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-noicon' },
       ]);
-      const { fp } = getFlatListProps({ groupedOperations: [group], categories: catsNoIcon });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsNoIcon });
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
     });
   });
 
@@ -352,12 +391,26 @@ describe('OperationsList', () => {
         { id: 'op-match', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
         { id: 'op-other', type: 'income', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
-      const { fp } = getFlatListProps({
+      const section = toSection(group);
+      const { sp } = getSectionListProps({
         groupedOperations: [group],
         pendingSuggestionId: 'op-match',
         pendingSuggestions: ['Groceries', 'Food'],
       });
-      expect(() => render(fp.renderItem({ item: group, index: 0 }))).not.toThrow();
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      expect(() => render(sp.renderItem({ item: section.data[1], index: 1, section }))).not.toThrow();
+    });
+
+    it('isLast is true for last item in section', () => {
+      const group = makeGroup(TODAY, [
+        { id: 'op-a', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+        { id: 'op-b', type: 'income', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-1' },
+      ]);
+      const section = toSection(group);
+      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      // should not throw for either index
+      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      expect(() => render(sp.renderItem({ item: section.data[1], index: 1, section }))).not.toThrow();
     });
   });
 });

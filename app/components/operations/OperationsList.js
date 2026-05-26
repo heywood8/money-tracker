@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, forwardRef } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SectionList, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import DateSeparator from './DateSeparator';
@@ -20,8 +20,10 @@ const getCurrencySymbol = (currencyCode) => {
 /**
  * OperationsList Component
  *
- * Displays a list of financial operations grouped by date. Each date group
- * renders as a single card containing all operations for that day.
+ * Displays a list of financial operations grouped by date using SectionList so
+ * that individual operation rows are properly virtualized. Each section
+ * represents one date group; the section header is a DateSeparator and each
+ * item is an OperationListItem rendered inside a shared card surface.
  */
 const OperationsList = forwardRef(({
   groupedOperations,
@@ -140,56 +142,92 @@ const OperationsList = forwardRef(({
     );
   }, [loadingMore, colors, t]);
 
-  // Render a full date group (header + card with operations)
-  const renderItem = useCallback(({ item }) => {
+  // Convert groupedOperations array into SectionList sections
+  const sections = useMemo(() => groupedOperations.map(group => ({
+    title: group.date,
+    spendingSums: group.spendingSums,
+    data: group.operations,
+  })), [groupedOperations]);
+
+  // Render the date separator as a section header
+  const renderSectionHeader = useCallback(({ section }) => (
+    <View style={styles.groupContainer}>
+      <DateSeparator
+        date={section.title}
+        spendingSums={section.spendingSums}
+        formatDate={formatDate}
+        colors={colors}
+        onPress={() => onDateSeparatorPress(section.title)}
+      />
+      {/* Top of the card surface — provides border, radius, and background */}
+      <View
+        style={[
+          styles.cardTop,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      />
+    </View>
+  ), [formatDate, colors, onDateSeparatorPress]);
+
+  // Render a closing cap at the bottom of each section's card
+  const renderSectionFooter = useCallback(({ section }) => (
+    <View
+      style={[
+        styles.cardBottom,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    />
+  ), [colors]);
+
+  // Render an individual operation row inside the card
+  const renderItem = useCallback(({ item, index, section }) => {
+    const isLast = index === section.data.length - 1;
     return (
-      <View style={styles.groupContainer}>
-        <DateSeparator
-          date={item.date}
-          spendingSums={item.spendingSums}
-          formatDate={formatDate}
+      <View
+        style={[
+          styles.itemWrapper,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <OperationListItem
+          testID={`operation-item-${index}`}
+          operation={item}
           colors={colors}
-          onPress={() => onDateSeparatorPress(item.date)}
+          t={t}
+          categories={categories}
+          getCategoryInfo={getCategoryInfo}
+          getAccountName={getAccountName}
+          formatCurrency={formatCurrency}
+          isLast={isLast}
+          onPress={() => onEditOperation(item)}
+          suggestionChips={item.id === pendingSuggestionId ? pendingSuggestions : null}
+          onApplySuggestion={onApplySuggestion}
+          onDismissSuggestion={onDismissSuggestion}
         />
-        <View
-          style={[
-            styles.operationsCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          {item.operations.map((operation, index) => (
-            <OperationListItem
-              key={operation.id}
-              testID={`operation-item-${index}`}
-              operation={operation}
-              colors={colors}
-              t={t}
-              categories={categories}
-              getCategoryInfo={getCategoryInfo}
-              getAccountName={getAccountName}
-              formatCurrency={formatCurrency}
-              isLast={index === item.operations.length - 1}
-              onPress={() => onEditOperation(operation)}
-              suggestionChips={operation.id === pendingSuggestionId ? pendingSuggestions : null}
-              onApplySuggestion={onApplySuggestion}
-              onDismissSuggestion={onDismissSuggestion}
-            />
-          ))}
-        </View>
       </View>
     );
-  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, formatDate, onEditOperation, onDateSeparatorPress, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
+  }, [colors, t, categories, getCategoryInfo, getAccountName, formatCurrency, onEditOperation, pendingSuggestionId, pendingSuggestions, onApplySuggestion, onDismissSuggestion]);
+
+  const keyExtractor = useCallback((item) => item.id, []);
 
   return (
-    <FlatList
+    <SectionList
       ref={ref}
       contentInsetAdjustmentBehavior="automatic"
-      data={groupedOperations}
+      sections={sections}
       renderItem={renderItem}
-      keyExtractor={item => item.id}
+      renderSectionHeader={renderSectionHeader}
+      renderSectionFooter={renderSectionFooter}
+      keyExtractor={keyExtractor}
       extraData={[accounts, categories, pendingSuggestionId]}
       ListHeaderComponent={headerComponent}
       ListFooterComponent={renderFooter}
@@ -208,7 +246,7 @@ const OperationsList = forwardRef(({
       contentContainerStyle={
         initialLoading
           ? styles.listContent
-          : groupedOperations.length === 0
+          : sections.length === 0
             ? styles.emptyList
             : styles.listContent
       }
@@ -218,10 +256,7 @@ const OperationsList = forwardRef(({
       onEndReachedThreshold={0.5}
       onScrollToIndexFailed={onScrollToIndexFailed}
       onContentSizeChange={onContentSizeChange}
-      maintainVisibleContentPosition={{
-        minIndexForVisible: 0,
-        autoscrollToTopThreshold: 10,
-      }}
+      stickySectionHeadersEnabled={false}
       windowSize={10}
       maxToRenderPerBatch={5}
       initialNumToRender={10}
@@ -270,6 +305,23 @@ OperationsList.defaultProps = {
 };
 
 const styles = StyleSheet.create({
+  cardBottom: {
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    marginBottom: SPACING.sm,
+    marginHorizontal: SPACING.lg,
+  },
+  cardTop: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderTopLeftRadius: BORDER_RADIUS.lg,
+    borderTopRightRadius: BORDER_RADIUS.lg,
+    borderTopWidth: 1,
+    marginHorizontal: SPACING.lg,
+  },
   emptyContainer: {
     alignItems: 'center',
     flex: 1,
@@ -284,7 +336,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   groupContainer: {
-    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  itemWrapper: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    marginHorizontal: SPACING.lg,
+    overflow: 'hidden',
   },
   listContent: {
     paddingBottom: 180,
@@ -297,12 +355,6 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     fontSize: 14,
     marginTop: SPACING.sm,
-  },
-  operationsCard: {
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    marginHorizontal: SPACING.lg,
-    overflow: 'hidden',
   },
 });
 
