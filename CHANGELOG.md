@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.2](https://github.com/heywood8/money-tracker/compare/penny-v0.123.1...penny-v0.123.2) (2026-05-26)
+
+
+### Performance Improvements
+
+* split BudgetsContext into BudgetsDataContext and BudgetsActionsContext ([#807](https://github.com/heywood8/money-tracker/issues/807)) ([8d8c877](https://github.com/heywood8/money-tracker/commit/8d8c877d16feedeb9053a595f872da4cb8fc1701))
+
 ## [0.123.1](https://github.com/heywood8/money-tracker/compare/penny-v0.123.0...penny-v0.123.1) (2026-05-26)
 
 
