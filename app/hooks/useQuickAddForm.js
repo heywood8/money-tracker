@@ -177,6 +177,11 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
     return unsubscribe;
   }, [loadSuggestions]);
 
+  useEffect(() => {
+    const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, loadSuggestions);
+    return unsubscribe;
+  }, [loadSuggestions]);
+
   // Filtered categories for quick add form (excluding shadow categories)
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => {

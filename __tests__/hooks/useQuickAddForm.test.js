@@ -1000,5 +1000,46 @@ describe('useQuickAddForm', () => {
 
       expect(mockGetTopCategories).not.toHaveBeenCalled();
     });
+
+    it('reloads suggestions when RELOAD_ALL fires', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+      mockGetTopTransferTargets.mockResolvedValue([]);
+
+      renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('cleans up RELOAD_ALL subscription on unmount', async () => {
+      mockGetTopCategories.mockResolvedValue([]);
+      mockGetTopTransferTargets.mockResolvedValue([]);
+
+      const { unmount } = renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
+      });
+
+      unmount();
+      mockGetTopCategories.mockClear();
+
+      await act(async () => {
+        appEvents.emit(EVENTS.RELOAD_ALL);
+      });
+
+      expect(mockGetTopCategories).not.toHaveBeenCalled();
+    });
   });
 });
