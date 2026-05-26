@@ -216,17 +216,18 @@ export const OperationsActionsProvider = ({ children }) => {
         _setHasMoreOperations(olderOps.some(op => op.date < chunkStart));
       } else {
         // Cache not ready yet — fall back to DB queries.
-        const isFiltered = _hasActiveFilters(activeFilters);
+        const currentFilters = activeFiltersRef.current;
+        const isFiltered = _hasActiveFilters(currentFilters);
 
         const todayStr = new Date().toISOString().split('T')[0];
         let nextOp;
         if (!_oldestLoadedDate) {
           nextOp = isFiltered
-            ? await OperationsDB.getNextOldestFilteredOperation(todayStr, activeFilters)
+            ? await OperationsDB.getNextOldestFilteredOperation(todayStr, currentFilters)
             : await OperationsDB.getNextOldestOperation(todayStr);
         } else {
           nextOp = isFiltered
-            ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, activeFilters)
+            ? await OperationsDB.getNextOldestFilteredOperation(_oldestLoadedDate, currentFilters)
             : await OperationsDB.getNextOldestOperation(_oldestLoadedDate);
         }
 
@@ -234,7 +235,7 @@ export const OperationsActionsProvider = ({ children }) => {
           _setHasMoreOperations(false);
         } else {
           const moreOperations = isFiltered
-            ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, activeFilters)
+            ? await OperationsDB.getFilteredOperationsByWeekFromDate(nextOp.date, currentFilters)
             : await OperationsDB.getOperationsByWeekFromDate(nextOp.date);
 
           _setOperations(prevOps => {
@@ -257,7 +258,6 @@ export const OperationsActionsProvider = ({ children }) => {
     _oldestLoadedDate,
     hasMoreOperations,
     loadingMore,
-    activeFilters,
     _hasActiveFilters,
     _setLoadingMore,
     _setHasMoreOperations,
@@ -272,11 +272,12 @@ export const OperationsActionsProvider = ({ children }) => {
     try {
       _setLoadingNewer(true);
 
-      const isFiltered = _hasActiveFilters(activeFilters);
+      const currentFilters = activeFiltersRef.current;
+      const isFiltered = _hasActiveFilters(currentFilters);
 
       // Find the next newest operation after our current newest date
       const nextOp = isFiltered
-        ? await OperationsDB.getNextNewestFilteredOperation(_newestLoadedDate, activeFilters)
+        ? await OperationsDB.getNextNewestFilteredOperation(_newestLoadedDate, currentFilters)
         : await OperationsDB.getNextNewestOperation(_newestLoadedDate);
 
       if (!nextOp) {
@@ -285,7 +286,7 @@ export const OperationsActionsProvider = ({ children }) => {
       } else {
         // Load a week of operations ending at this operation's date
         const newerOperations = isFiltered
-          ? await OperationsDB.getFilteredOperationsByWeekToDate(nextOp.date, activeFilters)
+          ? await OperationsDB.getFilteredOperationsByWeekToDate(nextOp.date, currentFilters)
           : await OperationsDB.getOperationsByWeekToDate(nextOp.date);
 
         // Merge and deduplicate operations by ID
@@ -310,7 +311,6 @@ export const OperationsActionsProvider = ({ children }) => {
     _newestLoadedDate,
     hasNewerOperations,
     loadingNewer,
-    activeFilters,
     _hasActiveFilters,
     _setLoadingNewer,
     _setHasNewerOperations,
@@ -420,7 +420,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Reload operations to include the new one (without showing loading spinner)
       // Note: We reload to ensure consistency with lazy-loaded week ranges
-      await loadInitialOperations(activeFilters, false);
+      await loadInitialOperations(activeFiltersRef.current, false);
 
       _setSaveError(null);
 
@@ -441,7 +441,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError]);
 
   const splitOperation = useCallback(async (id, updates, newOperationData) => {
     try {
@@ -451,7 +451,7 @@ export const OperationsActionsProvider = ({ children }) => {
       allOpsCacheRef.current = null;
       _loadCache();
 
-      await loadInitialOperations(activeFilters, false);
+      await loadInitialOperations(activeFiltersRef.current, false);
 
       _setSaveError(null);
 
@@ -468,7 +468,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, activeFilters, _setSaveError, _loadCache]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _loadCache]);
 
   const updateOperation = useCallback(async (id, updates) => {
     try {
@@ -586,7 +586,8 @@ export const OperationsActionsProvider = ({ children }) => {
   const jumpToDate = useCallback(async (date) => {
     try {
       _setLoading(true);
-      const isFiltered = _hasActiveFilters(activeFilters);
+      const currentFilters = activeFiltersRef.current;
+      const isFiltered = _hasActiveFilters(currentFilters);
 
       // Calculate today's date in YYYY-MM-DD format
       const today = new Date();
@@ -595,7 +596,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Load all operations from the selected date to today
       const operationsData = isFiltered
-        ? await OperationsDB.getFilteredOperationsByDateRange(date, todayStr, activeFilters)
+        ? await OperationsDB.getFilteredOperationsByDateRange(date, todayStr, currentFilters)
         : await OperationsDB.getOperationsByDateRange(date, todayStr);
 
       _setOperations(operationsData);
@@ -625,7 +626,6 @@ export const OperationsActionsProvider = ({ children }) => {
       _setLoading(false);
     }
   }, [
-    activeFilters,
     _hasActiveFilters,
     _setLoading,
     _setOperations,
@@ -682,15 +682,16 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Count active filter groups
   const getActiveFilterCount = useCallback(() => {
+    const f = activeFiltersRef.current;
     let count = 0;
-    if (activeFilters.types.length > 0) count++;
-    if (activeFilters.accountIds.length > 0) count++;
-    if (activeFilters.categoryIds.length > 0) count++;
-    if (activeFilters.searchText.trim().length > 0) count++;
-    if (activeFilters.dateRange.startDate || activeFilters.dateRange.endDate) count++;
-    if (activeFilters.amountRange.min !== null || activeFilters.amountRange.max !== null) count++;
+    if (f.types.length > 0) count++;
+    if (f.accountIds.length > 0) count++;
+    if (f.categoryIds.length > 0) count++;
+    if (f.searchText.trim().length > 0) count++;
+    if (f.dateRange.startDate || f.dateRange.endDate) count++;
+    if (f.amountRange.min !== null || f.amountRange.max !== null) count++;
     return count;
-  }, [activeFilters]);
+  }, []);
 
   const value = useMemo(() => ({
     addOperation,
