@@ -830,6 +830,56 @@ op-2,normal`;
       expect(backup.data.operations[1].description).toBe('normal');
     });
 
+    it('regression #764 — sparse rows (fewer columns than header) default missing fields to null without throwing', async () => {
+      // Row 0 has all 3 columns; row 1 only has 2.  The missing 3rd column
+      // (description) should become null, not crash, and a console.warn should fire.
+      const csvContent = `# Money Tracker Backup
+# Version: 1
+
+[ACCOUNTS]
+id,name,balance
+acc-1,Cash,100
+acc-2,Savings
+
+[OPERATIONS]
+id,type,amount,account_id,category_id,description
+op-1,expense,10,acc-1,cat-1,Full row
+op-2,income,20,acc-1,cat-1`;
+
+      mockDocumentPicker.getDocumentAsync.mockResolvedValue({
+        canceled: false,
+        assets: [{ uri: 'file:///mock/backup.csv', name: 'backup.csv' }],
+      });
+
+      mockFileSystem.readAsStringAsync.mockResolvedValue(csvContent);
+      mockDb.executeTransaction.mockImplementation(async (callback) => {
+        await callback({
+          runAsync: jest.fn().mockImplementation(() => Promise.resolve({ lastInsertRowId: Math.floor(Math.random() * 1000) })),
+          getAllAsync: jest.fn().mockResolvedValue([]),
+        });
+      });
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const backup = await BackupRestore.importBackup();
+
+      // Sparse account row (acc-2 missing balance)
+      expect(backup.data.accounts).toHaveLength(2);
+      expect(backup.data.accounts[1].balance).toBeNull();
+
+      // Sparse operation row (op-2 missing description)
+      expect(backup.data.operations).toHaveLength(2);
+      expect(backup.data.operations[1].description).toBeNull();
+
+      // Warn must have fired for each sparse row
+      const sparseWarnings = warnSpy.mock.calls.filter(([msg]) =>
+        typeof msg === 'string' && msg.includes('[BackupRestore] parseCSV'),
+      );
+      expect(sparseWarnings.length).toBeGreaterThanOrEqual(2);
+
+      warnSpy.mockRestore();
+    });
+
     it('handles empty CSV sections', async () => {
       const csvContent = `# Money Tracker Backup
 # Version: 1
