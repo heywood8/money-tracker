@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getIncomeByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import * as Currency from '../services/currency';
 
 const CHART_COLORS = [
   '#4BC0C0', '#36A2EB', '#9966FF', '#FF9F40', '#FFCE56',
@@ -72,9 +73,9 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
         if (rootParent) {
           const rootId = rootParent.id;
           if (!aggregatedIncome[rootId]) {
-            aggregatedIncome[rootId] = { category: rootParent, total: 0 };
+            aggregatedIncome[rootId] = { category: rootParent, total: '0' };
           }
-          aggregatedIncome[rootId].total += parseFloat(item.total);
+          aggregatedIncome[rootId].total = Currency.add(aggregatedIncome[rootId].total, item.total);
         }
       });
     } else {
@@ -84,9 +85,9 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
 
         if (category.parentId === selectedIncomeCategory) {
           if (!aggregatedIncome[category.id]) {
-            aggregatedIncome[category.id] = { category, total: 0 };
+            aggregatedIncome[category.id] = { category, total: '0' };
           }
-          aggregatedIncome[category.id].total += parseFloat(item.total);
+          aggregatedIncome[category.id].total = Currency.add(aggregatedIncome[category.id].total, item.total);
         } else {
           let current = category;
           while (current.parentId) {
@@ -94,9 +95,9 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
             if (!parent) break;
             if (parent.id === selectedIncomeCategory) {
               if (!aggregatedIncome[current.id]) {
-                aggregatedIncome[current.id] = { category: current, total: 0 };
+                aggregatedIncome[current.id] = { category: current, total: '0' };
               }
-              aggregatedIncome[current.id].total += parseFloat(item.total);
+              aggregatedIncome[current.id].total = Currency.add(aggregatedIncome[current.id].total, item.total);
               break;
             }
             current = parent;
@@ -109,7 +110,7 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
       const hasChildren = categories.some(cat => cat.parentId === item.category.id);
       return {
         name: item.category.name,
-        amount: item.total,
+        amount: parseFloat(item.total),
         color: CHART_COLORS[index % CHART_COLORS.length],
         legendFontColor: colors.text,
         legendFontSize: 13,
