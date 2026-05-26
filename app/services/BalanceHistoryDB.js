@@ -59,7 +59,7 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
       operations = await db.getAllAsync(
         `SELECT * FROM operations
          WHERE (account_id = ? OR to_account_id = ?)
-           AND date > ?
+           AND date(date) > date(?)
          ORDER BY date DESC, created_at DESC`,
         [accountId, accountId, targetDate],
       );
@@ -68,7 +68,7 @@ const calculateBalanceOnDate = async (accountId, targetDate, db = null) => {
       operations = await queryAll(
         `SELECT * FROM operations
          WHERE (account_id = ? OR to_account_id = ?)
-           AND date > ?
+           AND date(date) > date(?)
          ORDER BY date DESC, created_at DESC`,
         [accountId, accountId, targetDate],
       );

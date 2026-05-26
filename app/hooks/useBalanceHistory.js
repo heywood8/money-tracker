@@ -55,8 +55,12 @@ const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
       // Get balance history from database
       const history = await getBalanceHistory(selectedAccount, startDateStr, endDateStr);
 
-      // Calculate previous month dates
-      const prevMonthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      // Calculate previous month dates.
+      // When selectedMonth is 0 (January), selectedMonth - 1 = -1 which JS rolls
+      // to December of the *same* year instead of decrementing the year — fix explicitly.
+      const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
+      const prevYear  = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+      const prevMonthStart = new Date(prevYear, prevMonth, 1);
       const prevMonthEnd = new Date(selectedYear, selectedMonth, 0);
       const prevStartDateStr = formatDate(prevMonthStart);
       const prevEndDateStr = formatDate(prevMonthEnd);
