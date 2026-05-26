@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { getSpendingByCategoryAndCurrency } from '../services/OperationsDB';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { appEvents, EVENTS } from '../services/eventEmitter';
+import * as Currency from '../services/currency';
 
 const CHART_COLORS = [
   '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
@@ -69,11 +70,11 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
     };
 
     const regularSpending = [];
-    let shadowCategoryTotal = 0;
+    let shadowCategoryTotal = '0';
 
     rawSpending.forEach(item => {
       if (shadowCategoryIds.has(item.category_id)) {
-        shadowCategoryTotal += parseFloat(item.total);
+        shadowCategoryTotal = Currency.add(shadowCategoryTotal, item.total);
       } else {
         regularSpending.push(item);
       }
@@ -87,9 +88,9 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
         if (rootParent) {
           const rootId = rootParent.id;
           if (!aggregatedSpending[rootId]) {
-            aggregatedSpending[rootId] = { category: rootParent, total: 0 };
+            aggregatedSpending[rootId] = { category: rootParent, total: '0' };
           }
-          aggregatedSpending[rootId].total += parseFloat(item.total);
+          aggregatedSpending[rootId].total = Currency.add(aggregatedSpending[rootId].total, item.total);
         }
       });
     } else {
@@ -97,13 +98,11 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
         const category = categoryMap.get(item.category_id);
         if (!category) return;
 
-        const amount = parseFloat(item.total);
-
         if (category.parentId === selectedCategory) {
           if (!aggregatedSpending[category.id]) {
-            aggregatedSpending[category.id] = { category, total: 0 };
+            aggregatedSpending[category.id] = { category, total: '0' };
           }
-          aggregatedSpending[category.id].total += amount;
+          aggregatedSpending[category.id].total = Currency.add(aggregatedSpending[category.id].total, item.total);
         } else {
           let current = category;
           while (current.parentId) {
@@ -111,9 +110,9 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
             if (!parent) break;
             if (parent.id === selectedCategory) {
               if (!aggregatedSpending[current.id]) {
-                aggregatedSpending[current.id] = { category: current, total: 0 };
+                aggregatedSpending[current.id] = { category: current, total: '0' };
               }
-              aggregatedSpending[current.id].total += amount;
+              aggregatedSpending[current.id].total = Currency.add(aggregatedSpending[current.id].total, item.total);
               break;
             }
             current = parent;
@@ -126,7 +125,7 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
       const hasChildren = categories.some(cat => cat.parentId === item.category.id);
       return {
         name: item.category.name,
-        amount: item.total,
+        amount: parseFloat(item.total),
         color: CHART_COLORS[index % CHART_COLORS.length],
         legendFontColor: colors.text,
         legendFontSize: 13,
@@ -138,10 +137,10 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
 
     data.sort((a, b) => b.amount - a.amount);
 
-    if (shadowCategoryTotal > 0 && selectedCategory === 'all') {
+    if (parseFloat(shadowCategoryTotal) > 0 && selectedCategory === 'all') {
       data.push({
         name: t('balance_adjustments'),
-        amount: shadowCategoryTotal,
+        amount: parseFloat(shadowCategoryTotal),
         color: CHART_COLORS[data.length % CHART_COLORS.length],
         legendFontColor: colors.text,
         legendFontSize: 13,
