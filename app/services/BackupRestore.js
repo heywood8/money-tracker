@@ -64,18 +64,32 @@ export const createBackup = async () => {
   }
 };
 
+// Explicit column orderings per table — guards against sparse rows where
+// Object.keys(data[0]) would silently omit columns present only on later rows.
+const TABLE_FIELDS = {
+  accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'created_at', 'updated_at'],
+  categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
+  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance'],
+  budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
+  app_metadata:       ['key', 'value', 'updated_at'],
+  balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
+  planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
+};
+
 /**
  * Convert array of objects to CSV string
  * @param {Array} data - Array of objects
+ * @param {string[]} [explicitFields] - Ordered field list; falls back to Object.keys(data[0])
  * @returns {string} CSV string
  */
-const convertToCSV = (data) => {
+const convertToCSV = (data, explicitFields) => {
   if (!data || data.length === 0) {
     return '';
   }
 
-  // Get headers from first object
-  const headers = Object.keys(data[0]);
+  // Use the explicit field list when provided so every column is always present,
+  // even when optional fields are absent from some rows.
+  const headers = explicitFields || Object.keys(data[0]);
   const csvHeaders = headers.join(',');
 
   // Convert each row
@@ -107,15 +121,15 @@ export const exportBackupCSV = async () => {
     const backup = await createBackup();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
 
-    // Create CSV content for each table
+    // Create CSV content for each table using explicit field lists (issue #748)
     const csvFiles = {
-      'accounts.csv': convertToCSV(backup.data.accounts),
-      'categories.csv': convertToCSV(backup.data.categories),
-      'operations.csv': convertToCSV(backup.data.operations),
-      'budgets.csv': convertToCSV(backup.data.budgets),
-      'app_metadata.csv': convertToCSV(backup.data.app_metadata),
-      'balance_history.csv': convertToCSV(backup.data.balance_history),
-      'planned_operations.csv': convertToCSV(backup.data.planned_operations),
+      'accounts.csv': convertToCSV(backup.data.accounts, TABLE_FIELDS.accounts),
+      'categories.csv': convertToCSV(backup.data.categories, TABLE_FIELDS.categories),
+      'operations.csv': convertToCSV(backup.data.operations, TABLE_FIELDS.operations),
+      'budgets.csv': convertToCSV(backup.data.budgets, TABLE_FIELDS.budgets),
+      'app_metadata.csv': convertToCSV(backup.data.app_metadata, TABLE_FIELDS.app_metadata),
+      'balance_history.csv': convertToCSV(backup.data.balance_history, TABLE_FIELDS.balance_history),
+      'planned_operations.csv': convertToCSV(backup.data.planned_operations, TABLE_FIELDS.planned_operations),
       'backup_info.csv': `version,timestamp,platform\n${backup.version},${backup.timestamp},${backup.platform}`,
     };
 
