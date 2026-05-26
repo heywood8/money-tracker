@@ -349,8 +349,10 @@ export const importFromSheets = async (accessToken, onProgress) => {
     created_at: now,
   }));
 
-  // Preserve current app preferences (language, theme, etc.) so they survive the restore
-  const app_metadata = await queryAll('SELECT * FROM app_metadata WHERE key != ?', ['db_version']).catch(() => []);
+  // Preserve current app preferences (language, theme, etc.) so they survive the restore.
+  // Do NOT catch DB errors here — a locked or corrupted DB must abort the import loudly
+  // rather than silently overwriting all user preferences with an empty set (#747).
+  const app_metadata = await queryAll('SELECT * FROM app_metadata WHERE key != ?', ['db_version']);
 
   report('parse', 'completed');
 
