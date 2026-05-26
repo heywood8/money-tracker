@@ -440,8 +440,11 @@ export const executeTransaction = async (callback) => {
     return callbackResult;
   });
 
-  // Swallow rejection so the next queued transaction always starts.
-  _lastTransaction = txPromise.catch(() => {});
+  // Keep the chain always-resolved so the next queued transaction can start,
+  // but log and re-throw the error so callers can handle it.
+  _lastTransaction = txPromise.catch((err) => {
+    console.error('[DB] Transaction failed:', err);
+  });
   return txPromise;
 };
 
