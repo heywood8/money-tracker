@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.123.1](https://github.com/heywood8/money-tracker/compare/penny-v0.123.0...penny-v0.123.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* abort Google Sheets import on DB error instead of silently clearing preferences ([#803](https://github.com/heywood8/money-tracker/issues/803)) ([2e1d076](https://github.com/heywood8/money-tracker/commit/2e1d07605a340a7a9eb408cca3fd98c98d388a47))
+* correct January balance history boundary and normalize date comparisons ([#801](https://github.com/heywood8/money-tracker/issues/801)) ([f320d08](https://github.com/heywood8/money-tracker/commit/f320d08ad03a6dc9271fad49d5c1ce0eed8aeb38))
+* refresh quick-add suggestions on RELOAD_ALL event ([#800](https://github.com/heywood8/money-tracker/issues/800)) ([c0277f8](https://github.com/heywood8/money-tracker/commit/c0277f8cc57bc187180f0224e340d95ad53d237b))
+* use Currency.add for precise chart total accumulation ([#802](https://github.com/heywood8/money-tracker/issues/802)) ([a049f43](https://github.com/heywood8/money-tracker/commit/a049f43c77f29c8efdb49b77ece0efd8fb79003a))
+* use explicit CSV field lists to prevent silent data loss on export ([#799](https://github.com/heywood8/money-tracker/issues/799)) ([074f391](https://github.com/heywood8/money-tracker/commit/074f391b74163c4f837162519554ed10f529ab0f))
+
+
+### Performance Improvements
+
+* use ref for activeFilters in OperationsActionsContext to prevent memo invalidation on keypress ([#804](https://github.com/heywood8/money-tracker/issues/804)) ([55e9c29](https://github.com/heywood8/money-tracker/commit/55e9c29606323987de56266a2fc26da8fcb6cdc9))
+
 ## [0.123.0](https://github.com/heywood8/money-tracker/compare/penny-v0.122.7...penny-v0.123.0) (2026-05-25)
 
 
