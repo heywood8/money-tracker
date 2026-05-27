@@ -226,6 +226,19 @@ describe('Database Service', () => {
       expect(successCallback).toHaveBeenCalledWith(mockDb);
     });
 
+    it('logs transaction errors via console.error', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const err = new Error('DB write failed');
+      const failingCallback = jest.fn(async () => { throw err; });
+
+      await expect(executeTransaction(failingCallback)).rejects.toThrow('DB write failed');
+
+      // Give the _lastTransaction catch handler a chance to run
+      await Promise.resolve();
+      expect(errorSpy).toHaveBeenCalledWith('[DB] Transaction failed:', err);
+      errorSpy.mockRestore();
+    });
+
     it('serializes concurrent transactions', async () => {
       const order = [];
       const first = jest.fn(async (db) => {
