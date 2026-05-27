@@ -1,5 +1,7 @@
 # Backup/Trash
 .trash/
+# Git worktrees
+.worktrees/
 # React Native
 node_modules/
 npm-debug.log*
