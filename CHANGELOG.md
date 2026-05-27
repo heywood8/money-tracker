@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.3](https://github.com/heywood8/money-tracker/compare/penny-v0.123.2...penny-v0.123.3) (2026-05-27)
+
+
+### Bug Fixes
+
+* warn on sparse CSV rows during import to prevent silent data loss ([#805](https://github.com/heywood8/money-tracker/issues/805)) ([94044ab](https://github.com/heywood8/money-tracker/commit/94044ab8504d7af2b50c7097f6e7ae7d68ab6657))
+
 ## [0.123.2](https://github.com/heywood8/money-tracker/compare/penny-v0.123.1...penny-v0.123.2) (2026-05-26)
 
 
