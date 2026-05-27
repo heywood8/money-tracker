@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.4](https://github.com/heywood8/money-tracker/compare/penny-v0.123.3...penny-v0.123.4) (2026-05-27)
+
+
+### Bug Fixes
+
+* log and re-throw database transaction errors instead of silently swallowing them ([#806](https://github.com/heywood8/money-tracker/issues/806)) ([b1e1fc4](https://github.com/heywood8/money-tracker/commit/b1e1fc42f77a686915b73a4482a985832808277d))
+
 ## [0.123.3](https://github.com/heywood8/money-tracker/compare/penny-v0.123.2...penny-v0.123.3) (2026-05-27)
 
 
