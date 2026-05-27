@@ -6,32 +6,40 @@ const UpdateDownloadContext = createContext(null);
 
 export function UpdateDownloadProvider({ children }) {
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [downloadPhase, setDownloadPhase] = useState(null);
   const isDownloadingRef = useRef(false);
 
   const startDownload = useCallback(async (downloadUrl, { onError, checksumUrl = null } = {}) => {
     if (isDownloadingRef.current) return;
     isDownloadingRef.current = true;
+    setDownloadPhase('downloading');
     setDownloadProgress(0);
     try {
-      await downloadAndInstallApk(downloadUrl, setDownloadProgress, { checksumUrl });
+      await downloadAndInstallApk(downloadUrl, setDownloadProgress, {
+        checksumUrl,
+        onPhaseChange: (phase) => {
+          setDownloadPhase(phase);
+          if (phase === 'verifying') setDownloadProgress(0);
+        },
+      });
     } catch (e) {
       onError?.(e);
     } finally {
       isDownloadingRef.current = false;
       setDownloadProgress(null);
+      setDownloadPhase(null);
     }
   }, []);
 
   const value = useMemo(() => ({
     downloadProgress,
+    downloadPhase,
     isDownloading: downloadProgress !== null,
     startDownload,
-  }), [downloadProgress, startDownload]);
+  }), [downloadProgress, downloadPhase, startDownload]);
 
   return (
-    <UpdateDownloadContext.Provider
-      value={value}
-    >
+    <UpdateDownloadContext.Provider value={value}>
       {children}
     </UpdateDownloadContext.Provider>
   );
