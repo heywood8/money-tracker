@@ -930,9 +930,21 @@ const parseCSV = (csvContent) => {
     const values = rows[r];
     if (values.every(v => v.trim() === '')) continue;
 
+    // Warn when a row has fewer columns than the header — this is the sparse-row
+    // bug described in issue #764.  Values for missing columns default to null
+    // (same as an explicit empty cell) but we surface it so callers can detect
+    // data loss rather than silently swallowing it.
+    if (values.length < headers.length) {
+      console.warn(
+        `[BackupRestore] parseCSV: row ${r} has ${values.length} column(s) but header has ${headers.length}. ` +
+        `Missing fields will default to null: ${headers.slice(values.length).join(', ')}`,
+      );
+    }
+
     const obj = {};
     headers.forEach((header, index) => {
-      const value = values[index]?.trim() || '';
+      const raw = values[index];
+      const value = raw !== undefined ? raw.trim() : '';
       obj[header] = value === '' ? null : value;
     });
     data.push(obj);
