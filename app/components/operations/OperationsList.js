@@ -306,20 +306,22 @@ OperationsList.defaultProps = {
 
 const styles = StyleSheet.create({
   cardBottom: {
-    borderBottomLeftRadius: BORDER_RADIUS.lg,
-    borderBottomRightRadius: BORDER_RADIUS.lg,
+    borderBottomLeftRadius: BORDER_RADIUS.md,
+    borderBottomRightRadius: BORDER_RADIUS.md,
     borderBottomWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    marginBottom: SPACING.sm,
+    height: BORDER_RADIUS.md,
+    marginBottom: SPACING.xs,
     marginHorizontal: SPACING.lg,
   },
   cardTop: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-    borderTopRightRadius: BORDER_RADIUS.lg,
+    borderTopLeftRadius: BORDER_RADIUS.md,
+    borderTopRightRadius: BORDER_RADIUS.md,
     borderTopWidth: 1,
+    height: BORDER_RADIUS.md,
     marginHorizontal: SPACING.lg,
   },
   emptyContainer: {
@@ -335,9 +337,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: SPACING.lg,
   },
-  groupContainer: {
-    marginTop: SPACING.sm,
-  },
+  groupContainer: {},
   itemWrapper: {
     borderLeftWidth: 1,
     borderRightWidth: 1,

@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: SPACING.xs,
     paddingHorizontal: SPACING.lg + SPACING.sm,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   dateText: {
     fontSize: FONT_SIZE.xs,
