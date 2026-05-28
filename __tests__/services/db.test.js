@@ -210,6 +210,19 @@ describe('Database Service', () => {
       await expect(executeTransaction(callback)).rejects.toThrow('Transaction error');
     });
 
+    it('logs transaction errors via console.error', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const err = new Error('DB write failed');
+      const failingCallback = jest.fn(async () => { throw err; });
+
+      await expect(executeTransaction(failingCallback)).rejects.toThrow('DB write failed');
+
+      // Give the _lastTransaction catch handler a chance to run
+      await Promise.resolve();
+      expect(errorSpy).toHaveBeenCalledWith('[DB] Transaction failed:', err);
+      errorSpy.mockRestore();
+    });
+
     it('does not block subsequent transactions after a failed one', async () => {
       const failingCallback = jest.fn(async () => {
         throw new Error('Deliberate failure');
