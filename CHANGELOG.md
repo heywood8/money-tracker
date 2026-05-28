@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.10](https://github.com/heywood8/money-tracker/compare/penny-v0.123.9...penny-v0.123.10) (2026-05-28)
+
+
+### Bug Fixes
+
+* use Decimal.js for income/expense chart total accumulation ([#765](https://github.com/heywood8/money-tracker/issues/765)) ([#820](https://github.com/heywood8/money-tracker/issues/820)) ([2eb2719](https://github.com/heywood8/money-tracker/commit/2eb2719e6fa4b33f98e6f1db80b21ae43ee935c5))
+
 ## [0.123.9](https://github.com/heywood8/money-tracker/compare/penny-v0.123.8...penny-v0.123.9) (2026-05-28)
 
 
