@@ -270,7 +270,11 @@ describe('OperationsDB Service', () => {
       expect(Currency.add).toHaveBeenCalledWith('50000', '370');
     });
 
-    it('skips balance update when account not found', async () => {
+    it('throws and rolls back when account not found during balance update (#746)', async () => {
+      // Regression test for issue #746: operation insert must not succeed when
+      // the balance update step fails. Both steps must be atomic — if the account
+      // lookup returns null the whole transaction should be aborted via an error,
+      // ensuring the operation row is never persisted without a matching balance update.
       const operation = {
         id: 5,
         type: 'expense',
@@ -280,18 +284,14 @@ describe('OperationsDB Service', () => {
         date: '2025-12-05',
       };
 
+      // Account lookup returns null — simulates a missing/deleted account
       mockDb.getFirstAsync.mockResolvedValue(null);
 
-      await OperationsDB.createOperation(operation);
-
-      // Should still insert operation
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO operations'),
-        expect.any(Array),
+      // createOperation must reject — the transaction callback throws so the
+      // SQLite transaction rolls back and the INSERT is not committed.
+      await expect(OperationsDB.createOperation(operation)).rejects.toThrow(
+        'Account non-existent not found',
       );
-
-      // Should not attempt balance update
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     });
 
     it('handles object IDs by extracting the id property', async () => {

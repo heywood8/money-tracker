@@ -515,8 +515,7 @@ export const createOperationInTx = async (db, operation) => {
     const account = await db.getFirstAsync('SELECT balance FROM accounts WHERE id = ?', [accountId]);
 
     if (!account) {
-      console.warn(`Account ${accountId} not found, skipping balance update`);
-      continue;
+      throw new Error(`Account ${accountId} not found — rolling back operation insert`);
     }
 
     const newBalance = Currency.add(account.balance, delta);
