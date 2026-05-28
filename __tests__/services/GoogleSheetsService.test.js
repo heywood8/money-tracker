@@ -14,6 +14,10 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   setPreference: jest.fn(),
 }));
 
+jest.mock('../../app/services/db', () => ({
+  queryAll: jest.fn(() => Promise.resolve([])),
+}));
+
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
@@ -489,6 +493,12 @@ describe('GoogleSheetsService', () => {
       });
       await expect(importFromSheets('token')).rejects.toThrow('refresh_failed');
       expect(GoogleSignin.signOut).toHaveBeenCalled();
+    });
+
+    it('throws when the DB read for app_metadata fails (#760)', async () => {
+      const { queryAll } = require('../../app/services/db');
+      queryAll.mockRejectedValueOnce(new Error('database is locked'));
+      await expect(importFromSheets('token')).rejects.toThrow('database is locked');
     });
 
     it('returns a valid backup object on success', async () => {
