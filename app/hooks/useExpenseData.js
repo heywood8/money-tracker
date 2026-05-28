@@ -152,7 +152,7 @@ const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedC
   }, [rawSpending, selectedCategory, categories, colors.text, t, selectedCurrency]);
 
   const totalExpenses = useMemo(
-    () => chartData.reduce((sum, item) => sum + item.amount, 0),
+    () => parseFloat(chartData.reduce((sum, item) => Currency.add(sum, item.amount), '0')),
     [chartData],
   );
 

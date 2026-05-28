@@ -126,7 +126,7 @@ const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIn
   }, [rawIncome, selectedIncomeCategory, categories, colors.text, selectedCurrency]);
 
   const totalIncome = useMemo(
-    () => incomeChartData.reduce((sum, item) => sum + item.amount, 0),
+    () => parseFloat(incomeChartData.reduce((sum, item) => Currency.add(sum, item.amount), '0')),
     [incomeChartData],
   );
 
