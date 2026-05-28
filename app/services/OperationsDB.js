@@ -656,8 +656,9 @@ export const updateOperation = async (id, updates) => {
         balanceChanges.set(accountId, Currency.subtract(balanceChanges.get(accountId) || '0', delta));
       }
 
-      // Apply new operation
+      // Apply new operation — track which accounts the new operation requires
       const newChanges = await calculateBalanceChanges(newOperation, db);
+      const newOperationAccountIds = new Set(newChanges.keys());
       for (const [accountId, delta] of newChanges.entries()) {
         balanceChanges.set(accountId, Currency.add(balanceChanges.get(accountId) || '0', delta));
       }
@@ -674,7 +675,17 @@ export const updateOperation = async (id, updates) => {
         );
 
         if (!account) {
-          console.warn(`Account ${accountId} not found, skipping balance update`);
+          if (newOperationAccountIds.has(accountId)) {
+            // Account required by the new operation is missing — the operation
+            // record was already updated above, so we must abort the entire
+            // transaction to prevent corrupted balance state (#745).
+            throw new Error(
+              `Account ${accountId} not found. Cannot update operation ${id}: the account was deleted. Rolling back.`,
+            );
+          }
+          // Account was only referenced by the old operation and has since been
+          // deleted — its balance is already gone so skipping is safe.
+          console.warn(`Account ${accountId} not found (old operation only), skipping balance update`);
           continue;
         }
 
