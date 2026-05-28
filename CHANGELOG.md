@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.11](https://github.com/heywood8/money-tracker/compare/penny-v0.123.10...penny-v0.123.11) (2026-05-28)
+
+
+### Bug Fixes
+
+* make all operation mutations atomic with balance updates ([#746](https://github.com/heywood8/money-tracker/issues/746)) ([#823](https://github.com/heywood8/money-tracker/issues/823)) ([3e42108](https://github.com/heywood8/money-tracker/commit/3e42108eb48142692cccda251be4acfc3629151d))
+
 ## [0.123.10](https://github.com/heywood8/money-tracker/compare/penny-v0.123.9...penny-v0.123.10) (2026-05-28)
 
 
