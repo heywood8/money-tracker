@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     minHeight: HEIGHTS.listItem,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
   separator: {
     height: 1,
