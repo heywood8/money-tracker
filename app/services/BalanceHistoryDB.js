@@ -214,7 +214,7 @@ export const getBalanceHistory = async (accountId, startDate, endDate) => {
       `SELECT date, balance, created_at
        FROM accounts_balance_history
        WHERE account_id = ?
-         AND date(date) >= date(?)
+         AND date(date) >= date(?) -- date() normalises non-ISO formats from CSV import (#773)
          AND date(date) <= date(?)
        ORDER BY date ASC`,
       [accountId, startDate, endDate],
