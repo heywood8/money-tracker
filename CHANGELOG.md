@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.5](https://github.com/heywood8/money-tracker/compare/penny-v0.123.4...penny-v0.123.5) (2026-05-28)
+
+
+### Performance Improvements
+
+* replace pure-JS SHA-256 with crypto.subtle.digest for APK verification     ([#813](https://github.com/heywood8/money-tracker/issues/813)) ([7c9cdce](https://github.com/heywood8/money-tracker/commit/7c9cdce2fddb21d6eb187a1ed193f3b85328c7f6))
+
 ## [0.123.4](https://github.com/heywood8/money-tracker/compare/penny-v0.123.3...penny-v0.123.4) (2026-05-27)
 
 
