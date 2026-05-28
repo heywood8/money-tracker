@@ -354,8 +354,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   changelogScroll: {
-    maxHeight: 260,
     marginTop: SPACING.xs,
+    maxHeight: 260,
   },
   changelogSection: {
     marginBottom: SPACING.md,
@@ -434,6 +434,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
   },
+  upToDateContent: {
+    flex: 1,
+    paddingVertical: SPACING.xl,
+  },
+  upToDateHeader: {
+    alignItems: 'center',
+    paddingHorizontal: HORIZONTAL_PADDING * 2,
+  },
+  upToDateHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  upToDateHeaderSpacer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  upToDateHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   updateActionColumn: {
     alignItems: 'center',
     flex: 1,
@@ -474,29 +498,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
-  },
-  upToDateContent: {
-    flex: 1,
-    paddingVertical: SPACING.xl,
-  },
-  upToDateHeader: {
-    alignItems: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-  },
-  upToDateHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-  },
-  upToDateHeaderSpacer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  upToDateHeaderText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
