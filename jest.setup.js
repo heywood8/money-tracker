@@ -18,6 +18,14 @@ jest.mock('expo/src/winter/installGlobal.ts', () => ({
   }),
 }), { virtual: true });
 
+// Mock expo-clipboard
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(() => Promise.resolve()),
+  getStringAsync: jest.fn(() => Promise.resolve('')),
+  setString: jest.fn(),
+  getString: jest.fn(() => ''),
+}), { virtual: true });
+
 // Mock expo-sqlite with async methods
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(() => Promise.resolve({

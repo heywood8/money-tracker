@@ -70,13 +70,13 @@ describe('UpdateAvailableModal', () => {
       expect(onDismiss).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onUpdate with downloadUrl when update button pressed', () => {
+    it('calls onUpdate with downloadUrl and checksumUrl when update button pressed', () => {
       const onUpdate = jest.fn();
       const { getByText } = render(
         <UpdateAvailableModal {...baseProps} onUpdate={onUpdate} updateData={baseUpdateData} />,
       );
       fireEvent.press(getByText('update_now'));
-      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk');
+      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk', undefined);
     });
   });
 
@@ -129,19 +129,17 @@ describe('UpdateAvailableModal', () => {
       expect(getByText('Bold and italic text')).toBeTruthy();
     });
 
-    it('does NOT show version header when there is only one release note', () => {
+    it('always shows version label in changelog entries', () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'Single release' }],
       };
-      const { queryByText } = render(
+      const { getAllByText } = render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // Version header (v2.0.0) should NOT appear as a separate element
-      // Only the version number in the header row should show
-      const v200elements = queryByText('v2.0.0');
-      // It appears once (in the main header), not twice
-      expect(v200elements).toBeTruthy();
+      // v2.0.0 appears in both the version header row and the changelog entry
+      const v200elements = getAllByText('v2.0.0');
+      expect(v200elements.length).toBeGreaterThanOrEqual(2);
     });
 
     it('shows version header when there are multiple release notes', () => {
@@ -160,16 +158,17 @@ describe('UpdateAvailableModal', () => {
       expect(v200.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('shows install hint text above the update button when releaseNotes is provided', () => {
+    it('shows changelog section instead of install hint when releaseNotes is provided', () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'New stuff' }],
       };
-      const { getAllByText } = render(
+      const { queryByText, getByText } = render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // When releaseNotes exist, the hint appears above the button
-      expect(getAllByText('update_install_hint').length).toBeGreaterThanOrEqual(1);
+      // Changelog header shown, install hint not shown
+      expect(getByText('whats_new')).toBeTruthy();
+      expect(queryByText('update_install_hint')).toBeNull();
     });
   });
 

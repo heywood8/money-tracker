@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Linking } from 'react-native';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -58,29 +58,40 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
 
   if (!updateResult) return null;
 
+  const releaseNotes = updateResult.recentReleaseNotes || updateResult.releaseNotes;
+
   return (
     <Animated.View style={[styles.resultContainer, { opacity: contentAnim }]}>
       {updateResult.type === 'available' && (
         <>
-          {updateResult.releaseNotes ? (
+          {releaseNotes ? (
             <>
               <Divider style={styles.updateDivider} />
               <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
                 {t('whats_new') || "What's new"}
               </Text>
               <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
-                {updateResult.releaseNotes.map(({ version, notes }) => (
+                {releaseNotes.map(({ version, notes }) => (
                   <View key={version} style={styles.changelogSection}>
-                    {updateResult.releaseNotes.length > 1 && (
-                      <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                        v{version}
-                      </Text>
-                    )}
+                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                      v{version}
+                    </Text>
                     <Text style={[styles.changelogText, { color: colors.text }]}>
                       {stripMarkdown(notes)}
                     </Text>
                   </View>
                 ))}
+                {updateResult.releasesUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(updateResult.releasesUrl)}
+                    style={styles.moreReleasesLink}
+                  >
+                    <Text style={[styles.moreReleasesLinkText, { color: colors.primary }]}>
+                      {t('more_releases') || 'More on GitHub'}
+                    </Text>
+                    <Ionicons name="open-outline" size={14} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
               </ScrollView>
             </>
           ) : (
@@ -129,11 +140,19 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                   .replace('{currentVersion}', updateResult.currentVersion)}
               </Text>
               <TouchableRipple
-                onPress={() => onUpdate(updateResult.downloadUrl)}
+                onPress={() => {
+                  if (updateResult.alreadyDownloaded) {
+                    onInstallApk(updateResult.localUri);
+                  } else {
+                    onUpdate(updateResult.downloadUrl, updateResult.checksumUrl);
+                  }
+                }}
                 style={[styles.updateButtonCompact, { backgroundColor: colors.primary }]}
               >
                 <Text style={styles.updateButtonText}>
-                  {t('update_now') || 'Update now'}
+                  {updateResult.alreadyDownloaded
+                    ? (t('update_install_now') || 'Install now')
+                    : (t('update_now') || 'Update now')}
                 </Text>
               </TouchableRipple>
             </View>
@@ -143,42 +162,115 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
 
       {updateResult.type === 'up_to_date' && (
         <View style={styles.upToDateContent}>
-          <View style={styles.upToDateHeader}>
-            <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.centeredIcon} />
-            <Text style={[styles.updateVersionText, { color: colors.text }]}>
-              {t('up_to_date') || 'You already have the latest version installed.'}
-            </Text>
-          </View>
-          {downloadedApks.length > 0 && (
-            <View style={styles.downloadedApksSection}>
-              <Divider />
-              <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
-                {t('downloaded_apks') || 'Downloaded'}
+          {updateResult.recentReleaseNotes ? (
+            <>
+              <View style={styles.upToDateHeaderRow}>
+                <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
+                <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
+                  {t('up_to_date') || 'You already have the latest version installed.'}
+                </Text>
+              </View>
+              <Divider style={styles.updateDivider} />
+              <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
+                {t('release_history') || 'Release history'}
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.apkListContent}
-              >
-                {downloadedApks.map((item) => (
-                  <TouchableOpacity
-                    key={item.uri}
-                    onPress={() => onInstallApk(item.uri)}
-                    style={styles.apkChip}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Install version ${item.version || item.filename}`}
-                  >
-                    <Ionicons name="archive-outline" size={28} color={colors.primary} />
-                    <Text style={[styles.apkChipVersion, { color: colors.text }]}>
-                      {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
+                {updateResult.recentReleaseNotes.map(({ version, notes }) => (
+                  <View key={version} style={styles.changelogSection}>
+                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                      v{version}
                     </Text>
-                    <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
-                      {formatApkDate(item.modificationTime)}
+                    <Text style={[styles.changelogText, { color: colors.text }]}>
+                      {stripMarkdown(notes)}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
                 ))}
+                {updateResult.releasesUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(updateResult.releasesUrl)}
+                    style={styles.moreReleasesLink}
+                  >
+                    <Text style={[styles.moreReleasesLinkText, { color: colors.primary }]}>
+                      {t('more_releases') || 'More on GitHub'}
+                    </Text>
+                    <Ionicons name="open-outline" size={14} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
               </ScrollView>
-            </View>
+              {downloadedApks.length > 0 && (
+                <View style={styles.downloadedApksSection}>
+                  <Divider />
+                  <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
+                    {t('downloaded_apks') || 'Downloaded'}
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.apkListContent}
+                  >
+                    {downloadedApks.map((item) => (
+                      <TouchableOpacity
+                        key={item.uri}
+                        onPress={() => onInstallApk(item.uri)}
+                        style={styles.apkChip}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Install version ${item.version || item.filename}`}
+                      >
+                        <Ionicons name="archive-outline" size={28} color={colors.primary} />
+                        <Text style={[styles.apkChipVersion, { color: colors.text }]}>
+                          {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+                        </Text>
+                        <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
+                          {formatApkDate(item.modificationTime)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={styles.upToDateHeaderSpacer}>
+                <View style={styles.upToDateHeader}>
+                  <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.centeredIcon} />
+                  <Text style={[styles.updateVersionText, { color: colors.text }]}>
+                    {t('up_to_date') || 'You already have the latest version installed.'}
+                  </Text>
+                </View>
+              </View>
+              {downloadedApks.length > 0 && (
+                <View style={styles.downloadedApksSection}>
+                  <Divider />
+                  <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
+                    {t('downloaded_apks') || 'Downloaded'}
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.apkListContent}
+                  >
+                    {downloadedApks.map((item) => (
+                      <TouchableOpacity
+                        key={item.uri}
+                        onPress={() => onInstallApk(item.uri)}
+                        style={styles.apkChip}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Install version ${item.version || item.filename}`}
+                      >
+                        <Ionicons name="archive-outline" size={28} color={colors.primary} />
+                        <Text style={[styles.apkChipVersion, { color: colors.text }]}>
+                          {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
+                        </Text>
+                        <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
+                          {formatApkDate(item.modificationTime)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </>
           )}
         </View>
       )}
@@ -204,10 +296,18 @@ UpdateContentPanel.propTypes = {
     latestVersion: PropTypes.string,
     currentVersion: PropTypes.string,
     downloadUrl: PropTypes.string,
+    checksumUrl: PropTypes.string,
     releaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
       notes: PropTypes.string,
     })),
+    recentReleaseNotes: PropTypes.arrayOf(PropTypes.shape({
+      version: PropTypes.string,
+      notes: PropTypes.string,
+    })),
+    releasesUrl: PropTypes.string,
+    alreadyDownloaded: PropTypes.bool,
+    localUri: PropTypes.string,
     errorCode: PropTypes.string,
   }),
   downloadedApks: PropTypes.array,
@@ -320,6 +420,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING * 2,
     paddingVertical: SPACING.xl,
   },
+  moreReleasesLink: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+  },
+  moreReleasesLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   resultContainer: {
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
@@ -371,7 +481,22 @@ const styles = StyleSheet.create({
   },
   upToDateHeader: {
     alignItems: 'center',
-    paddingBottom: SPACING.lg,
     paddingHorizontal: HORIZONTAL_PADDING * 2,
+  },
+  upToDateHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  upToDateHeaderSpacer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  upToDateHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
