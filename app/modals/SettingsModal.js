@@ -22,6 +22,7 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
+import UpdateContentPanel from '../components/UpdateContentPanel';
 
 const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
@@ -46,21 +47,6 @@ const LOG_LEVEL_COLORS = {
 
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
-const formatApkDate = (modificationTime) => {
-  if (!modificationTime) return '';
-  return new Date(modificationTime * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
-
-const stripMarkdown = (md) => md
-  .replace(/\r\n/g, '\n')
-  .replace(/#{1,6}\s+/g, '')
-  .replace(/\*\*(.+?)\*\*/g, '$1')
-  .replace(/\*(.+?)\*/g, '$1')
-  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-  .replace(/`([^`]+)`/g, '$1')
-  .replace(/^\s*[-*+]\s+/gm, '• ')
-  .replace(/\n{3,}/g, '\n\n')
-  .trim();
 
 export default function SettingsModal({ visible, onClose }) {
   const { colors } = useThemeColors();
@@ -72,7 +58,6 @@ export default function SettingsModal({ visible, onClose }) {
   const { startDownload } = useUpdateDownload();
   const [activeSubPanel, setActiveSubPanel] = useState(null); // 'language' | 'export' | 'logs' | 'backups' | null
   const [logFilter, setLogFilter] = useState('all');
-  const [expandedLogIds, setExpandedLogIds] = useState(new Set());
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [pendingDeleteUri, setPendingDeleteUri] = useState(null);
@@ -89,6 +74,7 @@ export default function SettingsModal({ visible, onClose }) {
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
   const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
+  const [expandedLogIds, setExpandedLogIds] = useState(new Set());
 
   // Computed colors
   const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
@@ -98,7 +84,6 @@ export default function SettingsModal({ visible, onClose }) {
   const subPanelAnim = useRef(new Animated.Value(0)).current;
   const importPickInProgress = useRef(false);
   const toggleAnim = useRef(new Animated.Value(hideBalances ? 1 : 0)).current;
-  const updateContentAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(toggleAnim, {
       toValue: hideBalances ? 1 : 0,
@@ -107,17 +92,6 @@ export default function SettingsModal({ visible, onClose }) {
       bounciness: 4,
     }).start();
   }, [hideBalances, toggleAnim]);
-
-  useEffect(() => {
-    if (!isCheckingUpdate && updateResult) {
-      Animated.timing(updateContentAnim, {
-        toValue: 1,
-        duration: 280,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isCheckingUpdate, updateResult, updateContentAnim]);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
 
@@ -536,7 +510,7 @@ export default function SettingsModal({ visible, onClose }) {
 
   const loadDownloadedApks = useCallback(async () => {
     const apks = await listDownloadedApks();
-    setDownloadedApks(apks.slice().reverse());
+    setDownloadedApks(apks);
   }, []);
 
   const handleInstallApk = useCallback(async (uri) => {
@@ -553,7 +527,6 @@ export default function SettingsModal({ visible, onClose }) {
   }, [showDialog, t]);
 
   const handleCheckForUpdates = useCallback(async () => {
-    updateContentAnim.setValue(0);
     setUpdateResult(null);
     setIsCheckingUpdate(true);
     openSubPanel('update');
@@ -591,7 +564,25 @@ export default function SettingsModal({ visible, onClose }) {
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [openSubPanel, updateContentAnim, loadDownloadedApks]);
+  }, [openSubPanel, loadDownloadedApks]);
+
+  const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl) => {
+    if (updateResult) {
+      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+    }
+    closeSubPanel();
+    onClose();
+    startDownload(downloadUrl, {
+      checksumUrl: checksumUrl || null,
+      onError: () => {
+        showDialog(
+          t('error') || 'Error',
+          t('update_download_failed') || 'Could not download the update. Please try again.',
+          [{ text: t('ok') || 'OK' }],
+        );
+      },
+    });
+  }, [updateResult, closeSubPanel, onClose, startDownload, showDialog, t]);
 
   useEffect(() => {
     if (visible) {
@@ -663,49 +654,24 @@ export default function SettingsModal({ visible, onClose }) {
         return dateLabel;
       }
     }
-    if (filename.startsWith('pre_restore_')) {
-      // filename: pre_restore_YYYY-MM-DDTHH-MM-SS.json
-      const inner = filename.replace('pre_restore_', '').replace('.json', '');
-      // inner looks like: 2024-01-15T14-30-00
-      const datePart = inner.split('T')[0];
-      const timePart = inner.split('T')[1];
-      if (datePart) {
-        const [year, month, day] = datePart.split('-').map(Number);
-        const dateLabel = new Date(year, month - 1, day).toLocaleDateString(undefined, {
-          month: 'short', day: 'numeric', year: 'numeric',
-        });
-        if (timePart) {
-          const parts = timePart.split('-');
-          const hh = parts[0] || '00';
-          const mm = parts[1] || '00';
-          return `${dateLabel} · ${hh}:${mm}`;
-        }
-        return dateLabel;
-      }
-    }
     return filename;
   }, [t]);
 
   const renderBackupItem = useCallback(({ item }) => {
     const isDaily = item.filename.startsWith('daily_');
     const isManual = item.filename.startsWith('manual_');
-    const isPreRestore = item.filename.startsWith('pre_restore_');
     const label = formatBackupLabel(item.filename);
-    const typeLabel = isPreRestore
-      ? (t('pre_restore_snapshot') || 'Pre-restore snapshot')
-      : isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
+    const typeLabel = isDaily ? 'Daily' : isManual ? 'Manual' : (t('weekly') || 'Weekly');
     const sizeKB = item.size ? `${(item.size / 1024).toFixed(1)} KB` : '';
     const isPending = pendingDeleteUri === item.uri;
     return (
       <View style={[styles.backupItem, { borderBottomColor: colors.border }]}>
         <View style={styles.backupItemLeft}>
-          <Ionicons name={isPreRestore ? 'shield-checkmark-outline' : isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : isPreRestore ? colors.primary : colors.text} />
+          <Ionicons name={isDaily ? 'calendar-outline' : isManual ? 'save-outline' : 'calendar-number-outline'} size={22} color={isPending ? colors.mutedText : colors.text} />
           <View style={styles.backupItemText}>
-            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : isPreRestore ? colors.primary : colors.text }]}>
-              {isPreRestore ? `${typeLabel} — ${label}` : label}
-            </Text>
+            <Text style={[styles.backupItemLabel, { color: isPending ? colors.mutedText : colors.text }]}>{label}</Text>
             <Text style={[styles.backupItemMeta, { color: colors.mutedText }]}>
-              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : isPreRestore ? sizeKB : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
+              {isPending ? (t('delete_backup_confirm') || 'Delete this backup?') : `${typeLabel}${sizeKB ? ` · ${sizeKB}` : ''}`}
             </Text>
           </View>
         </View>
@@ -1361,250 +1327,13 @@ export default function SettingsModal({ visible, onClose }) {
 
               {activeSubPanel === 'update' && (
                 <View style={styles.updatePanelWrapper}>
-                  {isCheckingUpdate ? (
-                    <View style={styles.updateCheckingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary} />
-                      <Text style={[styles.updateCheckingText, { color: colors.text }]}>
-                        {t('checking_for_updates') || 'Checking for available updates…'}
-                      </Text>
-                    </View>
-                  ) : updateResult && (
-                    <Animated.View style={[styles.updateResultContainer, { opacity: updateContentAnim }]}>
-                      {updateResult.type === 'available' && (
-                        <>
-                          {(updateResult.recentReleaseNotes || updateResult.releaseNotes) ? (
-                            <>
-                              <Divider style={styles.updateDivider} />
-                              <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
-                                {t('whats_new') || "What's new"}
-                              </Text>
-                              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
-                                {(updateResult.recentReleaseNotes || updateResult.releaseNotes).map(({ version, notes }) => (
-                                  <View key={version} style={styles.changelogSection}>
-                                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                                      v{version}
-                                    </Text>
-                                    <Text style={[styles.changelogText, { color: colors.text }]}>
-                                      {stripMarkdown(notes)}
-                                    </Text>
-                                  </View>
-                                ))}
-                                {updateResult.releasesUrl && (
-                                  <TouchableOpacity
-                                    onPress={() => Linking.openURL(updateResult.releasesUrl)}
-                                    style={styles.moreReleasesLink}
-                                  >
-                                    <Text style={[styles.moreReleasesLinkText, { color: colors.primary }]}>
-                                      {t('more_releases') || 'More on GitHub'}
-                                    </Text>
-                                    <Ionicons name="open-outline" size={14} color={colors.primary} />
-                                  </TouchableOpacity>
-                                )}
-                              </ScrollView>
-                            </>
-                          ) : (
-                            <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
-                              {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-                            </Text>
-                          )}
-                          <Divider style={styles.updateDivider} />
-                          <View style={styles.updateBottomRow}>
-                            {downloadedApks.length > 0 && (
-                              <View style={styles.downloadedApksCompact}>
-                                <Text style={[styles.downloadedApksTitleCompact, { color: colors.mutedText }]}>
-                                  {t('downloaded_apks') || 'Downloaded APKs'}
-                                </Text>
-                                <FlatList
-                                  horizontal
-                                  data={downloadedApks}
-                                  keyExtractor={(item) => item.uri}
-                                  renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                      onPress={() => handleInstallApk(item.uri)}
-                                      style={styles.apkChipCompact}
-                                      accessibilityRole="button"
-                                      accessibilityLabel={`Install version ${item.version || item.filename}`}
-                                    >
-                                      <Ionicons name="archive-outline" size={22} color={colors.primary} />
-                                      <Text style={[styles.apkChipVersion, { color: colors.text }]}>
-                                        {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
-                                      </Text>
-                                      <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
-                                        {formatApkDate(item.modificationTime)}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
-                                  showsHorizontalScrollIndicator={false}
-                                  contentContainerStyle={styles.apkListContent}
-                                />
-                              </View>
-                            )}
-                            <View style={styles.updateActionColumn}>
-                              <Text style={[styles.updateButtonVersion, { color: colors.text }]}>
-                                v{updateResult.latestVersion}
-                              </Text>
-                              <Text style={[styles.updateButtonCurrentVersion, { color: colors.mutedText }]}>
-                                {(t('update_from_version') || 'installed: v{currentVersion}')
-                                  .replace('{currentVersion}', updateResult.currentVersion)}
-                              </Text>
-                              <TouchableRipple
-                                onPress={async () => {
-                                  await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
-                                  if (updateResult.alreadyDownloaded) {
-                                    await handleInstallApk(updateResult.localUri);
-                                  } else {
-                                    closeSubPanel();
-                                    onClose();
-                                    startDownload(updateResult.downloadUrl, {
-                                      checksumUrl: updateResult.checksumUrl || null,
-                                      onError: () => {
-                                        showDialog(
-                                          t('error') || 'Error',
-                                          t('update_download_failed') || 'Could not download the update. Please try again.',
-                                          [{ text: t('ok') || 'OK' }],
-                                        );
-                                      },
-                                    });
-                                  }
-                                }}
-                                style={[styles.updateButtonCompact, { backgroundColor: colors.primary }]}
-                              >
-                                <Text style={styles.importConfirmButtonText}>
-                                  {updateResult.alreadyDownloaded
-                                    ? (t('update_install_now') || 'Install now')
-                                    : (t('update_now') || 'Update now')}
-                                </Text>
-                              </TouchableRipple>
-                            </View>
-                          </View>
-                        </>
-                      )}
-                      {updateResult.type === 'up_to_date' && (
-                        <View style={styles.upToDateContent}>
-                          {updateResult.recentReleaseNotes ? (
-                            <>
-                              <View style={styles.upToDateHeaderRow}>
-                                <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
-                                <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
-                                  {t('up_to_date') || 'You already have the latest version installed.'}
-                                </Text>
-                              </View>
-                              <Divider style={styles.updateDivider} />
-                              <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
-                                {t('release_history') || 'Release history'}
-                              </Text>
-                              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
-                                {updateResult.recentReleaseNotes.map(({ version, notes }) => (
-                                  <View key={version} style={styles.changelogSection}>
-                                    <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                                      v{version}
-                                    </Text>
-                                    <Text style={[styles.changelogText, { color: colors.text }]}>
-                                      {stripMarkdown(notes)}
-                                    </Text>
-                                  </View>
-                                ))}
-                                {updateResult.releasesUrl && (
-                                  <TouchableOpacity
-                                    onPress={() => Linking.openURL(updateResult.releasesUrl)}
-                                    style={styles.moreReleasesLink}
-                                  >
-                                    <Text style={[styles.moreReleasesLinkText, { color: colors.primary }]}>
-                                      {t('more_releases') || 'More on GitHub'}
-                                    </Text>
-                                    <Ionicons name="open-outline" size={14} color={colors.primary} />
-                                  </TouchableOpacity>
-                                )}
-                              </ScrollView>
-                              {downloadedApks.length > 0 && (
-                                <View style={styles.downloadedApksSection}>
-                                  <Divider />
-                                  <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
-                                    {t('downloaded_apks') || 'Downloaded'}
-                                  </Text>
-                                  <FlatList
-                                    horizontal
-                                    data={downloadedApks}
-                                    keyExtractor={(item) => item.uri}
-                                    renderItem={({ item }) => (
-                                      <TouchableOpacity
-                                        onPress={() => handleInstallApk(item.uri)}
-                                        style={styles.apkChip}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Install version ${item.version || item.filename}`}
-                                      >
-                                        <Ionicons name="archive-outline" size={28} color={colors.primary} />
-                                        <Text style={[styles.apkChipVersion, { color: colors.text }]}>
-                                          {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
-                                        </Text>
-                                        <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
-                                          {formatApkDate(item.modificationTime)}
-                                        </Text>
-                                      </TouchableOpacity>
-                                    )}
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.apkListContent}
-                                  />
-                                </View>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <View style={styles.upToDateHeaderSpacer}>
-                                <View style={styles.upToDateHeader}>
-                                  <Ionicons name="checkmark-circle-outline" size={48} color="#4caf50" style={styles.importWarningIcon} />
-                                  <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                                    {t('up_to_date') || 'You already have the latest version installed.'}
-                                  </Text>
-                                </View>
-                              </View>
-                              {downloadedApks.length > 0 && (
-                                <View style={styles.downloadedApksSection}>
-                                  <Divider />
-                                  <Text style={[styles.downloadedApksTitle, { color: colors.mutedText }]}>
-                                    {t('downloaded_apks') || 'Downloaded'}
-                                  </Text>
-                                  <FlatList
-                                    horizontal
-                                    data={downloadedApks}
-                                    keyExtractor={(item) => item.uri}
-                                    renderItem={({ item }) => (
-                                      <TouchableOpacity
-                                        onPress={() => handleInstallApk(item.uri)}
-                                        style={styles.apkChip}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Install version ${item.version || item.filename}`}
-                                      >
-                                        <Ionicons name="archive-outline" size={28} color={colors.primary} />
-                                        <Text style={[styles.apkChipVersion, { color: colors.text }]}>
-                                          {item.version ? `v${item.version}` : item.filename.replace(/\.apk$/i, '')}
-                                        </Text>
-                                        <Text style={[styles.apkChipDate, { color: colors.mutedText }]}>
-                                          {formatApkDate(item.modificationTime)}
-                                        </Text>
-                                      </TouchableOpacity>
-                                    )}
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.apkListContent}
-                                  />
-                                </View>
-                              )}
-                            </>
-                          )}
-                        </View>
-                      )}
-                      {updateResult.type === 'error' && (
-                        <View style={styles.importConfirmContent}>
-                          <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.importWarningIcon} />
-                          <Text style={[styles.updateVersionText, { color: colors.text }]}>
-                            {updateResult.errorCode === 'releases_without_apks'
-                              ? (t('update_releases_without_apks') || 'Found releases but no APKs attached. Check GitHub for the latest release.')
-                              : (t('update_check_failed') || 'Could not check updates right now. Please try again later.')}
-                          </Text>
-                        </View>
-                      )}
-                    </Animated.View>
-                  )}
+                  <UpdateContentPanel
+                    isChecking={isCheckingUpdate}
+                    updateResult={updateResult}
+                    downloadedApks={downloadedApks}
+                    onUpdate={handleUpdateFromSettings}
+                    onInstallApk={handleInstallApk}
+                  />
                 </View>
               )}
 
@@ -1623,32 +1352,6 @@ const centeredModal = {
 };
 
 const styles = StyleSheet.create({
-  apkChip: {
-    alignItems: 'center',
-    gap: SPACING.xs,
-    minWidth: 72,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  apkChipCompact: {
-    alignItems: 'center',
-    gap: SPACING.xs,
-    minWidth: 44,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
-  },
-  apkChipDate: {
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  apkChipVersion: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  apkListContent: {
-    paddingHorizontal: SPACING.sm,
-  },
   backButton: {
     alignItems: 'center',
     height: 40,
@@ -1700,31 +1403,6 @@ const styles = StyleSheet.create({
   backupItemText: {
     flex: 1,
   },
-  changelogScroll: {
-    flex: 1,
-    marginTop: SPACING.xs,
-  },
-  changelogSection: {
-    marginBottom: SPACING.md,
-  },
-  changelogText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  changelogTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    marginTop: SPACING.md,
-    textTransform: 'uppercase',
-  },
-  changelogVersion: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-  },
   clearLogsText: {
     color: '#e53935',
   },
@@ -1743,29 +1421,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: SPACING.xs,
-  },
-  downloadedApksCompact: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  downloadedApksSection: {
-    paddingBottom: SPACING.md,
-  },
-  downloadedApksTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    paddingBottom: SPACING.sm,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: SPACING.md,
-    textTransform: 'uppercase',
-  },
-  downloadedApksTitleCompact: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    paddingBottom: SPACING.sm,
-    textTransform: 'uppercase',
   },
   filterChip: {
     borderRadius: 16,
@@ -1913,16 +1568,6 @@ const styles = StyleSheet.create({
     ...centeredModal,
     overflow: 'hidden',
   },
-  moreReleasesLink: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-  },
-  moreReleasesLinkText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   resetSpacer: {
     height: SPACING.sm,
   },
@@ -2029,88 +1674,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  upToDateContent: {
-    flex: 1,
-  },
-  upToDateHeader: {
-    alignItems: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-  },
-  upToDateHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-  },
-  upToDateHeaderSpacer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  upToDateHeaderText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  updateActionColumn: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  updateBottomRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingTop: SPACING.sm,
-  },
-  updateButtonCompact: {
-    alignSelf: 'stretch',
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  updateButtonCurrentVersion: {
-    fontSize: 11,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  updateButtonVersion: {
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  updateCheckingContainer: {
-    alignItems: 'center',
-    flex: 1,
-    gap: SPACING.lg,
-    justifyContent: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING * 2,
-  },
-  updateCheckingText: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  updateDivider: {
-    marginTop: SPACING.sm,
-  },
   updatePanelWrapper: {
     flex: 1,
-  },
-  updateResultContainer: {
-    flex: 1,
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.lg,
   },
   updateRowRight: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 4,
-  },
-  updateVersionText: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
   },
   versionLabel: {
     fontSize: 13,
