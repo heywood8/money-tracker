@@ -469,9 +469,27 @@ describe('OperationsDB Service', () => {
         destinationCurrency: 'EUR',
       };
 
+      // The DB row for the updated operation uses snake_case fields.
+      // Spread updates (camelCase) over the old row and remap to snake_case.
+      const updatedDbRow = {
+        ...oldOperation,
+        type: updates.type,
+        amount: updates.amount,
+        account_id: updates.accountId,
+        category_id: updates.categoryId,
+        date: updates.date,
+        description: updates.description,
+        exchange_rate: updates.exchangeRate,
+        destination_amount: updates.destinationAmount,
+        source_currency: updates.sourceCurrency,
+        destination_currency: updates.destinationCurrency,
+      };
+
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(oldOperation)
-        .mockResolvedValueOnce({ ...oldOperation, ...updates });
+        .mockResolvedValueOnce(oldOperation)    // get old operation
+        .mockResolvedValueOnce(updatedDbRow)    // get updated operation (snake_case)
+        .mockResolvedValueOnce(null)            // acc1 balance (old-only account, skipped gracefully)
+        .mockResolvedValueOnce({ balance: '500' }); // acc2 balance (new operation account)
 
       await OperationsDB.updateOperation(1, updates);
 
@@ -483,6 +501,104 @@ describe('OperationsDB Service', () => {
       expect(updateCall[1]).toContain('200');
       expect(updateCall[1]).toContain('acc2');
       expect(updateCall[1]).toContain('cat2');
+    });
+
+    describe('Regression Tests', () => {
+      it('throws and rolls back when the new operation account is deleted mid-transaction (#745)', async () => {
+        // Reproduces the bug: an account is deleted between the time an operation
+        // is created and when it is edited. The update should abort entirely
+        // rather than saving the operation row while skipping balance changes.
+        const oldOperation = {
+          id: 1,
+          type: 'expense',
+          amount: '100',
+          account_id: 'acc1',
+          category_id: 'cat1',
+          date: '2025-12-05',
+        };
+
+        const updatedOperation = {
+          ...oldOperation,
+          amount: '200',
+        };
+
+        mockDb.getFirstAsync
+          .mockResolvedValueOnce(oldOperation)     // get old operation
+          .mockResolvedValueOnce(updatedOperation) // get updated operation
+          .mockResolvedValueOnce(null);            // account lookup returns null — deleted mid-tx
+
+        await expect(
+          OperationsDB.updateOperation(1, { amount: '200' }),
+        ).rejects.toThrow(/Account acc1 not found.*Rolling back/);
+      });
+
+      it('throws and rolls back when the transfer destination account is deleted mid-transaction (#745)', async () => {
+        // Scenario: user edits the amount of a transfer. The destination account
+        // (acc2) was deleted between when the operation was created and now.
+        // The update should abort so the operation record and balance stay consistent.
+        const oldOperation = {
+          id: 2,
+          type: 'transfer',
+          amount: '500',
+          account_id: 'acc1',
+          to_account_id: 'acc2',
+          date: '2025-12-05',
+        };
+
+        const updatedOperation = {
+          ...oldOperation,
+          amount: '600', // amount changed — net delta on acc2 will be non-zero
+        };
+
+        mockDb.getFirstAsync
+          .mockResolvedValueOnce(oldOperation)        // get old operation
+          .mockResolvedValueOnce(updatedOperation)    // get updated operation
+          // calculateBalanceChanges for old transfer (no destination_amount → currency query)
+          .mockResolvedValueOnce({ currency: 'USD' }) // old op: acc1 currency
+          .mockResolvedValueOnce({ currency: 'USD' }) // old op: acc2 currency (same → no conversion)
+          // calculateBalanceChanges for new transfer
+          .mockResolvedValueOnce({ currency: 'USD' }) // new op: acc1 currency
+          .mockResolvedValueOnce({ currency: 'USD' }) // new op: acc2 currency
+          // balance lookups: acc1 has net delta -100 (source sends more), acc2 has +100
+          .mockResolvedValueOnce({ balance: '2000' }) // acc1 balance lookup → exists
+          .mockResolvedValueOnce(null);               // acc2 balance lookup → deleted, throws
+
+        await expect(
+          OperationsDB.updateOperation(2, { amount: '600' }),
+        ).rejects.toThrow(/Account acc2 not found.*Rolling back/);
+      });
+
+      it('allows update when only the old (now-deleted) account is missing (#745)', async () => {
+        // Old operation was on acc1 (now deleted). New operation moves to acc2 (exists).
+        // The reversal for acc1 should be skipped gracefully; acc2 update proceeds.
+        const oldOperation = {
+          id: 3,
+          type: 'expense',
+          amount: '100',
+          account_id: 'acc1',
+          category_id: 'cat1',
+          date: '2025-12-05',
+        };
+
+        const updatedOperation = {
+          ...oldOperation,
+          account_id: 'acc2', // moved to a different account
+        };
+
+        mockDb.getFirstAsync
+          .mockResolvedValueOnce(oldOperation)      // get old operation
+          .mockResolvedValueOnce(updatedOperation)  // get updated operation
+          .mockResolvedValueOnce(null)              // acc1 balance lookup → deleted, skip
+          .mockResolvedValueOnce({ balance: '500' }); // acc2 balance lookup → exists
+
+        // Should not throw — old account missing is tolerated, new account exists
+        await expect(
+          OperationsDB.updateOperation(3, { accountId: 'acc2' }),
+        ).resolves.not.toThrow();
+
+        // acc2 balance should be updated
+        expect(Currency.add).toHaveBeenCalledWith('500', expect.any(String));
+      });
     });
   });
 
@@ -1772,8 +1888,16 @@ describe('OperationsDB Service', () => {
       };
 
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(oldOperation)
-        .mockResolvedValueOnce(updatedOperation);
+        .mockResolvedValueOnce(oldOperation)             // get old operation
+        .mockResolvedValueOnce(updatedOperation)         // get updated operation
+        // calculateBalanceChanges currency queries (same-currency path for both old and new)
+        .mockResolvedValueOnce({ currency: null })       // old op: acc1 currency
+        .mockResolvedValueOnce({ currency: null })       // old op: acc2 currency
+        .mockResolvedValueOnce({ currency: null })       // new op: acc1 currency
+        .mockResolvedValueOnce({ currency: null })       // new op: acc3 currency
+        // balance lookups (acc1 net delta=0 skipped; acc2 old-only; acc3 new-required)
+        .mockResolvedValueOnce({ balance: '500' })       // acc2 balance (old-only account)
+        .mockResolvedValueOnce({ balance: '300' });      // acc3 balance (new operation account)
 
       await OperationsDB.updateOperation(1, { toAccountId: { id: 'acc3' } });
 
