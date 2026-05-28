@@ -822,8 +822,7 @@ export const splitOperation = async (id, updates, newOperationData) => {
         );
 
         if (!account) {
-          console.warn(`Account ${accountId} not found, skipping balance update`);
-          continue;
+          throw new Error(`Account ${accountId} not found`);
         }
 
         const newBalance = Currency.add(account.balance, delta);
@@ -884,8 +883,7 @@ export const deleteOperation = async (id) => {
         );
 
         if (!account) {
-          console.warn(`Account ${accountId} not found, skipping balance update`);
-          continue;
+          throw new Error(`Account ${accountId} not found`);
         }
 
         // Use Currency utilities for precise arithmetic

@@ -1909,7 +1909,11 @@ describe('OperationsDB Service', () => {
   });
 
   describe('Delete Operation - Additional Cases', () => {
-    it('skips balance update when account not found during delete', async () => {
+    it('throws and rolls back when account not found during balance reversal (#746)', async () => {
+      // Regression test: deleteOperation must not commit the DELETE when the
+      // subsequent balance-update step fails due to a missing account. The whole
+      // transaction must be atomic — a missing account should abort via throw,
+      // not silently skip.
       const operation = {
         id: 1,
         type: 'expense',
@@ -1920,18 +1924,89 @@ describe('OperationsDB Service', () => {
 
       mockDb.getFirstAsync
         .mockResolvedValueOnce(operation)  // Get operation
-        .mockResolvedValueOnce(null);      // Account not found
+        .mockResolvedValueOnce(null);      // Account not found during balance update
 
-      await OperationsDB.deleteOperation(1);
-
-      // Should still delete the operation
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        'DELETE FROM operations WHERE id = ?',
-        [1],
+      await expect(OperationsDB.deleteOperation(1)).rejects.toThrow(
+        'Account acc1 not found',
       );
+    });
+  });
 
-      // Should only have delete call, no balance update
-      expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+  describe('Update Operation - Atomicity Guard (#746)', () => {
+    it('throws and rolls back when account not found during balance update', async () => {
+      // Regression test: updateOperation must not commit the UPDATE when the
+      // balance-update step fails due to a missing account. Both must be atomic.
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+      };
+
+      const updatedOperation = {
+        ...oldOperation,
+        amount: '200',
+      };
+
+      // For expense type, calculateBalanceChanges makes no getFirstAsync calls.
+      // Sequence: fetch old op, fetch updated op, then account balance lookup (missing → throw).
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)     // Fetch old operation
+        .mockResolvedValueOnce(updatedOperation) // Fetch updated operation after UPDATE
+        .mockResolvedValueOnce(null);            // Account balance lookup → missing → throw
+
+      await expect(OperationsDB.updateOperation(1, { amount: '200' })).rejects.toThrow(
+        'Account acc1 not found',
+      );
+    });
+  });
+
+  describe('Split Operation - Atomicity Guard (#746)', () => {
+    it('throws and rolls back when account not found during balance update', async () => {
+      // Regression test: splitOperation must not commit either the UPDATE or the
+      // INSERT when the balance-update step fails due to a missing account.
+      //
+      // Amounts are chosen so the net delta is non-zero (old=100 reversed=+100,
+      // updated=-60, new=-80 → net=-40) so the balance loop body is reached and
+      // the missing-account throw fires.
+      const oldOperation = {
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+      };
+
+      const updatedOperation = {
+        ...oldOperation,
+        amount: '60',
+      };
+
+      // For expense type, calculateBalanceChanges makes no getFirstAsync calls.
+      // Sequence: fetch old op, fetch updated op, then account balance lookup (missing → throw).
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce(oldOperation)     // Fetch old operation (step 1)
+        .mockResolvedValueOnce(updatedOperation) // Fetch updated operation after UPDATE (step 2)
+        .mockResolvedValueOnce(null);            // Account balance lookup → missing → throw
+
+      mockDb.runAsync
+        .mockResolvedValueOnce(undefined)                // UPDATE original operation
+        .mockResolvedValueOnce({ lastInsertRowId: 42 }); // INSERT new split operation
+
+      const newOperationData = {
+        type: 'expense',
+        amount: '80',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+      };
+
+      await expect(
+        OperationsDB.splitOperation(1, { amount: '60' }, newOperationData),
+      ).rejects.toThrow('Account acc1 not found');
     });
   });
 
