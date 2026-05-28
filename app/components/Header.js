@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
@@ -19,17 +19,28 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { isDownloading, downloadProgress } = useUpdateDownload();
+  const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters, filtersExpanded } = useSearch();
   console.debug('[Header] openSearch exists:', !!openSearch);
   console.debug('[Header] searchMode:', searchMode);
   const downloadArrowAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!isDownloading) {
       downloadArrowAnim.setValue(0);
+      rotateAnim.setValue(0);
       return;
     }
+    if (downloadPhase === 'verifying') {
+      downloadArrowAnim.setValue(0);
+      const loop = Animated.loop(
+        Animated.timing(rotateAnim, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+    rotateAnim.setValue(0);
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(downloadArrowAnim, { toValue: 5, duration: 400, useNativeDriver: true }),
@@ -38,7 +49,7 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
     );
     loop.start();
     return () => loop.stop();
-  }, [isDownloading, downloadArrowAnim]);
+  }, [isDownloading, downloadPhase, downloadArrowAnim, rotateAnim]);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
   const { setSearchText, updateSearchFilters } = useOperationsActions();
@@ -103,15 +114,34 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
               {isDownloading && (
                 <View
                   style={styles.downloadIndicator}
-                  accessibilityLabel={`${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`}
+                  accessibilityLabel={
+                    downloadPhase === 'verifying'
+                      ? (t('verifying_update') || 'Checking…')
+                      : `${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`
+                  }
                   accessibilityRole="progressbar"
                   testID="download-indicator"
                 >
-                  <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
-                    <Ionicons name="arrow-down-outline" size={20} color={colors.primary} />
-                  </Animated.View>
+                  {downloadPhase === 'verifying' ? (
+                    <Animated.View style={{
+                      transform: [{
+                        rotate: rotateAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      }],
+                    }}>
+                      <Ionicons name="sync-outline" size={20} color={colors.primary} />
+                    </Animated.View>
+                  ) : (
+                    <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
+                      <Ionicons name="arrow-down-outline" size={20} color={colors.primary} />
+                    </Animated.View>
+                  )}
                   <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-                    {`${Math.round((downloadProgress ?? 0) * 100)}%`}
+                    {downloadPhase === 'verifying'
+                      ? (t('verifying_update') || 'Checking…')
+                      : `${Math.round((downloadProgress ?? 0) * 100)}%`}
                   </Text>
                 </View>
               )}

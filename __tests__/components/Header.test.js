@@ -54,10 +54,12 @@ jest.mock('../../app/styles/layout', () => ({
 // Mock UpdateDownloadContext
 let mockIsDownloading = false;
 let mockDownloadProgress = null;
+let mockDownloadPhase = null;
 jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   useUpdateDownload: () => ({
     isDownloading: mockIsDownloading,
     downloadProgress: mockDownloadProgress,
+    downloadPhase: mockDownloadPhase,
     startDownload: jest.fn(),
   }),
 }));
@@ -77,6 +79,7 @@ describe('Header', () => {
     jest.clearAllMocks();
     mockIsDownloading = false;
     mockDownloadProgress = null;
+    mockDownloadPhase = null;
   });
 
   describe('Rendering', () => {
@@ -159,6 +162,28 @@ describe('Header', () => {
       mockDownloadProgress = 0.75;
       const { getByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
       expect(getByText('75%')).toBeTruthy();
+    });
+
+    it('shows sync-outline icon and "verifying_update" text when phase is verifying', () => {
+      mockIsDownloading = true;
+      mockDownloadProgress = 0;
+      mockDownloadPhase = 'verifying';
+      const { getByTestId, getByText, queryByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+
+      expect(getByTestId('icon-sync-outline')).toBeTruthy();
+      expect(getByText('verifying_update')).toBeTruthy();
+      expect(queryByText('%')).toBeNull();
+    });
+
+    it('shows arrow-down-outline icon and percentage when phase is downloading', () => {
+      mockIsDownloading = true;
+      mockDownloadProgress = 0.6;
+      mockDownloadPhase = 'downloading';
+      const { getByTestId, getByText, queryByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+
+      expect(getByTestId('icon-arrow-down-outline')).toBeTruthy();
+      expect(getByText('60%')).toBeTruthy();
+      expect(queryByTestId('icon-sync-outline')).toBeNull();
     });
   });
 
