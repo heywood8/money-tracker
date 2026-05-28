@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.7](https://github.com/heywood8/money-tracker/compare/penny-v0.123.6...penny-v0.123.7) (2026-05-28)
+
+
+### Bug Fixes
+
+* **ui:** extract update panel into shared component, fix empty modal on startup ([#824](https://github.com/heywood8/money-tracker/issues/824)) ([c3652e1](https://github.com/heywood8/money-tracker/commit/c3652e1bc0b8993afaaf3065e445f1f8863af072))
+
 ## [0.123.6](https://github.com/heywood8/money-tracker/compare/penny-v0.123.5...penny-v0.123.6) (2026-05-28)
 
 
