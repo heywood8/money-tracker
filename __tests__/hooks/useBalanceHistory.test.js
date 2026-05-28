@@ -412,6 +412,39 @@ describe('useBalanceHistory', () => {
     });
   });
 
+  describe('Regression Tests', () => {
+    it('regression #757: previous-month boundary for January uses December of prior year, not current year', async () => {
+      // When selectedMonth is 0 (January), the bug caused prevMonthStart to point to
+      // December of the *same* year (future) instead of December of the prior year.
+      // We verify this by asserting the date strings passed to getBalanceHistory.
+      const janYear = 2024;
+      const janMonth = 0; // January
+
+      BalanceHistoryDB.getBalanceHistory
+        .mockResolvedValueOnce([]) // current month (Jan 2024)
+        .mockResolvedValueOnce([]); // previous month (should be Dec 2023)
+
+      const { result } = renderHook(() => useBalanceHistory(mockAccountId, janYear, janMonth));
+
+      await act(async () => {
+        await result.current.loadBalanceHistory();
+      });
+
+      await waitFor(() => {
+        expect(result.current.loadingBalanceHistory).toBe(false);
+      });
+
+      // getBalanceHistory is called twice: once for Jan 2024, once for the prev month.
+      // The second call must use Dec 2023 boundaries, not Dec 2024.
+      const prevMonthCall = BalanceHistoryDB.getBalanceHistory.mock.calls[1];
+      const prevStartDate = prevMonthCall[1]; // '2023-12-01'
+      const prevEndDate = prevMonthCall[2];   // '2023-12-31'
+
+      expect(prevStartDate).toBe('2023-12-01');
+      expect(prevEndDate).toBe('2023-12-31');
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle empty history data', async () => {
       BalanceHistoryDB.getBalanceHistory
