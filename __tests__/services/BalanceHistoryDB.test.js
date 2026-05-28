@@ -94,6 +94,20 @@ describe('BalanceHistoryDB', () => {
       expect(consoleSpy).toHaveBeenCalledWith('Failed to get balance history:', expect.any(Error));
       consoleSpy.mockRestore();
     });
+
+    describe('Regression Tests', () => {
+      it('wraps date comparisons in SQLite date() to handle non-ISO date formats (#773)', async () => {
+        // Raw lexicographic comparison (date >= ?) is wrong for non-ISO formats like DD/MM/YYYY.
+        // SQLite date() normalises inputs before comparing, making the query format-agnostic.
+        queryAll.mockResolvedValue([]);
+
+        await BalanceHistoryDB.getBalanceHistory(1, '2024-01-01', '2024-01-31');
+
+        const sql = queryAll.mock.calls[0][0];
+        expect(sql).toMatch(/date\(date\)\s*>=\s*date\(\?\)/);
+        expect(sql).toMatch(/date\(date\)\s*<=\s*date\(\?\)/);
+      });
+    });
   });
 
   describe('getAllAccountsBalanceOnDate', () => {
