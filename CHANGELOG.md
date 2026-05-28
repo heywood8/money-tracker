@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.9](https://github.com/heywood8/money-tracker/compare/penny-v0.123.8...penny-v0.123.9) (2026-05-28)
+
+
+### Bug Fixes
+
+* guard against corrupted balance when account deleted mid-transaction ([#745](https://github.com/heywood8/money-tracker/issues/745)) ([#822](https://github.com/heywood8/money-tracker/issues/822)) ([7373efd](https://github.com/heywood8/money-tracker/commit/7373efd8812053e6fcbf045cba42ce237ab5ff99))
+
 ## [0.123.8](https://github.com/heywood8/money-tracker/compare/penny-v0.123.7...penny-v0.123.8) (2026-05-28)
 
 
