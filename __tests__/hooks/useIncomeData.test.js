@@ -441,6 +441,31 @@ describe('useIncomeData', () => {
       });
     });
 
+    it('should sum totalIncome without floating-point accumulation errors (#765)', async () => {
+      // 0.1 + 0.2 in native JS = 0.30000000000000004; Decimal.js gives 0.3
+      const mockIncome = [
+        { category_id: 'cat-2', total: '0.10' },
+        { category_id: 'cat-3', total: '0.20' },
+      ];
+
+      OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
+
+      const { result } = renderHook(() =>
+        useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadIncomeData();
+      });
+
+      await waitFor(() => {
+        expect(result.current.loadingIncome).toBe(false);
+      });
+
+      // Must be exactly 0.3, not 0.30000000000000004
+      expect(result.current.totalIncome).toBe(0.3);
+    });
+
     it('should query all accounts for the currency without an account ID filter', async () => {
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue([]);
 

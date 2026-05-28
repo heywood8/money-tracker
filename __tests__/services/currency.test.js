@@ -551,6 +551,21 @@ describe('Currency Service', () => {
 
   // Critical regression tests for financial accuracy
   describe('Regression Tests - Financial Accuracy', () => {
+    it('summing 0.1 + 0.2 produces 0.30 not 0.30000000000000004 (#765)', () => {
+      // Native JS: 0.1 + 0.2 === 0.30000000000000004
+      // Decimal.js via Currency.add must return '0.30'
+      const result = Currency.add('0.1', '0.2');
+      expect(result).toBe('0.30');
+      expect(parseFloat(result)).toBe(0.3);
+    });
+
+    it('accumulating many small amounts via Currency.add stays exact (#765)', () => {
+      // Simulate the totalExpenses/totalIncome reduce pattern
+      const amounts = ['0.10', '0.20', '0.30', '0.40'];
+      const total = parseFloat(amounts.reduce((sum, amount) => Currency.add(sum, amount), '0'));
+      expect(total).toBe(1.0);
+    });
+
     it('handles repeated additions without accumulating errors', () => {
       let sum = '0';
       for (let i = 0; i < 100; i++) {

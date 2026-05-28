@@ -432,6 +432,31 @@ describe('useExpenseData', () => {
       });
     });
 
+    it('should sum totalExpenses without floating-point accumulation errors (#765)', async () => {
+      // 0.1 + 0.2 in native JS = 0.30000000000000004; Decimal.js gives 0.3
+      const mockSpending = [
+        { category_id: 'cat-2', total: '0.10' },
+        { category_id: 'cat-3', total: '0.20' },
+      ];
+
+      OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
+
+      const { result } = renderHook(() =>
+        useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
+      );
+
+      await act(async () => {
+        await result.current.loadExpenseData();
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Must be exactly 0.3, not 0.30000000000000004
+      expect(result.current.totalExpenses).toBe(0.3);
+    });
+
     it('should query all accounts for the currency without an account ID filter', async () => {
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue([]);
 
