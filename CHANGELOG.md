@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.6](https://github.com/heywood8/money-tracker/compare/penny-v0.123.5...penny-v0.123.6) (2026-05-28)
+
+
+### Performance Improvements
+
+* refactor OperationsList from nested FlatList+map to SectionList for proper virtualization ([#808](https://github.com/heywood8/money-tracker/issues/808)) ([d6de8aa](https://github.com/heywood8/money-tracker/commit/d6de8aa3265e27a817bdacf23d90fd34a18dff40))
+
 ## [0.123.5](https://github.com/heywood8/money-tracker/compare/penny-v0.123.4...penny-v0.123.5) (2026-05-28)
 
 
