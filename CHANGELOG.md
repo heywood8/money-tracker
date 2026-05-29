@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.124.0](https://github.com/heywood8/money-tracker/compare/penny-v0.123.12...penny-v0.124.0) (2026-05-29)
+
+
+### Features
+
+* **settings:** move Settings from modal to 6th tab screen ([#833](https://github.com/heywood8/money-tracker/issues/833)) ([aa21cbb](https://github.com/heywood8/money-tracker/commit/aa21cbbed35dd1482eb46003397df7118c2890af))
+
 ## [0.123.12](https://github.com/heywood8/money-tracker/compare/penny-v0.123.11...penny-v0.123.12) (2026-05-29)
 
 
