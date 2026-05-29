@@ -258,12 +258,13 @@ describe('SettingsScreen', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders settings title', () => {
-      const { getByText } = render(
+    it('renders the settings rows', () => {
+      const { getByTestId } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      expect(getByText('settings')).toBeTruthy();
+      expect(getByTestId('settings-language-row')).toBeTruthy();
+      expect(getByTestId('settings-export-row')).toBeTruthy();
     });
 
     it('renders language row', () => {
@@ -313,6 +314,35 @@ describe('SettingsScreen', () => {
       );
 
       expect(getAllByText(/English/).length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('setSubPanelActive signalling', () => {
+    it('calls setSubPanelActive(false) on initial mount (no subpanel open)', () => {
+      render(<SettingsScreen setSubPanelActive={mockSetSubPanelActive} />);
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(false);
+    });
+
+    it('calls setSubPanelActive(true) when a subpanel opens', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      mockSetSubPanelActive.mockClear();
+
+      fireEvent.press(getByTestId('settings-language-row'));
+
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+
+    it('calls setSubPanelActive(true) when export subpanel opens', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      mockSetSubPanelActive.mockClear();
+
+      fireEvent.press(getByTestId('settings-export-row'));
+
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
   });
 

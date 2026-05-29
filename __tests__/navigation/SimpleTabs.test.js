@@ -276,7 +276,7 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders all five tab labels', () => {
+  it('renders all six tab labels', () => {
     const { getByText } = render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
@@ -284,9 +284,10 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByText('Accounts')).toBeTruthy();
     expect(getByText('Categories')).toBeTruthy();
     expect(getByText('Planned')).toBeTruthy();
+    expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all five screens', () => {
+  it('renders all six screens', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
@@ -294,6 +295,7 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('accounts-screen')).toBeTruthy();
     expect(getByTestId('categories-screen')).toBeTruthy();
     expect(getByTestId('planned-screen')).toBeTruthy();
+    expect(getByTestId('settings-screen')).toBeTruthy();
   });
 
   it('switches active tab when tab is pressed', async () => {
