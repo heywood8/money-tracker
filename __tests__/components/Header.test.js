@@ -73,8 +73,6 @@ jest.mock('../../app/contexts/SearchContext', () => ({
 }));
 
 describe('Header', () => {
-  const mockOnOpenSettings = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsDownloading = false;
@@ -84,49 +82,25 @@ describe('Header', () => {
 
   describe('Rendering', () => {
     it('renders without crashing', () => {
-      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-      expect(getByTestId('settings-button')).toBeTruthy();
+      const { toJSON } = render(<Header />);
+      expect(toJSON()).toBeTruthy();
     });
 
     it('does not render version text in header', () => {
-      const { queryByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { queryByText } = render(<Header />);
       expect(queryByText(/v\d+\.\d+/)).toBeNull();
       expect(queryByText(/DB v/)).toBeNull();
     });
 
-    it('renders settings icon', () => {
-      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-      expect(getByTestId('icon-settings-outline')).toBeTruthy();
-    });
-
     it('renders theme toggle icon (sunny for light mode)', () => {
-      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByTestId } = render(<Header />);
       expect(getByTestId('icon-sunny')).toBeTruthy();
-    });
-  });
-
-  describe('Settings button', () => {
-    it('calls onOpenSettings when pressed', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-
-      const settingsButton = getByLabelText('settings');
-      fireEvent.press(settingsButton);
-
-      expect(mockOnOpenSettings).toHaveBeenCalledTimes(1);
-    });
-
-    it('has correct accessibility properties', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
-
-      const settingsButton = getByLabelText('settings');
-      expect(settingsButton.props.accessibilityRole).toBe('button');
-      expect(settingsButton.props.accessibilityHint).toBe('Opens settings menu');
     });
   });
 
   describe('Theme toggle', () => {
     it('calls setTheme with dark when in light mode', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByLabelText } = render(<Header />);
 
       const themeButton = getByLabelText('Switch to dark theme');
       fireEvent.press(themeButton);
@@ -135,7 +109,7 @@ describe('Header', () => {
     });
 
     it('has correct accessibility properties for light mode', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByLabelText } = render(<Header />);
 
       const themeButton = getByLabelText('Switch to dark theme');
       expect(themeButton.props.accessibilityRole).toBe('button');
@@ -146,21 +120,21 @@ describe('Header', () => {
   describe('Download indicator', () => {
     it('does not show download indicator when not downloading', () => {
       mockIsDownloading = false;
-      const { queryByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { queryByTestId } = render(<Header />);
       expect(queryByTestId('download-indicator')).toBeNull();
     });
 
     it('shows download indicator when downloading', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0.42;
-      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByTestId } = render(<Header />);
       expect(getByTestId('download-indicator')).toBeTruthy();
     });
 
     it('shows correct percentage when downloading', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0.75;
-      const { getByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByText } = render(<Header />);
       expect(getByText('75%')).toBeTruthy();
     });
 
@@ -168,7 +142,7 @@ describe('Header', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0;
       mockDownloadPhase = 'verifying';
-      const { getByTestId, getByText, queryByText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByTestId, getByText, queryByText } = render(<Header />);
 
       expect(getByTestId('icon-sync-outline')).toBeTruthy();
       expect(getByText('verifying_update')).toBeTruthy();
@@ -179,23 +153,11 @@ describe('Header', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0.6;
       mockDownloadPhase = 'downloading';
-      const { getByTestId, getByText, queryByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByTestId, getByText, queryByTestId } = render(<Header />);
 
       expect(getByTestId('icon-arrow-down-outline')).toBeTruthy();
       expect(getByText('60%')).toBeTruthy();
       expect(queryByTestId('icon-sync-outline')).toBeNull();
-    });
-  });
-
-  describe('Default props', () => {
-    it('uses default onOpenSettings when not provided', () => {
-      // Should not throw
-      const { getByLabelText } = render(<Header />);
-
-      const settingsButton = getByLabelText('settings');
-      fireEvent.press(settingsButton);
-
-      // Default is a no-op function, so nothing should happen
     });
   });
 
@@ -209,18 +171,18 @@ describe('Header', () => {
     });
 
     it('shows moon icon in dark mode', () => {
-      const { getByTestId } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByTestId } = render(<Header />);
       expect(getByTestId('icon-moon')).toBeTruthy();
     });
 
     it('has correct accessibility label for dark mode', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByLabelText } = render(<Header />);
       const themeButton = getByLabelText('Switch to light theme');
       expect(themeButton).toBeTruthy();
     });
 
     it('calls setTheme with light when in dark mode', () => {
-      const { getByLabelText } = render(<Header onOpenSettings={mockOnOpenSettings} />);
+      const { getByLabelText } = render(<Header />);
 
       const themeButton = getByLabelText('Switch to light theme');
       fireEvent.press(themeButton);

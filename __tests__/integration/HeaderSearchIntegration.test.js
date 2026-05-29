@@ -313,27 +313,23 @@ describe('Header Search Integration', () => {
   });
 
   describe('Integration with Other Header Buttons', () => {
-    it('shows search button alongside theme toggle and settings buttons', () => {
+    it('shows search button alongside theme toggle button', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(getByTestId('search-button')).toBeTruthy();
       expect(getByTestId('theme-toggle-button')).toBeTruthy();
-      expect(getByTestId('settings-button')).toBeTruthy();
     });
 
-    it('all buttons remain functional when search button is present', () => {
-      const mockOpenSettings = jest.fn();
+    it('search button remains functional alongside theme toggle', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={mockOpenSettings} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
 
       fireEvent.press(getByTestId('search-button'));
       fireEvent.press(getByTestId('theme-toggle-button'));
-      fireEvent.press(getByTestId('settings-button'));
 
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
-      expect(mockOpenSettings).toHaveBeenCalledTimes(1);
     });
   });
 

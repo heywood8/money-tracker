@@ -88,43 +88,25 @@ jest.mock('../../app/screens/PlannedOperationsScreen', () => {
 // Mock Header component
 jest.mock('../../app/components/Header', () => {
   const React = require('react');
-  const { View, Pressable, Text } = require('react-native');
-  const PropTypes = require('prop-types');
+  const { View } = require('react-native');
 
-  function Header({ onOpenSettings }) {
-    return React.createElement(View, { testID: 'header' },
-      React.createElement(Pressable, { testID: 'settings-button', onPress: onOpenSettings },
-        React.createElement(Text, {}, 'Settings')));
+  function Header() {
+    return React.createElement(View, { testID: 'mock-header' });
   }
-
-  Header.propTypes = {
-    onOpenSettings: PropTypes.func,
-  };
 
   return Header;
 });
 
-// Mock SettingsModal component
-jest.mock('../../app/modals/SettingsModal', () => {
+// Mock SettingsScreen component
+jest.mock('../../app/screens/SettingsScreen', () => {
   const React = require('react');
-  const { View, Text, Pressable, Modal } = require('react-native');
+  const { View } = require('react-native');
   const PropTypes = require('prop-types');
-
-  function SettingsModal({ visible, onClose }) {
-    if (!visible) return null;
-    return React.createElement(Modal, { visible, testID: 'settings-modal' },
-      React.createElement(View, {},
-        React.createElement(Text, {}, 'Settings Modal'),
-        React.createElement(Pressable, { testID: 'close-settings', onPress: onClose },
-          React.createElement(Text, {}, 'Close'))));
+  function SettingsScreen({ setSubPanelActive }) {
+    return React.createElement(View, { testID: 'settings-screen' });
   }
-
-  SettingsModal.propTypes = {
-    visible: PropTypes.bool,
-    onClose: PropTypes.func,
-  };
-
-  return SettingsModal;
+  SettingsScreen.propTypes = { setSubPanelActive: PropTypes.func };
+  return SettingsScreen;
 });
 
 // Mock react-native-safe-area-context
@@ -219,18 +201,27 @@ jest.mock('react-native-gesture-handler', () => {
   function GestureDetector({ children }) { return children; }
   GestureDetector.propTypes = { children: PropTypes.node };
 
+  const gestureObj = {
+    enabled: jest.fn(),
+    activeOffsetX: jest.fn(),
+    activeOffsetY: jest.fn(),
+    failOffsetX: jest.fn(),
+    failOffsetY: jest.fn(),
+    onStart: jest.fn(),
+    onUpdate: jest.fn(),
+    onEnd: jest.fn(),
+    onFinalize: jest.fn(),
+    minDistance: jest.fn(),
+    minPointers: jest.fn(),
+    maxPointers: jest.fn(),
+    shouldCancelWhenOutside: jest.fn(),
+  };
+  Object.keys(gestureObj).forEach((key) => {
+    gestureObj[key].mockReturnValue(gestureObj);
+  });
+
   const Gesture = {
-    Pan: () => ({
-      activeOffsetX: () => ({
-        failOffsetY: () => ({
-          onStart: () => ({
-            onUpdate: () => ({
-              onEnd: () => ({}),
-            }),
-          }),
-        }),
-      }),
-    }),
+    Pan: jest.fn(() => gestureObj),
   };
 
   function GestureHandlerRootView({ children }) {
@@ -282,7 +273,7 @@ describe('SimpleTabs Component Rendering', () => {
 
   it('renders without crashing', () => {
     const { getByTestId } = render(<SimpleTabs />);
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
   });
 
   it('renders all five tab labels', () => {
@@ -318,43 +309,16 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('opens settings modal when settings button is pressed', async () => {
-    const { getByTestId, queryByTestId } = render(<SimpleTabs />);
-
-    // Settings modal should not be visible initially
-    expect(queryByTestId('settings-modal')).toBeFalsy();
-
-    // Press the settings button
-    const settingsButton = getByTestId('settings-button');
-    fireEvent.press(settingsButton);
-
-    // Settings modal should now be visible
-    await waitFor(() => {
-      expect(getByTestId('settings-modal')).toBeTruthy();
-    });
-  });
-
-  it('closes settings modal when close is pressed', async () => {
-    const { getByTestId, queryByTestId } = render(<SimpleTabs />);
-
-    // Open settings
-    fireEvent.press(getByTestId('settings-button'));
-
-    await waitFor(() => {
-      expect(getByTestId('settings-modal')).toBeTruthy();
-    });
-
-    // Close settings
-    fireEvent.press(getByTestId('close-settings'));
-
-    await waitFor(() => {
-      expect(queryByTestId('settings-modal')).toBeFalsy();
-    });
-  });
-
   it('renders header component', () => {
     const { getByTestId } = render(<SimpleTabs />);
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
+  });
+
+  it('renders a Settings tab button', () => {
+    const { getAllByRole } = render(<SimpleTabs />);
+    const tabs = getAllByRole('button');
+    // 6 tabs total: Operations, Graphs, Accounts, Categories, Planned, Settings
+    expect(tabs.length).toBeGreaterThanOrEqual(6);
   });
 
   it('renders all tabs with correct accessibility labels', () => {
@@ -392,7 +356,7 @@ describe('SimpleTabs Component Rendering', () => {
 
     // Find the tabs row and trigger onLayout
     // The layout is handled internally but we verify component renders
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
   });
 
   it('maintains state when switching between tabs rapidly', async () => {
@@ -407,7 +371,7 @@ describe('SimpleTabs Component Rendering', () => {
     }
 
     // Component should still be stable
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
     expect(getByTestId('operations-screen')).toBeTruthy();
   });
 
@@ -438,24 +402,6 @@ describe('SimpleTabs Component Rendering', () => {
     await waitFor(() => {
       expect(getByText('Categories')).toBeTruthy();
     });
-  });
-
-  it('handles multiple settings modal open/close cycles', async () => {
-    const { getByTestId, queryByTestId } = render(<SimpleTabs />);
-
-    for (let i = 0; i < 3; i++) {
-      // Open settings
-      fireEvent.press(getByTestId('settings-button'));
-      await waitFor(() => {
-        expect(getByTestId('settings-modal')).toBeTruthy();
-      });
-
-      // Close settings
-      fireEvent.press(getByTestId('close-settings'));
-      await waitFor(() => {
-        expect(queryByTestId('settings-modal')).toBeFalsy();
-      });
-    }
   });
 
   it('renders all screen content areas', () => {
@@ -566,7 +512,7 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     // Verify component renders
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
 
     // Test navigateToTab logic directly - left swipe from Operations should go to Graphs
     // The actual navigateToTab is line 121-136
@@ -594,7 +540,7 @@ describe('SimpleTabs Pan Gesture Integration', () => {
 
   it('should handle navigateToTab direction logic for right swipe', () => {
     const { getByTestId } = render(<SimpleTabs />);
-    expect(getByTestId('header')).toBeTruthy();
+    expect(getByTestId('mock-header')).toBeTruthy();
 
     const TABS = [
       { key: 'Operations', label: 'Operations' },
@@ -960,12 +906,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(initialActive).toBe('Operations');
     });
 
-    it('should have settings modal initially hidden', () => {
-      // Based on SimpleTabs.js line 49: const [settingsVisible, setSettingsVisible] = React.useState(false);
-      const initialSettingsVisible = false;
-      expect(initialSettingsVisible).toBe(false);
-    });
-
     it('should support all tab keys', () => {
       const validTabKeys = ['Operations', 'Accounts', 'Categories', 'Graphs'];
       
@@ -1037,66 +977,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       
       setActiveTab('Operations');
       expect(activeTab).toBe('Operations');
-    });
-  });
-
-  describe('Settings Modal Logic', () => {
-    it('should toggle settings modal visibility', () => {
-      let settingsVisible = false;
-      
-      // Simulates handleOpenSettings and handleCloseSettings (lines 61-67)
-      const openSettings = () => { settingsVisible = true; };
-      const closeSettings = () => { settingsVisible = false; };
-      
-      expect(settingsVisible).toBe(false);
-      
-      openSettings();
-      expect(settingsVisible).toBe(true);
-      
-      closeSettings();
-      expect(settingsVisible).toBe(false);
-    });
-
-    it('should handle multiple settings modal toggles', () => {
-      let settingsVisible = false;
-      const toggleSettings = () => { settingsVisible = !settingsVisible; };
-      
-      toggleSettings();
-      expect(settingsVisible).toBe(true);
-      
-      toggleSettings();
-      expect(settingsVisible).toBe(false);
-      
-      toggleSettings();
-      expect(settingsVisible).toBe(true);
-      
-      toggleSettings();
-      expect(settingsVisible).toBe(false);
-    });
-
-    it('should maintain independent state from active tab', () => {
-      let activeTab = 'Operations';
-      let settingsVisible = false;
-      
-      // Change tab
-      activeTab = 'Accounts';
-      expect(activeTab).toBe('Accounts');
-      expect(settingsVisible).toBe(false);
-      
-      // Open settings
-      settingsVisible = true;
-      expect(activeTab).toBe('Accounts');
-      expect(settingsVisible).toBe(true);
-      
-      // Change tab while settings open
-      activeTab = 'Categories';
-      expect(activeTab).toBe('Categories');
-      expect(settingsVisible).toBe(true);
-      
-      // Close settings
-      settingsVisible = false;
-      expect(activeTab).toBe('Categories');
-      expect(settingsVisible).toBe(false);
     });
   });
 
@@ -1297,23 +1177,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(handleTabPress).toHaveBeenCalledTimes(2);
     });
 
-    it('should execute handleOpenSettings callback', () => {
-      const handleOpenSettings = jest.fn();
-      
-      handleOpenSettings();
-      expect(handleOpenSettings).toHaveBeenCalledTimes(1);
-      
-      handleOpenSettings();
-      expect(handleOpenSettings).toHaveBeenCalledTimes(2);
-    });
-
-    it('should execute handleCloseSettings callback', () => {
-      const handleCloseSettings = jest.fn();
-      
-      handleCloseSettings();
-      expect(handleCloseSettings).toHaveBeenCalledTimes(1);
-    });
-
     it('should use memoized callbacks', () => {
       // useCallback ensures callback reference stability
       const callback = jest.fn();
@@ -1465,19 +1328,11 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
     });
 
     it('should pass props correctly to child components', () => {
-      const headerProps = {
-        onOpenSettings: jest.fn(),
+      const settingsScreenProps = {
+        setSubPanelActive: jest.fn(),
       };
-      
-      expect(typeof headerProps.onOpenSettings).toBe('function');
-      
-      const modalProps = {
-        visible: false,
-        onClose: jest.fn(),
-      };
-      
-      expect(typeof modalProps.visible).toBe('boolean');
-      expect(typeof modalProps.onClose).toBe('function');
+
+      expect(typeof settingsScreenProps.setSubPanelActive).toBe('function');
     });
 
     it('should pass correct props to TabButton', () => {

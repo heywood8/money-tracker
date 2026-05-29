@@ -38,20 +38,18 @@ jest.mock('../../app/services/db', () => ({
 
 describe('Header - rightContent prop', () => {
   it('renders default buttons when rightContent not provided', () => {
-    const { getByTestId } = render(<Header onOpenSettings={jest.fn()} />);
+    const { getByTestId } = render(<Header />);
 
     expect(getByTestId('theme-toggle-button')).toBeTruthy();
-    expect(getByTestId('settings-button')).toBeTruthy();
   });
 
   it('renders rightContent instead of default buttons when provided', () => {
     const customContent = <Text testID="custom-content">Custom</Text>;
     const { getByTestId, queryByTestId } = render(
-      <Header onOpenSettings={jest.fn()} rightContent={customContent} />,
+      <Header rightContent={customContent} />,
     );
 
     expect(getByTestId('custom-content')).toBeTruthy();
     expect(queryByTestId('theme-toggle-button')).toBeNull();
-    expect(queryByTestId('settings-button')).toBeNull();
   });
 });
