@@ -1,11 +1,10 @@
 /**
- * Tests for SettingsModal Component
- * Regression test to ensure modal can be dismissed by tapping outside
+ * Tests for SettingsScreen Component
  */
 
 import React from 'react';
 import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
-import SettingsModal from '../../app/modals/SettingsModal';
+import SettingsScreen from '../../app/screens/SettingsScreen';
 
 // Create mock functions we can spy on
 const mockSetLanguage = jest.fn();
@@ -16,6 +15,7 @@ const mockCancelImport = jest.fn();
 const mockCompleteImport = jest.fn();
 const mockSetHideBalances = jest.fn();
 const mockAuthenticateWithBiometrics = jest.fn();
+const mockSetSubPanelActive = jest.fn();
 
 // Mutable state so individual tests can control hideBalances
 const displaySettingsMockState = { hideBalances: false };
@@ -155,9 +155,87 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
 
-describe('SettingsModal Component', () => {
-  const mockOnClose = jest.fn();
+// Mock react-native-gesture-handler
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const PropTypes = require('prop-types');
 
+  function GestureDetector({ children }) {
+    return React.createElement(View, {}, children);
+  }
+  GestureDetector.propTypes = { children: PropTypes.node };
+
+  const gestureObj = {
+    onStart: jest.fn(),
+    onUpdate: jest.fn(),
+    onEnd: jest.fn(),
+    onFinalize: jest.fn(),
+    enabled: jest.fn(),
+    activeOffsetX: jest.fn(),
+    activeOffsetY: jest.fn(),
+    failOffsetX: jest.fn(),
+    failOffsetY: jest.fn(),
+    minDistance: jest.fn(),
+    minPointers: jest.fn(),
+    maxPointers: jest.fn(),
+    shouldCancelWhenOutside: jest.fn(),
+  };
+  Object.keys(gestureObj).forEach((key) => {
+    gestureObj[key].mockReturnValue(gestureObj);
+  });
+
+  const Gesture = {
+    Pan: jest.fn(() => gestureObj),
+  };
+
+  return {
+    GestureDetector,
+    Gesture,
+    GestureHandlerRootView: View,
+  };
+});
+
+// Mock react-native-reanimated
+jest.mock('react-native-reanimated', () => ({
+  runOnJS: jest.fn((fn) => fn),
+}));
+
+// Mock AppUpdateService
+jest.mock('../../app/services/AppUpdateService', () => ({
+  checkForAppUpdate: jest.fn(() => Promise.resolve(null)),
+  listDownloadedApks: jest.fn(() => Promise.resolve([])),
+  installApk: jest.fn(() => Promise.resolve()),
+  checkAlreadyDownloaded: jest.fn(() => Promise.resolve(null)),
+}));
+
+// Mock PreferencesDB
+jest.mock('../../app/services/PreferencesDB', () => ({
+  getPreference: jest.fn(() => Promise.resolve(null)),
+  setPreference: jest.fn(() => Promise.resolve()),
+  PREF_KEYS: {
+    GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
+  },
+}));
+
+// Mock GoogleSheetsService
+jest.mock('../../app/services/GoogleSheetsService', () => ({
+  getValidAccessToken: jest.fn(() => Promise.resolve(null)),
+  signIn: jest.fn(() => Promise.resolve(null)),
+  exportToSheets: jest.fn(() => Promise.resolve()),
+  importFromSheets: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock UpdateContentPanel
+jest.mock('../../app/components/UpdateContentPanel', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return function UpdateContentPanel() {
+    return React.createElement(View, { testID: 'update-content-panel' });
+  };
+});
+
+describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSetLanguage.mockClear();
@@ -175,21 +253,23 @@ describe('SettingsModal Component', () => {
     mockGetPreRestoreSnapshots.mockClear();
     mockSetHideBalances.mockClear();
     mockAuthenticateWithBiometrics.mockClear();
+    mockSetSubPanelActive.mockClear();
     displaySettingsMockState.hideBalances = false;
   });
 
   describe('Basic Rendering', () => {
-    it('renders settings title', () => {
-      const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+    it('renders the settings rows', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      expect(getByText('settings')).toBeTruthy();
+      expect(getByTestId('settings-language-row')).toBeTruthy();
+      expect(getByTestId('settings-export-row')).toBeTruthy();
     });
 
     it('renders language row', () => {
       const { getAllByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       // "language" appears as row label and in language submodal header
@@ -198,7 +278,7 @@ describe('SettingsModal Component', () => {
 
     it('renders database section label', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('database')).toBeTruthy();
@@ -206,7 +286,7 @@ describe('SettingsModal Component', () => {
 
     it('renders export row', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('export')).toBeTruthy();
@@ -214,7 +294,7 @@ describe('SettingsModal Component', () => {
 
     it('renders import row', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('import')).toBeTruthy();
@@ -222,7 +302,7 @@ describe('SettingsModal Component', () => {
 
     it('renders reset database row', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('reset_database')).toBeTruthy();
@@ -230,17 +310,46 @@ describe('SettingsModal Component', () => {
 
     it('renders English language value', () => {
       const { getAllByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getAllByText(/English/).length).toBeGreaterThanOrEqual(1);
     });
   });
 
+  describe('setSubPanelActive signalling', () => {
+    it('calls setSubPanelActive(false) on initial mount (no subpanel open)', () => {
+      render(<SettingsScreen setSubPanelActive={mockSetSubPanelActive} />);
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(false);
+    });
+
+    it('calls setSubPanelActive(true) when a subpanel opens', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      mockSetSubPanelActive.mockClear();
+
+      fireEvent.press(getByTestId('settings-language-row'));
+
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+
+    it('calls setSubPanelActive(true) when export subpanel opens', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      mockSetSubPanelActive.mockClear();
+
+      fireEvent.press(getByTestId('settings-export-row'));
+
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+  });
+
   describe('Language Selection', () => {
     it('displays current language with flag in the row', () => {
       const { getAllByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getAllByText(/English/).length).toBeGreaterThanOrEqual(1);
@@ -248,7 +357,7 @@ describe('SettingsModal Component', () => {
 
     it('opens language modal when language row is pressed', () => {
       const { UNSAFE_getAllByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       const TouchableRipple = require('react-native-paper').TouchableRipple;
@@ -262,7 +371,7 @@ describe('SettingsModal Component', () => {
 
     it('applies language immediately on selection', () => {
       const { UNSAFE_getAllByType, getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       const TouchableRipple = require('react-native-paper').TouchableRipple;
@@ -282,26 +391,10 @@ describe('SettingsModal Component', () => {
     });
   });
 
-  describe('Close Button', () => {
-    it('calls onClose when close button is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const TouchableOpacity = require('react-native').TouchableOpacity;
-      const touchables = UNSAFE_getAllByType(TouchableOpacity);
-
-      // First TouchableOpacity is the close button in the header
-      fireEvent.press(touchables[0]);
-
-      expect(mockOnClose).toHaveBeenCalled();
-    });
-  });
-
   describe('Database Operations', () => {
     it('shows reset confirmation subpanel when reset row is pressed', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('reset_database'));
@@ -312,7 +405,7 @@ describe('SettingsModal Component', () => {
 
     it('shows import source picker when import row is pressed', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('import'));
@@ -323,7 +416,7 @@ describe('SettingsModal Component', () => {
 
     it('performs import when confirm button is pressed after selecting from file', async () => {
       const { getByText, getByTestId } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('import'));
@@ -341,13 +434,12 @@ describe('SettingsModal Component', () => {
       await waitFor(() => {
         expect(mockImportBackupFromFile).toHaveBeenCalledWith({ fileUri: '/mock/file.json', filename: 'backup.json' });
         expect(mockStartImport).toHaveBeenCalled();
-        expect(mockOnClose).toHaveBeenCalled();
       });
     });
 
     it('performs reset when subpanel confirm button is pressed', async () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('reset_database'));
@@ -357,14 +449,13 @@ describe('SettingsModal Component', () => {
       });
 
       expect(mockResetDatabase).toHaveBeenCalled();
-      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 
   describe('Export Functionality', () => {
     it('opens export format modal when export row is pressed', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       act(() => {
@@ -374,7 +465,7 @@ describe('SettingsModal Component', () => {
 
     it('shows export format options when export is pressed', async () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       act(() => {
@@ -388,7 +479,7 @@ describe('SettingsModal Component', () => {
 
     it('renders export format descriptions', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       act(() => {
@@ -404,7 +495,7 @@ describe('SettingsModal Component', () => {
   describe('Developer Section', () => {
     it('renders developer section label', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('developer')).toBeTruthy();
@@ -412,7 +503,7 @@ describe('SettingsModal Component', () => {
 
     it('renders logs row', () => {
       const { getByTestId } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByTestId('logs-row')).toBeTruthy();
@@ -420,7 +511,7 @@ describe('SettingsModal Component', () => {
 
     it('renders logs label text', () => {
       const { getAllByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       // "logs" appears in the settings row and in the logs sub-modal header
@@ -428,87 +519,10 @@ describe('SettingsModal Component', () => {
     });
   });
 
-  describe('Modal Dismissal - Regression Tests', () => {
-    it('modal can be dismissed by tapping outside', () => {
-      const { UNSAFE_getByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const Modal = require('react-native-paper').Modal;
-      const modalInstance = UNSAFE_getByType(Modal);
-
-      expect(modalInstance.props.dismissable).toBe(true);
-      expect(modalInstance.props.onDismiss).toBeDefined();
-      expect(typeof modalInstance.props.onDismiss).toBe('function');
-
-      modalInstance.props.onDismiss();
-
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('modal does not have contentContainerStyle that blocks backdrop tap events', () => {
-      const { UNSAFE_getByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const Modal = require('react-native-paper').Modal;
-      const modalInstance = UNSAFE_getByType(Modal);
-
-      const containerStyle = modalInstance.props.contentContainerStyle;
-
-      if (containerStyle) {
-        expect(containerStyle).not.toEqual(
-          expect.objectContaining({ flex: 1 }),
-        );
-        expect(containerStyle).not.toEqual(
-          expect.objectContaining({ backgroundColor: 'transparent' }),
-        );
-      } else {
-        expect(containerStyle).toBeUndefined();
-      }
-    });
-
-    it('onDismiss calls onClose when no sub-modal is open', () => {
-      const { UNSAFE_getByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const Modal = require('react-native-paper').Modal;
-      const modalInstance = UNSAFE_getByType(Modal);
-
-      modalInstance.props.onDismiss();
-
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not render when visible is false', () => {
-      const { UNSAFE_queryByType } = render(
-        <SettingsModal visible={false} onClose={mockOnClose} />,
-      );
-
-      const Modal = require('react-native-paper').Modal;
-      const modalInstance = UNSAFE_queryByType(Modal);
-
-      expect(modalInstance).toBeTruthy();
-    });
-
-    it('renders when visible is true', () => {
-      const { UNSAFE_getByType } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
-      );
-
-      const Modal = require('react-native-paper').Modal;
-      const modalInstance = UNSAFE_getByType(Modal);
-
-      expect(modalInstance).toBeTruthy();
-      expect(modalInstance.props.visible).toBe(true);
-    });
-  });
-
   describe('Import Flow', () => {
     it('shows three source options in the source picker', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('import'));
@@ -519,7 +533,7 @@ describe('SettingsModal Component', () => {
 
     it('shows confirm step after selecting from file', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('import'));
@@ -530,7 +544,7 @@ describe('SettingsModal Component', () => {
 
     it('back button from confirm-file returns to source picker', () => {
       const { getByText, getByTestId } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('import'));
@@ -539,13 +553,12 @@ describe('SettingsModal Component', () => {
 
       expect(getByText('import_from_file')).toBeTruthy();
     });
-
   });
 
   describe('Save Local Backup', () => {
     it('shows save local backup option in export panel', () => {
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('export'));
@@ -557,7 +570,7 @@ describe('SettingsModal Component', () => {
       mockCreateBackup.mockResolvedValue({ version: 1, data: {} });
 
       const { getByTestId, getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       fireEvent.press(getByText('export'));
@@ -577,7 +590,7 @@ describe('SettingsModal Component', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       await act(async () => {
@@ -599,7 +612,7 @@ describe('SettingsModal Component', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       const { getByText } = render(
-        <SettingsModal visible={true} onClose={mockOnClose} />,
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       await act(async () => {

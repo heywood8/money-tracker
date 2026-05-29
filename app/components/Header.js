@@ -14,7 +14,7 @@ import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
-export default function Header({ onOpenSettings, rightContent, activeScreen, operationsData }) {
+export default function Header({ rightContent, activeScreen, operationsData }) {
   console.debug('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
   const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
@@ -202,17 +202,6 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
                   color={colors.text}
                 />
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={onOpenSettings}
-                testID="settings-button"
-                accessibilityLabel={t('settings')}
-                accessibilityRole="button"
-                accessibilityHint="Opens settings menu"
-                style={styles.settingsButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="settings-outline" size={24} color={colors.text} />
-              </TouchableOpacity>
             </>
           )}
         </View>
@@ -222,14 +211,12 @@ export default function Header({ onOpenSettings, rightContent, activeScreen, ope
 }
 
 Header.propTypes = {
-  onOpenSettings: PropTypes.func,
   rightContent: PropTypes.node,
   activeScreen: PropTypes.string,
   operationsData: PropTypes.object,
 };
 
 Header.defaultProps = {
-  onOpenSettings: () => {},
   rightContent: null,
   activeScreen: null,
   operationsData: null,
@@ -266,9 +253,6 @@ const styles = StyleSheet.create({
   },
   searchButtonContainer: {
     position: 'relative',
-  },
-  settingsButton: {
-    padding: 8,
   },
   themeButton: {
     padding: 8,

@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native'; // FlatList used for backups list
+import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import { Portal, Modal, Text, Divider, TouchableRipple } from 'react-native-paper';
+import { Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
@@ -48,7 +50,7 @@ const LOG_LEVEL_COLORS = {
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 
-export default function SettingsModal({ visible, onClose }) {
+export default function SettingsScreen({ setSubPanelActive }) {
   const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { hideBalances, setHideBalances } = useDisplaySettings();
@@ -157,6 +159,26 @@ export default function SettingsModal({ visible, onClose }) {
       setDownloadedApks([]);
     });
   }, [settingsAnim, subPanelAnim]);
+
+  // Signal parent SimpleTabs when a subpanel is open so it can disable tab swiping
+  useEffect(() => {
+    setSubPanelActive(activeSubPanel !== null);
+  }, [activeSubPanel, setSubPanelActive]);
+
+  // Swipe right to close the active subpanel (mirrors Android back gesture)
+  const swipeBackGesture = useMemo(() =>
+    Gesture.Pan()
+      .enabled(activeSubPanel !== null)
+      .activeOffsetX([30, 9999])
+      .failOffsetY([-15, 15])
+      .onEnd((event) => {
+        'worklet';
+        if (event.translationX > 50 || event.velocityX > 500) {
+          runOnJS(closeSubPanel)();
+        }
+      }),
+  [activeSubPanel, closeSubPanel],
+  );
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
@@ -276,11 +298,10 @@ export default function SettingsModal({ visible, onClose }) {
     closeSubPanel();
     try {
       await resetDatabase();
-      onClose();
     } catch (error) {
       // Error already handled in resetDatabase
     }
-  }, [closeSubPanel, resetDatabase, onClose]);
+  }, [closeSubPanel, resetDatabase]);
 
   // Note: reloadApp removed because it was unused. Use expo-updates directly where needed.
 
@@ -288,7 +309,7 @@ export default function SettingsModal({ visible, onClose }) {
     if (importPickInProgress.current) return;
     importPickInProgress.current = true;
 
-    // Phase 1: pick file while settings modal is still open (cancel returns to source picker)
+    // Phase 1: pick file while settings screen is still open (cancel returns to source picker)
     let fileInfo;
     try {
       fileInfo = await pickImportFile();
@@ -306,9 +327,8 @@ export default function SettingsModal({ visible, onClose }) {
 
     importPickInProgress.current = false;
 
-    // Phase 2: file confirmed — close settings modal, then show progress panel on top
+    // Phase 2: file confirmed — close subpanel, then show progress panel on top
     closeSubPanel();
-    onClose();
     startImport();
     try {
       await importBackupFromFile(fileInfo);
@@ -318,7 +338,7 @@ export default function SettingsModal({ visible, onClose }) {
       console.error('Import backup error:', error);
       showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
     }
-  }, [closeSubPanel, onClose, startImport, completeImport, cancelImport, t, showDialog]);
+  }, [closeSubPanel, startImport, completeImport, cancelImport, t, showDialog]);
 
   const handleShareLogs = useCallback(async () => {
     try {
@@ -413,7 +433,6 @@ export default function SettingsModal({ visible, onClose }) {
     }
 
     closeSubPanel();
-    onClose();
     startImport();
     try {
       await restoreBackup(backup);
@@ -422,7 +441,7 @@ export default function SettingsModal({ visible, onClose }) {
       cancelImport();
       console.error('[SheetsImport] restore error:', restoreError);
     }
-  }, [t, closeSubPanel, onClose, startImport, completeImport, cancelImport]);
+  }, [t, closeSubPanel, startImport, completeImport, cancelImport]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
@@ -448,7 +467,6 @@ export default function SettingsModal({ visible, onClose }) {
   const confirmRestoreLocalBackup = useCallback(async () => {
     if (!importSelectedBackup) return;
     closeSubPanel();
-    onClose();
     startImport();
     try {
       const content = await LegacyFileSystem.readAsStringAsync(importSelectedBackup.uri);
@@ -464,7 +482,7 @@ export default function SettingsModal({ visible, onClose }) {
         [{ text: 'OK' }],
       );
     }
-  }, [importSelectedBackup, closeSubPanel, onClose, startImport, completeImport, cancelImport, t, showDialog]);
+  }, [importSelectedBackup, closeSubPanel, startImport, completeImport, cancelImport, t, showDialog]);
 
   const handleSaveLocalBackup = useCallback(async () => {
     setSaveLocalBackupLoading(true);
@@ -571,7 +589,6 @@ export default function SettingsModal({ visible, onClose }) {
       await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
     }
     closeSubPanel();
-    onClose();
     startDownload(downloadUrl, {
       checksumUrl: checksumUrl || null,
       onError: () => {
@@ -582,27 +599,7 @@ export default function SettingsModal({ visible, onClose }) {
         );
       },
     });
-  }, [updateResult, closeSubPanel, onClose, startDownload, showDialog, t]);
-
-  useEffect(() => {
-    if (visible) {
-      setActiveSubPanel(null);
-      setUpdateResult(null);
-      setImportStep('source');
-      setImportSelectedBackup(null);
-      setSaveLocalBackupLoading(false);
-      setSaveLocalBackupSuccess(false);
-      setPendingDeleteUri(null);
-      setExportStep('list');
-      setSheetsSteps(SHEETS_STEPS.map(s => ({ ...s, status: 'pending' })));
-      setSheetsSuccessUrl(null);
-      setSheetsError(null);
-      setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
-      setSheetsImportError(null);
-      settingsAnim.setValue(0);
-      subPanelAnim.setValue(0);
-    }
-  }, [visible, settingsAnim, subPanelAnim]);
+  }, [updateResult, closeSubPanel, startDownload, showDialog, t]);
 
   const settingsTranslateX = settingsAnim.interpolate({
     inputRange: [0, 1],
@@ -623,8 +620,6 @@ export default function SettingsModal({ visible, onClose }) {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
-
-  const anySubModalOpen = activeSubPanel !== null;
 
   const formatBackupLabel = useCallback((filename) => {
     if (filename.startsWith('daily_')) {
@@ -736,620 +731,601 @@ export default function SettingsModal({ visible, onClose }) {
 
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={activeSubPanel ? closeSubPanel : onClose}
-        dismissable={true}
-      >
-        <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+    <GestureDetector gesture={swipeBackGesture}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Animated.View style={[
+          styles.content,
+          {
+            transform: [{ translateX: settingsTranslateX }],
+            opacity: settingsOpacity,
+          },
+        ]}>
+
+          <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="language-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={handleToggleHideBalances} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="eye-off-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('hide_balances') || 'Hide balances'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {t('hide_balances_hint') || 'Mask account balances for privacy'}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
+                <Animated.View style={[styles.switchThumb, {
+                  transform: [{ translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
+                }]} />
+              </View>
+            </View>
+          </TouchableRipple>
+
+          <Divider style={styles.divider} />
+
+          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
+
+          <TouchableRipple onPress={() => openSubPanel('export')} style={styles.settingsRow} testID="settings-export-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={() => openSubPanel('import')} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <Divider style={styles.divider} />
+
+          <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
+
+          <TouchableRipple onPress={() => openSubPanel('logs')} style={styles.settingsRow} testID="logs-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="terminal-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="download-outline" size={22} color={colors.text} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                  {t('check_updates') || 'Check for updates'}
+                </Text>
+              </View>
+              <View style={styles.updateRowRight}>
+                <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
+                  {`v${require('../../package.json').version}`}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              </View>
+            </View>
+          </TouchableRipple>
+
+          <View style={styles.resetSpacer} />
+
+          <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="trash-outline" size={22} color="#c44" />
+                <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
+              </View>
+            </View>
+          </TouchableRipple>
+        </Animated.View>
+
+        {activeSubPanel && (
           <Animated.View style={[
-            styles.content,
+            styles.subPanelContent,
+            { backgroundColor: colors.background },
             {
-              transform: [{ translateX: settingsTranslateX }],
-              opacity: settingsOpacity,
+              transform: [{ translateX: subPanelTranslateX }],
+              opacity: subPanelOpacity,
             },
           ]}>
-            <View style={styles.header}>
-              <View style={styles.closeButton} />
-              <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton} testID="settings-close-button">
-                <Ionicons name="close" size={24} color={colors.mutedText} />
+            <View style={styles.languageModalHeader}>
+              <TouchableOpacity
+                onPress={
+                  activeSubPanel === 'import' ? handleImportBack :
+                    activeSubPanel === 'export' ? handleExportBack :
+                      closeSubPanel
+                }
+                style={styles.backButton}
+                testID="settings-subpanel-back"
+                disabled={
+                  (activeSubPanel === 'export' && exportStep === 'sheets-progress' && sheetsSteps.some(s => s.status === 'in_progress')) ||
+                  (activeSubPanel === 'import' && importStep === 'sheets-progress' && sheetsImportSteps.some(s => s.status === 'in_progress'))
+                }
+              >
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
+              <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {activeSubPanel === 'language' && t('language')}
+                {activeSubPanel === 'export' && (
+                  exportStep === 'sheets-progress'
+                    ? 'Google Sheets'
+                    : (t('export_format') || 'Export Format')
+                )}
+                {activeSubPanel === 'import' && (
+                  importStep === 'source'
+                    ? (t('import') || 'Import')
+                    : importStep === 'sheets-progress'
+                      ? (t('google_sheets_import') || 'Import from Sheets')
+                      : importStep === 'local-list'
+                        ? (t('local_backups') || 'Local Backups')
+                        : (t('restore_database') || 'Restore Database')
+                )}
+                {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
+                {activeSubPanel === 'update' && (
+                  isCheckingUpdate
+                    ? (t('check_updates') || 'Check for updates')
+                    : updateResult?.type === 'available'
+                      ? (t('update_available_title') || 'Update available')
+                      : (t('check_updates') || 'Check for updates')
+                )}
+                {activeSubPanel === 'reset' && (t('reset_database') || 'Reset Database')}
+              </Text>
+              {activeSubPanel === 'import' && importStep === 'local-list' ? (
+                <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+                  <Ionicons name="refresh-outline" size={22} color={colors.text} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.backButton} />
+              )}
             </View>
 
-            <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="language-outline" size={22} color={colors.text} />
-                  <View style={styles.settingsRowText}>
-                    <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('language')}</Text>
-                    <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                      {languageFlags[language] ? `${languageFlags[language]}  ${nativeLanguageNames[language] || language}` : (nativeLanguageNames[language] || language)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
+            <Divider />
 
-            <TouchableRipple onPress={handleToggleHideBalances} style={styles.settingsRow}>
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="eye-off-outline" size={22} color={colors.text} />
-                  <View style={styles.settingsRowText}>
-                    <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('hide_balances') || 'Hide balances'}</Text>
-                    <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                      {t('hide_balances_hint') || 'Mask account balances for privacy'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
-                  <Animated.View style={[styles.switchThumb, {
-                    transform: [{ translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
-                  }]} />
-                </View>
-              </View>
-            </TouchableRipple>
-
-            <Divider style={styles.divider} />
-
-            <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
-
-            <TouchableRipple onPress={() => openSubPanel('export')} style={styles.settingsRow} testID="settings-export-row">
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('export') || 'Export'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-
-            <TouchableRipple onPress={() => openSubPanel('import')} style={styles.settingsRow}>
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="cloud-download-outline" size={22} color={colors.text} />
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('import') || 'Import'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-
-            <Divider style={styles.divider} />
-
-            <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('developer') || 'Developer'}</Text>
-
-            <TouchableRipple onPress={() => openSubPanel('logs')} style={styles.settingsRow} testID="logs-row">
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="terminal-outline" size={22} color={colors.text} />
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('logs') || 'Logs'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-              </View>
-            </TouchableRipple>
-
-            <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="download-outline" size={22} color={colors.text} />
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                    {t('check_updates') || 'Check for updates'}
-                  </Text>
-                </View>
-                <View style={styles.updateRowRight}>
-                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
-                    {`v${require('../../package.json').version}`}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </View>
-            </TouchableRipple>
-
-            <View style={styles.resetSpacer} />
-
-            <TouchableRipple onPress={() => openSubPanel('reset')} style={styles.settingsRow}>
-              <View style={styles.settingsRowContent}>
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="trash-outline" size={22} color="#c44" />
-                  <Text style={[styles.settingsRowLabel, styles.destructiveText]}>{t('reset_database') || 'Reset Database'}</Text>
-                </View>
-              </View>
-            </TouchableRipple>
-          </Animated.View>
-
-          {activeSubPanel && (
-            <Animated.View style={[
-              styles.subPanelContent,
-              { backgroundColor: colors.card },
-              {
-                transform: [{ translateX: subPanelTranslateX }],
-                opacity: subPanelOpacity,
-              },
-            ]}>
-              <View style={styles.languageModalHeader}>
-                <TouchableOpacity
-                  onPress={
-                    activeSubPanel === 'import' ? handleImportBack :
-                      activeSubPanel === 'export' ? handleExportBack :
-                        closeSubPanel
-                  }
-                  style={styles.backButton}
-                  testID="settings-subpanel-back"
-                  disabled={
-                    (activeSubPanel === 'export' && exportStep === 'sheets-progress' && sheetsSteps.some(s => s.status === 'in_progress')) ||
-                    (activeSubPanel === 'import' && importStep === 'sheets-progress' && sheetsImportSteps.some(s => s.status === 'in_progress'))
-                  }
-                >
-                  <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
-                  {activeSubPanel === 'language' && t('language')}
-                  {activeSubPanel === 'export' && (
-                    exportStep === 'sheets-progress'
-                      ? 'Google Sheets'
-                      : (t('export_format') || 'Export Format')
-                  )}
-                  {activeSubPanel === 'import' && (
-                    importStep === 'source'
-                      ? (t('import') || 'Import')
-                      : importStep === 'sheets-progress'
-                        ? (t('google_sheets_import') || 'Import from Sheets')
-                        : importStep === 'local-list'
-                          ? (t('local_backups') || 'Local Backups')
-                          : (t('restore_database') || 'Restore Database')
-                  )}
-                  {activeSubPanel === 'logs' && (t('logs') || 'Logs')}
-                  {activeSubPanel === 'update' && (
-                    isCheckingUpdate
-                      ? (t('check_updates') || 'Check for updates')
-                      : updateResult?.type === 'available'
-                        ? (t('update_available_title') || 'Update available')
-                        : (t('check_updates') || 'Check for updates')
-                  )}
-                  {activeSubPanel === 'reset' && (t('reset_database') || 'Reset Database')}
-                </Text>
-                {activeSubPanel === 'import' && importStep === 'local-list' ? (
-                  <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
-                    <Ionicons name="refresh-outline" size={22} color={colors.text} />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.backButton} />
-                )}
-              </View>
-
-              <Divider />
-
-              {activeSubPanel === 'language' && (
-                <ScrollView style={styles.languageList}>
-                  {availableLanguages.map(lng => (
-                    <TouchableRipple
-                      key={lng}
-                      onPress={() => handleLanguageSelect(lng)}
-                      style={styles.languageItem}
-                    >
-                      <View style={styles.languageItemContent}>
-                        <Text style={[styles.languageItemText, { color: colors.text }]}>
-                          {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
-                        </Text>
-                        {language === lng && (
-                          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                        )}
-                      </View>
-                    </TouchableRipple>
-                  ))}
-                </ScrollView>
-              )}
-
-              {activeSubPanel === 'export' && exportStep === 'list' && (
-                <ScrollView style={styles.languageList}>
+            {activeSubPanel === 'language' && (
+              <ScrollView style={styles.languageList}>
+                {availableLanguages.map(lng => (
                   <TouchableRipple
-                    onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
+                    key={lng}
+                    onPress={() => handleLanguageSelect(lng)}
                     style={styles.languageItem}
-                    disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
-                    testID="settings-export-save-local-backup"
                   >
                     <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons
-                          name="archive-outline"
-                          size={24}
-                          color={saveLocalBackupColor}
-                        />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: saveLocalBackupColor }]}>
-                            {t('save_local_backup') || 'Save local backup'}
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {saveLocalBackupLoading
-                              ? (t('save_local_backup_saving') || 'Saving…')
-                              : saveLocalBackupSuccess
-                                ? (t('save_local_backup_success') || 'Backup saved')
-                                : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
-                          </Text>
-                        </View>
-                      </View>
-                      {saveLocalBackupLoading ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
-                      ) : saveLocalBackupSuccess ? (
-                        <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                      ) : (
-                        <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                      <Text style={[styles.languageItemText, { color: colors.text }]}>
+                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
+                      </Text>
+                      {language === lng && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                       )}
                     </View>
                   </TouchableRipple>
+                ))}
+              </ScrollView>
+            )}
 
-                  <TouchableRipple
-                    onPress={handleGoogleSheetsExport}
-                    style={styles.languageItem}
-                    testID="settings-export-google-sheets"
+            {activeSubPanel === 'export' && exportStep === 'list' && (
+              <ScrollView style={styles.languageList}>
+                <TouchableRipple
+                  onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
+                  style={styles.languageItem}
+                  disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
+                  testID="settings-export-save-local-backup"
+                >
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons
+                        name="archive-outline"
+                        size={24}
+                        color={saveLocalBackupColor}
+                      />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: saveLocalBackupColor }]}>
+                          {t('save_local_backup') || 'Save local backup'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {saveLocalBackupLoading
+                            ? (t('save_local_backup_saving') || 'Saving…')
+                            : saveLocalBackupSuccess
+                              ? (t('save_local_backup_success') || 'Backup saved')
+                              : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
+                        </Text>
+                      </View>
+                    </View>
+                    {saveLocalBackupLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : saveLocalBackupSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple
+                  onPress={handleGoogleSheetsExport}
+                  style={styles.languageItem}
+                  testID="settings-export-google-sheets"
+                >
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>
+                          Google Sheets
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('google_sheets_description') || 'Export to a Google Sheets spreadsheet'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="server-outline" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to SQLite</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('sqlite_description') || 'Raw database file, complete backup'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to CSV</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('csv_description') || 'Plain text format, easy to edit'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="code-outline" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to JSON</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('json_description') || 'Standard format, compatible with all versions'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+              </ScrollView>
+            )}
+
+            {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
+              <View style={styles.sheetsProgressContent}>
+                {sheetsSteps.map(step => (
+                  <View key={step.id} style={styles.sheetsProgressStep}>
+                    <View style={styles.sheetsProgressStepIcon}>
+                      {step.status === 'pending' && (
+                        <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />
+                      )}
+                      {step.status === 'in_progress' && (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      )}
+                      {step.status === 'completed' && (
+                        <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                      )}
+                      {step.status === 'error' && (
+                        <Ionicons name="close-circle" size={22} color="#c44" />
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.sheetsProgressStepLabel,
+                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                    ]}>
+                      {step.label}
+                    </Text>
+                  </View>
+                ))}
+
+                {sheetsError && (
+                  <Text style={styles.sheetsErrorText}>{sheetsError}</Text>
+                )}
+
+                {sheetsSuccessUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(sheetsSuccessUrl)}
+                    style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
                   >
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="logo-google" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            Google Sheets
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('google_sheets_description') || 'Export to a Google Sheets spreadsheet'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="server-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to SQLite</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('sqlite_description') || 'Raw database file, complete backup'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="document-text-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to CSV</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('csv_description') || 'Plain text format, easy to edit'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-
-                  <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="code-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>Save externally to JSON</Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('json_description') || 'Standard format, compatible with all versions'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-                </ScrollView>
-              )}
-
-              {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
-                <View style={styles.sheetsProgressContent}>
-                  {sheetsSteps.map(step => (
-                    <View key={step.id} style={styles.sheetsProgressStep}>
-                      <View style={styles.sheetsProgressStepIcon}>
-                        {step.status === 'pending' && (
-                          <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />
-                        )}
-                        {step.status === 'in_progress' && (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        )}
-                        {step.status === 'completed' && (
-                          <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                        )}
-                        {step.status === 'error' && (
-                          <Ionicons name="close-circle" size={22} color="#c44" />
-                        )}
-                      </View>
-                      <Text style={[
-                        styles.sheetsProgressStepLabel,
-                        step.status === 'error' ? styles.sheetsProgressStepLabelError :
-                          { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                      ]}>
-                        {step.label}
-                      </Text>
-                    </View>
-                  ))}
-
-                  {sheetsError && (
-                    <Text style={styles.sheetsErrorText}>{sheetsError}</Text>
-                  )}
-
-                  {sheetsSuccessUrl && (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(sheetsSuccessUrl)}
-                      style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
-                    >
-                      <Ionicons name="open-outline" size={16} color="#fff" />
-                      <Text style={styles.sheetsOpenButtonText}>
-                        {t('google_sheets_open') || 'Open in Google Sheets'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              {activeSubPanel === 'reset' && (
-                <View style={styles.importConfirmContent}>
-                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
-                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
-                    {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
-                  </Text>
-                  <TouchableRipple onPress={confirmResetDatabase} style={styles.importConfirmButtonDestructive}>
-                    <Text style={styles.importConfirmButtonText}>
-                      {t('reset') || 'Reset'}
+                    <Ionicons name="open-outline" size={16} color="#fff" />
+                    <Text style={styles.sheetsOpenButtonText}>
+                      {t('google_sheets_open') || 'Open in Google Sheets'}
                     </Text>
-                  </TouchableRipple>
-                </View>
-              )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
-              {activeSubPanel === 'import' && importStep === 'source' && (
-                <ScrollView style={styles.languageList}>
-                  <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="logo-google" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            {t('import_from_file') || 'From Google Drive'}
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
-                          </Text>
-                        </View>
+            {activeSubPanel === 'reset' && (
+              <View style={styles.importConfirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                  {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
+                </Text>
+                <TouchableRipple onPress={confirmResetDatabase} style={styles.importConfirmButtonDestructive}>
+                  <Text style={styles.importConfirmButtonText}>
+                    {t('reset') || 'Reset'}
+                  </Text>
+                </TouchableRipple>
+              </View>
+            )}
+
+            {activeSubPanel === 'import' && importStep === 'source' && (
+              <ScrollView style={styles.languageList}>
+                <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.languageItem}>
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>
+                          {t('import_from_file') || 'From Google Drive'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
+                        </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                     </View>
-                  </TouchableRipple>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
 
-                  <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.languageItem}>
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="archive-outline" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            {t('import_from_local') || 'From local backup'}
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
-                          </Text>
-                        </View>
+                <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.languageItem}>
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="archive-outline" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>
+                          {t('import_from_local') || 'From local backup'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
+                        </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                     </View>
-                  </TouchableRipple>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
 
-                  <TouchableRipple
-                    onPress={handleGoogleSheetsImport}
-                    style={styles.languageItem}
-                    testID="settings-import-google-sheets"
+                <TouchableRipple
+                  onPress={handleGoogleSheetsImport}
+                  style={styles.languageItem}
+                  testID="settings-import-google-sheets"
+                >
+                  <View style={styles.languageItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.languageItemText, { color: colors.text }]}>
+                          {t('import_from_google_sheets') || 'From Google Sheets'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+                {sheetsImportError && importStep === 'source' && (
+                  <Text
+                    testID="settings-import-no-spreadsheet"
+                    style={styles.sheetsImportErrorInline}
                   >
-                    <View style={styles.languageItemContent}>
-                      <View style={styles.formatItemRow}>
-                        <Ionicons name="logo-google" size={24} color={colors.text} />
-                        <View style={styles.formatTextContainer}>
-                          <Text style={[styles.languageItemText, { color: colors.text }]}>
-                            {t('import_from_google_sheets') || 'From Google Sheets'}
-                          </Text>
-                          <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                            {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                    </View>
-                  </TouchableRipple>
-                  {sheetsImportError && importStep === 'source' && (
-                    <Text
-                      testID="settings-import-no-spreadsheet"
-                      style={styles.sheetsImportErrorInline}
-                    >
-                      {sheetsImportError}
-                    </Text>
-                  )}
-                </ScrollView>
-              )}
-
-              {activeSubPanel === 'import' && importStep === 'local-list' && (
-                backupsLoading ? (
-                  <View style={styles.logsEmptyContainer}>
-                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={storedBackups}
-                    keyExtractor={(item) => item.uri}
-                    renderItem={renderBackupItem}
-                    style={styles.logsList}
-                    contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
-                    ListEmptyComponent={
-                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                        {t('local_backups_empty') || 'No local backups yet'}
-                      </Text>
-                    }
-                  />
-                )
-              )}
-
-              {activeSubPanel === 'import' && importStep === 'confirm-file' && (
-                <View style={styles.importConfirmContent}>
-                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
-                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
-                    {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                    {sheetsImportError}
                   </Text>
-                  <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
-                    <Text style={styles.importConfirmButtonText}>
-                      {t('restore_database') || 'Restore'}
-                    </Text>
-                  </TouchableRipple>
-                </View>
-              )}
+                )}
+              </ScrollView>
+            )}
 
-              {activeSubPanel === 'import' && importStep === 'confirm-local' && (
-                <View style={styles.importConfirmContent}>
-                  <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
-                  {importSelectedBackup && (
-                    <Text style={[styles.importConfirmText, { color: colors.mutedText }]}>
-                      {formatBackupLabel(importSelectedBackup.filename)}
+            {activeSubPanel === 'import' && importStep === 'local-list' && (
+              backupsLoading ? (
+                <View style={styles.logsEmptyContainer}>
+                  <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={storedBackups}
+                  keyExtractor={(item) => item.uri}
+                  renderItem={renderBackupItem}
+                  style={styles.logsList}
+                  contentContainerStyle={storedBackups.length === 0 && styles.logsEmptyContainer}
+                  ListEmptyComponent={
+                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                      {t('local_backups_empty') || 'No local backups yet'}
                     </Text>
-                  )}
-                  <Text style={[styles.importConfirmText, { color: colors.text }]}>
-                    {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                  }
+                />
+              )
+            )}
+
+            {activeSubPanel === 'import' && importStep === 'confirm-file' && (
+              <View style={styles.importConfirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                </Text>
+                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.importConfirmButtonDestructive}>
+                  <Text style={styles.importConfirmButtonText}>
+                    {t('restore_database') || 'Restore'}
                   </Text>
-                  <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.importConfirmButtonDestructive}>
-                    <Text style={styles.importConfirmButtonText}>
-                      {t('restore_database') || 'Restore'}
-                    </Text>
-                  </TouchableRipple>
-                </View>
-              )}
+                </TouchableRipple>
+              </View>
+            )}
 
-              {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
-                <View style={styles.sheetsProgressContent}>
-                  {sheetsImportSteps.map(step => (
-                    <View key={step.id} style={styles.sheetsProgressStep}>
-                      <View style={styles.sheetsProgressStepIcon}>
-                        {step.status === 'pending' && (
-                          <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />
-                        )}
-                        {step.status === 'in_progress' && (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        )}
-                        {step.status === 'completed' && (
-                          <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                        )}
-                        {step.status === 'error' && (
-                          <Ionicons name="close-circle" size={22} color="#c44" />
-                        )}
-                      </View>
-                      <Text style={[
-                        styles.sheetsProgressStepLabel,
-                        step.status === 'error' ? styles.sheetsProgressStepLabelError :
-                          { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                      ]}>
-                        {step.label}
-                      </Text>
+            {activeSubPanel === 'import' && importStep === 'confirm-local' && (
+              <View style={styles.importConfirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.importWarningIcon} />
+                {importSelectedBackup && (
+                  <Text style={[styles.importConfirmText, { color: colors.mutedText }]}>
+                    {formatBackupLabel(importSelectedBackup.filename)}
+                  </Text>
+                )}
+                <Text style={[styles.importConfirmText, { color: colors.text }]}>
+                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
+                </Text>
+                <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.importConfirmButtonDestructive}>
+                  <Text style={styles.importConfirmButtonText}>
+                    {t('restore_database') || 'Restore'}
+                  </Text>
+                </TouchableRipple>
+              </View>
+            )}
+
+            {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
+              <View style={styles.sheetsProgressContent}>
+                {sheetsImportSteps.map(step => (
+                  <View key={step.id} style={styles.sheetsProgressStep}>
+                    <View style={styles.sheetsProgressStepIcon}>
+                      {step.status === 'pending' && (
+                        <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />
+                      )}
+                      {step.status === 'in_progress' && (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      )}
+                      {step.status === 'completed' && (
+                        <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                      )}
+                      {step.status === 'error' && (
+                        <Ionicons name="close-circle" size={22} color="#c44" />
+                      )}
                     </View>
-                  ))}
-                  {sheetsImportError && (
-                    <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>
-                  )}
-                </View>
-              )}
-
-              {activeSubPanel === 'logs' && (
-                <>
-                  <View style={styles.filterRow}>
-                    {LOG_FILTERS.map(f => {
-                      const isSelected = f === logFilter;
-                      const filterLabelKey = `log_level_${f}`;
-                      return (
-                        <TouchableOpacity
-                          key={f}
-                          onPress={() => setLogFilter(f)}
-                          style={[
-                            styles.filterChip,
-                            { borderColor: colors.border },
-                            isSelected && { backgroundColor: colors.primary },
-                          ]}
-                        >
-                          <Text style={[
-                            styles.filterChipText,
-                            isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                          ]}>
-                            {t(filterLabelKey) || f}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                    <Text style={[
+                      styles.sheetsProgressStepLabel,
+                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                    ]}>
+                      {step.label}
+                    </Text>
                   </View>
+                ))}
+                {sheetsImportError && (
+                  <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>
+                )}
+              </View>
+            )}
 
-                  <FlatList
-                    data={entries.slice().reverse()}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderLogEntry}
-                    style={styles.logsList}
-                    inverted
-                    initialNumToRender={20}
-                    maxToRenderPerBatch={20}
-                    windowSize={5}
-                    contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
-                    ListEmptyComponent={
-                      <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
-                        {t('no_logs') || 'No logs yet'}
-                      </Text>
-                    }
-                  />
-
-                  <Divider />
-
-                  <View style={styles.logsActionBar}>
-                    <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-                      <Ionicons name="share-outline" size={20} color={colors.primary} />
-                      <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                        {t('share_logs') || 'Share Logs'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-                      <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                      <Text style={[styles.logsActionText, styles.clearLogsText]}>
-                        {t('clear_logs') || 'Clear Logs'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-
-              {activeSubPanel === 'update' && (
-                <View style={styles.updatePanelWrapper}>
-                  <UpdateContentPanel
-                    isChecking={isCheckingUpdate}
-                    updateResult={updateResult}
-                    downloadedApks={downloadedApks}
-                    onUpdate={handleUpdateFromSettings}
-                    onInstallApk={handleInstallApk}
-                  />
+            {activeSubPanel === 'logs' && (
+              <>
+                <View style={styles.filterRow}>
+                  {LOG_FILTERS.map(f => {
+                    const isSelected = f === logFilter;
+                    const filterLabelKey = `log_level_${f}`;
+                    return (
+                      <TouchableOpacity
+                        key={f}
+                        onPress={() => setLogFilter(f)}
+                        style={[
+                          styles.filterChip,
+                          { borderColor: colors.border },
+                          isSelected && { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterChipText,
+                          isSelected ? styles.filterChipTextSelected : { color: colors.text },
+                        ]}>
+                          {t(filterLabelKey) || f}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              )}
 
-            </Animated.View>
-          )}
-        </View>
-      </Modal>
-    </Portal>
+                <FlatList
+                  data={entries.slice().reverse()}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderLogEntry}
+                  style={styles.logsList}
+                  inverted
+                  initialNumToRender={20}
+                  maxToRenderPerBatch={20}
+                  windowSize={5}
+                  contentContainerStyle={entries.length === 0 && styles.logsEmptyContainer}
+                  ListEmptyComponent={
+                    <Text style={[styles.logsEmptyText, { color: colors.mutedText }]}>
+                      {t('no_logs') || 'No logs yet'}
+                    </Text>
+                  }
+                />
+
+                <Divider />
+
+                <View style={styles.logsActionBar}>
+                  <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
+                    <Ionicons name="share-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.logsActionText, { color: colors.primary }]}>
+                      {t('share_logs') || 'Share Logs'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
+                    <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
+                    <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                      {t('clear_logs') || 'Clear Logs'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {activeSubPanel === 'update' && (
+              <View style={styles.updatePanelWrapper}>
+                <UpdateContentPanel
+                  isChecking={isCheckingUpdate}
+                  updateResult={updateResult}
+                  downloadedApks={downloadedApks}
+                  onUpdate={handleUpdateFromSettings}
+                  onInstallApk={handleInstallApk}
+                />
+              </View>
+            )}
+
+          </Animated.View>
+        )}
+      </View>
+    </GestureDetector>
   );
 }
-
-const centeredModal = {
-  borderRadius: BORDER_RADIUS.lg,
-  margin: SPACING.md,
-  maxHeight: '95%',
-};
 
 const styles = StyleSheet.create({
   backButton: {
@@ -1406,14 +1382,12 @@ const styles = StyleSheet.create({
   clearLogsText: {
     color: '#e53935',
   },
-  closeButton: {
-    alignItems: 'center',
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
+  container: {
+    flex: 1,
+    overflow: 'hidden',
   },
   content: {
-    paddingBottom: SPACING.lg,
+    paddingBottom: 96,
     paddingTop: SPACING.sm,
   },
   destructiveText: {
@@ -1454,16 +1428,6 @@ const styles = StyleSheet.create({
   formatTextContainer: {
     flex: 1,
     flexShrink: 1,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.md,
-  },
-  headerTitle: {
-    fontWeight: '600',
   },
   importConfirmButtonDestructive: {
     backgroundColor: '#c44',
@@ -1564,10 +1528,6 @@ const styles = StyleSheet.create({
   logsList: {
     flex: 1,
   },
-  modalContainer: {
-    ...centeredModal,
-    overflow: 'hidden',
-  },
   resetSpacer: {
     height: SPACING.sm,
   },
@@ -1657,6 +1617,7 @@ const styles = StyleSheet.create({
   subPanelContent: {
     bottom: 0,
     left: 0,
+    paddingBottom: 96,
     position: 'absolute',
     right: 0,
     top: 0,
@@ -1687,7 +1648,6 @@ const styles = StyleSheet.create({
   },
 });
 
-SettingsModal.propTypes = {
-  visible: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
+SettingsScreen.propTypes = {
+  setSubPanelActive: PropTypes.func.isRequired,
 };

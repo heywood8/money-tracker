@@ -13,6 +13,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
+    '/.claude/',
   ],
   moduleNameMapper: {
     '^expo$': '<rootDir>/node_modules/expo',
