@@ -424,7 +424,7 @@ AccountRow.defaultProps = {
   isActive: false,
 };
 
-export default function AccountsScreen() {
+export default function AccountsScreen({ embedded }) {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
@@ -751,7 +751,7 @@ export default function AccountsScreen() {
 
   if (error) {
     return (
-      <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, styles.errorContainer, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
         <Text variant="bodyLarge" style={[styles.centeredErrorText, { color: colors.delete }]}>
           {t('error_loading_accounts') || 'Failed to load accounts'}
         </Text>
@@ -760,7 +760,7 @@ export default function AccountsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
       <NestableScrollContainer
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -1005,6 +1005,14 @@ export default function AccountsScreen() {
   );
 }
 
+AccountsScreen.propTypes = {
+  embedded: PropTypes.bool,
+};
+
+AccountsScreen.defaultProps = {
+  embedded: false,
+};
+
 const styles = StyleSheet.create({
   accountBalance: {
     flexShrink: 1,
@@ -1097,6 +1105,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
+  },
+  containerEmbedded: {
+    paddingTop: 0,
   },
   currencyPanel: {
     borderTopLeftRadius: 24,

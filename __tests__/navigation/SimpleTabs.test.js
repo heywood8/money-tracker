@@ -276,23 +276,21 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders all six tab labels', () => {
+  it('renders all five tab labels', () => {
     const { getByText } = render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
-    expect(getByText('Accounts')).toBeTruthy();
     expect(getByText('Categories')).toBeTruthy();
     expect(getByText('Planned')).toBeTruthy();
     expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all six screens', () => {
+  it('renders all five screens', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
     expect(getByTestId('graphs-screen')).toBeTruthy();
-    expect(getByTestId('accounts-screen')).toBeTruthy();
     expect(getByTestId('categories-screen')).toBeTruthy();
     expect(getByTestId('planned-screen')).toBeTruthy();
     expect(getByTestId('settings-screen')).toBeTruthy();
@@ -301,13 +299,13 @@ describe('SimpleTabs Component Rendering', () => {
   it('switches active tab when tab is pressed', async () => {
     const { getByTestId } = render(<SimpleTabs />);
 
-    // Press the Accounts tab
-    const accountsTab = getByTestId('tab-Accounts');
-    fireEvent.press(accountsTab);
+    // Press the Graphs tab
+    const graphsTab = getByTestId('tab-Graphs');
+    fireEvent.press(graphsTab);
 
     // Give React time to update
     await waitFor(() => {
-      expect(accountsTab).toBeTruthy();
+      expect(graphsTab).toBeTruthy();
     });
   });
 
@@ -319,8 +317,8 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders a Settings tab button', () => {
     const { getAllByRole } = render(<SimpleTabs />);
     const tabs = getAllByRole('button');
-    // 6 tabs total: Operations, Graphs, Accounts, Categories, Planned, Settings
-    expect(tabs.length).toBeGreaterThanOrEqual(6);
+    // 5 tabs total: Operations, Graphs, Categories, Planned, Settings
+    expect(tabs.length).toBeGreaterThanOrEqual(5);
   });
 
   it('renders all tabs with correct accessibility labels', () => {
@@ -328,7 +326,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
-    expect(getByTestId('tab-Accounts')).toBeTruthy();
     expect(getByTestId('tab-Categories')).toBeTruthy();
   });
 
@@ -338,7 +335,6 @@ describe('SimpleTabs Component Rendering', () => {
     // Press each tab
     fireEvent.press(getByTestId('tab-Operations'));
     fireEvent.press(getByTestId('tab-Graphs'));
-    fireEvent.press(getByTestId('tab-Accounts'));
     fireEvent.press(getByTestId('tab-Categories'));
 
     // All should work without errors
@@ -368,7 +364,6 @@ describe('SimpleTabs Component Rendering', () => {
     for (let i = 0; i < 5; i++) {
       fireEvent.press(getByTestId('tab-Operations'));
       fireEvent.press(getByTestId('tab-Graphs'));
-      fireEvent.press(getByTestId('tab-Accounts'));
       fireEvent.press(getByTestId('tab-Categories'));
     }
 
@@ -411,7 +406,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByText('Operations Screen')).toBeTruthy();
     expect(getByText('Graphs Screen')).toBeTruthy();
-    expect(getByText('Accounts Screen')).toBeTruthy();
     expect(getByText('Categories Screen')).toBeTruthy();
   });
 
@@ -448,12 +442,10 @@ describe('SimpleTabs Component Rendering', () => {
     // Verify all TabButtons render and are pressable
     const operationsTab = getByTestId('tab-Operations');
     const graphsTab = getByTestId('tab-Graphs');
-    const accountsTab = getByTestId('tab-Accounts');
     const categoriesTab = getByTestId('tab-Categories');
 
     expect(operationsTab.props.accessibilityLabel).toBe('Operations');
     expect(graphsTab.props.accessibilityLabel).toBe('Graphs');
-    expect(accountsTab.props.accessibilityLabel).toBe('Accounts');
     expect(categoriesTab.props.accessibilityLabel).toBe('Categories');
   });
 });

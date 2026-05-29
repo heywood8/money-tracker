@@ -235,6 +235,19 @@ jest.mock('../../app/components/UpdateContentPanel', () => {
   };
 });
 
+// Mock AccountsScreen (embedded in the accounts subpanel) to avoid pulling in
+// its heavy dependency tree (draggable list, accounts/operations contexts, etc.)
+jest.mock('../../app/screens/AccountsScreen', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const PropTypes = require('prop-types');
+  function AccountsScreen({ embedded }) {
+    return React.createElement(View, { testID: 'accounts-screen', accessibilityLabel: embedded ? 'embedded' : 'standalone' });
+  }
+  AccountsScreen.propTypes = { embedded: PropTypes.bool };
+  return AccountsScreen;
+});
+
 describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -265,6 +278,24 @@ describe('SettingsScreen', () => {
 
       expect(getByTestId('settings-language-row')).toBeTruthy();
       expect(getByTestId('settings-export-row')).toBeTruthy();
+    });
+
+    it('renders accounts row', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      expect(getByTestId('settings-accounts-row')).toBeTruthy();
+    });
+
+    it('opens the accounts subpanel when the accounts row is pressed', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByTestId('settings-accounts-row'));
+
+      expect(getByTestId('accounts-screen')).toBeTruthy();
     });
 
     it('renders language row', () => {
@@ -356,30 +387,23 @@ describe('SettingsScreen', () => {
     });
 
     it('opens language modal when language row is pressed', () => {
-      const { UNSAFE_getAllByType } = render(
+      const { getByTestId } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      const TouchableRipple = require('react-native-paper').TouchableRipple;
-      const touchables = UNSAFE_getAllByType(TouchableRipple);
-
-      // First TouchableRipple is the language row
       act(() => {
-        fireEvent.press(touchables[0]);
+        fireEvent.press(getByTestId('settings-language-row'));
       });
     });
 
     it('applies language immediately on selection', () => {
-      const { UNSAFE_getAllByType, getByText } = render(
+      const { getByTestId, getByText } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      const TouchableRipple = require('react-native-paper').TouchableRipple;
-      const touchables = UNSAFE_getAllByType(TouchableRipple);
-
-      // Open language modal (first TouchableRipple)
+      // Open language modal
       act(() => {
-        fireEvent.press(touchables[0]);
+        fireEvent.press(getByTestId('settings-language-row'));
       });
 
       // Select Spanish

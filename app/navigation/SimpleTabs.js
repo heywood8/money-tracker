@@ -12,7 +12,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
-import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
@@ -33,7 +32,6 @@ const withAlpha = (hex, alpha) => {
 const TAB_ICONS = {
   Operations: 'swap-horizontal',
   Graphs: 'chart-line',
-  Accounts: 'wallet-outline',
   Categories: 'shape-outline',
   Planned: 'calendar-clock',
   Settings: 'cog-outline',
@@ -113,7 +111,6 @@ export default function SimpleTabs() {
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
     { key: 'Graphs', label: t('graphs') || 'Graphs' },
-    { key: 'Accounts', label: t('accounts') || 'Accounts' },
     { key: 'Categories', label: t('categories') || 'Categories' },
     { key: 'Planned', label: t('planned') || 'Planned' },
     { key: 'Settings', label: t('settings') || 'Settings' },
@@ -228,9 +225,6 @@ export default function SimpleTabs() {
           <GraphsScreen />
         </View>
         <View style={styles.screen}>
-          <AccountsScreen />
-        </View>
-        <View style={styles.screen}>
           <CategoriesScreen />
         </View>
         <View style={styles.screen}>
@@ -340,7 +334,7 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 6,
+    width: SCREEN_WIDTH * 5,
   },
   tab: {
     flex: 1,
