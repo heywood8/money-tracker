@@ -621,8 +621,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     outputRange: [0, 1],
   });
 
-  const anySubModalOpen = activeSubPanel !== null;
-
   const formatBackupLabel = useCallback((filename) => {
     if (filename.startsWith('daily_')) {
       const dateStr = filename.replace('daily_', '').replace('.json', '');
