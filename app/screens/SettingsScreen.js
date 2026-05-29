@@ -740,9 +740,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
             opacity: settingsOpacity,
           },
         ]}>
-          <View style={styles.header}>
-            <Text variant="titleLarge" style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
-          </View>
 
           <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
             <View style={styles.settingsRowContent}>
@@ -1390,7 +1387,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingBottom: SPACING.lg,
+    paddingBottom: 96,
     paddingTop: SPACING.sm,
   },
   destructiveText: {
@@ -1431,16 +1428,6 @@ const styles = StyleSheet.create({
   formatTextContainer: {
     flex: 1,
     flexShrink: 1,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.md,
-  },
-  headerTitle: {
-    fontWeight: '600',
   },
   importConfirmButtonDestructive: {
     backgroundColor: '#c44',
@@ -1630,6 +1617,7 @@ const styles = StyleSheet.create({
   subPanelContent: {
     bottom: 0,
     left: 0,
+    paddingBottom: 96,
     position: 'absolute',
     right: 0,
     top: 0,

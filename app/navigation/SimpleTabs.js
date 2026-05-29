@@ -36,7 +36,7 @@ const TAB_ICONS = {
   Accounts: 'wallet-outline',
   Categories: 'shape-outline',
   Planned: 'calendar-clock',
-  Settings: 'settings-outline',
+  Settings: 'cog-outline',
 };
 
 // Memoized tab button with icon + label, pill active state
