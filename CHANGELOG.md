@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.123.12](https://github.com/heywood8/money-tracker/compare/penny-v0.123.11...penny-v0.123.12) (2026-05-29)
+
+
+### Bug Fixes
+
+* **ui:** restore flex layout on Check for updates panel ([#830](https://github.com/heywood8/money-tracker/issues/830)) ([4a6b52c](https://github.com/heywood8/money-tracker/commit/4a6b52c6dfaf84336a3203b55ffdadaa4e622834))
+
 ## [0.123.11](https://github.com/heywood8/money-tracker/compare/penny-v0.123.10...penny-v0.123.11) (2026-05-28)
 
 
