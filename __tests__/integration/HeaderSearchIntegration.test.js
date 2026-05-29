@@ -121,14 +121,14 @@ describe('Header Search Integration', () => {
   describe('Search Button Visibility', () => {
     it('does not show search button when activeScreen is not Operations', () => {
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Accounts" />,
+        <Header activeScreen="Accounts" />,
       );
       expect(queryByTestId('search-button')).toBeNull();
     });
 
     it('shows search button when activeScreen is Operations', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(getByTestId('search-button')).toBeTruthy();
     });
@@ -136,7 +136,7 @@ describe('Header Search Integration', () => {
     it('does not show search button when rightContent is provided', () => {
       const CustomContent = () => <></>;
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" rightContent={<CustomContent />} />,
+        <Header activeScreen="Operations" rightContent={<CustomContent />} />,
       );
       expect(queryByTestId('search-button')).toBeNull();
     });
@@ -145,7 +145,7 @@ describe('Header Search Integration', () => {
   describe('Search Button Functionality', () => {
     it('calls openSearch when button is pressed', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       fireEvent.press(getByTestId('search-button'));
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
@@ -153,7 +153,7 @@ describe('Header Search Integration', () => {
 
     it('does not throw when search button is pressed', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(() => {
         fireEvent.press(getByTestId('search-button'));
@@ -164,7 +164,7 @@ describe('Header Search Integration', () => {
   describe('Filter Badge (collapsed mode)', () => {
     it('does not show filter badge when no search filters are active', () => {
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(queryByTestId('filter-badge')).toBeNull();
     });
@@ -184,7 +184,7 @@ describe('Header Search Integration', () => {
       });
 
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(getByTestId('filter-badge')).toBeTruthy();
     });
@@ -199,7 +199,7 @@ describe('Header Search Integration', () => {
       });
 
       const { queryByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(queryByTestId('filter-badge')).toBeNull();
     });
@@ -218,21 +218,21 @@ describe('Header Search Integration', () => {
 
     it('renders SearchBar when search is open', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(getByTestId('search-bar-container')).toBeTruthy();
     });
 
     it('does not render title when search is open', () => {
       const { queryByText } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(queryByText('Penny')).toBeNull();
     });
 
     it('close button calls closeSearch with false when no active search', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       fireEvent.press(getByTestId('close-search-button'));
       expect(mockCloseSearch).toHaveBeenCalledWith(false);
@@ -246,7 +246,7 @@ describe('Header Search Integration', () => {
       });
 
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       fireEvent.press(getByTestId('close-search-button'));
       expect(mockCloseSearch).toHaveBeenCalledWith(true);
@@ -254,7 +254,7 @@ describe('Header Search Integration', () => {
 
     it('filter toggle button calls toggleFilters', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       fireEvent.press(getByTestId('filters-toggle-button'));
       expect(mockToggleFilters).toHaveBeenCalledTimes(1);
@@ -268,7 +268,7 @@ describe('Header Search Integration', () => {
       });
 
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       expect(getByTestId('filter-count-badge')).toBeTruthy();
     });
@@ -281,7 +281,7 @@ describe('Header Search Integration', () => {
       });
 
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       fireEvent.press(getByTestId('clear-search-button'));
       expect(mockSetSearchText).toHaveBeenCalledWith('');
@@ -291,7 +291,7 @@ describe('Header Search Integration', () => {
   describe('Complete Search Workflow', () => {
     it('search button opens search and SearchBar becomes visible', () => {
       const { getByTestId, queryByTestId, rerender } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
 
       expect(queryByTestId('search-bar-container')).toBeNull();
@@ -306,7 +306,7 @@ describe('Header Search Integration', () => {
         reopenSearch: jest.fn(),
         toggleFilters: mockToggleFilters,
       });
-      rerender(<Header onOpenSettings={() => {}} activeScreen="Operations" />);
+      rerender(<Header activeScreen="Operations" />);
 
       expect(getByTestId('search-bar-container')).toBeTruthy();
     });
@@ -336,7 +336,7 @@ describe('Header Search Integration', () => {
   describe('Accessibility', () => {
     it('has proper accessibility props on search button', () => {
       const { getByTestId } = render(
-        <Header onOpenSettings={() => {}} activeScreen="Operations" />,
+        <Header activeScreen="Operations" />,
       );
       const searchButton = getByTestId('search-button');
       expect(searchButton.props.accessibilityLabel).toBe('Search operations');

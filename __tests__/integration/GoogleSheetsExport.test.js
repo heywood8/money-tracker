@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import SettingsModal from '../../app/modals/SettingsModal';
+import SettingsScreen from '../../app/screens/SettingsScreen';
 
 const mockShowDialog = jest.fn();
 
@@ -12,19 +12,9 @@ jest.mock('../../app/services/GoogleSheetsService', () => ({
   importFromSheets: jest.fn(),
 }));
 
-jest.mock('../../app/services/BackupRestore', () => ({
-  exportBackup: jest.fn(),
-  importBackup: jest.fn(),
-  restoreBackup: jest.fn(),
-  createBackup: jest.fn().mockResolvedValue({ data: {} }),
-}));
-
 jest.mock('../../app/services/DailyBackupService', () => ({
   getStoredBackups: jest.fn().mockResolvedValue([]),
-}));
-
-jest.mock('../../app/services/AppUpdateService', () => ({
-  checkForAppUpdate: jest.fn(),
+  DAILY_BACKUP_DIR: '/mock/docs/daily_backups/',
 }));
 
 jest.mock('../../app/services/PreferencesDB', () => ({
@@ -77,6 +67,113 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
   openURL: jest.fn(),
 }));
 
+jest.mock('../../app/services/BackupRestore', () => ({
+  exportBackup: jest.fn(),
+  importBackup: jest.fn(),
+  restoreBackup: jest.fn(),
+  createBackup: jest.fn().mockResolvedValue({ data: {} }),
+  pickImportFile: jest.fn(),
+  importBackupFromFile: jest.fn(),
+  getPreRestoreSnapshots: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../../app/services/AppUpdateService', () => ({
+  checkForAppUpdate: jest.fn(),
+  listDownloadedApks: jest.fn().mockResolvedValue([]),
+  installApk: jest.fn(),
+  checkAlreadyDownloaded: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../../app/services/BiometricService', () => ({
+  authenticateWithBiometrics: jest.fn(),
+  BiometricResult: {
+    SUCCESS: 'success',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+    NOT_AVAILABLE: 'not_available',
+    NOT_ENROLLED: 'not_enrolled',
+  },
+}));
+
+jest.mock('../../app/components/UpdateContentPanel', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return function UpdateContentPanel() {
+    return React.createElement(View, { testID: 'update-content-panel' });
+  };
+});
+
+jest.mock('expo-file-system', () => ({
+  File: jest.fn().mockImplementation(() => ({
+    uri: '/tmp/cache/penny-logs.txt',
+    write: jest.fn(),
+  })),
+  Paths: { cache: '/tmp/cache/' },
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: '/mock/docs/',
+  getInfoAsync: jest.fn().mockResolvedValue({ size: 1024, exists: true }),
+  readDirectoryAsync: jest.fn().mockResolvedValue([]),
+  readAsStringAsync: jest.fn().mockResolvedValue(JSON.stringify({ version: 1, data: {} })),
+  writeAsStringAsync: jest.fn().mockResolvedValue(),
+  deleteAsync: jest.fn().mockResolvedValue(),
+  makeDirectoryAsync: jest.fn().mockResolvedValue(),
+}));
+
+jest.mock('expo-sharing', () => ({
+  shareAsync: jest.fn().mockResolvedValue(),
+  isAvailableAsync: jest.fn().mockResolvedValue(false),
+}));
+
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const PropTypes = require('prop-types');
+  function GestureDetector({ children }) {
+    return React.createElement(View, {}, children);
+  }
+  GestureDetector.propTypes = { children: PropTypes.node };
+  const gestureObj = {
+    onStart: jest.fn(),
+    onUpdate: jest.fn(),
+    onEnd: jest.fn(),
+    onFinalize: jest.fn(),
+    enabled: jest.fn(),
+    activeOffsetX: jest.fn(),
+    activeOffsetY: jest.fn(),
+    failOffsetX: jest.fn(),
+    failOffsetY: jest.fn(),
+    minDistance: jest.fn(),
+    minPointers: jest.fn(),
+    maxPointers: jest.fn(),
+    shouldCancelWhenOutside: jest.fn(),
+  };
+  Object.keys(gestureObj).forEach((key) => {
+    gestureObj[key].mockReturnValue(gestureObj);
+  });
+  const Gesture = { Pan: jest.fn(() => gestureObj) };
+  return { GestureDetector, Gesture, GestureHandlerRootView: View };
+});
+
+jest.mock('react-native-reanimated', () => ({
+  runOnJS: jest.fn((fn) => fn),
+}));
+
+jest.mock('../../app/contexts/ThemeColorsContext', () => ({
+  useThemeColors: () => ({
+    colors: {
+      card: '#ffffff',
+      text: '#000000',
+      border: '#cccccc',
+      primary: '#007AFF',
+      mutedText: '#666666',
+      surface: '#f5f5f5',
+      background: '#ffffff',
+    },
+  }),
+}));
+
 const { getValidAccessToken, signIn, exportToSheets } =
   require('../../app/services/GoogleSheetsService');
 
@@ -87,7 +184,7 @@ describe('GoogleSheetsExport integration', () => {
   });
 
   const renderModal = () =>
-    render(<SettingsModal visible={true} onClose={jest.fn()} />);
+    render(<SettingsScreen setSubPanelActive={jest.fn()} />);
 
   it('shows inline Open button after successful export (already signed in)', async () => {
     getValidAccessToken.mockResolvedValue('access-token');
@@ -190,7 +287,7 @@ describe('From Google Sheets import', () => {
 
   it('renders From Google Sheets row in import subpanel', async () => {
     const { getByText, getByTestId } = render(
-      <SettingsModal visible={true} onClose={jest.fn()} />,
+      <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
     fireEvent.press(getByText('import'));
     await waitFor(() => {
@@ -201,7 +298,7 @@ describe('From Google Sheets import', () => {
   it('shows no-spreadsheet message when no spreadsheet ID is saved', async () => {
     getPreference.mockResolvedValue(null);
     const { getByText, getByTestId } = render(
-      <SettingsModal visible={true} onClose={jest.fn()} />,
+      <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
     fireEvent.press(getByText('import'));
     await waitFor(() => getByTestId('settings-import-google-sheets'));
@@ -223,7 +320,7 @@ describe('From Google Sheets import', () => {
     restoreBackup.mockResolvedValue();
 
     const { getByText, getByTestId } = render(
-      <SettingsModal visible={true} onClose={jest.fn()} />,
+      <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
     fireEvent.press(getByText('import'));
     await waitFor(() => getByTestId('settings-import-google-sheets'));
