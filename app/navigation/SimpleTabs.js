@@ -20,7 +20,7 @@ import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import Header from '../components/Header';
-import SettingsModal from '../modals/SettingsModal';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -36,6 +36,7 @@ const TAB_ICONS = {
   Accounts: 'wallet-outline',
   Categories: 'shape-outline',
   Planned: 'calendar-clock',
+  Settings: 'settings-outline',
 };
 
 // Memoized tab button with icon + label, pill active state
@@ -106,7 +107,7 @@ export default function SimpleTabs() {
   const { t } = useLocalization();
   const operationsData = useOperationsData();
   const [active, setActive] = React.useState('Operations');
-  const [settingsVisible, setSettingsVisible] = React.useState(false);
+  const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
 
   const TABS = useMemo(() => [
@@ -115,6 +116,7 @@ export default function SimpleTabs() {
     { key: 'Accounts', label: t('accounts') || 'Accounts' },
     { key: 'Categories', label: t('categories') || 'Categories' },
     { key: 'Planned', label: t('planned') || 'Planned' },
+    { key: 'Settings', label: t('settings') || 'Settings' },
   ], [t]);
 
   // Animation shared values
@@ -139,17 +141,10 @@ export default function SimpleTabs() {
     setActive(tabKey);
   }, []);
 
-  const handleOpenSettings = useCallback(() => {
-    setSettingsVisible(true);
-  }, []);
-
-  const handleCloseSettings = useCallback(() => {
-    setSettingsVisible(false);
-  }, []);
-
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
     return Gesture.Pan()
+      .enabled(!subPanelActive)
       .activeOffsetX([-10, 10])
       .failOffsetY([-10, 10])
       .onStart(() => {
@@ -196,7 +191,7 @@ export default function SimpleTabs() {
           });
         }
       });
-  }, [translateX, activeIndex, startTranslateX, TABS, setActive]);
+  }, [translateX, activeIndex, startTranslateX, TABS, setActive, subPanelActive]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -241,13 +236,16 @@ export default function SimpleTabs() {
         <View style={styles.screen}>
           <PlannedOperationsScreen />
         </View>
+        <View style={styles.screen}>
+          <SettingsScreen setSubPanelActive={setSubPanelActive} />
+        </View>
       </>
     );
-  }, []);
+  }, [setSubPanelActive]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-      <Header onOpenSettings={handleOpenSettings} activeScreen={active} operationsData={operationsData} />
+      <Header activeScreen={active} operationsData={operationsData} />
       <View style={styles.content}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.screensContainer, animatedStyle]}>
@@ -255,7 +253,6 @@ export default function SimpleTabs() {
           </Animated.View>
         </GestureDetector>
       </View>
-      {settingsVisible && <SettingsModal visible={settingsVisible} onClose={handleCloseSettings} />}
       {/* Floating bar overlays content so screen shows through behind it */}
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
         <View
@@ -343,7 +340,7 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 5,
+    width: SCREEN_WIDTH * 6,
   },
   tab: {
     flex: 1,
