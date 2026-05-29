@@ -431,6 +431,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   resultContainer: {
+    flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
   },
