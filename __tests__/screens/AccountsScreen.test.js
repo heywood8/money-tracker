@@ -148,6 +148,18 @@ describe('AccountsScreen', () => {
       expect(() => render(<AccountsScreen />)).not.toThrow();
     });
 
+    it('zeroes top padding when embedded', () => {
+      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+      const { View, StyleSheet } = require('react-native');
+
+      const { UNSAFE_getAllByType } = render(<AccountsScreen embedded />);
+      // First View in the tree is the root container
+      const rootView = UNSAFE_getAllByType(View)[0];
+      const resolved = StyleSheet.flatten(rootView.props.style);
+      // containerEmbedded overrides paddingTop to 0
+      expect(resolved.paddingTop).toBe(0);
+    });
+
     it('uses ThemeContext for styling', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useThemeConfig } = require('../../app/contexts/ThemeConfigContext');

@@ -30,9 +30,9 @@ jest.mock('../../app/contexts/LocalizationContext', () => ({
       const translations = {
         operations: 'Operations',
         graphs: 'Graphs',
-        accounts: 'Accounts',
         categories: 'Categories',
         planned: 'Planned',
+        settings: 'settings',
       };
       return translations[key] || key;
     },
@@ -158,9 +158,10 @@ jest.mock('react-native-paper', () => {
   const { Text: RNText, View, Pressable } = require('react-native');
   const PropTypes = require('prop-types');
 
-  function TouchableRipple({ children, onPress, accessibilityLabel, accessibilityState, testID, ...props }) {
+  function TouchableRipple({ children, onPress, onPressIn, accessibilityLabel, accessibilityState, testID, ...props }) {
     return React.createElement(Pressable, {
       onPress,
+      onPressIn,
       accessibilityLabel,
       accessibilityState,
       testID: testID || `tab-${accessibilityLabel}`,
@@ -171,6 +172,7 @@ jest.mock('react-native-paper', () => {
   TouchableRipple.propTypes = {
     children: PropTypes.node,
     onPress: PropTypes.func,
+    onPressIn: PropTypes.func,
     accessibilityLabel: PropTypes.string,
     accessibilityState: PropTypes.object,
     testID: PropTypes.string,
@@ -262,7 +264,22 @@ jest.mock('react-native-reanimated', () => {
       if (callback) callback(true);
       return toValue;
     },
+    withTiming: (toValue, config, callback) => {
+      if (callback) callback(true);
+      return toValue;
+    },
     runOnJS: (fn) => fn,
+    runOnUI: (fn) => fn,
+    Easing: {
+      linear: () => {},
+      ease: () => {},
+      quad: () => {},
+      cubic: () => {},
+      bezier: () => () => {},
+      in: (easing) => easing,
+      out: (easing) => easing,
+      inOut: (easing) => easing,
+    },
   };
 });
 
@@ -276,23 +293,21 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders all six tab labels', () => {
+  it('renders all five tab labels', () => {
     const { getByText } = render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
-    expect(getByText('Accounts')).toBeTruthy();
     expect(getByText('Categories')).toBeTruthy();
     expect(getByText('Planned')).toBeTruthy();
     expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all six screens', () => {
+  it('renders all five screens', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
     expect(getByTestId('graphs-screen')).toBeTruthy();
-    expect(getByTestId('accounts-screen')).toBeTruthy();
     expect(getByTestId('categories-screen')).toBeTruthy();
     expect(getByTestId('planned-screen')).toBeTruthy();
     expect(getByTestId('settings-screen')).toBeTruthy();
@@ -301,13 +316,13 @@ describe('SimpleTabs Component Rendering', () => {
   it('switches active tab when tab is pressed', async () => {
     const { getByTestId } = render(<SimpleTabs />);
 
-    // Press the Accounts tab
-    const accountsTab = getByTestId('tab-Accounts');
-    fireEvent.press(accountsTab);
+    // Press the Graphs tab
+    const graphsTab = getByTestId('tab-Graphs');
+    fireEvent.press(graphsTab);
 
     // Give React time to update
     await waitFor(() => {
-      expect(accountsTab).toBeTruthy();
+      expect(graphsTab).toBeTruthy();
     });
   });
 
@@ -319,8 +334,8 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders a Settings tab button', () => {
     const { getAllByRole } = render(<SimpleTabs />);
     const tabs = getAllByRole('button');
-    // 6 tabs total: Operations, Graphs, Accounts, Categories, Planned, Settings
-    expect(tabs.length).toBeGreaterThanOrEqual(6);
+    // 5 tabs total: Operations, Graphs, Categories, Planned, Settings
+    expect(tabs.length).toBeGreaterThanOrEqual(5);
   });
 
   it('renders all tabs with correct accessibility labels', () => {
@@ -328,7 +343,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
-    expect(getByTestId('tab-Accounts')).toBeTruthy();
     expect(getByTestId('tab-Categories')).toBeTruthy();
   });
 
@@ -338,7 +352,6 @@ describe('SimpleTabs Component Rendering', () => {
     // Press each tab
     fireEvent.press(getByTestId('tab-Operations'));
     fireEvent.press(getByTestId('tab-Graphs'));
-    fireEvent.press(getByTestId('tab-Accounts'));
     fireEvent.press(getByTestId('tab-Categories'));
 
     // All should work without errors
@@ -362,19 +375,18 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('maintains state when switching between tabs rapidly', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId, queryAllByTestId } = render(<SimpleTabs />);
 
     // Rapidly switch between tabs
     for (let i = 0; i < 5; i++) {
       fireEvent.press(getByTestId('tab-Operations'));
       fireEvent.press(getByTestId('tab-Graphs'));
-      fireEvent.press(getByTestId('tab-Accounts'));
       fireEvent.press(getByTestId('tab-Categories'));
     }
 
-    // Component should still be stable
+    // Component should still be stable (overlay may duplicate a screen testID)
     expect(getByTestId('mock-header')).toBeTruthy();
-    expect(getByTestId('operations-screen')).toBeTruthy();
+    expect(queryAllByTestId('operations-screen').length).toBeGreaterThanOrEqual(1);
   });
 
   it('handles tab press callback correctly', async () => {
@@ -411,7 +423,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByText('Operations Screen')).toBeTruthy();
     expect(getByText('Graphs Screen')).toBeTruthy();
-    expect(getByText('Accounts Screen')).toBeTruthy();
     expect(getByText('Categories Screen')).toBeTruthy();
   });
 
@@ -448,13 +459,34 @@ describe('SimpleTabs Component Rendering', () => {
     // Verify all TabButtons render and are pressable
     const operationsTab = getByTestId('tab-Operations');
     const graphsTab = getByTestId('tab-Graphs');
-    const accountsTab = getByTestId('tab-Accounts');
     const categoriesTab = getByTestId('tab-Categories');
 
     expect(operationsTab.props.accessibilityLabel).toBe('Operations');
     expect(graphsTab.props.accessibilityLabel).toBe('Graphs');
-    expect(accountsTab.props.accessibilityLabel).toBe('Accounts');
     expect(categoriesTab.props.accessibilityLabel).toBe('Categories');
+  });
+
+  it('activates adjacent tab on pressIn', async () => {
+    const { getByTestId } = render(<SimpleTabs />);
+
+    // Operations is active by default; Graphs is adjacent (distance=1)
+    fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+
+    await waitFor(() => {
+      // Graphs tab should now be selected
+      expect(getByTestId('tab-Graphs').props.accessibilityState).toEqual({ selected: true });
+    });
+  });
+
+  it('activates non-adjacent tab via overlay on pressIn', async () => {
+    const { getByTestId } = render(<SimpleTabs />);
+
+    // Operations (index 0) → Categories (index 2) — distance=2, triggers overlay path
+    fireEvent(getByTestId('tab-Categories'), 'pressIn');
+
+    await waitFor(() => {
+      expect(getByTestId('tab-Categories').props.accessibilityState).toEqual({ selected: true });
+    });
   });
 });
 
@@ -516,13 +548,13 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     // Verify component renders
     expect(getByTestId('mock-header')).toBeTruthy();
 
-    // Test navigateToTab logic directly - left swipe from Operations should go to Graphs
-    // The actual navigateToTab is line 121-136
+    // Test navigateToTab logic directly — left swipe from Operations should go to Graphs
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
-      { key: 'Accounts', label: 'Accounts' },
       { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
     // Simulate navigateToTab('left') from index 0
@@ -547,8 +579,9 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
-      { key: 'Accounts', label: 'Accounts' },
       { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
     // Simulate navigateToTab('right') from index 2
@@ -570,12 +603,13 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
-      { key: 'Accounts', label: 'Accounts' },
       { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
-    // Simulate navigateToTab('left') from index 3 (last tab)
-    const currentIndex = 3;
+    // Simulate navigateToTab('left') from index 4 (last tab)
+    const currentIndex = 4;
     const direction = 'left';
     let newIndex;
 
@@ -585,16 +619,17 @@ describe('SimpleTabs Pan Gesture Integration', () => {
       newIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
     }
 
-    expect(newIndex).toBe(3); // Should stay at 3
-    expect(TABS[newIndex].key).toBe('Categories');
+    expect(newIndex).toBe(4); // Should stay at 4
+    expect(TABS[newIndex].key).toBe('Settings');
   });
 
   it('should not navigate past first tab on right swipe', () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
-      { key: 'Accounts', label: 'Accounts' },
       { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
     // Simulate navigateToTab('right') from index 0 (first tab)
@@ -617,8 +652,9 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
-      { key: 'Accounts', label: 'Accounts' },
       { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
     // Simulate the condition check at line 133
@@ -644,8 +680,8 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     simulateNavigate(0, 'right');
     expect(setActiveMock).toHaveBeenCalledTimes(1); // Still 1
 
-    // Navigate from 3 left - should NOT call setActive
-    simulateNavigate(3, 'left');
+    // Navigate from last (4) left - should NOT call setActive
+    simulateNavigate(4, 'left');
     expect(setActiveMock).toHaveBeenCalledTimes(1); // Still 1
   });
 });
@@ -655,8 +691,9 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
   const TABS = [
     { key: 'Operations', label: 'Operations' },
     { key: 'Graphs', label: 'Graphs' },
-    { key: 'Accounts', label: 'Accounts' },
     { key: 'Categories', label: 'Categories' },
+    { key: 'Planned', label: 'Planned' },
+    { key: 'Settings', label: 'Settings' },
   ];
   const SWIPE_THRESHOLD = 50;
   const VELOCITY_THRESHOLD = 500;
@@ -672,16 +709,16 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
 
     const newTranslateX = startTranslateX + eventTranslationX;
     const maxTranslateX = 0;
-    const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH; // -1200
+    const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH; // -1600
 
     const clampedValue = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
 
-    expect(clampedValue).toBe(-1200); // Clamped to min
+    expect(clampedValue).toBe(-1600); // Clamped to min
   });
 
   it('should clamp translation during onUpdate to prevent over-scrolling right', () => {
     // Simulates lines 150-155 in onUpdate
-    const startTranslateX = -800; // Currently at Accounts tab
+    const startTranslateX = -800; // Currently at Categories tab (index 2)
     const eventTranslationX = 2000; // Very large swipe right
 
     const newTranslateX = startTranslateX + eventTranslationX;
@@ -792,7 +829,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
 
   it('should not exceed last tab boundary on left swipe', () => {
     // Simulates line 168 Math.min check
-    const currentIndex = 3; // At last tab
+    const currentIndex = 4; // At last tab (Settings)
     const gestureTranslationX = -100;
     const velocityX = 0;
 
@@ -802,7 +839,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
       newIndex = Math.min(currentIndex + 1, TABS.length - 1);
     }
 
-    expect(newIndex).toBe(3); // Clamped to last tab
+    expect(newIndex).toBe(4); // Clamped to last tab
   });
 
   it('should not go below first tab boundary on right swipe', () => {
@@ -887,96 +924,101 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
   describe('Component Structure and Logic', () => {
     it('should have correct tab structure', () => {
-      // Test the tab configuration used in SimpleTabs (lines 50-55)
+      // Test the tab configuration used in SimpleTabs
       const tabs = [
         { key: 'Operations', label: 'Operations' },
-        { key: 'Accounts', label: 'Accounts' },
-        { key: 'Categories', label: 'Categories' },
         { key: 'Graphs', label: 'Graphs' },
+        { key: 'Categories', label: 'Categories' },
+        { key: 'Planned', label: 'Planned' },
+        { key: 'Settings', label: 'Settings' },
       ];
-      
-      expect(tabs).toHaveLength(4);
+
+      expect(tabs).toHaveLength(5);
       expect(tabs[0].key).toBe('Operations');
-      expect(tabs[1].key).toBe('Accounts');
+      expect(tabs[1].key).toBe('Graphs');
       expect(tabs[2].key).toBe('Categories');
-      expect(tabs[3].key).toBe('Graphs');
+      expect(tabs[3].key).toBe('Planned');
+      expect(tabs[4].key).toBe('Settings');
     });
 
     it('should default to Operations as initial active tab', () => {
-      // Based on SimpleTabs.js line 48: const [active, setActive] = React.useState('Operations');
+      // Based on SimpleTabs.js: const [active, setActive] = React.useState('Operations');
       const initialActive = 'Operations';
       expect(initialActive).toBe('Operations');
     });
 
     it('should support all tab keys', () => {
-      const validTabKeys = ['Operations', 'Accounts', 'Categories', 'Graphs'];
-      
+      const validTabKeys = ['Operations', 'Graphs', 'Categories', 'Planned', 'Settings'];
+
       validTabKeys.forEach(key => {
-        expect(key).toMatch(/^(Operations|Accounts|Categories|Graphs)$/);
+        expect(key).toMatch(/^(Operations|Graphs|Categories|Planned|Settings)$/);
       });
     });
   });
 
   describe('Tab Switching Logic', () => {
     it('should handle tab press correctly', () => {
-      // Simulates handleTabPress callback (lines 57-59)
+      // Simulates handleTabPress callback
       const handleTabPress = jest.fn((tabKey) => {
         return tabKey;
       });
-      
-      handleTabPress('Accounts');
-      expect(handleTabPress).toHaveBeenCalledWith('Accounts');
-      expect(handleTabPress('Accounts')).toBe('Accounts');
-      
+
+      handleTabPress('Planned');
+      expect(handleTabPress).toHaveBeenCalledWith('Planned');
+      expect(handleTabPress('Planned')).toBe('Planned');
+
       handleTabPress('Categories');
       expect(handleTabPress).toHaveBeenCalledWith('Categories');
-      
+
       handleTabPress('Graphs');
       expect(handleTabPress).toHaveBeenCalledWith('Graphs');
     });
 
     it('should render correct screen based on active tab', () => {
-      // Tests renderActive function logic (lines 69-81)
+      // Tests renderScreens logic
       const getActiveScreen = (active) => {
         switch (active) {
         case 'Operations':
           return 'OperationsScreen';
-        case 'Accounts':
-          return 'AccountsScreen';
-        case 'Categories':
-          return 'CategoriesScreen';
         case 'Graphs':
           return 'GraphsScreen';
+        case 'Categories':
+          return 'CategoriesScreen';
+        case 'Planned':
+          return 'PlannedOperationsScreen';
+        case 'Settings':
+          return 'SettingsScreen';
         default:
           return 'OperationsScreen';
         }
       };
-      
+
       expect(getActiveScreen('Operations')).toBe('OperationsScreen');
-      expect(getActiveScreen('Accounts')).toBe('AccountsScreen');
-      expect(getActiveScreen('Categories')).toBe('CategoriesScreen');
       expect(getActiveScreen('Graphs')).toBe('GraphsScreen');
+      expect(getActiveScreen('Categories')).toBe('CategoriesScreen');
+      expect(getActiveScreen('Planned')).toBe('PlannedOperationsScreen');
+      expect(getActiveScreen('Settings')).toBe('SettingsScreen');
       expect(getActiveScreen('Unknown')).toBe('OperationsScreen'); // Default case
     });
 
     it('should maintain tab state consistency', () => {
       let activeTab = 'Operations';
-      
+
       const setActiveTab = (newTab) => {
         activeTab = newTab;
       };
-      
+
       expect(activeTab).toBe('Operations');
-      
-      setActiveTab('Accounts');
-      expect(activeTab).toBe('Accounts');
-      
-      setActiveTab('Categories');
-      expect(activeTab).toBe('Categories');
-      
+
       setActiveTab('Graphs');
       expect(activeTab).toBe('Graphs');
-      
+
+      setActiveTab('Categories');
+      expect(activeTab).toBe('Categories');
+
+      setActiveTab('Planned');
+      expect(activeTab).toBe('Planned');
+
       setActiveTab('Operations');
       expect(activeTab).toBe('Operations');
     });
@@ -984,63 +1026,63 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
   describe('TabButton Component Logic', () => {
     it('should determine active state correctly', () => {
-      // Tests TabButton isActive prop logic (line 89)
+      // Tests TabButton isActive prop logic
       const isTabActive = (tabKey, activeTab) => tabKey === activeTab;
-      
+
       expect(isTabActive('Operations', 'Operations')).toBe(true);
-      expect(isTabActive('Accounts', 'Operations')).toBe(false);
-      expect(isTabActive('Categories', 'Operations')).toBe(false);
       expect(isTabActive('Graphs', 'Operations')).toBe(false);
-      
-      expect(isTabActive('Accounts', 'Accounts')).toBe(true);
-      expect(isTabActive('Operations', 'Accounts')).toBe(false);
+      expect(isTabActive('Categories', 'Operations')).toBe(false);
+      expect(isTabActive('Planned', 'Operations')).toBe(false);
+
+      expect(isTabActive('Graphs', 'Graphs')).toBe(true);
+      expect(isTabActive('Operations', 'Graphs')).toBe(false);
     });
 
     it('should have correct accessibility properties', () => {
-      // Tests TabButton accessibility props (lines 29-32)
+      // Tests TabButton accessibility props
       const getAccessibilityProps = (tabLabel, isActive) => ({
         accessibilityRole: 'button',
         accessibilityState: { selected: isActive },
         accessibilityLabel: tabLabel,
       });
-      
+
       const props = getAccessibilityProps('Operations', true);
       expect(props.accessibilityRole).toBe('button');
       expect(props.accessibilityState.selected).toBe(true);
       expect(props.accessibilityLabel).toBe('Operations');
-      
-      const props2 = getAccessibilityProps('Accounts', false);
+
+      const props2 = getAccessibilityProps('Graphs', false);
       expect(props2.accessibilityState.selected).toBe(false);
     });
 
     it('should handle rapid tab switches', () => {
       let activeTab = 'Operations';
       const switchTab = (newTab) => { activeTab = newTab; };
-      
+
       // Rapid switching
       for (let i = 0; i < 10; i++) {
-        switchTab('Accounts');
-        switchTab('Categories');
         switchTab('Graphs');
+        switchTab('Categories');
+        switchTab('Planned');
         switchTab('Operations');
       }
-      
+
       expect(activeTab).toBe('Operations');
     });
 
     it('should apply correct text style based on active state', () => {
       const colors = { primary: '#007AFF', mutedText: '#999999' };
-      
-      // Tests textStyle logic from TabButton (lines 16-19)
+
+      // Tests textStyle logic from TabButton
       const getTextStyle = (isActive) => ({
         fontWeight: isActive ? '700' : 'normal',
         color: isActive ? colors.primary : colors.mutedText,
       });
-      
+
       const activeStyle = getTextStyle(true);
       expect(activeStyle.fontWeight).toBe('700');
       expect(activeStyle.color).toBe('#007AFF');
-      
+
       const inactiveStyle = getTextStyle(false);
       expect(inactiveStyle.fontWeight).toBe('normal');
       expect(inactiveStyle.color).toBe('#999999');
@@ -1049,43 +1091,45 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
   describe('Localization Integration', () => {
     it('should use translation keys for tab labels', () => {
-      // Tests TABS useMemo with translation (lines 50-55)
+      // Tests TABS useMemo with translation
       const t = (key) => {
         const translations = {
           operations: 'Operations',
-          accounts: 'Accounts',
-          categories: 'Categories',
           graphs: 'Graphs',
+          categories: 'Categories',
+          planned: 'Planned',
+          settings: 'Settings',
         };
         return translations[key] || key;
       };
-      
+
       expect(t('operations')).toBe('Operations');
-      expect(t('accounts')).toBe('Accounts');
-      expect(t('categories')).toBe('Categories');
       expect(t('graphs')).toBe('Graphs');
+      expect(t('categories')).toBe('Categories');
+      expect(t('planned')).toBe('Planned');
+      expect(t('settings')).toBe('Settings');
     });
 
     it('should provide fallback for missing translations', () => {
       // Tests fallback logic: t('operations') || 'Operations'
       const t = (key) => null; // Simulate missing translation
       const label = t('operations') || 'Operations';
-      
+
       expect(label).toBe('Operations');
     });
 
     it('should handle different languages', () => {
       const translations = {
-        en: { operations: 'Operations', accounts: 'Accounts' },
-        ru: { operations: 'Операции', accounts: 'Счета' },
+        en: { operations: 'Operations', graphs: 'Graphs' },
+        ru: { operations: 'Операции', graphs: 'Графики' },
       };
-      
+
       const t = (key, lang = 'en') => translations[lang][key] || key;
-      
+
       expect(t('operations', 'en')).toBe('Operations');
       expect(t('operations', 'ru')).toBe('Операции');
-      expect(t('accounts', 'en')).toBe('Accounts');
-      expect(t('accounts', 'ru')).toBe('Счета');
+      expect(t('graphs', 'en')).toBe('Graphs');
+      expect(t('graphs', 'ru')).toBe('Графики');
     });
   });
 
@@ -1097,33 +1141,33 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         background: '#FFFFFF',
         text: '#000000',
       };
-      
+
       const getTextStyle = (isActive) => ({
         fontWeight: isActive ? '700' : 'normal',
         color: isActive ? colors.primary : colors.mutedText,
       });
-      
+
       const activeStyle = getTextStyle(true);
       expect(activeStyle.fontWeight).toBe('700');
       expect(activeStyle.color).toBe(colors.primary);
-      
+
       const inactiveStyle = getTextStyle(false);
       expect(inactiveStyle.fontWeight).toBe('normal');
       expect(inactiveStyle.color).toBe(colors.mutedText);
     });
 
     it('should apply indicator color from theme', () => {
-      // Tests indicator style (line 37)
+      // Tests indicator style
       const colors = { primary: '#007AFF' };
       const indicatorStyle = { backgroundColor: colors.primary };
-      
+
       expect(indicatorStyle.backgroundColor).toBe('#007AFF');
     });
 
     it('should apply background color from theme', () => {
       const colors = { background: '#FFFFFF' };
       const containerStyle = { backgroundColor: colors.background };
-      
+
       expect(containerStyle.backgroundColor).toBe('#FFFFFF');
     });
   });
@@ -1134,33 +1178,33 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         active: 'Operations',
         settingsVisible: false,
       };
-      
+
       expect(state.active).toBe('Operations');
       expect(state.settingsVisible).toBe(false);
-      
-      state.active = 'Accounts';
-      expect(state.active).toBe('Accounts');
+
+      state.active = 'Graphs';
+      expect(state.active).toBe('Graphs');
       expect(state.settingsVisible).toBe(false);
-      
+
       state.settingsVisible = true;
-      expect(state.active).toBe('Accounts');
+      expect(state.active).toBe('Graphs');
       expect(state.settingsVisible).toBe(true);
     });
 
     it('should handle concurrent state updates', () => {
       let active = 'Operations';
       let settingsVisible = false;
-      
+
       // Simulate concurrent updates
-      active = 'Accounts';
+      active = 'Graphs';
       settingsVisible = true;
-      
-      expect(active).toBe('Accounts');
+
+      expect(active).toBe('Graphs');
       expect(settingsVisible).toBe(true);
-      
+
       active = 'Categories';
       settingsVisible = false;
-      
+
       expect(active).toBe('Categories');
       expect(settingsVisible).toBe(false);
     });
@@ -1169,11 +1213,11 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   describe('Callback Functions', () => {
     it('should execute handleTabPress callback', () => {
       const handleTabPress = jest.fn();
-      
-      handleTabPress('Accounts');
-      expect(handleTabPress).toHaveBeenCalledWith('Accounts');
+
+      handleTabPress('Planned');
+      expect(handleTabPress).toHaveBeenCalledWith('Planned');
       expect(handleTabPress).toHaveBeenCalledTimes(1);
-      
+
       handleTabPress('Categories');
       expect(handleTabPress).toHaveBeenCalledWith('Categories');
       expect(handleTabPress).toHaveBeenCalledTimes(2);
@@ -1183,7 +1227,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       // useCallback ensures callback reference stability
       const callback = jest.fn();
       const memoizedCallback = jest.fn((...args) => callback(...args));
-      
+
       memoizedCallback('test');
       expect(callback).toHaveBeenCalledWith('test');
     });
@@ -1192,31 +1236,32 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   describe('Performance and Optimization', () => {
     it('should memoize TABS array based on translation function', () => {
       const t = jest.fn((key) => key);
-      
+
       // Simulates useMemo dependency
       const createTabs = (tFunc) => [
         { key: 'Operations', label: tFunc('operations') },
-        { key: 'Accounts', label: tFunc('accounts') },
-        { key: 'Categories', label: tFunc('categories') },
         { key: 'Graphs', label: tFunc('graphs') },
+        { key: 'Categories', label: tFunc('categories') },
+        { key: 'Planned', label: tFunc('planned') },
+        { key: 'Settings', label: tFunc('settings') },
       ];
-      
+
       const tabs = createTabs(t);
-      expect(tabs).toHaveLength(4);
-      expect(t).toHaveBeenCalledTimes(4);
+      expect(tabs).toHaveLength(5);
+      expect(t).toHaveBeenCalledTimes(5);
     });
 
     it('should memoize text styles', () => {
       const colors = { primary: '#007AFF', mutedText: '#999' };
-      
+
       const getTextStyle = (isActive) => ({
         fontWeight: isActive ? '700' : 'normal',
         color: isActive ? colors.primary : colors.mutedText,
       });
-      
+
       const style1 = getTextStyle(true);
       const style2 = getTextStyle(true);
-      
+
       expect(style1).toEqual(style2);
     });
 
@@ -1224,29 +1269,28 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       // Test that state updates are isolated
       let renderCount = 0;
       let activeTab = 'Operations';
-      
+
       for (let i = 0; i < 100; i++) {
-        activeTab = ['Operations', 'Accounts', 'Categories', 'Graphs'][i % 4];
+        activeTab = ['Operations', 'Graphs', 'Categories', 'Planned', 'Settings'][i % 5];
         renderCount++;
       }
-      
+
       expect(renderCount).toBe(100);
-      expect(activeTab).toBe('Graphs'); // 99 % 4 = 3
+      expect(activeTab).toBe('Settings'); // 99 % 5 = 4 → Settings
     });
 
     it('should use React.memo for TabButton component', () => {
-      // TabButton is wrapped in memo (line 15) to prevent unnecessary re-renders
-      // This test verifies that memoization concept is understood
+      // TabButton is wrapped in memo to prevent unnecessary re-renders
       const propsEqual = (prevProps, nextProps) => {
         return prevProps.tab === nextProps.tab &&
                prevProps.isActive === nextProps.isActive &&
                prevProps.colors === nextProps.colors;
       };
-      
+
       const props1 = { tab: 'Ops', isActive: true, colors: {} };
       const props2 = { tab: 'Ops', isActive: true, colors: {} };
-      const props3 = { tab: 'Acc', isActive: false, colors: {} };
-      
+      const props3 = { tab: 'Graphs', isActive: false, colors: {} };
+
       expect(propsEqual(props1, props1)).toBe(true);
       expect(propsEqual(props1, props3)).toBe(false);
     });
@@ -1257,13 +1301,14 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       const getScreen = (active) => {
         switch (active) {
         case 'Operations': return 'OperationsScreen';
-        case 'Accounts': return 'AccountsScreen';
-        case 'Categories': return 'CategoriesScreen';
         case 'Graphs': return 'GraphsScreen';
+        case 'Categories': return 'CategoriesScreen';
+        case 'Planned': return 'PlannedOperationsScreen';
+        case 'Settings': return 'SettingsScreen';
         default: return 'OperationsScreen';
         }
       };
-      
+
       expect(getScreen('InvalidTab')).toBe('OperationsScreen');
       expect(getScreen(null)).toBe('OperationsScreen');
       expect(getScreen(undefined)).toBe('OperationsScreen');
@@ -1277,15 +1322,15 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
     it('should maintain state consistency after many operations', () => {
       let active = 'Operations';
       let settingsVisible = false;
-      
+
       // Perform many operations
       for (let i = 0; i < 50; i++) {
-        active = ['Operations', 'Accounts', 'Categories', 'Graphs'][i % 4];
+        active = ['Operations', 'Graphs', 'Categories', 'Planned', 'Settings'][i % 5];
         settingsVisible = !settingsVisible;
       }
-      
+
       // State should still be valid
-      expect(['Operations', 'Accounts', 'Categories', 'Graphs']).toContain(active);
+      expect(['Operations', 'Graphs', 'Categories', 'Planned', 'Settings']).toContain(active);
       expect(typeof settingsVisible).toBe('boolean');
     });
 
@@ -1295,14 +1340,14 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         fontWeight: 'normal',
         color: colors.mutedText || '#999999', // Fallback
       };
-      
+
       expect(textStyle.color).toBe('#999999');
     });
   });
 
   describe('Component Integration Points', () => {
     it('should integrate with ThemeContext', () => {
-      // SimpleTabs uses useTheme() hook (line 9)
+      // SimpleTabs uses useThemeColors() hook
       const mockThemeContext = {
         colors: {
           background: '#FFFFFF',
@@ -1313,18 +1358,18 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
           border: '#E0E0E0',
         },
       };
-      
+
       expect(mockThemeContext.colors.primary).toBeDefined();
       expect(mockThemeContext.colors.mutedText).toBeDefined();
     });
 
     it('should integrate with LocalizationContext', () => {
-      // SimpleTabs uses useLocalization() hook (line 10)
+      // SimpleTabs uses useLocalization() hook
       const mockLocalizationContext = {
         t: (key) => key,
         language: 'en',
       };
-      
+
       expect(mockLocalizationContext.t('operations')).toBe('operations');
       expect(mockLocalizationContext.language).toBe('en');
     });
@@ -1344,7 +1389,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         colors: { primary: '#007AFF', mutedText: '#999' },
         onPress: jest.fn(),
       };
-      
+
       expect(tabButtonProps.tab.key).toBe('Operations');
       expect(tabButtonProps.isActive).toBe(true);
       expect(typeof tabButtonProps.onPress).toBe('function');
@@ -1392,9 +1437,10 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   describe('Swipe Navigation', () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
-      { key: 'Accounts', label: 'Accounts' },
-      { key: 'Categories', label: 'Categories' },
       { key: 'Graphs', label: 'Graphs' },
+      { key: 'Categories', label: 'Categories' },
+      { key: 'Planned', label: 'Planned' },
+      { key: 'Settings', label: 'Settings' },
     ];
 
     it('should navigate to next tab on left swipe', () => {
@@ -1412,9 +1458,10 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         return TABS[newIndex].key;
       };
 
-      expect(navigateToTab('Operations', 'left')).toBe('Accounts');
-      expect(navigateToTab('Accounts', 'left')).toBe('Categories');
-      expect(navigateToTab('Categories', 'left')).toBe('Graphs');
+      expect(navigateToTab('Operations', 'left')).toBe('Graphs');
+      expect(navigateToTab('Graphs', 'left')).toBe('Categories');
+      expect(navigateToTab('Categories', 'left')).toBe('Planned');
+      expect(navigateToTab('Planned', 'left')).toBe('Settings');
     });
 
     it('should navigate to previous tab on right swipe', () => {
@@ -1431,9 +1478,10 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         return TABS[newIndex].key;
       };
 
-      expect(navigateToTab('Graphs', 'right')).toBe('Categories');
-      expect(navigateToTab('Categories', 'right')).toBe('Accounts');
-      expect(navigateToTab('Accounts', 'right')).toBe('Operations');
+      expect(navigateToTab('Settings', 'right')).toBe('Planned');
+      expect(navigateToTab('Planned', 'right')).toBe('Categories');
+      expect(navigateToTab('Categories', 'right')).toBe('Graphs');
+      expect(navigateToTab('Graphs', 'right')).toBe('Operations');
     });
 
     it('should not navigate past first tab on right swipe', () => {
@@ -1467,7 +1515,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         return TABS[newIndex].key;
       };
 
-      expect(navigateToTab('Graphs', 'left')).toBe('Graphs');
+      expect(navigateToTab('Settings', 'left')).toBe('Settings');
     });
 
     it('should detect left swipe based on translation threshold', () => {
@@ -1527,19 +1575,25 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(currentTab).toBe('Operations');
 
       navigateToTab('left');
-      expect(currentTab).toBe('Accounts');
-
-      navigateToTab('left');
-      expect(currentTab).toBe('Categories');
-
-      navigateToTab('left');
       expect(currentTab).toBe('Graphs');
 
+      navigateToTab('left');
+      expect(currentTab).toBe('Categories');
+
+      navigateToTab('left');
+      expect(currentTab).toBe('Planned');
+
+      navigateToTab('left');
+      expect(currentTab).toBe('Settings');
+
+      navigateToTab('right');
+      expect(currentTab).toBe('Planned');
+
       navigateToTab('right');
       expect(currentTab).toBe('Categories');
 
       navigateToTab('right');
-      expect(currentTab).toBe('Accounts');
+      expect(currentTab).toBe('Graphs');
 
       navigateToTab('right');
       expect(currentTab).toBe('Operations');
@@ -1565,7 +1619,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       for (let i = 0; i < 10; i++) {
         navigateToTab('left');
       }
-      expect(currentTab).toBe('Graphs'); // Should stop at last tab
+      expect(currentTab).toBe('Settings'); // Should stop at last tab
 
       // Rapid right swipes
       for (let i = 0; i < 10; i++) {

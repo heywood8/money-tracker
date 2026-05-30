@@ -25,6 +25,7 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
+import AccountsScreen from './AccountsScreen';
 
 const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
@@ -58,7 +59,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
   const { startDownload } = useUpdateDownload();
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // 'language' | 'export' | 'logs' | 'backups' | null
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // 'accounts' | 'language' | 'export' | 'logs' | 'backups' | null
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -775,6 +776,21 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
           </TouchableRipple>
 
+          <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="wallet-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {t('accounts_hint') || 'Manage your accounts and balances'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
           <Divider style={styles.divider} />
 
           <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
@@ -846,6 +862,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           <Animated.View style={[
             styles.subPanelContent,
             { backgroundColor: colors.background },
+            activeSubPanel === 'accounts' && styles.subPanelContentFlush,
             {
               transform: [{ translateX: subPanelTranslateX }],
               opacity: subPanelOpacity,
@@ -868,6 +885,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
               <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
+                {activeSubPanel === 'accounts' && (t('accounts') || 'Accounts')}
                 {activeSubPanel === 'language' && t('language')}
                 {activeSubPanel === 'export' && (
                   exportStep === 'sheets-progress'
@@ -903,6 +921,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
 
             <Divider />
+
+            {activeSubPanel === 'accounts' && (
+              <View style={styles.accountsPanelWrapper}>
+                <AccountsScreen embedded />
+              </View>
+            )}
 
             {activeSubPanel === 'language' && (
               <ScrollView style={styles.languageList}>
@@ -1328,6 +1352,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
 }
 
 const styles = StyleSheet.create({
+  accountsPanelWrapper: {
+    flex: 1,
+  },
   backButton: {
     alignItems: 'center',
     height: 40,
@@ -1621,6 +1648,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+  },
+  subPanelContentFlush: {
+    paddingBottom: 0,
   },
   switchThumb: {
     backgroundColor: '#fff',
