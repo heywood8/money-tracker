@@ -296,6 +296,7 @@ describe('SettingsScreen', () => {
       fireEvent.press(getByTestId('settings-accounts-row'));
 
       expect(getByTestId('accounts-screen')).toBeTruthy();
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
     it('renders language row', () => {

@@ -7,10 +7,8 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
   withSpring,
   runOnJS,
-  Easing,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
@@ -24,8 +22,6 @@ import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SLIDE_DURATION = 280;
-const SLIDE_EASING = Easing.out(Easing.cubic);
 
 // Append alpha channel to a hex color (hex 00-FF)
 const withAlpha = (hex, alpha) => {
@@ -222,10 +218,8 @@ export default function SimpleTabs() {
     const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
     translateX.value = withSpring(stripExit, springConfig);
-    overlayTranslateX.value = withSpring(0, springConfig, (isFinished) => {
-      if (isFinished) {
-        runOnJS(completeOverlayTransition)(tabKey);
-      }
+    overlayTranslateX.value = withSpring(0, springConfig, () => {
+      runOnJS(completeOverlayTransition)(tabKey);
     });
     pillPosition.value = withSpring(newIndex, springConfig);
   }, [overlay, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
