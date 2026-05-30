@@ -950,7 +950,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'categories' && (
               <View style={styles.accountsPanelWrapper}>
-                <CategoriesScreen embedded />
+                <CategoriesScreen />
               </View>
             )}
 
