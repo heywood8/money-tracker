@@ -76,9 +76,11 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
   useCategories: jest.fn(() => ({
     categories: [],
     loading: false,
-    expandedIds: new Set(),
-    toggleExpanded: jest.fn(),
     getChildren: jest.fn(() => []),
+    addCategory: jest.fn(),
+    updateCategory: jest.fn(),
+    deleteCategory: jest.fn(),
+    validateCategory: jest.fn(() => null),
   })),
 }));
 
@@ -122,10 +124,10 @@ describe('CategoriesScreen', () => {
       expect(() => render(<CategoriesScreen />)).not.toThrow();
     });
 
-    it('renders without crashing when embedded prop is true', () => {
+    it('renders without crashing with no props', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
-      expect(() => render(<CategoriesScreen embedded />)).not.toThrow();
+      expect(() => render(<CategoriesScreen />)).not.toThrow();
     });
 
     it('uses ThemeContext for styling', () => {
@@ -173,9 +175,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [],
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -188,9 +192,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [],
         loading: true,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -209,9 +215,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -230,9 +238,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(['1']),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn((id) => mockCategories.filter(c => c.parentId === id)),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -250,9 +260,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       // Component should filter out shadow categories internally
@@ -325,9 +337,11 @@ describe('CategoriesScreen', () => {
           { id: '2', name: 'Groceries', parentId: '1' },
         ],
         loading: false,
-        expandedIds: new Set(['1']),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn((id) => id === '1' ? [{ id: '2', name: 'Groceries', parentId: '1' }] : []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -343,9 +357,11 @@ describe('CategoriesScreen', () => {
           { id: '2', name: 'Groceries', parentId: '1' },
         ],
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -421,9 +437,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -438,9 +456,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [],
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       // Context should always provide an array, even when empty
@@ -454,9 +474,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [],
         loading: true,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -474,9 +496,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -496,9 +520,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: mockCategories,
         loading: false,
-        expandedIds: new Set(['1', '2', '3']),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn((id) => mockCategories.filter(c => c.parentId === id)),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => render(<CategoriesScreen />)).not.toThrow();
@@ -527,9 +553,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: initialCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       const { rerender } = render(<CategoriesScreen />);
@@ -537,9 +565,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: updatedCategories,
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => rerender(<CategoriesScreen />)).not.toThrow();
@@ -552,9 +582,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [{ id: '1', name: 'Food', isFolder: true }],
         loading: false,
-        expandedIds: new Set(),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       const { rerender } = render(<CategoriesScreen />);
@@ -562,9 +594,11 @@ describe('CategoriesScreen', () => {
       useCategories.mockReturnValue({
         categories: [{ id: '1', name: 'Food', isFolder: true }],
         loading: false,
-        expandedIds: new Set(['1']),
-        toggleExpanded: jest.fn(),
         getChildren: jest.fn(() => []),
+        addCategory: jest.fn(),
+        updateCategory: jest.fn(),
+        deleteCategory: jest.fn(),
+        validateCategory: jest.fn(() => null),
       });
 
       expect(() => rerender(<CategoriesScreen />)).not.toThrow();

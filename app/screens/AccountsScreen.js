@@ -455,10 +455,12 @@ export default function AccountsScreen() {
 
   const balanceInputRef = useRef(null);
 
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+
   // Form panel interpolations
   const formPanelTranslateX = formPanelAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [300, 0],
+    outputRange: [SCREEN_WIDTH, 0],
   });
   const formPanelOpacity = formPanelAnim.interpolate({
     inputRange: [0, 1],
@@ -466,6 +468,8 @@ export default function AccountsScreen() {
   });
 
   const openFormPanel = useCallback((id, values) => {
+    setCurrencyPanelVisible(false);
+    currencySlideAnim.setValue(Dimensions.get('window').width);
     setEditingId(id);
     setEditValues(values);
     Animated.timing(formPanelAnim, {
@@ -474,7 +478,7 @@ export default function AccountsScreen() {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [formPanelAnim]);
+  }, [formPanelAnim, currencySlideAnim]);
 
   const closeFormPanel = useCallback(() => {
     Animated.timing(formPanelAnim, {
@@ -581,6 +585,7 @@ export default function AccountsScreen() {
     Animated.timing(currencySlideAnim, {
       toValue: 0,
       duration: 260,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [currencySlideAnim]);
@@ -962,38 +967,6 @@ export default function AccountsScreen() {
                 />
               </View>
             </View>
-
-            {/* In-panel currency picker — slides in from the right */}
-            {currencyPanelVisible && (
-              <Animated.View
-                style={[styles.currencyPanel, { backgroundColor: colors.card, transform: [{ translateX: currencySlideAnim }] }]}
-              >
-                <View style={[styles.currencyPanelHeader, { borderBottomColor: colors.border }]}>
-                  <TouchableOpacity onPress={handleClosePicker} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <Icon name="arrow-left" size={22} color={colors.text} />
-                  </TouchableOpacity>
-                  <Text style={[styles.currencyPanelTitle, { color: colors.text }]}>
-                    {t('select_currency') || 'Currency'}
-                  </Text>
-                </View>
-                <FlatList
-                  data={Object.entries(currencies)}
-                  keyExtractor={([code]) => code}
-                  renderItem={({ item: [code, cur] }) => (
-                    <TouchableRipple
-                      onPress={() => handleCurrencySelect(code)}
-                      style={styles.currencyPanelItem}
-                      rippleColor="rgba(0,0,0,0.08)"
-                    >
-                      <Text style={[styles.currencyPanelItemText, { color: colors.text }]}>
-                        {cur.name} ({cur.symbol})
-                      </Text>
-                    </TouchableRipple>
-                  )}
-                  ItemSeparatorComponent={() => <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-                />
-              </Animated.View>
-            )}
           </ScrollView>
 
           {/* Footer with Save/Cancel buttons */}
@@ -1005,6 +978,38 @@ export default function AccountsScreen() {
               <Text style={styles.formFooterBtnPrimaryText}>{t('save') || 'Save'}</Text>
             </TouchableRipple>
           </View>
+
+          {/* In-panel currency picker — absolute overlay, slides in from the right */}
+          {currencyPanelVisible && (
+            <Animated.View
+              style={[styles.currencyPanel, { backgroundColor: colors.card, transform: [{ translateX: currencySlideAnim }] }]}
+            >
+              <View style={[styles.currencyPanelHeader, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={handleClosePicker} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Icon name="arrow-left" size={22} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.currencyPanelTitle, { color: colors.text }]}>
+                  {t('select_currency') || 'Currency'}
+                </Text>
+              </View>
+              <FlatList
+                data={Object.entries(currencies)}
+                keyExtractor={([code]) => code}
+                renderItem={({ item: [code, cur] }) => (
+                  <TouchableRipple
+                    onPress={() => handleCurrencySelect(code)}
+                    style={styles.currencyPanelItem}
+                    rippleColor="rgba(0,0,0,0.08)"
+                  >
+                    <Text style={[styles.currencyPanelItemText, { color: colors.text }]}>
+                      {cur.name} ({cur.symbol})
+                    </Text>
+                  </TouchableRipple>
+                )}
+                ItemSeparatorComponent={() => <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+              />
+            </Animated.View>
+          )}
         </Animated.View>
       )}
 
@@ -1160,13 +1165,12 @@ const styles = StyleSheet.create({
     paddingTop: TOP_CONTENT_SPACING,
   },
   currencyPanel: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     bottom: 0,
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
+    zIndex: 20,
   },
   currencyPanelHeader: {
     alignItems: 'center',
