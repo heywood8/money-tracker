@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.126.0](https://github.com/heywood8/money-tracker/compare/penny-v0.125.1...penny-v0.126.0) (2026-05-30)
+
+
+### Features
+
+* **settings:** accounts and categories as proper subpanels ([#843](https://github.com/heywood8/money-tracker/issues/843)) ([b4cc41e](https://github.com/heywood8/money-tracker/commit/b4cc41e10383da967398e66140114dc20fdda310))
+
 ## [0.125.1](https://github.com/heywood8/money-tracker/compare/penny-v0.125.0...penny-v0.125.1) (2026-05-30)
 
 
