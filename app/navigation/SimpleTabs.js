@@ -12,7 +12,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
-import CategoriesScreen from '../screens/CategoriesScreen';
 import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -32,7 +31,6 @@ const withAlpha = (hex, alpha) => {
 const TAB_ICONS = {
   Operations: 'swap-horizontal',
   Graphs: 'chart-line',
-  Categories: 'shape-outline',
   Planned: 'calendar-clock',
   Settings: 'cog-outline',
 };
@@ -108,7 +106,6 @@ const ScreenContent = memo(({ tabKey, setSubPanelActive }) => {
   switch (tabKey) {
   case 'Operations': return <OperationsScreen />;
   case 'Graphs': return <GraphsScreen />;
-  case 'Categories': return <CategoriesScreen />;
   case 'Planned': return <PlannedOperationsScreen />;
   case 'Settings': return <SettingsScreen setSubPanelActive={setSubPanelActive} />;
   default: return null;
@@ -145,7 +142,6 @@ export default function SimpleTabs() {
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
     { key: 'Graphs', label: t('graphs') || 'Graphs' },
-    { key: 'Categories', label: t('categories') || 'Categories' },
     { key: 'Planned', label: t('planned') || 'Planned' },
     { key: 'Settings', label: t('settings') || 'Settings' },
   ], [t]);
@@ -317,9 +313,6 @@ export default function SimpleTabs() {
           <GraphsScreen />
         </View>
         <View style={styles.screen}>
-          <CategoriesScreen />
-        </View>
-        <View style={styles.screen}>
           <PlannedOperationsScreen />
         </View>
         <View style={styles.screen}>
@@ -446,7 +439,7 @@ const styles = StyleSheet.create({
   screensContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 5,
+    width: SCREEN_WIDTH * 4,
   },
   tab: {
     flex: 1,

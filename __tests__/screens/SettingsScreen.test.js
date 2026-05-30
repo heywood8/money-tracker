@@ -248,6 +248,18 @@ jest.mock('../../app/screens/AccountsScreen', () => {
   return AccountsScreen;
 });
 
+// Mock CategoriesScreen (embedded in the categories subpanel)
+jest.mock('../../app/screens/CategoriesScreen', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const PropTypes = require('prop-types');
+  function CategoriesScreen({ embedded }) {
+    return React.createElement(View, { testID: 'categories-screen', accessibilityLabel: embedded ? 'embedded' : 'standalone' });
+  }
+  CategoriesScreen.propTypes = { embedded: PropTypes.bool };
+  return CategoriesScreen;
+});
+
 describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -296,6 +308,25 @@ describe('SettingsScreen', () => {
       fireEvent.press(getByTestId('settings-accounts-row'));
 
       expect(getByTestId('accounts-screen')).toBeTruthy();
+      expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+
+    it('renders categories row', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      expect(getByTestId('settings-categories-row')).toBeTruthy();
+    });
+
+    it('opens categories subpanel when categories row is pressed', () => {
+      const { getByTestId } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByTestId('settings-categories-row'));
+
+      expect(getByTestId('categories-screen')).toBeTruthy();
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 

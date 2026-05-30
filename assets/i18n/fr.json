@@ -1,6 +1,7 @@
 {
   "accounts": "Comptes",
   "accounts_hint": "Gérez vos comptes et soldes",
+  "categories_hint": "Gérez vos catégories de dépenses et revenus",
   "graphs": "Graphiques",
   "operations": "Opérations",
   "categories": "Catégories",

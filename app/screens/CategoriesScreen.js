@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { View, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import LoadingView from '../components/LoadingView';
@@ -12,7 +13,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import CategoryModal from '../modals/CategoryModal';
 
-const CategoriesScreen = () => {
+const CategoriesScreen = ({ embedded } = {}) => {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { showDialog } = useDialog();
@@ -107,7 +108,7 @@ const CategoriesScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
       {gridParentId !== null && (
         <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
           <TouchableOpacity
@@ -170,6 +171,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
+  containerEmbedded: {
+    paddingTop: 0,
+  },
   emptyList: {
     flex: 1,
   },
@@ -208,5 +212,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
 });
+
+CategoriesScreen.propTypes = {
+  embedded: PropTypes.bool,
+};
+
+CategoriesScreen.defaultProps = {
+  embedded: false,
+};
 
 export default CategoriesScreen;

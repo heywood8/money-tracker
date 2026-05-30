@@ -1,6 +1,7 @@
 {
   "accounts": "Accounts",
   "accounts_hint": "口座と残高を管理",
+  "categories_hint": "支出と収入のカテゴリーを管理",
   "graphs": "Graphs",
   "operations": "Operations",
   "categories": "Categories",
