@@ -1,6 +1,7 @@
 {
   "accounts": "Accounts",
   "accounts_hint": "계정 및 잔액 관리",
+  "categories_hint": "지출 및 수입 카테고리 관리",
   "graphs": "Graphs",
   "operations": "Operations",
   "categories": "Categories",

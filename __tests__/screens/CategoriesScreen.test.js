@@ -122,6 +122,12 @@ describe('CategoriesScreen', () => {
       expect(() => render(<CategoriesScreen />)).not.toThrow();
     });
 
+    it('renders without crashing when embedded prop is true', () => {
+      const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
+
+      expect(() => render(<CategoriesScreen embedded />)).not.toThrow();
+    });
+
     it('uses ThemeContext for styling', () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');

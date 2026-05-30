@@ -26,6 +26,7 @@ import { authenticateWithBiometrics, BiometricResult } from '../services/Biometr
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import AccountsScreen from './AccountsScreen';
+import CategoriesScreen from './CategoriesScreen';
 
 const SHEETS_STEPS = [
   { id: 'auth', label: 'Signing in to Google' },
@@ -59,7 +60,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport } = useImportProgress();
   const { startDownload } = useUpdateDownload();
-  const [activeSubPanel, setActiveSubPanel] = useState(null); // 'accounts' | 'language' | 'export' | 'logs' | 'backups' | null
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // 'accounts' | 'categories' | 'language' | 'export' | 'logs' | 'backups' | null
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -791,6 +792,21 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
           </TouchableRipple>
 
+          <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="shape-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('categories') || 'Categories'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {t('categories_hint') || 'Manage your expense and income categories'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
+          </TouchableRipple>
+
           <Divider style={styles.divider} />
 
           <Text variant="labelLarge" style={[styles.sectionLabel, { color: colors.mutedText }]}>{t('database') || 'Database'}</Text>
@@ -862,7 +878,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           <Animated.View style={[
             styles.subPanelContent,
             { backgroundColor: colors.background },
-            activeSubPanel === 'accounts' && styles.subPanelContentFlush,
+            (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelContentFlush,
             {
               transform: [{ translateX: subPanelTranslateX }],
               opacity: subPanelOpacity,
@@ -886,6 +902,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
               </TouchableOpacity>
               <Text variant="titleLarge" style={[styles.languageModalTitle, { color: colors.text }]}>
                 {activeSubPanel === 'accounts' && (t('accounts') || 'Accounts')}
+                {activeSubPanel === 'categories' && (t('categories') || 'Categories')}
                 {activeSubPanel === 'language' && t('language')}
                 {activeSubPanel === 'export' && (
                   exportStep === 'sheets-progress'
@@ -925,6 +942,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
             {activeSubPanel === 'accounts' && (
               <View style={styles.accountsPanelWrapper}>
                 <AccountsScreen embedded />
+              </View>
+            )}
+
+            {activeSubPanel === 'categories' && (
+              <View style={styles.accountsPanelWrapper}>
+                <CategoriesScreen embedded />
               </View>
             )}
 

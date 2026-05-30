@@ -293,22 +293,20 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders all five tab labels', () => {
+  it('renders all four tab labels', () => {
     const { getByText } = render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
-    expect(getByText('Categories')).toBeTruthy();
     expect(getByText('Planned')).toBeTruthy();
     expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all five screens', () => {
+  it('renders all four screens', () => {
     const { getByTestId } = render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
     expect(getByTestId('graphs-screen')).toBeTruthy();
-    expect(getByTestId('categories-screen')).toBeTruthy();
     expect(getByTestId('planned-screen')).toBeTruthy();
     expect(getByTestId('settings-screen')).toBeTruthy();
   });
@@ -334,8 +332,8 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders a Settings tab button', () => {
     const { getAllByRole } = render(<SimpleTabs />);
     const tabs = getAllByRole('button');
-    // 5 tabs total: Operations, Graphs, Categories, Planned, Settings
-    expect(tabs.length).toBeGreaterThanOrEqual(5);
+    // 4 tabs total: Operations, Graphs, Planned, Settings
+    expect(tabs.length).toBeGreaterThanOrEqual(4);
   });
 
   it('renders all tabs with correct accessibility labels', () => {
@@ -343,7 +341,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
-    expect(getByTestId('tab-Categories')).toBeTruthy();
   });
 
   it('handles pressing each tab', async () => {
@@ -352,10 +349,10 @@ describe('SimpleTabs Component Rendering', () => {
     // Press each tab
     fireEvent.press(getByTestId('tab-Operations'));
     fireEvent.press(getByTestId('tab-Graphs'));
-    fireEvent.press(getByTestId('tab-Categories'));
+    fireEvent.press(getByTestId('tab-Planned'));
 
     // All should work without errors
-    expect(getByTestId('tab-Categories')).toBeTruthy();
+    expect(getByTestId('tab-Planned')).toBeTruthy();
   });
 
   it('applies styles based on active state', () => {
@@ -381,7 +378,7 @@ describe('SimpleTabs Component Rendering', () => {
     for (let i = 0; i < 5; i++) {
       fireEvent.press(getByTestId('tab-Operations'));
       fireEvent.press(getByTestId('tab-Graphs'));
-      fireEvent.press(getByTestId('tab-Categories'));
+      fireEvent.press(getByTestId('tab-Planned'));
     }
 
     // Component should still be stable (overlay may duplicate a screen testID)
@@ -410,11 +407,11 @@ describe('SimpleTabs Component Rendering', () => {
   it('re-renders when active tab changes', async () => {
     const { getByTestId, getByText } = render(<SimpleTabs />);
 
-    // Press Categories tab
-    fireEvent.press(getByTestId('tab-Categories'));
+    // Press Planned tab
+    fireEvent.press(getByTestId('tab-Planned'));
 
     await waitFor(() => {
-      expect(getByText('Categories')).toBeTruthy();
+      expect(getByText('Planned')).toBeTruthy();
     });
   });
 
@@ -423,7 +420,6 @@ describe('SimpleTabs Component Rendering', () => {
 
     expect(getByText('Operations Screen')).toBeTruthy();
     expect(getByText('Graphs Screen')).toBeTruthy();
-    expect(getByText('Categories Screen')).toBeTruthy();
   });
 
   it('handles tab bar layout event', () => {
@@ -459,11 +455,9 @@ describe('SimpleTabs Component Rendering', () => {
     // Verify all TabButtons render and are pressable
     const operationsTab = getByTestId('tab-Operations');
     const graphsTab = getByTestId('tab-Graphs');
-    const categoriesTab = getByTestId('tab-Categories');
 
     expect(operationsTab.props.accessibilityLabel).toBe('Operations');
     expect(graphsTab.props.accessibilityLabel).toBe('Graphs');
-    expect(categoriesTab.props.accessibilityLabel).toBe('Categories');
   });
 
   it('activates adjacent tab on pressIn', async () => {
@@ -481,11 +475,11 @@ describe('SimpleTabs Component Rendering', () => {
   it('activates non-adjacent tab via overlay on pressIn', async () => {
     const { getByTestId } = render(<SimpleTabs />);
 
-    // Operations (index 0) → Categories (index 2) — distance=2, triggers overlay path
-    fireEvent(getByTestId('tab-Categories'), 'pressIn');
+    // Operations (index 0) → Planned (index 2) — distance=2, triggers overlay path
+    fireEvent(getByTestId('tab-Planned'), 'pressIn');
 
     await waitFor(() => {
-      expect(getByTestId('tab-Categories').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-Planned').props.accessibilityState).toEqual({ selected: true });
     });
   });
 });
@@ -928,17 +922,15 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       const tabs = [
         { key: 'Operations', label: 'Operations' },
         { key: 'Graphs', label: 'Graphs' },
-        { key: 'Categories', label: 'Categories' },
         { key: 'Planned', label: 'Planned' },
         { key: 'Settings', label: 'Settings' },
       ];
 
-      expect(tabs).toHaveLength(5);
+      expect(tabs).toHaveLength(4);
       expect(tabs[0].key).toBe('Operations');
       expect(tabs[1].key).toBe('Graphs');
-      expect(tabs[2].key).toBe('Categories');
-      expect(tabs[3].key).toBe('Planned');
-      expect(tabs[4].key).toBe('Settings');
+      expect(tabs[2].key).toBe('Planned');
+      expect(tabs[3].key).toBe('Settings');
     });
 
     it('should default to Operations as initial active tab', () => {
@@ -948,10 +940,10 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
     });
 
     it('should support all tab keys', () => {
-      const validTabKeys = ['Operations', 'Graphs', 'Categories', 'Planned', 'Settings'];
+      const validTabKeys = ['Operations', 'Graphs', 'Planned', 'Settings'];
 
       validTabKeys.forEach(key => {
-        expect(key).toMatch(/^(Operations|Graphs|Categories|Planned|Settings)$/);
+        expect(key).toMatch(/^(Operations|Graphs|Planned|Settings)$/);
       });
     });
   });
@@ -982,8 +974,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
           return 'OperationsScreen';
         case 'Graphs':
           return 'GraphsScreen';
-        case 'Categories':
-          return 'CategoriesScreen';
         case 'Planned':
           return 'PlannedOperationsScreen';
         case 'Settings':
@@ -995,7 +985,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
       expect(getActiveScreen('Operations')).toBe('OperationsScreen');
       expect(getActiveScreen('Graphs')).toBe('GraphsScreen');
-      expect(getActiveScreen('Categories')).toBe('CategoriesScreen');
       expect(getActiveScreen('Planned')).toBe('PlannedOperationsScreen');
       expect(getActiveScreen('Settings')).toBe('SettingsScreen');
       expect(getActiveScreen('Unknown')).toBe('OperationsScreen'); // Default case
@@ -1013,9 +1002,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       setActiveTab('Graphs');
       expect(activeTab).toBe('Graphs');
 
-      setActiveTab('Categories');
-      expect(activeTab).toBe('Categories');
-
       setActiveTab('Planned');
       expect(activeTab).toBe('Planned');
 
@@ -1031,7 +1017,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
       expect(isTabActive('Operations', 'Operations')).toBe(true);
       expect(isTabActive('Graphs', 'Operations')).toBe(false);
-      expect(isTabActive('Categories', 'Operations')).toBe(false);
       expect(isTabActive('Planned', 'Operations')).toBe(false);
 
       expect(isTabActive('Graphs', 'Graphs')).toBe(true);
@@ -1062,7 +1047,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       // Rapid switching
       for (let i = 0; i < 10; i++) {
         switchTab('Graphs');
-        switchTab('Categories');
         switchTab('Planned');
         switchTab('Operations');
       }
@@ -1096,7 +1080,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
         const translations = {
           operations: 'Operations',
           graphs: 'Graphs',
-          categories: 'Categories',
           planned: 'Planned',
           settings: 'Settings',
         };
@@ -1105,7 +1088,6 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
 
       expect(t('operations')).toBe('Operations');
       expect(t('graphs')).toBe('Graphs');
-      expect(t('categories')).toBe('Categories');
       expect(t('planned')).toBe('Planned');
       expect(t('settings')).toBe('Settings');
     });
@@ -1241,14 +1223,13 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       const createTabs = (tFunc) => [
         { key: 'Operations', label: tFunc('operations') },
         { key: 'Graphs', label: tFunc('graphs') },
-        { key: 'Categories', label: tFunc('categories') },
         { key: 'Planned', label: tFunc('planned') },
         { key: 'Settings', label: tFunc('settings') },
       ];
 
       const tabs = createTabs(t);
-      expect(tabs).toHaveLength(5);
-      expect(t).toHaveBeenCalledTimes(5);
+      expect(tabs).toHaveLength(4);
+      expect(t).toHaveBeenCalledTimes(4);
     });
 
     it('should memoize text styles', () => {
