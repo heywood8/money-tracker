@@ -148,18 +148,6 @@ describe('AccountsScreen', () => {
       expect(() => render(<AccountsScreen />)).not.toThrow();
     });
 
-    it('zeroes top padding when embedded', () => {
-      const AccountsScreen = require('../../app/screens/AccountsScreen').default;
-      const { View, StyleSheet } = require('react-native');
-
-      const { UNSAFE_getAllByType } = render(<AccountsScreen embedded />);
-      // First View in the tree is the root container
-      const rootView = UNSAFE_getAllByType(View)[0];
-      const resolved = StyleSheet.flatten(rootView.props.style);
-      // containerEmbedded overrides paddingTop to 0
-      expect(resolved.paddingTop).toBe(0);
-    });
-
     it('uses ThemeContext for styling', () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useThemeConfig } = require('../../app/contexts/ThemeConfigContext');
@@ -886,16 +874,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
       fireEvent.press(accountRow);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Operation count should be checked
@@ -931,16 +919,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getAllByText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for first account
       const accountRows = getAllByText('Cash');
       fireEvent.press(accountRows[0]);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Should show transfer operations dialog
@@ -977,16 +965,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
       fireEvent.press(accountRow);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Wait for confirmation dialog to appear and then confirm

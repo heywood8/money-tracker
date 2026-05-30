@@ -2,6 +2,7 @@
 .trash/
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 # React Native
 node_modules/
 npm-debug.log*

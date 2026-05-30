@@ -1,41 +1,209 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import PropTypes from 'prop-types';
-import { View, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
-import { Text } from 'react-native-paper';
-import LoadingView from '../components/LoadingView';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Dimensions,
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  Keyboard,
+} from 'react-native';
+import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import AddFAB from '../components/AddFAB';
 import EmptyState from '../components/EmptyState';
+import LoadingView from '../components/LoadingView';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useCategories } from '../contexts/CategoriesContext';
-import CategoryModal from '../modals/CategoryModal';
+import IconPicker from '../components/IconPicker';
+import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 
-const CategoriesScreen = ({ embedded } = {}) => {
+const DEFAULT_FORM_VALUES = {
+  name: '',
+  type: 'folder',
+  parentId: null,
+  icon: 'folder',
+  category_type: 'expense',
+};
+
+const CategoriesScreen = () => {
   const { colors } = useThemeColors();
+  const { paperInputTheme } = makeModalStyles(colors);
+  const themed = useMemo(() => ({
+    pickerItemText: { color: colors.text, fontSize: 18 },
+    parentText: { color: colors.text, fontSize: 18, marginLeft: 12 },
+    saveButtonText: { color: '#fff' },
+    cancelButtonText: { color: colors.text },
+  }), [colors]);
   const { t } = useLocalization();
   const { showDialog } = useDialog();
-  const { categories, loading, getChildren } = useCategories();
+  const { categories, loading, getChildren, addCategory, updateCategory, deleteCategory, validateCategory } = useCategories();
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [isNew, setIsNew] = useState(false);
-
+  // Grid navigation state
   const [gridParentId, setGridParentId] = useState(null);
 
-  const handleAddCategory = () => {
-    setEditingCategory(null);
-    setIsNew(true);
-    setModalVisible(true);
-  };
+  // Form panel state
+  const [activePanel, setActivePanel] = useState(null); // null | 'form'
+  const [formValues, setFormValues] = useState(DEFAULT_FORM_VALUES);
+  const [formErrors, setFormErrors] = useState({});
+  const [formIsNew, setFormIsNew] = useState(true);
+  const [formEditingCategory, setFormEditingCategory] = useState(null);
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
+  const [activePicker, setActivePicker] = useState(null); // null | 'type' | 'categoryType' | 'parent'
 
-  const handleEditCategory = (category) => {
-    setEditingCategory(category);
-    setIsNew(false);
-    setModalVisible(true);
-  };
+  // Animation refs
+  const listAnim = useRef(new Animated.Value(0)).current;
+  const formAnim = useRef(new Animated.Value(0)).current;
+  const pickerSlideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+
+  // Interpolations for list layer
+  const listTranslateX = listAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
+  const listOpacity = listAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  // Interpolations for form panel
+  const formTranslateX = formAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] });
+  const formOpacity = formAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+  const openForm = useCallback((category) => {
+    if (category) {
+      setFormValues({
+        ...category,
+        category_type: category.category_type || category.categoryType || 'expense',
+      });
+      setFormIsNew(false);
+      setFormEditingCategory(category);
+    } else {
+      setFormValues(DEFAULT_FORM_VALUES);
+      setFormIsNew(true);
+      setFormEditingCategory(null);
+    }
+    setFormErrors({});
+    setActivePanel('form');
+    Animated.parallel([
+      Animated.timing(listAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(formAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, [listAnim, formAnim]);
+
+  const closeForm = useCallback(() => {
+    Keyboard.dismiss();
+    Animated.parallel([
+      Animated.timing(formAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(listAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => {
+      setActivePanel(null);
+      setFormErrors({});
+      setActivePicker(null);
+    });
+  }, [listAnim, formAnim]);
+
+  const handleSave = useCallback(() => {
+    const error = validateCategory(formValues, t);
+    if (error) {
+      setFormErrors({ general: error });
+      return;
+    }
+
+    if (formIsNew) {
+      addCategory(formValues);
+    } else {
+      updateCategory(formEditingCategory.id, formValues);
+    }
+
+    closeForm();
+  }, [validateCategory, formValues, formIsNew, addCategory, updateCategory, formEditingCategory, closeForm, t]);
+
+  const handleDelete = useCallback(() => {
+    showDialog(
+      t('delete_category'),
+      t('delete_category_confirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteCategory(formEditingCategory.id);
+            closeForm();
+          },
+        },
+      ],
+    );
+  }, [formEditingCategory, deleteCategory, closeForm, t, showDialog]);
+
+  const handleOpenPicker = useCallback((pickerKey) => {
+    pickerSlideAnim.setValue(Dimensions.get('window').width);
+    setActivePicker(pickerKey);
+    Animated.timing(pickerSlideAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [pickerSlideAnim]);
+
+  const handleClosePicker = useCallback(() => {
+    Animated.timing(pickerSlideAnim, {
+      toValue: Dimensions.get('window').width,
+      duration: 180,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => setActivePicker(null));
+  }, [pickerSlideAnim]);
+
+  const potentialParents = useMemo(() => {
+    return categories.filter(c => {
+      const catType = c.category_type || c.categoryType;
+      return catType === formValues.category_type && c.id !== formEditingCategory?.id && !c.isShadow;
+    });
+  }, [categories, formValues.category_type, formEditingCategory]);
+
+  const getParentName = useCallback((parentId) => {
+    if (!parentId) return t('none');
+    const parent = categories.find(c => c.id === parentId);
+    return parent ? (parent.nameKey ? t(parent.nameKey) : parent.name) : t('none');
+  }, [categories, t]);
+
+  const hasChildren = useMemo(() => {
+    if (!formEditingCategory?.id) return false;
+    return categories.some(cat => cat.parentId === formEditingCategory.id);
+  }, [formEditingCategory, categories]);
+
+  const CATEGORY_TYPES = useMemo(() => [
+    { key: 'expense', label: t('expense') },
+    { key: 'income', label: t('income') },
+  ], [t]);
+
+  const TYPE_OPTIONS = useMemo(() => [
+    { key: 'folder', label: t('folder') },
+    { key: 'entry', label: t('entry') },
+  ], [t]);
+
+  const pickerTitle = activePicker === 'type'
+    ? t('select_type')
+    : activePicker === 'categoryType'
+      ? t('category_type')
+      : t('parent_category');
+
+  const gridCategories = useMemo(() => {
+    const visible = categories.filter(c => !c.isShadow);
+    return visible.filter(c => (gridParentId === null ? !c.parentId : c.parentId === gridParentId));
+  }, [categories, gridParentId]);
+
+  const gridParentCategory = useMemo(() => {
+    if (gridParentId === null) return null;
+    return categories.find(c => c.id === gridParentId) || null;
+  }, [categories, gridParentId]);
+
+  const handleEditCategory = useCallback((category) => {
+    openForm(category);
+  }, [openForm]);
 
   const handleCategoryLongPress = useCallback((category) => {
     const categoryName = category.nameKey ? t(category.nameKey) : category.name;
@@ -56,19 +224,9 @@ const CategoriesScreen = ({ embedded } = {}) => {
     );
   }, [t, handleEditCategory, showDialog]);
 
-  const gridCategories = useMemo(() => {
-    const visible = categories.filter(c => !c.isShadow);
-    return visible.filter(c => (gridParentId === null ? !c.parentId : c.parentId === gridParentId));
-  }, [categories, gridParentId]);
-
-  const gridParentCategory = useMemo(() => {
-    if (gridParentId === null) return null;
-    return categories.find(c => c.id === gridParentId) || null;
-  }, [categories, gridParentId]);
-
   const handleGridCellPress = useCallback((category) => {
-    const hasChildren = getChildren(category.id).filter(c => !c.isShadow).length > 0;
-    if (hasChildren) {
+    const hasChildItems = getChildren(category.id).filter(c => !c.isShadow).length > 0;
+    if (hasChildItems) {
       setGridParentId(category.id);
     } else {
       handleEditCategory(category);
@@ -79,7 +237,7 @@ const CategoriesScreen = ({ embedded } = {}) => {
     const categoryType = category.category_type || category.categoryType || 'expense';
     const iconColor = categoryType === 'income' ? colors.income : colors.expense;
     const name = category.nameKey ? t(category.nameKey) : category.name;
-    const hasChildren = getChildren(category.id).filter(c => !c.isShadow).length > 0;
+    const hasChildItems = getChildren(category.id).filter(c => !c.isShadow).length > 0;
 
     return (
       <TouchableOpacity
@@ -94,7 +252,7 @@ const CategoriesScreen = ({ embedded } = {}) => {
         <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
           {name}
         </Text>
-        {hasChildren && (
+        {hasChildItems && (
           <View style={styles.folderBadge}>
             <Icon name="folder-outline" size={12} color={colors.mutedText} accessible={false} />
           </View>
@@ -108,56 +266,302 @@ const CategoriesScreen = ({ embedded } = {}) => {
   }
 
   return (
-    <View style={[styles.container, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
-      {gridParentId !== null && (
-        <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity
-            onPress={() => setGridParentId(null)}
-            style={styles.backButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Back to all categories"
-          >
-            <Icon name="chevron-left" size={18} color={colors.primary} />
-            <Text style={[styles.backLabel, { color: colors.primary }]}>
-              {gridParentCategory?.nameKey ? t(gridParentCategory.nameKey) : gridParentCategory?.name}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Layer 1: Category list (fades/shifts left when form opens) */}
+      <Animated.View style={[styles.listLayer, { transform: [{ translateX: listTranslateX }], opacity: listOpacity }]}>
+        {gridParentId !== null && (
+          <View style={[styles.toggleBar, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity
+              onPress={() => setGridParentId(null)}
+              style={styles.backButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to all categories"
+            >
+              <Icon name="chevron-left" size={18} color={colors.primary} />
+              <Text style={[styles.backLabel, { color: colors.primary }]}>
+                {gridParentCategory?.nameKey ? t(gridParentCategory.nameKey) : gridParentCategory?.name}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <FlatList
+          data={gridCategories}
+          renderItem={renderGridCell}
+          keyExtractor={item => item.id}
+          numColumns={3}
+          columnWrapperStyle={styles.gridRow}
+          ListEmptyComponent={
+            <EmptyState icon="shape-outline" message={t('no_categories')} />
+          }
+          contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
+          windowSize={10}
+          removeClippedSubviews={true}
+        />
+
+        <AddFAB
+          testID="categories-add-fab"
+          onPress={() => openForm(null)}
+          accessibilityLabel={t('add_category')}
+          accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
+        />
+      </Animated.View>
+
+      {/* Layer 2: Form panel (slides in from right) */}
+      {activePanel === 'form' && (
+        <Animated.View
+          style={[
+            styles.formPanel,
+            { backgroundColor: colors.background, transform: [{ translateX: formTranslateX }], opacity: formOpacity },
+          ]}
+        >
+          {/* Form header */}
+          <View style={[styles.formPanelHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={closeForm} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel="Back">
+              <Icon name="arrow-left" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.formPanelTitle, { color: colors.text }]}>
+              {formIsNew ? (t('add_category') || 'New Category') : (t('edit_category') || 'Edit Category')}
             </Text>
-          </TouchableOpacity>
-        </View>
+            {!formIsNew ? (
+              <TouchableOpacity onPress={handleDelete} style={styles.formPanelBack} accessibilityRole="button" accessibilityLabel={t('delete_category')}>
+                <Icon name="trash-can-outline" size={22} color={colors.delete || '#ef4444'} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.formPanelBack} />
+            )}
+          </View>
+
+          {/* Form body */}
+          <ScrollView style={styles.formPanelScroll} contentContainerStyle={styles.formPanelScrollContent} keyboardShouldPersistTaps="handled">
+            {/* Name */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('category_name') || 'Name').toUpperCase()}
+            </Text>
+            <PaperTextInput
+              mode="outlined"
+              value={formValues.name}
+              onChangeText={text => setFormValues(v => ({ ...v, name: text }))}
+              placeholder={t('category_name')}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+              theme={paperInputTheme}
+              style={modalSharedStyles.textInput}
+            />
+
+            {/* Type (Folder / Entry) */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('select_type') || 'Type').toUpperCase()}
+            </Text>
+            <TouchableRipple
+              style={[modalSharedStyles.pickerRow, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={() => handleOpenPicker('type')}
+              rippleColor="rgba(0,0,0,0.05)"
+              borderless={false}
+            >
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>
+                  {TYPE_OPTIONS.find(to => to.key === formValues.type)?.label}
+                </Text>
+                <Icon name="chevron-right" size={22} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            {/* Category Type (Income / Expense) */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('category_type') || 'Category Type').toUpperCase()}
+            </Text>
+            <TouchableRipple
+              style={[modalSharedStyles.pickerRow, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={() => handleOpenPicker('categoryType')}
+              rippleColor="rgba(0,0,0,0.05)"
+              borderless={false}
+            >
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>
+                  {CATEGORY_TYPES.find(ct => ct.key === formValues.category_type)?.label}
+                </Text>
+                <Icon name="chevron-right" size={22} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            {/* Parent Category */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('parent_category') || 'Parent').toUpperCase()}
+            </Text>
+            <TouchableRipple
+              style={[modalSharedStyles.pickerRow, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={() => handleOpenPicker('parent')}
+              rippleColor="rgba(0,0,0,0.05)"
+              borderless={false}
+            >
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>
+                  {getParentName(formValues.parentId)}
+                </Text>
+                <Icon name="chevron-right" size={22} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+
+            {/* Icon picker button */}
+            <Pressable
+              testID="category-icon-picker"
+              style={[styles.iconPickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder || colors.border }]}
+              onPress={() => setIconPickerVisible(true)}
+            >
+              <Icon name={formValues.icon || 'folder'} size={32} color={colors.text} />
+              <Text style={[styles.iconPickerText, { color: colors.mutedText }]}>
+                {t('select_icon')}
+              </Text>
+            </Pressable>
+
+            {formErrors.general && (
+              <Text style={styles.errorText}>{formErrors.general}</Text>
+            )}
+          </ScrollView>
+
+          {/* Form footer */}
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border }]}>
+            <TouchableRipple
+              onPress={closeForm}
+              style={[styles.formFooterBtn, { borderColor: colors.border }]}
+              borderless={false}
+            >
+              <Text style={themed.cancelButtonText}>{t('cancel') || 'Cancel'}</Text>
+            </TouchableRipple>
+            <TouchableRipple
+              onPress={handleSave}
+              style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }]}
+              borderless={false}
+            >
+              <Text style={themed.saveButtonText}>{t('save') || 'Save'}</Text>
+            </TouchableRipple>
+          </View>
+
+          {/* Inline picker panel — slides in from right within the form */}
+          {activePicker && (
+            <Animated.View
+              style={[
+                styles.pickerPanel,
+                { backgroundColor: colors.card, transform: [{ translateX: pickerSlideAnim }] },
+              ]}
+            >
+              <View style={[styles.pickerPanelHeader, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity
+                  testID="picker-back-button"
+                  onPress={handleClosePicker}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Icon name="arrow-left" size={22} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.pickerPanelTitle, { color: colors.text }]}>
+                  {pickerTitle}
+                </Text>
+              </View>
+
+              {activePicker === 'type' && (
+                <FlatList
+                  data={TYPE_OPTIONS}
+                  keyExtractor={item => item.key}
+                  renderItem={({ item }) => {
+                    const isDisabled = !formIsNew && hasChildren && item.key === 'entry';
+                    return (
+                      <Pressable
+                        onPress={() => {
+                          if (isDisabled) {
+                            showDialog(
+                              t('error'),
+                              t('cannot_change_to_entry_with_children') || 'Cannot change to entry type while category has subcategories',
+                              [{ text: t('ok') }],
+                            );
+                            return;
+                          }
+                          setFormValues(v => ({ ...v, type: item.key }));
+                          handleClosePicker();
+                        }}
+                        style={({ pressed }) => [
+                          styles.pickerOption,
+                          { borderColor: colors.border },
+                          pressed && !isDisabled && { backgroundColor: colors.selected },
+                          isDisabled && styles.disabledOption,
+                        ]}
+                      >
+                        <Text style={[themed.pickerItemText, isDisabled && { color: colors.mutedText }]}>
+                          {item.label}{isDisabled && ' ⚠️'}
+                        </Text>
+                      </Pressable>
+                    );
+                  }}
+                />
+              )}
+
+              {activePicker === 'categoryType' && (
+                <FlatList
+                  data={CATEGORY_TYPES}
+                  keyExtractor={item => item.key}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      onPress={() => {
+                        setFormValues(v => ({ ...v, category_type: item.key, parentId: null }));
+                        handleClosePicker();
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && { backgroundColor: colors.selected },
+                      ]}
+                    >
+                      <Text style={themed.pickerItemText}>{item.label}</Text>
+                    </Pressable>
+                  )}
+                />
+              )}
+
+              {activePicker === 'parent' && (
+                <FlatList
+                  data={[{ id: null, name: t('none'), icon: 'folder-outline' }, ...potentialParents]}
+                  keyExtractor={item => item.id || 'none'}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      onPress={() => {
+                        setFormValues(v => ({ ...v, parentId: item.id }));
+                        handleClosePicker();
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerOption,
+                        { borderColor: colors.border },
+                        pressed && { backgroundColor: colors.selected },
+                      ]}
+                    >
+                      <View style={styles.parentOption}>
+                        <Icon name={item.icon || 'folder'} size={24} color={colors.text} />
+                        <Text style={themed.parentText}>
+                          {item.nameKey ? t(item.nameKey) : item.name}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )}
+                />
+              )}
+            </Animated.View>
+          )}
+        </Animated.View>
       )}
 
-      <FlatList
-        data={gridCategories}
-        renderItem={renderGridCell}
-        keyExtractor={item => item.id}
-        numColumns={3}
-        columnWrapperStyle={styles.gridRow}
-        ListEmptyComponent={
-          <EmptyState icon="shape-outline" message={t('no_categories')} />
-        }
-        contentContainerStyle={gridCategories.length === 0 ? styles.emptyList : styles.gridContent}
-        windowSize={10}
-        removeClippedSubviews={true}
-      />
-
-      <AddFAB
-        testID="categories-add-fab"
-        onPress={handleAddCategory}
-        accessibilityLabel={t('add_category')}
-        accessibilityHint={t('add_category_hint') || 'Opens form to create a new category'}
-      />
-
-      <CategoryModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        category={editingCategory}
-        isNew={isNew}
+      {/* Icon Picker — rendered outside the form panel so it can cover everything */}
+      <IconPicker
+        visible={iconPickerVisible}
+        onClose={() => setIconPickerVisible(false)}
+        onSelect={(icon) => setFormValues(v => ({ ...v, icon }))}
+        selectedIcon={formValues.icon}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Grid / list layer
   backButton: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -171,16 +575,74 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  containerEmbedded: {
-    paddingTop: 0,
+  disabledOption: {
+    opacity: 0.5,
   },
   emptyList: {
     flex: 1,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginBottom: SPACING.sm,
   },
   folderBadge: {
     position: 'absolute',
     right: 4,
     top: 4,
+  },
+  // Form footer buttons
+  formFooterBtn: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+  },
+  formFooterBtnPrimary: {
+    borderWidth: 0,
+  },
+  // Form panel
+  formPanel: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 10,
+  },
+  formPanelBack: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  formPanelFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+  },
+  formPanelHeader: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    height: 56,
+    paddingHorizontal: 8,
+  },
+  formPanelScroll: {
+    flex: 1,
+  },
+  formPanelScrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  formPanelTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   gridCell: {
     alignItems: 'center',
@@ -204,6 +666,49 @@ const styles = StyleSheet.create({
   gridRow: {
     justifyContent: 'flex-start',
   },
+  iconPickerButton: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+  },
+  iconPickerText: {
+    marginLeft: SPACING.md,
+  },
+  listLayer: {
+    flex: 1,
+  },
+  parentOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  pickerOption: {
+    borderBottomWidth: 1,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.md,
+  },
+  pickerPanel: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  pickerPanelHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  pickerPanelTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
   toggleBar: {
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -212,13 +717,5 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
 });
-
-CategoriesScreen.propTypes = {
-  embedded: PropTypes.bool,
-};
-
-CategoriesScreen.defaultProps = {
-  embedded: false,
-};
 
 export default CategoriesScreen;

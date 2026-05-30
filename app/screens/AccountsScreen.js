@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Keyboard, FlatList, TouchableOpacity, Pressable, Animated, Dimensions } from 'react-native';
-import ModalShell from '../components/ModalShell';
+import { View, StyleSheet, Keyboard, FlatList, TouchableOpacity, Pressable, Animated, Dimensions, ScrollView, Easing } from 'react-native';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import { Text, TextInput as PaperTextInput, Button, Portal, Modal, TouchableRipple, Switch } from 'react-native-paper';
 import AddFAB from '../components/AddFAB';
@@ -424,7 +423,7 @@ AccountRow.defaultProps = {
   isActive: false,
 };
 
-export default function AccountsScreen({ embedded }) {
+export default function AccountsScreen() {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
@@ -432,6 +431,7 @@ export default function AccountsScreen({ embedded }) {
   const [createAdjustmentOperation, setCreateAdjustmentOperation] = useState(true);
   const [currencyPanelVisible, setCurrencyPanelVisible] = useState(false);
   const currencySlideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const formPanelAnim = useRef(new Animated.Value(0)).current;
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [accountToDeleteCurrency, setAccountToDeleteCurrency] = useState(null);
@@ -455,8 +455,46 @@ export default function AccountsScreen({ embedded }) {
 
   const balanceInputRef = useRef(null);
 
-  const startEdit = useCallback((id) => {
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+
+  // Form panel interpolations
+  const formPanelTranslateX = formPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_WIDTH, 0],
+  });
+  const formPanelOpacity = formPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const openFormPanel = useCallback((id, values) => {
+    setCurrencyPanelVisible(false);
+    currencySlideAnim.setValue(Dimensions.get('window').width);
     setEditingId(id);
+    setEditValues(values);
+    Animated.timing(formPanelAnim, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [formPanelAnim, currencySlideAnim]);
+
+  const closeFormPanel = useCallback(() => {
+    Animated.timing(formPanelAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      setEditingId(null);
+      setEditValues({});
+      setErrors({});
+      setCurrencyPanelVisible(false);
+    });
+  }, [formPanelAnim]);
+
+  const startEdit = useCallback((id) => {
     const acc = accounts.find(a => a.id === id);
     const decimals = currencies[acc.currency]?.decimal_digits ?? 2;
     let balance = String(acc.balance ?? '');
@@ -468,10 +506,10 @@ export default function AccountsScreen({ embedded }) {
         balance = balance.substring(0, dotIndex + 1) + balance.substring(dotIndex + 1).substring(0, decimals);
       }
     }
-    setEditValues({ ...acc, balance });
     setErrors({});
     setCreateAdjustmentOperation(true);
-  }, [accounts]);
+    openFormPanel(id, { ...acc, balance });
+  }, [accounts, openFormPanel]);
 
   const saveEdit = useCallback(() => {
     const validation = validateAccount(editValues, t);
@@ -484,18 +522,14 @@ export default function AccountsScreen({ embedded }) {
     } else {
       updateAccount(editingId, editValues, createAdjustmentOperation);
     }
-    setEditingId(null);
-    setEditValues({});
-    setErrors({});
-    setCreateAdjustmentOperation(true);
-  }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation, t]);
+    closeFormPanel();
+  }, [validateAccount, editValues, editingId, addAccount, updateAccount, createAdjustmentOperation, t, closeFormPanel]);
 
   const addAccountHandler = useCallback(() => {
-    setEditingId('new');
-    setEditValues({ name: '', balance: '', currency: Object.keys(currencies)[0], hidden: 0 });
     setErrors({});
     setCreateAdjustmentOperation(true);
-  }, [currencies]);
+    openFormPanel('new', { name: '', balance: '', currency: Object.keys(currencies)[0], hidden: 0 });
+  }, [openFormPanel]);
 
   const deleteAccountHandler = useCallback(async (id) => {
     try {
@@ -542,10 +576,8 @@ export default function AccountsScreen({ embedded }) {
 
   const handleCloseModal = useCallback(() => {
     Keyboard.dismiss();
-    setEditingId(null);
-    setErrors({});
-    setCreateAdjustmentOperation(true);
-  }, []);
+    closeFormPanel();
+  }, [closeFormPanel]);
 
   const handleOpenPicker = useCallback(() => {
     currencySlideAnim.setValue(Dimensions.get('window').width);
@@ -553,6 +585,7 @@ export default function AccountsScreen({ embedded }) {
     Animated.timing(currencySlideAnim, {
       toValue: 0,
       duration: 260,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [currencySlideAnim]);
@@ -670,9 +703,7 @@ export default function AccountsScreen({ embedded }) {
     try {
       await deleteAccount(deleteConfirmAccountId);
       if (editingId === deleteConfirmAccountId) {
-        setEditingId(null);
-        setEditValues({});
-        setErrors({});
+        closeFormPanel();
       }
     } catch (err) {
       console.error('Failed to delete account:', err);
@@ -680,7 +711,7 @@ export default function AccountsScreen({ embedded }) {
       setNoCurrencyMatchVisible(true);
     }
     setDeleteConfirmAccountId(null);
-  }, [deleteConfirmAccountId, deleteAccount, editingId, t]);
+  }, [deleteConfirmAccountId, deleteAccount, editingId, t, closeFormPanel]);
 
   // Handle transfer and delete confirmation
   const handleConfirmTransferAndDelete = useCallback(async () => {
@@ -690,9 +721,7 @@ export default function AccountsScreen({ embedded }) {
 
       // Clear edit state if we were editing the deleted account
       if (editingId === accountToDelete) {
-        setEditingId(null);
-        setEditValues({});
-        setErrors({});
+        closeFormPanel();
       }
 
       // Reset transfer modal state
@@ -705,7 +734,7 @@ export default function AccountsScreen({ embedded }) {
       setNoCurrencyMatchMessage(t('failed_to_delete_account') || 'Failed to delete account. Please try again.');
       setNoCurrencyMatchVisible(true);
     }
-  }, [accountToDelete, transferConfirmDestinationId, deleteAccount, editingId, t]);
+  }, [accountToDelete, transferConfirmDestinationId, deleteAccount, editingId, t, closeFormPanel]);
 
   // Enhance accounts with currency symbol for better performance
   const enhancedAccounts = useMemo(() => {
@@ -751,7 +780,7 @@ export default function AccountsScreen({ embedded }) {
 
   if (error) {
     return (
-      <View style={[styles.container, styles.errorContainer, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.background }]}>
         <Text variant="bodyLarge" style={[styles.centeredErrorText, { color: colors.delete }]}>
           {t('error_loading_accounts') || 'Failed to load accounts'}
         </Text>
@@ -760,7 +789,7 @@ export default function AccountsScreen({ embedded }) {
   }
 
   return (
-    <View style={[styles.container, embedded && styles.containerEmbedded, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <NestableScrollContainer
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -816,141 +845,174 @@ export default function AccountsScreen({ embedded }) {
         accessibilityHint={t('add_account_hint') || 'Opens form to create a new account'}
       />
 
-      <ModalShell
-        visible={!!editingId}
-        onDismiss={handleCloseModal}
-        title={editingId === 'new' ? (t('add_account') || 'New Account') : (t('edit_account') || 'Edit Account')}
-        subtitle={editingId !== 'new' && editValues.name ? editValues.name : undefined}
-        onSave={saveEdit}
-        onCancel={handleCloseModal}
-        onDelete={editingId !== 'new' ? handleDeleteEditingAccount : undefined}
-        deleteLabel={t('delete_account') || 'Delete account'}
-        showBlurOverlay
-      >
-        {/* Account name */}
-        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('account_name') || 'Account name').toUpperCase()}
-        </Text>
-        <PaperTextInput
-          mode="outlined"
-          theme={paperInputTheme}
-          value={editValues.name}
-          onChangeText={handleNameChange}
-          error={!!errors.name}
-          autoFocus={editingId === 'new'}
-          returnKeyType="next"
-          onSubmitEditing={() => balanceInputRef.current?.focus()}
-          blurOnSubmit={false}
-          style={modalSharedStyles.textInput}
-        />
-        {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
-
-        {/* Balance */}
-        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('balance') || 'Balance').toUpperCase()}
-        </Text>
-        <PaperTextInput
-          ref={balanceInputRef}
-          mode="outlined"
-          theme={paperInputTheme}
-          value={editValues.balance}
-          onChangeText={handleBalanceChange}
-          error={!!errors.balance}
-          keyboardType="numeric"
-          returnKeyType="done"
-          placeholder={(() => {
-            const dec = currencies[editValues.currency]?.decimal_digits ?? 2;
-            return dec === 0 ? '0' : `0.${'0'.repeat(dec)}`;
-          })()}
-          onSubmitEditing={Keyboard.dismiss}
-          style={modalSharedStyles.textInput}
-        />
-        {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
-
-        {/* Currency selector */}
-        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('currency') || 'Currency').toUpperCase()}
-        </Text>
-        <TouchableRipple onPress={handleOpenPicker} style={[modalSharedStyles.pickerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={modalSharedStyles.pickerRowInner}>
-            <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>
-              {editValues.currency
-                ? `${currencies[editValues.currency]?.name} · ${currencies[editValues.currency]?.symbol}`
-                : (t('select_currency') || 'Select currency')}
+      {/* Inline form panel — slides in from the right */}
+      {editingId && (
+        <Animated.View
+          style={[
+            styles.formPanel,
+            {
+              backgroundColor: colors.background,
+              transform: [{ translateX: formPanelTranslateX }],
+              opacity: formPanelOpacity,
+            },
+          ]}
+        >
+          {/* Header */}
+          <View style={[styles.formPanelHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={handleCloseModal} style={styles.formPanelBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="arrow-left" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.formPanelTitle, { color: colors.text }]}>
+              {editingId === 'new' ? (t('add_account') || 'New Account') : (t('edit_account') || 'Edit Account')}
             </Text>
-            <Icon name="chevron-right" size={22} color={colors.mutedText} />
+            {editingId !== 'new' ? (
+              <TouchableOpacity onPress={handleDeleteEditingAccount} style={styles.formPanelBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Icon name="trash-can-outline" size={22} color={colors.delete} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.formPanelBack} />
+            )}
           </View>
-        </TouchableRipple>
-        {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
 
-        {/* Settings group */}
-        <View style={[styles.settingsGroup, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          {editingId !== 'new' && (
-            <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
-              <View style={styles.settingItemText}>
-                <Text style={[styles.settingTitle, { color: colors.text }]}>
-                  {t('create_adjustment_operation') || 'Log adjustment'}
+          {/* Form content */}
+          <ScrollView style={styles.formPanelScroll} contentContainerStyle={styles.formPanelScrollContent} keyboardShouldPersistTaps="handled">
+            {/* Account name */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('account_name') || 'Account name').toUpperCase()}
+            </Text>
+            <PaperTextInput
+              mode="outlined"
+              theme={paperInputTheme}
+              value={editValues.name}
+              onChangeText={handleNameChange}
+              error={!!errors.name}
+              autoFocus={editingId === 'new'}
+              returnKeyType="next"
+              onSubmitEditing={() => balanceInputRef.current?.focus()}
+              blurOnSubmit={false}
+              style={modalSharedStyles.textInput}
+            />
+            {errors.name && <Text variant="bodySmall" style={styles.error}>{errors.name}</Text>}
+
+            {/* Balance */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('balance') || 'Balance').toUpperCase()}
+            </Text>
+            <PaperTextInput
+              ref={balanceInputRef}
+              mode="outlined"
+              theme={paperInputTheme}
+              value={editValues.balance}
+              onChangeText={handleBalanceChange}
+              error={!!errors.balance}
+              keyboardType="numeric"
+              returnKeyType="done"
+              placeholder={(() => {
+                const dec = currencies[editValues.currency]?.decimal_digits ?? 2;
+                return dec === 0 ? '0' : `0.${'0'.repeat(dec)}`;
+              })()}
+              onSubmitEditing={Keyboard.dismiss}
+              style={modalSharedStyles.textInput}
+            />
+            {errors.balance && <Text variant="bodySmall" style={styles.error}>{errors.balance}</Text>}
+
+            {/* Currency selector */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('currency') || 'Currency').toUpperCase()}
+            </Text>
+            <TouchableRipple onPress={handleOpenPicker} style={[modalSharedStyles.pickerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={modalSharedStyles.pickerRowInner}>
+                <Text style={[modalSharedStyles.pickerRowValue, { color: colors.text }]}>
+                  {editValues.currency
+                    ? `${currencies[editValues.currency]?.name} · ${currencies[editValues.currency]?.symbol}`
+                    : (t('select_currency') || 'Select currency')}
                 </Text>
-                <Text style={[styles.settingHint, { color: colors.mutedText }]}>
-                  {t('create_adjustment_operation_hint') || 'Record balance change as a transaction'}
+                <Icon name="chevron-right" size={22} color={colors.mutedText} />
+              </View>
+            </TouchableRipple>
+            {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
+
+            {/* Settings group */}
+            <View style={[styles.settingsGroup, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {editingId !== 'new' && (
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
+                  <View style={styles.settingItemText}>
+                    <Text style={[styles.settingTitle, { color: colors.text }]}>
+                      {t('create_adjustment_operation') || 'Log adjustment'}
+                    </Text>
+                    <Text style={[styles.settingHint, { color: colors.mutedText }]}>
+                      {t('create_adjustment_operation_hint') || 'Record balance change as a transaction'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={createAdjustmentOperation}
+                    onValueChange={handleToggleAdjustmentSwitch}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
+              <View style={styles.settingItem}>
+                <View style={styles.settingItemText}>
+                  <Text style={[styles.settingTitle, { color: colors.text }]}>
+                    {t('hidden_account') || 'Hidden account'}
+                  </Text>
+                  <Text style={[styles.settingHint, { color: colors.mutedText }]}>
+                    {t('hidden_account_hint') || 'Hide from main list and operations'}
+                  </Text>
+                </View>
+                <Switch
+                  value={!!editValues.hidden}
+                  onValueChange={handleToggleHiddenSwitch}
+                  color={colors.primary}
+                />
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Footer with Save/Cancel buttons */}
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border }]}>
+            <TouchableRipple onPress={handleCloseModal} style={[styles.formFooterBtn, { borderColor: colors.border }]}>
+              <Text style={{ color: colors.text }}>{t('cancel') || 'Cancel'}</Text>
+            </TouchableRipple>
+            <TouchableRipple onPress={saveEdit} style={[styles.formFooterBtn, styles.formFooterBtnPrimary, { backgroundColor: colors.primary }]}>
+              <Text style={styles.formFooterBtnPrimaryText}>{t('save') || 'Save'}</Text>
+            </TouchableRipple>
+          </View>
+
+          {/* In-panel currency picker — absolute overlay, slides in from the right */}
+          {currencyPanelVisible && (
+            <Animated.View
+              style={[styles.currencyPanel, { backgroundColor: colors.card, transform: [{ translateX: currencySlideAnim }] }]}
+            >
+              <View style={[styles.currencyPanelHeader, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={handleClosePicker} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Icon name="arrow-left" size={22} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.currencyPanelTitle, { color: colors.text }]}>
+                  {t('select_currency') || 'Currency'}
                 </Text>
               </View>
-              <Switch
-                value={createAdjustmentOperation}
-                onValueChange={handleToggleAdjustmentSwitch}
-                color={colors.primary}
+              <FlatList
+                data={Object.entries(currencies)}
+                keyExtractor={([code]) => code}
+                renderItem={({ item: [code, cur] }) => (
+                  <TouchableRipple
+                    onPress={() => handleCurrencySelect(code)}
+                    style={styles.currencyPanelItem}
+                    rippleColor="rgba(0,0,0,0.08)"
+                  >
+                    <Text style={[styles.currencyPanelItemText, { color: colors.text }]}>
+                      {cur.name} ({cur.symbol})
+                    </Text>
+                  </TouchableRipple>
+                )}
+                ItemSeparatorComponent={() => <View style={[styles.divider, { backgroundColor: colors.border }]} />}
               />
-            </View>
+            </Animated.View>
           )}
-          <View style={styles.settingItem}>
-            <View style={styles.settingItemText}>
-              <Text style={[styles.settingTitle, { color: colors.text }]}>
-                {t('hidden_account') || 'Hidden account'}
-              </Text>
-              <Text style={[styles.settingHint, { color: colors.mutedText }]}>
-                {t('hidden_account_hint') || 'Hide from main list and operations'}
-              </Text>
-            </View>
-            <Switch
-              value={!!editValues.hidden}
-              onValueChange={handleToggleHiddenSwitch}
-              color={colors.primary}
-            />
-          </View>
-        </View>
+        </Animated.View>
+      )}
 
-        {/* In-sheet currency picker — slides in from the right */}
-        {currencyPanelVisible && (
-          <Animated.View
-            style={[styles.currencyPanel, { backgroundColor: colors.card, transform: [{ translateX: currencySlideAnim }] }]}
-          >
-            <View style={[styles.currencyPanelHeader, { borderBottomColor: colors.border }]}>
-              <TouchableOpacity onPress={handleClosePicker} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Icon name="arrow-left" size={22} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.currencyPanelTitle, { color: colors.text }]}>
-                {t('select_currency') || 'Currency'}
-              </Text>
-            </View>
-            <FlatList
-              data={Object.entries(currencies)}
-              keyExtractor={([code]) => code}
-              renderItem={({ item: [code, cur] }) => (
-                <TouchableRipple
-                  onPress={() => handleCurrencySelect(code)}
-                  style={styles.currencyPanelItem}
-                  rippleColor="rgba(0,0,0,0.08)"
-                >
-                  <Text style={[styles.currencyPanelItemText, { color: colors.text }]}>
-                    {cur.name} ({cur.symbol})
-                  </Text>
-                </TouchableRipple>
-              )}
-              ItemSeparatorComponent={() => <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-            />
-          </Animated.View>
-        )}
-      </ModalShell>
       <TransferAccountPickerModal
         visible={transferModalVisible}
         onClose={handleCloseTransferModal}
@@ -1005,13 +1067,9 @@ export default function AccountsScreen({ embedded }) {
   );
 }
 
-AccountsScreen.propTypes = {
-  embedded: PropTypes.bool,
-};
+AccountsScreen.propTypes = {};
 
-AccountsScreen.defaultProps = {
-  embedded: false,
-};
+AccountsScreen.defaultProps = {};
 
 const styles = StyleSheet.create({
   accountBalance: {
@@ -1106,17 +1164,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: TOP_CONTENT_SPACING,
   },
-  containerEmbedded: {
-    paddingTop: 0,
-  },
   currencyPanel: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     bottom: 0,
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
+    zIndex: 20,
   },
   currencyPanelHeader: {
     alignItems: 'center',
@@ -1153,6 +1207,60 @@ const styles = StyleSheet.create({
   errorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  formFooterBtn: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+  },
+  formFooterBtnPrimary: {
+    borderWidth: 0,
+  },
+  formFooterBtnPrimaryText: {
+    color: '#fff',
+  },
+  formPanel: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 10,
+  },
+  formPanelBack: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  formPanelFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+  },
+  formPanelHeader: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    height: 56,
+    paddingHorizontal: 8,
+  },
+  formPanelScroll: {
+    flex: 1,
+  },
+  formPanelScrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  formPanelTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   hiddenBalance: {
     backgroundColor: 'rgba(120, 120, 120, 0.25)',
