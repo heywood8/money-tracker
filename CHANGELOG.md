@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.125.0](https://github.com/heywood8/money-tracker/compare/penny-v0.124.0...penny-v0.125.0) (2026-05-30)
+
+
+### Features
+
+* **settings:** move accounts management into a Settings subpanel ([#838](https://github.com/heywood8/money-tracker/issues/838)) ([22b9d1c](https://github.com/heywood8/money-tracker/commit/22b9d1c41e8e00901895343729bf35d4f4d85bff))
+
 ## [0.125.0] (Unreleased)
 
 ### Features
