@@ -742,23 +742,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
           },
         ]}>
 
-          <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
-            <View style={styles.settingsRowContent}>
-              <View style={styles.settingsRowLeft}>
-                <Ionicons name="wallet-outline" size={22} color={colors.text} />
-                <View style={styles.settingsRowText}>
-                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
-                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                    {t('accounts_hint') || 'Manage your accounts and balances'}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-            </View>
-          </TouchableRipple>
-
-          <Divider style={styles.divider} />
-
           <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
@@ -790,6 +773,21 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   transform: [{ translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
                 }]} />
               </View>
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="wallet-outline" size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {t('accounts_hint') || 'Manage your accounts and balances'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </View>
           </TouchableRipple>
 
