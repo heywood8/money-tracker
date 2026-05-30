@@ -874,16 +874,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
       fireEvent.press(accountRow);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Operation count should be checked
@@ -919,16 +919,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getAllByText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for first account
       const accountRows = getAllByText('Cash');
       fireEvent.press(accountRows[0]);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Should show transfer operations dialog
@@ -965,16 +965,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, getByTestId } = render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
       fireEvent.press(accountRow);
 
       await waitFor(() => {
-        // Find and press delete button
-        const deleteButtons = getAllByText('delete_account');
-        fireEvent.press(deleteButtons[0]);
+        // Find and press delete icon in form panel header
+        const deleteIcon = getByTestId('icon-trash-can-outline');
+        fireEvent.press(deleteIcon);
       });
 
       // Wait for confirmation dialog to appear and then confirm
