@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.125.1](https://github.com/heywood8/money-tracker/compare/penny-v0.125.0...penny-v0.125.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* **settings:** use safe area insets for subpanel bottom padding ([#841](https://github.com/heywood8/money-tracker/issues/841)) ([980f4b3](https://github.com/heywood8/money-tracker/commit/980f4b33089cf35da3db90f0975e8f04b6a90ab6))
+
 ## [0.125.0](https://github.com/heywood8/money-tracker/compare/penny-v0.124.0...penny-v0.125.0) (2026-05-30)
 
 
