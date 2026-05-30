@@ -6,6 +6,7 @@ import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-reanimated';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -53,6 +54,7 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 
 export default function SettingsScreen({ setSubPanelActive }) {
+  const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { hideBalances, setHideBalances } = useDisplaySettings();
@@ -879,6 +881,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             styles.subPanelContent,
             { backgroundColor: colors.background },
             (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelContentFlush,
+            !(activeSubPanel === 'accounts' || activeSubPanel === 'categories') && { paddingBottom: insets.bottom + 80 },
             {
               transform: [{ translateX: subPanelTranslateX }],
               opacity: subPanelOpacity,
