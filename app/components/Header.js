@@ -13,13 +13,10 @@ import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
 export default function Header({ rightContent, activeScreen, operationsData }) {
-  console.debug('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters, filtersExpanded } = useSearch();
-  console.debug('[Header] openSearch exists:', !!openSearch);
-  console.debug('[Header] searchMode:', searchMode);
   const downloadArrowAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 

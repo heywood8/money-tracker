@@ -823,7 +823,6 @@ const OperationsScreen = () => {
       {/* Search Overlay - renders filters when search is open */}
       <SearchOverlay
         visible={searchMode === 'open'}
-        onClose={() => {}}
         onHeightChange={setFilterPanelHeight}
         colors={colors}
         t={t}

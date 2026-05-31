@@ -13,7 +13,7 @@ import { useSearch } from '../../contexts/SearchContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
+const SearchOverlay = ({ colors, t, visible, onHeightChange }) => {
   const { searchState } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
@@ -70,7 +70,6 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
 };
 
 SearchOverlay.propTypes = {
-  onClose: PropTypes.func.isRequired,
   onHeightChange: PropTypes.func,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,

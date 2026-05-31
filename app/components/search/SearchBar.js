@@ -73,6 +73,8 @@ const SearchBar = ({
         testID="search-input-container"
         activeOpacity={collapsed ? 0.6 : 1}
         onPress={collapsed ? onCollapsedPress : undefined}
+        accessibilityRole={collapsed ? 'button' : undefined}
+        accessibilityLabel={collapsed ? t('search') : undefined}
         style={[
           styles.searchInputContainer,
           { backgroundColor: colors.background, borderBottomColor: colors.border },
@@ -82,7 +84,7 @@ const SearchBar = ({
         <View style={styles.iconWrapper}>
           <Icon name="magnify" size={20} color={colors.text} />
           {collapsed && filterCount > 0 && (
-            <View testID="filter-count-badge" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+            <View testID="filter-count-badge-collapsed" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
               <Text style={styles.filterBadgeText}>{filterCount}</Text>
             </View>
           )}

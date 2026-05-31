@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.sm,
     marginTop: SPACING.xs,
-    padding: SPACING.xsm,
+    padding: SPACING.xs,
   },
 });
 
