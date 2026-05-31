@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
@@ -183,6 +183,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
       }),
   [activeSubPanel, closeSubPanel],
   );
+
+  // Android hardware back button closes the active subpanel
+  useEffect(() => {
+    if (!activeSubPanel) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeSubPanel();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [activeSubPanel, closeSubPanel]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);

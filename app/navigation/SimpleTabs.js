@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef, useLayoutEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -219,6 +219,18 @@ export default function SimpleTabs() {
     });
     pillPosition.value = withSpring(newIndex, springConfig);
   }, [overlay, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
+
+  // Android hardware back button navigates to Operations from any other tab
+  React.useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (active !== 'Operations' && !overlay) {
+        handleTabPress('Operations');
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [active, overlay, handleTabPress]);
 
   // Pan gesture for swipe navigation with real-time feedback
   const panGesture = useMemo(() => {
