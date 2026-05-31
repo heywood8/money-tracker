@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.0](https://github.com/heywood8/money-tracker/compare/penny-v0.127.5...penny-v0.128.0) (2026-05-31)
+
+
+### Features
+
+* **import:** add cancel button and safety backup step to all import flows ([#863](https://github.com/heywood8/money-tracker/issues/863)) ([5a1045f](https://github.com/heywood8/money-tracker/commit/5a1045fbcd335a4bb6bb406cbda3745f4b9a42dc))
+
 ## [0.127.5](https://github.com/heywood8/money-tracker/compare/penny-v0.127.4...penny-v0.127.5) (2026-05-31)
 
 
