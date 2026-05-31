@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.4](https://github.com/heywood8/money-tracker/compare/penny-v0.127.3...penny-v0.127.4) (2026-05-31)
+
+
+### Bug Fixes
+
+* **settings:** replace Animated API with reanimated for subpanel touch fix ([#858](https://github.com/heywood8/money-tracker/issues/858)) ([9b13927](https://github.com/heywood8/money-tracker/commit/9b139275469b230f052b27f265f7b7142445edba))
+
 ## [0.127.3](https://github.com/heywood8/money-tracker/compare/penny-v0.127.2...penny-v0.127.3) (2026-05-31)
 
 
