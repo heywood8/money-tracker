@@ -13,6 +13,13 @@ const BACKUP_VERSION = 1;
 // Event for import progress
 export const IMPORT_PROGRESS_EVENT = 'import:progress';
 
+export class CancelledImportError extends Error {
+  constructor() {
+    super('Import cancelled by user');
+    this.name = 'CancelledImportError';
+  }
+}
+
 /**
  * Create a backup of the entire database
  * @returns {Promise<Object>} Backup data object
@@ -368,9 +375,10 @@ const validateBackup = (backup) => {
 /**
  * Restore database from backup data
  * @param {Object} backup - Backup object
+ * @param {{ cancelled: boolean }} [cancelToken] - Optional token; set cancelled=true to abort
  * @returns {Promise<void>}
  */
-export const restoreBackup = async (backup) => {
+export const restoreBackup = async (backup, cancelToken) => {
   try {
     console.log('Restoring database from backup...');
     appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'restore', status: 'in_progress' });
@@ -403,8 +411,11 @@ export const restoreBackup = async (backup) => {
       );
     }
 
+    if (cancelToken?.cancelled) throw new CancelledImportError();
+
     // Create a pre-restore snapshot so the user can recover if something goes wrong.
     let snapshotUri = null;
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'backup', status: 'in_progress' });
     try {
       const snapshot = await createBackup();
       const snapshotTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
@@ -427,8 +438,12 @@ export const restoreBackup = async (backup) => {
         console.warn('Failed to clean up old pre-restore snapshots:', cleanupError);
       }
     } catch (snapshotError) {
+      if (snapshotError instanceof CancelledImportError) throw snapshotError;
       console.warn('Failed to create pre-restore snapshot:', snapshotError);
     }
+    appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'backup', status: 'completed' });
+
+    if (cancelToken?.cancelled) throw new CancelledImportError();
 
     let skippedOperations = 0;
 
@@ -450,6 +465,8 @@ export const restoreBackup = async (backup) => {
 
       console.log('Existing data cleared and auto-increment counters reset');
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'completed' });
+
+      if (cancelToken?.cancelled) throw new CancelledImportError();
 
       // Restore accounts - preserve integer IDs, map UUID IDs to new integers
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -520,6 +537,8 @@ export const restoreBackup = async (backup) => {
         data: backup.data.accounts.length,
       });
 
+      if (cancelToken?.cancelled) throw new CancelledImportError();
+
       // Restore categories
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
         stepId: 'categories',
@@ -557,6 +576,8 @@ export const restoreBackup = async (backup) => {
         status: 'completed',
         data: backup.data.categories.length,
       });
+
+      if (cancelToken?.cancelled) throw new CancelledImportError();
 
       // Restore operations - map account IDs from UUID to integer
       appEvents.emit(IMPORT_PROGRESS_EVENT, {
@@ -613,6 +634,8 @@ export const restoreBackup = async (backup) => {
         status: 'completed',
         data: backup.data.operations.length,
       });
+
+      if (cancelToken?.cancelled) throw new CancelledImportError();
 
       // Restore balance history
       if (backup.data.balance_history) {
@@ -956,9 +979,10 @@ const parseCSV = (csvContent) => {
 /**
  * Import backup from CSV file
  * @param {string} fileUri - File URI
+ * @param {{ cancelled: boolean }} [cancelToken]
  * @returns {Promise<Object>} Imported backup object
  */
-const importBackupCSV = async (fileUri) => {
+const importBackupCSV = async (fileUri, cancelToken) => {
   console.log('Importing CSV backup...');
   appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
   const fileContent = await FileSystem.readAsStringAsync(fileUri);
@@ -1004,7 +1028,7 @@ const importBackupCSV = async (fileUri) => {
   };
 
   appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
-  await restoreBackup(backup);
+  await restoreBackup(backup, cancelToken);
   return backup;
 };
 
@@ -1013,9 +1037,10 @@ const importBackupCSV = async (fileUri) => {
 /**
  * Import backup from SQLite database file
  * @param {string} fileUri - File URI
+ * @param {{ cancelled: boolean }} [cancelToken]
  * @returns {Promise<Object>} Imported backup info
  */
-const importBackupSQLite = async (fileUri) => {
+const importBackupSQLite = async (fileUri, cancelToken) => {
   console.log('Importing SQLite backup...');
   appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
 
@@ -1134,7 +1159,7 @@ const importBackupSQLite = async (fileUri) => {
     appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
 
     // Use the standard restore process
-    await restoreBackup(backup);
+    await restoreBackup(backup, cancelToken);
 
     return backup;
   } catch (error) {
@@ -1197,7 +1222,7 @@ export const pickImportFile = async () => {
   };
 };
 
-export const importBackupFromFile = async ({ fileUri, filename }) => {
+export const importBackupFromFile = async ({ fileUri, filename }, cancelToken) => {
   try {
     console.log('Reading backup file:', fileUri, 'Name:', filename);
 
@@ -1214,10 +1239,10 @@ export const importBackupFromFile = async ({ fileUri, filename }) => {
     let backup;
     switch (format) {
     case 'csv':
-      backup = await importBackupCSV(fileUri);
+      backup = await importBackupCSV(fileUri, cancelToken);
       break;
     case 'sqlite':
-      backup = await importBackupSQLite(fileUri);
+      backup = await importBackupSQLite(fileUri, cancelToken);
       break;
     case 'json':
     default: {
@@ -1229,7 +1254,7 @@ export const importBackupFromFile = async ({ fileUri, filename }) => {
         throw new Error('Invalid backup file: not valid JSON');
       }
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'completed' });
-      await restoreBackup(backup);
+      await restoreBackup(backup, cancelToken);
       break;
     }
     }

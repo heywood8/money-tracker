@@ -8,7 +8,7 @@ import { useImportProgress } from '../contexts/ImportProgressContext';
 
 export default function ImportProgressModal() {
   const { colors } = useThemeColors();
-  const { isImporting, steps, currentStep, finishImport } = useImportProgress();
+  const { isImporting, steps, currentStep, isCancelling, finishImport, requestCancel } = useImportProgress();
   const scrollViewRef = useRef(null);
   const stepPositions = useRef({});
 
@@ -187,6 +187,24 @@ export default function ImportProgressModal() {
         </ScrollView>
 
         <View style={styles.footer}>
+          {!isComplete && (
+            isCancelling ? (
+              <Text
+                variant="bodyMedium"
+                style={[styles.cancellingText, { color: colors.mutedText }]}
+              >
+                Cancelling...
+              </Text>
+            ) : (
+              <Button
+                mode="outlined"
+                onPress={requestCancel}
+                style={styles.cancelButton}
+              >
+                <Text>Cancel</Text>
+              </Button>
+            )
+          )}
           <Button
             mode="contained"
             onPress={handleOkPress}
@@ -202,6 +220,14 @@ export default function ImportProgressModal() {
 }
 
 const styles = StyleSheet.create({
+  cancelButton: {
+    marginBottom: 8,
+    minWidth: 120,
+  },
+  cancellingText: {
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   footer: {
     alignItems: 'center',
     marginTop: 16,
