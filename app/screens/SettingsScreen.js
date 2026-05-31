@@ -144,6 +144,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   }, [hideBalances, setHideBalances, t, showDialog]);
 
   const openSubPanel = useCallback((panel) => {
+    console.log(`[DBG:settings] openSubPanel panel=${panel} ts=${Date.now()}`);
     if (panel === 'import') {
       setImportStep('source');
       setImportSelectedBackup(null);
@@ -156,14 +157,18 @@ export default function SettingsScreen({ setSubPanelActive }) {
     Animated.parallel([
       Animated.timing(settingsAnim, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(subPanelAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]).start();
+    ]).start(() => {
+      console.log(`[DBG:settings] openSubPanel anim complete panel=${panel} ts=${Date.now()}`);
+    });
   }, [settingsAnim, subPanelAnim, loadStoredBackups]);
 
   const closeSubPanel = useCallback(() => {
+    console.log(`[DBG:settings] closeSubPanel called ts=${Date.now()}`);
     Animated.parallel([
       Animated.timing(subPanelAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(settingsAnim, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start(() => {
+      console.log(`[DBG:settings] closeSubPanel anim complete ts=${Date.now()}`);
       setActiveSubPanel(null);
       setUpdateResult(null);
       setImportStep('source');
@@ -182,8 +187,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   // Signal parent SimpleTabs when a subpanel is open so it can disable tab swiping
   useEffect(() => {
+    console.log(`[DBG:settings] activeSubPanel changed → ${activeSubPanel} ts=${Date.now()}`);
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
+
+  // Debug helper called from the swipe worklet via runOnJS
+  const logSwipeGesture = useCallback((tx, vx, triggered) => {
+    console.log(`[DBG:settings] swipeBack onEnd tx=${tx.toFixed(1)} vx=${vx.toFixed(1)} triggered=${triggered} panel=${activeSubPanel} ts=${Date.now()}`);
+  }, [activeSubPanel]);
 
   // Swipe right to close the active subpanel (mirrors Android back gesture)
   const swipeBackGesture = useMemo(() =>
@@ -193,11 +204,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
       .failOffsetY([-15, 15])
       .onEnd((event) => {
         'worklet';
-        if (event.translationX > 50 || event.velocityX > 500) {
+        const triggered = event.translationX > 50 || event.velocityX > 500;
+        runOnJS(logSwipeGesture)(event.translationX, event.velocityX, triggered);
+        if (triggered) {
           runOnJS(closeSubPanel)();
         }
       }),
-  [activeSubPanel, closeSubPanel],
+  [activeSubPanel, closeSubPanel, logSwipeGesture],
   );
 
   // Android hardware back button closes the active subpanel
