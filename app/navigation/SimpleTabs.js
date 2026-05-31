@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, memo } from 'react';
+import React, { useMemo, useCallback, useRef, useLayoutEffect, memo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -142,6 +142,11 @@ export default function SimpleTabs() {
   // inside panGesture callbacks without making overlayContent a useMemo dep
   // (which would reinstall the native gesture recognizer mid-animation).
   const isTransitioningShared = useSharedValue(false);
+  // Stores animation params for the pending non-adjacent transition.
+  // handleTabPress writes here; useLayoutEffect reads and fires the actual
+  // slide AFTER ScreenContent has been committed to the native layer — so the
+  // overlay is never blank when it enters the viewport.
+  const pendingTransitionRef = useRef(null);
   // Start far offscreen so the always-mounted empty View is never visible at rest.
   const overlayTranslateX = useSharedValue(2 * SCREEN_WIDTH);
 
@@ -184,6 +189,22 @@ export default function SimpleTabs() {
     setOverlayContent(null);
   }, [TABS, translateX, overlayTranslateX, isTransitioningShared]);
 
+  // Fire the slide animation only after ScreenContent has been committed to the
+  // native layer — useLayoutEffect runs synchronously after React commit, so by
+  // the time this executes the overlay's views exist and the first animation
+  // frame will show content, not a blank background.
+  useLayoutEffect(() => {
+    if (!overlayContent || !pendingTransitionRef.current) return;
+    const { stripExit, direction, tabKey } = pendingTransitionRef.current;
+    pendingTransitionRef.current = null;
+    overlayTranslateX.value = direction * SCREEN_WIDTH; // snap to starting edge
+    translateX.value = withTiming(stripExit, SCREEN_TIMING);
+    overlayTranslateX.value = withTiming(0, SCREEN_TIMING, () => {
+      'worklet';
+      runOnJS(completeOverlayTransition)(tabKey);
+    });
+  }, [overlayContent, overlayTranslateX, translateX, completeOverlayTransition]);
+
   const handleTabPress = useCallback((tabKey) => {
     console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} transitioning=${isTransitioningRef.current} ts=${Date.now()}`);
     if (isTransitioningRef.current) {
@@ -205,10 +226,10 @@ export default function SimpleTabs() {
     }
 
     // ---- Non-adjacent tab ----
-    // Strip slides out (1 screen width). Overlay (target screen) slides in from
-    // the opposite side. Both start immediately on the worklet thread — no React
-    // render cycle delay. ScreenContent mounts inside the already-moving overlay
-    // a frame or two later; the overlay's background covers the strip until then.
+    // Mount target content in the overlay while it is still parked far offscreen
+    // (overlayTranslateX = 2*SCREEN_WIDTH). useLayoutEffect fires synchronously
+    // after React commits ScreenContent to the native layer, then starts the
+    // slide — so the overlay is never blank when it enters the viewport.
     const direction = newIndex > oldIndex ? 1 : -1;
     const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
@@ -218,15 +239,8 @@ export default function SimpleTabs() {
     activeIndex.value = newIndex;
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
-    // Snap overlay to starting edge, then animate both simultaneously.
-    overlayTranslateX.value = direction * SCREEN_WIDTH;
-    translateX.value = withTiming(stripExit, SCREEN_TIMING);
-    overlayTranslateX.value = withTiming(0, SCREEN_TIMING, () => {
-      'worklet';
-      runOnJS(completeOverlayTransition)(tabKey);
-    });
-
-    // Render content inside the overlay (React async — already animating by now).
+    // Store params for useLayoutEffect to consume after mount.
+    pendingTransitionRef.current = { stripExit, direction, tabKey };
     setOverlayContent(tabKey);
   }, [TABS, active, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition, isTransitioningShared]);
 
