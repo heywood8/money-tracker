@@ -30,6 +30,7 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 }));
 
 const mockFinishImport = jest.fn();
+const mockRequestCancel = jest.fn();
 const mockUseImportProgress = jest.fn();
 
 jest.mock('../../app/contexts/ImportProgressContext', () => ({
@@ -64,7 +65,9 @@ describe('ImportProgressModal', () => {
         { id: 'complete', label: 'Import complete', status: 'pending', data: null },
       ],
       currentStep: 'accounts',
+      isCancelling: false,
       finishImport: mockFinishImport,
+      requestCancel: mockRequestCancel,
     });
   });
 
@@ -161,10 +164,12 @@ describe('ImportProgressModal', () => {
 
   describe('OK Button', () => {
     it('disables OK button while import is in progress', () => {
-      const { UNSAFE_getByType } = render(<ImportProgressModal />);
+      const { UNSAFE_getAllByType } = render(<ImportProgressModal />);
 
       const Button = require('react-native-paper').Button;
-      const okButton = UNSAFE_getByType(Button);
+      const buttons = UNSAFE_getAllByType(Button);
+      // When not complete, both Cancel and OK buttons are rendered; OK is last
+      const okButton = buttons[buttons.length - 1];
 
       expect(okButton.props.disabled).toBe(true);
     });
@@ -286,6 +291,282 @@ describe('ImportProgressModal', () => {
 
       // Last step should be visible
       expect(getByText('Import complete')).toBeTruthy();
+    });
+  });
+
+  describe('Cancel Button', () => {
+    it('shows cancel button while import is in progress', () => {
+      const { getByText } = render(<ImportProgressModal />);
+      expect(getByText('Cancel')).toBeTruthy();
+    });
+
+    it('calls requestCancel when cancel button is pressed', () => {
+      const { getByText } = render(<ImportProgressModal />);
+      fireEvent.press(getByText('Cancel'));
+      expect(mockRequestCancel).toHaveBeenCalled();
+    });
+
+    it('shows Cancelling... text when isCancelling is true', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [],
+        currentStep: 'accounts',
+        isCancelling: true,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText, queryByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Cancelling...')).toBeTruthy();
+      expect(queryByText('Cancel')).toBeNull();
+    });
+
+    it('hides both cancel button and cancelling text when complete', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [{ id: 'complete', label: 'Done', status: 'completed', data: null }],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { queryByText } = render(<ImportProgressModal />);
+
+      expect(queryByText('Cancel')).toBeNull();
+      expect(queryByText('Cancelling...')).toBeNull();
+    });
+  });
+
+  describe('Extended Step Labels', () => {
+    it('shows in-progress labels for operations, budgets, metadata', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'operations', label: 'Restoring operations', status: 'in_progress', data: 42 },
+          { id: 'budgets', label: 'Restoring budgets', status: 'in_progress', data: 5 },
+          { id: 'metadata', label: 'Restoring metadata', status: 'in_progress', data: 3 },
+        ],
+        currentStep: 'operations',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restoring 42 operations...')).toBeTruthy();
+      expect(getByText('Restoring 5 budgets...')).toBeTruthy();
+      expect(getByText('Restoring 3 metadata entries...')).toBeTruthy();
+    });
+
+    it('shows completed labels for operations, budgets, metadata', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'operations', label: 'Restoring operations', status: 'completed', data: 42 },
+          { id: 'budgets', label: 'Restoring budgets', status: 'completed', data: 5 },
+          { id: 'metadata', label: 'Restoring metadata', status: 'completed', data: 3 },
+        ],
+        currentStep: 'metadata',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restored 42 operations')).toBeTruthy();
+      expect(getByText('Restored 5 budgets')).toBeTruthy();
+      expect(getByText('Restored 3 metadata entries')).toBeTruthy();
+    });
+
+    it('shows complete step label with multiple skipped operations', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 3 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully (3 operations skipped — see logs)')).toBeTruthy();
+    });
+
+    it('shows complete step label with 1 skipped operation (singular)', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 1 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully (1 operation skipped — see logs)')).toBeTruthy();
+    });
+
+    it('returns step label for in-progress step with data but unrecognised id', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'restore', label: 'Restoring database', status: 'in_progress', data: 'some-data' },
+        ],
+        currentStep: 'restore',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restoring database')).toBeTruthy();
+    });
+
+    it('returns step label for completed step with data but unrecognised id', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'clear', label: 'Clearing existing data', status: 'completed', data: 'some-data' },
+        ],
+        currentStep: 'clear',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Clearing existing data')).toBeTruthy();
+    });
+
+    it('shows default complete label when no operations were skipped', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 0 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully')).toBeTruthy();
+    });
+  });
+
+  describe('Step Layout', () => {
+    it('records step y-position when layout event fires', () => {
+      const { UNSAFE_getAllByType } = render(<ImportProgressModal />);
+
+      const { View } = require('react-native');
+      const viewsWithLayout = UNSAFE_getAllByType(View).filter(v => v.props.onLayout);
+
+      expect(viewsWithLayout.length).toBeGreaterThan(0);
+
+      // Firing a layout event should not throw
+      expect(() => {
+        fireEvent(viewsWithLayout[0], 'layout', {
+          nativeEvent: { layout: { y: 100 } },
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe('Auto-scroll Effect', () => {
+    it('scrolls to current step when its position is populated from a layout event', async () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'accounts', label: 'Accounts', status: 'in_progress', data: null },
+          { id: 'categories', label: 'Categories', status: 'pending', data: null },
+        ],
+        currentStep: 'accounts',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { UNSAFE_getAllByType, rerender } = render(<ImportProgressModal />);
+
+      const { View } = require('react-native');
+      // Populate stepPositions.current for all rendered step rows
+      const layoutViews = UNSAFE_getAllByType(View).filter(v => v.props.onLayout);
+      layoutViews.forEach((v, i) =>
+        fireEvent(v, 'layout', { nativeEvent: { layout: { y: i * 60 } } }),
+      );
+
+      // Re-render with a new currentStep that has a known position (categories at y=60)
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'accounts', label: 'Accounts', status: 'completed', data: null },
+          { id: 'categories', label: 'Categories', status: 'in_progress', data: null },
+        ],
+        currentStep: 'categories',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      rerender(<ImportProgressModal />);
+
+      // The useEffect fires for the new currentStep with a known position; no errors expected
+      await waitFor(() => {
+        expect(UNSAFE_getAllByType(View).length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('Web Platform Reload', () => {
+    it('calls window.location.reload when Platform.OS is web', async () => {
+      const Platform = require('react-native').Platform;
+      const originalOS = Platform.OS;
+      Platform.OS = 'web';
+
+      const mockReload = jest.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        writable: true,
+        value: { reload: mockReload },
+      });
+
+      try {
+        mockUseImportProgress.mockReturnValue({
+          isImporting: true,
+          steps: [{ id: 'complete', label: 'Done', status: 'completed', data: null }],
+          currentStep: 'complete',
+          isCancelling: false,
+          finishImport: mockFinishImport,
+          requestCancel: mockRequestCancel,
+        });
+
+        const { UNSAFE_getByType } = render(<ImportProgressModal />);
+        const Button = require('react-native-paper').Button;
+        const okButton = UNSAFE_getByType(Button);
+
+        fireEvent.press(okButton);
+
+        await waitFor(() => {
+          expect(mockFinishImport).toHaveBeenCalled();
+          expect(mockReload).toHaveBeenCalled();
+        });
+      } finally {
+        Platform.OS = originalOS;
+      }
     });
   });
 

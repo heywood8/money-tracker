@@ -60,6 +60,7 @@ jest.mock('../../app/contexts/ImportProgressContext', () => ({
     startImport: mockStartImport,
     cancelImport: mockCancelImport,
     completeImport: mockCompleteImport,
+    getCancelToken: jest.fn(() => ({ cancelled: false })),
   }),
 }));
 
@@ -506,7 +507,7 @@ describe('SettingsScreen', () => {
       expect(mockCancelImport).not.toHaveBeenCalled();
 
       await waitFor(() => {
-        expect(mockImportBackupFromFile).toHaveBeenCalledWith({ fileUri: '/mock/file.json', filename: 'backup.json' });
+        expect(mockImportBackupFromFile).toHaveBeenCalledWith({ fileUri: '/mock/file.json', filename: 'backup.json' }, expect.any(Object));
         expect(mockStartImport).toHaveBeenCalled();
       });
     });

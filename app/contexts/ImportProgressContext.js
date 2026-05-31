@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { appEvents } from '../services/eventEmitter';
 import { IMPORT_PROGRESS_EVENT } from '../services/BackupRestore';
@@ -17,12 +17,17 @@ export const ImportProgressProvider = ({ children }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [steps, setSteps] = useState([]);
   const [currentStep, setCurrentStep] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelTokenRef = useRef({ cancelled: false });
 
   const startImport = useCallback(() => {
+    cancelTokenRef.current = { cancelled: false };
+    setIsCancelling(false);
     setIsImporting(true);
     setSteps([
       { id: 'format', label: 'Detecting format', status: 'pending', data: null },
       { id: 'import', label: 'Importing backup', status: 'pending', data: null },
+      { id: 'backup', label: 'Creating safety backup', status: 'pending', data: null },
       { id: 'restore', label: 'Restoring database', status: 'pending', data: null },
       { id: 'clear', label: 'Clearing existing data', status: 'pending', data: null },
       { id: 'accounts', label: 'Restoring accounts', status: 'pending', data: null },
@@ -36,6 +41,13 @@ export const ImportProgressProvider = ({ children }) => {
     ]);
     setCurrentStep('format');
   }, []);
+
+  const requestCancel = useCallback(() => {
+    cancelTokenRef.current.cancelled = true;
+    setIsCancelling(true);
+  }, []);
+
+  const getCancelToken = useCallback(() => cancelTokenRef.current, []);
 
   const updateStep = useCallback((stepId, status, data = null) => {
     setSteps(prevSteps =>
@@ -58,6 +70,8 @@ export const ImportProgressProvider = ({ children }) => {
     setIsImporting(false);
     setSteps([]);
     setCurrentStep(null);
+    setIsCancelling(false);
+    cancelTokenRef.current = { cancelled: false };
   }, []);
 
   // Listen for import progress events
@@ -76,18 +90,23 @@ export const ImportProgressProvider = ({ children }) => {
     setIsImporting(false);
     setSteps([]);
     setCurrentStep(null);
+    setIsCancelling(false);
+    cancelTokenRef.current = { cancelled: false };
   }, []);
 
   const value = useMemo(() => ({
     isImporting,
     steps,
     currentStep,
+    isCancelling,
     startImport,
     updateStep,
     completeImport,
     cancelImport,
     finishImport,
-  }), [isImporting, steps, currentStep, startImport, updateStep, completeImport, cancelImport, finishImport]);
+    requestCancel,
+    getCancelToken,
+  }), [isImporting, steps, currentStep, isCancelling, startImport, updateStep, completeImport, cancelImport, finishImport, requestCancel, getCancelToken]);
 
   return (
     <ImportProgressContext.Provider value={value}>

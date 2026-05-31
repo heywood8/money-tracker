@@ -17,7 +17,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useImportProgress } from '../contexts/ImportProgressContext';
-import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots } from '../services/BackupRestore';
+import { exportBackup, pickImportFile, importBackupFromFile, restoreBackup, createBackup, getPreRestoreSnapshots, CancelledImportError } from '../services/BackupRestore';
 import { getStoredBackups, DAILY_BACKUP_DIR } from '../services/DailyBackupService';
 import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
@@ -67,7 +67,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { hideBalances, setHideBalances } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
-  const { startImport, cancelImport, completeImport } = useImportProgress();
+  const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload } = useUpdateDownload();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
@@ -347,15 +347,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     importPickInProgress.current = false;
     closeSubPanel();
     startImport();
+    const cancelToken = getCancelToken();
     try {
-      await importBackupFromFile(fileInfo);
+      await importBackupFromFile(fileInfo, cancelToken);
       completeImport();
     } catch (error) {
       cancelImport();
+      if (error instanceof CancelledImportError) return;
       console.error('Import backup error:', error);
       showDialog(t('error') || 'Error', error.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
     }
-  }, [closeSubPanel, startImport, completeImport, cancelImport, t, showDialog]);
+  }, [closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
 
   const handleShareLogs = useCallback(async () => {
     try {
@@ -427,14 +429,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
     closeSubPanel();
     startImport();
+    const cancelToken = getCancelToken();
     try {
-      await restoreBackup(backup);
+      await restoreBackup(backup, cancelToken);
       completeImport();
     } catch (restoreError) {
       cancelImport();
-      console.error('[SheetsImport] restore error:', restoreError);
+      if (!(restoreError instanceof CancelledImportError)) {
+        console.error('[SheetsImport] restore error:', restoreError);
+      }
     }
-  }, [t, closeSubPanel, startImport, completeImport, cancelImport]);
+  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
@@ -461,21 +466,23 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (!importSelectedBackup) return;
     closeSubPanel();
     startImport();
+    const cancelToken = getCancelToken();
     try {
       const content = await LegacyFileSystem.readAsStringAsync(importSelectedBackup.uri);
       const backup = JSON.parse(content);
-      await restoreBackup(backup);
+      await restoreBackup(backup, cancelToken);
       completeImport();
     } catch (error) {
-      console.error('Local backup restore error:', error);
       cancelImport();
+      if (error instanceof CancelledImportError) return;
+      console.error('Local backup restore error:', error);
       showDialog(
         t('error') || 'Error',
         error.message || t('restore_error') || 'Failed to restore backup',
         [{ text: 'OK' }],
       );
     }
-  }, [importSelectedBackup, closeSubPanel, startImport, completeImport, cancelImport, t, showDialog]);
+  }, [importSelectedBackup, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, t, showDialog]);
 
   const handleSaveLocalBackup = useCallback(async () => {
     setSaveLocalBackupLoading(true);

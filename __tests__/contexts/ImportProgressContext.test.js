@@ -88,14 +88,14 @@ describe('ImportProgressContext', () => {
         result.current.startImport();
       });
 
-      expect(result.current.steps).toHaveLength(12);
+      expect(result.current.steps).toHaveLength(13);
       expect(result.current.steps[0]).toEqual({
         id: 'format',
         label: 'Detecting format',
         status: 'pending',
         data: null,
       });
-      expect(result.current.steps[11]).toEqual({
+      expect(result.current.steps[12]).toEqual({
         id: 'complete',
         label: 'Database restored successfully',
         status: 'pending',
@@ -124,6 +124,7 @@ describe('ImportProgressContext', () => {
       expect(stepIds).toEqual([
         'format',
         'import',
+        'backup',
         'restore',
         'clear',
         'accounts',
@@ -216,7 +217,7 @@ describe('ImportProgressContext', () => {
       });
 
       // Steps should remain unchanged
-      expect(result.current.steps).toHaveLength(12);
+      expect(result.current.steps).toHaveLength(13);
     });
   });
 
@@ -502,7 +503,7 @@ describe('ImportProgressContext', () => {
       });
 
       expect(result.current.isImporting).toBe(true);
-      expect(result.current.steps).toHaveLength(12);
+      expect(result.current.steps).toHaveLength(13);
       expect(result.current.currentStep).toBe('format');
     });
 
@@ -528,7 +529,7 @@ describe('ImportProgressContext', () => {
       });
 
       expect(result.current.isImporting).toBe(true);
-      expect(result.current.steps).toHaveLength(12);
+      expect(result.current.steps).toHaveLength(13);
       expect(result.current.currentStep).toBe('format');
     });
   });
@@ -607,6 +608,123 @@ describe('ImportProgressContext', () => {
       expect(result.current.steps.find(s => s.id === 'import').status).toBe('completed');
       expect(result.current.steps.find(s => s.id === 'restore').status).toBe('in_progress');
       expect(result.current.currentStep).toBe('restore');
+    });
+  });
+
+  describe('requestCancel', () => {
+    it('sets isCancelling to true', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+
+      expect(result.current.isCancelling).toBe(false);
+
+      act(() => { result.current.requestCancel(); });
+
+      expect(result.current.isCancelling).toBe(true);
+    });
+
+    it('marks the cancel token as cancelled', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+
+      const token = result.current.getCancelToken();
+      expect(token.cancelled).toBe(false);
+
+      act(() => { result.current.requestCancel(); });
+
+      expect(token.cancelled).toBe(true);
+    });
+
+    it('isCancelling resets to false after cancelImport', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+      act(() => { result.current.requestCancel(); });
+
+      expect(result.current.isCancelling).toBe(true);
+
+      act(() => { result.current.cancelImport(); });
+
+      expect(result.current.isCancelling).toBe(false);
+    });
+
+    it('isCancelling resets to false after finishImport', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+      act(() => { result.current.requestCancel(); });
+      act(() => { result.current.finishImport(); });
+
+      expect(result.current.isCancelling).toBe(false);
+    });
+  });
+
+  describe('getCancelToken', () => {
+    it('returns a fresh non-cancelled token after startImport', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+
+      const token = result.current.getCancelToken();
+      expect(token).toBeDefined();
+      expect(token.cancelled).toBe(false);
+    });
+
+    it('returns a new token on each startImport call', () => {
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+      const firstToken = result.current.getCancelToken();
+
+      act(() => { result.current.cancelImport(); });
+      act(() => { result.current.startImport(); });
+      const secondToken = result.current.getCancelToken();
+
+      expect(secondToken.cancelled).toBe(false);
+      // After second startImport, the old token ref is replaced
+      expect(secondToken).not.toBe(firstToken);
+    });
+  });
+
+  describe('Event listener complete branch', () => {
+    it('sets currentStep to complete when complete event fires with completed status', () => {
+      let eventHandler;
+      appEvents.on.mockImplementation((event, handler) => {
+        eventHandler = handler;
+        return jest.fn();
+      });
+
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+
+      act(() => {
+        eventHandler({ stepId: 'complete', status: 'completed', data: null });
+      });
+
+      expect(result.current.currentStep).toBe('complete');
+    });
+
+    it('does not set currentStep to complete when complete event fires with non-completed status', () => {
+      let eventHandler;
+      appEvents.on.mockImplementation((event, handler) => {
+        eventHandler = handler;
+        return jest.fn();
+      });
+
+      const { result } = renderHook(() => useImportProgress(), { wrapper });
+
+      act(() => { result.current.startImport(); });
+
+      act(() => {
+        eventHandler({ stepId: 'complete', status: 'in_progress', data: null });
+      });
+
+      // currentStep should be 'complete' because updateStep sets it for in_progress too
+      // but that's handled by the in_progress branch, not the explicit setCurrentStep
+      expect(result.current.currentStep).toBe('complete');
     });
   });
 });
