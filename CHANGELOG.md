@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.3](https://github.com/heywood8/money-tracker/compare/penny-v0.127.2...penny-v0.127.3) (2026-05-31)
+
+
+### Bug Fixes
+
+* **tabs:** smooth non-adjacent tab transitions and settings subpanel touch ([#854](https://github.com/heywood8/money-tracker/issues/854)) ([e770f18](https://github.com/heywood8/money-tracker/commit/e770f189df6593fe571374e88d26f49d691bc7da))
+
 ## [0.127.2](https://github.com/heywood8/money-tracker/compare/penny-v0.127.1...penny-v0.127.2) (2026-05-31)
 
 
