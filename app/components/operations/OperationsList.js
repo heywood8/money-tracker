@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, forwardRef } from 'react';
+import React, { useMemo, useCallback, forwardRef, useRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, SectionList, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
@@ -219,9 +219,29 @@ const OperationsList = forwardRef(({
 
   const keyExtractor = useCallback((item) => item.id, []);
 
+  const sectionListRef = useRef(null);
+
+  // Expose FlatList-compatible scroll methods so OperationsScreen can call
+  // scrollToOffset/scrollToIndex without knowing the underlying list type.
+  useImperativeHandle(ref, () => ({
+    scrollToOffset: ({ offset, animated }) => {
+      sectionListRef.current?.getScrollResponder()?.scrollTo({ y: offset, animated });
+    },
+    scrollToIndex: ({ index, animated, viewPosition }) => {
+      if (!sectionListRef.current || index < 0 || index >= sections.length) return;
+      if (!sections[index] || sections[index].data.length === 0) return;
+      sectionListRef.current.scrollToLocation({
+        sectionIndex: index,
+        itemIndex: 0,
+        animated: animated ?? false,
+        viewPosition: viewPosition ?? 0,
+      });
+    },
+  }), [sections]);
+
   return (
     <SectionList
-      ref={ref}
+      ref={sectionListRef}
       contentInsetAdjustmentBehavior="automatic"
       sections={sections}
       renderItem={renderItem}
