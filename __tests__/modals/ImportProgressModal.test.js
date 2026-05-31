@@ -294,6 +294,164 @@ describe('ImportProgressModal', () => {
     });
   });
 
+  describe('Cancel Button', () => {
+    it('shows cancel button while import is in progress', () => {
+      const { getByText } = render(<ImportProgressModal />);
+      expect(getByText('Cancel')).toBeTruthy();
+    });
+
+    it('calls requestCancel when cancel button is pressed', () => {
+      const { getByText } = render(<ImportProgressModal />);
+      fireEvent.press(getByText('Cancel'));
+      expect(mockRequestCancel).toHaveBeenCalled();
+    });
+
+    it('shows Cancelling... text when isCancelling is true', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [],
+        currentStep: 'accounts',
+        isCancelling: true,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText, queryByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Cancelling...')).toBeTruthy();
+      expect(queryByText('Cancel')).toBeNull();
+    });
+
+    it('hides both cancel button and cancelling text when complete', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [{ id: 'complete', label: 'Done', status: 'completed', data: null }],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { queryByText } = render(<ImportProgressModal />);
+
+      expect(queryByText('Cancel')).toBeNull();
+      expect(queryByText('Cancelling...')).toBeNull();
+    });
+  });
+
+  describe('Extended Step Labels', () => {
+    it('shows in-progress labels for operations, budgets, metadata', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'operations', label: 'Restoring operations', status: 'in_progress', data: 42 },
+          { id: 'budgets', label: 'Restoring budgets', status: 'in_progress', data: 5 },
+          { id: 'metadata', label: 'Restoring metadata', status: 'in_progress', data: 3 },
+        ],
+        currentStep: 'operations',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restoring 42 operations...')).toBeTruthy();
+      expect(getByText('Restoring 5 budgets...')).toBeTruthy();
+      expect(getByText('Restoring 3 metadata entries...')).toBeTruthy();
+    });
+
+    it('shows completed labels for operations, budgets, metadata', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'operations', label: 'Restoring operations', status: 'completed', data: 42 },
+          { id: 'budgets', label: 'Restoring budgets', status: 'completed', data: 5 },
+          { id: 'metadata', label: 'Restoring metadata', status: 'completed', data: 3 },
+        ],
+        currentStep: 'metadata',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restored 42 operations')).toBeTruthy();
+      expect(getByText('Restored 5 budgets')).toBeTruthy();
+      expect(getByText('Restored 3 metadata entries')).toBeTruthy();
+    });
+
+    it('shows complete step label with multiple skipped operations', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 3 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully (3 operations skipped — see logs)')).toBeTruthy();
+    });
+
+    it('shows complete step label with 1 skipped operation (singular)', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 1 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully (1 operation skipped — see logs)')).toBeTruthy();
+    });
+
+    it('shows default complete label when no operations were skipped', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'complete', label: 'Database restored successfully', status: 'completed', data: { skippedOperations: 0 } },
+        ],
+        currentStep: 'complete',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Database restored successfully')).toBeTruthy();
+    });
+  });
+
+  describe('Step Layout', () => {
+    it('records step y-position when layout event fires', () => {
+      const { UNSAFE_getAllByType } = render(<ImportProgressModal />);
+
+      const { View } = require('react-native');
+      const viewsWithLayout = UNSAFE_getAllByType(View).filter(v => v.props.onLayout);
+
+      expect(viewsWithLayout.length).toBeGreaterThan(0);
+
+      // Firing a layout event should not throw
+      expect(() => {
+        fireEvent(viewsWithLayout[0], 'layout', {
+          nativeEvent: { layout: { y: 100 } },
+        });
+      }).not.toThrow();
+    });
+  });
+
   describe('Edge Cases', () => {
     it('handles empty steps array', () => {
       mockUseImportProgress.mockReturnValue({
