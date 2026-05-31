@@ -137,6 +137,11 @@ export default function SimpleTabs() {
   // opposite direction — like two adjacent screens. No intermediate screens
   // are ever visible because the overlay fully covers them.
   const [overlay, setOverlay] = React.useState(null); // { key: string } | null
+  // Ref mirror of overlay — always current, avoids stale closure in handleTabPress.
+  // React state updates are async; reading overlay inside a useCallback reads
+  // the value captured at creation time. The ref is updated synchronously
+  // alongside every setOverlay call so handleTabPress never sees stale state.
+  const overlayRef = useRef(null);
   const overlayTranslateX = useSharedValue(SCREEN_WIDTH);
 
   const TABS = useMemo(() => [
@@ -172,15 +177,16 @@ export default function SimpleTabs() {
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     translateX.value = -newIndex * SCREEN_WIDTH;
     activeIndex.value = newIndex;
+    overlayRef.current = null; // clear ref immediately — handleTabPress reads this
     setActive(tabKey);
-    console.log(`[DBG:tabs] overlay clearing synchronously (no RAF) ts=${Date.now()}`);
+    console.log(`[DBG:tabs] overlay clearing synchronously ts=${Date.now()}`);
     setOverlay(null);
   }, [TABS, translateX, activeIndex]);
 
   const handleTabPress = useCallback((tabKey) => {
-    console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} overlay=${overlay ? overlay.key : 'null'} ts=${Date.now()}`);
-    if (overlay) {
-      console.log(`[DBG:tabs] handleTabPress IGNORED — overlay still active (${overlay.key})`);
+    console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} overlayRef=${overlayRef.current ? overlayRef.current.key : 'null'} ts=${Date.now()}`);
+    if (overlayRef.current) {
+      console.log(`[DBG:tabs] handleTabPress IGNORED — overlayRef active (${overlayRef.current.key})`);
       return; // ignore during an active overlay transition
     }
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
@@ -210,8 +216,9 @@ export default function SimpleTabs() {
     //    useLayoutEffect fires after React commits the overlay View.
     overlayTranslateX.value = direction * SCREEN_WIDTH;
     pendingOverlayRef.current = { oldIndex, newIndex, direction, tabKey };
+    overlayRef.current = { key: tabKey }; // set ref immediately alongside state
     setOverlay({ key: tabKey });
-  }, [TABS, active, overlay, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
+  }, [TABS, active, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
 
   // Start overlay animations after React has committed the overlay mount.
   useLayoutEffect(() => {
