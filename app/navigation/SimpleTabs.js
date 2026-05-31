@@ -7,9 +7,13 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
+  withTiming,
+  Easing,
   runOnJS,
 } from 'react-native-reanimated';
+
+const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
+const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OperationsScreen from '../screens/OperationsScreen';
 import GraphsScreen from '../screens/GraphsScreen';
@@ -199,11 +203,8 @@ export default function SimpleTabs() {
       // Adjacent tab — animate the strip with a spring (no intermediates possible)
       setActive(tabKey);
       activeIndex.value = newIndex;
-      pillPosition.value = withSpring(newIndex, { damping: 40, stiffness: 150 });
-      translateX.value = withSpring(-newIndex * SCREEN_WIDTH, {
-        damping: 40,
-        stiffness: 150,
-      });
+      pillPosition.value = withTiming(newIndex, PILL_TIMING);
+      translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING);
       return;
     }
 
@@ -228,15 +229,14 @@ export default function SimpleTabs() {
 
     console.log(`[DBG:tabs] useLayoutEffect starting overlay anim tabKey=${tabKey} oldIndex=${oldIndex} newIndex=${newIndex} direction=${direction} ts=${Date.now()}`);
 
-    const springConfig = { damping: 40, stiffness: 150 };
     const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
-    translateX.value = withSpring(stripExit, springConfig);
-    overlayTranslateX.value = withSpring(0, springConfig, () => {
+    translateX.value = withTiming(stripExit, SCREEN_TIMING);
+    overlayTranslateX.value = withTiming(0, SCREEN_TIMING, () => {
       'worklet';
       runOnJS(completeOverlayTransition)(tabKey);
     });
-    pillPosition.value = withSpring(newIndex, springConfig);
+    pillPosition.value = withTiming(newIndex, PILL_TIMING);
   }, [overlay, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
 
   // Android hardware back button navigates to Operations from any other tab
@@ -288,21 +288,15 @@ export default function SimpleTabs() {
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
           const target = -newIndex * SCREEN_WIDTH;
-          pillPosition.value = withSpring(newIndex, { damping: 40, stiffness: 150 });
-          translateX.value = withSpring(target, {
-            damping: 40,
-            stiffness: 150,
-          }, (isFinished) => {
+          pillPosition.value = withTiming(newIndex, PILL_TIMING);
+          translateX.value = withTiming(target, SCREEN_TIMING, (isFinished) => {
             if (isFinished) {
               runOnJS(setActive)(TABS[newIndex].key);
             }
           });
         } else {
-          pillPosition.value = withSpring(currentIndex, { damping: 40, stiffness: 150 });
-          translateX.value = withSpring(-currentIndex * SCREEN_WIDTH, {
-            damping: 40,
-            stiffness: 150,
-          });
+          pillPosition.value = withTiming(currentIndex, PILL_TIMING);
+          translateX.value = withTiming(-currentIndex * SCREEN_WIDTH, SCREEN_TIMING);
         }
       });
   }, [translateX, activeIndex, startTranslateX, TABS, setActive, subPanelActive, overlay, pillPosition]);
