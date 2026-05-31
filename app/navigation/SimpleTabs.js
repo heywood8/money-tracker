@@ -161,17 +161,20 @@ export default function SimpleTabs() {
   // completeOverlayTransition.
 
   // Finalize an overlay transition: snap strip to new position, update React
-  // state, then remove the overlay on the next frame so the strip takes over.
+  // state, and remove the overlay in the same render cycle.
+  // NOTE: translateX is already snapped on the worklet thread before this
+  // runs, so there is no visual flash from removing the overlay synchronously.
+  // The previous requestAnimationFrame deferral created a 1-2 frame window
+  // where active had updated but overlay was still set, causing handleTabPress
+  // to ignore taps during that window.
   const completeOverlayTransition = useCallback((tabKey) => {
     console.log(`[DBG:tabs] completeOverlayTransition tabKey=${tabKey} ts=${Date.now()}`);
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     translateX.value = -newIndex * SCREEN_WIDTH;
     activeIndex.value = newIndex;
     setActive(tabKey);
-    requestAnimationFrame(() => {
-      console.log(`[DBG:tabs] overlay RAF clearing overlay ts=${Date.now()}`);
-      setOverlay(null);
-    });
+    console.log(`[DBG:tabs] overlay clearing synchronously (no RAF) ts=${Date.now()}`);
+    setOverlay(null);
   }, [TABS, translateX, activeIndex]);
 
   const handleTabPress = useCallback((tabKey) => {
