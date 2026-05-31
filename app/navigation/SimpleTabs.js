@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useLayoutEffect, memo } from 'react';
+import React, { useMemo, useCallback, useRef, memo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -102,27 +102,6 @@ TabButton.defaultProps = {
   onPress: () => {},
 };
 
-/**
- * Renders the correct screen for a given tab key.
- * Used by the overlay during non-adjacent tab transitions.
- */
-const ScreenContent = memo(({ tabKey, setSubPanelActive }) => {
-  switch (tabKey) {
-  case 'Operations': return <OperationsScreen />;
-  case 'Graphs': return <GraphsScreen />;
-  case 'Planned': return <PlannedOperationsScreen />;
-  case 'Settings': return <SettingsScreen setSubPanelActive={setSubPanelActive} />;
-  default: return null;
-  }
-});
-
-ScreenContent.displayName = 'ScreenContent';
-
-ScreenContent.propTypes = {
-  tabKey: PropTypes.string.isRequired,
-  setSubPanelActive: PropTypes.func.isRequired,
-};
-
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -131,24 +110,12 @@ export default function SimpleTabs() {
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
 
-  // overlayContent: which screen to render inside the always-mounted overlay View.
-  // The overlay View itself is always in the tree so its position can be driven
-  // by overlayTranslateX (a shared value) immediately on the worklet thread —
-  // no React render cycle needed before animations can start.
-  const [overlayContent, setOverlayContent] = React.useState(null); // string | null
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
-  // Shared value mirror of isTransitioningRef — readable on the worklet thread
-  // inside panGesture callbacks without making overlayContent a useMemo dep
-  // (which would reinstall the native gesture recognizer mid-animation).
+  // Shared value mirror — readable on the worklet thread inside panGesture
+  // callbacks without making any React state a useMemo dep (which would
+  // reinstall the native gesture recognizer mid-animation and cause jitter).
   const isTransitioningShared = useSharedValue(false);
-  // Stores animation params for the pending non-adjacent transition.
-  // handleTabPress writes here; useLayoutEffect reads and fires the actual
-  // slide AFTER ScreenContent has been committed to the native layer — so the
-  // overlay is never blank when it enters the viewport.
-  const pendingTransitionRef = useRef(null);
-  // Start far offscreen so the always-mounted empty View is never visible at rest.
-  const overlayTranslateX = useSharedValue(2 * SCREEN_WIDTH);
 
   const TABS = useMemo(() => [
     { key: 'Operations', label: t('operations') || 'Operations' },
@@ -163,86 +130,74 @@ export default function SimpleTabs() {
   const startTranslateX = useSharedValue(0);
   const tabBarWidthShared = useSharedValue(SCREEN_WIDTH);
   // Dedicated pill position — animated independently so it works for swipe,
-  // adjacent spring, and overlay timing transitions.
+  // adjacent, and non-adjacent transitions.
   const pillPosition = useSharedValue(0);
 
-  // NOTE: there is intentionally NO useEffect driving translateX from `active`.
-  // That pattern caused the useEffect to clobber ongoing spring animations.
-  // translateX is set exclusively by: handleTabPress, swipe onEnd, and
-  // completeOverlayTransition.
+  // Per-screen horizontal offset for non-adjacent transitions.
+  // During a non-adjacent tap A→D we instantly reposition the target screen to
+  // be adjacent to the source (worklet thread, no React render), animate the
+  // strip exactly 1 screen width (same as adjacent), then snap strip to the
+  // real resting position and zero the offset — both on the worklet thread so
+  // there is no visible jump. All 4 screens stay pre-mounted; no overlay needed.
+  const screenAdjust0 = useSharedValue(0);
+  const screenAdjust1 = useSharedValue(0);
+  const screenAdjust2 = useSharedValue(0);
+  const screenAdjust3 = useSharedValue(0);
 
-  // Finalize an overlay transition: snap strip to new position, update React
-  // state, and remove the overlay in the same render cycle.
-  // NOTE: translateX is already snapped on the worklet thread before this
-  // runs, so there is no visual flash from removing the overlay synchronously.
-  // The previous requestAnimationFrame deferral created a 1-2 frame window
-  // where active had updated but overlay was still set, causing handleTabPress
-  // to ignore taps during that window.
-  // Snap strip to final position and hide overlay when slide-in completes.
-  const completeOverlayTransition = useCallback((tabKey) => {
-    console.log(`[DBG:tabs] completeOverlayTransition tabKey=${tabKey} ts=${Date.now()}`);
-    const newIndex = TABS.findIndex(tab => tab.key === tabKey);
-    translateX.value = -newIndex * SCREEN_WIDTH; // snap strip to resting position
-    overlayTranslateX.value = 2 * SCREEN_WIDTH;  // hide overlay instantly
-    isTransitioningShared.value = false;
+  const screenAdjustedStyle0 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust0.value }] }));
+  const screenAdjustedStyle1 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust1.value }] }));
+  const screenAdjustedStyle2 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust2.value }] }));
+  const screenAdjustedStyle3 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust3.value }] }));
+
+  // Called on JS thread when a non-adjacent transition finishes.
+  const clearTransitioningRef = useCallback(() => {
     isTransitioningRef.current = false;
-    setOverlayContent(null);
-  }, [TABS, translateX, overlayTranslateX, isTransitioningShared]);
-
-  // Fire the slide animation only after ScreenContent has been committed to the
-  // native layer — useLayoutEffect runs synchronously after React commit, so by
-  // the time this executes the overlay's views exist and the first animation
-  // frame will show content, not a blank background.
-  useLayoutEffect(() => {
-    if (!overlayContent || !pendingTransitionRef.current) return;
-    const { stripExit, direction, tabKey } = pendingTransitionRef.current;
-    pendingTransitionRef.current = null;
-    overlayTranslateX.value = direction * SCREEN_WIDTH; // snap to starting edge
-    translateX.value = withTiming(stripExit, SCREEN_TIMING);
-    overlayTranslateX.value = withTiming(0, SCREEN_TIMING, () => {
-      'worklet';
-      runOnJS(completeOverlayTransition)(tabKey);
-    });
-  }, [overlayContent, overlayTranslateX, translateX, completeOverlayTransition]);
+  }, []);
 
   const handleTabPress = useCallback((tabKey) => {
-    console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} transitioning=${isTransitioningRef.current} ts=${Date.now()}`);
-    if (isTransitioningRef.current) {
-      console.log('[DBG:tabs] handleTabPress IGNORED — transition in progress');
-      return;
-    }
+    if (isTransitioningRef.current) return;
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     const oldIndex = TABS.findIndex(tab => tab.key === active);
     if (newIndex === -1 || newIndex === oldIndex) return;
 
     const distance = Math.abs(newIndex - oldIndex);
 
+    setActive(tabKey);
+    activeIndex.value = newIndex;
+    pillPosition.value = withTiming(newIndex, PILL_TIMING);
+
     if (distance === 1) {
-      setActive(tabKey);
-      activeIndex.value = newIndex;
-      pillPosition.value = withTiming(newIndex, PILL_TIMING);
       translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING);
       return;
     }
 
     // ---- Non-adjacent tab ----
-    // Mount target content in the overlay while it is still parked far offscreen
-    // (overlayTranslateX = 2*SCREEN_WIDTH). useLayoutEffect fires synchronously
-    // after React commits ScreenContent to the native layer, then starts the
-    // slide — so the overlay is never blank when it enters the viewport.
+    // Reposition the target screen to sit immediately adjacent to the source
+    // on the worklet thread (zero React overhead). The strip then animates
+    // exactly 1 screen width — identical feel to adjacent. On completion the
+    // strip snaps to the real resting position and the per-screen offset is
+    // zeroed simultaneously, both on the worklet thread — no visual jump.
     const direction = newIndex > oldIndex ? 1 : -1;
-    const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
+    // How far to shift the target so it appears one screen width past the source.
+    const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
+    const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
+    const targetAdjust = adjSharedValues[newIndex];
 
     isTransitioningShared.value = true;
     isTransitioningRef.current = true;
-    setActive(tabKey);
-    activeIndex.value = newIndex;
-    pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
-    // Store params for useLayoutEffect to consume after mount.
-    pendingTransitionRef.current = { stripExit, direction, tabKey };
-    setOverlayContent(tabKey);
-  }, [TABS, active, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition, isTransitioningShared]);
+    targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
+    translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
+      'worklet';
+      if (!finished) return;
+      // Snap strip and zero offset simultaneously — no React render, no flash.
+      translateX.value = -newIndex * SCREEN_WIDTH;
+      targetAdjust.value = 0;
+      isTransitioningShared.value = false;
+      runOnJS(clearTransitioningRef)();
+    });
+  }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
+    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, clearTransitioningRef]);
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
@@ -257,9 +212,9 @@ export default function SimpleTabs() {
   }, [active, handleTabPress]);
 
   // Pan gesture for swipe navigation with real-time feedback.
-  // isTransitioningShared (not overlayContent) guards against swipe during overlay
-  // transitions — avoids making overlayContent a dep which would reinstall the
-  // native gesture recognizer mid-animation and cause jitter.
+  // isTransitioningShared guards against swipe during non-adjacent transitions
+  // without being a useMemo dep — avoids reinstalling the native gesture
+  // recognizer mid-animation which causes jitter.
   const panGesture = useMemo(() => {
     return Gesture.Pan()
       .enabled(!subPanelActive)
@@ -277,7 +232,6 @@ export default function SimpleTabs() {
         const maxTranslateX = 0;
         const minTranslateX = -(TABS.length - 1) * SCREEN_WIDTH;
         translateX.value = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
-        // Keep pill tracking the drag
         pillPosition.value = -translateX.value / SCREEN_WIDTH;
       })
       .onEnd((event) => {
@@ -298,9 +252,8 @@ export default function SimpleTabs() {
 
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
-          const target = -newIndex * SCREEN_WIDTH;
           pillPosition.value = withTiming(newIndex, PILL_TIMING);
-          translateX.value = withTiming(target, SCREEN_TIMING, (isFinished) => {
+          translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING, (isFinished) => {
             if (isFinished) {
               runOnJS(setActive)(TABS[newIndex].key);
             }
@@ -316,23 +269,16 @@ export default function SimpleTabs() {
     transform: [{ translateX: translateX.value }],
   }));
 
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: overlayTranslateX.value }],
-  }));
-
   const handleTabBarLayout = useCallback((event) => {
     const { width } = event.nativeEvent.layout;
     setTabBarWidth(width);
     tabBarWidthShared.value = width;
   }, [tabBarWidthShared]);
 
-  // Pill indicator — driven by pillPosition which is animated for every
-  // transition type (swipe drag, adjacent spring, non-adjacent timing).
   const pillAnimatedStyle = useAnimatedStyle(() => {
     const tabWidth = tabBarWidthShared.value / TABS.length;
     const barPadding = 15;
     const position = pillPosition.value * tabWidth + barPadding;
-
     return {
       transform: [{ translateX: position }],
       width: tabWidth,
@@ -342,23 +288,22 @@ export default function SimpleTabs() {
   const renderScreens = useCallback(() => {
     return (
       <>
-        <View style={styles.screen}>
+        <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
           <OperationsScreen />
-        </View>
-        <View style={styles.screen}>
+        </Animated.View>
+        <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
           <GraphsScreen />
-        </View>
-        <View style={styles.screen}>
+        </Animated.View>
+        <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
           <PlannedOperationsScreen />
-        </View>
-        <View style={styles.screen}>
+        </Animated.View>
+        <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
           <SettingsScreen setSubPanelActive={setSubPanelActive} />
-        </View>
+        </Animated.View>
       </>
     );
-  }, [setSubPanelActive]);
+  }, [setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
-  // active is set immediately on tap so it's always the correct displayed tab.
   const displayedTab = active;
 
   return (
@@ -370,19 +315,6 @@ export default function SimpleTabs() {
             {renderScreens()}
           </Animated.View>
         </GestureDetector>
-
-        {/* Overlay for non-adjacent tab transitions — always mounted so its
-            position can be driven by overlayTranslateX immediately on the
-            worklet thread (no React render delay before animation starts).
-            Content loads asynchronously inside the already-moving view. */}
-        <Animated.View
-          style={[styles.overlayScreen, { backgroundColor: colors.background }, overlayAnimatedStyle]}
-          pointerEvents={overlayContent ? 'auto' : 'none'}
-        >
-          {overlayContent && (
-            <ScreenContent tabKey={overlayContent} setSubPanelActive={setSubPanelActive} />
-          )}
-        </Animated.View>
       </View>
       {/* Floating bar overlays content so screen shows through behind it */}
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
@@ -465,13 +397,6 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     right: 0,
-  },
-  overlayScreen: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
   },
   screen: {
     height: '100%',
