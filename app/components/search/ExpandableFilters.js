@@ -17,30 +17,32 @@ const ExpandableFilters = ({
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [localMinAmount, setLocalMinAmount] = useState(
-    filters.amountRange.min !== null ? String(filters.amountRange.min) : '',
+    filters.amountRange?.min != null ? String(filters.amountRange.min) : '',
   );
   const [localMaxAmount, setLocalMaxAmount] = useState(
-    filters.amountRange.max !== null ? String(filters.amountRange.max) : '',
+    filters.amountRange?.max != null ? String(filters.amountRange.max) : '',
   );
 
   // Sync local amount inputs when filters change externally (Clear all, chip clear, etc.)
   useEffect(() => {
-    const newMin = filters.amountRange.min !== null ? String(filters.amountRange.min) : '';
+    const min = filters.amountRange?.min;
+    const newMin = min != null ? String(min) : '';
     const parsedLocalMin = localMinAmount === '' ? null : parseFloat(localMinAmount.replace(',', '.'));
-    if ((filters.amountRange.min === null && localMinAmount !== '')
-      || (filters.amountRange.min !== null && parsedLocalMin !== filters.amountRange.min)) {
+    if ((min == null && localMinAmount !== '')
+      || (min != null && parsedLocalMin !== min)) {
       setLocalMinAmount(newMin);
     }
-  }, [filters.amountRange.min]);
+  }, [filters.amountRange?.min]);
 
   useEffect(() => {
-    const newMax = filters.amountRange.max !== null ? String(filters.amountRange.max) : '';
+    const max = filters.amountRange?.max;
+    const newMax = max != null ? String(max) : '';
     const parsedLocalMax = localMaxAmount === '' ? null : parseFloat(localMaxAmount.replace(',', '.'));
-    if ((filters.amountRange.max === null && localMaxAmount !== '')
-      || (filters.amountRange.max !== null && parsedLocalMax !== filters.amountRange.max)) {
+    if ((max == null && localMaxAmount !== '')
+      || (max != null && parsedLocalMax !== max)) {
       setLocalMaxAmount(newMax);
     }
-  }, [filters.amountRange.max]);
+  }, [filters.amountRange?.max]);
 
   if (!isExpanded) {
     return null;
@@ -90,10 +92,18 @@ const ExpandableFilters = ({
 
   const formatDateDisplay = (dateStr) => {
     if (!dateStr) return '';
-    // Parse "YYYY-MM-DD" as local time to avoid timezone shift on display.
     const [y, m, d] = dateStr.split('-').map(Number);
     if (!y || !m || !d) return '';
     return new Date(y, m - 1, d).toLocaleDateString();
+  };
+
+  const parseDateLocal = (dateStr) => {
+    if (!dateStr) return new Date();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return new Date();
+    const parsed = new Date(y, m - 1, d);
+    if (isNaN(parsed.getTime())) return new Date();
+    return parsed;
   };
 
   return (
@@ -250,7 +260,7 @@ const ExpandableFilters = ({
       {/* Date Pickers */}
       {showStartDatePicker && (
         <DateTimePicker
-          value={filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : new Date()}
+          value={parseDateLocal(filters.dateRange.startDate)}
           mode="date"
           display="default"
           onChange={handleStartDateChange}
@@ -258,7 +268,7 @@ const ExpandableFilters = ({
       )}
       {showEndDatePicker && (
         <DateTimePicker
-          value={filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : new Date()}
+          value={parseDateLocal(filters.dateRange.endDate)}
           mode="date"
           display="default"
           onChange={handleEndDateChange}
