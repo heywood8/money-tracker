@@ -226,10 +226,8 @@ export default function SimpleTabs() {
       runOnJS(completeOverlayTransition)(tabKey);
     });
 
-    // Render content inside the overlay. startTransition marks this as low-priority
-    // so React spreads the mount work across frames instead of blocking the UI thread
-    // in one synchronous chunk — keeps the animation smooth on Fabric/new arch.
-    React.startTransition(() => { setOverlayContent(tabKey); });
+    // Render content inside the overlay (React async — already animating by now).
+    setOverlayContent(tabKey);
   }, [TABS, active, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition, isTransitioningShared]);
 
   // Android hardware back button navigates to Operations from any other tab
