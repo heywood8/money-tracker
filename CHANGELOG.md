@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.2](https://github.com/heywood8/money-tracker/compare/penny-v0.127.1...penny-v0.127.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* Move dark/light theme switch to settings screen ([#851](https://github.com/heywood8/money-tracker/issues/851)) ([37e2d28](https://github.com/heywood8/money-tracker/commit/37e2d28299580bdfc76674146c190aaa10e4dac3))
+
 ## [0.127.1](https://github.com/heywood8/money-tracker/compare/penny-v0.127.0...penny-v0.127.1) (2026-05-31)
 
 
