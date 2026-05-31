@@ -209,35 +209,39 @@ export default function SimpleTabs() {
     }
 
     // ---- Non-adjacent tab ----
-    // Telegram-style: current screen slides out, target screen slides in,
-    // both moving at the same speed like two adjacent screens.
+    // Telegram-style: current screen slides out, target screen slides in.
+    // Strip animation starts immediately (worklet thread — zero React delay).
+    // Overlay mounts async; its slide-in starts in useLayoutEffect once
+    // React has committed the View. The strip is already moving by then so
+    // the user perceives no freeze.
     const direction = newIndex > oldIndex ? 1 : -1; // +1 = target is to the right
+    const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
-    // 1) Position overlay offscreen, store animation params, and mount.
-    //    useLayoutEffect fires after React commits the overlay View.
+    // Start strip and pill animations immediately — no React render involved.
+    translateX.value = withTiming(stripExit, SCREEN_TIMING);
+    pillPosition.value = withTiming(newIndex, PILL_TIMING);
+
+    // Mount overlay offscreen; useLayoutEffect slides it in.
     overlayTranslateX.value = direction * SCREEN_WIDTH;
-    pendingOverlayRef.current = { oldIndex, newIndex, direction, tabKey };
-    overlayRef.current = { key: tabKey }; // set ref immediately alongside state
+    pendingOverlayRef.current = { tabKey };
+    overlayRef.current = { key: tabKey };
     setOverlay({ key: tabKey });
   }, [TABS, active, activeIndex, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
 
-  // Start overlay animations after React has committed the overlay mount.
+  // Slide the overlay in after React has committed its mount.
+  // Strip is already animating by the time this fires.
   useLayoutEffect(() => {
     if (!overlay || !pendingOverlayRef.current) return;
-    const { oldIndex, newIndex, direction, tabKey } = pendingOverlayRef.current;
+    const { tabKey } = pendingOverlayRef.current;
     pendingOverlayRef.current = null;
 
-    console.log(`[DBG:tabs] useLayoutEffect starting overlay anim tabKey=${tabKey} oldIndex=${oldIndex} newIndex=${newIndex} direction=${direction} ts=${Date.now()}`);
+    console.log(`[DBG:tabs] useLayoutEffect sliding overlay in tabKey=${tabKey} ts=${Date.now()}`);
 
-    const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
-
-    translateX.value = withTiming(stripExit, SCREEN_TIMING);
     overlayTranslateX.value = withTiming(0, SCREEN_TIMING, () => {
       'worklet';
       runOnJS(completeOverlayTransition)(tabKey);
     });
-    pillPosition.value = withTiming(newIndex, PILL_TIMING);
-  }, [overlay, translateX, overlayTranslateX, pillPosition, completeOverlayTransition]);
+  }, [overlay, overlayTranslateX, completeOverlayTransition]);
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
