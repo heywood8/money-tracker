@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -65,32 +66,49 @@ const OperationsScreen = () => {
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
-  const { searchMode, filtersExpanded } = useSearch();
+  const { searchMode, filtersExpanded, openSearch } = useSearch();
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
   const prevSearchModeRef = useRef(searchMode);
-  const quickAddOpacity = useSharedValue(1);
-  const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
+
+  const pullProgress = useSharedValue(0);
+  const searchProgress = useSharedValue(0);
+  const scrollOffsetShared = useSharedValue(0);
 
   // Animate when searchMode changes
   useEffect(() => {
     if (searchMode === 'open') {
-      // Smooth hide when opening search
-      quickAddMaxHeight.value = withTiming(0, { duration: 300 });
-      quickAddOpacity.value = withTiming(0, { duration: 300 });
+      pullProgress.value = 0;
+      searchProgress.value = withTiming(1, { duration: 300 });
     } else {
-      // Instant height restore on close (avoids JS/UI-thread race with scrollToOffset),
-      // fade opacity in for a smooth visual.
-      quickAddMaxHeight.value = 1000;
-      quickAddOpacity.value = withTiming(1, { duration: 250 });
+      pullProgress.value = 0;
+      searchProgress.value = withTiming(0, { duration: 250 });
     }
   }, [searchMode]);
 
-  const animatedQuickAddStyle = useAnimatedStyle(() => ({
-    maxHeight: quickAddMaxHeight.value,
-    opacity: quickAddOpacity.value,
-    overflow: 'hidden',
-  }));
+  const animatedQuickAddStyle = useAnimatedStyle(() => {
+    'worklet';
+    const gestureP = Math.min(1, Math.max(0, pullProgress.value));
+    const searchP = Math.min(1, Math.max(0, searchProgress.value));
+    const visualP = Math.max(gestureP, searchP);
+    return {
+      opacity: Math.min(1, Math.max(0, 1 - visualP / 0.5)),
+      transform: [{ translateY: -14 * gestureP }],
+      maxHeight: searchP >= 1 ? 0 : 2000,
+      overflow: 'hidden',
+    };
+  });
+
+  const animatedPreviewSearchStyle = useAnimatedStyle(() => {
+    'worklet';
+    const p = pullProgress.value;
+    const ph = Math.min(1, Math.max(0, p));
+    const over = Math.max(0, p - 1);
+    return {
+      opacity: Math.min(1, Math.max(0, (ph - 0.5) / 0.5)),
+      transform: [{ translateY: (1 - ph) * 16 - over * 70 }],
+    };
+  });
 
   // Ref for FlatList to enable scrolling to top
   const flatListRef = useRef(null);
@@ -702,9 +720,41 @@ const OperationsScreen = () => {
   const handleScroll = useCallback((event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     scrollOffsetRef.current = offsetY;
+    scrollOffsetShared.value = offsetY;
     // Show button when scrolled down past the calculator (roughly 250px)
     setShowScrollToTop(offsetY > 250);
-  }, []);
+  }, [scrollOffsetShared]);
+
+  const panGesture = useMemo(() => Gesture.Pan()
+    .activeOffsetY([8, Infinity])
+    .failOffsetX([-12, 12])
+    .onUpdate((event) => {
+      'worklet';
+      if (scrollOffsetShared.value > 2) return;
+      const dy = event.translationY;
+      if (dy <= 0) {
+        pullProgress.value = 0;
+        return;
+      }
+      const r = dy / (1 + dy / 520);
+      pullProgress.value = Math.min(1.2, r / 170);
+    })
+    .onEnd(() => {
+      'worklet';
+      if (pullProgress.value > 0.4) {
+        pullProgress.value = withSpring(1, { damping: 14, stiffness: 200 }, () => {
+          runOnJS(openSearch)();
+        });
+      } else {
+        pullProgress.value = withTiming(0, { duration: 360 });
+      }
+    })
+    .onFinalize(() => {
+      'worklet';
+      if (pullProgress.value < 0.4) {
+        pullProgress.value = withTiming(0, { duration: 360 });
+      }
+    }), [openSearch, pullProgress, scrollOffsetShared]);
 
   // Scroll to top handler
   const scrollToTop = useCallback(() => {
@@ -739,95 +789,144 @@ const OperationsScreen = () => {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <OperationsList
-        ref={flatListRef}
-        groupedOperations={groupedOperations}
-        accounts={accounts}
-        categories={categories}
-        colors={colors}
-        t={t}
-        initialLoading={operationsLoading}
-        loadingMore={loadingMore}
-        hasMoreOperations={hasMoreOperations}
-        onLoadMore={loadMoreOperations}
-        onEditOperation={handleEditOperation}
-        onDateSeparatorPress={handleDateSeparatorPress}
-        onScroll={handleScroll}
-        onScrollToIndexFailed={handleScrollToIndexFailed}
-        onContentSizeChange={handleContentSizeChange}
-        headerComponent={quickAddFormComponent}
-        pendingSuggestionId={pendingSuggestionId}
-        pendingSuggestions={pendingSuggestions}
-        onApplySuggestion={handleApplySuggestion}
-        onDismissSuggestion={handleDismissSuggestion}
-      />
-
-      {/* Picker Modal for Account/Category selection */}
-      <PickerModal
-        visible={pickerState.visible}
-        pickerType={pickerState.type}
-        pickerData={pickerState.data}
-        colors={colors}
-        t={t}
-        onClose={closePicker}
-        onSelectAccount={handleSelectAccount}
-        onSelectToAccount={handleSelectToAccount}
-        categoryNavigation={categoryNavigation}
-        quickAddValues={quickAddValues}
-        onNavigateBack={navigateBack}
-        onNavigateIntoFolder={navigateIntoFolder}
-        onSelectCategory={handleSelectCategory}
-        onAutoAddWithCategory={handleAutoAddWithCategory}
-        onAutoAddWithAccount={handleAutoAddWithAccount}
-      />
-
-      {/* Scroll to Top Button - only show when scrolled down */}
-      {showScrollToTop && !operationsLoading && (
-        <TouchableOpacity
-          style={[styles.scrollToTopButton, { backgroundColor: colors.surface }]}
-          onPress={scrollToTop}
-          accessibilityRole="button"
-          accessibilityLabel="Scroll to top"
-          accessibilityHint="Scroll to the top of the list"
+    <GestureDetector gesture={panGesture}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Pull-to-search preview bar */}
+        <Animated.View
+          style={[styles.previewSearchBar, animatedPreviewSearchStyle, { backgroundColor: colors.background }]}
+          pointerEvents="none"
         >
-          <Icon name="chevron-up" size={24} color={colors.text} />
-        </TouchableOpacity>
-      )}
+          <View style={[styles.previewSearchInput, { borderBottomColor: colors.border }]}>
+            <Icon name="magnify" size={20} color={colors.text} />
+            <Text style={[styles.previewPlaceholder, { color: colors.mutedText }]} numberOfLines={1}>
+              {t('search_operations_placeholder')}
+            </Text>
+          </View>
+          <View style={styles.previewIconRow}>
+            <Icon name="filter-variant" size={22} color={colors.text} />
+            <Icon name="close" size={22} color={colors.text} />
+          </View>
+        </Animated.View>
 
-      <OperationModal
-        visible={modalVisible}
-        onClose={handleCloseOperationModal}
-        operation={editingOperation}
-        isNew={isNew}
-        onDelete={handleDeleteOperation}
-      />
-
-      {/* Date Picker for jumping to a specific date */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDatePickerChange}
+        <OperationsList
+          ref={flatListRef}
+          groupedOperations={groupedOperations}
+          accounts={accounts}
+          categories={categories}
+          colors={colors}
+          t={t}
+          initialLoading={operationsLoading}
+          loadingMore={loadingMore}
+          hasMoreOperations={hasMoreOperations}
+          onLoadMore={loadMoreOperations}
+          onEditOperation={handleEditOperation}
+          onDateSeparatorPress={handleDateSeparatorPress}
+          onScroll={handleScroll}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
+          onContentSizeChange={handleContentSizeChange}
+          headerComponent={quickAddFormComponent}
+          pendingSuggestionId={pendingSuggestionId}
+          pendingSuggestions={pendingSuggestions}
+          onApplySuggestion={handleApplySuggestion}
+          onDismissSuggestion={handleDismissSuggestion}
         />
-      )}
 
-      {/* Search Overlay - renders filters when search is open */}
-      <SearchOverlay
-        visible={searchMode === 'open'}
-        onClose={() => {}}
-        onHeightChange={setFilterPanelHeight}
-        colors={colors}
-        t={t}
-      />
-    </View>
+        {/* Picker Modal for Account/Category selection */}
+        <PickerModal
+          visible={pickerState.visible}
+          pickerType={pickerState.type}
+          pickerData={pickerState.data}
+          colors={colors}
+          t={t}
+          onClose={closePicker}
+          onSelectAccount={handleSelectAccount}
+          onSelectToAccount={handleSelectToAccount}
+          categoryNavigation={categoryNavigation}
+          quickAddValues={quickAddValues}
+          onNavigateBack={navigateBack}
+          onNavigateIntoFolder={navigateIntoFolder}
+          onSelectCategory={handleSelectCategory}
+          onAutoAddWithCategory={handleAutoAddWithCategory}
+          onAutoAddWithAccount={handleAutoAddWithAccount}
+        />
+
+        {/* Scroll to Top Button - only show when scrolled down */}
+        {showScrollToTop && !operationsLoading && (
+          <TouchableOpacity
+            style={[styles.scrollToTopButton, { backgroundColor: colors.surface }]}
+            onPress={scrollToTop}
+            accessibilityRole="button"
+            accessibilityLabel="Scroll to top"
+            accessibilityHint="Scroll to the top of the list"
+          >
+            <Icon name="chevron-up" size={24} color={colors.text} />
+          </TouchableOpacity>
+        )}
+
+        <OperationModal
+          visible={modalVisible}
+          onClose={handleCloseOperationModal}
+          operation={editingOperation}
+          isNew={isNew}
+          onDelete={handleDeleteOperation}
+        />
+
+        {/* Date Picker for jumping to a specific date */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={handleDatePickerChange}
+          />
+        )}
+
+        {/* Search Overlay - renders filters when search is open */}
+        <SearchOverlay
+          visible={searchMode === 'open'}
+          onClose={() => {}}
+          onHeightChange={setFilterPanelHeight}
+          colors={colors}
+          t={t}
+        />
+      </View>
+    </GestureDetector>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  previewIconRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  previewPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+  },
+  previewSearchBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    height: 56,
+    left: 0,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 20,
+  },
+  previewSearchInput: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+    height: 44,
+    marginRight: 12,
+    paddingHorizontal: 12,
   },
   scrollToTopButton: {
     alignItems: 'center',

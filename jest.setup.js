@@ -449,7 +449,7 @@ jest.mock('react-native/Libraries/NativeComponent/ViewConfigIgnore', () => ({
 
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
-  const View = require('react-native/Libraries/Components/View/View');
+  const { View } = require('react-native');
   const React = require('react');
 
   const PropTypes = require('prop-types');
