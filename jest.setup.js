@@ -719,10 +719,12 @@ jest.mock('react-native-reanimated', () => {
       delay(ms) { return this; }
       withCallback(callback) { return this; }
     },
-    SlideInRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
-    SlideInLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
-    SlideOutLeft: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
-    SlideOutRight: { duration: jest.fn(function() { return this; }), easing: jest.fn(function() { return this; }) },
+    FadeIn: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    FadeOut: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    SlideInRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    SlideInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    SlideOutLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    SlideOutRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SharedValue: class SharedValue {
       constructor(value) { this.value = value; }
     },
