@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
@@ -8,7 +8,6 @@ import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
-import FilterBadge from './search/FilterBadge';
 import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
@@ -18,7 +17,7 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
-  const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters, filtersExpanded } = useSearch();
+  const { openSearch, searchMode, closeSearch, toggleFilters } = useSearch();
   console.debug('[Header] openSearch exists:', !!openSearch);
   console.debug('[Header] searchMode:', searchMode);
   const downloadArrowAnim = useRef(new Animated.Value(0)).current;
@@ -138,48 +137,6 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
                   </Text>
                 </View>
               )}
-              {activeScreen === 'Operations' && (
-                <View style={styles.searchButtonContainer}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      console.debug('[Header] Search button pressed, mode:', searchMode);
-                      if (searchMode === 'collapsed') {
-                        // Reopen with smart logic: auto-expand the filter panel when
-                        // any non-text filter is active.
-                        const hasOtherFilters =
-                          (searchState?.types?.length > 0) ||
-                          (searchState?.accountIds?.length > 0) ||
-                          (searchState?.categoryIds?.length > 0) ||
-                          !!searchState?.dateRange?.startDate ||
-                          !!searchState?.dateRange?.endDate ||
-                          (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||
-                          (searchState?.amountRange?.max !== null && searchState?.amountRange?.max !== undefined);
-
-                        reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
-                          if (shouldExpand !== filtersExpanded) {
-                            toggleFilters();
-                          }
-                        });
-                      } else {
-                        openSearch();
-                      }
-                    }}
-                    testID="search-button"
-                    accessibilityLabel="Search operations"
-                    accessibilityRole="button"
-                    style={styles.searchButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="search-outline" size={24} color={colors.text} />
-                  </TouchableOpacity>
-                  {searchMode === 'collapsed' && hasActiveSearch && (
-                    <FilterBadge
-                      count={getSearchFilterCount()}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-              )}
             </>
           )}
         </View>
@@ -225,11 +182,5 @@ const styles = StyleSheet.create({
   downloadPercent: {
     fontSize: 9,
     fontVariant: ['tabular-nums'],
-  },
-  searchButton: {
-    padding: 8,
-  },
-  searchButtonContainer: {
-    position: 'relative',
   },
 });

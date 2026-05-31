@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
@@ -30,6 +31,9 @@ import { useSearch } from '../contexts/SearchContext';
 
 // Note: dynamic createStyles removed to keep linting stable.
 
+const PULL_THRESHOLD = 72;
+const PULL_INDICATOR_HEIGHT = 56;
+
 const OperationsScreen = () => {
   console.log('[OperationsScreen] Component rendered');
   const { colors } = useThemeColors();
@@ -41,6 +45,9 @@ const OperationsScreen = () => {
     loading: operationsLoading,
     loadingMore,
     hasMoreOperations,
+    searchState,
+    hasActiveSearch,
+    getSearchFilterCount,
   } = useOperationsData();
   const {
     deleteOperation,
@@ -65,12 +72,13 @@ const OperationsScreen = () => {
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
 
-  const { searchMode, filtersExpanded } = useSearch();
+  const { searchMode, filtersExpanded, openSearch, reopenSearch, toggleFilters } = useSearch();
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
   const prevSearchModeRef = useRef(searchMode);
   const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
+  const pullY = useSharedValue(0);
 
   // Animate when searchMode changes
   useEffect(() => {
@@ -90,6 +98,15 @@ const OperationsScreen = () => {
     maxHeight: quickAddMaxHeight.value,
     opacity: quickAddOpacity.value,
     overflow: 'hidden',
+  }));
+
+  const pullIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -PULL_INDICATOR_HEIGHT * (1 - Math.min(pullY.value / PULL_THRESHOLD, 1)) }],
+    opacity: interpolate(pullY.value, [0, PULL_THRESHOLD * 0.4], [0, 1], 'clamp'),
+  }));
+
+  const pullIconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pullY.value, [0, PULL_THRESHOLD], [0.5, 1.0], 'clamp') }],
   }));
 
   // Ref for FlatList to enable scrolling to top
@@ -706,6 +723,41 @@ const OperationsScreen = () => {
     setShowScrollToTop(offsetY > 250);
   }, []);
 
+  // Pull-to-search handler
+  const handlePullToSearch = useCallback(() => {
+    if (searchMode === 'collapsed') {
+      const hasOtherFilters =
+        (searchState?.types?.length > 0) ||
+        (searchState?.accountIds?.length > 0) ||
+        (searchState?.categoryIds?.length > 0) ||
+        !!searchState?.dateRange?.startDate ||
+        !!searchState?.dateRange?.endDate ||
+        (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||
+        (searchState?.amountRange?.max !== null && searchState?.amountRange?.max !== undefined);
+      reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
+        if (shouldExpand !== filtersExpanded) {
+          toggleFilters();
+        }
+      });
+    } else {
+      openSearch();
+    }
+  }, [searchMode, searchState, openSearch, reopenSearch, filtersExpanded, toggleFilters]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetY(8)
+    .failOffsetY(-8)
+    .onUpdate((e) => {
+      if (scrollOffsetRef.current > 8 || searchMode === 'open') return;
+      pullY.value = Math.min(Math.max(e.translationY - 8, 0), PULL_THRESHOLD * 1.2);
+    })
+    .onEnd(() => {
+      if (pullY.value >= PULL_THRESHOLD) {
+        runOnJS(handlePullToSearch)();
+      }
+      pullY.value = withSpring(0, { damping: 20, stiffness: 200 });
+    });
+
   // Scroll to top handler
   const scrollToTop = useCallback(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -739,95 +791,156 @@ const OperationsScreen = () => {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <OperationsList
-        ref={flatListRef}
-        groupedOperations={groupedOperations}
-        accounts={accounts}
-        categories={categories}
-        colors={colors}
-        t={t}
-        initialLoading={operationsLoading}
-        loadingMore={loadingMore}
-        hasMoreOperations={hasMoreOperations}
-        onLoadMore={loadMoreOperations}
-        onEditOperation={handleEditOperation}
-        onDateSeparatorPress={handleDateSeparatorPress}
-        onScroll={handleScroll}
-        onScrollToIndexFailed={handleScrollToIndexFailed}
-        onContentSizeChange={handleContentSizeChange}
-        headerComponent={quickAddFormComponent}
-        pendingSuggestionId={pendingSuggestionId}
-        pendingSuggestions={pendingSuggestions}
-        onApplySuggestion={handleApplySuggestion}
-        onDismissSuggestion={handleDismissSuggestion}
-      />
-
-      {/* Picker Modal for Account/Category selection */}
-      <PickerModal
-        visible={pickerState.visible}
-        pickerType={pickerState.type}
-        pickerData={pickerState.data}
-        colors={colors}
-        t={t}
-        onClose={closePicker}
-        onSelectAccount={handleSelectAccount}
-        onSelectToAccount={handleSelectToAccount}
-        categoryNavigation={categoryNavigation}
-        quickAddValues={quickAddValues}
-        onNavigateBack={navigateBack}
-        onNavigateIntoFolder={navigateIntoFolder}
-        onSelectCategory={handleSelectCategory}
-        onAutoAddWithCategory={handleAutoAddWithCategory}
-        onAutoAddWithAccount={handleAutoAddWithAccount}
-      />
-
-      {/* Scroll to Top Button - only show when scrolled down */}
-      {showScrollToTop && !operationsLoading && (
-        <TouchableOpacity
-          style={[styles.scrollToTopButton, { backgroundColor: colors.surface }]}
-          onPress={scrollToTop}
-          accessibilityRole="button"
-          accessibilityLabel="Scroll to top"
-          accessibilityHint="Scroll to the top of the list"
-        >
-          <Icon name="chevron-up" size={24} color={colors.text} />
-        </TouchableOpacity>
-      )}
-
-      <OperationModal
-        visible={modalVisible}
-        onClose={handleCloseOperationModal}
-        operation={editingOperation}
-        isNew={isNew}
-        onDelete={handleDeleteOperation}
-      />
-
-      {/* Date Picker for jumping to a specific date */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDatePickerChange}
+    <GestureDetector gesture={panGesture}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <OperationsList
+          ref={flatListRef}
+          groupedOperations={groupedOperations}
+          accounts={accounts}
+          categories={categories}
+          colors={colors}
+          t={t}
+          initialLoading={operationsLoading}
+          loadingMore={loadingMore}
+          hasMoreOperations={hasMoreOperations}
+          onLoadMore={loadMoreOperations}
+          onEditOperation={handleEditOperation}
+          onDateSeparatorPress={handleDateSeparatorPress}
+          onScroll={handleScroll}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
+          onContentSizeChange={handleContentSizeChange}
+          headerComponent={quickAddFormComponent}
+          pendingSuggestionId={pendingSuggestionId}
+          pendingSuggestions={pendingSuggestions}
+          onApplySuggestion={handleApplySuggestion}
+          onDismissSuggestion={handleDismissSuggestion}
         />
-      )}
 
-      {/* Search Overlay - renders filters when search is open */}
-      <SearchOverlay
-        visible={searchMode === 'open'}
-        onClose={() => {}}
-        onHeightChange={setFilterPanelHeight}
-        colors={colors}
-        t={t}
-      />
-    </View>
+        {/* Picker Modal for Account/Category selection */}
+        <PickerModal
+          visible={pickerState.visible}
+          pickerType={pickerState.type}
+          pickerData={pickerState.data}
+          colors={colors}
+          t={t}
+          onClose={closePicker}
+          onSelectAccount={handleSelectAccount}
+          onSelectToAccount={handleSelectToAccount}
+          categoryNavigation={categoryNavigation}
+          quickAddValues={quickAddValues}
+          onNavigateBack={navigateBack}
+          onNavigateIntoFolder={navigateIntoFolder}
+          onSelectCategory={handleSelectCategory}
+          onAutoAddWithCategory={handleAutoAddWithCategory}
+          onAutoAddWithAccount={handleAutoAddWithAccount}
+        />
+
+        {/* Scroll to Top Button - only show when scrolled down */}
+        {showScrollToTop && !operationsLoading && (
+          <TouchableOpacity
+            style={[styles.scrollToTopButton, { backgroundColor: colors.surface }]}
+            onPress={scrollToTop}
+            accessibilityRole="button"
+            accessibilityLabel="Scroll to top"
+            accessibilityHint="Scroll to the top of the list"
+          >
+            <Icon name="chevron-up" size={24} color={colors.text} />
+          </TouchableOpacity>
+        )}
+
+        <OperationModal
+          visible={modalVisible}
+          onClose={handleCloseOperationModal}
+          operation={editingOperation}
+          isNew={isNew}
+          onDelete={handleDeleteOperation}
+        />
+
+        {/* Date Picker for jumping to a specific date */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={handleDatePickerChange}
+          />
+        )}
+
+        {/* Search Overlay - renders filters when search is open */}
+        <SearchOverlay
+          visible={searchMode === 'open'}
+          onClose={() => {}}
+          onHeightChange={setFilterPanelHeight}
+          colors={colors}
+          t={t}
+        />
+
+        {/* Pull-to-search indicator — slides in from top as user pulls */}
+        {searchMode !== 'open' && (
+          <Animated.View
+            style={[styles.pullIndicator, pullIndicatorStyle, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
+            pointerEvents="none"
+          >
+            <View style={[styles.pullSearchRow, { paddingHorizontal: HORIZONTAL_PADDING }]}>
+              <View style={[styles.pullSearchInput, { borderBottomColor: colors.border }]}>
+                <Animated.View style={pullIconStyle}>
+                  <Icon name="magnify" size={20} color={colors.text} />
+                </Animated.View>
+                <Text style={[styles.pullSearchPlaceholder, { color: colors.mutedText }]} numberOfLines={1}>
+                  {t('search_operations_placeholder')}
+                </Text>
+              </View>
+              <View style={styles.pullSearchActions}>
+                <Icon name="filter-variant" size={22} color={colors.text} />
+                <Icon name="close" size={22} color={colors.text} />
+              </View>
+            </View>
+          </Animated.View>
+        )}
+      </View>
+    </GestureDetector>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  pullIndicator: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    height: PULL_INDICATOR_HEIGHT,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 5,
+  },
+  pullSearchActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-end',
+    width: 96,
+  },
+  pullSearchInput: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 12,
+    height: 44,
+    marginRight: 12,
+    paddingHorizontal: 12,
+  },
+  pullSearchPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+  },
+  pullSearchRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    height: '100%',
   },
   scrollToTopButton: {
     alignItems: 'center',
