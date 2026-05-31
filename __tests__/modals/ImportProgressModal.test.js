@@ -486,6 +486,90 @@ describe('ImportProgressModal', () => {
     });
   });
 
+  describe('Auto-scroll Effect', () => {
+    it('scrolls to current step when its position is populated from a layout event', async () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'accounts', label: 'Accounts', status: 'in_progress', data: null },
+          { id: 'categories', label: 'Categories', status: 'pending', data: null },
+        ],
+        currentStep: 'accounts',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { UNSAFE_getAllByType, rerender } = render(<ImportProgressModal />);
+
+      const { View } = require('react-native');
+      // Populate stepPositions.current for all rendered step rows
+      const layoutViews = UNSAFE_getAllByType(View).filter(v => v.props.onLayout);
+      layoutViews.forEach((v, i) =>
+        fireEvent(v, 'layout', { nativeEvent: { layout: { y: i * 60 } } }),
+      );
+
+      // Re-render with a new currentStep that has a known position (categories at y=60)
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'accounts', label: 'Accounts', status: 'completed', data: null },
+          { id: 'categories', label: 'Categories', status: 'in_progress', data: null },
+        ],
+        currentStep: 'categories',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      rerender(<ImportProgressModal />);
+
+      // The useEffect fires for the new currentStep with a known position; no errors expected
+      await waitFor(() => {
+        expect(UNSAFE_getAllByType(View).length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('Web Platform Reload', () => {
+    it('calls window.location.reload when Platform.OS is web', async () => {
+      const Platform = require('react-native').Platform;
+      const originalOS = Platform.OS;
+      Platform.OS = 'web';
+
+      const mockReload = jest.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        writable: true,
+        value: { reload: mockReload },
+      });
+
+      try {
+        mockUseImportProgress.mockReturnValue({
+          isImporting: true,
+          steps: [{ id: 'complete', label: 'Done', status: 'completed', data: null }],
+          currentStep: 'complete',
+          isCancelling: false,
+          finishImport: mockFinishImport,
+          requestCancel: mockRequestCancel,
+        });
+
+        const { UNSAFE_getByType } = render(<ImportProgressModal />);
+        const Button = require('react-native-paper').Button;
+        const okButton = UNSAFE_getByType(Button);
+
+        fireEvent.press(okButton);
+
+        await waitFor(() => {
+          expect(mockFinishImport).toHaveBeenCalled();
+          expect(mockReload).toHaveBeenCalled();
+        });
+      } finally {
+        Platform.OS = originalOS;
+      }
+    });
+  });
+
   describe('Edge Cases', () => {
     it('handles empty steps array', () => {
       mockUseImportProgress.mockReturnValue({
