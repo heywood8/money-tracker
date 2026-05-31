@@ -143,11 +143,17 @@ export default function SimpleTabs() {
   const screenAdjust1 = useSharedValue(0);
   const screenAdjust2 = useSharedValue(0);
   const screenAdjust3 = useSharedValue(0);
+  // Opacity per screen — intermediates are zeroed during non-adjacent transitions
+  // so they don't bleed through when the target overlaps their strip position.
+  const screenOpacity0 = useSharedValue(1);
+  const screenOpacity1 = useSharedValue(1);
+  const screenOpacity2 = useSharedValue(1);
+  const screenOpacity3 = useSharedValue(1);
 
-  const screenAdjustedStyle0 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust0.value }] }));
-  const screenAdjustedStyle1 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust1.value }] }));
-  const screenAdjustedStyle2 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust2.value }] }));
-  const screenAdjustedStyle3 = useAnimatedStyle(() => ({ transform: [{ translateX: screenAdjust3.value }] }));
+  const screenAdjustedStyle0 = useAnimatedStyle(() => ({ opacity: screenOpacity0.value, transform: [{ translateX: screenAdjust0.value }] }));
+  const screenAdjustedStyle1 = useAnimatedStyle(() => ({ opacity: screenOpacity1.value, transform: [{ translateX: screenAdjust1.value }] }));
+  const screenAdjustedStyle2 = useAnimatedStyle(() => ({ opacity: screenOpacity2.value, transform: [{ translateX: screenAdjust2.value }] }));
+  const screenAdjustedStyle3 = useAnimatedStyle(() => ({ opacity: screenOpacity3.value, transform: [{ translateX: screenAdjust3.value }] }));
 
   // Called on JS thread when a non-adjacent transition finishes.
   const clearTransitioningRef = useCallback(() => {
@@ -181,23 +187,36 @@ export default function SimpleTabs() {
     // How far to shift the target so it appears one screen width past the source.
     const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
     const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
+    const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3];
     const targetAdjust = adjSharedValues[newIndex];
 
     isTransitioningShared.value = true;
     isTransitioningRef.current = true;
 
+    // Hide intermediate screens so they don't bleed through when the repositioned
+    // target overlaps their strip position (all worklet-thread, no React render).
+    for (let i = 0; i < 4; i++) {
+      if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
+    }
+
     targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
     translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
       'worklet';
       if (!finished) return;
-      // Snap strip and zero offset simultaneously — no React render, no flash.
+      // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
       translateX.value = -newIndex * SCREEN_WIDTH;
       targetAdjust.value = 0;
+      opacityValues[0].value = 1;
+      opacityValues[1].value = 1;
+      opacityValues[2].value = 1;
+      opacityValues[3].value = 1;
       isTransitioningShared.value = false;
       runOnJS(clearTransitioningRef)();
     });
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
-    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3, clearTransitioningRef]);
+    screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
+    clearTransitioningRef]);
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
