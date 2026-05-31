@@ -251,16 +251,23 @@ export const OperationsDataProvider = ({ children }) => {
         const filters = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
         if (!mounted) return;
         if (filters) {
-          // convert legacy activeFilters format to searchState format
-          setSearchState({
+          const normalized = {
             text: filters.searchText || '',
             types: filters.types || [],
             accountIds: filters.accountIds || [],
             categoryIds: filters.categoryIds || [],
             dateRange: filters.dateRange || { startDate: null, endDate: null },
             amountRange: filters.amountRange || { min: null, max: null },
-          });
-          setFiltersActive(hasActiveFilters(filters));
+          };
+          setSearchState(normalized);
+          setFiltersActive(hasActiveFilters({
+            types: normalized.types,
+            accountIds: normalized.accountIds,
+            categoryIds: normalized.categoryIds,
+            searchText: normalized.text,
+            dateRange: normalized.dateRange,
+            amountRange: normalized.amountRange,
+          }));
         }
       } catch (error) {
         if (mounted) console.error('Failed to load filters:', error);
