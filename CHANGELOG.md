@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.1](https://github.com/heywood8/money-tracker/compare/penny-v0.127.0...penny-v0.127.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **settings:** disable pointer events on hidden settings list when subpanel is open ([#848](https://github.com/heywood8/money-tracker/issues/848)) ([a418659](https://github.com/heywood8/money-tracker/commit/a4186595f50582a45db6b215067115cd14145aae))
+
 ## [0.127.0](https://github.com/heywood8/money-tracker/compare/penny-v0.126.1...penny-v0.127.0) (2026-05-31)
 
 
