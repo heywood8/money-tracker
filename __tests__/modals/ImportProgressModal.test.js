@@ -30,6 +30,7 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 }));
 
 const mockFinishImport = jest.fn();
+const mockRequestCancel = jest.fn();
 const mockUseImportProgress = jest.fn();
 
 jest.mock('../../app/contexts/ImportProgressContext', () => ({
@@ -64,7 +65,9 @@ describe('ImportProgressModal', () => {
         { id: 'complete', label: 'Import complete', status: 'pending', data: null },
       ],
       currentStep: 'accounts',
+      isCancelling: false,
       finishImport: mockFinishImport,
+      requestCancel: mockRequestCancel,
     });
   });
 
@@ -161,10 +164,12 @@ describe('ImportProgressModal', () => {
 
   describe('OK Button', () => {
     it('disables OK button while import is in progress', () => {
-      const { UNSAFE_getByType } = render(<ImportProgressModal />);
+      const { UNSAFE_getAllByType } = render(<ImportProgressModal />);
 
       const Button = require('react-native-paper').Button;
-      const okButton = UNSAFE_getByType(Button);
+      const buttons = UNSAFE_getAllByType(Button);
+      // When not complete, both Cancel and OK buttons are rendered; OK is last
+      const okButton = buttons[buttons.length - 1];
 
       expect(okButton.props.disabled).toBe(true);
     });

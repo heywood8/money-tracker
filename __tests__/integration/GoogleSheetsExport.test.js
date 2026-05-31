@@ -35,6 +35,7 @@ jest.mock('../../app/contexts/ImportProgressContext', () => ({
     startImport: jest.fn(),
     cancelImport: jest.fn(),
     completeImport: jest.fn(),
+    getCancelToken: jest.fn(() => ({ cancelled: false })),
   }),
 }));
 
