@@ -14,7 +14,7 @@ import { useSearch } from '../../contexts/SearchContext';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const SearchOverlay = ({ colors, t, visible, onHeightChange }) => {
-  const { searchState } = useOperationsData();
+  const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
