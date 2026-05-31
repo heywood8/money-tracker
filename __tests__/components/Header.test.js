@@ -29,11 +29,11 @@ jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const { Text } = require('react-native');
   const PropTypes = require('prop-types');
-  function MockIonicons({ name }) {
+  function MockIcon({ name }) {
     return React.createElement(Text, { testID: `icon-${name}` }, name);
   }
-  MockIonicons.propTypes = { name: PropTypes.string, size: PropTypes.number, color: PropTypes.string };
-  return { Ionicons: MockIonicons };
+  MockIcon.propTypes = { name: PropTypes.string, size: PropTypes.number, color: PropTypes.string };
+  return { Ionicons: MockIcon, MaterialCommunityIcons: MockIcon };
 });
 
 // Mock layout constants
@@ -109,26 +109,26 @@ describe('Header', () => {
       expect(getByText('75%')).toBeTruthy();
     });
 
-    it('shows sync-outline icon and "verifying_update" text when phase is verifying', () => {
+    it('shows sync icon and "verifying_update" text when phase is verifying', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0;
       mockDownloadPhase = 'verifying';
       const { getByTestId, getByText, queryByText } = render(<Header />);
 
-      expect(getByTestId('icon-sync-outline')).toBeTruthy();
+      expect(getByTestId('icon-sync')).toBeTruthy();
       expect(getByText('verifying_update')).toBeTruthy();
       expect(queryByText('%')).toBeNull();
     });
 
-    it('shows arrow-down-outline icon and percentage when phase is downloading', () => {
+    it('shows arrow-down icon and percentage when phase is downloading', () => {
       mockIsDownloading = true;
       mockDownloadProgress = 0.6;
       mockDownloadPhase = 'downloading';
       const { getByTestId, getByText, queryByTestId } = render(<Header />);
 
-      expect(getByTestId('icon-arrow-down-outline')).toBeTruthy();
+      expect(getByTestId('icon-arrow-down')).toBeTruthy();
       expect(getByText('60%')).toBeTruthy();
-      expect(queryByTestId('icon-sync-outline')).toBeNull();
+      expect(queryByTestId('icon-sync')).toBeNull();
     });
   });
 

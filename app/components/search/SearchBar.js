@@ -12,6 +12,8 @@ const SearchBar = ({
   filterCount,
   colors,
   t,
+  collapsed,
+  onCollapsedPress,
 }) => {
   const [localText, setLocalText] = useState(searchText);
   // Track the last value we sent to the parent so we can distinguish
@@ -67,69 +69,78 @@ const SearchBar = ({
       testID="search-bar-container"
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <View
+      <TouchableOpacity
         testID="search-input-container"
-        style={[styles.searchInputContainer, {
-          backgroundColor: colors.background,
-          borderBottomColor: colors.border,
-        }]}
+        activeOpacity={collapsed ? 0.6 : 1}
+        onPress={collapsed ? onCollapsedPress : undefined}
+        accessibilityRole={collapsed ? 'button' : undefined}
+        accessibilityLabel={collapsed ? t('search') : undefined}
+        style={[
+          styles.searchInputContainer,
+          { backgroundColor: colors.background, borderBottomColor: colors.border },
+          collapsed && styles.searchInputContainerCollapsed,
+        ]}
       >
-        <Icon name="magnify" size={20} color={colors.text} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          value={localText}
-          onChangeText={setLocalText}
-          placeholder={t('search_operations_placeholder')}
-          placeholderTextColor={colors.mutedText}
-          autoFocus
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {localText.length > 0 && (
+        <View style={styles.iconWrapper}>
+          <Icon name="magnify" size={20} color={colors.text} />
+          {collapsed && filterCount > 0 && (
+            <View testID="filter-count-badge-collapsed" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.filterBadgeText}>{filterCount}</Text>
+            </View>
+          )}
+        </View>
+        {!collapsed && (
+          <>
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              value={localText}
+              onChangeText={setLocalText}
+              placeholder={t('search_operations_placeholder')}
+              placeholderTextColor={colors.mutedText}
+              autoFocus
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {localText.length > 0 && (
+              <TouchableOpacity
+                testID="clear-search-button"
+                onPress={handleClear}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Icon name="close-circle" size={20} color={colors.mutedText} />
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </TouchableOpacity>
+      {!collapsed && (
+        <View style={styles.buttonContainer}>
           <TouchableOpacity
-            testID="clear-search-button"
-            onPress={handleClear}
+            testID="filters-toggle-button"
+            onPress={() => { Keyboard.dismiss(); onToggleFilters(); }}
+            style={[styles.iconButton, filterCount > 0 && { backgroundColor: `${colors.primary}15` }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.filterButtonContent}>
+              <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
+              {filterCount > 0 && (
+                <View testID="filter-count-badge" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.filterBadgeText}>{filterCount}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="close-search-button"
+            onPress={onClose}
+            style={styles.iconButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="close-circle" size={20} color={colors.mutedText} />
+            <Icon name="close" size={22} color={colors.text} />
           </TouchableOpacity>
-        )}
-      </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          testID="filters-toggle-button"
-          onPress={() => {
-            Keyboard.dismiss();
-            onToggleFilters();
-          }}
-          style={[
-            styles.iconButton,
-            filterCount > 0 && { backgroundColor: `${colors.primary}15` },
-          ]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-        >
-          <View style={styles.filterButtonContent}>
-            <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
-            {filterCount > 0 && (
-              <View
-                testID="filter-count-badge"
-                style={[styles.filterBadge, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.filterBadgeText}>{filterCount}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="close-search-button"
-          onPress={onClose}
-          style={styles.iconButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icon name="close" size={22} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -148,10 +159,14 @@ SearchBar.propTypes = {
     primary: PropTypes.string.isRequired,
   }).isRequired,
   t: PropTypes.func.isRequired,
+  collapsed: PropTypes.bool,
+  onCollapsedPress: PropTypes.func,
 };
 
 SearchBar.defaultProps = {
   filterCount: 0,
+  collapsed: false,
+  onCollapsedPress: undefined,
 };
 
 const styles = StyleSheet.create({
@@ -163,7 +178,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    height: 56,
+    height: 25,
     paddingHorizontal: HORIZONTAL_PADDING,
     width: '100%',
     zIndex: 100,
@@ -194,6 +209,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  iconWrapper: {
+    position: 'relative',
+  },
   searchInput: {
     flex: 1,
     fontSize: 16,
@@ -209,6 +227,11 @@ const styles = StyleSheet.create({
     height: 44,
     marginRight: 12,
     paddingHorizontal: 12,
+  },
+  searchInputContainerCollapsed: {
+    borderBottomWidth: 0,
+    flex: 0,
+    marginRight: 0,
   },
 });
 

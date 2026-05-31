@@ -112,44 +112,44 @@ describe('Header Search Integration', () => {
   });
 
   describe('Search Button Visibility', () => {
-    it('does not show search button when activeScreen is not Operations', () => {
+    it('does not show search bar when activeScreen is not Operations', () => {
       const { queryByTestId } = render(
         <Header activeScreen="Accounts" />,
       );
-      expect(queryByTestId('search-button')).toBeNull();
+      expect(queryByTestId('search-bar-container')).toBeNull();
     });
 
-    it('shows search button when activeScreen is Operations', () => {
+    it('shows collapsed search bar when activeScreen is Operations', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      expect(getByTestId('search-button')).toBeTruthy();
+      expect(getByTestId('search-input-container')).toBeTruthy();
     });
 
-    it('does not show search button when rightContent is provided', () => {
+    it('still shows search bar when rightContent is provided on Operations screen', () => {
       const CustomContent = () => <></>;
-      const { queryByTestId } = render(
+      const { getByTestId } = render(
         <Header activeScreen="Operations" rightContent={<CustomContent />} />,
       );
-      expect(queryByTestId('search-button')).toBeNull();
+      expect(getByTestId('search-input-container')).toBeTruthy();
     });
   });
 
   describe('Search Button Functionality', () => {
-    it('calls openSearch when button is pressed', () => {
+    it('calls openSearch when collapsed search bar is pressed', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      fireEvent.press(getByTestId('search-button'));
+      fireEvent.press(getByTestId('search-input-container'));
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
     });
 
-    it('does not throw when search button is pressed', () => {
+    it('does not throw when collapsed search bar is pressed', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
       expect(() => {
-        fireEvent.press(getByTestId('search-button'));
+        fireEvent.press(getByTestId('search-input-container'));
       }).not.toThrow();
     });
   });
@@ -159,7 +159,7 @@ describe('Header Search Integration', () => {
       const { queryByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      expect(queryByTestId('filter-badge')).toBeNull();
+      expect(queryByTestId('filter-count-badge-collapsed')).toBeNull();
     });
 
     it('shows filter badge when search is collapsed and filters are active', () => {
@@ -179,7 +179,7 @@ describe('Header Search Integration', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      expect(getByTestId('filter-badge')).toBeTruthy();
+      expect(getByTestId('filter-count-badge-collapsed')).toBeTruthy();
     });
 
     it('does not show filter badge when collapsed but no active filters', () => {
@@ -194,7 +194,7 @@ describe('Header Search Integration', () => {
       const { queryByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      expect(queryByTestId('filter-badge')).toBeNull();
+      expect(queryByTestId('filter-count-badge-collapsed')).toBeNull();
     });
   });
 
@@ -287,8 +287,9 @@ describe('Header Search Integration', () => {
         <Header activeScreen="Operations" />,
       );
 
-      expect(queryByTestId('search-bar-container')).toBeNull();
-      fireEvent.press(getByTestId('search-button'));
+      // SearchBar is always mounted (collapsed when search is closed)
+      expect(getByTestId('search-bar-container')).toBeTruthy();
+      fireEvent.press(getByTestId('search-input-container'));
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
 
       // Simulate searchMode transitioning to 'open'
@@ -306,32 +307,76 @@ describe('Header Search Integration', () => {
   });
 
   describe('Integration with Other Header Buttons', () => {
-    it('shows search button in operations header', () => {
+    it('shows collapsed search bar in operations header', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      expect(getByTestId('search-button')).toBeTruthy();
+      expect(getByTestId('search-input-container')).toBeTruthy();
     });
 
-    it('search button is functional', () => {
+    it('collapsed search bar is functional', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
 
-      fireEvent.press(getByTestId('search-button'));
+      fireEvent.press(getByTestId('search-input-container'));
 
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Accessibility', () => {
-    it('has proper accessibility props on search button', () => {
+    it('has proper accessibility props on collapsed search bar', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
-      const searchButton = getByTestId('search-button');
-      expect(searchButton.props.accessibilityLabel).toBe('Search operations');
+      const searchButton = getByTestId('search-input-container');
+      expect(searchButton.props.accessibilityLabel).toBe('search');
       expect(searchButton.props.accessibilityRole).toBe('button');
+    });
+  });
+
+  describe('Header layout branches', () => {
+    it('does not render download indicator on Operations screen even when downloading', () => {
+      // isDownloading && !showSearchBar — false when activeScreen=Operations
+      jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+        useUpdateDownload: () => ({
+          isDownloading: true,
+          downloadProgress: 0.5,
+          downloadPhase: 'downloading',
+        }),
+      }));
+      const { queryByTestId } = render(<Header activeScreen="Operations" />);
+      expect(queryByTestId('download-indicator')).toBeNull();
+    });
+
+    it('does not render rightContent slot on Operations screen', () => {
+      // rightContent && !showSearchBar — false when activeScreen=Operations
+      const CustomContent = () => null;
+      CustomContent.displayName = 'CustomContent';
+      const { queryByTestId } = render(
+        <Header activeScreen="Operations" rightContent={<CustomContent />} />,
+      );
+      // SearchBar is shown; rightContent buttonContainer is suppressed
+      expect(queryByTestId('search-bar-container')).toBeTruthy();
+    });
+
+    it('does not render FilterChipStrip when search is open but no active search', () => {
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'open',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+        filtersExpanded: false,
+      });
+      useOperationsData.mockReturnValue({
+        searchState: defaultSearchState,
+        hasActiveSearch: false,
+        getSearchFilterCount: jest.fn(() => 0),
+      });
+      const { queryByTestId } = render(<Header activeScreen="Operations" />);
+      expect(queryByTestId('filter-chip-strip')).toBeNull();
     });
   });
 });

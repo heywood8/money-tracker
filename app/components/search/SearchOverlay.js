@@ -3,7 +3,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
@@ -13,11 +13,25 @@ import { useSearch } from '../../contexts/SearchContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
-  const { searchState } = useOperationsData();
+const SearchOverlay = ({ colors, t, visible, onHeightChange }) => {
+  const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
+
+  const translateY = useSharedValue(-SCREEN_HEIGHT);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) });
+    } else {
+      translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 250, easing: Easing.in(Easing.cubic) });
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const handleFilterChange = useCallback((partialFilters) => {
     updateSearchFilters(partialFilters);
@@ -37,14 +51,10 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
     }
   }, [visible, onHeightChange]);
 
-  if (!visible) {
-    return null;
-  }
-
   return (
     <Animated.View
-      style={[styles.filtersContainer, { backgroundColor: colors.background }]}
-      pointerEvents="box-none"
+      style={[styles.filtersContainer, { backgroundColor: colors.background }, animatedStyle]}
+      pointerEvents={visible ? 'box-none' : 'none'}
       onLayout={handleLayout}
     >
       <ExpandableFilters
@@ -60,7 +70,6 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
 };
 
 SearchOverlay.propTypes = {
-  onClose: PropTypes.func.isRequired,
   onHeightChange: PropTypes.func,
   colors: PropTypes.shape({
     background: PropTypes.string.isRequired,

@@ -127,8 +127,8 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.sm,
-    marginTop: SPACING.md,
-    padding: SPACING.xsm,
+    marginTop: SPACING.xs,
+    padding: SPACING.xs,
   },
 });
 
