@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.0](https://github.com/heywood8/money-tracker/compare/penny-v0.126.1...penny-v0.127.0) (2026-05-31)
+
+
+### Features
+
+* add Android back gesture for subpanels and tab navigation ([#845](https://github.com/heywood8/money-tracker/issues/845)) ([d21d7dd](https://github.com/heywood8/money-tracker/commit/d21d7dd36c11866fbc89c344d5072f97dc00cdb2))
+
 ## [0.126.1](https://github.com/heywood8/money-tracker/compare/penny-v0.126.0...penny-v0.126.1) (2026-05-31)
 
 
