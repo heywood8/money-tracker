@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.126.1](https://github.com/heywood8/money-tracker/compare/penny-v0.126.0...penny-v0.126.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **ui:** tab bar width/padding tweaks and categories icon fix ([#846](https://github.com/heywood8/money-tracker/issues/846)) ([e8323d9](https://github.com/heywood8/money-tracker/commit/e8323d96da8859c59a3784bc98cb10fc7fd01324))
+
 ## [0.126.0](https://github.com/heywood8/money-tracker/compare/penny-v0.125.1...penny-v0.126.0) (2026-05-30)
 
 
