@@ -163,17 +163,23 @@ export default function SimpleTabs() {
   // Finalize an overlay transition: snap strip to new position, update React
   // state, then remove the overlay on the next frame so the strip takes over.
   const completeOverlayTransition = useCallback((tabKey) => {
+    console.log(`[DBG:tabs] completeOverlayTransition tabKey=${tabKey} ts=${Date.now()}`);
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     translateX.value = -newIndex * SCREEN_WIDTH;
     activeIndex.value = newIndex;
     setActive(tabKey);
     requestAnimationFrame(() => {
+      console.log(`[DBG:tabs] overlay RAF clearing overlay ts=${Date.now()}`);
       setOverlay(null);
     });
   }, [TABS, translateX, activeIndex]);
 
   const handleTabPress = useCallback((tabKey) => {
-    if (overlay) return; // ignore during an active overlay transition
+    console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} overlay=${overlay ? overlay.key : 'null'} ts=${Date.now()}`);
+    if (overlay) {
+      console.log(`[DBG:tabs] handleTabPress IGNORED — overlay still active (${overlay.key})`);
+      return; // ignore during an active overlay transition
+    }
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     const oldIndex = TABS.findIndex(tab => tab.key === active);
     if (newIndex === -1 || newIndex === oldIndex) return;
@@ -210,11 +216,14 @@ export default function SimpleTabs() {
     const { oldIndex, newIndex, direction, tabKey } = pendingOverlayRef.current;
     pendingOverlayRef.current = null;
 
+    console.log(`[DBG:tabs] useLayoutEffect starting overlay anim tabKey=${tabKey} oldIndex=${oldIndex} newIndex=${newIndex} direction=${direction} ts=${Date.now()}`);
+
     const springConfig = { damping: 40, stiffness: 150 };
     const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
     translateX.value = withSpring(stripExit, springConfig);
     overlayTranslateX.value = withSpring(0, springConfig, () => {
+      'worklet';
       runOnJS(completeOverlayTransition)(tabKey);
     });
     pillPosition.value = withSpring(newIndex, springConfig);
