@@ -747,13 +747,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
   return (
     <GestureDetector gesture={swipeBackGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Animated.View style={[
-          styles.content,
-          {
-            transform: [{ translateX: settingsTranslateX }],
-            opacity: settingsOpacity,
-          },
-        ]}>
+        <Animated.View
+          pointerEvents={activeSubPanel ? 'none' : 'auto'}
+          style={[
+            styles.content,
+            {
+              transform: [{ translateX: settingsTranslateX }],
+              opacity: settingsOpacity,
+            },
+          ]}
+        >
 
           <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
             <View style={styles.settingsRowContent}>
