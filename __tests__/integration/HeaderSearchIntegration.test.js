@@ -335,4 +335,48 @@ describe('Header Search Integration', () => {
       expect(searchButton.props.accessibilityRole).toBe('button');
     });
   });
+
+  describe('Header layout branches', () => {
+    it('does not render download indicator on Operations screen even when downloading', () => {
+      // isDownloading && !showSearchBar — false when activeScreen=Operations
+      jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+        useUpdateDownload: () => ({
+          isDownloading: true,
+          downloadProgress: 0.5,
+          downloadPhase: 'downloading',
+        }),
+      }));
+      const { queryByTestId } = render(<Header activeScreen="Operations" />);
+      expect(queryByTestId('download-indicator')).toBeNull();
+    });
+
+    it('does not render rightContent slot on Operations screen', () => {
+      // rightContent && !showSearchBar — false when activeScreen=Operations
+      const CustomContent = () => null;
+      CustomContent.displayName = 'CustomContent';
+      const { queryByTestId } = render(
+        <Header activeScreen="Operations" rightContent={<CustomContent />} />,
+      );
+      // SearchBar is shown; rightContent buttonContainer is suppressed
+      expect(queryByTestId('search-bar-container')).toBeTruthy();
+    });
+
+    it('does not render FilterChipStrip when search is open but no active search', () => {
+      useSearch.mockReturnValue({
+        openSearch: mockOpenSearch,
+        searchMode: 'open',
+        closeSearch: mockCloseSearch,
+        reopenSearch: jest.fn(),
+        toggleFilters: mockToggleFilters,
+        filtersExpanded: false,
+      });
+      useOperationsData.mockReturnValue({
+        searchState: defaultSearchState,
+        hasActiveSearch: false,
+        getSearchFilterCount: jest.fn(() => 0),
+      });
+      const { queryByTestId } = render(<Header activeScreen="Operations" />);
+      expect(queryByTestId('filter-chip-strip')).toBeNull();
+    });
+  });
 });
