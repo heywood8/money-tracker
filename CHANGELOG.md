@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.127.5](https://github.com/heywood8/money-tracker/compare/penny-v0.127.4...penny-v0.127.5) (2026-05-31)
+
+
+### Bug Fixes
+
+* **settings:** remove gesture-handler, use LayoutAnimation for subpanels ([#860](https://github.com/heywood8/money-tracker/issues/860)) ([3eb3f33](https://github.com/heywood8/money-tracker/commit/3eb3f33914e02b7a287ffba05a668b32c1401fd6))
+
 ## [0.127.4](https://github.com/heywood8/money-tracker/compare/penny-v0.127.3...penny-v0.127.4) (2026-05-31)
 
 
