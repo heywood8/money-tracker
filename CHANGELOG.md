@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.1](https://github.com/heywood8/money-tracker/compare/penny-v0.128.0...penny-v0.128.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **search:** search UI polish and crash fixes ([#866](https://github.com/heywood8/money-tracker/issues/866)) ([06a10ab](https://github.com/heywood8/money-tracker/commit/06a10abaa49b43bd7c95ec19790039805f028b80))
+
 ## [0.128.0](https://github.com/heywood8/money-tracker/compare/penny-v0.127.5...penny-v0.128.0) (2026-05-31)
 
 
