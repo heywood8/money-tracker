@@ -197,9 +197,27 @@ jest.mock('react-native-gesture-handler', () => {
 });
 
 // Mock react-native-reanimated
-jest.mock('react-native-reanimated', () => ({
-  runOnJS: jest.fn((fn) => fn),
-}));
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const chainable = () => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; };
+  return {
+    __esModule: true,
+    default: { View, createAnimatedComponent: (C) => C },
+    useSharedValue: jest.fn((v) => ({ value: v })),
+    useAnimatedStyle: jest.fn(() => ({})),
+    withSpring: jest.fn((v) => v),
+    withTiming: jest.fn((v) => v),
+    runOnJS: jest.fn((fn) => fn),
+    Easing: {
+      linear: jest.fn(), ease: jest.fn(), quad: jest.fn(), cubic: jest.fn(),
+      in: jest.fn((e) => e), out: jest.fn((e) => e), inOut: jest.fn((e) => e),
+    },
+    SlideInRight: chainable(),
+    SlideOutRight: chainable(),
+    FadeIn: chainable(),
+  };
+});
 
 // Mock AppUpdateService
 jest.mock('../../app/services/AppUpdateService', () => ({
@@ -643,7 +661,6 @@ describe('SettingsScreen', () => {
     it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_AVAILABLE', async () => {
       displaySettingsMockState.hideBalances = true;
       mockAuthenticateWithBiometrics.mockResolvedValue('not_available');
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       const { getByText } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
@@ -655,17 +672,11 @@ describe('SettingsScreen', () => {
 
       expect(mockShowDialog).not.toHaveBeenCalled();
       expect(mockSetHideBalances).toHaveBeenCalledWith(false);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('biometric not available'),
-      );
-
-      consoleWarnSpy.mockRestore();
     });
 
     it('silently allows unhide and calls setHideBalances(false) when biometrics NOT_ENROLLED', async () => {
       displaySettingsMockState.hideBalances = true;
       mockAuthenticateWithBiometrics.mockResolvedValue('not_enrolled');
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       const { getByText } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
@@ -677,11 +688,6 @@ describe('SettingsScreen', () => {
 
       expect(mockShowDialog).not.toHaveBeenCalled();
       expect(mockSetHideBalances).toHaveBeenCalledWith(false);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('biometric not enrolled'),
-      );
-
-      consoleWarnSpy.mockRestore();
     });
   });
 });

@@ -156,9 +156,26 @@ jest.mock('react-native-gesture-handler', () => {
   return { GestureDetector, Gesture, GestureHandlerRootView: View };
 });
 
-jest.mock('react-native-reanimated', () => ({
-  runOnJS: jest.fn((fn) => fn),
-}));
+jest.mock('react-native-reanimated', () => {
+  const { View } = require('react-native');
+  const chainable = () => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; };
+  return {
+    __esModule: true,
+    default: { View, createAnimatedComponent: (C) => C },
+    useSharedValue: jest.fn((v) => ({ value: v })),
+    useAnimatedStyle: jest.fn(() => ({})),
+    withSpring: jest.fn((v) => v),
+    withTiming: jest.fn((v) => v),
+    runOnJS: jest.fn((fn) => fn),
+    Easing: {
+      linear: jest.fn(), ease: jest.fn(), quad: jest.fn(), cubic: jest.fn(),
+      in: jest.fn((e) => e), out: jest.fn((e) => e), inOut: jest.fn((e) => e),
+    },
+    SlideInRight: chainable(),
+    SlideOutRight: chainable(),
+    FadeIn: chainable(),
+  };
+});
 
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
