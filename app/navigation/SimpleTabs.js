@@ -178,14 +178,11 @@ export default function SimpleTabs() {
   // to ignore taps during that window.
   const completeOverlayTransition = useCallback((tabKey) => {
     console.log(`[DBG:tabs] completeOverlayTransition tabKey=${tabKey} ts=${Date.now()}`);
-    const newIndex = TABS.findIndex(tab => tab.key === tabKey);
-    translateX.value = -newIndex * SCREEN_WIDTH;
-    activeIndex.value = newIndex;
-    overlayRef.current = null; // clear ref immediately — handleTabPress reads this
-    setActive(tabKey);
-    console.log(`[DBG:tabs] overlay clearing synchronously ts=${Date.now()}`);
+    // translateX and setActive were set instantly in handleTabPress —
+    // nothing to snap or update here, just tear down the overlay.
+    overlayRef.current = null;
     setOverlay(null);
-  }, [TABS, translateX, activeIndex]);
+  }, []);
 
   const handleTabPress = useCallback((tabKey) => {
     console.log(`[DBG:tabs] handleTabPress tabKey=${tabKey} active=${active} overlayRef=${overlayRef.current ? overlayRef.current.key : 'null'} ts=${Date.now()}`);
@@ -209,16 +206,14 @@ export default function SimpleTabs() {
     }
 
     // ---- Non-adjacent tab ----
-    // Telegram-style: current screen slides out, target screen slides in.
-    // Strip animation starts immediately (worklet thread — zero React delay).
-    // Overlay mounts async; its slide-in starts in useLayoutEffect once
-    // React has committed the View. The strip is already moving by then so
-    // the user perceives no freeze.
+    // Snap strip to target instantly so intermediate screens are never visible.
+    // The overlay (target screen) starts offscreen and slides in to give the
+    // transition its animation — the strip behind it is already in position.
     const direction = newIndex > oldIndex ? 1 : -1; // +1 = target is to the right
-    const stripExit = (-oldIndex * SCREEN_WIDTH) - direction * SCREEN_WIDTH;
 
-    // Start strip and pill animations immediately — no React render involved.
-    translateX.value = withTiming(stripExit, SCREEN_TIMING);
+    translateX.value = -newIndex * SCREEN_WIDTH; // instant snap — no intermediate screens
+    activeIndex.value = newIndex;
+    setActive(tabKey);
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
     // Mount overlay offscreen; useLayoutEffect slides it in.
