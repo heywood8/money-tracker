@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -69,27 +69,32 @@ const OperationsScreen = () => {
   const scrollOffsetRef = useRef(0);
   const prevFiltersExpandedRef = useRef(false);
   const prevSearchModeRef = useRef(searchMode);
-  const quickAddOpacity = useSharedValue(1);
   const quickAddMaxHeight = useSharedValue(1000); // Large enough to not clip
+  const quickAddTranslateY = useSharedValue(0);
 
   // Animate when searchMode changes
   useEffect(() => {
     if (searchMode === 'open') {
-      // Smooth hide when opening search
-      quickAddMaxHeight.value = withTiming(0, { duration: 300 });
-      quickAddOpacity.value = withTiming(0, { duration: 300 });
+      // Outer clip collapses (easeIn so it accelerates into zero),
+      // inner content slides upward within the fixed clip boundary.
+      quickAddMaxHeight.value = withTiming(0, { duration: 320, easing: Easing.in(Easing.cubic) });
+      quickAddTranslateY.value = withTiming(-120, { duration: 320, easing: Easing.in(Easing.cubic) });
     } else {
-      // Instant height restore on close (avoids JS/UI-thread race with scrollToOffset),
-      // fade opacity in for a smooth visual.
-      quickAddMaxHeight.value = 1000;
-      quickAddOpacity.value = withTiming(1, { duration: 250 });
+      // Slide back down — content descends into view as height expands.
+      quickAddTranslateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) });
+      quickAddMaxHeight.value = withTiming(1000, { duration: 300, easing: Easing.out(Easing.cubic) });
     }
   }, [searchMode]);
 
-  const animatedQuickAddStyle = useAnimatedStyle(() => ({
+  // Outer view: clips the content as height collapses
+  const animatedQuickAddClipStyle = useAnimatedStyle(() => ({
     maxHeight: quickAddMaxHeight.value,
-    opacity: quickAddOpacity.value,
     overflow: 'hidden',
+  }));
+
+  // Inner view: slides the content upward within the fixed clip boundary
+  const animatedQuickAddSlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: quickAddTranslateY.value }],
   }));
 
   // Ref for FlatList to enable scrolling to top
@@ -633,37 +638,39 @@ const OperationsScreen = () => {
 
   const quickAddFormComponent = useMemo(() => (
     <>
-      <Animated.View style={animatedQuickAddStyle}>
-        <QuickAddForm
-          colors={colors}
-          t={t}
-          quickAddValues={quickAddValues}
-          setQuickAddValues={setQuickAddValues}
-          accounts={visibleAccounts}
-          filteredCategories={filteredCategories}
-          topCategoriesForType={topCategoriesForType}
-          getCategoryInfo={getCategoryInfo}
-          getAccountName={getAccountName}
-          getAccountBalance={getAccountBalance}
-          getCategoryName={getCategoryName}
-          openPicker={openPicker}
-          handleQuickAdd={handleQuickAdd}
-          handleAmountChange={handleAmountChange}
-          handleExchangeRateChange={handleExchangeRateChange}
-          handleDestinationAmountChange={handleDestinationAmountChange}
-          onAutoAddWithCategory={handleAutoAddWithCategory}
-          topTransferAccounts={topTransferAccountsForForm}
-          onAutoAddWithAccount={handleAutoAddWithAccount}
-          TYPES={TYPES}
-          rateSource={rateSource}
-          onOperationCurrencyChange={handleOperationCurrencyChange}
-          foreignRateSource={foreignRateSource}
-          foreignExchangeRate={foreignExchangeRate}
-        />
+      <Animated.View style={animatedQuickAddClipStyle}>
+        <Animated.View style={animatedQuickAddSlideStyle}>
+          <QuickAddForm
+            colors={colors}
+            t={t}
+            quickAddValues={quickAddValues}
+            setQuickAddValues={setQuickAddValues}
+            accounts={visibleAccounts}
+            filteredCategories={filteredCategories}
+            topCategoriesForType={topCategoriesForType}
+            getCategoryInfo={getCategoryInfo}
+            getAccountName={getAccountName}
+            getAccountBalance={getAccountBalance}
+            getCategoryName={getCategoryName}
+            openPicker={openPicker}
+            handleQuickAdd={handleQuickAdd}
+            handleAmountChange={handleAmountChange}
+            handleExchangeRateChange={handleExchangeRateChange}
+            handleDestinationAmountChange={handleDestinationAmountChange}
+            onAutoAddWithCategory={handleAutoAddWithCategory}
+            topTransferAccounts={topTransferAccountsForForm}
+            onAutoAddWithAccount={handleAutoAddWithAccount}
+            TYPES={TYPES}
+            rateSource={rateSource}
+            onOperationCurrencyChange={handleOperationCurrencyChange}
+            foreignRateSource={foreignRateSource}
+            foreignExchangeRate={foreignExchangeRate}
+          />
+        </Animated.View>
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:

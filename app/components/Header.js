@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { useEffect, useCallback, useRef } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -8,7 +8,6 @@ import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
-import FilterBadge from './search/FilterBadge';
 import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
@@ -72,15 +71,68 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
     updateSearchFilters(clearValues[groupKey]);
   }, [updateSearchFilters]);
 
+  const handleCollapsedPress = useCallback(() => {
+    if (searchMode === 'collapsed') {
+      const hasOtherFilters =
+        (searchState?.types?.length > 0) ||
+        (searchState?.accountIds?.length > 0) ||
+        (searchState?.categoryIds?.length > 0) ||
+        !!searchState?.dateRange?.startDate ||
+        !!searchState?.dateRange?.endDate ||
+        (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||
+        (searchState?.amountRange?.max !== null && searchState?.amountRange?.max !== undefined);
+      reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
+        if (shouldExpand !== filtersExpanded) toggleFilters();
+      });
+    } else {
+      openSearch();
+    }
+  }, [searchMode, searchState, reopenSearch, filtersExpanded, toggleFilters, openSearch]);
+
+  const isSearchOpen = searchMode === 'open' && activeScreen === 'Operations';
+  const showSearchBar = activeScreen === 'Operations';
+
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.background, borderBottomColor: colors.border },
-        searchMode === 'open' && activeScreen === 'Operations' && styles.containerSearchMode,
+        { backgroundColor: colors.background },
+        isSearchOpen && styles.containerSearchMode,
       ]}
     >
-      {searchMode === 'open' && activeScreen === 'Operations' ? (
+      {rightContent && !showSearchBar && (
+        <View style={styles.buttonContainer}>{rightContent}</View>
+      )}
+      {isDownloading && !showSearchBar && (
+        <View
+          style={styles.downloadIndicator}
+          accessibilityLabel={
+            downloadPhase === 'verifying'
+              ? (t('verifying_update') || 'Checking…')
+              : `${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`
+          }
+          accessibilityRole="progressbar"
+          testID="download-indicator"
+        >
+          {downloadPhase === 'verifying' ? (
+            <Animated.View style={{
+              transform: [{ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+            }}>
+              <Icon name="sync" size={20} color={colors.primary} />
+            </Animated.View>
+          ) : (
+            <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
+              <Icon name="arrow-down" size={20} color={colors.primary} />
+            </Animated.View>
+          )}
+          <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
+            {downloadPhase === 'verifying'
+              ? (t('verifying_update') || 'Checking…')
+              : `${Math.round((downloadProgress ?? 0) * 100)}%`}
+          </Text>
+        </View>
+      )}
+      {showSearchBar && (
         <>
           <SearchBar
             searchText={searchState?.text || ''}
@@ -90,8 +142,10 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
             filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
             colors={colors}
             t={t}
+            collapsed={!isSearchOpen}
+            onCollapsedPress={handleCollapsedPress}
           />
-          {hasActiveSearch && (
+          {isSearchOpen && hasActiveSearch && (
             <FilterChipStrip
               searchState={searchState}
               onClearGroup={handleClearFilterGroup}
@@ -100,89 +154,6 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
             />
           )}
         </>
-      ) : (
-        <View style={styles.buttonContainer}>
-          {rightContent || (
-            <>
-              {isDownloading && (
-                <View
-                  style={styles.downloadIndicator}
-                  accessibilityLabel={
-                    downloadPhase === 'verifying'
-                      ? (t('verifying_update') || 'Checking…')
-                      : `${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`
-                  }
-                  accessibilityRole="progressbar"
-                  testID="download-indicator"
-                >
-                  {downloadPhase === 'verifying' ? (
-                    <Animated.View style={{
-                      transform: [{
-                        rotate: rotateAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg'],
-                        }),
-                      }],
-                    }}>
-                      <Ionicons name="sync-outline" size={20} color={colors.primary} />
-                    </Animated.View>
-                  ) : (
-                    <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
-                      <Ionicons name="arrow-down-outline" size={20} color={colors.primary} />
-                    </Animated.View>
-                  )}
-                  <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-                    {downloadPhase === 'verifying'
-                      ? (t('verifying_update') || 'Checking…')
-                      : `${Math.round((downloadProgress ?? 0) * 100)}%`}
-                  </Text>
-                </View>
-              )}
-              {activeScreen === 'Operations' && (
-                <View style={styles.searchButtonContainer}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      console.debug('[Header] Search button pressed, mode:', searchMode);
-                      if (searchMode === 'collapsed') {
-                        // Reopen with smart logic: auto-expand the filter panel when
-                        // any non-text filter is active.
-                        const hasOtherFilters =
-                          (searchState?.types?.length > 0) ||
-                          (searchState?.accountIds?.length > 0) ||
-                          (searchState?.categoryIds?.length > 0) ||
-                          !!searchState?.dateRange?.startDate ||
-                          !!searchState?.dateRange?.endDate ||
-                          (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||
-                          (searchState?.amountRange?.max !== null && searchState?.amountRange?.max !== undefined);
-
-                        reopenSearch(searchState?.text !== '', hasOtherFilters, (shouldExpand) => {
-                          if (shouldExpand !== filtersExpanded) {
-                            toggleFilters();
-                          }
-                        });
-                      } else {
-                        openSearch();
-                      }
-                    }}
-                    testID="search-button"
-                    accessibilityLabel="Search operations"
-                    accessibilityRole="button"
-                    style={styles.searchButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="search-outline" size={24} color={colors.text} />
-                  </TouchableOpacity>
-                  {searchMode === 'collapsed' && hasActiveSearch && (
-                    <FilterBadge
-                      count={getSearchFilterCount()}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-              )}
-            </>
-          )}
-        </View>
       )}
     </View>
   );
@@ -209,9 +180,9 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 8,
+    justifyContent: 'flex-start',
+    paddingBottom: 2,
+    paddingTop: 2,
   },
   containerSearchMode: {
     alignItems: 'stretch',
@@ -225,11 +196,5 @@ const styles = StyleSheet.create({
   downloadPercent: {
     fontSize: 9,
     fontVariant: ['tabular-nums'],
-  },
-  searchButton: {
-    padding: 8,
-  },
-  searchButtonContainer: {
-    position: 'relative',
   },
 });

@@ -3,7 +3,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import PropTypes from 'prop-types';
 import ExpandableFilters from './ExpandableFilters';
 import { useOperationsData } from '../../contexts/OperationsDataContext';
@@ -18,6 +18,20 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
+
+  const translateY = useSharedValue(-SCREEN_HEIGHT);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) });
+    } else {
+      translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 250, easing: Easing.in(Easing.cubic) });
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const handleFilterChange = useCallback((partialFilters) => {
     updateSearchFilters(partialFilters);
@@ -37,14 +51,10 @@ const SearchOverlay = ({ onClose, colors, t, visible, onHeightChange }) => {
     }
   }, [visible, onHeightChange]);
 
-  if (!visible) {
-    return null;
-  }
-
   return (
     <Animated.View
-      style={[styles.filtersContainer, { backgroundColor: colors.background }]}
-      pointerEvents="box-none"
+      style={[styles.filtersContainer, { backgroundColor: colors.background }, animatedStyle]}
+      pointerEvents={visible ? 'box-none' : 'none'}
       onLayout={handleLayout}
     >
       <ExpandableFilters
