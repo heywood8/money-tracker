@@ -416,6 +416,40 @@ describe('ImportProgressModal', () => {
       expect(getByText('Database restored successfully (1 operation skipped — see logs)')).toBeTruthy();
     });
 
+    it('returns step label for in-progress step with data but unrecognised id', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'restore', label: 'Restoring database', status: 'in_progress', data: 'some-data' },
+        ],
+        currentStep: 'restore',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Restoring database')).toBeTruthy();
+    });
+
+    it('returns step label for completed step with data but unrecognised id', () => {
+      mockUseImportProgress.mockReturnValue({
+        isImporting: true,
+        steps: [
+          { id: 'clear', label: 'Clearing existing data', status: 'completed', data: 'some-data' },
+        ],
+        currentStep: 'clear',
+        isCancelling: false,
+        finishImport: mockFinishImport,
+        requestCancel: mockRequestCancel,
+      });
+
+      const { getByText } = render(<ImportProgressModal />);
+
+      expect(getByText('Clearing existing data')).toBeTruthy();
+    });
+
     it('shows default complete label when no operations were skipped', () => {
       mockUseImportProgress.mockReturnValue({
         isImporting: true,
