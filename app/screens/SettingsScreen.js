@@ -9,6 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-reanimated';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
+import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
@@ -56,6 +57,7 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 export default function SettingsScreen({ setSubPanelActive }) {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
+  const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
   const { hideBalances, setHideBalances } = useDisplaySettings();
   const { showDialog } = useDialog();
@@ -98,6 +100,20 @@ export default function SettingsScreen({ setSubPanelActive }) {
       bounciness: 4,
     }).start();
   }, [hideBalances, toggleAnim]);
+
+  const themeToggleAnim = useRef(new Animated.Value(colorScheme === 'dark' ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.spring(themeToggleAnim, {
+      toValue: colorScheme === 'dark' ? 1 : 0,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 4,
+    }).start();
+  }, [colorScheme, themeToggleAnim]);
+
+  const handleToggleDarkMode = useCallback(() => {
+    setTheme(colorScheme === 'dark' ? 'light' : 'dark');
+  }, [colorScheme, setTheme]);
 
   const { entries, clearLogs, getExportText } = useLogEntries(logFilter);
 
@@ -787,6 +803,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
                 <Animated.View style={[styles.switchThumb, {
                   transform: [{ translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
+                }]} />
+              </View>
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={handleToggleDarkMode} style={styles.settingsRow} testID="settings-theme-row">
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'} size={22} color={colors.text} />
+                <View style={styles.settingsRowText}>
+                  <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
+                  <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                    {colorScheme === 'dark' ? 'Dark' : 'Light'}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.switchTrack, { backgroundColor: colorScheme === 'dark' ? colors.primary : colors.border }]}>
+                <Animated.View style={[styles.switchThumb, {
+                  transform: [{ translateX: themeToggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] }) }],
                 }]} />
               </View>
             </View>

@@ -4,10 +4,6 @@ import { Text } from 'react-native';
 import Header from '../../app/components/Header';
 
 // Mock contexts
-jest.mock('../../app/contexts/ThemeConfigContext', () => ({
-  useThemeConfig: () => ({ colorScheme: 'light', setTheme: jest.fn() }),
-}));
-
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
     colors: {
@@ -37,19 +33,17 @@ jest.mock('../../app/services/db', () => ({
 }));
 
 describe('Header - rightContent prop', () => {
-  it('renders default buttons when rightContent not provided', () => {
-    const { getByTestId } = render(<Header />);
-
-    expect(getByTestId('theme-toggle-button')).toBeTruthy();
+  it('renders without crashing when rightContent not provided', () => {
+    const { toJSON } = render(<Header />);
+    expect(toJSON()).toBeTruthy();
   });
 
-  it('renders rightContent instead of default buttons when provided', () => {
+  it('renders rightContent when provided', () => {
     const customContent = <Text testID="custom-content">Custom</Text>;
-    const { getByTestId, queryByTestId } = render(
+    const { getByTestId } = render(
       <Header rightContent={customContent} />,
     );
 
     expect(getByTestId('custom-content')).toBeTruthy();
-    expect(queryByTestId('theme-toggle-button')).toBeNull();
   });
 });
