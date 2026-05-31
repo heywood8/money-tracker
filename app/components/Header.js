@@ -3,7 +3,6 @@ import { useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
-import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -16,7 +15,6 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 
 export default function Header({ rightContent, activeScreen, operationsData }) {
   console.debug('[Header] Rendering - activeScreen:', activeScreen, ', operationsData exists:', !!operationsData);
-  const { colorScheme, setTheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
@@ -73,11 +71,6 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
     };
     updateSearchFilters(clearValues[groupKey]);
   }, [updateSearchFilters]);
-
-  const toggleTheme = () => {
-    const newTheme = colorScheme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-  };
 
   return (
     <View
@@ -187,21 +180,6 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
                   )}
                 </View>
               )}
-              <TouchableOpacity
-                onPress={toggleTheme}
-                testID="theme-toggle-button"
-                accessibilityLabel={colorScheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                accessibilityRole="button"
-                accessibilityHint="Toggles between light and dark theme"
-                style={styles.themeButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={colorScheme === 'dark' ? 'moon' : 'sunny'}
-                  size={24}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
             </>
           )}
         </View>
@@ -253,8 +231,5 @@ const styles = StyleSheet.create({
   },
   searchButtonContainer: {
     position: 'relative',
-  },
-  themeButton: {
-    padding: 8,
   },
 });
