@@ -797,7 +797,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           <TouchableRipple onPress={() => openSubPanel('categories')} style={styles.settingsRow} testID="settings-categories-row">
             <View style={styles.settingsRowContent}>
               <View style={styles.settingsRowLeft}>
-                <Ionicons name="shape-outline" size={22} color={colors.text} />
+                <Ionicons name="shapes-outline" size={22} color={colors.text} />
                 <View style={styles.settingsRowText}>
                   <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('categories') || 'Categories'}</Text>
                   <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>

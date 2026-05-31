@@ -294,12 +294,12 @@ export default function SimpleTabs() {
   // transition type (swipe drag, adjacent spring, non-adjacent timing).
   const pillAnimatedStyle = useAnimatedStyle(() => {
     const tabWidth = tabBarWidthShared.value / TABS.length;
-    const pillPadding = 6;
-    const position = pillPosition.value * tabWidth + pillPadding;
+    const barPadding = 15;
+    const position = pillPosition.value * tabWidth + barPadding;
 
     return {
       transform: [{ translateX: position }],
-      width: tabWidth - pillPadding * 2,
+      width: tabWidth,
     };
   });
 
@@ -397,12 +397,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   floatingBar: {
+    alignSelf: 'center',
     borderRadius: 28,
     borderWidth: 1,
     marginBottom: 12,
-    marginHorizontal: 16,
     overflow: 'hidden',
+    paddingHorizontal: 15,
     position: 'relative',
+    width: '70%',
     ...Platform.select({
       android: {
         elevation: 8,
