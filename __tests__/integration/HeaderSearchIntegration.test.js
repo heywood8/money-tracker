@@ -12,13 +12,6 @@ jest.mock('../../app/contexts/SearchContext', () => ({
 jest.mock('../../app/contexts/OperationsDataContext');
 jest.mock('../../app/contexts/OperationsActionsContext');
 
-jest.mock('../../app/contexts/ThemeConfigContext', () => ({
-  useThemeConfig: () => ({
-    colorScheme: 'light',
-    setTheme: jest.fn(),
-  }),
-}));
-
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
     colors: {
@@ -313,21 +306,19 @@ describe('Header Search Integration', () => {
   });
 
   describe('Integration with Other Header Buttons', () => {
-    it('shows search button alongside theme toggle button', () => {
+    it('shows search button in operations header', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
       expect(getByTestId('search-button')).toBeTruthy();
-      expect(getByTestId('theme-toggle-button')).toBeTruthy();
     });
 
-    it('search button remains functional alongside theme toggle', () => {
+    it('search button is functional', () => {
       const { getByTestId } = render(
         <Header activeScreen="Operations" />,
       );
 
       fireEvent.press(getByTestId('search-button'));
-      fireEvent.press(getByTestId('theme-toggle-button'));
 
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
     });

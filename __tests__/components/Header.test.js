@@ -7,16 +7,6 @@ import { render, fireEvent } from '@testing-library/react-native';
 import Header from '../../app/components/Header';
 
 // Mock contexts
-const mockSetTheme = jest.fn();
-let mockColorScheme = 'light';
-
-jest.mock('../../app/contexts/ThemeConfigContext', () => ({
-  useThemeConfig: () => ({
-    colorScheme: mockColorScheme,
-    setTheme: mockSetTheme,
-  }),
-}));
-
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: () => ({
     colors: {
@@ -92,28 +82,9 @@ describe('Header', () => {
       expect(queryByText(/DB v/)).toBeNull();
     });
 
-    it('renders theme toggle icon (sunny for light mode)', () => {
-      const { getByTestId } = render(<Header />);
-      expect(getByTestId('icon-sunny')).toBeTruthy();
-    });
-  });
-
-  describe('Theme toggle', () => {
-    it('calls setTheme with dark when in light mode', () => {
-      const { getByLabelText } = render(<Header />);
-
-      const themeButton = getByLabelText('Switch to dark theme');
-      fireEvent.press(themeButton);
-
-      expect(mockSetTheme).toHaveBeenCalledWith('dark');
-    });
-
-    it('has correct accessibility properties for light mode', () => {
-      const { getByLabelText } = render(<Header />);
-
-      const themeButton = getByLabelText('Switch to dark theme');
-      expect(themeButton.props.accessibilityRole).toBe('button');
-      expect(themeButton.props.accessibilityHint).toBe('Toggles between light and dark theme');
+    it('does not render theme toggle button in header', () => {
+      const { queryByTestId } = render(<Header />);
+      expect(queryByTestId('theme-toggle-button')).toBeNull();
     });
   });
 
@@ -161,33 +132,4 @@ describe('Header', () => {
     });
   });
 
-  describe('Dark theme mode', () => {
-    beforeEach(() => {
-      mockColorScheme = 'dark';
-    });
-
-    afterEach(() => {
-      mockColorScheme = 'light';
-    });
-
-    it('shows moon icon in dark mode', () => {
-      const { getByTestId } = render(<Header />);
-      expect(getByTestId('icon-moon')).toBeTruthy();
-    });
-
-    it('has correct accessibility label for dark mode', () => {
-      const { getByLabelText } = render(<Header />);
-      const themeButton = getByLabelText('Switch to light theme');
-      expect(themeButton).toBeTruthy();
-    });
-
-    it('calls setTheme with light when in dark mode', () => {
-      const { getByLabelText } = render(<Header />);
-
-      const themeButton = getByLabelText('Switch to light theme');
-      fireEvent.press(themeButton);
-
-      expect(mockSetTheme).toHaveBeenCalledWith('light');
-    });
-  });
 });
