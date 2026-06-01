@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.3](https://github.com/heywood8/money-tracker/compare/penny-v0.128.2...penny-v0.128.3) (2026-06-01)
+
+
+### Bug Fixes
+
+* **restore:** fix balance history silently dropped on restore ([#874](https://github.com/heywood8/money-tracker/issues/874)) ([21fe54b](https://github.com/heywood8/money-tracker/commit/21fe54b4ff37e90933b3b18c4a6f5e4d8e639100))
+
 ## [0.128.2](https://github.com/heywood8/money-tracker/compare/penny-v0.128.1...penny-v0.128.2) (2026-06-01)
 
 
