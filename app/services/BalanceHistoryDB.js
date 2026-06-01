@@ -219,6 +219,7 @@ export const getBalanceHistory = async (accountId, startDate, endDate) => {
        ORDER BY date ASC`,
       [accountId, startDate, endDate],
     );
+    console.log(`[BH] getBalanceHistory(accountId=${JSON.stringify(accountId)}, ${startDate}, ${endDate}) → ${(results || []).length} rows`);
     return results || [];
   } catch (error) {
     console.error('Failed to get balance history:', error);
