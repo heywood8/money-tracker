@@ -22,6 +22,7 @@ export const accounts = sqliteTable('accounts', {
   monthlyTarget: text('monthly_target'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  deletedAt: text('deleted_at'),
 }, (table) => ({
   orderIdx: index('idx_accounts_order').on(table.displayOrder),
   hiddenIdx: index('idx_accounts_hidden').on(table.hidden),

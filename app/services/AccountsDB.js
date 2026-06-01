@@ -1,6 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction, getDrizzle } from './db';
 import * as Currency from './currency';
-import { eq, sql, desc, asc } from 'drizzle-orm';
+import { eq, sql, desc, asc, isNull, and } from 'drizzle-orm';
 import { accounts } from '../db/schema';
 import * as BalanceHistoryDB from './BalanceHistoryDB';
 
@@ -13,6 +13,7 @@ export const getAllAccounts = async () => {
     const db = await getDrizzle();
     const results = await db.select()
       .from(accounts)
+      .where(isNull(accounts.deletedAt))
       .orderBy(asc(accounts.displayOrder), desc(accounts.createdAt));
     return results || [];
   } catch (error) {
@@ -253,7 +254,10 @@ export const deleteAccount = async (id, transferToAccountId = null) => {
         );
       }
 
-      await db.runAsync('DELETE FROM accounts WHERE id = ?', [id]);
+      await db.runAsync(
+        'UPDATE accounts SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        [new Date().toISOString(), new Date().toISOString(), id],
+      );
     });
   } catch (error) {
     console.error('Failed to delete account:', error);
@@ -374,7 +378,7 @@ export const accountExists = async (id) => {
     const db = await getDrizzle();
     const results = await db.select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.id, id))
+      .where(and(eq(accounts.id, id), isNull(accounts.deletedAt)))
       .limit(1);
     return results.length > 0;
   } catch (error) {
