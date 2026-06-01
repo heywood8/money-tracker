@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.2](https://github.com/heywood8/money-tracker/compare/penny-v0.128.1...penny-v0.128.2) (2026-06-01)
+
+
+### Bug Fixes
+
+* handle Android back gesture in search/filter UI ([#868](https://github.com/heywood8/money-tracker/issues/868)) ([bd66e86](https://github.com/heywood8/money-tracker/commit/bd66e867d8b6a1a7dff078079fe837df2fe6b7ec))
+
 ## [0.128.1](https://github.com/heywood8/money-tracker/compare/penny-v0.128.0...penny-v0.128.1) (2026-05-31)
 
 
