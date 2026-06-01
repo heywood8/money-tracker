@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, BackHandler } from 'react-native';
 import { useEffect, useCallback, useRef } from 'react';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
@@ -88,6 +88,19 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
 
   const isSearchOpen = searchMode === 'open' && activeScreen === 'Operations';
   const showSearchBar = activeScreen === 'Operations';
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (filtersExpanded) {
+        toggleFilters();
+      } else {
+        handleCloseSearch();
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [isSearchOpen, filtersExpanded, toggleFilters, handleCloseSearch]);
 
   return (
     <View
