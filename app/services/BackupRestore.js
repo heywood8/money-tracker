@@ -505,7 +505,8 @@ export const restoreBackup = async (backup, cancelToken) => {
             ],
           );
           // For integer IDs, no remapping needed - map to itself
-          accountIdMapping.set(account.id, Number(account.id));
+          // Normalize key to string for consistent Map lookups across JSON/SQLite type differences
+          accountIdMapping.set(String(account.id), Number(account.id));
           console.log(`Preserved account ID: ${account.id}`);
         } else {
           // UUID or no ID - let SQLite auto-generate integer ID
@@ -525,7 +526,7 @@ export const restoreBackup = async (backup, cancelToken) => {
 
           // Map UUID to new integer ID
           if (account.id != null) {
-            accountIdMapping.set(account.id, result.lastInsertRowId);
+            accountIdMapping.set(String(account.id), result.lastInsertRowId);
             console.log(`Mapped account ID: ${account.id} -> ${result.lastInsertRowId}`);
           }
         }
@@ -645,16 +646,33 @@ export const restoreBackup = async (backup, cancelToken) => {
           data: backup.data.balance_history.length,
         });
 
+        let restoredHistoryCount = 0;
+        let skippedHistoryCount = 0;
         for (const history of backup.data.balance_history) {
-          const mappedAccountId = accountIdMapping.get(history.account_id) ?? history.account_id;
+          const mappedAccountId = accountIdMapping.get(String(history.account_id)) ?? history.account_id;
+
+          // Validate that the mapped account ID exists before inserting to avoid silent FK drops
+          const accountExists = await db.getFirstAsync(
+            'SELECT 1 FROM accounts WHERE id = ?',
+            [mappedAccountId],
+          );
+          if (!accountExists) {
+            console.warn(`Skipping balance history entry: account_id ${history.account_id} -> ${mappedAccountId} not found in restored accounts`);
+            skippedHistoryCount++;
+            continue;
+          }
 
           await db.runAsync(
-            'INSERT OR IGNORE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
+            'INSERT OR REPLACE INTO accounts_balance_history (account_id, date, balance, created_at) VALUES (?, ?, ?, ?)',
             [mappedAccountId, history.date, history.balance, history.created_at],
           );
+          restoredHistoryCount++;
         }
 
-        console.log(`Restored ${backup.data.balance_history.length} balance history entries`);
+        if (skippedHistoryCount > 0) {
+          console.warn(`Balance history restore: ${restoredHistoryCount} inserted, ${skippedHistoryCount} skipped due to missing account references`);
+        }
+        console.log(`Restored ${restoredHistoryCount} of ${backup.data.balance_history.length} balance history entries`);
         appEvents.emit(IMPORT_PROGRESS_EVENT, {
           stepId: 'balance_history',
           status: 'completed',
