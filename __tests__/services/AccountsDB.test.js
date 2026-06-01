@@ -281,8 +281,8 @@ describe('AccountsDB', () => {
 
       expect(db.executeTransaction).toHaveBeenCalled();
       expect(mockTxDb.runAsync).toHaveBeenCalledWith(
-        'DELETE FROM accounts WHERE id = ?',
-        ['1'],
+        'UPDATE accounts SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        expect.arrayContaining(['1']),
       );
     });
 
@@ -657,8 +657,8 @@ describe('AccountsDB', () => {
         ['transfer-to', 'to-delete'],
       );
       expect(mockTxDb.runAsync).toHaveBeenCalledWith(
-        'DELETE FROM accounts WHERE id = ?',
-        ['to-delete'],
+        'UPDATE accounts SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        expect.arrayContaining(['to-delete']),
       );
     });
   });
