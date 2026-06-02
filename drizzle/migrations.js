@@ -25,5 +25,9 @@ export default {
   postMigrationHandlers: {
     m0003: m0003PostMigration,
   },
+  // Explicit tag mapping for post-migration handlers to avoid fragile substring matching
+  postMigrationTags: {
+    m0003: '0003_slow_grandmaster',
+  },
 };
   

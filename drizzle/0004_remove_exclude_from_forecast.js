@@ -5,7 +5,8 @@
  * so we recreate the table without the column.
  */
 
-const sql = `DROP INDEX IF EXISTS \`idx_categories_exclude_from_forecast\`;--> statement-breakpoint
+const sql = `PRAGMA foreign_keys=OFF;--> statement-breakpoint
+DROP INDEX IF EXISTS \`idx_categories_exclude_from_forecast\`;--> statement-breakpoint
 CREATE TABLE \`categories_new\` (
 	\`id\` text PRIMARY KEY NOT NULL,
 	\`name\` text NOT NULL,
@@ -25,6 +26,7 @@ ALTER TABLE \`categories_new\` RENAME TO \`categories\`;--> statement-breakpoint
 CREATE INDEX \`idx_categories_parent\` ON \`categories\` (\`parent_id\`);--> statement-breakpoint
 CREATE INDEX \`idx_categories_type\` ON \`categories\` (\`type\`);--> statement-breakpoint
 CREATE INDEX \`idx_categories_category_type\` ON \`categories\` (\`category_type\`);--> statement-breakpoint
-CREATE INDEX \`idx_categories_is_shadow\` ON \`categories\` (\`is_shadow\`)`;
+CREATE INDEX \`idx_categories_is_shadow\` ON \`categories\` (\`is_shadow\`);--> statement-breakpoint
+PRAGMA foreign_keys=ON`;
 
 export default sql;

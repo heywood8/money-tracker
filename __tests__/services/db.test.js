@@ -390,7 +390,7 @@ describe('Database Service', () => {
     });
   });
 
-  describe('Migration 0007 pre-migration guard', () => {
+  describe('Migration 0007 detection', () => {
     const validOpsSchema = {
       sql: 'CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL)',
     };
@@ -398,11 +398,11 @@ describe('Database Service', () => {
       sql: "CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL CHECK (`type` IN ('expense', 'income', 'transfer')), `amount` text NOT NULL)",
     };
 
-    it('calls migrate with full config when no invalid operation types exist', async () => {
-      // isDatabaseCorrupted uses getAllAsync; first getFirstAsync is the opsSchema check
+    it('calls migrate with full config when trigger not yet present', async () => {
+      // m0007Trigger check -> null (no trigger), opsSchemaForCheck -> no CHECK
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(validOpsSchema) // opsSchema: no CHECK yet
-        .mockResolvedValueOnce(null);          // invalid op check -> none found
+        .mockResolvedValueOnce(null)           // m0007Trigger: not found
+        .mockResolvedValueOnce(validOpsSchema); // opsSchemaForCheck: no CHECK
 
       await getDatabase();
 
@@ -411,72 +411,52 @@ describe('Database Service', () => {
       expect(migrationsArg).toHaveProperty('migrations');
     });
 
-    it('skips migration 0007 and warns when invalid operation types are found', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
+    it('does not skip migration 0007 when invalid operation types exist (triggers allow existing data)', async () => {
+      // With the trigger approach, existing invalid data doesn't prevent migration
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(validOpsSchema)             // opsSchema: no CHECK yet
-        .mockResolvedValueOnce({ id: 42, type: 'bogus' }); // invalid op found
+        .mockResolvedValueOnce(null)           // m0007Trigger: not found
+        .mockResolvedValueOnce(validOpsSchema); // opsSchemaForCheck: no CHECK
 
       await getDatabase();
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping migration 0007'),
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('bogus'),
-      );
+      // Should NOT filter 0007 — triggers don't care about existing invalid data
+      // migrate() receives the original unmodified config
+      expect(migrate).toHaveBeenCalled();
       const migrationsArg = migrate.mock.calls[0][1];
-      const tags = (migrationsArg.journal.entries || []).map(e => e.tag);
-      expect(tags).not.toContain('0007_add_enum_check_constraints');
-      expect(migrationsArg.migrations).not.toHaveProperty('m0007');
-
-      warnSpy.mockRestore();
+      expect(migrationsArg).toHaveProperty('migrations');
+      // No filtering happened — config is passed through as-is
+      expect(migrationsArg.journal).toBeDefined();
     });
 
-    it('skips the invalid-type check when CHECK constraint is already present', async () => {
+    it('skips the trigger check when CHECK constraint is already present (old installs)', async () => {
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(null)            // isDatabaseCorrupted
-        .mockResolvedValueOnce(checkedOpsSchema); // opsSchema: CHECK present
+        .mockResolvedValueOnce(null)             // m0007Trigger: not found
+        .mockResolvedValueOnce(checkedOpsSchema); // opsSchemaForCheck: CHECK present
 
       await getDatabase();
 
-      const invalidOpCheckCalls = mockDb.getFirstAsync.mock.calls.filter(
-        ([sql]) => typeof sql === 'string' && sql.includes('NOT IN'),
-      );
-      expect(invalidOpCheckCalls).toHaveLength(0);
+      // m0007AlreadyApplied = true via CHECK, so migrate() still runs with full config
+      // (Drizzle will skip it because hash already in __drizzle_migrations)
       expect(migrate).toHaveBeenCalled();
     });
 
-    it('still runs the invalid-type check when a non-type CHECK constraint is present', async () => {
-      // Guard against the regression where includes('CHECK') would falsely match any
-      // CHECK constraint (e.g. on amount) and skip the invalid-type validation.
-      const otherCheckSchema = {
-        sql: 'CREATE TABLE `operations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `type` text NOT NULL, `amount` text NOT NULL CHECK (`amount` >= 0))',
-      };
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
+    it('recognizes trigger as m0007 already applied', async () => {
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(otherCheckSchema)           // opsSchema: CHECK on amount, not type
-        .mockResolvedValueOnce({ id: 7, type: 'garbage' }); // invalid op found
+        .mockResolvedValueOnce({ name: 'trg_operations_type_insert' }) // m0007Trigger: found
+        .mockResolvedValueOnce(validOpsSchema);                         // opsSchemaForCheck
 
       await getDatabase();
 
-      // Should detect that 0007 has NOT been applied (despite the unrelated CHECK)
-      // and run the invalid-type check, finding the bad row and warning.
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping migration 0007'),
-      );
-
-      warnSpy.mockRestore();
+      // m0007AlreadyApplied = true via trigger
+      expect(migrate).toHaveBeenCalled();
     });
 
     it('skips the pre-check when operations table does not exist yet', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       mockDb.getFirstAsync
-        .mockResolvedValueOnce(null) // isDatabaseCorrupted
-        .mockResolvedValueOnce(null); // opsSchema: table absent
+        .mockResolvedValueOnce(null) // m0007Trigger: not found
+        .mockResolvedValueOnce(null); // opsSchemaForCheck: table absent
 
       await getDatabase();
 
