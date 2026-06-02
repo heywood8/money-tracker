@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.7](https://github.com/heywood8/money-tracker/compare/penny-v0.128.6...penny-v0.128.7) (2026-06-02)
+
+
+### Bug Fixes
+
+* bypass Drizzle migrate() — apply pending migrations manually ([#884](https://github.com/heywood8/money-tracker/issues/884)) ([74773e5](https://github.com/heywood8/money-tracker/commit/74773e5c8c550ce2447cd87eb09c66c0ad956e5c))
+
 ## [0.128.6](https://github.com/heywood8/money-tracker/compare/penny-v0.128.5...penny-v0.128.6) (2026-06-02)
 
 
