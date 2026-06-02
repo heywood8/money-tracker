@@ -121,6 +121,12 @@ const UpdateProgressIcon = memo(({ phase, progress, color }) => {
 
 UpdateProgressIcon.displayName = 'UpdateProgressIcon';
 
+UpdateProgressIcon.propTypes = {
+  phase: PropTypes.string,
+  progress: PropTypes.number,
+  color: PropTypes.string.isRequired,
+};
+
 // Memoized tab button with icon + label, pill active state
 const TabButton = memo(({ tab, isActive, colors, onPress, isUpdating, updatePhase, updateProgress }) => {
   const handlePress = useCallback(() => {
