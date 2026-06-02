@@ -110,6 +110,7 @@ jest.mock('drizzle-orm', () => {
   return {
     eq: jest.fn((field, value) => ({ field, value, op: 'eq' })),
     and: jest.fn((...conditions) => ({ conditions, op: 'and' })),
+    isNull: jest.fn((field) => ({ field, op: 'isNull' })),
     desc: jest.fn((field) => ({ field, direction: 'desc' })),
     asc: jest.fn((field) => ({ field, direction: 'asc' })),
     sql: sqlMock,
