@@ -137,6 +137,9 @@ const isSchemaComplete = async (rawDb) => {
       if (!opsSchema?.sql || !/CHECK\s*\(\s*[`"]?type[`"]?\s+IN\s*\(/i.test(opsSchema.sql)) return false;
     }
 
+    // Check accounts has deleted_at column (migration 0008)
+    if (!accountsCols.some(c => c.name === 'deleted_at')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -317,6 +320,14 @@ const detectAppliedMigrations = async (rawDb) => {
     ).catch(() => null);
     if (opsSchema?.sql && /CHECK\s*\(\s*[`"]?type[`"]?\s+IN\s*\(/i.test(opsSchema.sql)) {
       applied.push(7);
+    }
+  }
+
+  // Migration 0008: Adds deleted_at column to accounts (soft-delete)
+  if (await tableExists('accounts')) {
+    const accCols = await getColumns('accounts');
+    if (accCols.some(c => c.name === 'deleted_at')) {
+      applied.push(8);
     }
   }
 
