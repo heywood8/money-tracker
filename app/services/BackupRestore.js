@@ -1063,9 +1063,7 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
   appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'import', status: 'in_progress' });
 
   const SQLite = await import('expo-sqlite');
-  const { drizzle } = await import('drizzle-orm/expo-sqlite');
-  const { migrate } = await import('drizzle-orm/expo-sqlite/migrator');
-  const schema = await import('../db/schema');
+  const { applyPendingMigrations } = await import('./db');
   const migrations = await import('../../drizzle/migrations');
 
   const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
@@ -1086,13 +1084,11 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
   });
 
   let tempDb = null;
-  let tempDrizzle = null;
 
   try {
     // Open the imported database
     console.log('Opening imported database...');
     tempDb = await SQLite.openDatabaseAsync('penny_import_temp.db');
-    tempDrizzle = drizzle(tempDb, { schema: schema.default || schema });
 
     // Run migrations on the imported database to bring it up to current schema
     console.log('Running migrations on imported database...');
@@ -1111,11 +1107,11 @@ const importBackupSQLite = async (fileUri, cancelToken) => {
       console.log('No migrations table found - database will be migrated from scratch');
     }
 
-    await migrate(tempDrizzle, migrationsData);
+    await applyPendingMigrations(tempDb, migrationsData);
 
     // Log which migrations were applied
     const finalMigrations = await tempDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-    console.log('Migrations after running migrate:', (finalMigrations || []).map(m => `${m.hash}`).join(', '));
+    console.log('Migrations after running applyPendingMigrations:', (finalMigrations || []).map(m => `${m.hash?.substring(0, 40)}...`).join(', '));
     console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrationsData.journal.entries.length}`);
 
     // Enable foreign keys and WAL mode after migrations
