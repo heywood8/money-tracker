@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.6](https://github.com/heywood8/money-tracker/compare/penny-v0.128.5...penny-v0.128.6) (2026-06-02)
+
+
+### Bug Fixes
+
+* show green success indicator for all export types ([#879](https://github.com/heywood8/money-tracker/issues/879)) ([1ddcca2](https://github.com/heywood8/money-tracker/commit/1ddcca27794e0ace44926d2f0697bbdcadb2d1a2))
+
 ## [0.128.5](https://github.com/heywood8/money-tracker/compare/penny-v0.128.4...penny-v0.128.5) (2026-06-02)
 
 
