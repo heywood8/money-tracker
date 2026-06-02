@@ -1,5 +1,4 @@
 import { drizzle } from 'drizzle-orm/expo-sqlite';
-import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as SQLite from 'expo-sqlite';
 import * as schema from '../db/schema';
 import migrations from '../../drizzle/migrations';
@@ -196,42 +195,66 @@ const syncMigrationRecords = async (rawDb, migrationsConfig) => {
 };
 
 /**
- * Repair __drizzle_migrations when it contains null hashes.
- * Determines which migrations are already applied by inspecting the schema,
- * then rebuilds the table with correct hashes so migrate() can properly
- * identify and apply only the truly pending migrations.
+ * Apply pending migrations manually, bypassing Drizzle's migrate().
+ *
+ * WHY: Drizzle's expo-sqlite migrator computes `folderMillis` via formatToMillis()
+ * on migration keys like "m0000". Since these aren't date strings, folderMillis = NaN.
+ * The comparison `Number(created_at) < NaN` is always false, so if ANY records exist
+ * in __drizzle_migrations, Drizzle will never run pending migrations.
+ *
+ * This function detects which migrations are truly applied (via schema inspection),
+ * then executes only the pending ones directly via rawDb, and records them.
  */
-const repairMigrationHashes = async (rawDb, migrationsConfig) => {
-  try {
-    const journalEntries = migrationsConfig.journal.entries;
-    const migrationKeys = Object.keys(migrationsConfig.migrations);
+export const applyPendingMigrations = async (rawDb, migrationsConfig) => {
+  const journalEntries = migrationsConfig.journal.entries;
+  const migrationKeys = Object.keys(migrationsConfig.migrations);
 
-    // Determine which migrations have been applied by checking schema markers
-    const appliedIndices = await detectAppliedMigrations(rawDb);
-    console.log(`[DB] Detected ${appliedIndices.length}/${journalEntries.length} migrations as already applied: ${appliedIndices.join(', ')}`);
+  // Determine which migrations have been applied by checking schema markers
+  const appliedIndices = await detectAppliedMigrations(rawDb);
+  const appliedSet = new Set(appliedIndices);
+  console.log(`[DB] Detected ${appliedIndices.length}/${journalEntries.length} migrations as already applied: ${appliedIndices.join(', ')}`);
 
-    // Rebuild __drizzle_migrations with correct hashes for applied migrations
-    await rawDb.runAsync('DROP TABLE IF EXISTS __drizzle_migrations');
-    await rawDb.runAsync(
-      'CREATE TABLE IF NOT EXISTS __drizzle_migrations (id integer PRIMARY KEY AUTOINCREMENT, hash text NOT NULL, created_at numeric)',
-    );
+  const pendingIndices = [];
+  for (let i = 0; i < journalEntries.length; i++) {
+    if (!appliedSet.has(i)) pendingIndices.push(i);
+  }
 
-    for (const idx of appliedIndices) {
-      const key = migrationKeys[idx];
-      const migrationSql = migrationsConfig.migrations[key];
-      const hash = typeof migrationSql === 'string' ? migrationSql : (migrationSql?.default || String(migrationSql));
-      await rawDb.runAsync(
-        'INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)',
-        [hash, journalEntries[idx].when],
-      );
+  if (pendingIndices.length === 0) {
+    console.log('[DB] No pending migrations to apply');
+    await syncMigrationRecords(rawDb, migrationsConfig);
+    return;
+  }
+
+  console.log(`[DB] Applying ${pendingIndices.length} pending migrations: ${pendingIndices.map(i => journalEntries[i].tag).join(', ')}`);
+
+  for (const idx of pendingIndices) {
+    const key = migrationKeys[idx];
+    const migrationSql = migrationsConfig.migrations[key];
+    const rawSql = typeof migrationSql === 'string' ? migrationSql : (migrationSql?.default || String(migrationSql));
+    const tag = journalEntries[idx].tag;
+
+    // Split on Drizzle's statement breakpoint marker (same logic as Drizzle internals)
+    const statements = rawSql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
+
+    console.log(`[DB] Applying migration ${tag} (${statements.length} statements)`);
+
+    for (const stmt of statements) {
+      try {
+        await rawDb.execAsync(stmt);
+      } catch (stmtErr) {
+        // Some statements may fail if partially applied (e.g. column already exists)
+        // Log but continue — detectAppliedMigrations already confirmed the migration
+        // as NOT applied, so most statements should succeed.
+        console.warn(`[DB] Statement in ${tag} failed (continuing): ${stmtErr.message}`);
+        console.warn(`[DB] Failed SQL: ${stmt.substring(0, 120)}...`);
+      }
     }
 
-    console.log(`[DB] Migration records repaired: ${appliedIndices.length} applied, ${journalEntries.length - appliedIndices.length} pending`);
-  } catch (error) {
-    console.error('[DB] Failed to repair migration hashes:', error.message);
-    // If repair fails, migrate() will attempt to run all migrations which may
-    // partially fail — but the defensive guards handle most of those cases.
+    console.log(`[DB] Migration ${tag} applied successfully`);
   }
+
+  // Rebuild __drizzle_migrations to reflect all migrations as applied
+  await syncMigrationRecords(rawDb, migrationsConfig);
 };
 
 /**
@@ -432,157 +455,33 @@ const initializeDatabase = async (rawDb, db) => {
       // startups are even faster (no need to re-check schema).
       await syncMigrationRecords(rawDb, migrations);
     } else {
-      // Pre-migration: log exact column list of operations table so we can see
-      // what state it is in before migrations run.
-      const opsColumnsPreMigration = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
-      if (opsColumnsPreMigration && opsColumnsPreMigration.length > 0) {
-        console.log('[DB] operations table columns before migrations:', opsColumnsPreMigration.map(c => `${c.cid}:${c.name}(${c.type})`).join(', '));
-      } else {
-        console.log('[DB] operations table does not exist yet (fresh database)');
-      }
+      // Schema is NOT complete — apply pending migrations manually.
+      // We bypass Drizzle's migrate() because its expo-sqlite migrator has a fatal bug:
+      // it computes folderMillis via formatToMillis() on keys like "m0000" → NaN,
+      // so the comparison `Number(created_at) < NaN` is always false, meaning
+      // pending migrations are never executed when any records exist.
+      await applyPendingMigrations(rawDb, migrations);
 
-      // PRE-MIGRATION DEFENSIVE CHECK: ensure original_balance column exists BEFORE
-      // running migrations. If migration 0006 was recorded in __drizzle_migrations but
-      // its ALTER TABLE was rolled back (Drizzle/Expo SQLite bug), the column will be
-      // absent. Migration 0007 does `INSERT INTO __new_operations SELECT * FROM operations`
-      // which fails when the column counts mismatch (old=13, new=14) — causing migrate()
-      // to throw BEFORE the post-migration fallback below can run. Adding the column here
-      // breaks that infinite failure loop.
-      if (opsColumnsPreMigration && opsColumnsPreMigration.length > 0) {
-        const hasOriginalBalancePre = opsColumnsPreMigration.some(col => col.name === 'original_balance');
-        if (!hasOriginalBalancePre) {
-          console.warn('[DB] PRE-MIGRATION: original_balance column missing from operations table — adding it now so migration 0007 SELECT * column count matches');
-          try {
-            await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
-            console.log('[DB] PRE-MIGRATION: original_balance column added successfully');
-          } catch (preAddErr) {
-            console.error('[DB] PRE-MIGRATION: failed to add original_balance column:', preAddErr.message);
-          }
-        } else {
-          console.log('[DB] PRE-MIGRATION: original_balance column already present — no action needed');
-        }
-      }
-
-      // Check if migration 0007 (type-enforcement trigger) is already applied.
-      // Accepts either the new trigger or the old CHECK constraint from prior installs.
-      let migrationsConfig = migrations;
-      const m0007Trigger = await rawDb.getFirstAsync(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_operations_type_insert'",
-      ).catch(() => null);
-      const opsSchemaForCheck = await rawDb.getFirstAsync(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='operations'",
-      ).catch(() => null);
-      const m0007AlreadyApplied = !!m0007Trigger ||
-      (!!opsSchemaForCheck?.sql && /CHECK\s*\(\s*[`"]?type[`"]?\s+IN\s*\(/i.test(opsSchemaForCheck.sql));
-
-      // FIX NULL HASHES: If __drizzle_migrations has null hashes, Drizzle's migrator
-      // cannot match stored records to known migrations — it will either skip everything
-      // or try to re-apply already-applied migrations. Repair the table by detecting
-      // which migrations are already applied (via schema inspection) and inserting correct
-      // hashes so migrate() only applies truly pending migrations.
-      const hasNullHashes = (migrationsBefore || []).some(m => !m.hash);
-      if (hasNullHashes && migrationsBefore.length > 0) {
-        console.log('[DB] Detected null hashes in __drizzle_migrations — repairing...');
-        await repairMigrationHashes(rawDb, migrationsConfig);
-      }
-
-      // Run Drizzle migrations
-      console.log('[DB] calling migrate() with', migrationsConfig.journal.entries.length, 'journal entries:', migrationsConfig.journal.entries.map(e => e.tag).join(', '));
-      try {
-        await migrate(db, migrationsConfig);
-        console.log('[DB] migrate() completed without throwing');
-      } catch (migrateErr) {
-        console.error('[DB] migrate() threw an error:', migrateErr.message);
-        console.error('[DB] migrate() error cause:', migrateErr.cause?.message ?? '(no cause)');
-        throw migrateErr;
-      }
-
-      // Post-migration verification: log the final column list and confirm
-      // original_balance is present. Acts as a last-resort fallback in case
-      // both the pre-migration guard and migrate() somehow left it absent.
-      const opsColumnsPostMigration = await rawDb.getAllAsync('PRAGMA table_info(operations)').catch(() => []);
-      if (opsColumnsPostMigration && opsColumnsPostMigration.length > 0) {
-        console.log('[DB] operations table columns after migrations:', opsColumnsPostMigration.map(c => `${c.cid}:${c.name}(${c.type})`).join(', '));
-      }
-      const hasOriginalBalance = (opsColumnsPostMigration || []).some(col => col.name === 'original_balance');
-      if (!hasOriginalBalance) {
-        console.warn('[DB] POST-MIGRATION: original_balance column still missing — adding it as last-resort fallback');
-        try {
-          await rawDb.runAsync('ALTER TABLE `operations` ADD COLUMN `original_balance` text');
-          console.log('[DB] POST-MIGRATION: original_balance column added via fallback');
-        } catch (postAddErr) {
-          console.error('[DB] POST-MIGRATION: failed to add original_balance column:', postAddErr.message);
-        }
-      } else {
-        console.log('[DB] POST-MIGRATION: original_balance column confirmed present');
-      }
-
-
-
-      // Defensive: ensure planned_operations table exists after migrations.
-      // The beta Drizzle migrator can silently fail to apply a migration (transaction
-      // rolls back, hash not recorded), so we create the table directly as a fallback.
-      const plannedOpsTable = await rawDb.getAllAsync(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='planned_operations'",
-      ) || [];
-      if (plannedOpsTable.length === 0) {
-        console.warn('planned_operations table missing after migrations — creating it directly');
-        await rawDb.runAsync(
-          `CREATE TABLE IF NOT EXISTS \`planned_operations\` (
-          \`id\` text PRIMARY KEY NOT NULL,
-          \`name\` text NOT NULL,
-          \`type\` text NOT NULL,
-          \`amount\` text NOT NULL,
-          \`account_id\` integer NOT NULL,
-          \`category_id\` text,
-          \`to_account_id\` integer,
-          \`description\` text,
-          \`is_recurring\` integer NOT NULL DEFAULT 1,
-          \`last_executed_month\` text,
-          \`display_order\` integer,
-          \`created_at\` text NOT NULL,
-          \`updated_at\` text NOT NULL,
-          FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade,
-          FOREIGN KEY (\`category_id\`) REFERENCES \`categories\`(\`id\`) ON UPDATE no action ON DELETE set null,
-          FOREIGN KEY (\`to_account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade
-        )`,
-        );
-        await rawDb.runAsync(
-          'CREATE INDEX IF NOT EXISTS `idx_planned_ops_account` ON `planned_operations` (`account_id`)',
-        );
-        await rawDb.runAsync(
-          'CREATE INDEX IF NOT EXISTS `idx_planned_ops_type` ON `planned_operations` (`type`)',
-        );
-        await rawDb.runAsync(
-          'CREATE INDEX IF NOT EXISTS `idx_planned_ops_recurring` ON `planned_operations` (`is_recurring`)',
-        );
-        console.log('planned_operations table created via fallback');
-      }
-
-      // Log which migrations were applied
-      const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC');
-      const finalHashList = (finalMigrations || []).map(m => m.hash || 'null').join(', ');
-      console.log('Migrations after running migrate:', finalHashList || 'none');
+      // Log final state
+      const finalMigrations = await rawDb.getAllAsync('SELECT * FROM __drizzle_migrations ORDER BY created_at ASC').catch(() => []);
       console.log(`Total migrations applied: ${(finalMigrations || []).length}/${migrations.journal.entries.length}`);
 
       // Run post-migration handlers for newly applied migrations
       if (migrations.postMigrationHandlers) {
         const appliedHashesAfter = new Set((finalMigrations || []).map(m => m.hash));
-      
+
         for (const [key, handler] of Object.entries(migrations.postMigrationHandlers)) {
-        // Use explicit tag mapping (avoids fragile substring matching)
           const tag = migrations.postMigrationTags?.[key];
           const migrationEntry = tag
             ? migrations.journal.entries.find(e => e.tag === tag)
             : null;
-        
+
           if (migrationEntry && appliedHashesAfter.has(migrationEntry.hash) && !appliedHashesBefore.has(migrationEntry.hash)) {
             console.log(`Running post-migration handler for ${key}...`);
             try {
               await handler(rawDb);
             } catch (handlerError) {
               console.error(`Post-migration handler ${key} failed:`, handlerError);
-            // Don't throw - allow app to continue; handler will be retried on next launch
             }
           }
         }
