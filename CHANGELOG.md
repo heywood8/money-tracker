@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.128.4](https://github.com/heywood8/money-tracker/compare/penny-v0.128.3...penny-v0.128.4) (2026-06-02)
+
+
+### Bug Fixes
+
+* replace fragile table-rebuild migration with trigger-based type enforcement ([#877](https://github.com/heywood8/money-tracker/issues/877)) ([3fc55f1](https://github.com/heywood8/money-tracker/commit/3fc55f180416817a73759a6cdbb419c30d865b3c))
+* soft-delete accounts to preserve balance history ([#872](https://github.com/heywood8/money-tracker/issues/872)) ([#876](https://github.com/heywood8/money-tracker/issues/876)) ([992beaf](https://github.com/heywood8/money-tracker/commit/992beafe52028098603592a63617706c1dd8a07a))
+
 ## [0.128.3](https://github.com/heywood8/money-tracker/compare/penny-v0.128.2...penny-v0.128.3) (2026-06-01)
 
 
