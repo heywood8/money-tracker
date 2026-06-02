@@ -268,6 +268,8 @@ jest.mock('react-native-reanimated', () => {
       if (callback) callback(true);
       return toValue;
     },
+    withRepeat: (animation) => animation,
+    cancelAnimation: jest.fn(),
     runOnJS: (fn) => fn,
     runOnUI: (fn) => fn,
     Easing: {
@@ -282,6 +284,30 @@ jest.mock('react-native-reanimated', () => {
     },
   };
 });
+
+// Mock react-native-svg
+jest.mock('react-native-svg', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const PropTypes = require('prop-types');
+  function Svg({ children, width, height }) {
+    return React.createElement(View, { testID: 'svg', width, height }, children);
+  }
+  Svg.propTypes = { children: PropTypes.node, width: PropTypes.number, height: PropTypes.number, viewBox: PropTypes.string };
+  function Circle() { return null; }
+  Circle.propTypes = { cx: PropTypes.number, cy: PropTypes.number, r: PropTypes.number, stroke: PropTypes.string, strokeWidth: PropTypes.number, fill: PropTypes.string, opacity: PropTypes.number, strokeDasharray: PropTypes.any, strokeDashoffset: PropTypes.number, strokeLinecap: PropTypes.string };
+  return { Svg, Circle };
+});
+
+// Mock UpdateDownloadContext
+jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
+  useUpdateDownload: () => ({
+    isDownloading: false,
+    downloadProgress: null,
+    downloadPhase: null,
+    startDownload: jest.fn(),
+  }),
+}));
 
 describe('SimpleTabs Component Rendering', () => {
   beforeEach(() => {
