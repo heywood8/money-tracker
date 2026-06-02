@@ -5,6 +5,8 @@
  * Custom handler: Populates current month history after table creation
  */
 
+import { add as currencyAdd, subtract as currencySubtract } from '../app/services/currency';
+
 const sql = `CREATE TABLE \`accounts_balance_history\` (
 	\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	\`account_id\` integer NOT NULL,
@@ -24,8 +26,6 @@ CREATE UNIQUE INDEX \`accounts_balance_history_account_id_date_unique\` ON \`acc
  */
 const postMigration = async (db) => {
   console.log('Running post-migration: Populating current month balance history...');
-  
-  const Currency = require('../app/services/currency');
   
   const formatDate = (date) => {
     const year = date.getFullYear();
@@ -57,15 +57,15 @@ const postMigration = async (db) => {
     // Reverse each operation
     for (const op of operations) {
       if (op.type === 'expense' && op.account_id === accountId) {
-        currentBalance = Currency.add(currentBalance, op.amount);
+        currentBalance = currencyAdd(currentBalance, op.amount);
       } else if (op.type === 'income' && op.account_id === accountId) {
-        currentBalance = Currency.subtract(currentBalance, op.amount);
+        currentBalance = currencySubtract(currentBalance, op.amount);
       } else if (op.type === 'transfer') {
         if (op.account_id === accountId) {
-          currentBalance = Currency.add(currentBalance, op.amount);
+          currentBalance = currencyAdd(currentBalance, op.amount);
         } else if (op.to_account_id === accountId) {
           const creditAmount = op.destination_amount || op.amount;
-          currentBalance = Currency.subtract(currentBalance, creditAmount);
+          currentBalance = currencySubtract(currentBalance, creditAmount);
         }
       }
     }
@@ -105,10 +105,16 @@ const postMigration = async (db) => {
       }
     }
 
+    // Mark post-migration as completed so it won't be retried
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_metadata (key, value, updated_at) VALUES ('post_migration_m0003_completed', 'true', ?)",
+      [new Date().toISOString()],
+    );
     console.log('Current month balance history populated successfully');
   } catch (error) {
     console.error('Failed to populate balance history during migration:', error);
-    // Don't throw - allow app to continue
+    // Don't throw - allow app to continue. The handler will be retried on next launch
+    // because the completion flag was not set.
   }
 };
 

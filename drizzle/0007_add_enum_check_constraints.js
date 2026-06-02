@@ -1,47 +1,26 @@
 /**
- * Migration 0007: Add CHECK constraint to operations.type enum column
+ * Migration 0007: Enforce operations.type enum via TRIGGER
  *
- * Drizzle enums are not backed by SQLite CHECK constraints, so invalid values
- * from corrupted backups or manual edits can be inserted undetected.
+ * SQLite has no ALTER TABLE ADD CONSTRAINT, so adding a CHECK requires a full
+ * table rebuild (CREATE new → INSERT SELECT → DROP old → RENAME). That approach
+ * is fragile inside Drizzle's transaction wrapper because PRAGMA foreign_keys=OFF
+ * is a no-op within a transaction (documented SQLite limitation).
  *
- * This migration recreates the operations table with an explicit CHECK constraint.
- * It copies ALL rows — it does NOT silently drop invalid ones. If any row has an
- * invalid type the INSERT will fail due to the CHECK constraint, aborting the
- * migration. The pre-migration guard in db.js detects this situation first and
- * skips the migration with a warning so the app can still start.
+ * Instead we use BEFORE INSERT/UPDATE triggers — they provide identical enforcement
+ * (reject invalid types at the DB level) without any destructive table operations.
+ * Triggers work fine inside transactions and survive backup/restore cycles.
  */
 
-export default `PRAGMA foreign_keys=OFF;--> statement-breakpoint
+export default `CREATE TRIGGER IF NOT EXISTS \`trg_operations_type_insert\`
+BEFORE INSERT ON \`operations\`
+BEGIN
+  SELECT RAISE(ABORT, 'operations.type must be expense, income, or transfer')
+  WHERE NEW.\`type\` NOT IN ('expense', 'income', 'transfer');
+END;--> statement-breakpoint
 
-CREATE TABLE \`__new_operations\` (
-	\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	\`type\` text NOT NULL CHECK (\`type\` IN ('expense', 'income', 'transfer')),
-	\`amount\` text NOT NULL,
-	\`account_id\` integer NOT NULL,
-	\`category_id\` text,
-	\`to_account_id\` integer,
-	\`date\` text NOT NULL,
-	\`created_at\` text NOT NULL,
-	\`description\` text,
-	\`exchange_rate\` text,
-	\`destination_amount\` text,
-	\`source_currency\` text,
-	\`destination_currency\` text,
-	\`original_balance\` text,
-	FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (\`category_id\`) REFERENCES \`categories\`(\`id\`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (\`to_account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE cascade
-);--> statement-breakpoint
-
-INSERT INTO \`__new_operations\` SELECT * FROM \`operations\`;--> statement-breakpoint
-
-DROP TABLE \`operations\`;--> statement-breakpoint
-
-ALTER TABLE \`__new_operations\` RENAME TO \`operations\`;--> statement-breakpoint
-
-PRAGMA foreign_keys=ON;--> statement-breakpoint
-
-CREATE INDEX \`idx_operations_date\` ON \`operations\` (\`date\`);--> statement-breakpoint
-CREATE INDEX \`idx_operations_account\` ON \`operations\` (\`account_id\`);--> statement-breakpoint
-CREATE INDEX \`idx_operations_category\` ON \`operations\` (\`category_id\`);--> statement-breakpoint
-CREATE INDEX \`idx_operations_type\` ON \`operations\` (\`type\`);`;
+CREATE TRIGGER IF NOT EXISTS \`trg_operations_type_update\`
+BEFORE UPDATE OF \`type\` ON \`operations\`
+BEGIN
+  SELECT RAISE(ABORT, 'operations.type must be expense, income, or transfer')
+  WHERE NEW.\`type\` NOT IN ('expense', 'income', 'transfer');
+END;`;
