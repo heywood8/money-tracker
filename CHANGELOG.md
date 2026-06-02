@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.5](https://github.com/heywood8/money-tracker/compare/penny-v0.128.4...penny-v0.128.5) (2026-06-02)
+
+
+### Bug Fixes
+
+* move update indicator from header to Settings tab icon ([#880](https://github.com/heywood8/money-tracker/issues/880)) ([071c477](https://github.com/heywood8/money-tracker/commit/071c477861a4b323ef77da9d1c39d8c0ecf205e7))
+
 ## [0.128.4](https://github.com/heywood8/money-tracker/compare/penny-v0.128.3...penny-v0.128.4) (2026-06-02)
 
 
