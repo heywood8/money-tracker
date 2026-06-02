@@ -565,6 +565,126 @@ describe('SettingsScreen', () => {
       expect(getByText('csv_description')).toBeTruthy();
       expect(getByText('sqlite_description')).toBeTruthy();
     });
+
+    it('shows success state after SQLite export completes', async () => {
+      mockExportBackup.mockResolvedValue();
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      await act(async () => {
+        fireEvent.press(getByText('Save externally to SQLite'));
+      });
+
+      expect(mockExportBackup).toHaveBeenCalledWith('sqlite');
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows success state after CSV export completes', async () => {
+      mockExportBackup.mockResolvedValue();
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      await act(async () => {
+        fireEvent.press(getByText('Save externally to CSV'));
+      });
+
+      expect(mockExportBackup).toHaveBeenCalledWith('csv');
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows success state after JSON export completes', async () => {
+      mockExportBackup.mockResolvedValue();
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      await act(async () => {
+        fireEvent.press(getByText('Save externally to JSON'));
+      });
+
+      expect(mockExportBackup).toHaveBeenCalledWith('json');
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows error dialog when an external export fails', async () => {
+      mockExportBackup.mockRejectedValue(new Error('Export failed'));
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      fireEvent.press(getByText('export'));
+
+      await act(async () => {
+        fireEvent.press(getByText('Save externally to SQLite'));
+      });
+
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+
+    it('shows loading indicator while SQLite export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to SQLite'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows loading indicator while CSV export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to CSV'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows loading indicator while JSON export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to JSON'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
   });
 
   describe('Developer Section', () => {

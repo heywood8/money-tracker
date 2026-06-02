@@ -87,9 +87,20 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
   const [saveLocalBackupSuccess, setSaveLocalBackupSuccess] = useState(false);
+  const [sheetsExportSuccess, setSheetsExportSuccess] = useState(false);
+  const [sqliteExportLoading, setSqliteExportLoading] = useState(false);
+  const [sqliteExportSuccess, setSqliteExportSuccess] = useState(false);
+  const [csvExportLoading, setCsvExportLoading] = useState(false);
+  const [csvExportSuccess, setCsvExportSuccess] = useState(false);
+  const [jsonExportLoading, setJsonExportLoading] = useState(false);
+  const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
   const [expandedLogIds, setExpandedLogIds] = useState(new Set());
 
   const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
+  const sheetsColor = sheetsExportSuccess ? '#4caf50' : colors.text;
+  const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
+  const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
+  const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
 
   // Toggle animations using reanimated shared values
   const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
@@ -240,8 +251,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
   };
 
   const handleExportFormatSelect = useCallback(async (format) => {
+    const setLoading = format === 'sqlite' ? setSqliteExportLoading : format === 'csv' ? setCsvExportLoading : setJsonExportLoading;
+    const setSuccess = format === 'sqlite' ? setSqliteExportSuccess : format === 'csv' ? setCsvExportSuccess : setJsonExportSuccess;
+    setLoading(true);
     try {
       await exportBackup(format);
+      setSuccess(true);
     } catch (error) {
       console.error('Export backup error:', error);
       showDialog(
@@ -249,6 +264,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
         t('backup_error') || 'Failed to create backup',
         [{ text: 'OK' }],
       );
+    } finally {
+      setLoading(false);
     }
   }, [t, showDialog]);
 
@@ -282,6 +299,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
       updateSheetsStep('complete', 'completed');
       setSheetsSuccessUrl(sheetUrl);
+      setSheetsExportSuccess(true);
     } catch (error) {
       if (error.message === 'sign_in_cancelled') {
         setExportStep('list');
@@ -851,60 +869,108 @@ export default function SettingsScreen({ setSubPanelActive }) {
               >
                 <View style={styles.listItemContent}>
                   <View style={styles.formatItemRow}>
-                    <Ionicons name="logo-google" size={24} color={colors.text} />
+                    <Ionicons name="logo-google" size={24} color={sheetsColor} />
                     <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>Google Sheets</Text>
+                      <Text style={[styles.listItemText, { color: sheetsColor }]}>Google Sheets</Text>
                       <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('google_sheets_description') || 'Export to a Google Sheets spreadsheet'}
+                        {sheetsExportSuccess
+                          ? (t('export_success') || 'Export complete')
+                          : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  {sheetsExportSuccess ? (
+                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  )}
                 </View>
               </TouchableRipple>
 
-              <TouchableRipple onPress={() => handleExportFormatSelect('sqlite')} style={styles.listItem}>
+              <TouchableRipple
+                onPress={sqliteExportLoading ? null : () => handleExportFormatSelect('sqlite')}
+                style={styles.listItem}
+                disabled={sqliteExportLoading}
+              >
                 <View style={styles.listItemContent}>
                   <View style={styles.formatItemRow}>
-                    <Ionicons name="server-outline" size={24} color={colors.text} />
+                    <Ionicons name="server-outline" size={24} color={sqliteColor} />
                     <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>Save externally to SQLite</Text>
+                      <Text style={[styles.listItemText, { color: sqliteColor }]}>Save externally to SQLite</Text>
                       <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('sqlite_description') || 'Raw database file, complete backup'}
+                        {sqliteExportLoading
+                          ? (t('exporting') || 'Exporting…')
+                          : sqliteExportSuccess
+                            ? (t('export_success') || 'Export complete')
+                            : (t('sqlite_description') || 'Raw database file, complete backup')}
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  {sqliteExportLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : sqliteExportSuccess ? (
+                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  )}
                 </View>
               </TouchableRipple>
 
-              <TouchableRipple onPress={() => handleExportFormatSelect('csv')} style={styles.listItem}>
+              <TouchableRipple
+                onPress={csvExportLoading ? null : () => handleExportFormatSelect('csv')}
+                style={styles.listItem}
+                disabled={csvExportLoading}
+              >
                 <View style={styles.listItemContent}>
                   <View style={styles.formatItemRow}>
-                    <Ionicons name="document-text-outline" size={24} color={colors.text} />
+                    <Ionicons name="document-text-outline" size={24} color={csvColor} />
                     <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>Save externally to CSV</Text>
+                      <Text style={[styles.listItemText, { color: csvColor }]}>Save externally to CSV</Text>
                       <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('csv_description') || 'Plain text format, easy to edit'}
+                        {csvExportLoading
+                          ? (t('exporting') || 'Exporting…')
+                          : csvExportSuccess
+                            ? (t('export_success') || 'Export complete')
+                            : (t('csv_description') || 'Plain text format, easy to edit')}
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  {csvExportLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : csvExportSuccess ? (
+                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  )}
                 </View>
               </TouchableRipple>
 
-              <TouchableRipple onPress={() => handleExportFormatSelect('json')} style={styles.listItem}>
+              <TouchableRipple
+                onPress={jsonExportLoading ? null : () => handleExportFormatSelect('json')}
+                style={styles.listItem}
+                disabled={jsonExportLoading}
+              >
                 <View style={styles.listItemContent}>
                   <View style={styles.formatItemRow}>
-                    <Ionicons name="code-outline" size={24} color={colors.text} />
+                    <Ionicons name="code-outline" size={24} color={jsonColor} />
                     <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>Save externally to JSON</Text>
+                      <Text style={[styles.listItemText, { color: jsonColor }]}>Save externally to JSON</Text>
                       <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('json_description') || 'Standard format, compatible with all versions'}
+                        {jsonExportLoading
+                          ? (t('exporting') || 'Exporting…')
+                          : jsonExportSuccess
+                            ? (t('export_success') || 'Export complete')
+                            : (t('json_description') || 'Standard format, compatible with all versions')}
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  {jsonExportLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : jsonExportSuccess ? (
+                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  )}
                 </View>
               </TouchableRipple>
             </ScrollView>
