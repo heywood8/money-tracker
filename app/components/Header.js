@@ -1,12 +1,11 @@
-import { View, Text, StyleSheet, Animated, Easing, BackHandler } from 'react-native';
-import { useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, BackHandler } from 'react-native';
+import { useEffect, useCallback } from 'react';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SearchBar from './search/SearchBar';
 import PropTypes from 'prop-types';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { HORIZONTAL_PADDING } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { useSearch } from '../contexts/SearchContext';
 import FilterChipStrip from './search/FilterChipStrip';
 import { useOperationsData } from '../contexts/OperationsDataContext';
@@ -15,35 +14,7 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 export default function Header({ rightContent, activeScreen, operationsData }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const { openSearch, searchMode, closeSearch, reopenSearch, toggleFilters, filtersExpanded } = useSearch();
-  const downloadArrowAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!isDownloading) {
-      downloadArrowAnim.setValue(0);
-      rotateAnim.setValue(0);
-      return;
-    }
-    if (downloadPhase === 'verifying') {
-      downloadArrowAnim.setValue(0);
-      const loop = Animated.loop(
-        Animated.timing(rotateAnim, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }),
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-    rotateAnim.setValue(0);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(downloadArrowAnim, { toValue: 5, duration: 400, useNativeDriver: true }),
-        Animated.timing(downloadArrowAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isDownloading, downloadPhase, downloadArrowAnim, rotateAnim]);
 
   const { searchState, hasActiveSearch, getSearchFilterCount } = useOperationsData();
   const { setSearchText, updateSearchFilters } = useOperationsActions();
@@ -113,35 +84,6 @@ export default function Header({ rightContent, activeScreen, operationsData }) {
       {rightContent && !showSearchBar && (
         <View style={styles.buttonContainer}>{rightContent}</View>
       )}
-      {isDownloading && !showSearchBar && (
-        <View
-          style={styles.downloadIndicator}
-          accessibilityLabel={
-            downloadPhase === 'verifying'
-              ? (t('verifying_update') || 'Checking…')
-              : `${t('downloading_update') || 'Downloading update'} ${Math.round((downloadProgress ?? 0) * 100)}%`
-          }
-          accessibilityRole="progressbar"
-          testID="download-indicator"
-        >
-          {downloadPhase === 'verifying' ? (
-            <Animated.View style={{
-              transform: [{ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
-            }}>
-              <Icon name="sync" size={20} color={colors.primary} />
-            </Animated.View>
-          ) : (
-            <Animated.View style={{ transform: [{ translateY: downloadArrowAnim }] }}>
-              <Icon name="arrow-down" size={20} color={colors.primary} />
-            </Animated.View>
-          )}
-          <Text style={[styles.downloadPercent, { color: colors.mutedText }]}>
-            {downloadPhase === 'verifying'
-              ? (t('verifying_update') || 'Checking…')
-              : `${Math.round((downloadProgress ?? 0) * 100)}%`}
-          </Text>
-        </View>
-      )}
       {showSearchBar && (
         <>
           <SearchBar
@@ -198,13 +140,5 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     flexDirection: 'column',
     paddingHorizontal: 0,
-  },
-  downloadIndicator: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  downloadPercent: {
-    fontSize: 9,
-    fontVariant: ['tabular-nums'],
   },
 });

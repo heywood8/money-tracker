@@ -41,19 +41,6 @@ jest.mock('../../app/styles/layout', () => ({
   HORIZONTAL_PADDING: 16,
 }));
 
-// Mock UpdateDownloadContext
-let mockIsDownloading = false;
-let mockDownloadProgress = null;
-let mockDownloadPhase = null;
-jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
-  useUpdateDownload: () => ({
-    isDownloading: mockIsDownloading,
-    downloadProgress: mockDownloadProgress,
-    downloadPhase: mockDownloadPhase,
-    startDownload: jest.fn(),
-  }),
-}));
-
 // Mock SearchContext
 jest.mock('../../app/contexts/SearchContext', () => ({
   useSearch: () => ({
@@ -65,9 +52,6 @@ jest.mock('../../app/contexts/SearchContext', () => ({
 describe('Header', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsDownloading = false;
-    mockDownloadProgress = null;
-    mockDownloadPhase = null;
   });
 
   describe('Rendering', () => {
@@ -89,46 +73,9 @@ describe('Header', () => {
   });
 
   describe('Download indicator', () => {
-    it('does not show download indicator when not downloading', () => {
-      mockIsDownloading = false;
+    it('never shows a download indicator in the header (indicator lives on the tab bar)', () => {
       const { queryByTestId } = render(<Header />);
       expect(queryByTestId('download-indicator')).toBeNull();
-    });
-
-    it('shows download indicator when downloading', () => {
-      mockIsDownloading = true;
-      mockDownloadProgress = 0.42;
-      const { getByTestId } = render(<Header />);
-      expect(getByTestId('download-indicator')).toBeTruthy();
-    });
-
-    it('shows correct percentage when downloading', () => {
-      mockIsDownloading = true;
-      mockDownloadProgress = 0.75;
-      const { getByText } = render(<Header />);
-      expect(getByText('75%')).toBeTruthy();
-    });
-
-    it('shows sync icon and "verifying_update" text when phase is verifying', () => {
-      mockIsDownloading = true;
-      mockDownloadProgress = 0;
-      mockDownloadPhase = 'verifying';
-      const { getByTestId, getByText, queryByText } = render(<Header />);
-
-      expect(getByTestId('icon-sync')).toBeTruthy();
-      expect(getByText('verifying_update')).toBeTruthy();
-      expect(queryByText('%')).toBeNull();
-    });
-
-    it('shows arrow-down icon and percentage when phase is downloading', () => {
-      mockIsDownloading = true;
-      mockDownloadProgress = 0.6;
-      mockDownloadPhase = 'downloading';
-      const { getByTestId, getByText, queryByTestId } = render(<Header />);
-
-      expect(getByTestId('icon-arrow-down')).toBeTruthy();
-      expect(getByText('60%')).toBeTruthy();
-      expect(queryByTestId('icon-sync')).toBeNull();
     });
   });
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, memo } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,9 +8,12 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  cancelAnimation,
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import { Svg, Circle } from 'react-native-svg';
 
 const SCREEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
 const PILL_TIMING = { duration: 200, easing: Easing.out(Easing.quad) };
@@ -21,6 +24,7 @@ import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
+import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -39,11 +43,97 @@ const TAB_ICONS = {
   Settings: 'cog-outline',
 };
 
+const PROGRESS_RADIUS = 9;
+const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RADIUS;
+
+// Circular material progress indicator that replaces the Settings cog icon
+// while an update is downloading or being verified.
+const UpdateProgressIcon = memo(({ phase, progress, color }) => {
+  const spinValue = useSharedValue(0);
+
+  useEffect(() => {
+    if (phase === 'verifying') {
+      spinValue.value = withRepeat(
+        withTiming(1, { duration: 1000, easing: Easing.linear }),
+        -1,
+        false,
+      );
+    } else {
+      cancelAnimation(spinValue);
+      spinValue.value = 0;
+    }
+    return () => cancelAnimation(spinValue);
+  }, [phase, spinValue]);
+
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spinValue.value * 360 - 90}deg` }],
+  }));
+
+  const strokeOffset = PROGRESS_CIRCUMFERENCE * (1 - (progress ?? 0));
+
+  if (phase === 'verifying') {
+    return (
+      <Animated.View style={spinStyle}>
+        <Svg width={22} height={22} viewBox="0 0 22 22">
+          <Circle
+            cx={11}
+            cy={11}
+            r={PROGRESS_RADIUS}
+            stroke={color}
+            strokeWidth={2.5}
+            fill="none"
+            strokeDasharray={`${PROGRESS_CIRCUMFERENCE * 0.75} ${PROGRESS_CIRCUMFERENCE * 0.25}`}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </Animated.View>
+    );
+  }
+
+  // Determinate circle: track + progress arc, rotated so fill starts at 12 o'clock
+  return (
+    <View style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Svg width={22} height={22} viewBox="0 0 22 22">
+        <Circle
+          cx={11}
+          cy={11}
+          r={PROGRESS_RADIUS}
+          stroke={color}
+          strokeWidth={2}
+          fill="none"
+          opacity={0.25}
+        />
+        <Circle
+          cx={11}
+          cy={11}
+          r={PROGRESS_RADIUS}
+          stroke={color}
+          strokeWidth={2.5}
+          fill="none"
+          strokeDasharray={PROGRESS_CIRCUMFERENCE}
+          strokeDashoffset={strokeOffset}
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
+  );
+});
+
+UpdateProgressIcon.displayName = 'UpdateProgressIcon';
+
+UpdateProgressIcon.propTypes = {
+  phase: PropTypes.string,
+  progress: PropTypes.number,
+  color: PropTypes.string.isRequired,
+};
+
 // Memoized tab button with icon + label, pill active state
-const TabButton = memo(({ tab, isActive, colors, onPress }) => {
+const TabButton = memo(({ tab, isActive, colors, onPress, isUpdating, updatePhase, updateProgress }) => {
   const handlePress = useCallback(() => {
     onPress(tab.key);
   }, [onPress, tab.key]);
+
+  const iconColor = isActive ? colors.primary : colors.mutedText;
 
   const labelStyle = useMemo(() => [
     styles.tabLabel,
@@ -64,11 +154,15 @@ const TabButton = memo(({ tab, isActive, colors, onPress }) => {
       accessibilityLabel={tab.label}
     >
       <View style={styles.tabContent}>
-        <MaterialCommunityIcons
-          name={TAB_ICONS[tab.key] || 'circle-outline'}
-          size={22}
-          color={isActive ? colors.primary : colors.mutedText}
-        />
+        {isUpdating ? (
+          <UpdateProgressIcon phase={updatePhase} progress={updateProgress} color={iconColor} />
+        ) : (
+          <MaterialCommunityIcons
+            name={TAB_ICONS[tab.key] || 'circle-outline'}
+            size={22}
+            color={iconColor}
+          />
+        )}
         <Text
           variant="labelSmall"
           style={labelStyle}
@@ -95,17 +189,24 @@ TabButton.propTypes = {
     mutedText: PropTypes.string,
   }).isRequired,
   onPress: PropTypes.func,
+  isUpdating: PropTypes.bool,
+  updatePhase: PropTypes.string,
+  updateProgress: PropTypes.number,
 };
 
 TabButton.defaultProps = {
   isActive: false,
   onPress: () => {},
+  isUpdating: false,
+  updatePhase: null,
+  updateProgress: null,
 };
 
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const operationsData = useOperationsData();
+  const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
@@ -363,6 +464,9 @@ export default function SimpleTabs() {
                   isActive={displayedTab === tab.key}
                   colors={colors}
                   onPress={handleTabPress}
+                  isUpdating={tab.key === 'Settings' && isDownloading}
+                  updatePhase={downloadPhase}
+                  updateProgress={downloadProgress}
                 />
               ))}
             </View>
