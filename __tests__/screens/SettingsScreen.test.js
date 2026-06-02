@@ -628,6 +628,63 @@ describe('SettingsScreen', () => {
 
       expect(mockShowDialog).toHaveBeenCalled();
     });
+
+    it('shows loading indicator while SQLite export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to SQLite'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows loading indicator while CSV export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to CSV'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
+
+    it('shows loading indicator while JSON export is in progress', async () => {
+      let resolveExport;
+      mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
+
+      const { getByText } = render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      fireEvent.press(getByText('export'));
+
+      act(() => {
+        fireEvent.press(getByText('Save externally to JSON'));
+      });
+
+      await waitFor(() => expect(getByText('exporting')).toBeTruthy());
+
+      await act(async () => { resolveExport(); });
+      expect(getByText('export_success')).toBeTruthy();
+    });
   });
 
   describe('Developer Section', () => {
