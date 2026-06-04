@@ -239,7 +239,7 @@ describe('Operations Filtering Integration', () => {
       });
 
       const filteredOps = [mockOperations[0]]; // Only expense
-      OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue(filteredOps);
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(filteredOps);
 
       await act(async () => {
         await result.current.updateFilters({
@@ -253,7 +253,7 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalled();
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalled();
         expect(result.current.operations).toEqual(filteredOps);
       });
     });
@@ -274,8 +274,8 @@ describe('Operations Filtering Integration', () => {
         await result.current.loadMoreOperations();
       });
 
-      // Apply filter should reset to week 0
-      OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([mockOperations[0]]);
+      // Apply filter loads all matching operations at once
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([mockOperations[0]]);
 
       await act(async () => {
         await result.current.updateFilters({
@@ -289,10 +289,10 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledWith(
-          0,
-          expect.any(Object),
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledWith(
+          expect.objectContaining({ types: ['expense'] }),
         );
+        expect(result.current.hasMoreOperations).toBe(false);
       });
     });
 
@@ -338,9 +338,9 @@ describe('Operations Filtering Integration', () => {
         wrapper: OperationsProvider,
       });
 
-      // Apply filter
-      const filteredOps = [mockOperations[0]];
-      OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue(filteredOps);
+      // Apply filter — loads all matching results at once, no pagination
+      const filteredOps = [mockOperations[0], { ...mockOperations[0], id: 'op4', date: '2025-11-30' }];
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(filteredOps);
 
       await act(async () => {
         await result.current.updateFilters({
@@ -354,21 +354,17 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.operations).toHaveLength(1);
+        expect(result.current.operations).toHaveLength(2);
+        expect(result.current.hasMoreOperations).toBe(false);
       });
 
-      // Load more
-      const olderOp = { ...mockOperations[0], id: 'op4', date: '2025-11-30' };
-      OperationsDB.getNextOldestFilteredOperation.mockResolvedValue(olderOp);
-      OperationsDB.getFilteredOperationsByWeekFromDate.mockResolvedValue([olderOp]);
-
+      // loadMoreOperations is a no-op when hasMoreOperations is false
       await act(async () => {
         await result.current.loadMoreOperations();
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getNextOldestFilteredOperation).toHaveBeenCalled();
-        expect(OperationsDB.getFilteredOperationsByWeekFromDate).toHaveBeenCalled();
+        expect(OperationsDB.getNextOldestFilteredOperation).not.toHaveBeenCalled();
       });
     });
 
@@ -377,8 +373,8 @@ describe('Operations Filtering Integration', () => {
         wrapper: OperationsProvider,
       });
 
-      // Apply filter
-      OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([mockOperations[0]]);
+      // Apply filter — all matching results loaded at once, hasMoreOperations is false immediately
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([mockOperations[0]]);
 
       await act(async () => {
         await result.current.updateFilters({
@@ -389,13 +385,6 @@ describe('Operations Filtering Integration', () => {
           dateRange: { startDate: null, endDate: null },
           amountRange: { min: null, max: null },
         });
-      });
-
-      // No more operations
-      OperationsDB.getNextOldestFilteredOperation.mockResolvedValue(null);
-
-      await act(async () => {
-        await result.current.loadMoreOperations();
       });
 
       await waitFor(() => {
@@ -408,8 +397,9 @@ describe('Operations Filtering Integration', () => {
         wrapper: OperationsProvider,
       });
 
-      // Apply filter
-      OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([mockOperations[0]]);
+      // Filtered load returns all results at once — no duplicates possible
+      const op5 = { ...mockOperations[0], id: 'op5', date: '2025-11-30' };
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([mockOperations[0], op5]);
 
       await act(async () => {
         await result.current.updateFilters({
@@ -422,21 +412,10 @@ describe('Operations Filtering Integration', () => {
         });
       });
 
-      // Load more with duplicate
-      OperationsDB.getNextOldestFilteredOperation.mockResolvedValue(mockOperations[0]);
-      OperationsDB.getFilteredOperationsByWeekFromDate.mockResolvedValue([
-        mockOperations[0], // Duplicate
-        { ...mockOperations[0], id: 'op5' }, // New
-      ]);
-
-      await act(async () => {
-        await result.current.loadMoreOperations();
-      });
-
       await waitFor(() => {
-        // Should only add the new operation, not the duplicate
         const ids = result.current.operations.map((op) => op.id);
         expect(ids).toEqual(['op1', 'op5']);
+        expect(result.current.hasMoreOperations).toBe(false);
       });
     });
   });
@@ -560,7 +539,7 @@ describe('Operations Filtering Integration', () => {
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalled();
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalled();
         expect(OperationsDB.getOperationsByWeekOffset).not.toHaveBeenCalled();
       });
     });

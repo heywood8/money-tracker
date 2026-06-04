@@ -50,7 +50,8 @@ const QuickAddForm = memo(({
   const innerCardThemed = React.useMemo(() => ({
     backgroundColor: colors.background,
     borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.sm,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
   }), [colors]);
 
   return (
@@ -127,8 +128,9 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.sm,
-    marginTop: SPACING.xs,
-    padding: SPACING.xs,
+    marginTop: 0,
+    paddingBottom: SPACING.xs,
+    paddingHorizontal: SPACING.xs,
   },
 });
 

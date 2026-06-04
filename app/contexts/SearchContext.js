@@ -26,6 +26,7 @@ export const SearchProvider = ({ children }) => {
     console.debug('[SearchContext] closeSearch called, hasActiveFilters:', hasActiveFilters);
     const newMode = hasActiveFilters ? 'collapsed' : 'closed';
     setInternalSearchMode(newMode);
+    setFiltersExpanded(false);
   }, []);
 
   const reopenSearch = useCallback((hasTextFilter, hasOtherFilters, onShouldExpandFilters) => {

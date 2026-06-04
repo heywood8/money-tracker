@@ -178,8 +178,8 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    height: 25,
     paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: 2,
     width: '100%',
     zIndex: 100,
   },
@@ -231,6 +231,7 @@ const styles = StyleSheet.create({
   searchInputContainerCollapsed: {
     borderBottomWidth: 0,
     flex: 0,
+    height: 32,
     marginRight: 0,
   },
 });

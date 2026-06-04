@@ -92,7 +92,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
   beforeEach(() => {
     jest.clearAllMocks();
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-    OperationsDB.getFilteredOperationsByWeekOffset.mockResolvedValue([]);
+    OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
     OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
     const PreferencesDB = require('../../app/services/PreferencesDB');
     mockSetJsonPreference = PreferencesDB.setJsonPreference;
@@ -189,7 +189,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -205,7 +205,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -221,7 +221,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -239,7 +239,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -257,7 +257,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -273,11 +273,10 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       });
 
       await waitFor(() => {
-        expect(OperationsDB.getFilteredOperationsByWeekOffset).toHaveBeenCalledTimes(1);
+        expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
 
-      const [offset, filters] = OperationsDB.getFilteredOperationsByWeekOffset.mock.calls[0];
-      expect(offset).toBe(0);
+      const [filters] = OperationsDB.getFilteredOperationsAllDates.mock.calls[0];
       expect(filters.types).toEqual(['income']);
     });
   });
