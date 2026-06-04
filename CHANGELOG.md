@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.128.8](https://github.com/heywood8/money-tracker/compare/penny-v0.128.7...penny-v0.128.8) (2026-06-04)
+
+
+### Code Refactoring
+
+* move search out of Header, fix filter overlay and all-dates query ([#887](https://github.com/heywood8/money-tracker/issues/887)) ([86a46a8](https://github.com/heywood8/money-tracker/commit/86a46a88c0863cc03f47961db8aa78d5c6772a51))
+
 ## [0.128.7](https://github.com/heywood8/money-tracker/compare/penny-v0.128.6...penny-v0.128.7) (2026-06-02)
 
 
