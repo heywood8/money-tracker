@@ -23,7 +23,6 @@ import GraphsScreen from '../screens/GraphsScreen';
 import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -205,7 +204,6 @@ TabButton.defaultProps = {
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
-  const operationsData = useOperationsData();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
@@ -428,7 +426,7 @@ export default function SimpleTabs() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-      <Header activeScreen={displayedTab} operationsData={operationsData} />
+      <Header />
       <View style={styles.content}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.screensContainer, animatedStyle]}>
