@@ -13,7 +13,7 @@ import { useSearch } from '../../contexts/SearchContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const SearchOverlay = ({ colors, t, visible, onHeightChange }) => {
+const SearchOverlay = ({ colors, t, visible, onHeightChange, topOffset }) => {
   const { searchState = { text: '', types: [], accountIds: [], categoryIds: [], dateRange: { startDate: null, endDate: null }, amountRange: { min: null, max: null } } } = useOperationsData();
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
@@ -53,7 +53,7 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange }) => {
 
   return (
     <Animated.View
-      style={[styles.filtersContainer, { backgroundColor: colors.background }, animatedStyle]}
+      style={[styles.filtersContainer, { backgroundColor: colors.background, top: topOffset }, animatedStyle]}
       pointerEvents={visible ? 'box-none' : 'none'}
       onLayout={handleLayout}
     >
@@ -76,10 +76,12 @@ SearchOverlay.propTypes = {
   }).isRequired,
   t: PropTypes.func.isRequired,
   visible: PropTypes.bool.isRequired,
+  topOffset: PropTypes.number,
 };
 
 SearchOverlay.defaultProps = {
   onHeightChange: null,
+  topOffset: 0,
 };
 
 const styles = StyleSheet.create({

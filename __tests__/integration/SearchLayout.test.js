@@ -90,8 +90,8 @@ describe('SearchLayout integration', () => {
     expect(styles.position).toBe('absolute');
   });
 
-  it('SearchOverlay does not have top offset', () => {
-    const { getByText } = render(<SearchOverlay {...defaultProps} />);
+  it('SearchOverlay positions below SearchBar using topOffset prop', () => {
+    const { getByText } = render(<SearchOverlay {...defaultProps} topOffset={50} />);
 
     const mockFilters = getByText('Mock Filters');
     let current = mockFilters;
@@ -100,8 +100,8 @@ describe('SearchLayout integration', () => {
     }
     const styles = StyleSheet.flatten(current.props.style);
 
-    // Should have top: 0 to anchor at the top of OperationsScreen
-    expect(styles.top).toBe(0);
+    // top comes from topOffset prop so overlay clears the SearchBar
+    expect(styles.top).toBe(50);
   });
 
   it('SearchOverlay has proper zIndex for layering', () => {

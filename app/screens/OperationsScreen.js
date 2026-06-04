@@ -70,6 +70,7 @@ const OperationsScreen = () => {
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
+  const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(0);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
   const scrollOffsetRef = useRef(0);
@@ -690,25 +691,6 @@ const OperationsScreen = () => {
 
   const quickAddFormComponent = useMemo(() => (
     <>
-      <SearchBar
-        searchText={searchState?.text || ''}
-        onSearchTextChange={setSearchText}
-        onToggleFilters={handleToggleFilters}
-        onClose={handleCloseSearch}
-        filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
-        colors={colors}
-        t={t}
-        collapsed={!isSearchOpen}
-        onCollapsedPress={handleCollapsedPress}
-      />
-      {isSearchOpen && hasActiveSearch && (
-        <FilterChipStrip
-          searchState={searchState}
-          onClearGroup={handleClearFilterGroup}
-          colors={colors}
-          t={t}
-        />
-      )}
       <Animated.View style={animatedQuickAddClipStyle}>
         <Animated.View style={animatedQuickAddSlideStyle}>
           <QuickAddForm
@@ -741,7 +723,7 @@ const OperationsScreen = () => {
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, searchState, setSearchText, handleToggleFilters, handleCloseSearch, getSearchFilterCount, isSearchOpen, handleCollapsedPress, hasActiveSearch, handleClearFilterGroup]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
@@ -816,8 +798,33 @@ const OperationsScreen = () => {
     }, 100);
   }, []);
 
+  const handleSearchBarAreaLayout = useCallback((event) => {
+    setSearchBarAreaHeight(event.nativeEvent.layout.height);
+  }, []);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View onLayout={handleSearchBarAreaLayout}>
+        <SearchBar
+          searchText={searchState?.text || ''}
+          onSearchTextChange={setSearchText}
+          onToggleFilters={handleToggleFilters}
+          onClose={handleCloseSearch}
+          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
+          colors={colors}
+          t={t}
+          collapsed={!isSearchOpen}
+          onCollapsedPress={handleCollapsedPress}
+        />
+        {isSearchOpen && hasActiveSearch && (
+          <FilterChipStrip
+            searchState={searchState}
+            onClearGroup={handleClearFilterGroup}
+            colors={colors}
+            t={t}
+          />
+        )}
+      </View>
       <OperationsList
         ref={flatListRef}
         groupedOperations={groupedOperations}
@@ -895,6 +902,7 @@ const OperationsScreen = () => {
       <SearchOverlay
         visible={searchMode === 'open'}
         onHeightChange={setFilterPanelHeight}
+        topOffset={searchBarAreaHeight}
         colors={colors}
         t={t}
       />

@@ -178,8 +178,8 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    height: 25,
     paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: 6,
     width: '100%',
     zIndex: 100,
   },

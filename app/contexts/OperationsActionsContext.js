@@ -119,10 +119,11 @@ export const OperationsActionsProvider = ({ children }) => {
           _loadCache();
         }
         allDatesLoaded = true;
+      } else if (isFiltered) {
+        operationsData = await OperationsDB.getFilteredOperationsAllDates(effectiveFilters);
+        allDatesLoaded = true;
       } else {
-        operationsData = isFiltered
-          ? await OperationsDB.getFilteredOperationsByWeekOffset(0, effectiveFilters)
-          : await OperationsDB.getOperationsByWeekOffset(0);
+        operationsData = await OperationsDB.getOperationsByWeekOffset(0);
       }
 
       // Check if this request is still the latest (ignore stale results)
