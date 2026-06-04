@@ -71,6 +71,7 @@ const OperationsScreen = () => {
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(0);
+  const [flashCategoryErrorCount, setFlashCategoryErrorCount] = useState(0);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
   const scrollOffsetRef = useRef(0);
@@ -507,6 +508,10 @@ const OperationsScreen = () => {
 
     const error = validateOperation(operationData, t);
     if (error) {
+      if (operationData.type !== 'transfer' && !operationData.categoryId) {
+        setFlashCategoryErrorCount(c => c + 1);
+        return;
+      }
       showDialog(t('error'), error, [{ text: 'OK' }]);
       return;
     }
@@ -718,12 +723,13 @@ const OperationsScreen = () => {
             onOperationCurrencyChange={handleOperationCurrencyChange}
             foreignRateSource={foreignRateSource}
             foreignExchangeRate={foreignExchangeRate}
+            flashCategoryError={flashCategoryErrorCount}
           />
         </Animated.View>
       </Animated.View>
       {filtersExpanded && filterPanelHeight > 0 && <View style={{ height: filterPanelHeight }} />}
     </>
-  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded]);
+  ), [animatedQuickAddClipStyle, animatedQuickAddSlideStyle, colors, t, quickAddValues, visibleAccounts, filteredCategories, topCategoriesForType, getCategoryInfo, getAccountName, getAccountBalance, getCategoryName, openPicker, handleQuickAdd, handleAmountChange, handleExchangeRateChange, handleDestinationAmountChange, handleAutoAddWithCategory, topTransferAccountsForForm, handleAutoAddWithAccount, TYPES, rateSource, handleOperationCurrencyChange, foreignRateSource, foreignExchangeRate, filterPanelHeight, filtersExpanded, flashCategoryErrorCount]);
 
   // Auto-scroll to top when filter panel closes, but only if the user is still
   // near the top (hasn't scrolled into past dates). The threshold is filterPanelHeight:
