@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.129.0](https://github.com/heywood8/money-tracker/compare/penny-v0.128.8...penny-v0.129.0) (2026-06-04)
+
+
+### Features
+
+* backup database before installing app update ([#889](https://github.com/heywood8/money-tracker/issues/889)) ([17a1e46](https://github.com/heywood8/money-tracker/commit/17a1e4676fc32677b68df9d43686fdd3c3f312bb))
+
 ## [0.128.8](https://github.com/heywood8/money-tracker/compare/penny-v0.128.7...penny-v0.128.8) (2026-06-04)
 
 
