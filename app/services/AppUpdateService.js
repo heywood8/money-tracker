@@ -426,6 +426,32 @@ export const downloadAndInstallApk = async (downloadUrl, onProgress, { checksumU
     }
   }
 
+  try {
+    onPhaseChange?.('backing_up');
+    const { createBackup } = await import('./BackupRestore');
+    const snapshot = await createBackup();
+    const snapshotTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const snapshotUri = `${FileSystem.documentDirectory}pre_update_${snapshotTimestamp}.json`;
+    await FileSystem.writeAsStringAsync(snapshotUri, JSON.stringify(snapshot, null, 2));
+    console.log('[AppUpdate] Pre-update backup saved:', snapshotUri);
+
+    try {
+      const allFiles = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
+      const snapshots = allFiles
+        .filter((name) => name.startsWith('pre_update_') && name.endsWith('.json'))
+        .sort();
+      const excess = snapshots.slice(0, Math.max(0, snapshots.length - 3));
+      for (const name of excess) {
+        await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${name}`, { idempotent: true });
+        console.log('[AppUpdate] Deleted old pre-update snapshot:', name);
+      }
+    } catch (cleanupError) {
+      console.warn('[AppUpdate] Failed to clean up old pre-update snapshots:', cleanupError);
+    }
+  } catch (backupError) {
+    console.warn('[AppUpdate] Pre-update backup failed; proceeding with install:', backupError.message);
+  }
+
   await cleanupOldApks();
 
   const contentUri = await FileSystem.getContentUriAsync(result.uri);
