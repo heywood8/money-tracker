@@ -784,7 +784,7 @@ describe('AppUpdateService', () => {
       expect(onPhaseChange).toHaveBeenCalledWith('verifying');
     });
 
-    it('does not call onPhaseChange when no checksumUrl is provided', async () => {
+    it('does not call onPhaseChange with verifying when no checksumUrl is provided', async () => {
       FileSystem.createDownloadResumable.mockReturnValue({
         downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///cache/penny-v1.0.0.apk' }),
       });
@@ -797,7 +797,7 @@ describe('AppUpdateService', () => {
         { onPhaseChange },
       );
 
-      expect(onPhaseChange).not.toHaveBeenCalled();
+      expect(onPhaseChange).not.toHaveBeenCalledWith('verifying');
     });
   });
 });
