@@ -12,7 +12,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/layout';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
@@ -1240,7 +1240,9 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 8,
-    padding: 12,
+    paddingBottom: HEIGHTS.tabBar,
+    paddingHorizontal: 12,
+    paddingTop: 12,
   },
   formPanelHeader: {
     alignItems: 'center',
