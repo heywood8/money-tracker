@@ -1,6 +1,6 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
@@ -10,6 +10,8 @@ import * as Currency from '../../services/currency';
 import currencies from '../../../assets/currencies.json';
 
 const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
@@ -89,11 +91,32 @@ const OperationFormFields = memo(({
   foreignRateSource,
   foreignExchangeRate,
   foreignCurrencyEditable = false,
+  flashCategoryError = 0,
 }) => {
   const { hideBalances } = useDisplaySettings();
 
   // Local state for currency picker visibility
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+
+  // Animated value for category chip error flash (0 = normal, 1 = error red)
+  const categoryErrorAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!flashCategoryError) return;
+    categoryErrorAnim.setValue(1);
+    Animated.timing(categoryErrorAnim, {
+      toValue: 0,
+      duration: 2000,
+      useNativeDriver: false,
+    }).start();
+  }, [flashCategoryError, categoryErrorAnim]);
+
+  const chipErrorBorderColor = useMemo(() =>
+    categoryErrorAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [colors.border, '#ef4444'],
+    }),
+  [categoryErrorAnim, colors.border]);
 
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -351,7 +374,7 @@ const OperationFormFields = memo(({
         const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
 
         return (
-          <Pressable
+          <AnimatedPressable
             key={category.id}
             testID={`category-shortcut-${isSecondRow ? 'r2-' : ''}${index}`}
             style={[
@@ -359,7 +382,7 @@ const OperationFormFields = memo(({
               compact && styles.categoryShortcutButtonCompact,
               {
                 backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                borderColor: colors.border,
+                borderColor: chipErrorBorderColor,
               },
               disabledStyle,
             ]}
@@ -374,7 +397,7 @@ const OperationFormFields = memo(({
             >
               {categoryInfo.name}
             </Text>
-          </Pressable>
+          </AnimatedPressable>
         );
       };
 
@@ -383,8 +406,8 @@ const OperationFormFields = memo(({
           {/* Row 1: "All categories" button (if > 8 total) + first 3 or 4 shortcuts */}
           <View style={styles.categoryButtonsContainer}>
             {showAllButton && (
-              <Pressable
-                style={[styles.categoryPickerButton, inputStyle, groupBorderStyle, disabledStyle]}
+              <AnimatedPressable
+                style={[styles.categoryPickerButton, inputStyle, { borderColor: chipErrorBorderColor }, disabledStyle]}
                 onPress={() => !disabled && openPicker('category', categories)}
                 disabled={disabled}
               >
@@ -395,7 +418,7 @@ const OperationFormFields = memo(({
                 >
                   {t('all_categories')}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
             {firstRowCats.map((category, index) => renderCategoryChip(category, index, false))}
           </View>
@@ -683,6 +706,7 @@ OperationFormFields.propTypes = {
   foreignRateSource: PropTypes.oneOf(['loading', 'live', 'offline']),
   foreignExchangeRate: PropTypes.string,
   foreignCurrencyEditable: PropTypes.bool,
+  flashCategoryError: PropTypes.number,
 };
 
 const styles = StyleSheet.create({

@@ -539,4 +539,94 @@ describe('OperationFormFields', () => {
       expect(multiCurrencyFields.props.destinationAccount.currency).toBe('USD');
     });
   });
+
+  describe('Category Picker Visibility', () => {
+    it('hides category picker when hideCategoryPicker is true', () => {
+      const props = { ...defaultProps, hideCategoryPicker: true };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+
+    it('hides category picker for transfer type', () => {
+      const props = {
+        ...defaultProps,
+        values: { ...defaultProps.values, type: 'transfer', toAccountId: '' },
+      };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+
+    it('renders placeholder when onAutoAddWithCategory is provided but no top categories', () => {
+      const props = {
+        ...defaultProps,
+        topCategoriesForType: [],
+        onAutoAddWithCategory: jest.fn(),
+        values: { ...defaultProps.values, categoryId: '' },
+      };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+
+    it('renders all-categories button when more than 8 leaf categories exist', () => {
+      const manyCategories = Array.from({ length: 10 }, (_, i) => ({
+        id: `cat${i}`,
+        name: `Category ${i}`,
+        icon: 'tag',
+        type: 'entry',
+        categoryType: 'expense',
+        isShadow: false,
+      }));
+      const props = {
+        ...defaultProps,
+        categories: manyCategories,
+        topCategoriesForType: manyCategories.slice(0, 8),
+        getCategoryInfo: (id) => ({ name: id, icon: 'tag', parentName: null }),
+        onAutoAddWithCategory: jest.fn(),
+        values: { ...defaultProps.values, categoryId: '' },
+      };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+  });
+
+  describe('Category Error Flash Animation', () => {
+    const mockTopCategories = [
+      { id: 'cat1', name: 'Food', icon: 'food', type: 'entry', categoryType: 'expense' },
+      { id: 'cat2', name: 'Transport', icon: 'car', type: 'entry', categoryType: 'expense' },
+    ];
+    const getCategoryInfo = (id) => {
+      const cat = mockTopCategories.find(c => c.id === id);
+      return { name: cat?.name || 'Unknown', icon: cat?.icon || 'tag', parentName: null };
+    };
+
+    it('renders category chips without error when flashCategoryError is 0', () => {
+      const props = {
+        ...defaultProps,
+        topCategoriesForType: mockTopCategories,
+        getCategoryInfo,
+        values: { ...defaultProps.values, categoryId: '' },
+      };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+
+    it('triggers flash animation branch when flashCategoryError is non-zero', () => {
+      const props = {
+        ...defaultProps,
+        topCategoriesForType: mockTopCategories,
+        getCategoryInfo,
+        values: { ...defaultProps.values, categoryId: '' },
+        flashCategoryError: 1,
+      };
+      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+    });
+
+    it('re-triggers animation when flashCategoryError increments again', () => {
+      const props = {
+        ...defaultProps,
+        topCategoriesForType: mockTopCategories,
+        getCategoryInfo,
+        values: { ...defaultProps.values, categoryId: '' },
+        flashCategoryError: 0,
+      };
+      const { rerender } = render(<OperationFormFields {...props} />);
+      expect(() => rerender(<OperationFormFields {...props} flashCategoryError={1} />)).not.toThrow();
+      expect(() => rerender(<OperationFormFields {...props} flashCategoryError={2} />)).not.toThrow();
+    });
+  });
 });

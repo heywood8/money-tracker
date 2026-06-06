@@ -2230,4 +2230,79 @@ describe('OperationsScreen', () => {
       expect(clearCall).toBeTruthy();
     });
   });
+
+  describe('Category Validation Flash', () => {
+    const { act } = require('@testing-library/react-native');
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('flashes category chips instead of showing dialog when category is missing on expense', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useDialog } = require('../../app/contexts/DialogContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+
+      const mockShowDialog = jest.fn();
+      const mockValidateOperation = jest.fn((op) =>
+        op.type !== 'transfer' && !op.categoryId ? 'category_required' : null,
+      );
+
+      useDialog.mockReturnValue({ showDialog: mockShowDialog });
+      useOperationsActions.mockReturnValue({
+        loadMoreOperations: jest.fn(),
+        addOperation: jest.fn(),
+        updateOperation: jest.fn(),
+        deleteOperation: jest.fn(),
+        validateOperation: mockValidateOperation,
+        setSearchText: jest.fn(),
+        updateSearchFilters: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = render(<OperationsScreen />);
+      // onAutoAddWithCategory is exposed on the PickerModal mock and routes through handleQuickAdd
+      const pickerModal = getByTestId('picker-modal');
+
+      // Passing empty string: no categoryId → category error → flash (no dialog)
+      await act(async () => {
+        await pickerModal.props.onAutoAddWithCategory('');
+      });
+
+      expect(mockShowDialog).not.toHaveBeenCalled();
+      expect(mockValidateOperation).toHaveBeenCalled();
+    });
+
+    it('shows dialog for non-category validation errors when category is present', async () => {
+      const OperationsScreen = require('../../app/screens/OperationsScreen').default;
+      const { useDialog } = require('../../app/contexts/DialogContext');
+      const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
+
+      const mockShowDialog = jest.fn();
+      // Error unrelated to category (amount missing)
+      const mockValidateOperation = jest.fn(() => 'valid_amount_required');
+
+      useDialog.mockReturnValue({ showDialog: mockShowDialog });
+      useOperationsActions.mockReturnValue({
+        loadMoreOperations: jest.fn(),
+        addOperation: jest.fn(),
+        updateOperation: jest.fn(),
+        deleteOperation: jest.fn(),
+        validateOperation: mockValidateOperation,
+        setSearchText: jest.fn(),
+        updateSearchFilters: jest.fn(),
+        jumpToDate: jest.fn(),
+      });
+
+      const { getByTestId } = render(<OperationsScreen />);
+      const pickerModal = getByTestId('picker-modal');
+
+      // Passing a real categoryId: category check passes → dialog shown for other error
+      await act(async () => {
+        await pickerModal.props.onAutoAddWithCategory('cat-1');
+      });
+
+      expect(mockShowDialog).toHaveBeenCalled();
+    });
+  });
 });
