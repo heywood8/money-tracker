@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.130.0](https://github.com/heywood8/money-tracker/compare/penny-v0.129.0...penny-v0.130.0) (2026-06-06)
+
+
+### Features
+
+* red border on category chips when submitting without a category ([#891](https://github.com/heywood8/money-tracker/issues/891)) ([c9bfd64](https://github.com/heywood8/money-tracker/commit/c9bfd6416cc4685c74c69ca32f459b9835dc42c5))
+
 ## [0.129.0](https://github.com/heywood8/money-tracker/compare/penny-v0.128.8...penny-v0.129.0) (2026-06-04)
 
 
