@@ -12,6 +12,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useBackShrink } from '../hooks/useBackShrink';
+import { useNativePredictiveBack } from '../hooks/useNativePredictiveBack';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -180,6 +181,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
     originStyle: shrinkOrigin,
     reset: resetShrink,
     commit: commitShrink,
+    setProgress: setShrinkProgress,
+    cancel: cancelShrink,
   } = useBackShrink();
 
   const openSubPanel = useCallback((panel) => {
@@ -222,15 +225,26 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
 
-  // Android hardware back button closes subpanel
+  // Live predictive back: when available, the native gesture drives the shrink
+  // as the finger moves, commits on release, and eases back on cancel.
+  const { available: nativePredictiveBack } = useNativePredictiveBack({
+    enabled: activeSubPanel !== null,
+    onProgress: setShrinkProgress,
+    onCommit: closeWithShrink,
+    onCancel: cancelShrink,
+  });
+
+  // Android hardware back button closes subpanel. Only needed as a fallback when
+  // the native predictive-back bridge isn't available — otherwise the native
+  // callback consumes the gesture and drives the close itself.
   useEffect(() => {
-    if (!activeSubPanel) return;
+    if (!activeSubPanel || nativePredictiveBack) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       closeWithShrink();
       return true;
     });
     return () => subscription.remove();
-  }, [activeSubPanel, closeWithShrink]);
+  }, [activeSubPanel, nativePredictiveBack, closeWithShrink]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
