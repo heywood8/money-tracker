@@ -11,6 +11,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
+import { useBackShrink } from '../hooks/useBackShrink';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -173,6 +174,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, []);
 
+  // Telegram-style predictive "back" shrink for the active subpanel.
+  const {
+    animatedStyle: shrinkStyle,
+    originStyle: shrinkOrigin,
+    reset: resetShrink,
+    commit: commitShrink,
+  } = useBackShrink();
+
   const openSubPanel = useCallback((panel) => {
     if (panel === 'import') {
       setImportStep('source');
@@ -182,9 +191,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (panel === 'export') {
       setExportStep('list');
     }
+    resetShrink();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveSubPanel(panel);
-  }, [loadStoredBackups]);
+  }, [loadStoredBackups, resetShrink]);
 
   const closeSubPanel = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -203,6 +213,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setDownloadedApks([]);
   }, []);
 
+  // Back-gesture close: play the Telegram-style shrink, then dismiss the panel.
+  const closeWithShrink = useCallback(() => {
+    commitShrink(closeSubPanel);
+  }, [commitShrink, closeSubPanel]);
+
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
@@ -211,11 +226,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
   useEffect(() => {
     if (!activeSubPanel) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      closeSubPanel();
+      closeWithShrink();
       return true;
     });
     return () => subscription.remove();
-  }, [activeSubPanel, closeSubPanel]);
+  }, [activeSubPanel, closeWithShrink]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
@@ -754,8 +769,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const handleSubPanelBack = useMemo(() => {
     if (activeSubPanel === 'import') return handleImportBack;
     if (activeSubPanel === 'export') return handleExportBack;
-    return closeSubPanel;
-  }, [activeSubPanel, handleImportBack, handleExportBack, closeSubPanel]);
+    return closeWithShrink;
+  }, [activeSubPanel, handleImportBack, handleExportBack, closeWithShrink]);
 
   const isBackDisabled = useMemo(() => {
     if (activeSubPanel === 'export' && exportStep === 'sheets-progress') {
@@ -771,8 +786,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // ─── RENDER ───
   if (activeSubPanel !== null) {
     return (
-      <View
-        style={[styles.container, { backgroundColor: colors.background }]}
+      <Animated.View
+        style={[styles.container, styles.subPanelShrink, { backgroundColor: colors.background }, shrinkOrigin, shrinkStyle]}
       >
         {/* Subpanel header */}
         <View style={styles.subPanelHeader}>
@@ -1234,7 +1249,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
           )}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -1681,6 +1696,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
+  },
+  subPanelShrink: {
+    // Clip content to the rounded corners while the panel shrinks, and lift it
+    // off the backdrop so the Telegram-style shrink reads clearly.
+    elevation: 8,
+    overflow: 'hidden',
   },
   subPanelTitle: {
     fontWeight: '600',
