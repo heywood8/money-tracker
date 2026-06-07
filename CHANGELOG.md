@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.131.0](https://github.com/heywood8/money-tracker/compare/penny-v0.130.1...penny-v0.131.0) (2026-06-07)
+
+
+### Features
+
+* Telegram-style predictive back shrink for panels ([#895](https://github.com/heywood8/money-tracker/issues/895)) ([f61f0f1](https://github.com/heywood8/money-tracker/commit/f61f0f1f8f72b9a09e2d616b7cfeec4200421e80))
+
 ## [0.130.1](https://github.com/heywood8/money-tracker/compare/penny-v0.130.0...penny-v0.130.1) (2026-06-07)
 
 
