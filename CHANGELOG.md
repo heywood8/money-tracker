@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.130.1](https://github.com/heywood8/money-tracker/compare/penny-v0.130.0...penny-v0.130.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* save/Cancel buttons hidden behind floating tab bar in Edit Account ([#892](https://github.com/heywood8/money-tracker/issues/892)) ([17a721e](https://github.com/heywood8/money-tracker/commit/17a721e2dac251f99dd2a7cf8d093d36982dca7e))
+
 ## [0.130.0](https://github.com/heywood8/money-tracker/compare/penny-v0.129.0...penny-v0.130.0) (2026-06-06)
 
 
