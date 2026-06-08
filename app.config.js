@@ -50,6 +50,7 @@ module.exports = {
         },
       ],
       './plugins/withR8Config.js',
+      './plugins/withPredictiveBack.js',
     ],
     updates: {
       'url': 'https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406',
