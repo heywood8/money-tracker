@@ -1,7 +1,0 @@
-{
-  "name": "predictive-back",
-  "version": "0.1.0",
-  "description": "Local Expo module bridging Android's predictive-back gesture (OnBackAnimationCallback) to JS so panels can follow the finger live during the back gesture.",
-  "main": "index.js",
-  "private": true
-}
