@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.1](https://github.com/heywood8/money-tracker/compare/penny-v0.132.0...penny-v0.132.1) (2026-06-08)
+
+
+### Reverts
+
+* native predictive-back bridge for live panel shrink ([#897](https://github.com/heywood8/money-tracker/issues/897)) ([ae7470b](https://github.com/heywood8/money-tracker/commit/ae7470be0b77273f5d9ac9e9f021ef2461f08e90))
+
 ## [0.132.0](https://github.com/heywood8/money-tracker/compare/penny-v0.131.0...penny-v0.132.0) (2026-06-08)
 
 
