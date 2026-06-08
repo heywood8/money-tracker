@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.2](https://github.com/heywood8/money-tracker/compare/penny-v0.132.1...penny-v0.132.2) (2026-06-08)
+
+
+### Continuous Integration
+
+* add PR title validation for release-please convention ([#903](https://github.com/heywood8/money-tracker/issues/903)) ([843004d](https://github.com/heywood8/money-tracker/commit/843004de648ae77b1988ba81f8aa2af9f7f30bfa))
+
 ## [0.132.1](https://github.com/heywood8/money-tracker/compare/penny-v0.132.0...penny-v0.132.1) (2026-06-08)
 
 
