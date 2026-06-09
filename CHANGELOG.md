@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.3](https://github.com/heywood8/money-tracker/compare/penny-v0.132.2...penny-v0.132.3) (2026-06-09)
+
+
+### Bug Fixes
+
+* account edit buttons hidden behind floating tab bar on gesture-nav devices ([#905](https://github.com/heywood8/money-tracker/issues/905)) ([2fbeb7c](https://github.com/heywood8/money-tracker/commit/2fbeb7c9460424e040816444c17f07f40ea3904c))
+
 ## [0.132.2](https://github.com/heywood8/money-tracker/compare/penny-v0.132.1...penny-v0.132.2) (2026-06-08)
 
 
