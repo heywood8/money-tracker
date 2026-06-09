@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import { NestableScrollContainer, NestableDraggableFlatList } from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
@@ -445,6 +446,7 @@ export default function AccountsScreen() {
   const [noCurrencyMatchVisible, setNoCurrencyMatchVisible] = useState(false);
   const [noCurrencyMatchMessage, setNoCurrencyMatchMessage] = useState('');
 
+  const insets = useSafeAreaInsets();
   const { colorScheme } = useThemeConfig();
   const { colors } = useThemeColors();
   const { paperInputTheme } = makeModalStyles(colors);
@@ -970,7 +972,7 @@ export default function AccountsScreen() {
           </ScrollView>
 
           {/* Footer with Save/Cancel buttons */}
-          <View style={[styles.formPanelFooter, { borderTopColor: colors.border }]}>
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
             <TouchableRipple onPress={handleCloseModal} style={[styles.formFooterBtn, { borderColor: colors.border }]}>
               <Text style={{ color: colors.text }}>{t('cancel') || 'Cancel'}</Text>
             </TouchableRipple>
@@ -1240,7 +1242,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 8,
-    paddingBottom: HEIGHTS.tabBar,
     paddingHorizontal: 12,
     paddingTop: 12,
   },
