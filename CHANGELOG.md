@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.4](https://github.com/heywood8/money-tracker/compare/penny-v0.132.3...penny-v0.132.4) (2026-06-09)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump expo/expo-github-action from 8 to 9 ([#898](https://github.com/heywood8/money-tracker/issues/898)) ([b48df7b](https://github.com/heywood8/money-tracker/commit/b48df7bce1ff128c51556a5e7a8ab4b83e5e2219))
+
 ## [0.132.3](https://github.com/heywood8/money-tracker/compare/penny-v0.132.2...penny-v0.132.3) (2026-06-09)
 
 
