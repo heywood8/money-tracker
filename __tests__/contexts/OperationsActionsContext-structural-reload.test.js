@@ -103,12 +103,12 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
   );
 
   const setupHook = async () => await renderHook(
-      () => ({
-        data: useOperationsData(),
-        actions: useOperationsActions(),
-      }),
-      { wrapper },
-    );
+    () => ({
+      data: useOperationsData(),
+      actions: useOperationsActions(),
+    }),
+    { wrapper },
+  );
 
   describe('text search triggers all-dates DB query', () => {
     beforeEach(() => {

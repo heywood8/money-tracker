@@ -100,13 +100,13 @@ describe('IconPicker', () => {
       // Modal content doesn't render in test environment
       // Verify component renders without error
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
 
     it('displays close button', async () => {
@@ -226,14 +226,14 @@ describe('IconPicker', () => {
       // Modal content may not render in test environment
       // Verify component renders with selectedIcon prop
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon="cash"
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon="cash"
+        />,
+        { wrapper },
+      );;
       expect(COMMON_ICONS).toContain('cash');
     });
 
@@ -241,14 +241,14 @@ describe('IconPicker', () => {
       // Modal content may not render in test environment
       // Verify component renders without selectedIcon
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon={null}
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon={null}
+        />,
+        { wrapper },
+      );;
     });
 
     it('updates highlighting when selected icon changes', async () => {
@@ -280,13 +280,13 @@ describe('IconPicker', () => {
       // Modal content may not render in test environment
       // Verify component renders with ScrollView
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
 
     it('displays icons beyond initial viewport', async () => {
@@ -406,14 +406,14 @@ describe('IconPicker', () => {
       // Verify component renders with selectedIcon prop
       const onSelect = jest.fn();
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={onSelect}
-            selectedIcon="cash"
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={onSelect}
+          selectedIcon="cash"
+        />,
+        { wrapper },
+      );;
       expect(COMMON_ICONS).toContain('cash');
     });
   });
@@ -437,13 +437,13 @@ describe('IconPicker', () => {
       // Modal content doesn't render in test environment
       // Verify component renders with onClose prop for accessibility
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
   });
 
@@ -452,13 +452,13 @@ describe('IconPicker', () => {
       // Modal content may not render in test environment
       // Verify component renders (specific sizing is tested through snapshots)
       await render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );;
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
   });
 });

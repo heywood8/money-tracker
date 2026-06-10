@@ -207,8 +207,8 @@ describe('SearchContext', () => {
 
       // Call without third argument — onShouldExpandFilters is undefined, branch is skipped
       await act(async () => {
-          result.current.reopenSearch(false, true);
-        });;
+        result.current.reopenSearch(false, true);
+      });;
 
       expect(result.current.searchMode).toBe('open');
     });

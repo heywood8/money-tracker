@@ -119,8 +119,8 @@ describe('DialogContext', () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.hideDialog();
-        });;
+        result.current.hideDialog();
+      });;
     });
 
     it('can be called multiple times', async () => {
@@ -131,10 +131,10 @@ describe('DialogContext', () => {
       });
 
       await act(async () => {
-          result.current.hideDialog();
-          result.current.hideDialog();
-          result.current.hideDialog();
-        });;
+        result.current.hideDialog();
+        result.current.hideDialog();
+        result.current.hideDialog();
+      });;
     });
   });
 
@@ -166,12 +166,12 @@ describe('DialogContext', () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog('Title 1', 'Message 1');
-          result.current.hideDialog();
-          result.current.showDialog('Title 2', 'Message 2');
-          result.current.hideDialog();
-          result.current.showDialog('Title 3', 'Message 3');
-        });;
+        result.current.showDialog('Title 1', 'Message 1');
+        result.current.hideDialog();
+        result.current.showDialog('Title 2', 'Message 2');
+        result.current.hideDialog();
+        result.current.showDialog('Title 3', 'Message 3');
+      });;
     });
   });
 
@@ -302,40 +302,40 @@ describe('DialogContext', () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog('', 'Message');
-        });;
+        result.current.showDialog('', 'Message');
+      });;
     });
 
     it('handles empty message', async () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog('Title', '');
-        });;
+        result.current.showDialog('Title', '');
+      });;
     });
 
     it('handles null title', async () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog(null, 'Message');
-        });;
+        result.current.showDialog(null, 'Message');
+      });;
     });
 
     it('handles null message', async () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog('Title', null);
-        });;
+        result.current.showDialog('Title', null);
+      });;
     });
 
     it('handles undefined buttons param', async () => {
       const { result } = await renderHook(() => useDialog(), { wrapper });
 
       await act(async () => {
-          result.current.showDialog('Title', 'Message', undefined);
-        });;
+        result.current.showDialog('Title', 'Message', undefined);
+      });;
     });
 
     it('handles very long title', async () => {
@@ -343,8 +343,8 @@ describe('DialogContext', () => {
       const longTitle = 'A'.repeat(1000);
 
       await act(async () => {
-          result.current.showDialog(longTitle, 'Message');
-        });;
+        result.current.showDialog(longTitle, 'Message');
+      });;
     });
 
     it('handles very long message', async () => {
@@ -352,8 +352,8 @@ describe('DialogContext', () => {
       const longMessage = 'B'.repeat(5000);
 
       await act(async () => {
-          result.current.showDialog('Title', longMessage);
-        });;
+        result.current.showDialog('Title', longMessage);
+      });;
     });
   });
 
