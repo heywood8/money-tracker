@@ -149,6 +149,8 @@ describe('OperationsDataContext - Search API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
+    OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(mockOperations);
+    OperationsDB.getAllOperations.mockResolvedValue(mockOperations);
   });
 
   const wrapper = ({ children }) => (
@@ -156,8 +158,8 @@ describe('OperationsDataContext - Search API', () => {
   );
 
   describe('searchState initialization', () => {
-    it('initializes with empty searchState', () => {
-      const { result } = renderHook(() => useOperationsData(), { wrapper });
+    it('initializes with empty searchState', async () => {
+      const { result } = await renderHook(() => useOperationsData(), { wrapper });
 
       expect(result.current.searchState).toEqual({
         text: '',
@@ -169,15 +171,15 @@ describe('OperationsDataContext - Search API', () => {
       });
     });
 
-    it('initializes hasActiveSearch as false', () => {
-      const { result } = renderHook(() => useOperationsData(), { wrapper });
+    it('initializes hasActiveSearch as false', async () => {
+      const { result } = await renderHook(() => useOperationsData(), { wrapper });
       expect(result.current.hasActiveSearch).toBe(false);
     });
   });
 
   describe('setSearchText', () => {
-    it('updates searchState.text', () => {
-      const { result } = renderHook(
+    it('updates searchState.text', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -185,7 +187,7 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('coffee');
       });
 
@@ -194,8 +196,8 @@ describe('OperationsDataContext - Search API', () => {
   });
 
   describe('updateSearchFilters', () => {
-    it('merges partial filter updates', () => {
-      const { result } = renderHook(
+    it('merges partial filter updates', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -203,14 +205,14 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
       expect(result.current.data.searchState.types).toEqual(['expense']);
       expect(result.current.data.searchState.text).toBe('');
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ accountIds: ['acc-1'] });
       });
 
@@ -220,8 +222,8 @@ describe('OperationsDataContext - Search API', () => {
   });
 
   describe('clearAllSearch', () => {
-    it('resets all searchState fields', () => {
-      const { result } = renderHook(
+    it('resets all searchState fields', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -229,12 +231,12 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('coffee');
         result.current.actions.updateSearchFilters({ types: ['expense'], accountIds: ['acc-1'] });
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.clearAllSearch();
       });
 
@@ -250,8 +252,8 @@ describe('OperationsDataContext - Search API', () => {
   });
 
   describe('hasActiveSearch', () => {
-    it('returns true when text search is active', () => {
-      const { result } = renderHook(
+    it('returns true when text search is active', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -259,15 +261,15 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('coffee');
       });
 
       expect(result.current.data.hasActiveSearch).toBe(true);
     });
 
-    it('returns true when type filter is active', () => {
-      const { result } = renderHook(
+    it('returns true when type filter is active', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -275,22 +277,22 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
       expect(result.current.data.hasActiveSearch).toBe(true);
     });
 
-    it('returns false when all filters are empty', () => {
-      const { result } = renderHook(() => useOperationsData(), { wrapper });
+    it('returns false when all filters are empty', async () => {
+      const { result } = await renderHook(() => useOperationsData(), { wrapper });
       expect(result.current.hasActiveSearch).toBe(false);
     });
   });
 
   describe('getSearchFilterCount', () => {
-    it('returns count of active non-text filters', () => {
-      const { result } = renderHook(
+    it('returns count of active non-text filters', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -298,7 +300,7 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({
           types: ['expense'],
           accountIds: ['acc-1', 'acc-2'],
@@ -309,8 +311,8 @@ describe('OperationsDataContext - Search API', () => {
       expect(result.current.data.getSearchFilterCount()).toBe(3);
     });
 
-    it('does not count text in filter count', () => {
-      const { result } = renderHook(
+    it('does not count text in filter count', async () => {
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -318,7 +320,7 @@ describe('OperationsDataContext - Search API', () => {
         { wrapper },
       );
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('coffee');
       });
 
@@ -328,11 +330,11 @@ describe('OperationsDataContext - Search API', () => {
 
   describe('Filtering Integration Tests', () => {
     // helper to setup context with mock operations
-    const setupWithOperations = () => {
+    const setupWithOperations = async () => {
       // mock the database to return our mock operations
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
 
-      const { result } = renderHook(
+      const { result } = await renderHook(
         () => ({
           data: useOperationsData(),
           actions: useOperationsActions(),
@@ -345,13 +347,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('text search filtering', () => {
       it('filters by description match', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('coffee');
         });
 
@@ -362,13 +364,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by account name match', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('bank');
         });
 
@@ -381,13 +383,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by category name match', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('food');
         });
 
@@ -400,7 +402,7 @@ describe('OperationsDataContext - Search API', () => {
 
       it('filters by parent category name match (hierarchy traversal)', async () => {
         // Add an operation categorized under 'Restaurants' (child of 'Food')
-        OperationsDB.getOperationsByWeekOffset.mockResolvedValue([
+        const allOps = [
           ...mockOperations,
           {
             id: 'op-6',
@@ -411,9 +413,12 @@ describe('OperationsDataContext - Search API', () => {
             description: 'Dinner out',
             date: '2026-04-12',
           },
-        ]);
+        ];
+        OperationsDB.getOperationsByWeekOffset.mockResolvedValue(allOps);
+        OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(allOps);
+        OperationsDB.getAllOperations.mockResolvedValue(allOps);
 
-        const { result } = renderHook(
+        const { result } = await renderHook(
           () => ({
             data: useOperationsData(),
             actions: useOperationsActions(),
@@ -425,7 +430,7 @@ describe('OperationsDataContext - Search API', () => {
           expect(result.current.data.operations).toHaveLength(6);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('food');
         });
 
@@ -438,13 +443,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by amount match', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('5000');
         });
 
@@ -455,13 +460,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('is case insensitive', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('COFFEE');
         });
 
@@ -474,13 +479,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('type filtering', () => {
       it('filters by single type', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ types: ['expense'] });
         });
 
@@ -492,13 +497,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by multiple types', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ types: ['expense', 'income'] });
         });
 
@@ -512,13 +517,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('account filtering', () => {
       it('filters by single account', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ accountIds: ['acc-1'] });
         });
 
@@ -530,13 +535,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by multiple accounts', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ accountIds: ['acc-1', 'acc-2'] });
         });
 
@@ -548,13 +553,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('category filtering', () => {
       it('filters by single category', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ categoryIds: ['cat-1'] });
         });
 
@@ -566,13 +571,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters by multiple categories', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({ categoryIds: ['cat-1', 'cat-2'] });
         });
 
@@ -586,13 +591,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('date range filtering', () => {
       it('filters with both start and end date', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             dateRange: { startDate: '2026-04-01', endDate: '2026-04-15' },
           });
@@ -606,13 +611,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters with only start date', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             dateRange: { startDate: '2026-04-10', endDate: null },
           });
@@ -626,13 +631,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters with only end date', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             dateRange: { startDate: null, endDate: '2026-04-01' },
           });
@@ -646,14 +651,14 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('swaps dates when start > end (regression test for issue #3)', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
         // deliberately swap dates (start > end)
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             dateRange: { startDate: '2026-04-15', endDate: '2026-04-01' },
           });
@@ -670,13 +675,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('amount range filtering', () => {
       it('filters with both min and max', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             amountRange: { min: 20, max: 100 },
           });
@@ -690,13 +695,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters with only min', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             amountRange: { min: 50, max: null },
           });
@@ -710,13 +715,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('filters with only max', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             amountRange: { min: null, max: 50 },
           });
@@ -732,13 +737,13 @@ describe('OperationsDataContext - Search API', () => {
 
     describe('combined filters (and logic)', () => {
       it('applies text search and type filter together', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('food');
           result.current.actions.updateSearchFilters({ types: ['expense'] });
         });
@@ -751,13 +756,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('applies account and category filters together', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             accountIds: ['acc-1'],
             categoryIds: ['cat-1'],
@@ -772,13 +777,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('applies all filters together', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('shopping');
           result.current.actions.updateSearchFilters({
             types: ['expense'],
@@ -797,13 +802,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('returns empty when no operations match combined filters', async () => {
-        const result = setupWithOperations();
+        const result = await setupWithOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(5);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.updateSearchFilters({
             types: ['income'],
             accountIds: ['acc-1'], // income operation is in acc-2, not acc-1
@@ -847,10 +852,12 @@ describe('OperationsDataContext - Search API', () => {
         },
       ];
 
-      const setupWithCyrillicOperations = () => {
+      const setupWithCyrillicOperations = async () => {
         OperationsDB.getOperationsByWeekOffset.mockResolvedValue(cyrillicOperations);
+        OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(cyrillicOperations);
+        OperationsDB.getAllOperations.mockResolvedValue(cyrillicOperations);
 
-        const { result } = renderHook(
+        const { result } = await renderHook(
           () => ({
             data: useOperationsData(),
             actions: useOperationsActions(),
@@ -862,13 +869,13 @@ describe('OperationsDataContext - Search API', () => {
       };
 
       it('matches Cyrillic description case-insensitively (uppercase search finds lowercase data)', async () => {
-        const result = setupWithCyrillicOperations();
+        const result = await setupWithCyrillicOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(3);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('САМОЛЕТ');
         });
 
@@ -879,13 +886,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('matches Cyrillic description case-insensitively (lowercase search finds mixed-case data)', async () => {
-        const result = setupWithCyrillicOperations();
+        const result = await setupWithCyrillicOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(3);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('самолет');
         });
 
@@ -896,14 +903,14 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('matches Cyrillic category name case-insensitively', async () => {
-        const result = setupWithCyrillicOperations();
+        const result = await setupWithCyrillicOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(3);
         });
 
         // Search for category name "Транспорт" using uppercase
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('ТРАНСПОРТ');
         });
 
@@ -915,14 +922,14 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('matches Cyrillic parent category name via hierarchy traversal', async () => {
-        const result = setupWithCyrillicOperations();
+        const result = await setupWithCyrillicOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(3);
         });
 
         // "путешествия" is the parent of "Транспорт"; searching for it should find op-cyr-2
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('путешествия');
         });
 
@@ -935,13 +942,13 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('matches partial Cyrillic text in description', async () => {
-        const result = setupWithCyrillicOperations();
+        const result = await setupWithCyrillicOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(3);
         });
 
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('моск');
         });
 
@@ -978,9 +985,11 @@ describe('OperationsDataContext - Search API', () => {
         },
       ];
 
-      const setupWithYoOperations = () => {
+      const setupWithYoOperations = async () => {
         OperationsDB.getOperationsByWeekOffset.mockResolvedValue(yoOperations);
-        const { result } = renderHook(
+        OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(yoOperations);
+        OperationsDB.getAllOperations.mockResolvedValue(yoOperations);
+        const { result } = await renderHook(
           () => ({
             data: useOperationsData(),
             actions: useOperationsActions(),
@@ -991,14 +1000,14 @@ describe('OperationsDataContext - Search API', () => {
       };
 
       it('search with е finds descriptions written with ё', async () => {
-        const result = setupWithYoOperations();
+        const result = await setupWithYoOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(2);
         });
 
         // Type with plain е — should find BOTH the plain and the ё version.
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('Самолет');
         });
 
@@ -1009,14 +1018,14 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('search with ё finds descriptions written with е', async () => {
-        const result = setupWithYoOperations();
+        const result = await setupWithYoOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(2);
         });
 
         // Type with ё (or keyboard autocomplete supplies it) — should still match plain е.
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('Самолёт');
         });
 
@@ -1027,14 +1036,14 @@ describe('OperationsDataContext - Search API', () => {
       });
 
       it('yo-fold combines with case-folding', async () => {
-        const result = setupWithYoOperations();
+        const result = await setupWithYoOperations();
 
         await waitFor(() => {
           expect(result.current.data.operations).toHaveLength(2);
         });
 
         // ALL-CAPS with ё — should still match both.
-        act(() => {
+        await act(async () => {
           result.current.actions.setSearchText('САМОЛЁТ');
         });
 

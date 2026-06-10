@@ -118,57 +118,57 @@ describe('CategoriesScreen', () => {
   });
 
   describe('Component Structure', () => {
-    it('renders without crashing', () => {
+    it('renders without crashing', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('renders without crashing with no props', () => {
+    it('renders without crashing with no props', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('uses ThemeContext for styling', () => {
+    it('uses ThemeContext for styling', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      render(<CategoriesScreen />);
+      await render(<CategoriesScreen />);
 
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('uses CategoriesContext for category data', () => {
+    it('uses CategoriesContext for category data', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
-      render(<CategoriesScreen />);
+      await render(<CategoriesScreen />);
 
       expect(useCategories).toHaveBeenCalled();
     });
 
-    it('uses DialogContext for dialogs', () => {
+    it('uses DialogContext for dialogs', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useDialog } = require('../../app/contexts/DialogContext');
 
-      render(<CategoriesScreen />);
+      await render(<CategoriesScreen />);
 
       expect(useDialog).toHaveBeenCalled();
     });
 
-    it('uses LocalizationContext for translations', () => {
+    it('uses LocalizationContext for translations', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
-      render(<CategoriesScreen />);
+      await render(<CategoriesScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
   });
 
   describe('Integration with Contexts', () => {
-    it('handles empty category list', () => {
+    it('handles empty category list', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -182,10 +182,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles loading state', () => {
+    it('handles loading state', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -199,10 +199,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles flat category list', () => {
+    it('handles flat category list', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -222,10 +222,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles hierarchical category structure', () => {
+    it('handles hierarchical category structure', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -245,10 +245,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('filters out shadow categories from display', () => {
+    it('filters out shadow categories from display', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -268,12 +268,12 @@ describe('CategoriesScreen', () => {
       });
 
       // Component should filter out shadow categories internally
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Budget Integration', () => {
-    it('handles categories without budgets', () => {
+    it('handles categories without budgets', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useBudgets } = require('../../app/contexts/BudgetsContext');
 
@@ -282,10 +282,10 @@ describe('CategoriesScreen', () => {
         getBudgetForCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles categories with active budgets', () => {
+    it('handles categories with active budgets', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useBudgets } = require('../../app/contexts/BudgetsContext');
 
@@ -299,35 +299,35 @@ describe('CategoriesScreen', () => {
         })),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('State Management', () => {
-    it('manages category modal visibility state', () => {
+    it('manages category modal visibility state', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component should manage modal state internally
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('manages budget modal visibility state', () => {
+    it('manages budget modal visibility state', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component should manage budget modal state
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('manages edit vs new mode for categories', () => {
+    it('manages edit vs new mode for categories', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component should track whether adding new or editing existing
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Category Expansion Logic', () => {
-    it('handles expanded category folders', () => {
+    it('handles expanded category folders', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -344,10 +344,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles collapsed category folders', () => {
+    it('handles collapsed category folders', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -364,12 +364,12 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Theme Integration', () => {
-    it('applies theme colors to components', () => {
+    it('applies theme colors to components', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -386,11 +386,11 @@ describe('CategoriesScreen', () => {
 
       useThemeColors.mockReturnValue({ colors: mockColors });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('handles dark theme', () => {
+    it('handles dark theme', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -405,12 +405,12 @@ describe('CategoriesScreen', () => {
         },
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Localization Integration', () => {
-    it('uses translation function for UI text', () => {
+    it('uses translation function for UI text', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -420,12 +420,12 @@ describe('CategoriesScreen', () => {
         language: 'en',
       });
 
-      render(<CategoriesScreen />);
+      await render(<CategoriesScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
 
-    it('handles category nameKey translations', () => {
+    it('handles category nameKey translations', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -444,12 +444,12 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles empty categories array when context provides empty state', () => {
+    it('handles empty categories array when context provides empty state', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -464,10 +464,10 @@ describe('CategoriesScreen', () => {
       });
 
       // Context should always provide an array, even when empty
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles initial loading state with empty categories', () => {
+    it('handles initial loading state with empty categories', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -481,10 +481,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles categories with missing properties', () => {
+    it('handles categories with missing properties', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -503,10 +503,10 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('handles deeply nested category hierarchy', () => {
+    it('handles deeply nested category hierarchy', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -527,20 +527,20 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 
   describe('Regression Tests', () => {
-    it('handles re-rendering without errors', () => {
+    it('handles re-rendering without errors', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
-      const { rerender } = render(<CategoriesScreen />);
+      const { rerender } = await render(<CategoriesScreen />);
 
       expect(() => rerender(<CategoriesScreen />)).not.toThrow();
     });
 
-    it('maintains stability when categories change', () => {
+    it('maintains stability when categories change', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -560,7 +560,7 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      const { rerender } = render(<CategoriesScreen />);
+      const { rerender } = await render(<CategoriesScreen />);
 
       useCategories.mockReturnValue({
         categories: updatedCategories,
@@ -575,7 +575,7 @@ describe('CategoriesScreen', () => {
       expect(() => rerender(<CategoriesScreen />)).not.toThrow();
     });
 
-    it('handles rapid expansion state changes', () => {
+    it('handles rapid expansion state changes', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -589,7 +589,7 @@ describe('CategoriesScreen', () => {
         validateCategory: jest.fn(() => null),
       });
 
-      const { rerender } = render(<CategoriesScreen />);
+      const { rerender } = await render(<CategoriesScreen />);
 
       useCategories.mockReturnValue({
         categories: [{ id: '1', name: 'Food', isFolder: true }],
@@ -606,32 +606,32 @@ describe('CategoriesScreen', () => {
   });
 
   describe('Component Integration Points', () => {
-    it('provides necessary props to child components', () => {
+    it('provides necessary props to child components', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component should pass proper props to modals and progress bars
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('integrates with CategoryModal', () => {
+    it('integrates with CategoryModal', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component uses CategoryModal for editing/creating categories
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('integrates with BudgetModal', () => {
+    it('integrates with BudgetModal', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component uses BudgetModal for budget management
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
 
-    it('integrates with BudgetProgressBar', () => {
+    it('integrates with BudgetProgressBar', async () => {
       const CategoriesScreen = require('../../app/screens/CategoriesScreen').default;
 
       // Component uses BudgetProgressBar to show budget status
-      expect(() => render(<CategoriesScreen />)).not.toThrow();
+      await render(<CategoriesScreen />);
     });
   });
 });

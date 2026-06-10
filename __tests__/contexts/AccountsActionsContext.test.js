@@ -65,7 +65,7 @@ describe('AccountsActionsContext', () => {
 
   describe('validateAccount', () => {
     it('returns no errors for valid account', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'My Bank', balance: '100', currency: 'USD' });
@@ -73,7 +73,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('returns error when name is empty', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: '', balance: '100', currency: 'USD' });
@@ -81,7 +81,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('returns error when name is whitespace only', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: '   ', balance: '100', currency: 'USD' });
@@ -89,7 +89,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('returns error when balance is not a number', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'Bank', balance: 'abc', currency: 'USD' });
@@ -97,7 +97,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('returns error when balance is empty string', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'Bank', balance: '', currency: 'USD' });
@@ -105,7 +105,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('returns error when currency is missing', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'Bank', balance: '100', currency: '' });
@@ -113,7 +113,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('uses translation function when provided', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const t = jest.fn(key => `translated_${key}`);
@@ -123,7 +123,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('allows zero balance', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'Bank', balance: '0', currency: 'USD' });
@@ -131,7 +131,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('allows negative balance', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const errors = result.current.validateAccount({ name: 'Bank', balance: '-50', currency: 'USD' });
@@ -144,7 +144,7 @@ describe('AccountsActionsContext', () => {
       const newAccount = { id: 'acc-1', name: 'Savings', balance: '500', currency: 'EUR' };
       AccountsDB.createAccount.mockResolvedValue(newAccount);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -160,7 +160,7 @@ describe('AccountsActionsContext', () => {
     it('shows dialog and re-throws on error', async () => {
       AccountsDB.createAccount.mockRejectedValue(new Error('DB error'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await expect(
@@ -171,7 +171,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('converts balance to string', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -192,7 +192,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('uses adjustAccountBalance when balance changes with createAdjustmentOperation=true', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -204,7 +204,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('also updates name when balance changes and name differs', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -216,7 +216,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('also updates currency when balance changes and currency differs', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -227,7 +227,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('does not call updateAccount for non-balance fields when they are unchanged', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -246,7 +246,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('uses updateAccount directly when createAdjustmentOperation=false', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -259,7 +259,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('does not emit RELOAD_ALL when balance unchanged and no adjustment', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -272,7 +272,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('throws when account not found', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await expect(
@@ -283,7 +283,7 @@ describe('AccountsActionsContext', () => {
     it('shows dialog and re-throws on DB error', async () => {
       AccountsDB.updateAccount.mockRejectedValue(new Error('update failed'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await expect(
@@ -294,7 +294,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('supports updating hidden field without balance', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -307,7 +307,7 @@ describe('AccountsActionsContext', () => {
     it('propagates hidden field when balance also changes with createAdjustmentOperation=true', async () => {
       // Regression: when balance changes AND createAdjustmentOperation=true, the hidden
       // field was missing from nonBalanceUpdates, so it would never be saved.
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -325,7 +325,7 @@ describe('AccountsActionsContext', () => {
       const accountWithFormattedBalance = { id: 'acc-1', name: 'Old Name', balance: '100.00', currency: 'USD' };
       AccountsDB.getAllAccounts.mockResolvedValue([accountWithFormattedBalance]);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -346,7 +346,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('deletes account and removes it from state', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -362,7 +362,7 @@ describe('AccountsActionsContext', () => {
         .mockResolvedValueOnce([existingAccount])
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -373,7 +373,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('does not emit RELOAD_ALL when no transfer account', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await act(async () => {
@@ -386,7 +386,7 @@ describe('AccountsActionsContext', () => {
     it('shows dialog and re-throws on error', async () => {
       AccountsDB.deleteAccount.mockRejectedValue(new Error('delete failed'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(1));
 
       await expect(
@@ -405,7 +405,7 @@ describe('AccountsActionsContext', () => {
         .mockResolvedValueOnce([{ id: 'init', name: 'Init', balance: '0', currency: 'USD' }])
         .mockResolvedValueOnce([reloadedAccount]);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -428,7 +428,7 @@ describe('AccountsActionsContext', () => {
     });
 
     it('persists new order to DB', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(2));
 
       await act(async () => {
@@ -446,7 +446,7 @@ describe('AccountsActionsContext', () => {
     it('shows dialog and re-throws on DB error', async () => {
       AccountsDB.reorderAccounts.mockRejectedValue(new Error('reorder failed'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.accounts).toHaveLength(2));
 
       let caughtError;
@@ -467,7 +467,7 @@ describe('AccountsActionsContext', () => {
     it('returns operation count for account', async () => {
       AccountsDB.getOperationCount.mockResolvedValue(5);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const count = await result.current.getOperationCount('acc-1');
@@ -477,7 +477,7 @@ describe('AccountsActionsContext', () => {
     it('returns 0 on error', async () => {
       AccountsDB.getOperationCount.mockRejectedValue(new Error('fail'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       const count = await result.current.getOperationCount('acc-1');
@@ -487,12 +487,12 @@ describe('AccountsActionsContext', () => {
 
   describe('toggleShowHiddenAccounts', () => {
     it('toggles showHiddenAccounts from false to true', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.showHiddenAccounts).toBe(false);
 
-      act(() => {
+      await act(async () => {
         result.current.toggleShowHiddenAccounts();
       });
 
@@ -500,11 +500,11 @@ describe('AccountsActionsContext', () => {
     });
 
     it('toggles showHiddenAccounts from true to false', async () => {
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      act(() => { result.current.toggleShowHiddenAccounts(); });
-      act(() => { result.current.toggleShowHiddenAccounts(); });
+      await act(async () => { result.current.toggleShowHiddenAccounts(); });
+      await act(async () => { result.current.toggleShowHiddenAccounts(); });
 
       expect(result.current.showHiddenAccounts).toBe(false);
     });

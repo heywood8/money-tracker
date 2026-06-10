@@ -39,8 +39,8 @@ describe('Calculator', () => {
   });
 
   describe('Initialization', () => {
-    it('renders with empty value', () => {
-      const { getByText } = render(
+    it('renders with empty value', async () => {
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -54,8 +54,8 @@ describe('Calculator', () => {
       expect(getByText('9')).toBeTruthy();
     });
 
-    it('renders with initial value', () => {
-      const { getByText } = render(
+    it('renders with initial value', async () => {
+      const { getByText } = await render(
         <Calculator
           value="123"
           onValueChange={jest.fn()}
@@ -66,8 +66,8 @@ describe('Calculator', () => {
       expect(getByText('123')).toBeTruthy();
     });
 
-    it('displays all numeric buttons', () => {
-      const { getByText } = render(
+    it('displays all numeric buttons', async () => {
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -80,8 +80,8 @@ describe('Calculator', () => {
       }
     });
 
-    it('displays all operation buttons', () => {
-      const { getByText } = render(
+    it('displays all operation buttons', async () => {
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -96,8 +96,8 @@ describe('Calculator', () => {
       expect(getByText('.')).toBeTruthy();
     });
 
-    it('displays backspace button', () => {
-      const { getByLabelText } = render(
+    it('displays backspace button', async () => {
+      const { getByLabelText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -110,9 +110,9 @@ describe('Calculator', () => {
   });
 
   describe('Numeric Input', () => {
-    it('enters single digit', () => {
+    it('enters single digit', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -120,14 +120,14 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('5'), 'pressIn');
+      await fireEvent(getByText('5'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5');
     });
 
-    it('enters multiple digits', () => {
+    it('enters multiple digits', async () => {
       const onValueChange = jest.fn();
-      const { getByText, rerender } = render(
+      const { getByText, rerender } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -135,8 +135,8 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('1'), 'pressIn');
-      rerender(
+      await fireEvent(getByText('1'), 'pressIn');
+      await rerender(
         <Calculator
           value="1"
           onValueChange={onValueChange}
@@ -144,8 +144,8 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('2'), 'pressIn');
-      rerender(
+      await fireEvent(getByText('2'), 'pressIn');
+      await rerender(
         <Calculator
           value="12"
           onValueChange={onValueChange}
@@ -153,14 +153,14 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('3'), 'pressIn');
+      await fireEvent(getByText('3'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalled();
     });
 
-    it('enters zero', () => {
+    it('enters zero', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -168,7 +168,7 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('0'), 'pressIn');
+      await fireEvent(getByText('0'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('0');
 
@@ -176,9 +176,9 @@ describe('Calculator', () => {
   });
 
   describe('Decimal Point', () => {
-    it('enters decimal point', () => {
+    it('enters decimal point', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5"
           onValueChange={onValueChange}
@@ -186,15 +186,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('.'), 'pressIn');
+      await fireEvent(getByText('.'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5.');
 
     });
 
-    it('prevents multiple decimal points in same number', () => {
+    it('prevents multiple decimal points in same number', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5.5"
           onValueChange={onValueChange}
@@ -203,15 +203,15 @@ describe('Calculator', () => {
       );
 
       onValueChange.mockClear();
-      fireEvent(getByText('.'), 'pressIn');
+      await fireEvent(getByText('.'), 'pressIn');
 
       // Should not call onValueChange for duplicate decimal
       expect(onValueChange).not.toHaveBeenCalled();
     });
 
-    it('allows decimal point in new number after operation', () => {
+    it('allows decimal point in new number after operation', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5.5+3"
           onValueChange={onValueChange}
@@ -219,7 +219,7 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('.'), 'pressIn');
+      await fireEvent(getByText('.'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5.5+3.');
 
@@ -227,9 +227,9 @@ describe('Calculator', () => {
   });
 
   describe('Operations', () => {
-    it('enters addition operation', () => {
+    it('enters addition operation', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5"
           onValueChange={onValueChange}
@@ -237,15 +237,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('+'), 'pressIn');
+      await fireEvent(getByText('+'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5+');
 
     });
 
-    it('enters subtraction operation', () => {
+    it('enters subtraction operation', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="10"
           onValueChange={onValueChange}
@@ -253,15 +253,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('-'), 'pressIn');
+      await fireEvent(getByText('-'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('10-');
 
     });
 
-    it('enters multiplication operation', () => {
+    it('enters multiplication operation', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5"
           onValueChange={onValueChange}
@@ -269,15 +269,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('×'), 'pressIn');
+      await fireEvent(getByText('×'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5×');
 
     });
 
-    it('enters division operation', () => {
+    it('enters division operation', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="10"
           onValueChange={onValueChange}
@@ -285,15 +285,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('÷'), 'pressIn');
+      await fireEvent(getByText('÷'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('10÷');
 
     });
 
-    it('replaces operation when consecutive operations are entered', () => {
+    it('replaces operation when consecutive operations are entered', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value="5+"
           onValueChange={onValueChange}
@@ -301,15 +301,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('-'), 'pressIn');
+      await fireEvent(getByText('-'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5-');
 
     });
 
-    it('allows minus at start for negative numbers', () => {
+    it('allows minus at start for negative numbers', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -317,15 +317,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('-'), 'pressIn');
+      await fireEvent(getByText('-'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('-');
 
     });
 
-    it('prevents other operations at start', () => {
+    it('prevents other operations at start', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -333,7 +333,7 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('+'), 'pressIn');
+      await fireEvent(getByText('+'), 'pressIn');
 
       // Should not add operation at start
       expect(onValueChange).not.toHaveBeenCalled();
@@ -341,9 +341,9 @@ describe('Calculator', () => {
   });
 
   describe('Backspace', () => {
-    it('deletes last character', () => {
+    it('deletes last character', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="123"
           onValueChange={onValueChange}
@@ -351,15 +351,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByLabelText('backspace'), 'pressIn');
+      await fireEvent(getByLabelText('backspace'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('12');
 
     });
 
-    it('handles backspace on empty string', () => {
+    it('handles backspace on empty string', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -367,16 +367,16 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByLabelText('backspace'), 'pressIn');
+      await fireEvent(getByLabelText('backspace'), 'pressIn');
 
       // Backspace on empty string is a no-op, no call expected
       expect(onValueChange).not.toHaveBeenCalled();
 
     });
 
-    it('deletes operation character', () => {
+    it('deletes operation character', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="5+"
           onValueChange={onValueChange}
@@ -384,15 +384,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByLabelText('backspace'), 'pressIn');
+      await fireEvent(getByLabelText('backspace'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('5');
     });
   });
 
   describe('Equals Button', () => {
-    it('shows equals button when expression contains operation', () => {
-      const { getByLabelText } = render(
+    it('shows equals button when expression contains operation', async () => {
+      const { getByLabelText } = await render(
         <Calculator
           value="5+3"
           onValueChange={jest.fn()}
@@ -403,8 +403,8 @@ describe('Calculator', () => {
       expect(getByLabelText('equals')).toBeTruthy();
     });
 
-    it('hides equals button when no operation in expression', () => {
-      const { queryByLabelText } = render(
+    it('hides equals button when no operation in expression', async () => {
+      const { queryByLabelText } = await render(
         <Calculator
           value="123"
           onValueChange={jest.fn()}
@@ -415,9 +415,9 @@ describe('Calculator', () => {
       expect(queryByLabelText('equals')).toBeNull();
     });
 
-    it('evaluates expression when equals is pressed', () => {
+    it('evaluates expression when equals is pressed', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="5+3"
           onValueChange={onValueChange}
@@ -425,15 +425,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('equals'));
+      await fireEvent.press(getByLabelText('equals'));
 
       expect(onValueChange).toHaveBeenCalledWith('8');
 
     });
 
-    it('evaluates multiplication correctly', () => {
+    it('evaluates multiplication correctly', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="5×3"
           onValueChange={onValueChange}
@@ -441,15 +441,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('equals'));
+      await fireEvent.press(getByLabelText('equals'));
 
       expect(onValueChange).toHaveBeenCalledWith('15');
 
     });
 
-    it('evaluates division correctly', () => {
+    it('evaluates division correctly', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="10÷2"
           onValueChange={onValueChange}
@@ -457,14 +457,14 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('equals'));
+      await fireEvent.press(getByLabelText('equals'));
 
       expect(onValueChange).toHaveBeenCalledWith('5');
     });
 
-    it('evaluates complex expression', () => {
+    it('evaluates complex expression', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="10+5×2"
           onValueChange={onValueChange}
@@ -472,7 +472,7 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('equals'));
+      await fireEvent.press(getByLabelText('equals'));
 
       expect(onValueChange).toHaveBeenCalledWith('20');
 
@@ -480,9 +480,9 @@ describe('Calculator', () => {
   });
 
   describe('Add Button (Optional)', () => {
-    it('renders add button when onAdd prop is provided', () => {
+    it('renders add button when onAdd prop is provided', async () => {
       const onAdd = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="100"
           onValueChange={jest.fn()}
@@ -494,8 +494,8 @@ describe('Calculator', () => {
       expect(getByLabelText('add')).toBeTruthy();
     });
 
-    it('does not render add button when onAdd prop is not provided', () => {
-      const { queryByLabelText } = render(
+    it('does not render add button when onAdd prop is not provided', async () => {
+      const { queryByLabelText } = await render(
         <Calculator
           value="100"
           onValueChange={jest.fn()}
@@ -506,9 +506,9 @@ describe('Calculator', () => {
       expect(queryByLabelText('add')).toBeNull();
     });
 
-    it('calls onAdd when add button is pressed', () => {
+    it('calls onAdd when add button is pressed', async () => {
       const onAdd = jest.fn();
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="100"
           onValueChange={jest.fn()}
@@ -517,15 +517,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('add'));
+      await fireEvent.press(getByLabelText('add'));
 
       expect(onAdd).toHaveBeenCalled();
     });
   });
 
   describe('Value Synchronization', () => {
-    it('syncs internal state with prop changes', () => {
-      const { rerender, getByText } = render(
+    it('syncs internal state with prop changes', async () => {
+      const { rerender, getByText } = await render(
         <Calculator
           value="123"
           onValueChange={jest.fn()}
@@ -535,7 +535,7 @@ describe('Calculator', () => {
 
       expect(getByText('123')).toBeTruthy();
 
-      rerender(
+      await rerender(
         <Calculator
           value="456"
           onValueChange={jest.fn()}
@@ -546,8 +546,8 @@ describe('Calculator', () => {
       expect(getByText('456')).toBeTruthy();
     });
 
-    it('handles empty value prop', () => {
-      const { root } = render(
+    it('handles empty value prop', async () => {
+      const { root } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -559,8 +559,8 @@ describe('Calculator', () => {
       expect(root).toBeTruthy();
     });
 
-    it('handles undefined value prop', () => {
-      const { root } = render(
+    it('handles undefined value prop', async () => {
+      const { root } = await render(
         <Calculator
           value={undefined}
           onValueChange={jest.fn()}
@@ -574,9 +574,9 @@ describe('Calculator', () => {
   });
 
   describe('Regression Tests', () => {
-    it('handles rapid button presses', () => {
+    it('handles rapid button presses', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -585,17 +585,17 @@ describe('Calculator', () => {
       );
 
       // Rapidly press multiple buttons
-      fireEvent(getByText('1'), 'pressIn');
-      fireEvent(getByText('2'), 'pressIn');
-      fireEvent(getByText('3'), 'pressIn');
+      await fireEvent(getByText('1'), 'pressIn');
+      await fireEvent(getByText('2'), 'pressIn');
+      await fireEvent(getByText('3'), 'pressIn');
 
       // Should handle all presses
       expect(onValueChange).toHaveBeenCalled();
     });
 
-    it('maintains expression after evaluation', () => {
+    it('maintains expression after evaluation', async () => {
       const onValueChange = jest.fn();
-      const { getByLabelText, rerender } = render(
+      const { getByLabelText, rerender } = await render(
         <Calculator
           value="5+3"
           onValueChange={onValueChange}
@@ -603,9 +603,9 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent.press(getByLabelText('equals'));
+      await fireEvent.press(getByLabelText('equals'));
 
-      rerender(
+      await rerender(
         <Calculator
           value="8"
           onValueChange={onValueChange}
@@ -614,13 +614,13 @@ describe('Calculator', () => {
       );
 
       // Can continue calculating with result
-      fireEvent(getByLabelText('backspace'), 'pressIn');
+      await fireEvent(getByLabelText('backspace'), 'pressIn');
       expect(onValueChange).toHaveBeenCalled();
     });
 
-    it('handles expression with leading zero', () => {
+    it('handles expression with leading zero', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -628,15 +628,15 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('0'), 'pressIn');
-      fireEvent(getByText('5'), 'pressIn');
+      await fireEvent(getByText('0'), 'pressIn');
+      await fireEvent(getByText('5'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalled();
     });
 
-    it('handles decimal-only value', () => {
+    it('handles decimal-only value', async () => {
       const onValueChange = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={onValueChange}
@@ -644,7 +644,7 @@ describe('Calculator', () => {
         />,
       );
 
-      fireEvent(getByText('.'), 'pressIn');
+      await fireEvent(getByText('.'), 'pressIn');
 
       expect(onValueChange).toHaveBeenCalledWith('.');
 
@@ -652,8 +652,8 @@ describe('Calculator', () => {
   });
 
   describe('Accessibility', () => {
-    it('has accessible button labels', () => {
-      const { getByLabelText } = render(
+    it('has accessible button labels', async () => {
+      const { getByLabelText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}
@@ -664,8 +664,8 @@ describe('Calculator', () => {
       expect(getByLabelText('backspace')).toBeTruthy();
     });
 
-    it('all buttons have accessibility role', () => {
-      const { getByText } = render(
+    it('all buttons have accessibility role', async () => {
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={jest.fn()}

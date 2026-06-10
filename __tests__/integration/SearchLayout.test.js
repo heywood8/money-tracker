@@ -71,8 +71,8 @@ describe('SearchLayout integration', () => {
     visible: true,
   };
 
-  it('SearchOverlay does not use absolute positioning', () => {
-    const { getByText } = render(<SearchOverlay {...defaultProps} />);
+  it('SearchOverlay does not use absolute positioning', async () => {
+    const { getByText } = await render(<SearchOverlay {...defaultProps} />);
 
     // Get the mock filters which is inside the filtersContainer
     const mockFilters = getByText('Mock Filters');
@@ -90,8 +90,8 @@ describe('SearchLayout integration', () => {
     expect(styles.position).toBe('absolute');
   });
 
-  it('SearchOverlay positions below SearchBar using topOffset prop', () => {
-    const { getByText } = render(<SearchOverlay {...defaultProps} topOffset={50} />);
+  it('SearchOverlay positions below SearchBar using topOffset prop', async () => {
+    const { getByText } = await render(<SearchOverlay {...defaultProps} topOffset={50} />);
 
     const mockFilters = getByText('Mock Filters');
     let current = mockFilters;
@@ -104,8 +104,8 @@ describe('SearchLayout integration', () => {
     expect(styles.top).toBe(50);
   });
 
-  it('SearchOverlay has proper zIndex for layering', () => {
-    const { getByText } = render(<SearchOverlay {...defaultProps} />);
+  it('SearchOverlay has proper zIndex for layering', async () => {
+    const { getByText } = await render(<SearchOverlay {...defaultProps} />);
 
     const mockFilters = getByText('Mock Filters');
     let current = mockFilters;

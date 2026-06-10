@@ -39,8 +39,8 @@ describe('useBalanceHistory', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+    it('should initialize with default state', async () => {
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       expect(result.current.balanceHistoryData).toEqual({ labels: [] });
       expect(result.current.loadingBalanceHistory).toBe(true);
@@ -52,7 +52,7 @@ describe('useBalanceHistory', () => {
 
   describe('loadBalanceHistory', () => {
     it('should return early if no account selected', async () => {
-      const { result } = renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -64,7 +64,7 @@ describe('useBalanceHistory', () => {
     });
 
     it('should return early if no month selected', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, null));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, null));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -90,7 +90,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockHistory)
         .mockResolvedValueOnce(mockPrevHistory);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -122,7 +122,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockHistory)
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -143,7 +143,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockHistory)
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -165,7 +165,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockHistory)
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -185,7 +185,7 @@ describe('useBalanceHistory', () => {
     it('should handle errors gracefully', async () => {
       BalanceHistoryDB.getBalanceHistory.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -201,7 +201,7 @@ describe('useBalanceHistory', () => {
 
   describe('loadBalanceHistoryTable', () => {
     it('should return null if no account selected', async () => {
-      const { result } = renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
 
       let tableData;
       await act(async () => {
@@ -220,7 +220,7 @@ describe('useBalanceHistory', () => {
 
       BalanceHistoryDB.getBalanceHistory.mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistoryTable();
@@ -238,7 +238,7 @@ describe('useBalanceHistory', () => {
     it('should handle errors gracefully', async () => {
       BalanceHistoryDB.getBalanceHistory.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       let tableData;
       await act(async () => {
@@ -252,7 +252,7 @@ describe('useBalanceHistory', () => {
 
   describe('handleEditBalance', () => {
     it('should set editing state for a row', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.handleEditBalance('2024-01-15', '1000');
@@ -263,7 +263,7 @@ describe('useBalanceHistory', () => {
     });
 
     it('should handle null balance', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.handleEditBalance('2024-01-15', null);
@@ -276,7 +276,7 @@ describe('useBalanceHistory', () => {
 
   describe('handleCancelEdit', () => {
     it('should clear editing state', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.handleEditBalance('2024-01-15', '1000');
@@ -300,7 +300,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       // Set up table data
       await act(async () => {
@@ -330,7 +330,7 @@ describe('useBalanceHistory', () => {
     });
 
     it('should not save if no editing value', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.handleEditBalance('2024-01-15', null);
@@ -346,7 +346,7 @@ describe('useBalanceHistory', () => {
     it('should handle errors gracefully', async () => {
       BalanceHistoryDB.upsertBalanceHistory.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.handleEditBalance('2024-01-15', null);
@@ -368,7 +368,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.handleDeleteBalance('2024-01-15');
@@ -378,7 +378,7 @@ describe('useBalanceHistory', () => {
     });
 
     it('should not delete if no account selected', async () => {
-      const { result } = renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(null, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.handleDeleteBalance('2024-01-15');
@@ -390,7 +390,7 @@ describe('useBalanceHistory', () => {
     it('should handle errors gracefully', async () => {
       BalanceHistoryDB.deleteBalanceHistory.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.handleDeleteBalance('2024-01-15');
@@ -402,7 +402,7 @@ describe('useBalanceHistory', () => {
 
   describe('setEditingBalanceValue', () => {
     it('should update editing balance value', async () => {
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         result.current.setEditingBalanceValue('1500');
@@ -424,7 +424,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce([]) // current month (Jan 2024)
         .mockResolvedValueOnce([]); // previous month (should be Dec 2023)
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, janYear, janMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, janYear, janMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -451,7 +451,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -475,7 +475,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockHistory)
         .mockResolvedValueOnce(mockPrevHistory);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -504,7 +504,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce(mockMayHistory)
         .mockResolvedValueOnce(mockAprilHistory);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mayYear, mayMonthIndex));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mayYear, mayMonthIndex));
 
       await act(async () => {
         await result.current.loadBalanceHistory();
@@ -526,7 +526,7 @@ describe('useBalanceHistory', () => {
         .mockResolvedValueOnce([]);
       OperationsDB.getTotalExpenses.mockResolvedValue(620);
 
-      const { result } = renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
+      const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       await act(async () => {
         await result.current.loadBalanceHistory();

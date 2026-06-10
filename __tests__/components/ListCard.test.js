@@ -12,26 +12,26 @@ import ListCard from '../../app/components/ListCard';
 
 describe('ListCard', () => {
   const childText = 'Card Content';
-  const renderCard = (props = {}) =>
-    render(
+  const renderCard = async (props = {}) =>
+    await render(
       <ListCard {...props}>
         <Text>{childText}</Text>
       </ListCard>,
     );
 
   describe('Rendering', () => {
-    it('renders children', () => {
-      const { getByText } = renderCard();
+    it('renders children', async () => {
+      const { getByText } = await renderCard();
       expect(getByText(childText)).toBeTruthy();
     });
 
-    it('renders without optional props', () => {
-      const { root } = renderCard();
+    it('renders without optional props', async () => {
+      const { root } = await renderCard();
       expect(root).toBeTruthy();
     });
 
-    it('renders with accessibilityLabel and accessibilityHint', () => {
-      const { getByLabelText } = renderCard({
+    it('renders with accessibilityLabel and accessibilityHint', async () => {
+      const { getByLabelText } = await renderCard({
         accessibilityLabel: 'Account row',
         accessibilityHint: 'Double tap to edit',
       });
@@ -40,117 +40,117 @@ describe('ListCard', () => {
   });
 
   describe('Variants', () => {
-    it('renders default variant without crashing', () => {
-      const { root } = renderCard({ variant: 'default' });
+    it('renders default variant without crashing', async () => {
+      const { root } = await renderCard({ variant: 'default' });
       expect(root).toBeTruthy();
     });
 
-    it('renders expense variant without crashing', () => {
-      const { root } = renderCard({ variant: 'expense' });
+    it('renders expense variant without crashing', async () => {
+      const { root } = await renderCard({ variant: 'expense' });
       expect(root).toBeTruthy();
     });
 
-    it('renders income variant without crashing', () => {
-      const { root } = renderCard({ variant: 'income' });
+    it('renders income variant without crashing', async () => {
+      const { root } = await renderCard({ variant: 'income' });
       expect(root).toBeTruthy();
     });
 
-    it('renders transfer variant without crashing', () => {
-      const { root } = renderCard({ variant: 'transfer' });
+    it('renders transfer variant without crashing', async () => {
+      const { root } = await renderCard({ variant: 'transfer' });
       expect(root).toBeTruthy();
     });
   });
 
   describe('Alternate background', () => {
-    it('renders with alternateBackground=true on default variant', () => {
+    it('renders with alternateBackground=true on default variant', async () => {
       // Should use altRow background
-      const { root } = renderCard({ variant: 'default', alternateBackground: true });
+      const { root } = await renderCard({ variant: 'default', alternateBackground: true });
       expect(root).toBeTruthy();
     });
 
-    it('renders with alternateBackground=false on default variant', () => {
+    it('renders with alternateBackground=false on default variant', async () => {
       // Should use regular background
-      const { root } = renderCard({ variant: 'default', alternateBackground: false });
+      const { root } = await renderCard({ variant: 'default', alternateBackground: false });
       expect(root).toBeTruthy();
     });
 
-    it('expense variant ignores alternateBackground (always altRow)', () => {
-      const { root } = renderCard({ variant: 'expense', alternateBackground: true });
+    it('expense variant ignores alternateBackground (always altRow)', async () => {
+      const { root } = await renderCard({ variant: 'expense', alternateBackground: true });
       expect(root).toBeTruthy();
     });
   });
 
   describe('Left icon', () => {
-    it('renders icon when leftIcon is provided', () => {
-      const { root } = renderCard({ leftIcon: 'cart' });
+    it('renders icon when leftIcon is provided', async () => {
+      const { root } = await renderCard({ leftIcon: 'cart' });
       expect(root).toBeTruthy();
     });
 
-    it('does not render icon container when leftIcon is omitted', () => {
+    it('does not render icon container when leftIcon is omitted', async () => {
       // Just verify it renders without an icon
-      const { root } = renderCard();
+      const { root } = await renderCard();
       expect(root).toBeTruthy();
     });
 
-    it('renders leftIcon with custom color override', () => {
-      const { root } = renderCard({ leftIcon: 'cart', leftIconColor: '#ff0000' });
+    it('renders leftIcon with custom color override', async () => {
+      const { root } = await renderCard({ leftIcon: 'cart', leftIconColor: '#ff0000' });
       expect(root).toBeTruthy();
     });
 
-    it('renders leftIcon with custom size', () => {
-      const { root } = renderCard({ leftIcon: 'cart', leftIconSize: 32 });
+    it('renders leftIcon with custom size', async () => {
+      const { root } = await renderCard({ leftIcon: 'cart', leftIconSize: 32 });
       expect(root).toBeTruthy();
     });
 
-    it('renders leftIcon with background when leftIconBackground=true', () => {
-      const { root } = renderCard({ leftIcon: 'cart', leftIconBackground: true });
+    it('renders leftIcon with background when leftIconBackground=true', async () => {
+      const { root } = await renderCard({ leftIcon: 'cart', leftIconBackground: true });
       expect(root).toBeTruthy();
     });
 
-    it('expense variant icon uses expense color (no override)', () => {
-      const { root } = renderCard({ variant: 'expense', leftIcon: 'cart' });
+    it('expense variant icon uses expense color (no override)', async () => {
+      const { root } = await renderCard({ variant: 'expense', leftIcon: 'cart' });
       expect(root).toBeTruthy();
     });
 
-    it('income variant icon uses income color', () => {
-      const { root } = renderCard({ variant: 'income', leftIcon: 'arrow-down' });
+    it('income variant icon uses income color', async () => {
+      const { root } = await renderCard({ variant: 'income', leftIcon: 'arrow-down' });
       expect(root).toBeTruthy();
     });
 
-    it('transfer variant icon uses transfer color', () => {
-      const { root } = renderCard({ variant: 'transfer', leftIcon: 'swap-horizontal' });
+    it('transfer variant icon uses transfer color', async () => {
+      const { root } = await renderCard({ variant: 'transfer', leftIcon: 'swap-horizontal' });
       expect(root).toBeTruthy();
     });
 
-    it('default variant icon uses text color', () => {
-      const { root } = renderCard({ variant: 'default', leftIcon: 'account' });
+    it('default variant icon uses text color', async () => {
+      const { root } = await renderCard({ variant: 'default', leftIcon: 'account' });
       expect(root).toBeTruthy();
     });
 
-    it('icon background: expense variant uses altRow', () => {
-      const { root } = renderCard({ variant: 'expense', leftIcon: 'cart', leftIconBackground: true });
+    it('icon background: expense variant uses altRow', async () => {
+      const { root } = await renderCard({ variant: 'expense', leftIcon: 'cart', leftIconBackground: true });
       expect(root).toBeTruthy();
     });
 
-    it('icon background: income variant uses altRow', () => {
-      const { root } = renderCard({ variant: 'income', leftIcon: 'arrow-down', leftIconBackground: true });
+    it('icon background: income variant uses altRow', async () => {
+      const { root } = await renderCard({ variant: 'income', leftIcon: 'arrow-down', leftIconBackground: true });
       expect(root).toBeTruthy();
     });
 
-    it('icon background: transfer variant uses altRow', () => {
-      const { root } = renderCard({ variant: 'transfer', leftIcon: 'swap-horizontal', leftIconBackground: true });
+    it('icon background: transfer variant uses altRow', async () => {
+      const { root } = await renderCard({ variant: 'transfer', leftIcon: 'swap-horizontal', leftIconBackground: true });
       expect(root).toBeTruthy();
     });
 
-    it('icon background: default variant uses surface', () => {
-      const { root } = renderCard({ variant: 'default', leftIcon: 'account', leftIconBackground: true });
+    it('icon background: default variant uses surface', async () => {
+      const { root } = await renderCard({ variant: 'default', leftIcon: 'account', leftIconBackground: true });
       expect(root).toBeTruthy();
     });
   });
 
   describe('Right action', () => {
-    it('renders rightAction when provided', () => {
-      const { getByText } = render(
+    it('renders rightAction when provided', async () => {
+      const { getByText } = await render(
         <ListCard rightAction={<Text>Drag</Text>}>
           <Text>{childText}</Text>
         </ListCard>,
@@ -158,48 +158,48 @@ describe('ListCard', () => {
       expect(getByText('Drag')).toBeTruthy();
     });
 
-    it('does not render right action container when omitted', () => {
-      const { root } = renderCard();
+    it('does not render right action container when omitted', async () => {
+      const { root } = await renderCard();
       expect(root).toBeTruthy();
     });
   });
 
   describe('Border', () => {
-    it('renders with border by default', () => {
-      const { root } = renderCard();
+    it('renders with border by default', async () => {
+      const { root } = await renderCard();
       expect(root).toBeTruthy();
     });
 
-    it('renders without border when showBorder=false', () => {
-      const { root } = renderCard({ showBorder: false });
+    it('renders without border when showBorder=false', async () => {
+      const { root } = await renderCard({ showBorder: false });
       expect(root).toBeTruthy();
     });
   });
 
   describe('Interactions', () => {
-    it('calls onPress when pressed', () => {
+    it('calls onPress when pressed', async () => {
       const onPress = jest.fn();
-      const { getByRole } = renderCard({ onPress });
-      fireEvent.press(getByRole('button'));
+      const { getByRole } = await renderCard({ onPress });
+      await fireEvent.press(getByRole('button'));
       expect(onPress).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onLongPress when long pressed', () => {
+    it('calls onLongPress when long pressed', async () => {
       const onLongPress = jest.fn();
-      const { getByRole } = renderCard({ onLongPress });
+      const { getByRole } = await renderCard({ onLongPress });
       fireEvent(getByRole('button'), 'longPress');
       expect(onLongPress).toHaveBeenCalledTimes(1);
     });
 
-    it('works without onPress (no crash)', () => {
-      const { root } = renderCard();
+    it('works without onPress (no crash)', async () => {
+      const { root } = await renderCard();
       expect(root).toBeTruthy();
     });
   });
 
   describe('Custom style', () => {
-    it('accepts custom style override', () => {
-      const { root } = renderCard({ style: { paddingLeft: 40 } });
+    it('accepts custom style override', async () => {
+      const { root } = await renderCard({ style: { paddingLeft: 40 } });
       expect(root).toBeTruthy();
     });
   });

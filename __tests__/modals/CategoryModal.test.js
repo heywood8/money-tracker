@@ -118,8 +118,8 @@ describe('CategoryModal', () => {
   });
 
   describe('Rendering', () => {
-    it('renders correctly when visible for new category', () => {
-      const { getByText, getByPlaceholderText } = render(
+    it('renders correctly when visible for new category', async () => {
+      const { getByText, getByPlaceholderText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -127,7 +127,7 @@ describe('CategoryModal', () => {
       expect(getByPlaceholderText('category_name')).toBeTruthy();
     });
 
-    it('renders correctly when visible for editing category', () => {
+    it('renders correctly when visible for editing category', async () => {
       const mockCategory = {
         id: 'cat1',
         name: 'Food',
@@ -137,7 +137,7 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByText, getByDisplayValue } = render(
+      const { getByText, getByDisplayValue } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -146,8 +146,8 @@ describe('CategoryModal', () => {
       expect(getByText('delete_category')).toBeTruthy();
     });
 
-    it('does not render when not visible', () => {
-      const { queryByText } = render(
+    it('does not render when not visible', async () => {
+      const { queryByText } = await render(
         <CategoryModal visible={false} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -156,8 +156,8 @@ describe('CategoryModal', () => {
   });
 
   describe('Form Initialization', () => {
-    it('initializes with default values for new category', () => {
-      const { getByPlaceholderText } = render(
+    it('initializes with default values for new category', async () => {
+      const { getByPlaceholderText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -165,7 +165,7 @@ describe('CategoryModal', () => {
       expect(nameInput.props.value).toBe('');
     });
 
-    it('initializes with existing category values for edit mode', () => {
+    it('initializes with existing category values for edit mode', async () => {
       const mockCategory = {
         id: 'cat1',
         name: 'Food',
@@ -175,14 +175,14 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       expect(getByDisplayValue('Food')).toBeTruthy();
     });
 
-    it('handles category_type vs categoryType field names', () => {
+    it('handles category_type vs categoryType field names', async () => {
       const mockCategory = {
         id: 'cat1',
         name: 'Food',
@@ -192,7 +192,7 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -201,39 +201,39 @@ describe('CategoryModal', () => {
   });
 
   describe('User Interactions', () => {
-    it('allows name input', () => {
-      const { getByPlaceholderText } = render(
+    it('allows name input', async () => {
+      const { getByPlaceholderText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const nameInput = getByPlaceholderText('category_name');
-      fireEvent.changeText(nameInput, 'Entertainment');
+      await fireEvent.changeText(nameInput, 'Entertainment');
 
       expect(nameInput.props.value).toBe('Entertainment');
     });
 
-    it('opens icon picker when icon button is pressed', () => {
-      const { getByText } = render(
+    it('opens icon picker when icon button is pressed', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const iconButton = getByText('select_icon');
-      fireEvent.press(iconButton);
+      await fireEvent.press(iconButton);
 
       // Icon picker modal should be visible
       expect(getByText('Close Icon Picker')).toBeTruthy();
     });
 
-    it('selects icon from icon picker', () => {
-      const { getByText, getByTestId } = render(
+    it('selects icon from icon picker', async () => {
+      const { getByText, getByTestId } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const iconButton = getByText('select_icon');
-      fireEvent.press(iconButton);
+      await fireEvent.press(iconButton);
 
       const selectButton = getByTestId('icon-picker-select');
-      fireEvent.press(selectButton);
+      await fireEvent.press(selectButton);
 
       // Icon picker should close
       const closeButton = getByTestId('icon-picker-close');
@@ -243,8 +243,8 @@ describe('CategoryModal', () => {
   });
 
   describe('Type Selection', () => {
-    it('displays folder and entry options', () => {
-      const { getByText } = render(
+    it('displays folder and entry options', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -252,7 +252,7 @@ describe('CategoryModal', () => {
       expect(getByText('SELECT_TYPE')).toBeTruthy();
     });
 
-    it('prevents changing folder to entry when category has children', () => {
+    it('prevents changing folder to entry when category has children', async () => {
       const mockShowDialog = jest.fn();
       jest.spyOn(require('../../app/contexts/DialogContext'), 'useDialog').mockReturnValue({
         showDialog: mockShowDialog,
@@ -267,7 +267,7 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -276,7 +276,7 @@ describe('CategoryModal', () => {
       expect(typeButton).toBeTruthy();
     });
 
-    it('allows changing entry to folder', () => {
+    it('allows changing entry to folder', async () => {
       const mockCategory = {
         id: 'cat3',
         name: 'Groceries',
@@ -286,7 +286,7 @@ describe('CategoryModal', () => {
         parentId: 'cat1',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -295,8 +295,8 @@ describe('CategoryModal', () => {
   });
 
   describe('Category Type Selection', () => {
-    it('displays expense and income options', () => {
-      const { getByText } = render(
+    it('displays expense and income options', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -304,8 +304,8 @@ describe('CategoryModal', () => {
       expect(getByText('expense')).toBeTruthy();
     });
 
-    it('filters parent categories by category type', () => {
-      const { getByText } = render(
+    it('filters parent categories by category type', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -315,15 +315,15 @@ describe('CategoryModal', () => {
   });
 
   describe('Parent Category Selection', () => {
-    it('shows none option for parent category', () => {
-      const { getByText } = render(
+    it('shows none option for parent category', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(getByText('none')).toBeTruthy();
     });
 
-    it('excludes current category from parent list when editing', () => {
+    it('excludes current category from parent list when editing', async () => {
       const mockCategory = {
         id: 'cat1',
         name: 'Food',
@@ -333,7 +333,7 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -341,7 +341,7 @@ describe('CategoryModal', () => {
       expect(getByDisplayValue('Food')).toBeTruthy();
     });
 
-    it('displays parent name correctly', () => {
+    it('displays parent name correctly', async () => {
       const mockCategory = {
         id: 'cat3',
         name: 'Groceries',
@@ -351,7 +351,7 @@ describe('CategoryModal', () => {
         parentId: 'cat1',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
@@ -362,15 +362,15 @@ describe('CategoryModal', () => {
 
   describe('Form Validation', () => {
     it('validates category before saving', async () => {
-      const { getByPlaceholderText, getByText } = render(
+      const { getByPlaceholderText, getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const nameInput = getByPlaceholderText('category_name');
-      fireEvent.changeText(nameInput, 'New Category');
+      await fireEvent.changeText(nameInput, 'New Category');
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockValidateCategory).toHaveBeenCalled();
@@ -380,12 +380,12 @@ describe('CategoryModal', () => {
     it('shows error message when validation fails', async () => {
       mockValidateCategory.mockReturnValueOnce('Category name required');
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(getByText('Category name required')).toBeTruthy();
@@ -395,12 +395,12 @@ describe('CategoryModal', () => {
     it('does not save when validation fails', async () => {
       mockValidateCategory.mockReturnValueOnce('Invalid category');
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockAddCategory).not.toHaveBeenCalled();
@@ -412,15 +412,15 @@ describe('CategoryModal', () => {
     it('calls addCategory when saving new category with valid data', async () => {
       mockValidateCategory.mockReturnValue(null);
 
-      const { getByPlaceholderText, getByText } = render(
+      const { getByPlaceholderText, getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const nameInput = getByPlaceholderText('category_name');
-      fireEvent.changeText(nameInput, 'Entertainment');
+      await fireEvent.changeText(nameInput, 'Entertainment');
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockAddCategory).toHaveBeenCalledWith(
@@ -447,15 +447,15 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByDisplayValue, getByText } = render(
+      const { getByDisplayValue, getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       const nameInput = getByDisplayValue('Food');
-      fireEvent.changeText(nameInput, 'Food & Drink');
+      await fireEvent.changeText(nameInput, 'Food & Drink');
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockUpdateCategory).toHaveBeenCalledWith(
@@ -470,7 +470,7 @@ describe('CategoryModal', () => {
   });
 
   describe('Delete Operation', () => {
-    it('shows delete button only for existing categories', () => {
+    it('shows delete button only for existing categories', async () => {
       const mockCategory = {
         id: 'cat1',
         name: 'Food',
@@ -480,15 +480,15 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       expect(getByText('delete_category')).toBeTruthy();
     });
 
-    it('does not show delete button for new categories', () => {
-      const { queryByText } = render(
+    it('does not show delete button for new categories', async () => {
+      const { queryByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -496,7 +496,7 @@ describe('CategoryModal', () => {
       expect(deleteButton).toBeFalsy();
     });
 
-    it('shows confirmation dialog when delete is pressed', () => {
+    it('shows confirmation dialog when delete is pressed', async () => {
       const mockShowDialog = jest.fn();
       jest.spyOn(require('../../app/contexts/DialogContext'), 'useDialog').mockReturnValue({
         showDialog: mockShowDialog,
@@ -511,12 +511,12 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       const deleteButton = getByText('delete_category');
-      fireEvent.press(deleteButton);
+      await fireEvent.press(deleteButton);
 
       expect(mockShowDialog).toHaveBeenCalledWith(
         'delete_category',
@@ -548,12 +548,12 @@ describe('CategoryModal', () => {
         showDialog: mockShowDialog,
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       const deleteButton = getByText('delete_category');
-      fireEvent.press(deleteButton);
+      await fireEvent.press(deleteButton);
 
       await waitFor(() => {
         expect(mockDeleteCategory).toHaveBeenCalledWith('cat1');
@@ -564,38 +564,38 @@ describe('CategoryModal', () => {
 
   describe('Modal Dismissal', () => {
     it('calls onClose when cancel button is pressed', async () => {
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const cancelButton = getByText('cancel');
-      fireEvent.press(cancelButton);
+      await fireEvent.press(cancelButton);
 
       await waitFor(() => {
         expect(mockOnClose).toHaveBeenCalled();
       });
     });
 
-    it('clears errors when modal is closed and reopened', () => {
+    it('clears errors when modal is closed and reopened', async () => {
       mockValidateCategory.mockReturnValueOnce('Error message');
 
-      const { getByText, queryByText, rerender } = render(
+      const { getByText, queryByText, rerender } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Generate an error
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       // Error should be visible
       expect(getByText('Error message')).toBeTruthy();
 
       // Close modal
-      rerender(<CategoryModal visible={false} onClose={mockOnClose} isNew={true} />);
+      await rerender(<CategoryModal visible={false} onClose={mockOnClose} isNew={true} />);
 
       // Reopen modal
       mockValidateCategory.mockReturnValue(null);
-      rerender(<CategoryModal visible={true} onClose={mockOnClose} isNew={true} />);
+      await rerender(<CategoryModal visible={true} onClose={mockOnClose} isNew={true} />);
 
       // Error should be cleared
       expect(queryByText('Error message')).toBeFalsy();
@@ -604,14 +604,14 @@ describe('CategoryModal', () => {
 
   describe('Picker Modal Interactions', () => {
     it('opens type picker panel when type button is pressed', async () => {
-      const { queryByTestId, queryAllByText } = render(
+      const { queryByTestId, queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Find and press the type button (shows 'folder' by default)
       const folderTexts = queryAllByText('folder');
       if (folderTexts.length > 0) {
-        fireEvent.press(folderTexts[0]);
+        await fireEvent.press(folderTexts[0]);
       }
 
       // Type picker panel should show back button
@@ -621,14 +621,14 @@ describe('CategoryModal', () => {
     });
 
     it('opens category type picker panel when category type button is pressed', async () => {
-      const { queryByTestId, queryAllByText } = render(
+      const { queryByTestId, queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Find and press the category type button (shows 'expense' by default)
       const expenseTexts = queryAllByText('expense');
       if (expenseTexts.length > 0) {
-        fireEvent.press(expenseTexts[0]);
+        await fireEvent.press(expenseTexts[0]);
       }
 
       // Category type picker panel should show back button
@@ -638,14 +638,14 @@ describe('CategoryModal', () => {
     });
 
     it('opens parent picker panel when parent button is pressed', async () => {
-      const { queryByTestId, queryAllByText } = render(
+      const { queryByTestId, queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Find and press the parent button (shows 'none' by default)
       const noneTexts = queryAllByText('none');
       if (noneTexts.length > 0) {
-        fireEvent.press(noneTexts[0]);
+        await fireEvent.press(noneTexts[0]);
       }
 
       // Parent picker panel should show back button
@@ -655,14 +655,14 @@ describe('CategoryModal', () => {
     });
 
     it('renders parent picker with available categories', async () => {
-      const { queryByText, queryAllByText } = render(
+      const { queryByText, queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open parent picker
       const noneTexts = queryAllByText('none');
       if (noneTexts.length > 0) {
-        fireEvent.press(noneTexts[0]);
+        await fireEvent.press(noneTexts[0]);
       }
 
       // Should show category names in the picker
@@ -672,121 +672,121 @@ describe('CategoryModal', () => {
     });
 
     it('selects entry type from type picker and closes modal', async () => {
-      const { queryAllByText } = render(
+      const { queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open type picker
       const folderTexts = queryAllByText('folder');
       if (folderTexts.length > 0) {
-        fireEvent.press(folderTexts[0]);
+        await fireEvent.press(folderTexts[0]);
       }
 
       // Find and select 'entry' option
-      await waitFor(() => {
+      await waitFor(async () => {
         const entryTexts = queryAllByText('entry');
         if (entryTexts.length > 0) {
-          fireEvent.press(entryTexts[entryTexts.length - 1]);
+          await fireEvent.press(entryTexts[entryTexts.length - 1]);
         }
       });
     });
 
     it('selects income from category type picker and closes modal', async () => {
-      const { queryAllByText } = render(
+      const { queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open category type picker
       const expenseTexts = queryAllByText('expense');
       if (expenseTexts.length > 0) {
-        fireEvent.press(expenseTexts[0]);
+        await fireEvent.press(expenseTexts[0]);
       }
 
       // Find and select 'income' option
-      await waitFor(() => {
+      await waitFor(async () => {
         const incomeTexts = queryAllByText('income');
         if (incomeTexts.length > 0) {
-          fireEvent.press(incomeTexts[incomeTexts.length - 1]);
+          await fireEvent.press(incomeTexts[incomeTexts.length - 1]);
         }
       });
     });
 
     it('selects parent category from parent picker', async () => {
-      const { queryAllByText } = render(
+      const { queryAllByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open parent picker
       const noneTexts = queryAllByText('none');
       if (noneTexts.length > 0) {
-        fireEvent.press(noneTexts[0]);
+        await fireEvent.press(noneTexts[0]);
       }
 
       // Find and select 'Food' category as parent
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodTexts = queryAllByText('Food');
         if (foodTexts.length > 0) {
-          fireEvent.press(foodTexts[foodTexts.length - 1]);
+          await fireEvent.press(foodTexts[foodTexts.length - 1]);
         }
       });
     });
 
     it('closes type picker via back button', async () => {
-      const { queryAllByText, queryByTestId } = render(
+      const { queryAllByText, queryByTestId } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open type picker
       const folderTexts = queryAllByText('folder');
       if (folderTexts.length > 0) {
-        fireEvent.press(folderTexts[0]);
+        await fireEvent.press(folderTexts[0]);
       }
 
       // Press back button
-      await waitFor(() => {
+      await waitFor(async () => {
         const backButton = queryByTestId('picker-back-button');
         if (backButton) {
-          fireEvent.press(backButton);
+          await fireEvent.press(backButton);
         }
       });
     });
 
     it('closes category type picker via back button', async () => {
-      const { queryAllByText, queryByTestId } = render(
+      const { queryAllByText, queryByTestId } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open category type picker
       const expenseTexts = queryAllByText('expense');
       if (expenseTexts.length > 0) {
-        fireEvent.press(expenseTexts[0]);
+        await fireEvent.press(expenseTexts[0]);
       }
 
       // Press back button
-      await waitFor(() => {
+      await waitFor(async () => {
         const backButton = queryByTestId('picker-back-button');
         if (backButton) {
-          fireEvent.press(backButton);
+          await fireEvent.press(backButton);
         }
       });
     });
 
     it('closes parent picker via back button', async () => {
-      const { queryAllByText, queryByTestId } = render(
+      const { queryAllByText, queryByTestId } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open parent picker
       const noneTexts = queryAllByText('none');
       if (noneTexts.length > 0) {
-        fireEvent.press(noneTexts[0]);
+        await fireEvent.press(noneTexts[0]);
       }
 
       // Press back button
-      await waitFor(() => {
+      await waitFor(async () => {
         const backButton = queryByTestId('picker-back-button');
         if (backButton) {
-          fireEvent.press(backButton);
+          await fireEvent.press(backButton);
         }
       });
     });
@@ -802,13 +802,13 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByText, queryByText } = render(
+      const { getByText, queryByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 
       // Open type picker
       const typeButton = getByText('folder');
-      fireEvent.press(typeButton);
+      await fireEvent.press(typeButton);
 
       // Entry option should be visible (possibly with warning indicator)
       await waitFor(() => {
@@ -818,13 +818,13 @@ describe('CategoryModal', () => {
     });
 
     it('renders parent picker with icon and name', async () => {
-      const { getByText, queryByText } = render(
+      const { getByText, queryByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Open parent picker
       const parentButton = getByText('none');
-      fireEvent.press(parentButton);
+      await fireEvent.press(parentButton);
 
       // Should show category names in the picker
       await waitFor(() => {
@@ -835,15 +835,15 @@ describe('CategoryModal', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles missing category data gracefully', () => {
-      const { getByText } = render(
+    it('handles missing category data gracefully', async () => {
+      const { getByText } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={null} isNew={true} />,
       );
 
       expect(getByText('add_category')).toBeTruthy();
     });
 
-    it('handles categories with nameKey for translations', () => {
+    it('handles categories with nameKey for translations', async () => {
       const mockCategory = {
         id: 'cat1',
         nameKey: 'food_category',
@@ -854,7 +854,7 @@ describe('CategoryModal', () => {
         parentId: null,
       };
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <CategoryModal visible={true} onClose={mockOnClose} category={mockCategory} isNew={false} />,
       );
 

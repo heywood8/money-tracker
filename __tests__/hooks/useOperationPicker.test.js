@@ -38,8 +38,8 @@ describe('useOperationPicker', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should initialize with default state', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
       expect(result.current.pickerState).toEqual({
         visible: false,
@@ -55,10 +55,10 @@ describe('useOperationPicker', () => {
   });
 
   describe('openPicker', () => {
-    it('should open picker for non-category type', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should open picker for non-category type', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('account', mockAccounts);
       });
 
@@ -71,10 +71,10 @@ describe('useOperationPicker', () => {
       });
     });
 
-    it('should open picker for categories with root items only', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should open picker for categories with root items only', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
@@ -90,22 +90,22 @@ describe('useOperationPicker', () => {
       expect(result.current.pickerState.data).toContainEqual(mockCategories[5]); // Income
     });
 
-    it('should reset category navigation on open', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should reset category navigation on open', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
       // First navigate into a folder
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(mockCategories[0]); // Food folder
       });
 
       expect(result.current.categoryNavigation.currentFolderId).toBe('cat-1');
 
       // Open picker again
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
@@ -118,16 +118,16 @@ describe('useOperationPicker', () => {
   });
 
   describe('closePicker', () => {
-    it('should close picker and reset state', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should close picker and reset state', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('account', mockAccounts);
       });
 
       expect(result.current.pickerState.visible).toBe(true);
 
-      act(() => {
+      await act(async () => {
         result.current.closePicker();
       });
 
@@ -145,14 +145,14 @@ describe('useOperationPicker', () => {
   });
 
   describe('navigateIntoFolder', () => {
-    it('should navigate into folder and show children', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should navigate into folder and show children', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(mockCategories[0]); // Food folder
       });
 
@@ -167,19 +167,19 @@ describe('useOperationPicker', () => {
       expect(result.current.pickerState.data).toContainEqual(mockCategories[2]); // Dining
     });
 
-    it('should use name if nameKey is not present', () => {
+    it('should use name if nameKey is not present', async () => {
       const categoriesWithoutKeys = [
         { id: 'cat-1', name: 'Food', parentId: null, type: 'folder' },
         { id: 'cat-2', name: 'Groceries', parentId: 'cat-1', type: 'entry' },
       ];
 
-      const { result } = renderHook(() => useOperationPicker(mockT));
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', categoriesWithoutKeys);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(categoriesWithoutKeys[0]);
       });
 
@@ -188,27 +188,27 @@ describe('useOperationPicker', () => {
       ]);
     });
 
-    it('should build breadcrumb trail for nested navigation', () => {
+    it('should build breadcrumb trail for nested navigation', async () => {
       const deepCategories = [
         ...mockCategories,
         { id: 'cat-7', name: 'Subfolder', parentId: 'cat-1', type: 'folder' },
         { id: 'cat-8', name: 'Subentry', parentId: 'cat-7', type: 'entry' },
       ];
 
-      const { result } = renderHook(() => useOperationPicker(mockT));
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', deepCategories);
       });
 
       // Navigate into Food
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(deepCategories[0]);
       });
 
       // Navigate into Subfolder
       const subfolder = deepCategories.find(c => c.id === 'cat-7');
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(subfolder);
       });
 
@@ -219,22 +219,22 @@ describe('useOperationPicker', () => {
   });
 
   describe('navigateBack', () => {
-    it('should navigate back to parent folder', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should navigate back to parent folder', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
       // Navigate into Food folder
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(mockCategories[0]);
       });
 
       expect(result.current.categoryNavigation.currentFolderId).toBe('cat-1');
 
       // Navigate back
-      act(() => {
+      await act(async () => {
         result.current.navigateBack();
       });
 
@@ -245,34 +245,34 @@ describe('useOperationPicker', () => {
       expect(result.current.pickerState.data).toHaveLength(3);
     });
 
-    it('should navigate back through multiple levels', () => {
+    it('should navigate back through multiple levels', async () => {
       const deepCategories = [
         ...mockCategories,
         { id: 'cat-7', name: 'Subfolder', parentId: 'cat-1', type: 'folder' },
         { id: 'cat-8', name: 'Subentry', parentId: 'cat-7', type: 'entry' },
       ];
 
-      const { result } = renderHook(() => useOperationPicker(mockT));
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', deepCategories);
       });
 
       // Navigate into Food
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(deepCategories[0]);
       });
 
       // Navigate into Subfolder
       const subfolder = deepCategories.find(c => c.id === 'cat-7');
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(subfolder);
       });
 
       expect(result.current.categoryNavigation.currentFolderId).toBe('cat-7');
 
       // Navigate back to Food
-      act(() => {
+      await act(async () => {
         result.current.navigateBack();
       });
 
@@ -280,7 +280,7 @@ describe('useOperationPicker', () => {
       expect(result.current.categoryNavigation.breadcrumb).toHaveLength(1);
 
       // Navigate back to root
-      act(() => {
+      await act(async () => {
         result.current.navigateBack();
       });
 
@@ -288,15 +288,15 @@ describe('useOperationPicker', () => {
       expect(result.current.categoryNavigation.breadcrumb).toHaveLength(0);
     });
 
-    it('should handle navigateBack from root gracefully', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should handle navigateBack from root gracefully', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
       // Already at root, navigateBack should not crash
-      act(() => {
+      await act(async () => {
         result.current.navigateBack();
       });
 
@@ -306,10 +306,10 @@ describe('useOperationPicker', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty category list', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should handle empty category list', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', []);
       });
 
@@ -317,18 +317,18 @@ describe('useOperationPicker', () => {
       expect(result.current.pickerState.allCategories).toEqual([]);
     });
 
-    it('should handle navigating into folder with no children', () => {
+    it('should handle navigating into folder with no children', async () => {
       const categoriesWithEmptyFolder = [
         { id: 'cat-1', name: 'Empty Folder', parentId: null, type: 'folder' },
       ];
 
-      const { result } = renderHook(() => useOperationPicker(mockT));
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', categoriesWithEmptyFolder);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(categoriesWithEmptyFolder[0]);
       });
 
@@ -336,19 +336,19 @@ describe('useOperationPicker', () => {
       expect(result.current.categoryNavigation.currentFolderId).toBe('cat-1');
     });
 
-    it('should handle category without nameKey', () => {
+    it('should handle category without nameKey', async () => {
       const categories = [
         { id: 'cat-1', name: 'Custom Category', parentId: null, type: 'folder' },
         { id: 'cat-2', name: 'Child', parentId: 'cat-1', type: 'entry' },
       ];
 
-      const { result } = renderHook(() => useOperationPicker(mockT));
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', categories);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(categories[0]);
       });
 
@@ -357,17 +357,17 @@ describe('useOperationPicker', () => {
   });
 
   describe('Regression Tests', () => {
-    it('should maintain allCategories throughout navigation', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should maintain allCategories throughout navigation', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
       const allCategoriesBefore = result.current.pickerState.allCategories;
 
       // Navigate into folder
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(mockCategories[0]);
       });
 
@@ -377,14 +377,14 @@ describe('useOperationPicker', () => {
       expect(allCategoriesAfter).toEqual(allCategoriesBefore);
     });
 
-    it('should filter by parentId correctly', () => {
-      const { result } = renderHook(() => useOperationPicker(mockT));
+    it('should filter by parentId correctly', async () => {
+      const { result } = await renderHook(() => useOperationPicker(mockT));
 
-      act(() => {
+      await act(async () => {
         result.current.openPicker('category', mockCategories);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.navigateIntoFolder(mockCategories[0]); // Food
       });
 

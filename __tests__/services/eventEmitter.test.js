@@ -49,7 +49,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Event Registration (on)', () => {
-    it('should register a listener for an event', () => {
+    it('should register a listener for an event', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -57,7 +57,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).toContain(listener);
     });
 
-    it('should create event array if it does not exist', () => {
+    it('should create event array if it does not exist', async () => {
       const listener = jest.fn();
       
       expect(emitter.events['new-event']).toBeUndefined();
@@ -68,7 +68,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['new-event']).toHaveLength(1);
     });
 
-    it('should register multiple listeners for the same event', () => {
+    it('should register multiple listeners for the same event', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       const listener3 = jest.fn();
@@ -83,7 +83,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).toContain(listener3);
     });
 
-    it('should register listeners for different events independently', () => {
+    it('should register listeners for different events independently', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       
@@ -96,7 +96,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['event-2']).not.toContain(listener1);
     });
 
-    it('should return an unsubscribe function', () => {
+    it('should return an unsubscribe function', async () => {
       const listener = jest.fn();
       
       const unsubscribe = emitter.on('test-event', listener);
@@ -106,7 +106,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Event Emission (emit)', () => {
-    it('should call all registered listeners when event is emitted', () => {
+    it('should call all registered listeners when event is emitted', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       
@@ -119,7 +119,7 @@ describe('EventEmitter', () => {
       expect(listener2).toHaveBeenCalledTimes(1);
     });
 
-    it('should pass data to listeners', () => {
+    it('should pass data to listeners', async () => {
       const listener = jest.fn();
       const testData = { id: 123, name: 'Test' };
       
@@ -129,13 +129,13 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledWith(testData);
     });
 
-    it('should handle emitting non-existent event gracefully', () => {
+    it('should handle emitting non-existent event gracefully', async () => {
       expect(() => {
         emitter.emit('non-existent-event');
       }).not.toThrow();
     });
 
-    it('should not call listeners for different events', () => {
+    it('should not call listeners for different events', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       
@@ -148,7 +148,7 @@ describe('EventEmitter', () => {
       expect(listener2).not.toHaveBeenCalled();
     });
 
-    it('should call listeners in order of registration', () => {
+    it('should call listeners in order of registration', async () => {
       const callOrder = [];
       const listener1 = jest.fn(() => callOrder.push(1));
       const listener2 = jest.fn(() => callOrder.push(2));
@@ -163,7 +163,7 @@ describe('EventEmitter', () => {
       expect(callOrder).toEqual([1, 2, 3]);
     });
 
-    it('should handle listener errors gracefully and continue executing other listeners', () => {
+    it('should handle listener errors gracefully and continue executing other listeners', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const listener1 = jest.fn(() => {
         throw new Error('Listener 1 error');
@@ -188,7 +188,7 @@ describe('EventEmitter', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should allow same listener to be called multiple times for multiple emissions', () => {
+    it('should allow same listener to be called multiple times for multiple emissions', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -205,7 +205,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Event Unsubscription (unsubscribe function)', () => {
-    it('should remove listener when unsubscribe function is called', () => {
+    it('should remove listener when unsubscribe function is called', async () => {
       const listener = jest.fn();
       
       const unsubscribe = emitter.on('test-event', listener);
@@ -216,7 +216,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).not.toContain(listener);
     });
 
-    it('should not call listener after unsubscribing', () => {
+    it('should not call listener after unsubscribing', async () => {
       const listener = jest.fn();
       
       const unsubscribe = emitter.on('test-event', listener);
@@ -229,7 +229,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledTimes(1); // Still 1, not 2
     });
 
-    it('should only remove the specific listener, not others', () => {
+    it('should only remove the specific listener, not others', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       const listener3 = jest.fn();
@@ -246,7 +246,7 @@ describe('EventEmitter', () => {
       expect(listener3).toHaveBeenCalled();
     });
 
-    it('should handle calling unsubscribe multiple times gracefully', () => {
+    it('should handle calling unsubscribe multiple times gracefully', async () => {
       const listener = jest.fn();
       
       const unsubscribe = emitter.on('test-event', listener);
@@ -258,7 +258,7 @@ describe('EventEmitter', () => {
       }).not.toThrow();
     });
 
-    it('should work correctly when unsubscribing during event emission', () => {
+    it('should work correctly when unsubscribing during event emission', async () => {
       const listener1 = jest.fn();
       let unsubscribe2;
       const listener2 = jest.fn(() => {
@@ -286,7 +286,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Event Unsubscription (off method)', () => {
-    it('should remove listener using off method', () => {
+    it('should remove listener using off method', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -297,7 +297,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).not.toContain(listener);
     });
 
-    it('should handle removing listener from non-existent event gracefully', () => {
+    it('should handle removing listener from non-existent event gracefully', async () => {
       const listener = jest.fn();
       
       expect(() => {
@@ -305,7 +305,7 @@ describe('EventEmitter', () => {
       }).not.toThrow();
     });
 
-    it('should handle removing non-existent listener gracefully', () => {
+    it('should handle removing non-existent listener gracefully', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       
@@ -318,7 +318,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).toContain(listener1);
     });
 
-    it('should only remove specified listener, not all listeners', () => {
+    it('should only remove specified listener, not all listeners', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
       const listener3 = jest.fn();
@@ -337,14 +337,14 @@ describe('EventEmitter', () => {
   });
 
   describe('Singleton Instance (appEvents)', () => {
-    it('should export a singleton instance', () => {
+    it('should export a singleton instance', async () => {
       expect(appEvents).toBeDefined();
       expect(typeof appEvents.on).toBe('function');
       expect(typeof appEvents.emit).toBe('function');
       expect(typeof appEvents.off).toBe('function');
     });
 
-    it('should maintain state across multiple imports', () => {
+    it('should maintain state across multiple imports', async () => {
       const listener = jest.fn();
       
       appEvents.on('singleton-test', listener);
@@ -353,7 +353,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledWith('test-data');
     });
 
-    it('should have independent events from new instances', () => {
+    it('should have independent events from new instances', async () => {
       const newEmitter = new EventEmitter();
       const listener1 = jest.fn();
       const listener2 = jest.fn();
@@ -369,23 +369,23 @@ describe('EventEmitter', () => {
   });
 
   describe('Event Constants (EVENTS)', () => {
-    it('should export DATABASE_RESET event constant', () => {
+    it('should export DATABASE_RESET event constant', async () => {
       expect(EVENTS.DATABASE_RESET).toBe('database:reset');
     });
 
-    it('should export RELOAD_ALL event constant', () => {
+    it('should export RELOAD_ALL event constant', async () => {
       expect(EVENTS.RELOAD_ALL).toBe('reload:all');
     });
 
-    it('should export OPERATION_CHANGED event constant', () => {
+    it('should export OPERATION_CHANGED event constant', async () => {
       expect(EVENTS.OPERATION_CHANGED).toBe('operation:changed');
     });
 
-    it('should export BUDGETS_NEED_REFRESH event constant', () => {
+    it('should export BUDGETS_NEED_REFRESH event constant', async () => {
       expect(EVENTS.BUDGETS_NEED_REFRESH).toBe('budgets:refresh');
     });
 
-    it('should allow using constants with appEvents', () => {
+    it('should allow using constants with appEvents', async () => {
       const listener = jest.fn();
       
       appEvents.on(EVENTS.DATABASE_RESET, listener);
@@ -396,7 +396,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Edge Cases and Error Handling', () => {
-    it('should handle undefined data in emit', () => {
+    it('should handle undefined data in emit', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -405,7 +405,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledWith(undefined);
     });
 
-    it('should handle null data in emit', () => {
+    it('should handle null data in emit', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -414,7 +414,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledWith(null);
     });
 
-    it('should handle complex data structures', () => {
+    it('should handle complex data structures', async () => {
       const listener = jest.fn();
       const complexData = {
         nested: {
@@ -433,7 +433,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledWith(complexData);
     });
 
-    it('should handle rapid successive emissions', () => {
+    it('should handle rapid successive emissions', async () => {
       const listener = jest.fn();
       
       emitter.on('test-event', listener);
@@ -445,7 +445,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledTimes(100);
     });
 
-    it('should handle many listeners for same event', () => {
+    it('should handle many listeners for same event', async () => {
       const listeners = [];
       
       for (let i = 0; i < 50; i++) {
@@ -490,7 +490,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Real-World Usage Patterns', () => {
-    it('should support typical reload pattern', () => {
+    it('should support typical reload pattern', async () => {
       const reloadAccounts = jest.fn();
       const reloadOperations = jest.fn();
       const reloadCategories = jest.fn();
@@ -506,7 +506,7 @@ describe('EventEmitter', () => {
       expect(reloadCategories).toHaveBeenCalled();
     });
 
-    it('should support operation change notifications', () => {
+    it('should support operation change notifications', async () => {
       const updateBudgets = jest.fn();
       const refreshGraphs = jest.fn();
       
@@ -520,7 +520,7 @@ describe('EventEmitter', () => {
       expect(refreshGraphs).toHaveBeenCalledWith(operationData);
     });
 
-    it('should support cleanup pattern with unsubscribe', () => {
+    it('should support cleanup pattern with unsubscribe', async () => {
       const listener = jest.fn();
       
       const unsubscribe = appEvents.on(EVENTS.DATABASE_RESET, listener);
@@ -535,7 +535,7 @@ describe('EventEmitter', () => {
       expect(listener).toHaveBeenCalledTimes(1); // Still 1, not called again
     });
 
-    it('should support multiple event types for same listener', () => {
+    it('should support multiple event types for same listener', async () => {
       const refreshUI = jest.fn();
       
       appEvents.on(EVENTS.DATABASE_RESET, refreshUI);
@@ -554,7 +554,7 @@ describe('EventEmitter', () => {
   });
 
   describe('Memory Management', () => {
-    it('should allow garbage collection of unsubscribed listeners', () => {
+    it('should allow garbage collection of unsubscribed listeners', async () => {
       let listener = jest.fn();
       const weakRef = new WeakRef(listener);
       
@@ -567,7 +567,7 @@ describe('EventEmitter', () => {
       expect(emitter.events['test-event']).toHaveLength(0);
     });
 
-    it('should not accumulate listeners after repeated subscribe/unsubscribe', () => {
+    it('should not accumulate listeners after repeated subscribe/unsubscribe', async () => {
       for (let i = 0; i < 100; i++) {
         const listener = jest.fn();
         const unsubscribe = emitter.on('test-event', listener);
@@ -579,7 +579,7 @@ describe('EventEmitter', () => {
   });
 
   describe('appEvents singleton - uncovered paths', () => {
-    it('appEvents.emit catches and logs listener errors without stopping other listeners', () => {
+    it('appEvents.emit catches and logs listener errors without stopping other listeners', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const throwingListener = jest.fn(() => { throw new Error('boom'); });
       const normalListener = jest.fn();
@@ -599,11 +599,11 @@ describe('EventEmitter', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('appEvents.off on a non-existent event does not throw', () => {
+    it('appEvents.off on a non-existent event does not throw', async () => {
       expect(() => appEvents.off('does-not-exist', jest.fn())).not.toThrow();
     });
 
-    it('appEvents.off removes a specific listener from the singleton', () => {
+    it('appEvents.off removes a specific listener from the singleton', async () => {
       const listener = jest.fn();
       appEvents.on('off-test', listener);
       appEvents.off('off-test', listener);

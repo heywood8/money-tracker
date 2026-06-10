@@ -71,7 +71,7 @@ describe('CategoriesContext', () => {
 
   describe('Initialization', () => {
     it('provides categories context with default values', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -92,7 +92,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(mockCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -107,7 +107,7 @@ describe('CategoriesContext', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(defaultCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -124,7 +124,7 @@ describe('CategoriesContext', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      renderHook(() => useCategories(), { wrapper });
+      await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(CategoriesDB.initializeDefaultCategories).toHaveBeenCalledWith('ru');
@@ -134,7 +134,7 @@ describe('CategoriesContext', () => {
     it('skips loading on first launch', async () => {
       mockIsFirstLaunch.mockReturnValue(true);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -147,7 +147,7 @@ describe('CategoriesContext', () => {
     it('falls back to default categories on error', async () => {
       CategoriesDB.getAllCategories.mockRejectedValue(new Error('Load failed'));
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -160,7 +160,7 @@ describe('CategoriesContext', () => {
   describe('CRUD Operations', () => {
     it('adds a new category', async () => {
       CategoriesDB.getAllCategories.mockResolvedValue([]);
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -195,7 +195,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -221,7 +221,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -247,7 +247,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -264,7 +264,7 @@ describe('CategoriesContext', () => {
 
     it('handles add category error and shows dialog', async () => {
       CategoriesDB.getAllCategories.mockResolvedValue([]);
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -301,7 +301,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -328,7 +328,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -352,7 +352,7 @@ describe('CategoriesContext', () => {
 
   describe('Validation', () => {
     it('validates category with all required fields', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -369,7 +369,7 @@ describe('CategoriesContext', () => {
     });
 
     it('rejects category without name', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -386,7 +386,7 @@ describe('CategoriesContext', () => {
     });
 
     it('rejects category with empty name', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -403,7 +403,7 @@ describe('CategoriesContext', () => {
     });
 
     it('rejects category without categoryType', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -420,7 +420,7 @@ describe('CategoriesContext', () => {
     });
 
     it('accepts category with category_type (snake_case)', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -437,7 +437,7 @@ describe('CategoriesContext', () => {
     });
 
     it('rejects category without icon', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -454,7 +454,7 @@ describe('CategoriesContext', () => {
     });
 
     it('uses translation function for validation messages', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -471,7 +471,7 @@ describe('CategoriesContext', () => {
 
   describe('Hierarchy Functions', () => {
     it('toggles expanded state for category', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -479,13 +479,13 @@ describe('CategoriesContext', () => {
 
       expect(result.current.expandedIds.has('cat1')).toBe(false);
 
-      act(() => {
+      await act(async () => {
         result.current.toggleExpanded('cat1');
       });
 
       expect(result.current.expandedIds.has('cat1')).toBe(true);
 
-      act(() => {
+      await act(async () => {
         result.current.toggleExpanded('cat1');
       });
 
@@ -501,7 +501,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -519,7 +519,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -538,7 +538,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -557,7 +557,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -575,7 +575,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(existingCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -601,7 +601,7 @@ describe('CategoriesContext', () => {
         .mockResolvedValueOnce(initialCategories)
         .mockResolvedValueOnce(reloadedCategories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -632,7 +632,7 @@ describe('CategoriesContext', () => {
           { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense' },
         ]);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -664,7 +664,7 @@ describe('CategoriesContext', () => {
         { id: 'cat1', name: 'Food', type: 'folder', categoryType: 'expense' },
       ]);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -673,7 +673,7 @@ describe('CategoriesContext', () => {
       expect(result.current.categories).toHaveLength(1);
 
       // Trigger the reset event
-      act(() => {
+      await act(async () => {
         resetListener();
       });
 
@@ -690,7 +690,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(categories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -706,7 +706,7 @@ describe('CategoriesContext', () => {
 
     it('clears save error after successful operation', async () => {
       CategoriesDB.getAllCategories.mockResolvedValue([]);
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -745,7 +745,7 @@ describe('CategoriesContext', () => {
 
     it('handles concurrent category additions', async () => {
       CategoriesDB.getAllCategories.mockResolvedValue([]);
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -778,7 +778,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(categories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -803,7 +803,7 @@ describe('CategoriesContext', () => {
       ];
       CategoriesDB.getAllCategories.mockResolvedValue(categories);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -819,13 +819,13 @@ describe('CategoriesContext', () => {
     });
 
     it('handles multiple expanded categories', async () => {
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.toggleExpanded('cat1');
         result.current.toggleExpanded('cat2');
         result.current.toggleExpanded('cat3');
@@ -845,7 +845,7 @@ describe('CategoriesContext', () => {
           { id: 'cat1', name: 'Еда', type: 'folder', categoryType: 'expense' },
         ]);
 
-      const { result } = renderHook(() => useCategories(), { wrapper });
+      const { result } = await renderHook(() => useCategories(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

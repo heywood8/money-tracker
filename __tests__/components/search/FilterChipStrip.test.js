@@ -31,13 +31,13 @@ describe('FilterChipStrip', () => {
     jest.clearAllMocks();
   });
 
-  it('returns null when no filter groups are active', () => {
-    const { toJSON } = render(<FilterChipStrip {...defaultProps} />);
+  it('returns null when no filter groups are active', async () => {
+    const { toJSON } = await render(<FilterChipStrip {...defaultProps} />);
     expect(toJSON()).toBeNull();
   });
 
-  it('renders a chip for active types (single type shows type name)', () => {
-    const { getByText } = render(
+  it('renders a chip for active types (single type shows type name)', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, types: ['expense'] }}
@@ -46,8 +46,8 @@ describe('FilterChipStrip', () => {
     expect(getByText('expense')).toBeTruthy();
   });
 
-  it('renders "operation_type: N" for multiple active types', () => {
-    const { getByText } = render(
+  it('renders "operation_type: N" for multiple active types', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, types: ['expense', 'income'] }}
@@ -56,8 +56,8 @@ describe('FilterChipStrip', () => {
     expect(getByText('operation_type: 2')).toBeTruthy();
   });
 
-  it('renders a chip for active date range (both dates)', () => {
-    const { getByTestId } = render(
+  it('renders a chip for active date range (both dates)', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, dateRange: { startDate: '2024-04-01', endDate: '2024-04-30' } }}
@@ -66,8 +66,8 @@ describe('FilterChipStrip', () => {
     expect(getByTestId('chip-dateRange')).toBeTruthy();
   });
 
-  it('renders a chip for start date only', () => {
-    const { getByTestId } = render(
+  it('renders a chip for start date only', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, dateRange: { startDate: '2024-04-01', endDate: null } }}
@@ -76,8 +76,8 @@ describe('FilterChipStrip', () => {
     expect(getByTestId('chip-dateRange')).toBeTruthy();
   });
 
-  it('renders "accounts: N" chip for active accountIds', () => {
-    const { getByText } = render(
+  it('renders "accounts: N" chip for active accountIds', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, accountIds: ['a1', 'a2'] }}
@@ -86,8 +86,8 @@ describe('FilterChipStrip', () => {
     expect(getByText('accounts: 2')).toBeTruthy();
   });
 
-  it('renders "> min" label for min-only amount range', () => {
-    const { getByText } = render(
+  it('renders "> min" label for min-only amount range', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, amountRange: { min: 50, max: null } }}
@@ -96,8 +96,8 @@ describe('FilterChipStrip', () => {
     expect(getByText('> 50')).toBeTruthy();
   });
 
-  it('renders "< max" label for max-only amount range', () => {
-    const { getByText } = render(
+  it('renders "< max" label for max-only amount range', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, amountRange: { min: null, max: 200 } }}
@@ -106,8 +106,8 @@ describe('FilterChipStrip', () => {
     expect(getByText('< 200')).toBeTruthy();
   });
 
-  it('renders "min – max" label for both amount bounds', () => {
-    const { getByText } = render(
+  it('renders "min – max" label for both amount bounds', async () => {
+    const { getByText } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, amountRange: { min: 50, max: 200 } }}
@@ -116,30 +116,30 @@ describe('FilterChipStrip', () => {
     expect(getByText('50 – 200')).toBeTruthy();
   });
 
-  it('calls onClearGroup with "types" when types chip ✕ is pressed', () => {
-    const { getByTestId } = render(
+  it('calls onClearGroup with "types" when types chip ✕ is pressed', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, types: ['expense'] }}
       />,
     );
-    fireEvent.press(getByTestId('clear-chip-types'));
+    await fireEvent.press(getByTestId('clear-chip-types'));
     expect(defaultProps.onClearGroup).toHaveBeenCalledWith('types');
   });
 
-  it('calls onClearGroup with "accountIds" when accounts chip ✕ is pressed', () => {
-    const { getByTestId } = render(
+  it('calls onClearGroup with "accountIds" when accounts chip ✕ is pressed', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, accountIds: ['a1'] }}
       />,
     );
-    fireEvent.press(getByTestId('clear-chip-accountIds'));
+    await fireEvent.press(getByTestId('clear-chip-accountIds'));
     expect(defaultProps.onClearGroup).toHaveBeenCalledWith('accountIds');
   });
 
-  it('renders multiple chips when multiple groups are active', () => {
-    const { getByTestId } = render(
+  it('renders multiple chips when multiple groups are active', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{
@@ -153,8 +153,8 @@ describe('FilterChipStrip', () => {
     expect(getByTestId('chip-accountIds')).toBeTruthy();
   });
 
-  it('renders endDate-only date chip when only endDate is set', () => {
-    const { getByTestId } = render(
+  it('renders endDate-only date chip when only endDate is set', async () => {
+    const { getByTestId } = await render(
       <FilterChipStrip
         {...defaultProps}
         searchState={{ ...emptySearchState, dateRange: { startDate: null, endDate: '2024-04-30' } }}

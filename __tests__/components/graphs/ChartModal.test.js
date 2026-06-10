@@ -123,70 +123,70 @@ describe('ChartModal', () => {
   });
 
   describe('Rendering', () => {
-    it('renders when visible is true', () => {
-      const { getByText } = render(<ChartModal {...defaultProps} />);
+    it('renders when visible is true', async () => {
+      const { getByText } = await render(<ChartModal {...defaultProps} />);
       expect(getByText('Expenses by Category')).toBeTruthy();
     });
 
-    it('does not render content when visible is false', () => {
-      const { queryByText } = render(<ChartModal {...defaultProps} visible={false} />);
+    it('does not render content when visible is false', async () => {
+      const { queryByText } = await render(<ChartModal {...defaultProps} visible={false} />);
       expect(queryByText('Expenses by Category')).toBeNull();
     });
 
-    it('renders close button', () => {
-      const { getByText } = render(<ChartModal {...defaultProps} />);
+    it('renders close button', async () => {
+      const { getByText } = await render(<ChartModal {...defaultProps} />);
       expect(getByText('Close')).toBeTruthy();
     });
 
-    it('calls onClose when close button is pressed', () => {
+    it('calls onClose when close button is pressed', async () => {
       const onClose = jest.fn();
-      const { getByText } = render(<ChartModal {...defaultProps} onClose={onClose} />);
+      const { getByText } = await render(<ChartModal {...defaultProps} onClose={onClose} />);
 
-      fireEvent.press(getByText('Close'));
+      await fireEvent.press(getByText('Close'));
 
       expect(onClose).toHaveBeenCalled();
     });
   });
 
   describe('Expense mode', () => {
-    it('renders expense chart title', () => {
-      const { getByText } = render(<ChartModal {...defaultProps} modalType="expense" />);
+    it('renders expense chart title', async () => {
+      const { getByText } = await render(<ChartModal {...defaultProps} modalType="expense" />);
       expect(getByText('Expenses by Category')).toBeTruthy();
     });
 
-    it('renders ExpensePieChart component', () => {
-      const { getByTestId } = render(<ChartModal {...defaultProps} modalType="expense" />);
+    it('renders ExpensePieChart component', async () => {
+      const { getByTestId } = await render(<ChartModal {...defaultProps} modalType="expense" />);
       expect(getByTestId('expense-pie-chart')).toBeTruthy();
     });
 
-    it('does not render IncomePieChart in expense mode', () => {
-      const { queryByTestId } = render(<ChartModal {...defaultProps} modalType="expense" />);
+    it('does not render IncomePieChart in expense mode', async () => {
+      const { queryByTestId } = await render(<ChartModal {...defaultProps} modalType="expense" />);
       expect(queryByTestId('income-pie-chart')).toBeNull();
     });
 
-    it('does not show category picker when viewing "all"', () => {
-      const { queryByTestId } = render(
+    it('does not show category picker when viewing "all"', async () => {
+      const { queryByTestId } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="all" />,
       );
       expect(queryByTestId('simple-picker')).toBeNull();
     });
 
-    it('shows category picker when viewing specific category', () => {
-      const { getByTestId } = render(
+    it('shows category picker when viewing specific category', async () => {
+      const { getByTestId } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="cat-1" />,
       );
       expect(getByTestId('simple-picker')).toBeTruthy();
     });
 
-    it('does not show back button when viewing "all"', () => {
-      const { queryByTestId } = render(
+    it('does not show back button when viewing "all"', async () => {
+      const { queryByTestId } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="all" />,
       );
       expect(queryByTestId('icon-arrow-left')).toBeNull();
     });
 
-    it('shows back button when viewing specific category', () => {
-      const { getByTestId } = render(
+    it('shows back button when viewing specific category', async () => {
+      const { getByTestId } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="cat-1" />,
       );
       expect(getByTestId('icon-arrow-left')).toBeTruthy();
@@ -194,37 +194,37 @@ describe('ChartModal', () => {
   });
 
   describe('Income mode', () => {
-    it('renders income chart title', () => {
-      const { getByText } = render(<ChartModal {...defaultProps} modalType="income" />);
+    it('renders income chart title', async () => {
+      const { getByText } = await render(<ChartModal {...defaultProps} modalType="income" />);
       expect(getByText('Income by Category')).toBeTruthy();
     });
 
-    it('renders IncomePieChart component', () => {
-      const { getByTestId } = render(<ChartModal {...defaultProps} modalType="income" />);
+    it('renders IncomePieChart component', async () => {
+      const { getByTestId } = await render(<ChartModal {...defaultProps} modalType="income" />);
       expect(getByTestId('income-pie-chart')).toBeTruthy();
     });
 
-    it('does not render ExpensePieChart in income mode', () => {
-      const { queryByTestId } = render(<ChartModal {...defaultProps} modalType="income" />);
+    it('does not render ExpensePieChart in income mode', async () => {
+      const { queryByTestId } = await render(<ChartModal {...defaultProps} modalType="income" />);
       expect(queryByTestId('expense-pie-chart')).toBeNull();
     });
 
-    it('does not show category picker when viewing "all"', () => {
-      const { queryByTestId } = render(
+    it('does not show category picker when viewing "all"', async () => {
+      const { queryByTestId } = await render(
         <ChartModal {...defaultProps} modalType="income" selectedIncomeCategory="all" />,
       );
       expect(queryByTestId('simple-picker')).toBeNull();
     });
 
-    it('shows category picker when viewing specific income category', () => {
-      const { getByTestId } = render(
+    it('shows category picker when viewing specific income category', async () => {
+      const { getByTestId } = await render(
         <ChartModal {...defaultProps} modalType="income" selectedIncomeCategory="inc-1" />,
       );
       expect(getByTestId('simple-picker')).toBeTruthy();
     });
 
-    it('shows back button when viewing specific income category', () => {
-      const { getByTestId } = render(
+    it('shows back button when viewing specific income category', async () => {
+      const { getByTestId } = await render(
         <ChartModal {...defaultProps} modalType="income" selectedIncomeCategory="inc-1" />,
       );
       expect(getByTestId('icon-arrow-left')).toBeTruthy();
@@ -232,9 +232,9 @@ describe('ChartModal', () => {
   });
 
   describe('Category navigation', () => {
-    it('navigates to parent category when back button pressed (expense)', () => {
+    it('navigates to parent category when back button pressed (expense)', async () => {
       const onCategoryChange = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <ChartModal
           {...defaultProps}
           modalType="expense"
@@ -245,14 +245,14 @@ describe('ChartModal', () => {
 
       // Find and press the back button
       const backButton = getByTestId('icon-arrow-left').parent;
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(onCategoryChange).toHaveBeenCalledWith('cat-1');
     });
 
-    it('navigates to "all" when category has no parent (expense)', () => {
+    it('navigates to "all" when category has no parent (expense)', async () => {
       const onCategoryChange = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <ChartModal
           {...defaultProps}
           modalType="expense"
@@ -262,14 +262,14 @@ describe('ChartModal', () => {
       );
 
       const backButton = getByTestId('icon-arrow-left').parent;
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(onCategoryChange).toHaveBeenCalledWith('all');
     });
 
-    it('navigates to "all" when category not found (expense)', () => {
+    it('navigates to "all" when category not found (expense)', async () => {
       const onCategoryChange = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <ChartModal
           {...defaultProps}
           modalType="expense"
@@ -279,12 +279,12 @@ describe('ChartModal', () => {
       );
 
       const backButton = getByTestId('icon-arrow-left').parent;
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(onCategoryChange).toHaveBeenCalledWith('all');
     });
 
-    it('navigates to parent category when back button pressed (income)', () => {
+    it('navigates to parent category when back button pressed (income)', async () => {
       const onIncomeCategoryChange = jest.fn();
       const categoriesWithIncome = [
         ...mockCategories,
@@ -292,7 +292,7 @@ describe('ChartModal', () => {
         { id: 'inc-2', name: 'Bonus', parentId: 'inc-1' },
       ];
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <ChartModal
           {...defaultProps}
           modalType="income"
@@ -303,16 +303,16 @@ describe('ChartModal', () => {
       );
 
       const backButton = getByTestId('icon-arrow-left').parent;
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(onIncomeCategoryChange).toHaveBeenCalledWith('inc-1');
     });
 
-    it('stays at "all" when getParentCategoryId is called with "all"', () => {
+    it('stays at "all" when getParentCategoryId is called with "all"', async () => {
       const onCategoryChange = jest.fn();
       // This tests the edge case where selectedCategory is already 'all'
       // but back button is somehow visible (shouldn't happen in practice)
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <ChartModal
           {...defaultProps}
           modalType="expense"
@@ -327,15 +327,15 @@ describe('ChartModal', () => {
   });
 
   describe('Loading states', () => {
-    it('shows loading state for expense chart', () => {
-      const { getByText } = render(
+    it('shows loading state for expense chart', async () => {
+      const { getByText } = await render(
         <ChartModal {...defaultProps} modalType="expense" loading={true} />,
       );
       expect(getByText('Loading...')).toBeTruthy();
     });
 
-    it('shows loading state for income chart', () => {
-      const { getByText } = render(
+    it('shows loading state for income chart', async () => {
+      const { getByText } = await render(
         <ChartModal {...defaultProps} modalType="income" loadingIncome={true} />,
       );
       expect(getByText('Loading...')).toBeTruthy();
@@ -343,8 +343,8 @@ describe('ChartModal', () => {
   });
 
   describe('Chart data display', () => {
-    it('displays expense chart data count', () => {
-      const { getByText } = render(
+    it('displays expense chart data count', async () => {
+      const { getByText } = await render(
         <ChartModal
           {...defaultProps}
           modalType="expense"
@@ -354,8 +354,8 @@ describe('ChartModal', () => {
       expect(getByText('Expense Chart: 2 items')).toBeTruthy();
     });
 
-    it('displays income chart data count', () => {
-      const { getByText } = render(
+    it('displays income chart data count', async () => {
+      const { getByText } = await render(
         <ChartModal
           {...defaultProps}
           modalType="income"
@@ -367,22 +367,22 @@ describe('ChartModal', () => {
   });
 
   describe('Accessibility', () => {
-    it('has accessibility role on close button', () => {
-      const { getByLabelText } = render(<ChartModal {...defaultProps} />);
+    it('has accessibility role on close button', async () => {
+      const { getByLabelText } = await render(<ChartModal {...defaultProps} />);
       const closeButton = getByLabelText('Close');
       expect(closeButton.props.accessibilityRole).toBe('button');
     });
 
-    it('has accessibility label on back button', () => {
-      const { getByLabelText } = render(
+    it('has accessibility label on back button', async () => {
+      const { getByLabelText } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="cat-1" />,
       );
       const backButton = getByLabelText('Back');
       expect(backButton).toBeTruthy();
     });
 
-    it('has accessibility hint on back button', () => {
-      const { getByLabelText } = render(
+    it('has accessibility hint on back button', async () => {
+      const { getByLabelText } = await render(
         <ChartModal {...defaultProps} modalType="expense" selectedCategory="cat-1" />,
       );
       const backButton = getByLabelText('Back');
@@ -391,24 +391,24 @@ describe('ChartModal', () => {
   });
 
   describe('Modal interaction', () => {
-    it('closes modal when tapping outside the modal content', () => {
+    it('closes modal when tapping outside the modal content', async () => {
       const onClose = jest.fn();
-      const { getByTestId } = render(<ChartModal {...defaultProps} onClose={onClose} />);
+      const { getByTestId } = await render(<ChartModal {...defaultProps} onClose={onClose} />);
 
       // Find the modal overlay (TouchableWithoutFeedback)
       const overlay = getByTestId('modal-overlay');
-      fireEvent.press(overlay);
+      await fireEvent.press(overlay);
 
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('does not close modal when tapping inside the modal content wrapper', () => {
+    it('does not close modal when tapping inside the modal content wrapper', async () => {
       const onClose = jest.fn();
-      const { getByTestId } = render(<ChartModal {...defaultProps} onClose={onClose} />);
+      const { getByTestId } = await render(<ChartModal {...defaultProps} onClose={onClose} />);
 
       // Find the inner TouchableWithoutFeedback (prevents bubbling)
       const modalContentWrapper = getByTestId('modal-content-wrapper');
-      fireEvent.press(modalContentWrapper);
+      await fireEvent.press(modalContentWrapper);
 
       // Should not close because the inner TouchableWithoutFeedback prevents bubbling
       expect(onClose).not.toHaveBeenCalled();

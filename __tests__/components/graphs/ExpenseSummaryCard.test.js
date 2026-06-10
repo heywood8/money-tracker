@@ -45,15 +45,15 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders expense categories label with abbreviated amount', () => {
-      const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
+    it('renders expense categories label with abbreviated amount', async () => {
+      const { getByText } = await render(<ExpenseSummaryCard {...defaultProps} />);
 
       expect(getByText(/\$1\.5K/)).toBeTruthy();
     });
 
-    it('uses translation function for accessibility', () => {
+    it('uses translation function for accessibility', async () => {
       const customT = jest.fn((key) => `translated_${key}`);
-      render(
+      await render(
         <ExpenseSummaryCard {...defaultProps} t={customT} />,
       );
 
@@ -62,56 +62,56 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats small amounts with full decimals', () => {
-      const { getByText } = render(
+    it('formats small amounts with full decimals', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={100.5} selectedCurrency="USD" />,
       );
 
       expect(getByText(/\$100\.50/)).toBeTruthy();
     });
 
-    it('abbreviates thousands with K', () => {
-      const { getByText } = render(
+    it('abbreviates thousands with K', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={5400} selectedCurrency="USD" />,
       );
 
       expect(getByText(/\$5\.4K/)).toBeTruthy();
     });
 
-    it('abbreviates millions with M', () => {
-      const { getByText } = render(
+    it('abbreviates millions with M', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={2500000} selectedCurrency="USD" />,
       );
 
       expect(getByText(/\$2\.5M/)).toBeTruthy();
     });
 
-    it('formats EUR with symbol', () => {
-      const { getByText } = render(
+    it('formats EUR with symbol', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={85.1} selectedCurrency="EUR" />,
       );
 
       expect(getByText(/€85\.10/)).toBeTruthy();
     });
 
-    it('formats JPY thousands with K', () => {
-      const { getByText } = render(
+    it('formats JPY thousands with K', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={1000.99} selectedCurrency="JPY" />,
       );
 
       expect(getByText(/¥1\.0K/)).toBeTruthy();
     });
 
-    it('formats BTC with full decimals when small', () => {
-      const { getByText } = render(
+    it('formats BTC with full decimals when small', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={0.00012345} selectedCurrency="BTC" />,
       );
 
       expect(getByText(/₿0\.00012345/)).toBeTruthy();
     });
 
-    it('defaults to currency code for unknown currency', () => {
-      const { getByText } = render(
+    it('defaults to currency code for unknown currency', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} totalExpenses={100.999} selectedCurrency="XYZ" />,
       );
 
@@ -120,16 +120,16 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Loading State', () => {
-    it('shows loading indicator when loading', () => {
-      const { getByText } = render(
+    it('shows loading indicator when loading', async () => {
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
       expect(getByText(/\.\.\./)).toBeTruthy();
     });
 
-    it('does not show amount when loading', () => {
-      const { queryByText } = render(
+    it('does not show amount when loading', async () => {
+      const { queryByText } = await render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
@@ -138,28 +138,28 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Press Interaction', () => {
-    it('calls onPress when card is pressed', () => {
+    it('calls onPress when card is pressed', async () => {
       const onPress = jest.fn();
-      const { getByRole } = render(
+      const { getByRole } = await render(
         <ExpenseSummaryCard {...defaultProps} onPress={onPress} />,
       );
 
       const button = getByRole('button');
-      fireEvent.press(button);
+      await fireEvent.press(button);
 
       expect(onPress).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Accessibility', () => {
-    it('has button accessibility role', () => {
-      const { getByRole } = render(<ExpenseSummaryCard {...defaultProps} />);
+    it('has button accessibility role', async () => {
+      const { getByRole } = await render(<ExpenseSummaryCard {...defaultProps} />);
 
       expect(getByRole('button')).toBeTruthy();
     });
 
-    it('has accessibility label', () => {
-      const { getByLabelText } = render(<ExpenseSummaryCard {...defaultProps} />);
+    it('has accessibility label', async () => {
+      const { getByLabelText } = await render(<ExpenseSummaryCard {...defaultProps} />);
 
       expect(getByLabelText('expenses_by_category')).toBeTruthy();
     });
@@ -176,20 +176,20 @@ describe('ExpenseSummaryCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('renders \'••••\' instead of the formatted currency amount', () => {
-      const { getByText } = render(<ExpenseSummaryCard {...defaultProps} />);
+    it('renders \'••••\' instead of the formatted currency amount', async () => {
+      const { getByText } = await render(<ExpenseSummaryCard {...defaultProps} />);
 
       expect(getByText('••••')).toBeTruthy();
     });
 
-    it('does not render the formatted currency amount', () => {
-      const { queryByText } = render(<ExpenseSummaryCard {...defaultProps} />);
+    it('does not render the formatted currency amount', async () => {
+      const { queryByText } = await render(<ExpenseSummaryCard {...defaultProps} />);
 
       expect(queryByText(/\$1\.5K/)).toBeNull();
     });
 
-    it('does not show loading indicator even when loading is true', () => {
-      const { getByText, queryByText } = render(
+    it('does not show loading indicator even when loading is true', async () => {
+      const { getByText, queryByText } = await render(
         <ExpenseSummaryCard {...defaultProps} loading={true} />,
       );
 
@@ -199,12 +199,12 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('Theming', () => {
-    it('applies text color', () => {
+    it('applies text color', async () => {
       const customColors = {
         ...defaultProps.colors,
         text: '#FF0000',
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} colors={customColors} />,
       );
 
@@ -216,16 +216,16 @@ describe('ExpenseSummaryCard', () => {
   });
 
   describe('categoryName / onBack overlay', () => {
-    it('shows category chip when both categoryName and onBack are provided', () => {
+    it('shows category chip when both categoryName and onBack are provided', async () => {
       const onBack = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <ExpenseSummaryCard {...defaultProps} categoryName="Food" onBack={onBack} />,
       );
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('does not show category chip when categoryName provided but onBack is null', () => {
-      const { queryByText } = render(
+    it('does not show category chip when categoryName provided but onBack is null', async () => {
+      const { queryByText } = await render(
         <ExpenseSummaryCard {...defaultProps} categoryName="Food" onBack={null} />,
       );
       expect(queryByText('Food')).toBeNull();

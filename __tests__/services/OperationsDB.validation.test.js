@@ -138,7 +138,7 @@ describe('OperationsDB Data Type Validation', () => {
   });
 
   describe('accountId validation', () => {
-    it('should identify when accountId is a string instead of number', () => {
+    it('should identify when accountId is a string instead of number', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -162,7 +162,7 @@ describe('OperationsDB Data Type Validation', () => {
       );
     });
 
-    it('should accept valid numeric accountId', () => {
+    it('should accept valid numeric accountId', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -186,7 +186,7 @@ describe('OperationsDB Data Type Validation', () => {
   });
 
   describe('categoryId validation', () => {
-    it('should identify when categoryId is an object (React event)', () => {
+    it('should identify when categoryId is an object (React event)', async () => {
       const mockReactEvent = {
         nativeEvent: { touches: [] },
         currentTarget: { __nativeTag: 123 },
@@ -223,7 +223,7 @@ describe('OperationsDB Data Type Validation', () => {
       );
     });
 
-    it('should accept valid string categoryId', () => {
+    it('should accept valid string categoryId', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -250,7 +250,7 @@ describe('OperationsDB Data Type Validation', () => {
       expect(validateCategoryId(operation.categoryId)).toBe(true);
     });
 
-    it('should accept undefined categoryId for transfers', () => {
+    it('should accept undefined categoryId for transfers', async () => {
       const operation = {
         type: 'transfer',
         amount: '100',
@@ -324,7 +324,7 @@ describe('OperationsDB Data Type Validation', () => {
       return errors;
     };
 
-    it('should reject operation with string accountId', () => {
+    it('should reject operation with string accountId', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -338,7 +338,7 @@ describe('OperationsDB Data Type Validation', () => {
       expect(errors.some(e => e.includes('accountId'))).toBe(true);
     });
 
-    it('should reject operation with object categoryId', () => {
+    it('should reject operation with object categoryId', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -352,7 +352,7 @@ describe('OperationsDB Data Type Validation', () => {
       expect(errors.some(e => e.includes('categoryId'))).toBe(true);
     });
 
-    it('should accept valid expense operation', () => {
+    it('should accept valid expense operation', async () => {
       const operation = {
         type: 'expense',
         amount: '100',
@@ -365,7 +365,7 @@ describe('OperationsDB Data Type Validation', () => {
       expect(errors).toEqual([]);
     });
 
-    it('should accept valid transfer operation', () => {
+    it('should accept valid transfer operation', async () => {
       const operation = {
         type: 'transfer',
         amount: '100',
@@ -380,7 +380,7 @@ describe('OperationsDB Data Type Validation', () => {
   });
 
   describe('Regression test: specific bugs encountered', () => {
-    it('REGRESSION: accountId set to "add" from Calculator button', () => {
+    it('REGRESSION: accountId set to "add" from Calculator button', async () => {
       // This was the actual bug where CalcButton passed its value to onAdd callback
       const buggyData = {
         type: 'expense',
@@ -397,7 +397,7 @@ describe('OperationsDB Data Type Validation', () => {
       expect(isValidAccountId).toBe(false);
     });
 
-    it('REGRESSION: categoryId set to React event object', () => {
+    it('REGRESSION: categoryId set to React event object', async () => {
       // This was the actual bug where Pressable passed event to onPress callback
       const mockEvent = {
         _dispatchInstances: { _debugHookTypes: null },

@@ -93,8 +93,8 @@ describe('useMaterialTheme', () => {
       useThemeColors.mockReturnValue({ colors: mockLightColors });
     });
 
-    it('should generate light theme with correct base', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should generate light theme with correct base', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.primary).toBe(mockLightColors.primary);
       expect(result.current.colors.background).toBe(mockLightColors.background);
@@ -103,8 +103,8 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onSurface).toBe(mockLightColors.text);
     });
 
-    it('should map primary colors correctly', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map primary colors correctly', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.primary).toBe(mockLightColors.primary);
       expect(result.current.colors.primaryContainer).toBe('#c0e0ff');
@@ -112,8 +112,8 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onPrimaryContainer).toBe('#001d35');
     });
 
-    it('should map secondary colors correctly', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map secondary colors correctly', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.secondary).toBe(mockLightColors.secondary);
       expect(result.current.colors.secondaryContainer).toBe('#e8e8e8');
@@ -121,8 +121,8 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onSecondaryContainer).toBe(mockLightColors.text);
     });
 
-    it('should map error colors correctly', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map error colors correctly', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.error).toBe(mockLightColors.danger);
       expect(result.current.colors.errorContainer).toBe('#ffdad6');
@@ -130,23 +130,23 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onErrorContainer).toBe('#410002');
     });
 
-    it('should map outline colors correctly', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map outline colors correctly', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.outline).toBe(mockLightColors.border);
       expect(result.current.colors.outlineVariant).toBe(mockLightColors.inputBorder);
     });
 
-    it('should include elevation levels', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should include elevation levels', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.elevation.level0).toBe('transparent');
       expect(result.current.colors.elevation.level1).toBe(mockLightColors.surface);
       expect(result.current.colors.elevation.level2).toBe(mockLightColors.card);
     });
 
-    it('should include custom colors', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should include custom colors', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.custom.expense).toBe(mockLightColors.expense);
       expect(result.current.colors.custom.income).toBe(mockLightColors.income);
@@ -160,14 +160,14 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.custom.delete).toBe(mockLightColors.delete);
     });
 
-    it('should set backdrop color', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should set backdrop color', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.backdrop).toBe(mockLightColors.modalBackground);
     });
 
-    it('should set surface disabled colors', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should set surface disabled colors', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.surfaceDisabled).toBe('rgba(0,0,0,0.12)');
       expect(result.current.colors.onSurfaceDisabled).toBe('rgba(0,0,0,0.38)');
@@ -180,8 +180,8 @@ describe('useMaterialTheme', () => {
       useThemeColors.mockReturnValue({ colors: mockDarkColors });
     });
 
-    it('should generate dark theme with correct base', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should generate dark theme with correct base', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.primary).toBe(mockDarkColors.primary);
       expect(result.current.colors.background).toBe(mockDarkColors.background);
@@ -190,8 +190,8 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onSurface).toBe(mockDarkColors.text);
     });
 
-    it('should map primary colors correctly for dark theme', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map primary colors correctly for dark theme', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.primary).toBe(mockDarkColors.primary);
       expect(result.current.colors.primaryContainer).toBe('#004a77');
@@ -199,15 +199,15 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onPrimaryContainer).toBe('#c0e0ff');
     });
 
-    it('should map secondary colors correctly for dark theme', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map secondary colors correctly for dark theme', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.secondary).toBe(mockDarkColors.secondary);
       expect(result.current.colors.secondaryContainer).toBe('#444444');
     });
 
-    it('should map error colors correctly for dark theme', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should map error colors correctly for dark theme', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.error).toBe(mockDarkColors.danger);
       expect(result.current.colors.errorContainer).toBe('#93000a');
@@ -215,15 +215,15 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors.onErrorContainer).toBe('#ffdad6');
     });
 
-    it('should set surface disabled colors for dark theme', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should set surface disabled colors for dark theme', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.surfaceDisabled).toBe('rgba(255,255,255,0.12)');
       expect(result.current.colors.onSurfaceDisabled).toBe('rgba(255,255,255,0.38)');
     });
 
-    it('should include custom dark colors', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should include custom dark colors', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.colors.custom.expense).toBe(mockDarkColors.expense);
       expect(result.current.colors.custom.income).toBe(mockDarkColors.income);
@@ -237,45 +237,45 @@ describe('useMaterialTheme', () => {
       useThemeColors.mockReturnValue({ colors: mockLightColors });
     });
 
-    it('should set animation scale to 1.0', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should set animation scale to 1.0', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.animation.scale).toBe(1.0);
     });
 
-    it('should set roundness to 8', () => {
-      const { result } = renderHook(() => useMaterialTheme());
+    it('should set roundness to 8', async () => {
+      const { result } = await renderHook(() => useMaterialTheme());
 
       expect(result.current.roundness).toBe(8);
     });
   });
 
   describe('Memoization', () => {
-    it('should memoize theme object', () => {
+    it('should memoize theme object', async () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: mockLightColors });
 
-      const { result, rerender } = renderHook(() => useMaterialTheme());
+      const { result, rerender } = await renderHook(() => useMaterialTheme());
       const firstTheme = result.current;
 
-      rerender();
+      await rerender();
       const secondTheme = result.current;
 
       // Should be the same reference if inputs haven't changed
       expect(firstTheme).toBe(secondTheme);
     });
 
-    it('should recreate theme when colorScheme changes', () => {
+    it('should recreate theme when colorScheme changes', async () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: mockLightColors });
 
-      const { result, rerender } = renderHook(() => useMaterialTheme());
+      const { result, rerender } = await renderHook(() => useMaterialTheme());
       const lightTheme = result.current;
 
       useThemeConfig.mockReturnValue({ colorScheme: 'dark' });
       useThemeColors.mockReturnValue({ colors: mockDarkColors });
 
-      rerender();
+      await rerender();
       const darkTheme = result.current;
 
       // Should be different references
@@ -283,17 +283,17 @@ describe('useMaterialTheme', () => {
       expect(darkTheme.colors.primary).toBe(mockDarkColors.primary);
     });
 
-    it('should recreate theme when colors change', () => {
+    it('should recreate theme when colors change', async () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: mockLightColors });
 
-      const { result, rerender } = renderHook(() => useMaterialTheme());
+      const { result, rerender } = await renderHook(() => useMaterialTheme());
       const firstTheme = result.current;
 
       const modifiedColors = { ...mockLightColors, primary: '#ff0000' };
       useThemeColors.mockReturnValue({ colors: modifiedColors });
 
-      rerender();
+      await rerender();
       const secondTheme = result.current;
 
       // Should be different references
@@ -303,7 +303,7 @@ describe('useMaterialTheme', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle missing custom colors gracefully', () => {
+    it('should handle missing custom colors gracefully', async () => {
       const minimalColors = {
         primary: '#0066cc',
         secondary: '#666666',
@@ -323,7 +323,7 @@ describe('useMaterialTheme', () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: minimalColors });
 
-      const { result } = renderHook(() => useMaterialTheme());
+      const { result } = await renderHook(() => useMaterialTheme());
 
       // Should not crash, but custom colors will be undefined
       expect(result.current.colors.custom).toBeDefined();
@@ -331,11 +331,11 @@ describe('useMaterialTheme', () => {
   });
 
   describe('Regression Tests', () => {
-    it('should maintain consistent color structure', () => {
+    it('should maintain consistent color structure', async () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: mockLightColors });
 
-      const { result } = renderHook(() => useMaterialTheme());
+      const { result } = await renderHook(() => useMaterialTheme());
 
       // Verify all expected top-level keys exist
       expect(result.current).toHaveProperty('colors');
@@ -352,11 +352,11 @@ describe('useMaterialTheme', () => {
       expect(result.current.colors).toHaveProperty('custom');
     });
 
-    it('should have all elevation levels', () => {
+    it('should have all elevation levels', async () => {
       useThemeConfig.mockReturnValue({ colorScheme: 'light' });
       useThemeColors.mockReturnValue({ colors: mockLightColors });
 
-      const { result } = renderHook(() => useMaterialTheme());
+      const { result } = await renderHook(() => useMaterialTheme());
 
       const elevation = result.current.colors.elevation;
       expect(elevation).toHaveProperty('level0');

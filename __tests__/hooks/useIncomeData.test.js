@@ -56,8 +56,8 @@ describe('useIncomeData', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with default state', async () => {
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -69,7 +69,7 @@ describe('useIncomeData', () => {
 
   describe('loadIncomeData', () => {
     it('should return early if no currency selected', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, null, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -89,7 +89,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -116,7 +116,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, null, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -143,7 +143,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -172,7 +172,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
       );
 
@@ -198,7 +198,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -223,7 +223,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -246,7 +246,7 @@ describe('useIncomeData', () => {
     it('should handle errors gracefully', async () => {
       OperationsDB.getIncomeByCategoryAndCurrency.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -270,7 +270,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -285,8 +285,8 @@ describe('useIncomeData', () => {
       expect(result.current.totalIncome).toBe(6500);
     });
 
-    it('should return 0 for empty chart data', () => {
-      const { result } = renderHook(() =>
+    it('should return 0 for empty chart data', async () => {
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -298,7 +298,7 @@ describe('useIncomeData', () => {
     it('should handle empty income data', async () => {
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -320,7 +320,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -347,7 +347,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', categoriesWithDeepHierarchy, mockColors, mockT),
       );
 
@@ -378,7 +378,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-2', categoriesWithDeepHierarchy, mockColors, mockT),
       );
 
@@ -405,7 +405,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -427,7 +427,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -450,7 +450,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -469,7 +469,7 @@ describe('useIncomeData', () => {
     it('should query all accounts for the currency without an account ID filter', async () => {
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -500,7 +500,7 @@ describe('useIncomeData', () => {
       ];
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-1', deepCategories, mockColors, mockT),
       );
 
@@ -522,7 +522,7 @@ describe('useIncomeData', () => {
       ];
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
       );
 
@@ -545,7 +545,7 @@ describe('useIncomeData', () => {
 
       OperationsDB.getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncome);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -571,7 +571,7 @@ describe('useIncomeData', () => {
         .mockResolvedValueOnce([{ category_id: 'cat-3', total: '100' }])
         .mockResolvedValueOnce([{ category_id: 'cat-3', total: '888' }]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useIncomeData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 

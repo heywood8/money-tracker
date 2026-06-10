@@ -84,7 +84,7 @@ describe('BudgetsContext', () => {
       ];
       BudgetsDB.getAllBudgets.mockResolvedValue(mockBudgets);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -99,7 +99,7 @@ describe('BudgetsContext', () => {
     it('handles empty budget list', async () => {
       BudgetsDB.getAllBudgets.mockResolvedValue([]);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -113,7 +113,7 @@ describe('BudgetsContext', () => {
       const error = new Error('Database connection failed');
       BudgetsDB.getAllBudgets.mockRejectedValue(error);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -123,14 +123,12 @@ describe('BudgetsContext', () => {
       expect(result.current.saveError).toBe('Database connection failed');
     });
 
-    it('throws error when used outside provider', () => {
+    it('throws error when used outside provider', async () => {
       // Suppress console.error for this test
       const originalError = console.error;
       console.error = jest.fn();
 
-      expect(() => {
-        renderHook(() => useBudgets());
-      }).toThrow('useBudgets must be used within a BudgetsProvider');
+      await expect(renderHook(() => useBudgets())).rejects.toThrow('useBudgets must be used within a BudgetsProvider');
 
       console.error = originalError;
     });
@@ -144,7 +142,7 @@ describe('BudgetsContext', () => {
       ]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -156,7 +154,7 @@ describe('BudgetsContext', () => {
     it('handles status calculation error gracefully', async () => {
       BudgetsDB.calculateAllBudgetStatuses.mockRejectedValue(new Error('Calculation failed'));
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -180,7 +178,7 @@ describe('BudgetsContext', () => {
         rolloverEnabled: false,
       };
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -214,7 +212,7 @@ describe('BudgetsContext', () => {
         startDate: '2025-01-01',
       };
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -253,7 +251,7 @@ describe('BudgetsContext', () => {
         startDate: '2025-01-01',
       };
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -280,7 +278,7 @@ describe('BudgetsContext', () => {
         startDate: '2025-01-01',
       };
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -316,7 +314,7 @@ describe('BudgetsContext', () => {
       ];
       BudgetsDB.getAllBudgets.mockResolvedValue(existingBudgets);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -334,7 +332,7 @@ describe('BudgetsContext', () => {
     });
 
     it('rejects update for non-existent budget', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -363,7 +361,7 @@ describe('BudgetsContext', () => {
       BudgetsDB.getAllBudgets.mockResolvedValue(existingBudgets);
       BudgetsDB.validateBudget.mockReturnValue('Invalid period type');
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -398,7 +396,7 @@ describe('BudgetsContext', () => {
         periodType: 'monthly',
       });
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -427,7 +425,7 @@ describe('BudgetsContext', () => {
       BudgetsDB.getAllBudgets.mockResolvedValue(existingBudgets);
       BudgetsDB.updateBudget.mockRejectedValue(new Error('Database update failed'));
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -475,7 +473,7 @@ describe('BudgetsContext', () => {
       ]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -506,7 +504,7 @@ describe('BudgetsContext', () => {
       BudgetsDB.getAllBudgets.mockResolvedValue(existingBudgets);
       BudgetsDB.deleteBudget.mockRejectedValue(new Error('Foreign key constraint'));
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -561,7 +559,7 @@ describe('BudgetsContext', () => {
     });
 
     it('gets budget for category', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -573,7 +571,7 @@ describe('BudgetsContext', () => {
     });
 
     it('gets budget for category with currency filter', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -585,7 +583,7 @@ describe('BudgetsContext', () => {
     });
 
     it('gets budget for category with period type filter', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -597,7 +595,7 @@ describe('BudgetsContext', () => {
     });
 
     it('returns undefined for non-existent category', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -608,7 +606,7 @@ describe('BudgetsContext', () => {
     });
 
     it('gets budgets by period type', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -624,7 +622,7 @@ describe('BudgetsContext', () => {
     });
 
     it('checks if category has active budget', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -636,7 +634,7 @@ describe('BudgetsContext', () => {
     });
 
     it('checks active budget with currency filter', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -674,7 +672,7 @@ describe('BudgetsContext', () => {
       const mockStatuses = new Map([['1', mockStatus]]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -685,7 +683,7 @@ describe('BudgetsContext', () => {
     });
 
     it('returns null for non-existent budget status', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -701,7 +699,7 @@ describe('BudgetsContext', () => {
       ]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -711,7 +709,7 @@ describe('BudgetsContext', () => {
     });
 
     it('returns false for non-existent budget exceeded check', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -726,7 +724,7 @@ describe('BudgetsContext', () => {
       ]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -736,7 +734,7 @@ describe('BudgetsContext', () => {
     });
 
     it('returns 0 for non-existent budget progress', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -751,7 +749,7 @@ describe('BudgetsContext', () => {
       ]);
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(mockStatuses);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -761,7 +759,7 @@ describe('BudgetsContext', () => {
     });
 
     it('returns 0 for non-existent budget remaining', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -775,7 +773,7 @@ describe('BudgetsContext', () => {
     it('reloads budgets manually', async () => {
       BudgetsDB.getAllBudgets.mockResolvedValue([]);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -802,7 +800,7 @@ describe('BudgetsContext', () => {
     });
 
     it('refreshes budget statuses manually', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -832,7 +830,7 @@ describe('BudgetsContext', () => {
         return jest.fn(); // Return unsubscribe function
       });
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -867,7 +865,7 @@ describe('BudgetsContext', () => {
         return jest.fn();
       });
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -918,7 +916,7 @@ describe('BudgetsContext', () => {
       ];
       BudgetsDB.getAllBudgets.mockResolvedValue(mockBudgets);
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -931,7 +929,7 @@ describe('BudgetsContext', () => {
       );
 
       // Simulate database reset
-      act(() => {
+      await act(async () => {
         databaseResetCallback();
       });
 
@@ -953,13 +951,13 @@ describe('BudgetsContext', () => {
         return jest.fn();
       });
 
-      const { unmount } = renderHook(() => useBudgets(), { wrapper });
+      const { unmount } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(appEvents.on).toHaveBeenCalledTimes(3);
       });
 
-      unmount();
+      await unmount();
 
       expect(unsubscribeMocks.operationChanged).toHaveBeenCalled();
       expect(unsubscribeMocks.reloadAll).toHaveBeenCalled();
@@ -969,7 +967,7 @@ describe('BudgetsContext', () => {
 
   describe('Edge Cases', () => {
     it('handles concurrent budget operations', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -1002,7 +1000,7 @@ describe('BudgetsContext', () => {
     });
 
     it('maintains state consistency after multiple operations', async () => {
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -1039,7 +1037,7 @@ describe('BudgetsContext', () => {
     it('handles empty status map gracefully', async () => {
       BudgetsDB.calculateAllBudgetStatuses.mockResolvedValue(new Map());
 
-      const { result } = renderHook(() => useBudgets(), { wrapper });
+      const { result } = await renderHook(() => useBudgets(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

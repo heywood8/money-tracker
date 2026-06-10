@@ -84,35 +84,35 @@ describe('GraphsScreen', () => {
   });
 
   describe('Component Structure', () => {
-    it('renders without crashing', () => {
+    it('renders without crashing', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('uses ThemeContext for styling', () => {
+    it('uses ThemeContext for styling', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('uses LocalizationContext for translations', () => {
+    it('uses LocalizationContext for translations', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
 
-    it('uses AccountsContext for account data', () => {
+    it('uses AccountsContext for account data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       expect(useAccountsData).toHaveBeenCalled();
     });
@@ -123,7 +123,7 @@ describe('GraphsScreen', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       // Component should call database service to fetch spending data
       expect(true).toBe(true); // Component initializes without errors
@@ -133,7 +133,7 @@ describe('GraphsScreen', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getIncomeByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       // Component should call database service to fetch income data
       expect(true).toBe(true);
@@ -143,7 +143,7 @@ describe('GraphsScreen', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getAvailableMonths } = require('../../app/services/OperationsDB');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       // Component should call database service to fetch available months
       expect(true).toBe(true);
@@ -153,7 +153,7 @@ describe('GraphsScreen', () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getAllCategories } = require('../../app/services/CategoriesDB');
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       // Component should call database service to fetch categories
       expect(true).toBe(true);
@@ -161,51 +161,51 @@ describe('GraphsScreen', () => {
   });
 
   describe('State Management', () => {
-    it('manages selected year state', () => {
+    it('manages selected year state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage year selection state
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('manages selected month state', () => {
+    it('manages selected month state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage month selection state
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('manages selected currency state', () => {
+    it('manages selected currency state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage currency selection state
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('manages selected category filter state', () => {
+    it('manages selected category filter state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage category filter state
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('manages chart data state', () => {
+    it('manages chart data state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage spending and income chart data
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('manages modal visibility state', () => {
+    it('manages modal visibility state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should manage detail modal state
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Account Integration', () => {
-    it('handles empty accounts list', () => {
+    it('handles empty accounts list', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -213,10 +213,10 @@ describe('GraphsScreen', () => {
         accounts: [],
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles accounts with different currencies', () => {
+    it('handles accounts with different currencies', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -230,10 +230,10 @@ describe('GraphsScreen', () => {
         accounts: mockAccounts,
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('extracts unique currencies from accounts', () => {
+    it('extracts unique currencies from accounts', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -247,37 +247,37 @@ describe('GraphsScreen', () => {
         accounts: mockAccounts,
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Data Loading and Processing', () => {
-    it('handles loading state', () => {
+    it('handles loading state', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should show loading indicator during data fetch
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles empty spending data', () => {
+    it('handles empty spending data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
       getSpendingByCategoryAndCurrency.mockResolvedValue([]);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles empty income data', () => {
+    it('handles empty income data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getIncomeByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
       getIncomeByCategoryAndCurrency.mockResolvedValue([]);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('processes spending data correctly', () => {
+    it('processes spending data correctly', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
@@ -288,10 +288,10 @@ describe('GraphsScreen', () => {
 
       getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpendingData);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('processes income data correctly', () => {
+    it('processes income data correctly', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getIncomeByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
@@ -302,26 +302,26 @@ describe('GraphsScreen', () => {
 
       getIncomeByCategoryAndCurrency.mockResolvedValue(mockIncomeData);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Time Period Selection', () => {
-    it('defaults to current month and year', () => {
+    it('defaults to current month and year', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should initialize with current month/year
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles period selection with combined picker', () => {
+    it('handles period selection with combined picker', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should allow combined month+year selection
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles available months data', () => {
+    it('handles available months data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getAvailableMonths } = require('../../app/services/OperationsDB');
 
@@ -333,10 +333,10 @@ describe('GraphsScreen', () => {
 
       getAvailableMonths.mockResolvedValue(mockMonths);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles multi-year available months data', () => {
+    it('handles multi-year available months data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getAvailableMonths } = require('../../app/services/OperationsDB');
 
@@ -348,13 +348,13 @@ describe('GraphsScreen', () => {
 
       getAvailableMonths.mockResolvedValue(mockMonths);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Combined Period Picker Logic', () => {
     describe('Period string parsing', () => {
-      it('parses specific month period correctly', () => {
+      it('parses specific month period correctly', async () => {
         // Test the parsing logic: "2025-11" should give year=2025, month=11
         const periodString = '2025-11';
         const [yearStr, monthStr] = periodString.split('-');
@@ -365,7 +365,7 @@ describe('GraphsScreen', () => {
         expect(month).toBe(11);
       });
 
-      it('parses full year period correctly', () => {
+      it('parses full year period correctly', async () => {
         // Test the parsing logic: "2025-full" should give year=2025, month=null
         const periodString = '2025-full';
         const [yearStr, monthStr] = periodString.split('-');
@@ -376,7 +376,7 @@ describe('GraphsScreen', () => {
         expect(month).toBeNull();
       });
 
-      it('parses January (month 0) correctly', () => {
+      it('parses January (month 0) correctly', async () => {
         // Edge case: month 0 should not be confused with falsy
         const periodString = '2025-0';
         const [yearStr, monthStr] = periodString.split('-');
@@ -389,7 +389,7 @@ describe('GraphsScreen', () => {
     });
 
     describe('Period items generation order', () => {
-      it('generates items in descending date order with Full Year after each years months', () => {
+      it('generates items in descending date order with Full Year after each years months', async () => {
         // Simulate the periodItems generation logic
         const availableYears = [2025, 2024];
         const availableMonths = [
@@ -436,7 +436,7 @@ describe('GraphsScreen', () => {
         expect(items[5].value).toBe('2024-full'); // Full Year 2024
       });
 
-      it('includes Full Year option even with single month available', () => {
+      it('includes Full Year option even with single month available', async () => {
         const availableYears = [2025];
         const availableMonths = [{ year: 2025, month: 5 }]; // Only June
         const t = (key) => key;
@@ -474,28 +474,28 @@ describe('GraphsScreen', () => {
   });
 
   describe('Category Filtering', () => {
-    it('handles "all categories" filter', () => {
+    it('handles "all categories" filter', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should support viewing all categories
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles specific category filter for spending', () => {
+    it('handles specific category filter for spending', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should support filtering by specific category
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles specific category filter for income', () => {
+    it('handles specific category filter for income', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should support filtering income by category
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('loads categories from database', () => {
+    it('loads categories from database', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getAllCategories } = require('../../app/services/CategoriesDB');
 
@@ -506,12 +506,12 @@ describe('GraphsScreen', () => {
 
       getAllCategories.mockResolvedValue(mockCategories);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Theme Integration', () => {
-    it('applies theme colors to components', () => {
+    it('applies theme colors to components', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -526,11 +526,11 @@ describe('GraphsScreen', () => {
 
       useThemeColors.mockReturnValue({ colors: mockColors });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('handles dark theme', () => {
+    it('handles dark theme', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -545,12 +545,12 @@ describe('GraphsScreen', () => {
         },
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Localization Integration', () => {
-    it('uses translation function for UI text', () => {
+    it('uses translation function for UI text', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -560,12 +560,12 @@ describe('GraphsScreen', () => {
         language: 'en',
       });
 
-      render(<GraphsScreen />);
+      await render(<GraphsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
 
-    it('handles different languages', () => {
+    it('handles different languages', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -574,30 +574,30 @@ describe('GraphsScreen', () => {
         language: 'ru',
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles database query errors gracefully', () => {
+    it('handles database query errors gracefully', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
       getSpendingByCategoryAndCurrency.mockRejectedValue(new Error('Database error'));
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles null/undefined chart data', () => {
+    it('handles null/undefined chart data', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
       getSpendingByCategoryAndCurrency.mockResolvedValue(null);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles malformed data from database', () => {
+    it('handles malformed data from database', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
@@ -608,10 +608,10 @@ describe('GraphsScreen', () => {
 
       getSpendingByCategoryAndCurrency.mockResolvedValue(malformedData);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles very large data sets', () => {
+    it('handles very large data sets', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { getSpendingByCategoryAndCurrency } = require('../../app/services/OperationsDB');
 
@@ -625,10 +625,10 @@ describe('GraphsScreen', () => {
 
       getSpendingByCategoryAndCurrency.mockResolvedValue(largeDataSet);
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles empty currency list', () => {
+    it('handles empty currency list', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -636,20 +636,20 @@ describe('GraphsScreen', () => {
         accounts: [],
       });
 
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Regression Tests', () => {
-    it('handles re-rendering without errors', () => {
+    it('handles re-rendering without errors', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
-      const { rerender } = render(<GraphsScreen />);
+      const { rerender } = await render(<GraphsScreen />);
 
-      expect(() => rerender(<GraphsScreen />)).not.toThrow();
+      await expect(rerender(<GraphsScreen />)).resolves.not.toThrow();
     });
 
-    it('maintains stability when accounts change', () => {
+    it('maintains stability when accounts change', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -663,123 +663,123 @@ describe('GraphsScreen', () => {
         accounts: initialAccounts,
       });
 
-      const { rerender } = render(<GraphsScreen />);
+      const { rerender } = await render(<GraphsScreen />);
 
       useAccountsData.mockReturnValue({
         accounts: updatedAccounts,
       });
 
-      expect(() => rerender(<GraphsScreen />)).not.toThrow();
+      await expect(rerender(<GraphsScreen />)).resolves.not.toThrow();
     });
 
-    it('handles rapid state changes', () => {
+    it('handles rapid state changes', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
-      const { rerender } = render(<GraphsScreen />);
+      const { rerender } = await render(<GraphsScreen />);
 
       // Simulate rapid re-renders
-      rerender(<GraphsScreen />);
-      rerender(<GraphsScreen />);
-      rerender(<GraphsScreen />);
+      await rerender(<GraphsScreen />);
+      await rerender(<GraphsScreen />);
+      await rerender(<GraphsScreen />);
 
       expect(true).toBe(true); // Should not crash
     });
   });
 
   describe('Component Integration Points', () => {
-    it('provides necessary props to PieChart component', () => {
+    it('provides necessary props to PieChart component', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should pass proper data to PieChart
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('integrates with SimplePicker for filters', () => {
+    it('integrates with SimplePicker for filters', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component uses SimplePicker for period/currency/category selection
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('renders custom legend component', () => {
+    it('renders custom legend component', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component includes CustomLegend for chart data
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Currency Formatting', () => {
-    it('formats currency amounts correctly', () => {
+    it('formats currency amounts correctly', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Component should use formatCurrency helper
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles different decimal places for currencies', () => {
+    it('handles different decimal places for currencies', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // USD: 2 decimals, JPY: 0 decimals, etc.
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
 
-    it('handles missing currency info', () => {
+    it('handles missing currency info', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
 
       // Should fallback to default when currency not in currencies.json
-      expect(() => render(<GraphsScreen />)).not.toThrow();
+      await render(<GraphsScreen />);
     });
   });
 
   describe('Card Expansion', () => {
-    it('renders both summary cards on mount', () => {
+    it('renders both summary cards on mount', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getByTestId } = render(<GraphsScreen />);
+      const { getByTestId } = await render(<GraphsScreen />);
 
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
 
-    it('keeps expense card in tree after pressing income card', () => {
+    it('keeps expense card in tree after pressing income card', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getByTestId } = render(<GraphsScreen />);
+      const { getByTestId } = await render(<GraphsScreen />);
 
-      fireEvent.press(getByTestId('income-summary-card'));
+      await fireEvent.press(getByTestId('income-summary-card'));
 
       // With the new always-mounted design, the expense card must still be in the tree
       expect(getByTestId('expense-summary-card')).toBeTruthy();
       expect(getByTestId('income-summary-card')).toBeTruthy();
     });
 
-    it('keeps income card in tree after pressing expense card', () => {
+    it('keeps income card in tree after pressing expense card', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getByTestId } = render(<GraphsScreen />);
+      const { getByTestId } = await render(<GraphsScreen />);
 
-      fireEvent.press(getByTestId('expense-summary-card'));
+      await fireEvent.press(getByTestId('expense-summary-card'));
 
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
 
-    it('collapses back when pressing the expanded income card again', () => {
+    it('collapses back when pressing the expanded income card again', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getByTestId } = render(<GraphsScreen />);
+      const { getByTestId } = await render(<GraphsScreen />);
 
-      fireEvent.press(getByTestId('income-summary-card')); // expand
-      fireEvent.press(getByTestId('income-summary-card')); // collapse
+      await fireEvent.press(getByTestId('income-summary-card')); // expand
+      await fireEvent.press(getByTestId('income-summary-card')); // collapse
 
       // Both cards still present after collapse too
       expect(getByTestId('income-summary-card')).toBeTruthy();
       expect(getByTestId('expense-summary-card')).toBeTruthy();
     });
 
-    it('handles switching directly from income expanded to expense', () => {
+    it('handles switching directly from income expanded to expense', async () => {
       const GraphsScreen = require('../../app/screens/GraphsScreen').default;
-      const { getByTestId } = render(<GraphsScreen />);
+      const { getByTestId } = await render(<GraphsScreen />);
 
-      fireEvent.press(getByTestId('income-summary-card')); // expand income
-      fireEvent.press(getByTestId('expense-summary-card')); // switch to expense without collapsing
+      await fireEvent.press(getByTestId('income-summary-card')); // expand income
+      await fireEvent.press(getByTestId('expense-summary-card')); // switch to expense without collapsing
 
       // Both cards still in tree
       expect(getByTestId('income-summary-card')).toBeTruthy();

@@ -30,29 +30,29 @@ import {
 
 describe('Layout Constants', () => {
   describe('Re-exports from designTokens', () => {
-    it('HORIZONTAL_PADDING matches designTokens', () => {
+    it('HORIZONTAL_PADDING matches designTokens', async () => {
       expect(HORIZONTAL_PADDING).toBe(DT_HORIZONTAL_PADDING);
     });
 
-    it('TOP_CONTENT_SPACING matches designTokens', () => {
+    it('TOP_CONTENT_SPACING matches designTokens', async () => {
       expect(TOP_CONTENT_SPACING).toBe(DT_TOP_CONTENT_SPACING);
     });
 
-    it('SPACING matches designTokens', () => {
+    it('SPACING matches designTokens', async () => {
       expect(SPACING).toBe(DT_SPACING);
     });
 
-    it('BORDER_RADIUS matches designTokens', () => {
+    it('BORDER_RADIUS matches designTokens', async () => {
       expect(BORDER_RADIUS).toBe(DT_BORDER_RADIUS);
     });
 
-    it('HEIGHTS matches designTokens', () => {
+    it('HEIGHTS matches designTokens', async () => {
       expect(HEIGHTS).toBe(DT_HEIGHTS);
     });
   });
 
   describe('SPACING scale (4px grid)', () => {
-    it('has all expected size keys', () => {
+    it('has all expected size keys', async () => {
       expect(SPACING).toHaveProperty('xs');
       expect(SPACING).toHaveProperty('sm');
       expect(SPACING).toHaveProperty('md');
@@ -61,7 +61,7 @@ describe('Layout Constants', () => {
       expect(SPACING).toHaveProperty('xxl');
     });
 
-    it('follows 4px grid system', () => {
+    it('follows 4px grid system', async () => {
       expect(SPACING.xs).toBe(4);
       expect(SPACING.sm).toBe(8);
       expect(SPACING.md).toBe(12);
@@ -70,14 +70,14 @@ describe('Layout Constants', () => {
       expect(SPACING.xxl).toBe(24);
     });
 
-    it('all values are positive numbers', () => {
+    it('all values are positive numbers', async () => {
       Object.values(SPACING).forEach(value => {
         expect(typeof value).toBe('number');
         expect(value).toBeGreaterThan(0);
       });
     });
 
-    it('all values are multiples of 4', () => {
+    it('all values are multiples of 4', async () => {
       Object.values(SPACING).forEach(value => {
         expect(value % 4).toBe(0);
       });
@@ -85,31 +85,31 @@ describe('Layout Constants', () => {
   });
 
   describe('BORDER_RADIUS', () => {
-    it('has exactly 3 values', () => {
+    it('has exactly 3 values', async () => {
       const keys = Object.keys(BORDER_RADIUS);
       expect(keys.length).toBe(3);
     });
 
-    it('has sm, md, lg keys', () => {
+    it('has sm, md, lg keys', async () => {
       expect(BORDER_RADIUS).toHaveProperty('sm');
       expect(BORDER_RADIUS).toHaveProperty('md');
       expect(BORDER_RADIUS).toHaveProperty('lg');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(BORDER_RADIUS.sm).toBe(4);
       expect(BORDER_RADIUS.md).toBe(8);
       expect(BORDER_RADIUS.lg).toBe(12);
     });
 
-    it('values increase in order', () => {
+    it('values increase in order', async () => {
       expect(BORDER_RADIUS.sm).toBeLessThan(BORDER_RADIUS.md);
       expect(BORDER_RADIUS.md).toBeLessThan(BORDER_RADIUS.lg);
     });
   });
 
   describe('HEIGHTS', () => {
-    it('has all expected component height keys', () => {
+    it('has all expected component height keys', async () => {
       expect(HEIGHTS).toHaveProperty('input');
       expect(HEIGHTS).toHaveProperty('listItem');
       expect(HEIGHTS).toHaveProperty('calculator');
@@ -117,7 +117,7 @@ describe('Layout Constants', () => {
       expect(HEIGHTS).toHaveProperty('tabBar');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(HEIGHTS.input).toBe(48);
       expect(HEIGHTS.listItem).toBe(48);
       expect(HEIGHTS.calculator).toBe(44);
@@ -125,22 +125,22 @@ describe('Layout Constants', () => {
       expect(HEIGHTS.tabBar).toBe(80);
     });
 
-    it('input height meets minimum touch target (48px)', () => {
+    it('input height meets minimum touch target (48px)', async () => {
       expect(HEIGHTS.input).toBeGreaterThanOrEqual(48);
     });
 
-    it('list item height meets minimum touch target (48px)', () => {
+    it('list item height meets minimum touch target (48px)', async () => {
       expect(HEIGHTS.listItem).toBeGreaterThanOrEqual(48);
     });
   });
 
   describe('Backward compatibility exports', () => {
-    it('HORIZONTAL_PADDING equals SPACING.lg (16px)', () => {
+    it('HORIZONTAL_PADDING equals SPACING.lg (16px)', async () => {
       expect(HORIZONTAL_PADDING).toBe(SPACING.lg);
       expect(HORIZONTAL_PADDING).toBe(16);
     });
 
-    it('TOP_CONTENT_SPACING equals SPACING.sm', () => {
+    it('TOP_CONTENT_SPACING equals SPACING.sm', async () => {
       expect(TOP_CONTENT_SPACING).toBe(SPACING.sm);
     });
   });
@@ -148,7 +148,7 @@ describe('Layout Constants', () => {
 
 describe('Design Tokens', () => {
   describe('FONT_SIZE', () => {
-    it('has all expected size keys', () => {
+    it('has all expected size keys', async () => {
       expect(FONT_SIZE).toHaveProperty('xs');
       expect(FONT_SIZE).toHaveProperty('sm');
       expect(FONT_SIZE).toHaveProperty('md');
@@ -158,7 +158,7 @@ describe('Design Tokens', () => {
       expect(FONT_SIZE).toHaveProperty('xxl');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(FONT_SIZE.xs).toBe(10);
       expect(FONT_SIZE.sm).toBe(12);
       expect(FONT_SIZE.md).toBe(14);
@@ -168,14 +168,14 @@ describe('Design Tokens', () => {
       expect(FONT_SIZE.xxl).toBe(24);
     });
 
-    it('all values are positive numbers', () => {
+    it('all values are positive numbers', async () => {
       Object.values(FONT_SIZE).forEach(value => {
         expect(typeof value).toBe('number');
         expect(value).toBeGreaterThan(0);
       });
     });
 
-    it('values increase in order', () => {
+    it('values increase in order', async () => {
       expect(FONT_SIZE.xs).toBeLessThan(FONT_SIZE.sm);
       expect(FONT_SIZE.sm).toBeLessThan(FONT_SIZE.md);
       expect(FONT_SIZE.md).toBeLessThan(FONT_SIZE.base);
@@ -186,21 +186,21 @@ describe('Design Tokens', () => {
   });
 
   describe('FONT_WEIGHT', () => {
-    it('has all expected weight keys', () => {
+    it('has all expected weight keys', async () => {
       expect(FONT_WEIGHT).toHaveProperty('regular');
       expect(FONT_WEIGHT).toHaveProperty('medium');
       expect(FONT_WEIGHT).toHaveProperty('semibold');
       expect(FONT_WEIGHT).toHaveProperty('bold');
     });
 
-    it('has correct string values', () => {
+    it('has correct string values', async () => {
       expect(FONT_WEIGHT.regular).toBe('400');
       expect(FONT_WEIGHT.medium).toBe('500');
       expect(FONT_WEIGHT.semibold).toBe('600');
       expect(FONT_WEIGHT.bold).toBe('700');
     });
 
-    it('all values are numeric strings', () => {
+    it('all values are numeric strings', async () => {
       Object.values(FONT_WEIGHT).forEach(value => {
         expect(typeof value).toBe('string');
         expect(Number(value)).not.toBeNaN();
@@ -209,7 +209,7 @@ describe('Design Tokens', () => {
   });
 
   describe('ICON_SIZE', () => {
-    it('has all expected size keys', () => {
+    it('has all expected size keys', async () => {
       expect(ICON_SIZE).toHaveProperty('xs');
       expect(ICON_SIZE).toHaveProperty('sm');
       expect(ICON_SIZE).toHaveProperty('md');
@@ -218,7 +218,7 @@ describe('Design Tokens', () => {
       expect(ICON_SIZE).toHaveProperty('xl');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(ICON_SIZE.xs).toBe(16);
       expect(ICON_SIZE.sm).toBe(18);
       expect(ICON_SIZE.md).toBe(22);
@@ -227,7 +227,7 @@ describe('Design Tokens', () => {
       expect(ICON_SIZE.xl).toBe(48);
     });
 
-    it('values increase in order', () => {
+    it('values increase in order', async () => {
       expect(ICON_SIZE.xs).toBeLessThan(ICON_SIZE.sm);
       expect(ICON_SIZE.sm).toBeLessThan(ICON_SIZE.md);
       expect(ICON_SIZE.md).toBeLessThan(ICON_SIZE.base);
@@ -237,31 +237,31 @@ describe('Design Tokens', () => {
   });
 
   describe('ELEVATION', () => {
-    it('has all expected elevation keys', () => {
+    it('has all expected elevation keys', async () => {
       expect(ELEVATION).toHaveProperty('none');
       expect(ELEVATION).toHaveProperty('low');
       expect(ELEVATION).toHaveProperty('medium');
       expect(ELEVATION).toHaveProperty('high');
     });
 
-    it('none has zero elevation', () => {
+    it('none has zero elevation', async () => {
       expect(ELEVATION.none.elevation).toBe(0);
       expect(ELEVATION.none.shadowOpacity).toBe(0);
     });
 
-    it('low has elevation 2', () => {
+    it('low has elevation 2', async () => {
       expect(ELEVATION.low.elevation).toBe(2);
     });
 
-    it('medium has elevation 3', () => {
+    it('medium has elevation 3', async () => {
       expect(ELEVATION.medium.elevation).toBe(3);
     });
 
-    it('high has elevation 5', () => {
+    it('high has elevation 5', async () => {
       expect(ELEVATION.high.elevation).toBe(5);
     });
 
-    it('all elevations have required shadow properties', () => {
+    it('all elevations have required shadow properties', async () => {
       Object.values(ELEVATION).forEach(el => {
         expect(el).toHaveProperty('shadowColor');
         expect(el).toHaveProperty('shadowOffset');
@@ -271,14 +271,14 @@ describe('Design Tokens', () => {
       });
     });
 
-    it('shadowOffset has width and height', () => {
+    it('shadowOffset has width and height', async () => {
       Object.values(ELEVATION).forEach(el => {
         expect(el.shadowOffset).toHaveProperty('width');
         expect(el.shadowOffset).toHaveProperty('height');
       });
     });
 
-    it('elevation values increase in order', () => {
+    it('elevation values increase in order', async () => {
       expect(ELEVATION.none.elevation).toBeLessThan(ELEVATION.low.elevation);
       expect(ELEVATION.low.elevation).toBeLessThan(ELEVATION.medium.elevation);
       expect(ELEVATION.medium.elevation).toBeLessThan(ELEVATION.high.elevation);
@@ -286,21 +286,21 @@ describe('Design Tokens', () => {
   });
 
   describe('OPACITY', () => {
-    it('has all expected opacity keys', () => {
+    it('has all expected opacity keys', async () => {
       expect(OPACITY).toHaveProperty('disabled');
       expect(OPACITY).toHaveProperty('overlay');
       expect(OPACITY).toHaveProperty('subtle');
       expect(OPACITY).toHaveProperty('semiTransparent');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(OPACITY.disabled).toBe(0.5);
       expect(OPACITY.overlay).toBe(0.3);
       expect(OPACITY.subtle).toBe(0.6);
       expect(OPACITY.semiTransparent).toBe(0.12);
     });
 
-    it('all values are between 0 and 1', () => {
+    it('all values are between 0 and 1', async () => {
       Object.values(OPACITY).forEach(value => {
         expect(value).toBeGreaterThan(0);
         expect(value).toBeLessThanOrEqual(1);
@@ -309,27 +309,27 @@ describe('Design Tokens', () => {
   });
 
   describe('DURATION', () => {
-    it('has all expected duration keys', () => {
+    it('has all expected duration keys', async () => {
       expect(DURATION).toHaveProperty('fastest');
       expect(DURATION).toHaveProperty('fast');
       expect(DURATION).toHaveProperty('normal');
       expect(DURATION).toHaveProperty('slow');
     });
 
-    it('has correct values in milliseconds', () => {
+    it('has correct values in milliseconds', async () => {
       expect(DURATION.fastest).toBe(100);
       expect(DURATION.fast).toBe(200);
       expect(DURATION.normal).toBe(300);
       expect(DURATION.slow).toBe(500);
     });
 
-    it('values increase in order', () => {
+    it('values increase in order', async () => {
       expect(DURATION.fastest).toBeLessThan(DURATION.fast);
       expect(DURATION.fast).toBeLessThan(DURATION.normal);
       expect(DURATION.normal).toBeLessThan(DURATION.slow);
     });
 
-    it('all values are positive numbers', () => {
+    it('all values are positive numbers', async () => {
       Object.values(DURATION).forEach(value => {
         expect(typeof value).toBe('number');
         expect(value).toBeGreaterThan(0);
@@ -338,7 +338,7 @@ describe('Design Tokens', () => {
   });
 
   describe('Z_INDEX', () => {
-    it('has all expected z-index keys', () => {
+    it('has all expected z-index keys', async () => {
       expect(Z_INDEX).toHaveProperty('base');
       expect(Z_INDEX).toHaveProperty('dropdown');
       expect(Z_INDEX).toHaveProperty('sticky');
@@ -348,7 +348,7 @@ describe('Design Tokens', () => {
       expect(Z_INDEX).toHaveProperty('toast');
     });
 
-    it('has correct values', () => {
+    it('has correct values', async () => {
       expect(Z_INDEX.base).toBe(0);
       expect(Z_INDEX.dropdown).toBe(10);
       expect(Z_INDEX.sticky).toBe(20);
@@ -358,7 +358,7 @@ describe('Design Tokens', () => {
       expect(Z_INDEX.toast).toBe(60);
     });
 
-    it('values increase in proper stacking order', () => {
+    it('values increase in proper stacking order', async () => {
       expect(Z_INDEX.base).toBeLessThan(Z_INDEX.dropdown);
       expect(Z_INDEX.dropdown).toBeLessThan(Z_INDEX.sticky);
       expect(Z_INDEX.sticky).toBeLessThan(Z_INDEX.overlay);
@@ -367,7 +367,7 @@ describe('Design Tokens', () => {
       expect(Z_INDEX.popover).toBeLessThan(Z_INDEX.toast);
     });
 
-    it('toast has highest z-index for visibility', () => {
+    it('toast has highest z-index for visibility', async () => {
       const maxZIndex = Math.max(...Object.values(Z_INDEX));
       expect(Z_INDEX.toast).toBe(maxZIndex);
     });

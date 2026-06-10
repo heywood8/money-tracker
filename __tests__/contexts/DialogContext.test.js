@@ -14,30 +14,28 @@ describe('DialogContext', () => {
   const wrapper = ({ children }) => <DialogProvider>{children}</DialogProvider>;
 
   describe('Initialization', () => {
-    it('provides dialog context', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('provides dialog context', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
       expect(result.current.showDialog).toBeDefined();
       expect(result.current.hideDialog).toBeDefined();
     });
 
-    it('throws error when used outside provider', () => {
+    it('throws error when used outside provider', async () => {
       // Suppress console.error for this test
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      expect(() => {
-        renderHook(() => useDialog());
-      }).toThrow('useDialog must be used within a DialogProvider');
+      await expect(renderHook(() => useDialog())).rejects.toThrow('useDialog must be used within a DialogProvider');
 
       consoleSpy.mockRestore();
     });
   });
 
   describe('showDialog', () => {
-    it('shows dialog with title and message', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('shows dialog with title and message', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Test Title', 'Test Message');
       });
 
@@ -46,10 +44,10 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('shows dialog with default OK button', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('shows dialog with default OK button', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message');
       });
 
@@ -57,8 +55,8 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('shows dialog with custom buttons', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('shows dialog with custom buttons', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
       const mockOnPress = jest.fn();
 
       const buttons = [
@@ -66,7 +64,7 @@ describe('DialogContext', () => {
         { text: 'Delete', style: 'destructive', onPress: mockOnPress },
       ];
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Confirm', 'Are you sure?', buttons);
       });
 
@@ -74,10 +72,10 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('accepts empty button array', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('accepts empty button array', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message', []);
       });
 
@@ -85,14 +83,14 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('replaces previous dialog when called multiple times', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('replaces previous dialog when called multiple times', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('First', 'First message');
       });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Second', 'Second message');
       });
 
@@ -102,14 +100,14 @@ describe('DialogContext', () => {
   });
 
   describe('hideDialog', () => {
-    it('hides dialog', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('hides dialog', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message');
       });
 
-      act(() => {
+      await act(async () => {
         result.current.hideDialog();
       });
 
@@ -117,50 +115,46 @@ describe('DialogContext', () => {
       expect(result.current.hideDialog).toBeDefined();
     });
 
-    it('can be called when no dialog is shown', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('can be called when no dialog is shown', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.hideDialog();
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('can be called multiple times', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('can be called multiple times', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message');
       });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.hideDialog();
           result.current.hideDialog();
           result.current.hideDialog();
-        });
-      }).not.toThrow();
+        });;
     });
   });
 
   describe('Dialog Workflow', () => {
-    it('shows and hides dialog in sequence', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('shows and hides dialog in sequence', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title 1', 'Message 1');
       });
 
-      act(() => {
+      await act(async () => {
         result.current.hideDialog();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title 2', 'Message 2');
       });
 
-      act(() => {
+      await act(async () => {
         result.current.hideDialog();
       });
 
@@ -168,24 +162,22 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('handles rapid show/hide calls', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles rapid show/hide calls', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('Title 1', 'Message 1');
           result.current.hideDialog();
           result.current.showDialog('Title 2', 'Message 2');
           result.current.hideDialog();
           result.current.showDialog('Title 3', 'Message 3');
-        });
-      }).not.toThrow();
+        });;
     });
   });
 
   describe('Button Configurations', () => {
-    it('handles button with onPress callback', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles button with onPress callback', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
       const mockCallback = jest.fn();
 
       const buttons = [
@@ -195,7 +187,7 @@ describe('DialogContext', () => {
         },
       ];
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message', buttons);
       });
 
@@ -203,8 +195,8 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('handles button with style property', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles button with style property', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
       const buttons = [
         { text: 'Cancel', style: 'cancel' },
@@ -212,7 +204,7 @@ describe('DialogContext', () => {
         { text: 'OK', style: 'default' },
       ];
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message', buttons);
       });
 
@@ -220,14 +212,14 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('handles button without style', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles button without style', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
       const buttons = [
         { text: 'OK', onPress: jest.fn() },
       ];
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog('Title', 'Message', buttons);
       });
 
@@ -237,11 +229,11 @@ describe('DialogContext', () => {
   });
 
   describe('Common Dialog Patterns', () => {
-    it('confirmation dialog pattern', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('confirmation dialog pattern', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
       const mockConfirm = jest.fn();
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog(
           'Delete Account',
           'Are you sure you want to delete this account?',
@@ -259,10 +251,10 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('alert dialog pattern', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('alert dialog pattern', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog(
           'Error',
           'Failed to save data',
@@ -273,10 +265,10 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('info dialog pattern', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('info dialog pattern', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog(
           'Success',
           'Account created successfully',
@@ -286,10 +278,10 @@ describe('DialogContext', () => {
       expect(result.current.showDialog).toBeDefined();
     });
 
-    it('multi-button choice dialog pattern', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('multi-button choice dialog pattern', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.showDialog(
           'Choose Option',
           'How would you like to proceed?',
@@ -306,82 +298,68 @@ describe('DialogContext', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles empty title', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles empty title', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('', 'Message');
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles empty message', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles empty message', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('Title', '');
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles null title', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles null title', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog(null, 'Message');
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles null message', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles null message', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('Title', null);
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles undefined buttons param', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles undefined buttons param', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('Title', 'Message', undefined);
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles very long title', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles very long title', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
       const longTitle = 'A'.repeat(1000);
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog(longTitle, 'Message');
-        });
-      }).not.toThrow();
+        });;
     });
 
-    it('handles very long message', () => {
-      const { result } = renderHook(() => useDialog(), { wrapper });
+    it('handles very long message', async () => {
+      const { result } = await renderHook(() => useDialog(), { wrapper });
       const longMessage = 'B'.repeat(5000);
 
-      expect(() => {
-        act(() => {
+      await act(async () => {
           result.current.showDialog('Title', longMessage);
-        });
-      }).not.toThrow();
+        });;
     });
   });
 
   describe('Callback Stability', () => {
-    it('showDialog callback is stable across renders', () => {
-      const { result, rerender } = renderHook(() => useDialog(), { wrapper });
+    it('showDialog callback is stable across renders', async () => {
+      const { result, rerender } = await renderHook(() => useDialog(), { wrapper });
 
       const firstShowDialog = result.current.showDialog;
       rerender();
@@ -390,8 +368,8 @@ describe('DialogContext', () => {
       expect(firstShowDialog).toBe(secondShowDialog);
     });
 
-    it('hideDialog callback is stable across renders', () => {
-      const { result, rerender } = renderHook(() => useDialog(), { wrapper });
+    it('hideDialog callback is stable across renders', async () => {
+      const { result, rerender } = await renderHook(() => useDialog(), { wrapper });
 
       const firstHideDialog = result.current.hideDialog;
       rerender();

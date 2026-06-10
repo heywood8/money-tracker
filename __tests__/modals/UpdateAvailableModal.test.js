@@ -36,15 +36,15 @@ describe('UpdateAvailableModal', () => {
   });
 
   describe('Null guard', () => {
-    it('returns null when updateData is not provided', () => {
-      const { toJSON } = render(
+    it('returns null when updateData is not provided', async () => {
+      const { toJSON } = await render(
         <UpdateAvailableModal {...baseProps} updateData={null} />,
       );
       expect(toJSON()).toBeNull();
     });
 
-    it('returns null when updateData is undefined', () => {
-      const { toJSON } = render(
+    it('returns null when updateData is undefined', async () => {
+      const { toJSON } = await render(
         <UpdateAvailableModal {...baseProps} updateData={undefined} />,
       );
       expect(toJSON()).toBeNull();
@@ -52,37 +52,36 @@ describe('UpdateAvailableModal', () => {
   });
 
   describe('Basic rendering', () => {
-    it('renders version numbers when updateData is provided', () => {
-      const { getByText } = render(
+    it('renders version numbers when updateData is provided', async () => {
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={baseUpdateData} />,
       );
       expect(getByText('v2.0.0')).toBeTruthy();
     });
 
-    it('renders dismiss button and calls onDismiss when pressed', () => {
+    it('renders dismiss button and calls onDismiss when pressed', async () => {
       const onDismiss = jest.fn();
-      const { UNSAFE_getAllByType } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} onDismiss={onDismiss} updateData={baseUpdateData} />,
       );
-      const { TouchableOpacity } = require('react-native');
-      const buttons = UNSAFE_getAllByType(TouchableOpacity);
-      fireEvent.press(buttons[0]);
+      // The back button wraps an Ionicons 'arrow-back' icon; press it to trigger onDismiss
+      await fireEvent.press(getByText('arrow-back'));
       expect(onDismiss).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onUpdate with downloadUrl and checksumUrl when update button pressed', () => {
+    it('calls onUpdate with downloadUrl and checksumUrl when update button pressed', async () => {
       const onUpdate = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} onUpdate={onUpdate} updateData={baseUpdateData} />,
       );
-      fireEvent.press(getByText('update_now'));
+      await fireEvent.press(getByText('update_now'));
       expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk', undefined);
     });
   });
 
   describe('Without releaseNotes', () => {
-    it('shows install hint text when releaseNotes is null', () => {
-      const { getByText } = render(
+    it('shows install hint text when releaseNotes is null', async () => {
+      const { getByText } = await render(
         <UpdateAvailableModal
           {...baseProps}
           updateData={{ ...baseUpdateData, releaseNotes: null }}
@@ -92,8 +91,8 @@ describe('UpdateAvailableModal', () => {
       expect(getByText('update_install_hint')).toBeTruthy();
     });
 
-    it('does not show the update hint below the button when releaseNotes is null', () => {
-      const { getAllByText } = render(
+    it('does not show the update hint below the button when releaseNotes is null', async () => {
+      const { getAllByText } = await render(
         <UpdateAvailableModal
           {...baseProps}
           updateData={{ ...baseUpdateData, releaseNotes: null }}
@@ -107,34 +106,34 @@ describe('UpdateAvailableModal', () => {
   });
 
   describe('With releaseNotes', () => {
-    it('shows changelog section when releaseNotes is provided', () => {
+    it('shows changelog section when releaseNotes is provided', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '**Bold feature** added' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('whats_new')).toBeTruthy();
     });
 
-    it('strips markdown from release notes', () => {
+    it('strips markdown from release notes', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '**Bold** and *italic* text' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('Bold and italic text')).toBeTruthy();
     });
 
-    it('always shows version label in changelog entries', () => {
+    it('always shows version label in changelog entries', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'Single release' }],
       };
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       // v2.0.0 appears in both the version header row and the changelog entry
@@ -142,7 +141,7 @@ describe('UpdateAvailableModal', () => {
       expect(v200elements.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('shows version header when there are multiple release notes', () => {
+    it('shows version header when there are multiple release notes', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [
@@ -150,7 +149,7 @@ describe('UpdateAvailableModal', () => {
           { version: '1.9.0', notes: 'Bug fix' },
         ],
       };
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       // v2.0.0 should appear twice: once in header, once as changelog version
@@ -158,12 +157,12 @@ describe('UpdateAvailableModal', () => {
       expect(v200.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('shows changelog section instead of install hint when releaseNotes is provided', () => {
+    it('shows changelog section instead of install hint when releaseNotes is provided', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'New stuff' }],
       };
-      const { queryByText, getByText } = render(
+      const { queryByText, getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       // Changelog header shown, install hint not shown
@@ -173,58 +172,58 @@ describe('UpdateAvailableModal', () => {
   });
 
   describe('Invisible state', () => {
-    it('renders without crashing when visible=false (updateData still provided)', () => {
+    it('renders without crashing when visible=false (updateData still provided)', async () => {
       // When visible=false but updateData is provided, the modal renders (hidden by Portal)
-      expect(() => render(
+      await render(
         <UpdateAvailableModal
           {...baseProps}
           visible={false}
           updateData={baseUpdateData}
         />,
-      )).not.toThrow();
+      );
     });
   });
 
   describe('stripMarkdown helper', () => {
-    it('strips heading markers', () => {
+    it('strips heading markers', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '## Heading\nContent' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('Heading\nContent')).toBeTruthy();
     });
 
-    it('converts list items to bullets', () => {
+    it('converts list items to bullets', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '- item one' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('• item one')).toBeTruthy();
     });
 
-    it('strips inline code backticks', () => {
+    it('strips inline code backticks', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'Use `code` here' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('Use code here')).toBeTruthy();
     });
 
-    it('strips links to plain text', () => {
+    it('strips links to plain text', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: '[link text](https://example.com)' }],
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
       expect(getByText('link text')).toBeTruthy();

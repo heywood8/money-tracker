@@ -36,8 +36,8 @@ describe('SpendingPredictionCard', () => {
   };
 
   describe('Rendering', () => {
-    it('renders null when spendingPrediction is null', () => {
-      const { toJSON } = render(
+    it('renders null when spendingPrediction is null', async () => {
+      const { toJSON } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -48,8 +48,8 @@ describe('SpendingPredictionCard', () => {
       expect(toJSON()).toBeNull();
     });
 
-    it('renders null when spendingPrediction is undefined', () => {
-      const { toJSON } = render(
+    it('renders null when spendingPrediction is undefined', async () => {
+      const { toJSON } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -60,8 +60,8 @@ describe('SpendingPredictionCard', () => {
       expect(toJSON()).toBeNull();
     });
 
-    it('renders prediction card with data', () => {
-      const { getByText } = render(
+    it('renders prediction card with data', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -75,8 +75,8 @@ describe('SpendingPredictionCard', () => {
       expect(getByText('predicted_spending')).toBeTruthy();
     });
 
-    it('displays formatted currency amounts', () => {
-      const { getByText } = render(
+    it('displays formatted currency amounts', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -90,8 +90,8 @@ describe('SpendingPredictionCard', () => {
       expect(getByText('35.75 USD')).toBeTruthy();
     });
 
-    it('displays days elapsed information', () => {
-      const { getByText } = render(
+    it('displays days elapsed information', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -106,8 +106,8 @@ describe('SpendingPredictionCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats JPY with 0 decimal places', () => {
-      const { getByText } = render(
+    it('formats JPY with 0 decimal places', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -122,8 +122,8 @@ describe('SpendingPredictionCard', () => {
       expect(getByText('5000 JPY')).toBeTruthy();
     });
 
-    it('formats EUR with 2 decimal places', () => {
-      const { getByText } = render(
+    it('formats EUR with 2 decimal places', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -138,8 +138,8 @@ describe('SpendingPredictionCard', () => {
       expect(getByText('100.99 EUR')).toBeTruthy();
     });
 
-    it('handles unknown currency with default 2 decimal places', () => {
-      const { getByText } = render(
+    it('handles unknown currency with default 2 decimal places', async () => {
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -156,8 +156,8 @@ describe('SpendingPredictionCard', () => {
   });
 
   describe('Progress Bar', () => {
-    it('caps progress at 100%', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('caps progress at 100%', async () => {
+      const { container } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -169,13 +169,13 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      // Component should still render (progress bar capped at 100%)
+      // Component should still await render (progress bar capped at 100%)
       // We just verify the component renders without error
-      expect(UNSAFE_getAllByType('View').length).toBeGreaterThan(0);
+      expect(container.queryAll(n => n.type === 'View').length).toBeGreaterThan(0);
     });
 
-    it('handles 0% progress', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('handles 0% progress', async () => {
+      const { container } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}
@@ -187,12 +187,12 @@ describe('SpendingPredictionCard', () => {
         />,
       );
 
-      expect(UNSAFE_getAllByType('View').length).toBeGreaterThan(0);
+      expect(container.queryAll(n => n.type === 'View').length).toBeGreaterThan(0);
     });
   });
 
   describe('Styling', () => {
-    it('applies theme colors', () => {
+    it('applies theme colors', async () => {
       const customColors = {
         text: '#111111',
         mutedText: '#666666',
@@ -202,7 +202,7 @@ describe('SpendingPredictionCard', () => {
         expense: '#FF0000',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={customColors}
           t={defaultT}
@@ -219,7 +219,7 @@ describe('SpendingPredictionCard', () => {
       );
     });
 
-    it('uses default expense color when not provided', () => {
+    it('uses default expense color when not provided', async () => {
       const colorsWithoutExpense = {
         text: '#000000',
         mutedText: '#888888',
@@ -229,7 +229,7 @@ describe('SpendingPredictionCard', () => {
         // expense not provided
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={colorsWithoutExpense}
           t={defaultT}
@@ -247,12 +247,12 @@ describe('SpendingPredictionCard', () => {
       );
     });
 
-    it('renders with selectedAccount and accounts provided (true branch of account lookup)', () => {
+    it('renders with selectedAccount and accounts provided (true branch of account lookup)', async () => {
       const accounts = [
         { id: 'acc-1', name: 'Savings', currency: 'USD' },
         { id: 'acc-2', name: 'Checking', currency: 'EUR' },
       ];
-      const { getByText } = render(
+      const { getByText } = await render(
         <SpendingPredictionCard
           colors={defaultColors}
           t={defaultT}

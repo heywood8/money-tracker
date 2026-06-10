@@ -52,15 +52,15 @@ describe('MultiCurrencyFields', () => {
   });
 
   describe('Component Rendering', () => {
-    it('renders currency info display', () => {
-      const { getByText } = render(<MultiCurrencyFields {...defaultProps} />);
+    it('renders currency info display', async () => {
+      const { getByText } = await render(<MultiCurrencyFields {...defaultProps} />);
 
       // Should show currency symbols: $ → €
       expect(getByText('$ → €')).toBeTruthy();
     });
 
-    it('renders exchange rate input with label', () => {
-      const { getByText, getByDisplayValue } = render(
+    it('renders exchange rate input with label', async () => {
+      const { getByText, getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} />,
       );
 
@@ -68,8 +68,8 @@ describe('MultiCurrencyFields', () => {
       expect(getByDisplayValue('1.08')).toBeTruthy();
     });
 
-    it('renders destination amount input with label', () => {
-      const { getByText, getByDisplayValue } = render(
+    it('renders destination amount input with label', async () => {
+      const { getByText, getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} />,
       );
 
@@ -77,44 +77,44 @@ describe('MultiCurrencyFields', () => {
       expect(getByDisplayValue('108.00')).toBeTruthy();
     });
 
-    it('renders destination currency symbol', () => {
-      const { getAllByText } = render(<MultiCurrencyFields {...defaultProps} />);
+    it('renders destination currency symbol', async () => {
+      const { getAllByText } = await render(<MultiCurrencyFields {...defaultProps} />);
 
       // € appears in both currency info and destination amount label
       const euroSymbols = getAllByText('€');
       expect(euroSymbols.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders exchange rate info text', () => {
-      const { getByText } = render(<MultiCurrencyFields {...defaultProps} />);
+    it('renders exchange rate info text', async () => {
+      const { getByText } = await render(<MultiCurrencyFields {...defaultProps} />);
 
       expect(getByText('offline_rate_info (2024-01-15 10:30)')).toBeTruthy();
     });
 
-    it('shows fetching_rate text when rateSource is loading', () => {
-      const { getByText } = render(
+    it('shows fetching_rate text when rateSource is loading', async () => {
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} rateSource="loading" />,
       );
       expect(getByText('fetching_rate')).toBeTruthy();
     });
 
-    it('shows manual_rate_info text when rateSource is manual', () => {
-      const { getByText } = render(
+    it('shows manual_rate_info text when rateSource is manual', async () => {
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} rateSource="manual" />,
       );
       expect(getByText('manual_rate_info')).toBeTruthy();
     });
 
-    it('shows live_rate_info text when rateSource is live', () => {
-      const { getByText } = render(
+    it('shows live_rate_info text when rateSource is live', async () => {
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} rateSource="live" />,
       );
       expect(getByText('live_rate_info')).toBeTruthy();
     });
 
-    it('uses custom translation function', () => {
+    it('uses custom translation function', async () => {
       const customT = jest.fn((key) => `translated_${key}`);
-      const { getByText } = render(
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} t={customT} />,
       );
 
@@ -126,13 +126,13 @@ describe('MultiCurrencyFields', () => {
   });
 
   describe('Currency Symbol Resolution', () => {
-    it('displays correct symbols for known currencies', () => {
+    it('displays correct symbols for known currencies', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: 'GBP' },
         destinationAccount: { currency: 'JPY' },
       };
-      const { getByText, getAllByText } = render(
+      const { getByText, getAllByText } = await render(
         <MultiCurrencyFields {...props} />,
       );
 
@@ -142,29 +142,29 @@ describe('MultiCurrencyFields', () => {
       expect(yenSymbols.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('falls back to currency code for unknown currencies', () => {
+    it('falls back to currency code for unknown currencies', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: 'XYZ' },
         destinationAccount: { currency: 'ABC' },
       };
-      const { getByText } = render(<MultiCurrencyFields {...props} />);
+      const { getByText } = await render(<MultiCurrencyFields {...props} />);
 
       expect(getByText('XYZ → ABC')).toBeTruthy();
     });
 
-    it('handles empty currency code', () => {
+    it('handles empty currency code', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: '' },
         destinationAccount: { currency: 'USD' },
       };
-      const { getByText } = render(<MultiCurrencyFields {...props} />);
+      const { getByText } = await render(<MultiCurrencyFields {...props} />);
 
       expect(getByText(' → $')).toBeTruthy();
     });
 
-    it('handles null/undefined currency gracefully', () => {
+    it('handles null/undefined currency gracefully', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: null },
@@ -172,26 +172,26 @@ describe('MultiCurrencyFields', () => {
       };
 
       // Should not throw
-      const { getByText } = render(<MultiCurrencyFields {...props} />);
+      const { getByText } = await render(<MultiCurrencyFields {...props} />);
       expect(getByText(' → ')).toBeTruthy();
     });
 
-    it('displays RUB currency symbol correctly', () => {
+    it('displays RUB currency symbol correctly', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: 'RUB' },
         destinationAccount: { currency: 'USD' },
       };
-      const { getByText } = render(<MultiCurrencyFields {...props} />);
+      const { getByText } = await render(<MultiCurrencyFields {...props} />);
 
       expect(getByText('₽ → $')).toBeTruthy();
     });
   });
 
   describe('Input Interactions', () => {
-    it('calls onExchangeRateChange when exchange rate input changes', () => {
+    it('calls onExchangeRateChange when exchange rate input changes', async () => {
       const onExchangeRateChange = jest.fn();
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields
           {...defaultProps}
           onExchangeRateChange={onExchangeRateChange}
@@ -199,14 +199,14 @@ describe('MultiCurrencyFields', () => {
       );
 
       const exchangeRateInput = getByDisplayValue('1.08');
-      fireEvent.changeText(exchangeRateInput, '1.15');
+      await fireEvent.changeText(exchangeRateInput, '1.15');
 
       expect(onExchangeRateChange).toHaveBeenCalledWith('1.15');
     });
 
-    it('calls onDestinationAmountChange when destination amount input changes', () => {
+    it('calls onDestinationAmountChange when destination amount input changes', async () => {
       const onDestinationAmountChange = jest.fn();
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields
           {...defaultProps}
           onDestinationAmountChange={onDestinationAmountChange}
@@ -214,13 +214,13 @@ describe('MultiCurrencyFields', () => {
       );
 
       const destinationInput = getByDisplayValue('108.00');
-      fireEvent.changeText(destinationInput, '150.00');
+      await fireEvent.changeText(destinationInput, '150.00');
 
       expect(onDestinationAmountChange).toHaveBeenCalledWith('150.00');
     });
 
-    it('inputs have decimal-pad keyboard type', () => {
-      const { getByDisplayValue } = render(
+    it('inputs have decimal-pad keyboard type', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} />,
       );
 
@@ -231,8 +231,8 @@ describe('MultiCurrencyFields', () => {
       expect(destinationInput.props.keyboardType).toBe('decimal-pad');
     });
 
-    it('inputs have done return key type', () => {
-      const { getByDisplayValue } = render(
+    it('inputs have done return key type', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} />,
       );
 
@@ -243,8 +243,8 @@ describe('MultiCurrencyFields', () => {
       expect(destinationInput.props.returnKeyType).toBe('done');
     });
 
-    it('inputs show placeholder when empty', () => {
-      const { getAllByPlaceholderText } = render(
+    it('inputs show placeholder when empty', async () => {
+      const { getAllByPlaceholderText } = await render(
         <MultiCurrencyFields
           {...defaultProps}
           exchangeRate=""
@@ -258,8 +258,8 @@ describe('MultiCurrencyFields', () => {
   });
 
   describe('Shadow Operation (Disabled State)', () => {
-    it('inputs are editable when not shadow operation', () => {
-      const { getByDisplayValue } = render(
+    it('inputs are editable when not shadow operation', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} isShadowOperation={false} />,
       );
 
@@ -270,8 +270,8 @@ describe('MultiCurrencyFields', () => {
       expect(destinationInput.props.editable).toBe(true);
     });
 
-    it('inputs are not editable when shadow operation', () => {
-      const { getByDisplayValue } = render(
+    it('inputs are not editable when shadow operation', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} isShadowOperation={true} />,
       );
 
@@ -282,8 +282,8 @@ describe('MultiCurrencyFields', () => {
       expect(destinationInput.props.editable).toBe(false);
     });
 
-    it('applies disabled style when shadow operation', () => {
-      const { getByDisplayValue } = render(
+    it('applies disabled style when shadow operation', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} isShadowOperation={true} />,
       );
 
@@ -306,8 +306,8 @@ describe('MultiCurrencyFields', () => {
       expect(hasDisabledStyle(destinationStyles)).toBe(true);
     });
 
-    it('does not apply disabled style when not shadow operation', () => {
-      const { getByDisplayValue } = render(
+    it('does not apply disabled style when not shadow operation', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} isShadowOperation={false} />,
       );
 
@@ -323,11 +323,11 @@ describe('MultiCurrencyFields', () => {
       expect(hasDisabledStyle(exchangeRateInput.props.style)).toBe(false);
     });
 
-    it('defaults isShadowOperation to false/undefined', () => {
+    it('defaults isShadowOperation to false/undefined', async () => {
       const propsWithoutShadow = { ...defaultProps };
       delete propsWithoutShadow.isShadowOperation;
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...propsWithoutShadow} />,
       );
 
@@ -337,12 +337,12 @@ describe('MultiCurrencyFields', () => {
   });
 
   describe('Theming', () => {
-    it('applies text color from colors prop', () => {
+    it('applies text color from colors prop', async () => {
       const customColors = {
         ...defaultProps.colors,
         text: '#FF0000',
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} colors={customColors} />,
       );
 
@@ -352,12 +352,12 @@ describe('MultiCurrencyFields', () => {
       );
     });
 
-    it('applies mutedText color to currency info', () => {
+    it('applies mutedText color to currency info', async () => {
       const customColors = {
         ...defaultProps.colors,
         mutedText: '#999999',
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <MultiCurrencyFields {...defaultProps} colors={customColors} />,
       );
 
@@ -367,13 +367,13 @@ describe('MultiCurrencyFields', () => {
       );
     });
 
-    it('applies input background and border colors', () => {
+    it('applies input background and border colors', async () => {
       const customColors = {
         ...defaultProps.colors,
         inputBackground: '#F0F0F0',
         inputBorder: '#DDDDDD',
       };
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} colors={customColors} />,
       );
 
@@ -388,12 +388,12 @@ describe('MultiCurrencyFields', () => {
       );
     });
 
-    it('applies mutedText color to placeholder', () => {
+    it('applies mutedText color to placeholder', async () => {
       const customColors = {
         ...defaultProps.colors,
         mutedText: '#AAAAAA',
       };
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields {...defaultProps} colors={customColors} />,
       );
 
@@ -403,28 +403,28 @@ describe('MultiCurrencyFields', () => {
   });
 
   describe('Exchange Rate Info', () => {
-    it('displays last updated timestamp from currency service', () => {
+    it('displays last updated timestamp from currency service', async () => {
       const Currency = require('../../../app/services/currency');
       Currency.getExchangeRatesLastUpdated.mockReturnValue('2024-06-20 14:45');
 
-      const { getByText } = render(<MultiCurrencyFields {...defaultProps} />);
+      const { getByText } = await render(<MultiCurrencyFields {...defaultProps} />);
 
       expect(getByText('offline_rate_info (2024-06-20 14:45)')).toBeTruthy();
     });
 
-    it('calls getExchangeRatesLastUpdated on render', () => {
+    it('calls getExchangeRatesLastUpdated on render', async () => {
       const Currency = require('../../../app/services/currency');
       Currency.getExchangeRatesLastUpdated.mockClear();
 
-      render(<MultiCurrencyFields {...defaultProps} />);
+      await render(<MultiCurrencyFields {...defaultProps} />);
 
       expect(Currency.getExchangeRatesLastUpdated).toHaveBeenCalled();
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles very long exchange rate values', () => {
-      const { getByDisplayValue } = render(
+    it('handles very long exchange rate values', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields
           {...defaultProps}
           exchangeRate="1.234567890123456789"
@@ -434,8 +434,8 @@ describe('MultiCurrencyFields', () => {
       expect(getByDisplayValue('1.234567890123456789')).toBeTruthy();
     });
 
-    it('handles very large destination amounts', () => {
-      const { getByDisplayValue } = render(
+    it('handles very large destination amounts', async () => {
+      const { getByDisplayValue } = await render(
         <MultiCurrencyFields
           {...defaultProps}
           destinationAmount="9999999999.99"
@@ -445,18 +445,18 @@ describe('MultiCurrencyFields', () => {
       expect(getByDisplayValue('9999999999.99')).toBeTruthy();
     });
 
-    it('handles same source and destination currency', () => {
+    it('handles same source and destination currency', async () => {
       const props = {
         ...defaultProps,
         sourceAccount: { currency: 'USD' },
         destinationAccount: { currency: 'USD' },
       };
-      const { getByText } = render(<MultiCurrencyFields {...props} />);
+      const { getByText } = await render(<MultiCurrencyFields {...props} />);
 
       expect(getByText('$ → $')).toBeTruthy();
     });
 
-    it('renders correctly with minimal required props', () => {
+    it('renders correctly with minimal required props', async () => {
       const minimalProps = {
         colors: {
           text: '#000',
@@ -473,7 +473,7 @@ describe('MultiCurrencyFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { getByText } = render(<MultiCurrencyFields {...minimalProps} />);
+      const { getByText } = await render(<MultiCurrencyFields {...minimalProps} />);
       expect(getByText('$ → €')).toBeTruthy();
     });
   });

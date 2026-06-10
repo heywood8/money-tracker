@@ -21,11 +21,11 @@ describe('Quick Add Flow - Regression Tests', () => {
   });
 
   describe('Calculator onAdd callback', () => {
-    it('should call onAdd without passing any arguments when checkmark button is pressed', () => {
+    it('should call onAdd without passing any arguments when checkmark button is pressed', async () => {
       const mockOnAdd = jest.fn();
       const mockOnValueChange = jest.fn();
 
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="123"
           onValueChange={mockOnValueChange}
@@ -36,7 +36,7 @@ describe('Quick Add Flow - Regression Tests', () => {
 
       // Press the checkmark button
       const addButton = getByLabelText('add');
-      fireEvent.press(addButton);
+      await fireEvent.press(addButton);
 
       // Verify onAdd was called without arguments (not with event object or "add" string)
       expect(mockOnAdd).toHaveBeenCalledTimes(1);
@@ -47,11 +47,11 @@ describe('Quick Add Flow - Regression Tests', () => {
       expect(callArgs.length).toBe(0);
     });
 
-    it('should not pass event object to onAdd callback', () => {
+    it('should not pass event object to onAdd callback', async () => {
       const mockOnAdd = jest.fn();
       const mockOnValueChange = jest.fn();
 
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="456"
           onValueChange={mockOnValueChange}
@@ -61,7 +61,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       );
 
       const addButton = getByLabelText('add');
-      fireEvent.press(addButton);
+      await fireEvent.press(addButton);
 
       // Get the first argument passed to onAdd
       const firstArg = mockOnAdd.mock.calls[0]?.[0];
@@ -77,11 +77,11 @@ describe('Quick Add Flow - Regression Tests', () => {
       }
     });
 
-    it('should not pass button value string to onAdd callback', () => {
+    it('should not pass button value string to onAdd callback', async () => {
       const mockOnAdd = jest.fn();
       const mockOnValueChange = jest.fn();
 
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="789"
           onValueChange={mockOnValueChange}
@@ -91,7 +91,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       );
 
       const addButton = getByLabelText('add');
-      fireEvent.press(addButton);
+      await fireEvent.press(addButton);
 
       const firstArg = mockOnAdd.mock.calls[0]?.[0];
 
@@ -167,7 +167,7 @@ describe('Quick Add Flow - Regression Tests', () => {
   });
 
   describe('Data type validation', () => {
-    it('should detect when accountId is contaminated with button value', () => {
+    it('should detect when accountId is contaminated with button value', async () => {
       const operationData = {
         type: 'expense',
         amount: '555',
@@ -180,7 +180,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       expect(operationData.accountId).toBe('add');
     });
 
-    it('should detect when categoryId is contaminated with event object', () => {
+    it('should detect when categoryId is contaminated with event object', async () => {
       const mockEvent = {
         nativeEvent: { touches: [] },
         currentTarget: {},
@@ -205,7 +205,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       expect(isValid).toBe(false);
     });
 
-    it('should validate that accountId is always a number', () => {
+    it('should validate that accountId is always a number', async () => {
       const testCases = [
         { accountId: 17, expected: true },
         { accountId: 'add', expected: false },
@@ -221,7 +221,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       });
     });
 
-    it('should validate that categoryId is a string or number, not an object', () => {
+    it('should validate that categoryId is a string or number, not an object', async () => {
       const testCases = [
         { categoryId: '5', expected: true },
         { categoryId: 5, expected: true },
@@ -241,10 +241,10 @@ describe('Quick Add Flow - Regression Tests', () => {
   });
 
   describe('Calculator button press behavior', () => {
-    it('should call onValueChange when numeric buttons are pressed', () => {
+    it('should call onValueChange when numeric buttons are pressed', async () => {
       const mockOnValueChange = jest.fn();
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <Calculator
           value=""
           onValueChange={mockOnValueChange}
@@ -253,16 +253,16 @@ describe('Quick Add Flow - Regression Tests', () => {
       );
 
       const button5 = getByText('5');
-      fireEvent.press(button5);
+      await fireEvent.press(button5);
 
       // Should call onValueChange
       expect(mockOnValueChange).toHaveBeenCalled();
     });
 
-    it('should call onValueChange when backspace is pressed', () => {
+    it('should call onValueChange when backspace is pressed', async () => {
       const mockOnValueChange = jest.fn();
 
-      const { getByLabelText } = render(
+      const { getByLabelText } = await render(
         <Calculator
           value="123"
           onValueChange={mockOnValueChange}
@@ -271,7 +271,7 @@ describe('Quick Add Flow - Regression Tests', () => {
       );
 
       const backspaceButton = getByLabelText('backspace');
-      fireEvent.press(backspaceButton);
+      await fireEvent.press(backspaceButton);
 
       // Should call onValueChange
       expect(mockOnValueChange).toHaveBeenCalled();

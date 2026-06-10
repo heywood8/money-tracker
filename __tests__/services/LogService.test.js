@@ -8,14 +8,14 @@ describe('LogService', () => {
   });
 
   describe('Circular Buffer', () => {
-    it('stores entries up to the max limit', () => {
+    it('stores entries up to the max limit', async () => {
       for (let i = 0; i < 500; i++) {
         service._addEntry('info', [`msg ${i}`]);
       }
       expect(service.getEntries().length).toBe(500);
     });
 
-    it('evicts oldest entries when buffer overflows', () => {
+    it('evicts oldest entries when buffer overflows', async () => {
       for (let i = 0; i < 510; i++) {
         service._addEntry('info', [`msg ${i}`]);
       }
@@ -27,20 +27,20 @@ describe('LogService', () => {
   });
 
   describe('Level Filtering', () => {
-    it('returns all entries when filter is "all"', () => {
+    it('returns all entries when filter is "all"', async () => {
       service._addEntry('info', ['hello']);
       service._addEntry('error', ['oops']);
       service._addEntry('warn', ['careful']);
       expect(service.getEntries('all').length).toBe(3);
     });
 
-    it('returns all entries when no filter specified', () => {
+    it('returns all entries when no filter specified', async () => {
       service._addEntry('info', ['hello']);
       service._addEntry('error', ['oops']);
       expect(service.getEntries().length).toBe(2);
     });
 
-    it('filters by level', () => {
+    it('filters by level', async () => {
       service._addEntry('info', ['a']);
       service._addEntry('error', ['b']);
       service._addEntry('warn', ['c']);
@@ -52,28 +52,28 @@ describe('LogService', () => {
       expect(errors[1].message).toBe('d');
     });
 
-    it('returns empty array for level with no entries', () => {
+    it('returns empty array for level with no entries', async () => {
       service._addEntry('info', ['a']);
       expect(service.getEntries('debug')).toEqual([]);
     });
   });
 
   describe('Clear and Notify', () => {
-    it('clears all entries', () => {
+    it('clears all entries', async () => {
       service._addEntry('info', ['a']);
       service._addEntry('error', ['b']);
       service.clear();
       expect(service.getEntries().length).toBe(0);
     });
 
-    it('notifies listeners on clear', () => {
+    it('notifies listeners on clear', async () => {
       const listener = jest.fn();
       service.subscribe(listener);
       service.clear();
       expect(listener).toHaveBeenCalled();
     });
 
-    it('notifies listeners on new entry', () => {
+    it('notifies listeners on new entry', async () => {
       const listener = jest.fn();
       service.subscribe(listener);
       service._addEntry('info', ['test']);
@@ -82,13 +82,13 @@ describe('LogService', () => {
   });
 
   describe('Subscribe / Unsubscribe', () => {
-    it('subscribe returns an unsubscribe function', () => {
+    it('subscribe returns an unsubscribe function', async () => {
       const listener = jest.fn();
       const unsub = service.subscribe(listener);
       expect(typeof unsub).toBe('function');
     });
 
-    it('unsubscribed listener is not called', () => {
+    it('unsubscribed listener is not called', async () => {
       const listener = jest.fn();
       const unsub = service.subscribe(listener);
       unsub();
@@ -96,7 +96,7 @@ describe('LogService', () => {
       expect(listener).not.toHaveBeenCalled();
     });
 
-    it('supports multiple listeners', () => {
+    it('supports multiple listeners', async () => {
       const l1 = jest.fn();
       const l2 = jest.fn();
       service.subscribe(l1);
@@ -108,41 +108,41 @@ describe('LogService', () => {
   });
 
   describe('Message Serialization', () => {
-    it('serializes strings as is', () => {
+    it('serializes strings as is', async () => {
       service._addEntry('info', ['hello world']);
       expect(service.getEntries()[0].message).toBe('hello world');
     });
 
-    it('joins multiple args with space', () => {
+    it('joins multiple args with space', async () => {
       service._addEntry('info', ['hello', 'world']);
       expect(service.getEntries()[0].message).toBe('hello world');
     });
 
-    it('serializes objects to JSON', () => {
+    it('serializes objects to JSON', async () => {
       service._addEntry('info', [{ foo: 'bar' }]);
       expect(service.getEntries()[0].message).toBe('{"foo":"bar"}');
     });
 
-    it('handles null and undefined', () => {
+    it('handles null and undefined', async () => {
       service._addEntry('info', [null, undefined]);
       expect(service.getEntries()[0].message).toBe('null undefined');
     });
 
-    it('handles circular references without throwing', () => {
+    it('handles circular references without throwing', async () => {
       const obj = { a: 1 };
       obj.self = obj;
       service._addEntry('info', [obj]);
       expect(service.getEntries()[0].message).toContain('[Circular]');
     });
 
-    it('handles numbers', () => {
+    it('handles numbers', async () => {
       service._addEntry('info', [42]);
       expect(service.getEntries()[0].message).toBe('42');
     });
   });
 
   describe('Format For Export', () => {
-    it('formats entries as plain text lines', () => {
+    it('formats entries as plain text lines', async () => {
       service._addEntry('info', ['hello']);
       service._addEntry('error', ['oops']);
 
@@ -153,7 +153,7 @@ describe('LogService', () => {
       expect(lines[1]).toMatch(/^\[.*\] \[ERROR\] oops$/);
     });
 
-    it('respects filter param', () => {
+    it('respects filter param', async () => {
       service._addEntry('info', ['a']);
       service._addEntry('error', ['b']);
 
@@ -163,13 +163,13 @@ describe('LogService', () => {
       expect(lines[0]).toContain('[ERROR]');
     });
 
-    it('returns empty string when no entries', () => {
+    it('returns empty string when no entries', async () => {
       expect(service.formatForExport()).toBe('');
     });
   });
 
   describe('Install', () => {
-    it('is idempotent', () => {
+    it('is idempotent', async () => {
       const origLog = console.log;
       service.install();
       const afterFirst = console.log;
@@ -180,7 +180,7 @@ describe('LogService', () => {
       console.log = origLog;
     });
 
-    it('patches console methods to capture entries', () => {
+    it('patches console methods to capture entries', async () => {
       const origLog = console.log;
       const origError = console.error;
       const origWarn = console.warn;
@@ -209,7 +209,7 @@ describe('LogService', () => {
   });
 
   describe('Entry Shape', () => {
-    it('entries have id, timestamp, level, message', () => {
+    it('entries have id, timestamp, level, message', async () => {
       service._addEntry('warn', ['test']);
       const entry = service.getEntries()[0];
       expect(entry).toHaveProperty('id');
@@ -222,7 +222,7 @@ describe('LogService', () => {
   });
 
   describe('Immutability', () => {
-    it('getEntries returns a copy, not a reference', () => {
+    it('getEntries returns a copy, not a reference', async () => {
       service._addEntry('info', ['a']);
       const entries1 = service.getEntries();
       const entries2 = service.getEntries();

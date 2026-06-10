@@ -115,8 +115,8 @@ describe('BudgetModal', () => {
     jest.clearAllMocks();
   });
 
-  it('renders correctly when visible for new budget', () => {
-    const { getByText, getByPlaceholderText } = render(
+  it('renders correctly when visible for new budget', async () => {
+    const { getByText, getByPlaceholderText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
@@ -127,20 +127,20 @@ describe('BudgetModal', () => {
   });
 
   it('opens currency picker and selects currency', async () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // find displayed currency value and press it
     const valueBtn = getByText(/USD/);
-    fireEvent.press(valueBtn);
+    await fireEvent.press(valueBtn);
 
     // Currency modal should open
     expect(getByText('select_currency')).toBeTruthy();
 
     // Select EUR option (FlatList renders code text)
     const eurOption = getByText('EUR');
-    fireEvent.press(eurOption);
+    await fireEvent.press(eurOption);
 
     // Currency modal should close
     await waitFor(() => {
@@ -149,12 +149,12 @@ describe('BudgetModal', () => {
   });
 
   it('validates amount and shows error when invalid', async () => {
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(getByText('amount_must_be_greater_than_zero')).toBeTruthy();
@@ -163,15 +163,15 @@ describe('BudgetModal', () => {
   });
 
   it('saves new budget with valid data', async () => {
-    const { getByPlaceholderText, getByText } = render(
+    const { getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '123.45');
+    await fireEvent.changeText(amountInput, '123.45');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({
@@ -201,7 +201,7 @@ describe('BudgetModal', () => {
     });
     jest.spyOn(require('../../app/contexts/DialogContext'), 'useDialog').mockReturnValue({ showDialog: mockShowDialog });
 
-    const { getByText, getByDisplayValue } = render(
+    const { getByText, getByDisplayValue } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
@@ -209,7 +209,7 @@ describe('BudgetModal', () => {
     expect(getByDisplayValue('200')).toBeTruthy();
 
     const deleteButton = getByText('delete_budget');
-    fireEvent.press(deleteButton);
+    await fireEvent.press(deleteButton);
 
     await waitFor(() => {
       expect(mockDeleteBudget).toHaveBeenCalledWith('b1');
@@ -218,20 +218,20 @@ describe('BudgetModal', () => {
   });
 
   it('changes period type when selected from picker', async () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // default period label is 'monthly'
     const periodBtn = getByText('monthly');
-    fireEvent.press(periodBtn);
+    await fireEvent.press(periodBtn);
 
     // Period modal should open (options rendered)
     await waitFor(() => expect(getByText('weekly')).toBeTruthy());
 
     // Select 'weekly'
     const weeklyOption = getByText('weekly');
-    fireEvent.press(weeklyOption);
+    await fireEvent.press(weeklyOption);
 
     // Label should update to weekly after selection
     await waitFor(() => expect(getByText('weekly')).toBeTruthy());
@@ -249,13 +249,13 @@ describe('BudgetModal', () => {
       rolloverEnabled: false,
     };
 
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
     // Attempt to save should trigger validation and not call update
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockUpdateBudget).not.toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe('BudgetModal', () => {
       rolloverEnabled: true,
     };
 
-    const { getByText, getByDisplayValue } = render(
+    const { getByText, getByDisplayValue } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
@@ -283,7 +283,7 @@ describe('BudgetModal', () => {
     expect(getByDisplayValue('100')).toBeTruthy();
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockUpdateBudget).toHaveBeenCalledWith('b3', expect.objectContaining({
@@ -295,19 +295,19 @@ describe('BudgetModal', () => {
   });
 
   it('selects EUR currency then saves with EUR', async () => {
-    const { getByText, queryByText, getByPlaceholderText } = render(
+    const { getByText, queryByText, getByPlaceholderText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open currency picker
     const valueBtn = getByText(/USD/);
-    fireEvent.press(valueBtn);
+    await fireEvent.press(valueBtn);
 
     expect(getByText('select_currency')).toBeTruthy();
 
     // Select EUR
     const eurOption = getByText('EUR');
-    fireEvent.press(eurOption);
+    await fireEvent.press(eurOption);
 
     await waitFor(() => {
       expect(queryByText('select_currency')).toBeFalsy();
@@ -315,9 +315,9 @@ describe('BudgetModal', () => {
 
     // Fill amount and save
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '9.99');
+    await fireEvent.changeText(amountInput, '9.99');
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({ currency: 'EUR', amount: '9.99' }));
@@ -325,12 +325,12 @@ describe('BudgetModal', () => {
   });
 
   it('closes modal when cancel button is pressed (line 174-176)', async () => {
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     const cancelButton = getByText('cancel');
-    fireEvent.press(cancelButton);
+    await fireEvent.press(cancelButton);
 
     await waitFor(() => {
       expect(mockOnClose).toHaveBeenCalled();
@@ -341,15 +341,15 @@ describe('BudgetModal', () => {
     mockAddBudget.mockRejectedValueOnce(new Error('Save failed'));
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { getByPlaceholderText, getByText } = render(
+    const { getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '50');
+    await fireEvent.changeText(amountInput, '50');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalled();
@@ -360,7 +360,7 @@ describe('BudgetModal', () => {
   });
 
   it('opens start date picker when pressed (line 326)', async () => {
-    const { getAllByText, getAllByTestId, getByText } = render(
+    const { getAllByText, getAllByTestId, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
@@ -385,7 +385,7 @@ describe('BudgetModal', () => {
       rolloverEnabled: false,
     };
 
-    const { getAllByTestId, getByPlaceholderText, getByText } = render(
+    const { getAllByTestId, getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
@@ -394,14 +394,14 @@ describe('BudgetModal', () => {
     expect(closeIcons.length).toBeGreaterThan(0);
 
     // Press the clear button
-    fireEvent.press(closeIcons[0]);
+    await fireEvent.press(closeIcons[0]);
 
     // After clearing, save and check endDate is null
     const amountInput = getByPlaceholderText('0.00');
     expect(amountInput).toBeTruthy();
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockUpdateBudget).toHaveBeenCalledWith('b4', expect.objectContaining({
@@ -411,24 +411,24 @@ describe('BudgetModal', () => {
   });
 
   it('toggles recurring switch (lines 378-384)', async () => {
-    const { getByText, getByPlaceholderText, UNSAFE_getAllByType } = render(
+    const { getByText, getByPlaceholderText, container } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Enter valid amount
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '100');
+    await fireEvent.changeText(amountInput, '100');
 
     // Find and toggle the recurring switch (Switch component)
     const { Switch } = require('react-native');
-    const switches = UNSAFE_getAllByType(Switch);
+    const switches = container.queryAll(n => n.type === 'RCTSwitch');
     expect(switches.length).toBe(2); // recurring and rollover
 
     // Toggle recurring off
-    fireEvent(switches[0], 'valueChange', false);
+    await fireEvent(switches[0], 'valueChange', false);
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({
@@ -438,24 +438,24 @@ describe('BudgetModal', () => {
   });
 
   it('toggles rollover switch (lines 397-402)', async () => {
-    const { getByText, getByPlaceholderText, UNSAFE_getAllByType } = render(
+    const { getByText, getByPlaceholderText, container } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Enter valid amount
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '100');
+    await fireEvent.changeText(amountInput, '100');
 
     // Find and toggle the rollover switch (second Switch component)
     const { Switch } = require('react-native');
-    const switches = UNSAFE_getAllByType(Switch);
+    const switches = container.queryAll(n => n.type === 'RCTSwitch');
     expect(switches.length).toBe(2);
 
     // Toggle rollover on
-    fireEvent(switches[1], 'valueChange', true);
+    await fireEvent(switches[1], 'valueChange', true);
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({
@@ -465,29 +465,29 @@ describe('BudgetModal', () => {
   });
 
   it('shows DateTimePicker for start date and handles selection (lines 447-454, 202-204)', async () => {
-    const { getAllByTestId, getByPlaceholderText, getByText } = render(
+    const { getAllByTestId, getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Find the start_date pressable by finding a calendar icon
     const calendarIcons = getAllByTestId('icon-calendar');
     // First calendar icon is for start date
-    fireEvent.press(calendarIcons[0].parent);
+    await fireEvent.press(calendarIcons[0].parent);
 
     // DateTimePicker should now be visible, trigger the mock
-    await waitFor(() => {
+    await waitFor(async () => {
       const pickers = getAllByTestId('datetimepicker-trigger');
       if (pickers.length > 0) {
-        fireEvent.press(pickers[0]);
+        await fireEvent.press(pickers[0]);
       }
     });
 
     // Enter amount and save to verify start date was set
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '200');
+    await fireEvent.changeText(amountInput, '200');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalled();
@@ -495,22 +495,22 @@ describe('BudgetModal', () => {
   });
 
   it('shows DateTimePicker for end date and handles selection (lines 457-465, 209-211)', async () => {
-    const { getAllByTestId, getByPlaceholderText, getByText } = render(
+    const { getAllByTestId, getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Find the end_date pressable by finding a calendar icon (second one)
     const calendarIcons = getAllByTestId('icon-calendar');
     if (calendarIcons.length > 1) {
-      fireEvent.press(calendarIcons[1].parent);
+      await fireEvent.press(calendarIcons[1].parent);
     }
 
     // Enter amount and save
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '150');
+    await fireEvent.changeText(amountInput, '150');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalled();
@@ -518,20 +518,20 @@ describe('BudgetModal', () => {
   });
 
   it('closes currency picker via close button (lines 504-506)', async () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open currency picker
     const currencyBtn = getByText(/USD/);
-    fireEvent.press(currencyBtn);
+    await fireEvent.press(currencyBtn);
 
     // Modal should open
     expect(getByText('select_currency')).toBeTruthy();
 
     // Find and press close button
     const closeBtn = getByText('close');
-    fireEvent.press(closeBtn);
+    await fireEvent.press(closeBtn);
 
     await waitFor(() => {
       expect(queryByText('select_currency')).toBeFalsy();
@@ -539,13 +539,13 @@ describe('BudgetModal', () => {
   });
 
   it('closes period picker via close button (lines 541)', async () => {
-    const { getByText, queryByText, getAllByText } = render(
+    const { getByText, queryByText, getAllByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open period picker
     const periodBtn = getByText('monthly');
-    fireEvent.press(periodBtn);
+    await fireEvent.press(periodBtn);
 
     // Modal should open with period_type title
     await waitFor(() => {
@@ -555,7 +555,7 @@ describe('BudgetModal', () => {
 
     // Find and press close button in the period picker
     const closeBtns = getAllByText('close');
-    fireEvent.press(closeBtns[closeBtns.length - 1]);
+    await fireEvent.press(closeBtns[closeBtns.length - 1]);
 
     // Picker should close - period picker has period_type as title
     await waitFor(() => {
@@ -565,7 +565,7 @@ describe('BudgetModal', () => {
   });
 
   it('closes modal via overlay press', async () => {
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
@@ -574,28 +574,28 @@ describe('BudgetModal', () => {
   });
 
   it('handles date picker dismiss without selection (line 202-204 edge case)', async () => {
-    const { getAllByTestId, getByPlaceholderText, getByText } = render(
+    const { getAllByTestId, getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open start date picker
     const calendarIcons = getAllByTestId('icon-calendar');
-    fireEvent.press(calendarIcons[0].parent);
+    await fireEvent.press(calendarIcons[0].parent);
 
     // Trigger dismiss (no date selected)
-    await waitFor(() => {
+    await waitFor(async () => {
       const dismissBtns = getAllByTestId('datetimepicker-dismiss');
       if (dismissBtns.length > 0) {
-        fireEvent.press(dismissBtns[0]);
+        await fireEvent.press(dismissBtns[0]);
       }
     });
 
     // Should still be able to save with default date
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '50');
+    await fireEvent.changeText(amountInput, '50');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalled();
@@ -614,16 +614,16 @@ describe('BudgetModal', () => {
       rolloverEnabled: false,
     };
 
-    const { getByPlaceholderText, getByText } = render(
+    const { getByPlaceholderText, getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
     // Change the amount
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '400');
+    await fireEvent.changeText(amountInput, '400');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockUpdateBudget).toHaveBeenCalledWith('b5', expect.objectContaining({
@@ -634,13 +634,13 @@ describe('BudgetModal', () => {
   });
 
   it('renders currency picker list items correctly (lines 480-501)', async () => {
-    const { getByText, getAllByText } = render(
+    const { getByText, getAllByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open currency picker
     const currencyBtn = getByText(/USD/);
-    fireEvent.press(currencyBtn);
+    await fireEvent.press(currencyBtn);
 
     // Should see both USD and EUR in the list
     await waitFor(() => {
@@ -650,13 +650,13 @@ describe('BudgetModal', () => {
   });
 
   it('renders period picker list items correctly (lines 524-538)', async () => {
-    const { getByText, getAllByText } = render(
+    const { getByText, getAllByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open period picker
     const periodBtn = getByText('monthly');
-    fireEvent.press(periodBtn);
+    await fireEvent.press(periodBtn);
 
     // Should see all period options
     await waitFor(() => {
@@ -667,25 +667,25 @@ describe('BudgetModal', () => {
   });
 
   it('selects yearly period and saves', async () => {
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByPlaceholderText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
     // Open period picker and select yearly
     const periodBtn = getByText('monthly');
-    fireEvent.press(periodBtn);
+    await fireEvent.press(periodBtn);
 
-    await waitFor(() => {
+    await waitFor(async () => {
       const yearlyOption = getByText('yearly');
-      fireEvent.press(yearlyOption);
+      await fireEvent.press(yearlyOption);
     });
 
     // Enter amount and save
     const amountInput = getByPlaceholderText('0.00');
-    fireEvent.changeText(amountInput, '1200');
+    await fireEvent.changeText(amountInput, '1200');
 
     const saveButton = getByText('save');
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     await waitFor(() => {
       expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({
@@ -695,7 +695,7 @@ describe('BudgetModal', () => {
     });
   });
 
-  it('formats date as "never" when endDate is null', () => {
+  it('formats date as "never" when endDate is null', async () => {
     const mockBudget = {
       id: 'b6',
       amount: '100',
@@ -707,7 +707,7 @@ describe('BudgetModal', () => {
       rolloverEnabled: false,
     };
 
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
@@ -715,7 +715,7 @@ describe('BudgetModal', () => {
     expect(getByText('never')).toBeTruthy();
   });
 
-  it('displays delete button only for existing budgets (lines 410-420)', () => {
+  it('displays delete button only for existing budgets (lines 410-420)', async () => {
     const mockBudget = {
       id: 'b7',
       amount: '50',
@@ -727,7 +727,7 @@ describe('BudgetModal', () => {
       rolloverEnabled: false,
     };
 
-    const { getByText, queryByText, rerender } = render(
+    const { getByText, queryByText, rerender } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
@@ -735,7 +735,7 @@ describe('BudgetModal', () => {
     expect(queryByText('delete_budget')).toBeFalsy();
 
     // Rerender with existing budget
-    rerender(
+    await rerender(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
@@ -762,12 +762,12 @@ describe('BudgetModal', () => {
     });
     jest.spyOn(require('../../app/contexts/DialogContext'), 'useDialog').mockReturnValue({ showDialog: mockShowDialog });
 
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
     const deleteButton = getByText('delete_budget');
-    fireEvent.press(deleteButton);
+    await fireEvent.press(deleteButton);
 
     // Delete should not be called when cancel is pressed
     expect(mockDeleteBudget).not.toHaveBeenCalled();
@@ -795,12 +795,12 @@ describe('BudgetModal', () => {
     });
     jest.spyOn(require('../../app/contexts/DialogContext'), 'useDialog').mockReturnValue({ showDialog: mockShowDialog });
 
-    const { getByText } = render(
+    const { getByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
     );
 
     const deleteButton = getByText('delete_budget');
-    fireEvent.press(deleteButton);
+    await fireEvent.press(deleteButton);
 
     await waitFor(() => {
       expect(mockDeleteBudget).toHaveBeenCalledWith('b9');
@@ -809,8 +809,8 @@ describe('BudgetModal', () => {
   });
 
   describe('Additional validation and edge cases', () => {
-    it('renders end date picker UI elements', () => {
-      const { getAllByTestId, getByText } = render(
+    it('renders end date picker UI elements', async () => {
+      const { getAllByTestId, getByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
@@ -838,7 +838,7 @@ describe('BudgetModal', () => {
         rolloverEnabled: false,
       };
 
-      const { getByText, getByDisplayValue } = render(
+      const { getByText, getByDisplayValue } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
       );
 
@@ -847,7 +847,7 @@ describe('BudgetModal', () => {
 
       // Save the budget
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockUpdateBudget).toHaveBeenCalledWith('bEndDate', expect.objectContaining({
@@ -856,12 +856,12 @@ describe('BudgetModal', () => {
       });
     });
 
-    it('handles initialization with no accounts (empty currencies)', () => {
+    it('handles initialization with no accounts (empty currencies)', async () => {
       // Mock empty accounts
       jest.spyOn(require('../../app/contexts/AccountsDataContext'), 'useAccountsData')
         .mockReturnValue({ accounts: [] });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
@@ -869,7 +869,7 @@ describe('BudgetModal', () => {
       expect(getByText(/USD/)).toBeTruthy();
     });
 
-    it('handles formatDate for valid date string (line 217-218)', () => {
+    it('handles formatDate for valid date string (line 217-218)', async () => {
       const mockBudget = {
         id: 'bDate',
         amount: '100',
@@ -881,7 +881,7 @@ describe('BudgetModal', () => {
         rolloverEnabled: false,
       };
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
       );
 
@@ -901,7 +901,7 @@ describe('BudgetModal', () => {
         rolloverEnabled: true,
       };
 
-      const { getByDisplayValue, getByText } = render(
+      const { getByDisplayValue, getByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={false} budget={mockBudget} categoryId="c1" categoryName="Food" />,
       );
 
@@ -910,7 +910,7 @@ describe('BudgetModal', () => {
       expect(getByText('yearly')).toBeTruthy();
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockUpdateBudget).toHaveBeenCalledWith('bFull', expect.objectContaining({
@@ -924,15 +924,15 @@ describe('BudgetModal', () => {
     });
 
     it('save button triggers addBudget with correct data', async () => {
-      const { getByPlaceholderText, getByText } = render(
+      const { getByPlaceholderText, getByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
       const amountInput = getByPlaceholderText('0.00');
-      fireEvent.changeText(amountInput, '999');
+      await fireEvent.changeText(amountInput, '999');
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       await waitFor(() => {
         expect(mockAddBudget).toHaveBeenCalledWith(expect.objectContaining({
@@ -941,8 +941,8 @@ describe('BudgetModal', () => {
       });
     });
 
-    it('renders action buttons row correctly (lines 424-441)', () => {
-      const { getByText } = render(
+    it('renders action buttons row correctly (lines 424-441)', async () => {
+      const { getByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
@@ -952,20 +952,20 @@ describe('BudgetModal', () => {
     });
 
     it('opens currency picker modal successfully', async () => {
-      const { getByText, queryByText } = render(
+      const { getByText, queryByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
       // Open currency picker
       const currencyBtn = getByText(/USD/);
-      fireEvent.press(currencyBtn);
+      await fireEvent.press(currencyBtn);
 
       // Modal should open with title
       expect(getByText('select_currency')).toBeTruthy();
 
       // Close via close button
       const closeBtn = getByText('close');
-      fireEvent.press(closeBtn);
+      await fireEvent.press(closeBtn);
 
       await waitFor(() => {
         expect(queryByText('select_currency')).toBeFalsy();
@@ -973,13 +973,13 @@ describe('BudgetModal', () => {
     });
 
     it('opens period picker modal successfully', async () => {
-      const { getByText, getAllByText, queryAllByText, getByPlaceholderText } = render(
+      const { getByText, getAllByText, queryAllByText, getByPlaceholderText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
       // Open period picker
       const periodBtn = getByText('monthly');
-      fireEvent.press(periodBtn);
+      await fireEvent.press(periodBtn);
 
       // Modal should open with title - now there should be 2 period_type elements
       await waitFor(() => {
@@ -989,7 +989,7 @@ describe('BudgetModal', () => {
 
       // Close via close button (last close button)
       const closeBtns = getAllByText('close');
-      fireEvent.press(closeBtns[closeBtns.length - 1]);
+      await fireEvent.press(closeBtns[closeBtns.length - 1]);
 
       // Modal should close
       await waitFor(() => {

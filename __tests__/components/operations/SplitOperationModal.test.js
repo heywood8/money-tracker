@@ -84,41 +84,41 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Rendering', () => {
-    it('renders when visible is true', () => {
-      const { getByText } = render(<SplitOperationModal {...defaultProps} />);
+    it('renders when visible is true', async () => {
+      const { getByText } = await render(<SplitOperationModal {...defaultProps} />);
 
       expect(getByText('Split Transaction')).toBeTruthy();
       expect(getByText('Split Amount')).toBeTruthy();
     });
 
-    it('does not render content when visible is false', () => {
-      const { queryByText } = render(
+    it('does not render content when visible is false', async () => {
+      const { queryByText } = await render(
         <SplitOperationModal {...defaultProps} visible={false} />,
       );
 
       expect(queryByText('Split Transaction')).toBeNull();
     });
 
-    it('displays original amount info', () => {
-      const { getByText } = render(<SplitOperationModal {...defaultProps} />);
+    it('displays original amount info', async () => {
+      const { getByText } = await render(<SplitOperationModal {...defaultProps} />);
 
       expect(getByText('Amount: 100.00')).toBeTruthy();
     });
 
-    it('shows amount input field', () => {
-      const { getByTestId } = render(<SplitOperationModal {...defaultProps} />);
+    it('shows amount input field', async () => {
+      const { getByTestId } = await render(<SplitOperationModal {...defaultProps} />);
 
       expect(getByTestId('split-amount-input')).toBeTruthy();
     });
 
-    it('shows category picker button', () => {
-      const { getByTestId } = render(<SplitOperationModal {...defaultProps} />);
+    it('shows category picker button', async () => {
+      const { getByTestId } = await render(<SplitOperationModal {...defaultProps} />);
 
       expect(getByTestId('category-picker-button')).toBeTruthy();
     });
 
-    it('shows cancel and confirm buttons', () => {
-      const { getByTestId } = render(<SplitOperationModal {...defaultProps} />);
+    it('shows cancel and confirm buttons', async () => {
+      const { getByTestId } = await render(<SplitOperationModal {...defaultProps} />);
 
       expect(getByTestId('cancel-button')).toBeTruthy();
       expect(getByTestId('confirm-button')).toBeTruthy();
@@ -126,26 +126,26 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Amount Input', () => {
-    it('accepts valid amount input', () => {
-      const { getByTestId } = render(<SplitOperationModal {...defaultProps} />);
+    it('accepts valid amount input', async () => {
+      const { getByTestId } = await render(<SplitOperationModal {...defaultProps} />);
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '50.00');
+      await fireEvent.changeText(input, '50.00');
 
       expect(input.props.value).toBe('50.00');
     });
 
     it('clears amount when modal reopens', async () => {
-      const { getByTestId, rerender } = render(
+      const { getByTestId, rerender } = await render(
         <SplitOperationModal {...defaultProps} />,
       );
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '50.00');
+      await fireEvent.changeText(input, '50.00');
 
       // Close and reopen modal
-      rerender(<SplitOperationModal {...defaultProps} visible={false} />);
-      rerender(<SplitOperationModal {...defaultProps} visible={true} />);
+      await rerender(<SplitOperationModal {...defaultProps} visible={false} />);
+      await rerender(<SplitOperationModal {...defaultProps} visible={true} />);
 
       await waitFor(() => {
         const newInput = getByTestId('split-amount-input');
@@ -155,24 +155,24 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Category Selection', () => {
-    it('opens category picker when button is pressed', () => {
-      const { getByTestId, getByText } = render(
+    it('opens category picker when button is pressed', async () => {
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal {...defaultProps} />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
 
       // Category picker modal should open with categories
       expect(getByText('Food')).toBeTruthy();
       expect(getByText('Transport')).toBeTruthy();
     });
 
-    it('filters categories by operation type (expense)', () => {
-      const { getByTestId, getByText, queryByText } = render(
+    it('filters categories by operation type (expense)', async () => {
+      const { getByTestId, getByText, queryByText } = await render(
         <SplitOperationModal {...defaultProps} operationType="expense" />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
 
       // Should show expense categories
       expect(getByText('Food')).toBeTruthy();
@@ -183,12 +183,12 @@ describe('SplitOperationModal', () => {
       expect(queryByText('Shopping')).toBeNull();
     });
 
-    it('filters categories by operation type (income)', () => {
-      const { getByTestId, getByText, queryByText } = render(
+    it('filters categories by operation type (income)', async () => {
+      const { getByTestId, getByText, queryByText } = await render(
         <SplitOperationModal {...defaultProps} operationType="income" />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
 
       // Should show income categories
       expect(getByText('Salary')).toBeTruthy();
@@ -197,12 +197,12 @@ describe('SplitOperationModal', () => {
     });
 
     it('selects category when pressed', async () => {
-      const { getByTestId, getByText, queryByText } = render(
+      const { getByTestId, getByText, queryByText } = await render(
         <SplitOperationModal {...defaultProps} />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByText('Food'));
 
       await waitFor(() => {
         // Category picker should close
@@ -213,14 +213,14 @@ describe('SplitOperationModal', () => {
     });
 
     it('closes category picker when close button is pressed', async () => {
-      const { getByTestId, getByText, queryByText } = render(
+      const { getByTestId, getByText, queryByText } = await render(
         <SplitOperationModal {...defaultProps} />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
       expect(getByText('Food')).toBeTruthy();
 
-      fireEvent.press(getByText('Close'));
+      await fireEvent.press(getByText('Close'));
 
       await waitFor(() => {
         // Category list should no longer be visible in the picker
@@ -230,86 +230,86 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Validation', () => {
-    it('shows error when amount is empty', () => {
+    it('shows error when amount is empty', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.press(getByTestId('confirm-button'));
 
       expect(getByTestId('error-message')).toBeTruthy();
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('shows error when amount is zero', () => {
+    it('shows error when amount is zero', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '0');
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.changeText(input, '0');
+      await fireEvent.press(getByTestId('confirm-button'));
 
       expect(getByTestId('error-message')).toBeTruthy();
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('shows error when amount equals original', () => {
+    it('shows error when amount equals original', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '100.00');
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.changeText(input, '100.00');
+      await fireEvent.press(getByTestId('confirm-button'));
 
       expect(getByTestId('error-message')).toBeTruthy();
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('shows error when amount exceeds original', () => {
+    it('shows error when amount exceeds original', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '150.00');
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.changeText(input, '150.00');
+      await fireEvent.press(getByTestId('confirm-button'));
 
       expect(getByTestId('error-message')).toBeTruthy();
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('shows error when category is not selected', () => {
+    it('shows error when category is not selected', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '50.00');
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.changeText(input, '50.00');
+      await fireEvent.press(getByTestId('confirm-button'));
 
       expect(getByTestId('error-message')).toBeTruthy();
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
     it('clears error when amount is changed', async () => {
-      const { getByTestId, queryByTestId } = render(
+      const { getByTestId, queryByTestId } = await render(
         <SplitOperationModal {...defaultProps} />,
       );
 
       // Trigger error
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.press(getByTestId('confirm-button'));
       expect(getByTestId('error-message')).toBeTruthy();
 
       // Change amount
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '50.00');
+      await fireEvent.changeText(input, '50.00');
 
       await waitFor(() => {
         expect(queryByTestId('error-message')).toBeNull();
@@ -320,20 +320,20 @@ describe('SplitOperationModal', () => {
   describe('Confirm Action', () => {
     it('calls onConfirm with correct data when valid', async () => {
       const onConfirm = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal {...defaultProps} onConfirm={onConfirm} />,
       );
 
       // Enter amount
       const input = getByTestId('split-amount-input');
-      fireEvent.changeText(input, '30.00');
+      await fireEvent.changeText(input, '30.00');
 
       // Select category
-      fireEvent.press(getByTestId('category-picker-button'));
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByText('Food'));
 
       // Confirm
-      fireEvent.press(getByTestId('confirm-button'));
+      await fireEvent.press(getByTestId('confirm-button'));
 
       await waitFor(() => {
         expect(onConfirm).toHaveBeenCalledWith('30.00', 'cat-1');
@@ -342,20 +342,20 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Cancel Action', () => {
-    it('calls onClose when cancel button is pressed', () => {
+    it('calls onClose when cancel button is pressed', async () => {
       const onClose = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SplitOperationModal {...defaultProps} onClose={onClose} />,
       );
 
-      fireEvent.press(getByTestId('cancel-button'));
+      await fireEvent.press(getByTestId('cancel-button'));
 
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('calls onClose when overlay is pressed', () => {
+    it('calls onClose when overlay is pressed', async () => {
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <SplitOperationModal {...defaultProps} onClose={onClose} />,
       );
 
@@ -366,19 +366,19 @@ describe('SplitOperationModal', () => {
   });
 
   describe('Empty Categories', () => {
-    it('shows no categories message when list is empty', () => {
-      const { getByTestId, getByText } = render(
+    it('shows no categories message when list is empty', async () => {
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal {...defaultProps} categories={[]} />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
 
       expect(getByText('No categories')).toBeTruthy();
     });
   });
 
   describe('Translated Category Names', () => {
-    it('uses nameKey for translation if available', () => {
+    it('uses nameKey for translation if available', async () => {
       const categoriesWithNameKey = [
         { id: 'cat-1', name: 'Food', nameKey: 'food_key', icon: 'food', categoryType: 'expense', type: 'entry' },
       ];
@@ -388,7 +388,7 @@ describe('SplitOperationModal', () => {
         return mockT(key);
       };
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SplitOperationModal
           {...defaultProps}
           categories={categoriesWithNameKey}
@@ -396,7 +396,7 @@ describe('SplitOperationModal', () => {
         />,
       );
 
-      fireEvent.press(getByTestId('category-picker-button'));
+      await fireEvent.press(getByTestId('category-picker-button'));
 
       expect(getByText('Translated Food')).toBeTruthy();
     });

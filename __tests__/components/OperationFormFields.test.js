@@ -75,7 +75,7 @@ describe('OperationFormFields', () => {
   });
 
   describe('Multi-Currency Transfer Detection', () => {
-    it('should detect multi-currency transfer when accounts have different currencies', () => {
+    it('should detect multi-currency transfer when accounts have different currencies', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -91,14 +91,14 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should be rendered
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
       expect(multiCurrencyFields).toBeTruthy();
     });
 
-    it('should not detect multi-currency transfer when accounts have same currency', () => {
+    it('should not detect multi-currency transfer when accounts have same currency', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -114,14 +114,14 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
 
-    it('should not show multi-currency fields for non-transfer operations', () => {
+    it('should not show multi-currency fields for non-transfer operations', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -137,14 +137,14 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered for expense
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
 
-    it('should not render MultiCurrencyFields if onExchangeRateChange callback is missing', () => {
+    it('should not render MultiCurrencyFields if onExchangeRateChange callback is missing', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -160,14 +160,14 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered without callback
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
 
-    it('should not render MultiCurrencyFields if onDestinationAmountChange callback is missing', () => {
+    it('should not render MultiCurrencyFields if onDestinationAmountChange callback is missing', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -183,14 +183,14 @@ describe('OperationFormFields', () => {
         // Missing onDestinationAmountChange
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered without callback
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
 
-    it('should not render MultiCurrencyFields if source account is not found', () => {
+    it('should not render MultiCurrencyFields if source account is not found', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -206,14 +206,14 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered without valid source account
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
 
-    it('should not render MultiCurrencyFields if destination account is not found', () => {
+    it('should not render MultiCurrencyFields if destination account is not found', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -229,16 +229,16 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_queryByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
       // MultiCurrencyFields should NOT be rendered without valid destination account
-      const multiCurrencyFields = UNSAFE_queryByType('MultiCurrencyFields');
-      expect(multiCurrencyFields).toBeNull();
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
+      expect(multiCurrencyFields).toBeFalsy();
     });
   });
 
   describe('MultiCurrencyFields Props', () => {
-    it('should pass correct props to MultiCurrencyFields', () => {
+    it('should pass correct props to MultiCurrencyFields', async () => {
       const mockOnExchangeRateChange = jest.fn();
       const mockOnDestinationAmountChange = jest.fn();
 
@@ -257,9 +257,9 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: mockOnDestinationAmountChange,
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
 
       // Verify props
       expect(multiCurrencyFields.props.colors).toBe(mockColors);
@@ -273,7 +273,7 @@ describe('OperationFormFields', () => {
       expect(multiCurrencyFields.props.onDestinationAmountChange).toBe(mockOnDestinationAmountChange);
     });
 
-    it('should pass empty strings for undefined exchange rate and destination amount', () => {
+    it('should pass empty strings for undefined exchange rate and destination amount', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -289,16 +289,16 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
 
       // Should default to empty strings
       expect(multiCurrencyFields.props.exchangeRate).toBe('');
       expect(multiCurrencyFields.props.destinationAmount).toBe('');
     });
 
-    it('should pass disabled state to MultiCurrencyFields as isShadowOperation', () => {
+    it('should pass disabled state to MultiCurrencyFields as isShadowOperation', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -315,9 +315,9 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
 
       // disabled prop should map to isShadowOperation
       expect(multiCurrencyFields.props.isShadowOperation).toBe(true);
@@ -325,13 +325,13 @@ describe('OperationFormFields', () => {
   });
 
   describe('Conditional Rendering Based on Props', () => {
-    it('should render type selector when showTypeSelector is true', () => {
+    it('should render type selector when showTypeSelector is true', async () => {
       const props = {
         ...defaultProps,
         showTypeSelector: true,
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Type selector buttons should be visible
       expect(getByText('Expense')).toBeTruthy();
@@ -339,13 +339,13 @@ describe('OperationFormFields', () => {
       expect(getByText('Transfer')).toBeTruthy();
     });
 
-    it('should not render type selector when showTypeSelector is false', () => {
+    it('should not render type selector when showTypeSelector is false', async () => {
       const props = {
         ...defaultProps,
         showTypeSelector: false,
       };
 
-      const { queryByText } = render(<OperationFormFields {...props} />);
+      const { queryByText } = await render(<OperationFormFields {...props} />);
 
       // Type selector buttons should NOT be visible
       expect(queryByText('Expense')).toBeNull();
@@ -353,10 +353,10 @@ describe('OperationFormFields', () => {
       expect(queryByText('Transfer')).toBeNull();
     });
 
-    it('should render Calculator component', () => {
-      const { UNSAFE_getByType } = render(<OperationFormFields {...defaultProps} />);
+    it('should render Calculator component', async () => {
+      const { container } = await render(<OperationFormFields {...defaultProps} />);
 
-      const calculator = UNSAFE_getByType('Calculator');
+      const calculator = container.queryAll(n => n.type === 'Calculator')[0];
       expect(calculator).toBeTruthy();
       expect(calculator.props.value).toBe('100');
       expect(calculator.props.onValueChange).toBe(defaultProps.onAmountChange);
@@ -365,7 +365,7 @@ describe('OperationFormFields', () => {
   });
 
   describe('Category Picker Visibility', () => {
-    it('should show category picker for expense type', () => {
+    it('should show category picker for expense type', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -375,13 +375,13 @@ describe('OperationFormFields', () => {
         },
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Category picker should show category name
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('should show category picker for income type', () => {
+    it('should show category picker for income type', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -391,13 +391,13 @@ describe('OperationFormFields', () => {
         },
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Category picker should show category name
       expect(getByText('Salary')).toBeTruthy();
     });
 
-    it('should hide category picker for transfer type', () => {
+    it('should hide category picker for transfer type', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -408,7 +408,7 @@ describe('OperationFormFields', () => {
         },
       };
 
-      const { queryByText } = render(<OperationFormFields {...props} />);
+      const { queryByText } = await render(<OperationFormFields {...props} />);
 
       // Category names should not be visible
       expect(queryByText('Food')).toBeNull();
@@ -417,7 +417,7 @@ describe('OperationFormFields', () => {
   });
 
   describe('Transfer Layout', () => {
-    it('should use stacked layout by default', () => {
+    it('should use stacked layout by default', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -430,14 +430,14 @@ describe('OperationFormFields', () => {
         transferLayout: 'stacked',
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Should show both account names in stacked layout
       expect(getByText('USD Account')).toBeTruthy();
       expect(getByText(/EUR Account/)).toBeTruthy();
     });
 
-    it('should use side-by-side layout when specified', () => {
+    it('should use side-by-side layout when specified', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -450,7 +450,7 @@ describe('OperationFormFields', () => {
         transferLayout: 'sideBySide',
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Should show both account names in side-by-side layout
       expect(getByText('USD Account')).toBeTruthy();
@@ -459,25 +459,25 @@ describe('OperationFormFields', () => {
   });
 
   describe('Account Balance Display', () => {
-    it('should show account balance when showAccountBalance is true', () => {
+    it('should show account balance when showAccountBalance is true', async () => {
       const props = {
         ...defaultProps,
         showAccountBalance: true,
       };
 
-      const { getByText } = render(<OperationFormFields {...props} />);
+      const { getByText } = await render(<OperationFormFields {...props} />);
 
       // Balance should be visible
       expect(getByText('$1000')).toBeTruthy();
     });
 
-    it('should not show account balance when showAccountBalance is false', () => {
+    it('should not show account balance when showAccountBalance is false', async () => {
       const props = {
         ...defaultProps,
         showAccountBalance: false,
       };
 
-      const { queryByText } = render(<OperationFormFields {...props} />);
+      const { queryByText } = await render(<OperationFormFields {...props} />);
 
       // Balance should NOT be visible
       expect(queryByText('$1000')).toBeNull();
@@ -485,7 +485,7 @@ describe('OperationFormFields', () => {
   });
 
   describe('Regression: Multi-Currency Data Consistency', () => {
-    it('should correctly identify accounts by ID for multi-currency detection', () => {
+    it('should correctly identify accounts by ID for multi-currency detection', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -501,9 +501,9 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
 
       // Verify correct accounts were found
       expect(multiCurrencyFields.props.sourceAccount.id).toBe('1');
@@ -512,7 +512,7 @@ describe('OperationFormFields', () => {
       expect(multiCurrencyFields.props.destinationAccount.currency).toBe('EUR');
     });
 
-    it('should handle account switching correctly for multi-currency detection', () => {
+    it('should handle account switching correctly for multi-currency detection', async () => {
       const props = {
         ...defaultProps,
         values: {
@@ -528,9 +528,9 @@ describe('OperationFormFields', () => {
         onDestinationAmountChange: jest.fn(),
       };
 
-      const { UNSAFE_getByType } = render(<OperationFormFields {...props} />);
+      const { container } = await render(<OperationFormFields {...props} />);
 
-      const multiCurrencyFields = UNSAFE_getByType('MultiCurrencyFields');
+      const multiCurrencyFields = container.queryAll(n => n.type === 'MultiCurrencyFields')[0];
 
       // Verify accounts are correctly identified after switching
       expect(multiCurrencyFields.props.sourceAccount.id).toBe('2');
@@ -541,30 +541,30 @@ describe('OperationFormFields', () => {
   });
 
   describe('Category Picker Visibility', () => {
-    it('hides category picker when hideCategoryPicker is true', () => {
+    it('hides category picker when hideCategoryPicker is true', async () => {
       const props = { ...defaultProps, hideCategoryPicker: true };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
 
-    it('hides category picker for transfer type', () => {
+    it('hides category picker for transfer type', async () => {
       const props = {
         ...defaultProps,
         values: { ...defaultProps.values, type: 'transfer', toAccountId: '' },
       };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
 
-    it('renders placeholder when onAutoAddWithCategory is provided but no top categories', () => {
+    it('renders placeholder when onAutoAddWithCategory is provided but no top categories', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: [],
         onAutoAddWithCategory: jest.fn(),
         values: { ...defaultProps.values, categoryId: '' },
       };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
 
-    it('renders all-categories button when more than 8 leaf categories exist', () => {
+    it('renders all-categories button when more than 8 leaf categories exist', async () => {
       const manyCategories = Array.from({ length: 10 }, (_, i) => ({
         id: `cat${i}`,
         name: `Category ${i}`,
@@ -581,7 +581,7 @@ describe('OperationFormFields', () => {
         onAutoAddWithCategory: jest.fn(),
         values: { ...defaultProps.values, categoryId: '' },
       };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
   });
 
@@ -595,17 +595,17 @@ describe('OperationFormFields', () => {
       return { name: cat?.name || 'Unknown', icon: cat?.icon || 'tag', parentName: null };
     };
 
-    it('renders category chips without error when flashCategoryError is 0', () => {
+    it('renders category chips without error when flashCategoryError is 0', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
         getCategoryInfo,
         values: { ...defaultProps.values, categoryId: '' },
       };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
 
-    it('triggers flash animation branch when flashCategoryError is non-zero', () => {
+    it('triggers flash animation branch when flashCategoryError is non-zero', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
@@ -613,10 +613,10 @@ describe('OperationFormFields', () => {
         values: { ...defaultProps.values, categoryId: '' },
         flashCategoryError: 1,
       };
-      expect(() => render(<OperationFormFields {...props} />)).not.toThrow();
+      await render(<OperationFormFields {...props} />);
     });
 
-    it('re-triggers animation when flashCategoryError increments again', () => {
+    it('re-triggers animation when flashCategoryError increments again', async () => {
       const props = {
         ...defaultProps,
         topCategoriesForType: mockTopCategories,
@@ -624,7 +624,7 @@ describe('OperationFormFields', () => {
         values: { ...defaultProps.values, categoryId: '' },
         flashCategoryError: 0,
       };
-      const { rerender } = render(<OperationFormFields {...props} />);
+      const { rerender } = await render(<OperationFormFields {...props} />);
       expect(() => rerender(<OperationFormFields {...props} flashCategoryError={1} />)).not.toThrow();
       expect(() => rerender(<OperationFormFields {...props} flashCategoryError={2} />)).not.toThrow();
     });

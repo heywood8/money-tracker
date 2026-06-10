@@ -41,59 +41,59 @@ describe('ExpandableFilters', () => {
     jest.clearAllMocks();
   });
 
-  it('does not render when isExpanded is false', () => {
-    const { queryByTestId } = render(
+  it('does not render when isExpanded is false', async () => {
+    const { queryByTestId } = await render(
       <ExpandableFilters {...defaultProps} isExpanded={false} />,
     );
     expect(queryByTestId('expandable-filters')).toBeNull();
   });
 
-  it('renders when isExpanded is true', () => {
-    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+  it('renders when isExpanded is true', async () => {
+    const { getByTestId } = await render(<ExpandableFilters {...defaultProps} />);
     expect(getByTestId('expandable-filters')).toBeTruthy();
   });
 
-  it('renders type filter chips', () => {
-    const { getByText } = render(<ExpandableFilters {...defaultProps} />);
+  it('renders type filter chips', async () => {
+    const { getByText } = await render(<ExpandableFilters {...defaultProps} />);
     expect(getByText('expense')).toBeTruthy();
     expect(getByText('income')).toBeTruthy();
     expect(getByText('transfer')).toBeTruthy();
   });
 
-  it('calls onFilterChange when type chip is pressed', () => {
-    const { getByText } = render(<ExpandableFilters {...defaultProps} />);
+  it('calls onFilterChange when type chip is pressed', async () => {
+    const { getByText } = await render(<ExpandableFilters {...defaultProps} />);
 
-    fireEvent.press(getByText('expense'));
+    await fireEvent.press(getByText('expense'));
 
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
       types: ['expense'],
     });
   });
 
-  it('renders account checkboxes', () => {
-    const { getByText } = render(<ExpandableFilters {...defaultProps} />);
+  it('renders account checkboxes', async () => {
+    const { getByText } = await render(<ExpandableFilters {...defaultProps} />);
     expect(getByText('Checking Account')).toBeTruthy();
     expect(getByText('Savings Account')).toBeTruthy();
   });
 
-  it('calls onFilterChange when account checkbox is pressed', () => {
-    const { getByText } = render(<ExpandableFilters {...defaultProps} />);
+  it('calls onFilterChange when account checkbox is pressed', async () => {
+    const { getByText } = await render(<ExpandableFilters {...defaultProps} />);
 
-    fireEvent.press(getByText('Checking Account'));
+    await fireEvent.press(getByText('Checking Account'));
 
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
       accountIds: ['acc-1'],
     });
   });
 
-  it('renders clear all button', () => {
-    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
+  it('renders clear all button', async () => {
+    const { getByTestId } = await render(<ExpandableFilters {...defaultProps} />);
     expect(getByTestId('clear-all-button')).toBeTruthy();
   });
 
-  it('calls onFilterChange with all groups reset when clear all is pressed', () => {
-    const { getByTestId } = render(<ExpandableFilters {...defaultProps} />);
-    fireEvent.press(getByTestId('clear-all-button'));
+  it('calls onFilterChange with all groups reset when clear all is pressed', async () => {
+    const { getByTestId } = await render(<ExpandableFilters {...defaultProps} />);
+    await fireEvent.press(getByTestId('clear-all-button'));
     expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
       text: '',
       types: [],
@@ -105,11 +105,11 @@ describe('ExpandableFilters', () => {
   });
 
   describe('Amount range input', () => {
-    it('preserves decimal point mid-typing without calling onFilterChange', () => {
-      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+    it('preserves decimal point mid-typing without calling onFilterChange', async () => {
+      const { getByPlaceholderText } = await render(<ExpandableFilters {...defaultProps} />);
       const minInput = getByPlaceholderText('min_amount');
 
-      fireEvent.changeText(minInput, '1.');
+      await fireEvent.changeText(minInput, '1.');
 
       // onFilterChange should NOT be called while still typing
       expect(defaultProps.onFilterChange).not.toHaveBeenCalled();
@@ -117,11 +117,11 @@ describe('ExpandableFilters', () => {
       expect(minInput.props.value).toBe('1.');
     });
 
-    it('calls onFilterChange with parsed float on blur', () => {
-      const { getByPlaceholderText } = render(<ExpandableFilters {...defaultProps} />);
+    it('calls onFilterChange with parsed float on blur', async () => {
+      const { getByPlaceholderText } = await render(<ExpandableFilters {...defaultProps} />);
       const minInput = getByPlaceholderText('min_amount');
 
-      fireEvent.changeText(minInput, '1.5');
+      await fireEvent.changeText(minInput, '1.5');
       fireEvent(minInput, 'blur');
 
       expect(defaultProps.onFilterChange).toHaveBeenCalledWith({
@@ -129,13 +129,13 @@ describe('ExpandableFilters', () => {
       });
     });
 
-    it('calls onFilterChange with null on blur when input cleared', () => {
-      const { getByPlaceholderText } = render(
+    it('calls onFilterChange with null on blur when input cleared', async () => {
+      const { getByPlaceholderText } = await render(
         <ExpandableFilters {...defaultProps} filters={{ ...defaultFilters, amountRange: { min: 5, max: null } }} />,
       );
       const minInput = getByPlaceholderText('min_amount');
 
-      fireEvent.changeText(minInput, '');
+      await fireEvent.changeText(minInput, '');
       fireEvent(minInput, 'blur');
 
       expect(defaultProps.onFilterChange).toHaveBeenCalledWith({

@@ -314,13 +314,13 @@ describe('SimpleTabs Component Rendering', () => {
     jest.clearAllMocks();
   });
 
-  it('renders without crashing', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('renders without crashing', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders all four tab labels', () => {
-    const { getByText } = render(<SimpleTabs />);
+  it('renders all four tab labels', async () => {
+    const { getByText } = await render(<SimpleTabs />);
 
     expect(getByText('Operations')).toBeTruthy();
     expect(getByText('Graphs')).toBeTruthy();
@@ -328,8 +328,8 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all four screens', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('renders all four screens', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
 
     expect(getByTestId('operations-screen')).toBeTruthy();
     expect(getByTestId('graphs-screen')).toBeTruthy();
@@ -338,11 +338,11 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('switches active tab when tab is pressed', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Press the Graphs tab
     const graphsTab = getByTestId('tab-Graphs');
-    fireEvent.press(graphsTab);
+    await fireEvent.press(graphsTab);
 
     // Give React time to update
     await waitFor(() => {
@@ -350,47 +350,47 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('renders header component', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('renders header component', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
     expect(getByTestId('mock-header')).toBeTruthy();
   });
 
-  it('renders a Settings tab button', () => {
-    const { getAllByRole } = render(<SimpleTabs />);
+  it('renders a Settings tab button', async () => {
+    const { getAllByRole } = await render(<SimpleTabs />);
     const tabs = getAllByRole('button');
     // 4 tabs total: Operations, Graphs, Planned, Settings
     expect(tabs.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('renders all tabs with correct accessibility labels', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('renders all tabs with correct accessibility labels', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
 
     expect(getByTestId('tab-Operations')).toBeTruthy();
     expect(getByTestId('tab-Graphs')).toBeTruthy();
   });
 
   it('handles pressing each tab', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Press each tab
-    fireEvent.press(getByTestId('tab-Operations'));
-    fireEvent.press(getByTestId('tab-Graphs'));
-    fireEvent.press(getByTestId('tab-Planned'));
+    await fireEvent.press(getByTestId('tab-Operations'));
+    await fireEvent.press(getByTestId('tab-Graphs'));
+    await fireEvent.press(getByTestId('tab-Planned'));
 
     // All should work without errors
     expect(getByTestId('tab-Planned')).toBeTruthy();
   });
 
-  it('applies styles based on active state', () => {
-    const { getByText } = render(<SimpleTabs />);
+  it('applies styles based on active state', async () => {
+    const { getByText } = await render(<SimpleTabs />);
 
     // Operations is active by default
     const operationsText = getByText('Operations');
     expect(operationsText).toBeTruthy();
   });
 
-  it('triggers handleTabBarLayout on tab bar layout', () => {
-    const { getByTestId, UNSAFE_root } = render(<SimpleTabs />);
+  it('triggers handleTabBarLayout on tab bar layout', async () => {
+    const { getByTestId, container } = await render(<SimpleTabs />);
 
     // Find the tabs row and trigger onLayout
     // The layout is handled internally but we verify component renders
@@ -398,13 +398,13 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('maintains state when switching between tabs rapidly', async () => {
-    const { getByTestId, queryAllByTestId } = render(<SimpleTabs />);
+    const { getByTestId, queryAllByTestId } = await render(<SimpleTabs />);
 
     // Rapidly switch between tabs
     for (let i = 0; i < 5; i++) {
-      fireEvent.press(getByTestId('tab-Operations'));
-      fireEvent.press(getByTestId('tab-Graphs'));
-      fireEvent.press(getByTestId('tab-Planned'));
+      await fireEvent.press(getByTestId('tab-Operations'));
+      await fireEvent.press(getByTestId('tab-Graphs'));
+      await fireEvent.press(getByTestId('tab-Planned'));
     }
 
     // Component should still be stable (overlay may duplicate a screen testID)
@@ -413,17 +413,17 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('handles tab press callback correctly', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Press Graphs tab
-    fireEvent.press(getByTestId('tab-Graphs'));
+    await fireEvent.press(getByTestId('tab-Graphs'));
 
     // Component should still be rendered
     expect(getByTestId('graphs-screen')).toBeTruthy();
   });
 
-  it('renders with correct initial active tab (Operations)', () => {
-    const { getByText } = render(<SimpleTabs />);
+  it('renders with correct initial active tab (Operations)', async () => {
+    const { getByText } = await render(<SimpleTabs />);
 
     // Operations text should be present (it's the default active tab)
     const operationsLabel = getByText('Operations');
@@ -431,25 +431,25 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('re-renders when active tab changes', async () => {
-    const { getByTestId, getByText } = render(<SimpleTabs />);
+    const { getByTestId, getByText } = await render(<SimpleTabs />);
 
     // Press Planned tab
-    fireEvent.press(getByTestId('tab-Planned'));
+    await fireEvent.press(getByTestId('tab-Planned'));
 
     await waitFor(() => {
       expect(getByText('Planned')).toBeTruthy();
     });
   });
 
-  it('renders all screen content areas', () => {
-    const { getByText } = render(<SimpleTabs />);
+  it('renders all screen content areas', async () => {
+    const { getByText } = await render(<SimpleTabs />);
 
     expect(getByText('Operations Screen')).toBeTruthy();
     expect(getByText('Graphs Screen')).toBeTruthy();
   });
 
-  it('handles tab bar layout event', () => {
-    const { UNSAFE_root } = render(<SimpleTabs />);
+  it('handles tab bar layout event', async () => {
+    const { container } = await render(<SimpleTabs />);
 
     // Find a View with onLayout handler and trigger it
     const findViewWithOnLayout = (node) => {
@@ -464,7 +464,7 @@ describe('SimpleTabs Component Rendering', () => {
       return null;
     };
 
-    const viewWithLayout = findViewWithOnLayout(UNSAFE_root);
+    const viewWithLayout = findViewWithOnLayout(container);
     if (viewWithLayout && viewWithLayout.props.onLayout) {
       // Trigger the layout event
       viewWithLayout.props.onLayout({
@@ -475,8 +475,8 @@ describe('SimpleTabs Component Rendering', () => {
     }
   });
 
-  it('renders TabButton for each tab with correct props', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('renders TabButton for each tab with correct props', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Verify all TabButtons render and are pressable
     const operationsTab = getByTestId('tab-Operations');
@@ -487,7 +487,7 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('activates adjacent tab on pressIn', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations is active by default; Graphs is adjacent (distance=1)
     fireEvent(getByTestId('tab-Graphs'), 'pressIn');
@@ -499,7 +499,7 @@ describe('SimpleTabs Component Rendering', () => {
   });
 
   it('activates non-adjacent tab via overlay on pressIn', async () => {
-    const { getByTestId } = render(<SimpleTabs />);
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Operations (index 0) → Planned (index 2) — distance=2, triggers overlay path
     fireEvent(getByTestId('tab-Planned'), 'pressIn');
@@ -562,8 +562,8 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     });
   });
 
-  it('should handle navigateToTab direction logic for left swipe', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('should handle navigateToTab direction logic for left swipe', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
 
     // Verify component renders
     expect(getByTestId('mock-header')).toBeTruthy();
@@ -592,8 +592,8 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     expect(TABS[newIndex].key).toBe('Graphs');
   });
 
-  it('should handle navigateToTab direction logic for right swipe', () => {
-    const { getByTestId } = render(<SimpleTabs />);
+  it('should handle navigateToTab direction logic for right swipe', async () => {
+    const { getByTestId } = await render(<SimpleTabs />);
     expect(getByTestId('mock-header')).toBeTruthy();
 
     const TABS = [
@@ -619,7 +619,7 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     expect(TABS[newIndex].key).toBe('Graphs');
   });
 
-  it('should not navigate past last tab on left swipe', () => {
+  it('should not navigate past last tab on left swipe', async () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
@@ -643,7 +643,7 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     expect(TABS[newIndex].key).toBe('Settings');
   });
 
-  it('should not navigate past first tab on right swipe', () => {
+  it('should not navigate past first tab on right swipe', async () => {
     const TABS = [
       { key: 'Operations', label: 'Operations' },
       { key: 'Graphs', label: 'Graphs' },
@@ -667,7 +667,7 @@ describe('SimpleTabs Pan Gesture Integration', () => {
     expect(TABS[newIndex].key).toBe('Operations');
   });
 
-  it('should only update state when newIndex differs from currentIndex', () => {
+  it('should only update state when newIndex differs from currentIndex', async () => {
     const setActiveMock = jest.fn();
     const TABS = [
       { key: 'Operations', label: 'Operations' },
@@ -722,7 +722,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     jest.clearAllMocks();
   });
 
-  it('should clamp translation during onUpdate to prevent over-scrolling left', () => {
+  it('should clamp translation during onUpdate to prevent over-scrolling left', async () => {
     // Simulates lines 150-155 in onUpdate
     const startTranslateX = 0;
     const eventTranslationX = -2000; // Very large swipe left
@@ -736,7 +736,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(clampedValue).toBe(-1600); // Clamped to min
   });
 
-  it('should clamp translation during onUpdate to prevent over-scrolling right', () => {
+  it('should clamp translation during onUpdate to prevent over-scrolling right', async () => {
     // Simulates lines 150-155 in onUpdate
     const startTranslateX = -800; // Currently at Categories tab (index 2)
     const eventTranslationX = 2000; // Very large swipe right
@@ -750,7 +750,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(clampedValue).toBe(0); // Clamped to max
   });
 
-  it('should allow translation within valid range', () => {
+  it('should allow translation within valid range', async () => {
     const startTranslateX = -400; // At Graphs tab
     const eventTranslationX = -100; // Small swipe left
 
@@ -763,7 +763,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(clampedValue).toBe(-500); // Allowed, within range
   });
 
-  it('should navigate to next tab when swipe exceeds threshold (onEnd)', () => {
+  it('should navigate to next tab when swipe exceeds threshold (onEnd)', async () => {
     // Simulates lines 167-168
     const currentIndex = 0;
     const gestureTranslationX = -60; // Exceeds -SWIPE_THRESHOLD
@@ -780,7 +780,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(1); // Moved to next tab
   });
 
-  it('should navigate to previous tab when swipe exceeds threshold (onEnd)', () => {
+  it('should navigate to previous tab when swipe exceeds threshold (onEnd)', async () => {
     // Simulates lines 169-170
     const currentIndex = 2;
     const gestureTranslationX = 60; // Exceeds SWIPE_THRESHOLD
@@ -797,7 +797,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(1); // Moved to previous tab
   });
 
-  it('should navigate based on velocity even with small translation', () => {
+  it('should navigate based on velocity even with small translation', async () => {
     // Simulates velocity check in lines 167, 169
     const currentIndex = 1;
     const gestureTranslationX = 10; // Small translation
@@ -814,7 +814,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(0); // Moved based on velocity
   });
 
-  it('should navigate left based on negative velocity', () => {
+  it('should navigate left based on negative velocity', async () => {
     const currentIndex = 1;
     const gestureTranslationX = -10; // Small translation
     const velocityX = -600; // Exceeds -VELOCITY_THRESHOLD
@@ -830,7 +830,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(2); // Moved to next tab based on velocity
   });
 
-  it('should snap back when threshold not met', () => {
+  it('should snap back when threshold not met', async () => {
     // Simulates lines 186-191
     const currentIndex = 1;
     const gestureTranslationX = 30; // Below threshold
@@ -847,7 +847,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(currentIndex); // No change, will snap back
   });
 
-  it('should not exceed last tab boundary on left swipe', () => {
+  it('should not exceed last tab boundary on left swipe', async () => {
     // Simulates line 168 Math.min check
     const currentIndex = 4; // At last tab (Settings)
     const gestureTranslationX = -100;
@@ -862,7 +862,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(4); // Clamped to last tab
   });
 
-  it('should not go below first tab boundary on right swipe', () => {
+  it('should not go below first tab boundary on right swipe', async () => {
     // Simulates line 170 Math.max check
     const currentIndex = 0; // At first tab
     const gestureTranslationX = 100;
@@ -877,7 +877,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(newIndex).toBe(0); // Clamped to first tab
   });
 
-  it('should calculate target position correctly after navigation', () => {
+  it('should calculate target position correctly after navigation', async () => {
     // Simulates line 176
     const newIndex = 2;
     const target = -newIndex * SCREEN_WIDTH;
@@ -885,7 +885,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(target).toBe(-800);
   });
 
-  it('should trigger state update only when index changes', () => {
+  it('should trigger state update only when index changes', async () => {
     const setActiveMock = jest.fn();
 
     // Simulates lines 174-185 vs 186-191
@@ -919,7 +919,7 @@ describe('SimpleTabs Pan Gesture Worklet Logic', () => {
     expect(Object.is(result2.target, 0) || Object.is(result2.target, -0)).toBe(true);
   });
 
-  it('should handle edge case with both translation and velocity', () => {
+  it('should handle edge case with both translation and velocity', async () => {
     // Translation says go right, velocity says go left - translation wins if threshold met
     const currentIndex = 1;
     const gestureTranslationX = 60; // Right swipe threshold met
@@ -943,7 +943,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Component Structure and Logic', () => {
-    it('should have correct tab structure', () => {
+    it('should have correct tab structure', async () => {
       // Test the tab configuration used in SimpleTabs
       const tabs = [
         { key: 'Operations', label: 'Operations' },
@@ -959,13 +959,13 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(tabs[3].key).toBe('Settings');
     });
 
-    it('should default to Operations as initial active tab', () => {
+    it('should default to Operations as initial active tab', async () => {
       // Based on SimpleTabs.js: const [active, setActive] = React.useState('Operations');
       const initialActive = 'Operations';
       expect(initialActive).toBe('Operations');
     });
 
-    it('should support all tab keys', () => {
+    it('should support all tab keys', async () => {
       const validTabKeys = ['Operations', 'Graphs', 'Planned', 'Settings'];
 
       validTabKeys.forEach(key => {
@@ -975,7 +975,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Tab Switching Logic', () => {
-    it('should handle tab press correctly', () => {
+    it('should handle tab press correctly', async () => {
       // Simulates handleTabPress callback
       const handleTabPress = jest.fn((tabKey) => {
         return tabKey;
@@ -992,7 +992,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(handleTabPress).toHaveBeenCalledWith('Graphs');
     });
 
-    it('should render correct screen based on active tab', () => {
+    it('should render correct screen based on active tab', async () => {
       // Tests renderScreens logic
       const getActiveScreen = (active) => {
         switch (active) {
@@ -1016,7 +1016,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(getActiveScreen('Unknown')).toBe('OperationsScreen'); // Default case
     });
 
-    it('should maintain tab state consistency', () => {
+    it('should maintain tab state consistency', async () => {
       let activeTab = 'Operations';
 
       const setActiveTab = (newTab) => {
@@ -1037,7 +1037,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('TabButton Component Logic', () => {
-    it('should determine active state correctly', () => {
+    it('should determine active state correctly', async () => {
       // Tests TabButton isActive prop logic
       const isTabActive = (tabKey, activeTab) => tabKey === activeTab;
 
@@ -1049,7 +1049,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(isTabActive('Operations', 'Graphs')).toBe(false);
     });
 
-    it('should have correct accessibility properties', () => {
+    it('should have correct accessibility properties', async () => {
       // Tests TabButton accessibility props
       const getAccessibilityProps = (tabLabel, isActive) => ({
         accessibilityRole: 'button',
@@ -1066,7 +1066,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(props2.accessibilityState.selected).toBe(false);
     });
 
-    it('should handle rapid tab switches', () => {
+    it('should handle rapid tab switches', async () => {
       let activeTab = 'Operations';
       const switchTab = (newTab) => { activeTab = newTab; };
 
@@ -1080,7 +1080,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(activeTab).toBe('Operations');
     });
 
-    it('should apply correct text style based on active state', () => {
+    it('should apply correct text style based on active state', async () => {
       const colors = { primary: '#007AFF', mutedText: '#999999' };
 
       // Tests textStyle logic from TabButton
@@ -1100,7 +1100,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Localization Integration', () => {
-    it('should use translation keys for tab labels', () => {
+    it('should use translation keys for tab labels', async () => {
       // Tests TABS useMemo with translation
       const t = (key) => {
         const translations = {
@@ -1118,7 +1118,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(t('settings')).toBe('Settings');
     });
 
-    it('should provide fallback for missing translations', () => {
+    it('should provide fallback for missing translations', async () => {
       // Tests fallback logic: t('operations') || 'Operations'
       const t = (key) => null; // Simulate missing translation
       const label = t('operations') || 'Operations';
@@ -1126,7 +1126,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(label).toBe('Operations');
     });
 
-    it('should handle different languages', () => {
+    it('should handle different languages', async () => {
       const translations = {
         en: { operations: 'Operations', graphs: 'Graphs' },
         ru: { operations: 'Операции', graphs: 'Графики' },
@@ -1142,7 +1142,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Theme Integration', () => {
-    it('should use theme colors for active/inactive states', () => {
+    it('should use theme colors for active/inactive states', async () => {
       const colors = {
         primary: '#007AFF',
         mutedText: '#999999',
@@ -1164,7 +1164,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(inactiveStyle.color).toBe(colors.mutedText);
     });
 
-    it('should apply indicator color from theme', () => {
+    it('should apply indicator color from theme', async () => {
       // Tests indicator style
       const colors = { primary: '#007AFF' };
       const indicatorStyle = { backgroundColor: colors.primary };
@@ -1172,7 +1172,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(indicatorStyle.backgroundColor).toBe('#007AFF');
     });
 
-    it('should apply background color from theme', () => {
+    it('should apply background color from theme', async () => {
       const colors = { background: '#FFFFFF' };
       const containerStyle = { backgroundColor: colors.background };
 
@@ -1181,7 +1181,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('State Management', () => {
-    it('should maintain separate state variables', () => {
+    it('should maintain separate state variables', async () => {
       const state = {
         active: 'Operations',
         settingsVisible: false,
@@ -1199,7 +1199,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(state.settingsVisible).toBe(true);
     });
 
-    it('should handle concurrent state updates', () => {
+    it('should handle concurrent state updates', async () => {
       let active = 'Operations';
       let settingsVisible = false;
 
@@ -1219,7 +1219,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Callback Functions', () => {
-    it('should execute handleTabPress callback', () => {
+    it('should execute handleTabPress callback', async () => {
       const handleTabPress = jest.fn();
 
       handleTabPress('Planned');
@@ -1231,7 +1231,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(handleTabPress).toHaveBeenCalledTimes(2);
     });
 
-    it('should use memoized callbacks', () => {
+    it('should use memoized callbacks', async () => {
       // useCallback ensures callback reference stability
       const callback = jest.fn();
       const memoizedCallback = jest.fn((...args) => callback(...args));
@@ -1242,7 +1242,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Performance and Optimization', () => {
-    it('should memoize TABS array based on translation function', () => {
+    it('should memoize TABS array based on translation function', async () => {
       const t = jest.fn((key) => key);
 
       // Simulates useMemo dependency
@@ -1258,7 +1258,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(t).toHaveBeenCalledTimes(4);
     });
 
-    it('should memoize text styles', () => {
+    it('should memoize text styles', async () => {
       const colors = { primary: '#007AFF', mutedText: '#999' };
 
       const getTextStyle = (isActive) => ({
@@ -1272,7 +1272,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(style1).toEqual(style2);
     });
 
-    it('should handle frequent renders efficiently', () => {
+    it('should handle frequent renders efficiently', async () => {
       // Test that state updates are isolated
       let renderCount = 0;
       let activeTab = 'Operations';
@@ -1286,7 +1286,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(activeTab).toBe('Settings'); // 99 % 5 = 4 → Settings
     });
 
-    it('should use React.memo for TabButton component', () => {
+    it('should use React.memo for TabButton component', async () => {
       // TabButton is wrapped in memo to prevent unnecessary re-renders
       const propsEqual = (prevProps, nextProps) => {
         return prevProps.tab === nextProps.tab &&
@@ -1304,7 +1304,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle invalid tab key gracefully', () => {
+    it('should handle invalid tab key gracefully', async () => {
       const getScreen = (active) => {
         switch (active) {
         case 'Operations': return 'OperationsScreen';
@@ -1321,12 +1321,12 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(getScreen(undefined)).toBe('OperationsScreen');
     });
 
-    it('should handle empty tab label', () => {
+    it('should handle empty tab label', async () => {
       const tab = { key: 'Operations', label: '' };
       expect(tab.label || 'Operations').toBe('Operations');
     });
 
-    it('should maintain state consistency after many operations', () => {
+    it('should maintain state consistency after many operations', async () => {
       let active = 'Operations';
       let settingsVisible = false;
 
@@ -1341,7 +1341,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(typeof settingsVisible).toBe('boolean');
     });
 
-    it('should handle undefined colors gracefully', () => {
+    it('should handle undefined colors gracefully', async () => {
       const colors = {};
       const textStyle = {
         fontWeight: 'normal',
@@ -1353,7 +1353,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Component Integration Points', () => {
-    it('should integrate with ThemeContext', () => {
+    it('should integrate with ThemeContext', async () => {
       // SimpleTabs uses useThemeColors() hook
       const mockThemeContext = {
         colors: {
@@ -1370,7 +1370,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(mockThemeContext.colors.mutedText).toBeDefined();
     });
 
-    it('should integrate with LocalizationContext', () => {
+    it('should integrate with LocalizationContext', async () => {
       // SimpleTabs uses useLocalization() hook
       const mockLocalizationContext = {
         t: (key) => key,
@@ -1381,7 +1381,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(mockLocalizationContext.language).toBe('en');
     });
 
-    it('should pass props correctly to child components', () => {
+    it('should pass props correctly to child components', async () => {
       const settingsScreenProps = {
         setSubPanelActive: jest.fn(),
       };
@@ -1389,7 +1389,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(typeof settingsScreenProps.setSubPanelActive).toBe('function');
     });
 
-    it('should pass correct props to TabButton', () => {
+    it('should pass correct props to TabButton', async () => {
       const tabButtonProps = {
         tab: { key: 'Operations', label: 'Operations' },
         isActive: true,
@@ -1404,7 +1404,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
   });
 
   describe('Styling and Layout', () => {
-    it('should have correct container styles', () => {
+    it('should have correct container styles', async () => {
       const styles = {
         container: { flex: 1 },
         content: { flex: 1 },
@@ -1414,7 +1414,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(styles.content.flex).toBe(1);
     });
 
-    it('should have correct tab bar styles', () => {
+    it('should have correct tab bar styles', async () => {
       const styles = {
         tabBar: { flexDirection: 'row' },
         tab: { flex: 1, minHeight: 56 },
@@ -1425,7 +1425,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(styles.tab.minHeight).toBe(56);
     });
 
-    it('should have correct indicator styles', () => {
+    it('should have correct indicator styles', async () => {
       const styles = {
         indicator: {
           position: 'absolute',
@@ -1450,7 +1450,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       { key: 'Settings', label: 'Settings' },
     ];
 
-    it('should navigate to next tab on left swipe', () => {
+    it('should navigate to next tab on left swipe', async () => {
       // Simulates navigateToTab function for left swipe
       const navigateToTab = (currentTab, direction) => {
         const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
@@ -1471,7 +1471,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(navigateToTab('Planned', 'left')).toBe('Settings');
     });
 
-    it('should navigate to previous tab on right swipe', () => {
+    it('should navigate to previous tab on right swipe', async () => {
       const navigateToTab = (currentTab, direction) => {
         const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
         let newIndex;
@@ -1491,7 +1491,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(navigateToTab('Graphs', 'right')).toBe('Operations');
     });
 
-    it('should not navigate past first tab on right swipe', () => {
+    it('should not navigate past first tab on right swipe', async () => {
       const navigateToTab = (currentTab, direction) => {
         const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
         let newIndex;
@@ -1508,7 +1508,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(navigateToTab('Operations', 'right')).toBe('Operations');
     });
 
-    it('should not navigate past last tab on left swipe', () => {
+    it('should not navigate past last tab on left swipe', async () => {
       const navigateToTab = (currentTab, direction) => {
         const currentIndex = TABS.findIndex(tab => tab.key === currentTab);
         let newIndex;
@@ -1525,7 +1525,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(navigateToTab('Settings', 'left')).toBe('Settings');
     });
 
-    it('should detect left swipe based on translation threshold', () => {
+    it('should detect left swipe based on translation threshold', async () => {
       const SWIPE_THRESHOLD = 50;
       const isLeftSwipe = (translationX) => translationX < -SWIPE_THRESHOLD;
 
@@ -1535,7 +1535,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(isLeftSwipe(0)).toBe(false);
     });
 
-    it('should detect right swipe based on translation threshold', () => {
+    it('should detect right swipe based on translation threshold', async () => {
       const SWIPE_THRESHOLD = 50;
       const isRightSwipe = (translationX) => translationX > SWIPE_THRESHOLD;
 
@@ -1545,7 +1545,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(isRightSwipe(0)).toBe(false);
     });
 
-    it('should detect left swipe based on velocity threshold', () => {
+    it('should detect left swipe based on velocity threshold', async () => {
       const VELOCITY_THRESHOLD = 500;
       const isLeftSwipeByVelocity = (velocityX) => velocityX < -VELOCITY_THRESHOLD;
 
@@ -1554,7 +1554,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(isLeftSwipeByVelocity(-499)).toBe(false);
     });
 
-    it('should detect right swipe based on velocity threshold', () => {
+    it('should detect right swipe based on velocity threshold', async () => {
       const VELOCITY_THRESHOLD = 500;
       const isRightSwipeByVelocity = (velocityX) => velocityX > VELOCITY_THRESHOLD;
 
@@ -1563,7 +1563,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(isRightSwipeByVelocity(499)).toBe(false);
     });
 
-    it('should navigate through all tabs sequentially with swipes', () => {
+    it('should navigate through all tabs sequentially with swipes', async () => {
       let currentTab = 'Operations';
 
       const navigateToTab = (direction) => {
@@ -1606,7 +1606,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(currentTab).toBe('Operations');
     });
 
-    it('should handle rapid swipe gestures', () => {
+    it('should handle rapid swipe gestures', async () => {
       let currentTab = 'Operations';
 
       const navigateToTab = (direction) => {
@@ -1635,7 +1635,7 @@ describe('SimpleTabs Navigation (Logic Tests)', () => {
       expect(currentTab).toBe('Operations'); // Should stop at first tab
     });
 
-    it('should ignore small swipes below threshold', () => {
+    it('should ignore small swipes below threshold', async () => {
       const SWIPE_THRESHOLD = 50;
       const VELOCITY_THRESHOLD = 500;
 

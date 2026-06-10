@@ -24,7 +24,7 @@ describe('DisplaySettingsContext', () => {
     it('defaults to hideBalances=false when stored value is "false"', async () => {
       PreferencesDB.getPreference.mockResolvedValue('false');
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(PreferencesDB.getPreference).toHaveBeenCalled();
@@ -36,7 +36,7 @@ describe('DisplaySettingsContext', () => {
     it('sets hideBalances=true when stored value is "true"', async () => {
       PreferencesDB.getPreference.mockResolvedValue('true');
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.hideBalances).toBe(true);
@@ -46,7 +46,7 @@ describe('DisplaySettingsContext', () => {
     it('defaults to false when stored value is null', async () => {
       PreferencesDB.getPreference.mockResolvedValue(null);
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(PreferencesDB.getPreference).toHaveBeenCalled();
@@ -55,8 +55,8 @@ describe('DisplaySettingsContext', () => {
       expect(result.current.hideBalances).toBe(false);
     });
 
-    it('provides setHideBalances function', () => {
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+    it('provides setHideBalances function', async () => {
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
       expect(typeof result.current.setHideBalances).toBe('function');
     });
   });
@@ -65,7 +65,7 @@ describe('DisplaySettingsContext', () => {
     it('sets hideBalances to true and persists "true" to preferences', async () => {
       PreferencesDB.getPreference.mockResolvedValue('false');
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       // Wait for the initialization useEffect to complete first
       await waitFor(() => {
@@ -86,7 +86,7 @@ describe('DisplaySettingsContext', () => {
     it('sets hideBalances to false and persists "false" to preferences', async () => {
       PreferencesDB.getPreference.mockResolvedValue('true');
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.hideBalances).toBe(true);
@@ -104,7 +104,7 @@ describe('DisplaySettingsContext', () => {
     });
 
     it('toggles from false to true correctly', async () => {
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.hideBalances).toBe(false);
@@ -120,7 +120,7 @@ describe('DisplaySettingsContext', () => {
     it('toggles from true to false correctly', async () => {
       PreferencesDB.getPreference.mockResolvedValue('true');
 
-      const { result } = renderHook(() => useDisplaySettings(), { wrapper });
+      const { result } = await renderHook(() => useDisplaySettings(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.hideBalances).toBe(true);

@@ -26,8 +26,8 @@ describe('UpdateDownloadContext', () => {
     });
   });
 
-  it('exposes null downloadPhase initially', () => {
-    const { result } = renderHook(() => useUpdateDownload(), { wrapper });
+  it('exposes null downloadPhase initially', async () => {
+    const { result } = await renderHook(() => useUpdateDownload(), { wrapper });
     expect(result.current.downloadPhase).toBeNull();
   });
 
@@ -39,9 +39,9 @@ describe('UpdateDownloadContext', () => {
       return new Promise((resolve) => { resolveDownload = resolve; });
     });
 
-    const { result } = renderHook(() => useUpdateDownload(), { wrapper });
+    const { result } = await renderHook(() => useUpdateDownload(), { wrapper });
 
-    act(() => {
+    await act(async () => {
       result.current.startDownload('https://example.com/penny.apk');
     });
 
@@ -51,7 +51,7 @@ describe('UpdateDownloadContext', () => {
   });
 
   it('resets downloadPhase to null after download completes', async () => {
-    const { result } = renderHook(() => useUpdateDownload(), { wrapper });
+    const { result } = await renderHook(() => useUpdateDownload(), { wrapper });
 
     await act(async () => {
       await result.current.startDownload('https://example.com/penny.apk');
@@ -69,16 +69,16 @@ describe('UpdateDownloadContext', () => {
       return new Promise((resolve) => { resolveDownload = resolve; });
     });
 
-    const { result } = renderHook(() => useUpdateDownload(), { wrapper });
+    const { result } = await renderHook(() => useUpdateDownload(), { wrapper });
 
-    act(() => {
+    await act(async () => {
       result.current.startDownload('https://example.com/penny.apk', { checksumUrl: 'https://example.com/penny.apk.sha256' });
     });
 
-    act(() => { capturedOnProgress?.(1); });
+    await act(async () => { capturedOnProgress?.(1); });
     expect(result.current.downloadProgress).toBe(1);
 
-    act(() => { capturedOnPhaseChange?.('verifying'); });
+    await act(async () => { capturedOnPhaseChange?.('verifying'); });
     expect(result.current.downloadPhase).toBe('verifying');
     expect(result.current.downloadProgress).toBe(0);
 
@@ -87,7 +87,7 @@ describe('UpdateDownloadContext', () => {
 
   it('passes checksumUrl to downloadAndInstallApk', async () => {
     const { downloadAndInstallApk } = require('../../app/services/AppUpdateService');
-    const { result } = renderHook(() => useUpdateDownload(), { wrapper });
+    const { result } = await renderHook(() => useUpdateDownload(), { wrapper });
 
     await act(async () => {
       await result.current.startDownload('https://example.com/penny.apk', { checksumUrl: 'https://example.com/penny.apk.sha256' });

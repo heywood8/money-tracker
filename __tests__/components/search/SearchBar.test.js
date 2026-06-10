@@ -35,102 +35,102 @@ describe('SearchBar', () => {
     jest.useRealTimers();
   });
 
-  it('renders search input with placeholder', () => {
-    const { getByPlaceholderText } = render(<SearchBar {...defaultProps} />);
+  it('renders search input with placeholder', async () => {
+    const { getByPlaceholderText } = await render(<SearchBar {...defaultProps} />);
     expect(getByPlaceholderText('search_operations_placeholder')).toBeTruthy();
   });
 
-  it('calls onSearchTextChange after debounce when typing', () => {
-    const { getByPlaceholderText } = render(<SearchBar {...defaultProps} />);
+  it('calls onSearchTextChange after debounce when typing', async () => {
+    const { getByPlaceholderText } = await render(<SearchBar {...defaultProps} />);
     const input = getByPlaceholderText('search_operations_placeholder');
 
-    fireEvent.changeText(input, 'coffee');
+    await fireEvent.changeText(input, 'coffee');
 
     // Should not be called immediately
     expect(defaultProps.onSearchTextChange).not.toHaveBeenCalledWith('coffee');
 
     // Should be called after the 300ms debounce
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(300);
     });
 
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('coffee');
   });
 
-  it('shows clear button when searchText prop initializes with text', () => {
-    const { getByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+  it('shows clear button when searchText prop initializes with text', async () => {
+    const { getByTestId } = await render(<SearchBar {...defaultProps} searchText="coffee" />);
     expect(getByTestId('clear-search-button')).toBeTruthy();
   });
 
-  it('shows clear button after typing text', () => {
-    const { getByPlaceholderText, getByTestId } = render(<SearchBar {...defaultProps} />);
+  it('shows clear button after typing text', async () => {
+    const { getByPlaceholderText, getByTestId } = await render(<SearchBar {...defaultProps} />);
     const input = getByPlaceholderText('search_operations_placeholder');
 
-    fireEvent.changeText(input, 'coffee');
+    await fireEvent.changeText(input, 'coffee');
 
     expect(getByTestId('clear-search-button')).toBeTruthy();
   });
 
-  it('hides clear button when searchText is empty', () => {
-    const { queryByTestId } = render(<SearchBar {...defaultProps} searchText="" />);
+  it('hides clear button when searchText is empty', async () => {
+    const { queryByTestId } = await render(<SearchBar {...defaultProps} searchText="" />);
     expect(queryByTestId('clear-search-button')).toBeNull();
   });
 
-  it('calls onSearchTextChange with empty string immediately when clear button pressed', () => {
-    const { getByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+  it('calls onSearchTextChange with empty string immediately when clear button pressed', async () => {
+    const { getByTestId } = await render(<SearchBar {...defaultProps} searchText="coffee" />);
 
-    fireEvent.press(getByTestId('clear-search-button'));
+    await fireEvent.press(getByTestId('clear-search-button'));
 
     // Clear is immediate, no debounce
     expect(defaultProps.onSearchTextChange).toHaveBeenCalledWith('');
   });
 
-  it('hides clear button after pressing clear', () => {
-    const { getByTestId, queryByTestId } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+  it('hides clear button after pressing clear', async () => {
+    const { getByTestId, queryByTestId } = await render(<SearchBar {...defaultProps} searchText="coffee" />);
 
-    fireEvent.press(getByTestId('clear-search-button'));
+    await fireEvent.press(getByTestId('clear-search-button'));
 
     expect(queryByTestId('clear-search-button')).toBeNull();
   });
 
-  it('calls onToggleFilters when filters button pressed', () => {
-    const { getByTestId } = render(<SearchBar {...defaultProps} />);
+  it('calls onToggleFilters when filters button pressed', async () => {
+    const { getByTestId } = await render(<SearchBar {...defaultProps} />);
 
-    fireEvent.press(getByTestId('filters-toggle-button'));
+    await fireEvent.press(getByTestId('filters-toggle-button'));
 
     expect(defaultProps.onToggleFilters).toHaveBeenCalled();
   });
 
-  it('calls onClose when close button pressed', () => {
-    const { getByTestId } = render(<SearchBar {...defaultProps} />);
+  it('calls onClose when close button pressed', async () => {
+    const { getByTestId } = await render(<SearchBar {...defaultProps} />);
 
-    fireEvent.press(getByTestId('close-search-button'));
+    await fireEvent.press(getByTestId('close-search-button'));
 
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
 
-  it('shows filter count badge when filterCount > 0', () => {
-    const { getByText } = render(<SearchBar {...defaultProps} filterCount={3} />);
+  it('shows filter count badge when filterCount > 0', async () => {
+    const { getByText } = await render(<SearchBar {...defaultProps} filterCount={3} />);
     expect(getByText('3')).toBeTruthy();
   });
 
-  it('does not show filter count badge when filterCount is 0', () => {
-    const { queryByTestId } = render(<SearchBar {...defaultProps} filterCount={0} />);
+  it('does not show filter count badge when filterCount is 0', async () => {
+    const { queryByTestId } = await render(<SearchBar {...defaultProps} filterCount={0} />);
     expect(queryByTestId('filter-count-badge')).toBeNull();
   });
 
-  it('debounces rapid typing and only calls onSearchTextChange once with final value', () => {
-    const { getByPlaceholderText } = render(<SearchBar {...defaultProps} />);
+  it('debounces rapid typing and only calls onSearchTextChange once with final value', async () => {
+    const { getByPlaceholderText } = await render(<SearchBar {...defaultProps} />);
     const input = getByPlaceholderText('search_operations_placeholder');
 
-    fireEvent.changeText(input, 'c');
-    fireEvent.changeText(input, 'co');
-    fireEvent.changeText(input, 'cof');
-    fireEvent.changeText(input, 'coff');
-    fireEvent.changeText(input, 'coffe');
-    fireEvent.changeText(input, 'coffee');
+    await fireEvent.changeText(input, 'c');
+    await fireEvent.changeText(input, 'co');
+    await fireEvent.changeText(input, 'cof');
+    await fireEvent.changeText(input, 'coff');
+    await fireEvent.changeText(input, 'coffe');
+    await fireEvent.changeText(input, 'coffee');
 
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(300);
     });
 
@@ -139,17 +139,17 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar layout', () => {
-    it('search input container uses flex: 1 to take full available width', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('search input container uses flex: 1 to take full available width', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
       expect(containerStyle.flex).toBe(1);
     });
 
-    it('button container has explicit width to prevent overlap', () => {
-      const { UNSAFE_getAllByType } = render(<SearchBar {...defaultProps} />);
-      const views = UNSAFE_getAllByType('View');
+    it('button container has explicit width to prevent overlap', async () => {
+      const { container } = await render(<SearchBar {...defaultProps} />);
+      const views = container.queryAll(n => n.type === 'View');
       const buttonContainer = views.find(v => {
         const style = StyleSheet.flatten(v.props.style);
         return style && style.width === 96;
@@ -160,8 +160,8 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar button sizing', () => {
-    it('filter button has proper 44x44px touch target', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('filter button has proper 44x44px touch target', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const button = getByTestId('filters-toggle-button');
 
       const buttonStyle = StyleSheet.flatten(button.props.style);
@@ -171,8 +171,8 @@ describe('SearchBar', () => {
       expect(buttonStyle.justifyContent).toBe('center');
     });
 
-    it('close button has proper 44x44px touch target', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('close button has proper 44x44px touch target', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const button = getByTestId('close-search-button');
 
       const buttonStyle = StyleSheet.flatten(button.props.style);
@@ -184,8 +184,8 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar visual style', () => {
-    it('search input container has clean rounded style', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('search input container has clean rounded style', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
@@ -195,8 +195,8 @@ describe('SearchBar', () => {
       expect(containerStyle.height).toBe(44);
     });
 
-    it('search input container has subtle background for visibility', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('search input container has subtle background for visibility', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
@@ -204,8 +204,8 @@ describe('SearchBar', () => {
       expect(containerStyle.backgroundColor).toBe('#1f1f1f');
     });
 
-    it('search input container has proper padding', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} />);
+    it('search input container has proper padding', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
@@ -215,20 +215,20 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar filter button active state', () => {
-    it('filter button has transparent background when no filters active', () => {
-      const { getByTestId } = render(<SearchBar {...defaultProps} filterCount={0} />);
+    it('filter button has transparent background when no filters active', async () => {
+      const { getByTestId } = await render(<SearchBar {...defaultProps} filterCount={0} />);
       const button = getByTestId('filters-toggle-button');
 
       const buttonStyle = StyleSheet.flatten(button.props.style);
       expect(buttonStyle.backgroundColor).toBeUndefined();
     });
 
-    it('filter button has subtle background tint when filters active', () => {
+    it('filter button has subtle background tint when filters active', async () => {
       const mockColors = {
         ...defaultProps.colors,
         primary: '#4da3ff',
       };
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SearchBar {...defaultProps} colors={mockColors} filterCount={2} />,
       );
       const button = getByTestId('filters-toggle-button');
@@ -238,21 +238,21 @@ describe('SearchBar', () => {
       expect(buttonStyle.backgroundColor).toMatch(/#4da3ff/i);
     });
 
-    it('filter icon uses primary color when filterCount > 0', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('filter icon uses primary color when filterCount > 0', async () => {
+      const { container } = await render(
         <SearchBar {...defaultProps} filterCount={2} colors={{ ...mockColors, primary: '#FF3B30' }} />,
       );
-      const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
+      const icons = container.queryAll(n => n.props && n.props.testID && n.props.testID.startsWith('icon-'));
       // The first icon in the button is the filter-variant icon
       const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
       expect(filterIcon.props.color).toBe('#FF3B30');
     });
 
-    it('filter icon uses text color when filterCount is 0', () => {
-      const { UNSAFE_getAllByType } = render(
+    it('filter icon uses text color when filterCount is 0', async () => {
+      const { container } = await render(
         <SearchBar {...defaultProps} filterCount={0} colors={{ ...mockColors, text: '#CCCCCC' }} />,
       );
-      const icons = UNSAFE_getAllByType(require('@expo/vector-icons').MaterialCommunityIcons);
+      const icons = container.queryAll(n => n.props && n.props.testID && n.props.testID.startsWith('icon-'));
       const filterIcon = icons.find(icon => icon.props.name === 'filter-variant');
       expect(filterIcon.props.color).toBe('#CCCCCC');
     });
@@ -262,9 +262,9 @@ describe('SearchBar', () => {
     it('skips local update when searchText prop rerenders with same value', async () => {
       // First render with 'coffee': effect sets lastSentRef.current = 'coffee'
       // Rerender with same 'coffee': condition is false → no-op branch is hit
-      const { rerender } = render(<SearchBar {...defaultProps} searchText="coffee" />);
+      const { rerender } = await render(<SearchBar {...defaultProps} searchText="coffee" />);
       await act(async () => { jest.runAllTimers(); });
-      rerender(<SearchBar {...defaultProps} searchText="coffee" />);
+      await rerender(<SearchBar {...defaultProps} searchText="coffee" />);
       await act(async () => { jest.runAllTimers(); });
       // No assertion needed; exercising the false branch is the goal
     });

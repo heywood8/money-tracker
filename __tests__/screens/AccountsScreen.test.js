@@ -142,55 +142,55 @@ describe('AccountsScreen', () => {
   });
 
   describe('Component Structure', () => {
-    it('renders without crashing', () => {
+    it('renders without crashing', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('uses ThemeContext for styling', () => {
+    it('uses ThemeContext for styling', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useThemeConfig } = require('../../app/contexts/ThemeConfigContext');
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      render(<AccountsScreen />);
+      await render(<AccountsScreen />);
 
       expect(useThemeConfig).toHaveBeenCalled();
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('uses AccountsContext for account data', () => {
+    it('uses AccountsContext for account data', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
 
-      render(<AccountsScreen />);
+      await render(<AccountsScreen />);
 
       expect(useAccountsData).toHaveBeenCalled();
       expect(useAccountsActions).toHaveBeenCalled();
     });
 
-    it('uses LocalizationContext for translations', () => {
+    it('uses LocalizationContext for translations', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
-      render(<AccountsScreen />);
+      await render(<AccountsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
   });
 
   describe('Integration with Contexts', () => {
-    it('handles empty account list', () => {
+    it('handles empty account list', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
       useAccountsData.mockReturnValue(createAccountsDataMock());
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('handles loading state', () => {
+    it('handles loading state', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -198,10 +198,10 @@ describe('AccountsScreen', () => {
         loading: true,
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('handles account list with data', () => {
+    it('handles account list with data', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -215,21 +215,21 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Component Logic', () => {
-    it('initializes with modal closed', () => {
+    it('initializes with modal closed', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
-      const { queryByTestId } = render(<AccountsScreen />);
+      const { queryByTestId } = await render(<AccountsScreen />);
 
       // Modal should not be visible initially (testing internal state via behavior)
       expect(true).toBe(true); // Component initializes without errors
     });
 
-    it('handles multiple currencies', () => {
+    it('handles multiple currencies', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -250,58 +250,58 @@ describe('AccountsScreen', () => {
         },
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('State Management', () => {
-    it('manages modal visibility state', () => {
+    it('manages modal visibility state', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component should manage modal state internally
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('manages edit mode state', () => {
+    it('manages edit mode state', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component should manage edit/new mode state
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('manages delete confirmation state', () => {
+    it('manages delete confirmation state', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component should manage delete confirmation dialogs
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Memoization and Performance', () => {
-    it('uses callbacks for account actions', () => {
+    it('uses callbacks for account actions', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component should use useCallback for performance
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('memoizes currency picker modal', () => {
+    it('memoizes currency picker modal', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component uses memo() for CurrencyPickerModal
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('memoizes transfer account picker modal', () => {
+    it('memoizes transfer account picker modal', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component uses memo() for TransferAccountPickerModal
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Theme Integration', () => {
-    it('applies theme colors to components', () => {
+    it('applies theme colors to components', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -314,11 +314,11 @@ describe('AccountsScreen', () => {
 
       useThemeColors.mockReturnValue({ colors: mockColors });
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('handles dark theme', () => {
+    it('handles dark theme', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -333,12 +333,12 @@ describe('AccountsScreen', () => {
         },
       });
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Localization Integration', () => {
-    it('uses translation function for UI text', () => {
+    it('uses translation function for UI text', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -348,12 +348,12 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      render(<AccountsScreen />);
+      await render(<AccountsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
 
-    it('handles different languages', () => {
+    it('handles different languages', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -362,12 +362,12 @@ describe('AccountsScreen', () => {
         language: 'ru',
       });
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles empty accounts array when context provides empty state', () => {
+    it('handles empty accounts array when context provides empty state', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -379,10 +379,10 @@ describe('AccountsScreen', () => {
       }));
 
       // Should handle gracefully with empty arrays (normal empty state from context)
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('handles empty displayed accounts with hidden accounts', () => {
+    it('handles empty displayed accounts with hidden accounts', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -396,10 +396,10 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('handles accounts with missing properties', () => {
+    it('handles accounts with missing properties', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -415,10 +415,10 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('handles empty currencies object', () => {
+    it('handles empty currencies object', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -431,20 +431,20 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Regression Tests', () => {
-    it('handles re-rendering without errors', () => {
+    it('handles re-rendering without errors', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
-      const { rerender } = render(<AccountsScreen />);
+      const { rerender } = await render(<AccountsScreen />);
 
       expect(() => rerender(<AccountsScreen />)).not.toThrow();
     });
 
-    it('maintains stability when accounts change', () => {
+    it('maintains stability when accounts change', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -461,7 +461,7 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      const { rerender } = render(<AccountsScreen />);
+      const { rerender } = await render(<AccountsScreen />);
 
       useAccountsData.mockReturnValue(createAccountsDataMock({
         accounts: updatedAccounts,
@@ -472,7 +472,7 @@ describe('AccountsScreen', () => {
       expect(() => rerender(<AccountsScreen />)).not.toThrow();
     });
 
-    it('handles rapid loading state changes', () => {
+    it('handles rapid loading state changes', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -482,7 +482,7 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      const { rerender } = render(<AccountsScreen />);
+      const { rerender } = await render(<AccountsScreen />);
 
       useAccountsData.mockReturnValue(createAccountsDataMock({
         loading: false,
@@ -494,21 +494,21 @@ describe('AccountsScreen', () => {
   });
 
   describe('Component Integration Points', () => {
-    it('provides necessary props to child components', () => {
+    it('provides necessary props to child components', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component should pass proper props to DraggableFlatList and modals
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('integrates with React Native Paper components', () => {
+    it('integrates with React Native Paper components', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
 
       // Component uses FAB, Modal, Card, etc. from react-native-paper
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
 
-    it('integrates with DraggableFlatList for account reordering', () => {
+    it('integrates with DraggableFlatList for account reordering', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -525,12 +525,12 @@ describe('AccountsScreen', () => {
         currencies: {},
       }));
 
-      expect(() => render(<AccountsScreen />)).not.toThrow();
+      await render(<AccountsScreen />);
     });
   });
 
   describe('Account Rendering', () => {
-    it('renders account names correctly', () => {
+    it('renders account names correctly', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -543,12 +543,12 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       expect(getByText('My Cash')).toBeTruthy();
     });
 
-    it('renders formatted balance with currency symbol', () => {
+    it('renders formatted balance with currency symbol', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -561,7 +561,7 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       // Balance should be formatted with currency symbol
       expect(getByText('Test Account')).toBeTruthy();
@@ -569,7 +569,7 @@ describe('AccountsScreen', () => {
   });
 
   describe('FAB Button', () => {
-    it('renders add account FAB button', () => {
+    it('renders add account FAB button', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -579,14 +579,14 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText } = render(<AccountsScreen />);
+      const { getByLabelText } = await render(<AccountsScreen />);
 
       expect(getByLabelText('add_account')).toBeTruthy();
     });
   });
 
   describe('Hidden Accounts Toggle', () => {
-    it('renders show hidden accounts button when hidden accounts exist', () => {
+    it('renders show hidden accounts button when hidden accounts exist', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -606,13 +606,13 @@ describe('AccountsScreen', () => {
         hiddenAccounts: hiddenAccounts,
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       // Should show the toggle button - returns translation key
       expect(getByText('show_hidden_accounts')).toBeTruthy();
     });
 
-    it('does not render hidden accounts button when no hidden accounts', () => {
+    it('does not render hidden accounts button when no hidden accounts', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -628,14 +628,14 @@ describe('AccountsScreen', () => {
         hiddenAccounts: [],
       }));
 
-      const { queryByText } = render(<AccountsScreen />);
+      const { queryByText } = await render(<AccountsScreen />);
 
       expect(queryByText(/show_hidden_accounts|hide_hidden_accounts/)).toBeNull();
     });
   });
 
   describe('Loading and Error States', () => {
-    it('displays loading indicator when loading', () => {
+    it('displays loading indicator when loading', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -649,13 +649,13 @@ describe('AccountsScreen', () => {
         loading: true,
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       // Check for translation key
       expect(getByText('loading_accounts')).toBeTruthy();
     });
 
-    it('displays error message when error occurs', () => {
+    it('displays error message when error occurs', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -669,7 +669,7 @@ describe('AccountsScreen', () => {
         error: 'Failed to load',
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       // Check for translation key
       expect(getByText('error_loading_accounts')).toBeTruthy();
@@ -677,7 +677,7 @@ describe('AccountsScreen', () => {
   });
 
   describe('Empty State', () => {
-    it('displays no accounts message when list is empty', () => {
+    it('displays no accounts message when list is empty', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
@@ -692,7 +692,7 @@ describe('AccountsScreen', () => {
         displayedAccounts: [],
       }));
 
-      const { getByText } = render(<AccountsScreen />);
+      const { getByText } = await render(<AccountsScreen />);
 
       // Check for translation key since mock returns key
       expect(getByText('no_accounts')).toBeTruthy();
@@ -721,11 +721,11 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      const { getByText, getByLabelText } = render(<AccountsScreen />);
+      const { getByText, getByLabelText } = await render(<AccountsScreen />);
 
       // Find and press the account
       const accountRow = getByLabelText('edit_account');
-      fireEvent.press(accountRow);
+      await fireEvent.press(accountRow);
 
       // Modal should now show edit form with account name
       await waitFor(() => {
@@ -742,11 +742,11 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getByText } = await render(<AccountsScreen />);
 
       // Find and press the FAB
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Modal should now show add form
       await waitFor(() => {
@@ -772,18 +772,18 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, getAllByText, getByDisplayValue } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, getByDisplayValue } = await render(<AccountsScreen />);
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Fill in the form - find inputs and set values
       // Since the modal is rendered, we need to interact with the form
 
       // Find save button and press it
       const saveButtons = getAllByText('save');
-      fireEvent.press(saveButtons[0]);
+      await fireEvent.press(saveButtons[0]);
 
       // validateAccount should have been called
       expect(mockValidateAccount).toHaveBeenCalled();
@@ -805,15 +805,15 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, getAllByText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, getByText } = await render(<AccountsScreen />);
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Press save without filling anything
       const saveButtons = getAllByText('save');
-      fireEvent.press(saveButtons[0]);
+      await fireEvent.press(saveButtons[0]);
 
       // Error should be displayed
       await waitFor(() => {
@@ -830,15 +830,15 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, getAllByText, queryByText } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, queryByText } = await render(<AccountsScreen />);
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Press cancel
       const cancelButtons = getAllByText('cancel');
-      fireEvent.press(cancelButtons[0]);
+      await fireEvent.press(cancelButtons[0]);
 
       // Modal state should be cleared (editingId set to null)
       expect(true).toBe(true); // Handler was called without error
@@ -874,16 +874,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getByTestId } = render(<AccountsScreen />);
+      const { getByLabelText, getByTestId } = await render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
-      fireEvent.press(accountRow);
+      await fireEvent.press(accountRow);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         // Find and press delete icon in form panel header
         const deleteIcon = getByTestId('icon-trash-can-outline');
-        fireEvent.press(deleteIcon);
+        await fireEvent.press(deleteIcon);
       });
 
       // Operation count should be checked
@@ -919,16 +919,16 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getAllByText, getByTestId } = render(<AccountsScreen />);
+      const { getAllByText, getByTestId } = await render(<AccountsScreen />);
 
       // Open edit modal for first account
       const accountRows = getAllByText('Cash');
-      fireEvent.press(accountRows[0]);
+      await fireEvent.press(accountRows[0]);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         // Find and press delete icon in form panel header
         const deleteIcon = getByTestId('icon-trash-can-outline');
-        fireEvent.press(deleteIcon);
+        await fireEvent.press(deleteIcon);
       });
 
       // Should show transfer operations dialog
@@ -965,22 +965,22 @@ describe('AccountsScreen', () => {
         getOperationCount: mockGetOperationCount,
       }));
 
-      const { getByLabelText, getAllByText, getByTestId } = render(<AccountsScreen />);
+      const { getByLabelText, getAllByText, getByTestId } = await render(<AccountsScreen />);
 
       // Open edit modal for account
       const accountRow = getByLabelText('edit_account');
-      fireEvent.press(accountRow);
+      await fireEvent.press(accountRow);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         // Find and press delete icon in form panel header
         const deleteIcon = getByTestId('icon-trash-can-outline');
-        fireEvent.press(deleteIcon);
+        await fireEvent.press(deleteIcon);
       });
 
       // Wait for confirmation dialog to appear and then confirm
-      await waitFor(() => {
+      await waitFor(async () => {
         const confirmDeleteButtons = getAllByText('delete');
-        fireEvent.press(confirmDeleteButtons[0]);
+        await fireEvent.press(confirmDeleteButtons[0]);
       });
     });
   });
@@ -997,11 +997,11 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, getByText } = await render(<AccountsScreen />);
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // The modal should be visible with the add form
       await waitFor(() => {
@@ -1022,20 +1022,20 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, UNSAFE_getAllByType } = render(<AccountsScreen />);
+      const { getByLabelText, container } = await render(<AccountsScreen />);
       const { TextInput } = require('react-native');
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Find and update text inputs
-      await waitFor(() => {
-        const inputs = UNSAFE_getAllByType(TextInput);
+      await waitFor(async () => {
+        const inputs = container.queryAll(n => n.type === 'TextInput');
         expect(inputs.length).toBeGreaterThan(0);
 
         // Change name
-        fireEvent.changeText(inputs[0], 'New Account');
+        await fireEvent.changeText(inputs[0], 'New Account');
       });
     });
 
@@ -1048,20 +1048,20 @@ describe('AccountsScreen', () => {
         language: 'en',
       });
 
-      const { getByLabelText, UNSAFE_getAllByType } = render(<AccountsScreen />);
+      const { getByLabelText, container } = await render(<AccountsScreen />);
       const { TextInput } = require('react-native');
 
       // Open add modal
       const fab = getByLabelText('add_account');
-      fireEvent.press(fab);
+      await fireEvent.press(fab);
 
       // Find and update text inputs
-      await waitFor(() => {
-        const inputs = UNSAFE_getAllByType(TextInput);
+      await waitFor(async () => {
+        const inputs = container.queryAll(n => n.type === 'TextInput');
         expect(inputs.length).toBeGreaterThan(1);
 
         // Change balance
-        fireEvent.changeText(inputs[1], '5000.00');
+        await fireEvent.changeText(inputs[1], '5000.00');
       });
     });
   });
@@ -1069,7 +1069,7 @@ describe('AccountsScreen', () => {
   describe('Drag and Drop Reorder', () => {
     const { fireEvent } = require('@testing-library/react-native');
 
-    it('calls reorderAccounts on drag end', () => {
+    it('calls reorderAccounts on drag end', async () => {
       const AccountsScreen = require('../../app/screens/AccountsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
@@ -1096,7 +1096,7 @@ describe('AccountsScreen', () => {
         reorderAccounts: mockReorderAccounts,
       }));
 
-      render(<AccountsScreen />);
+      await render(<AccountsScreen />);
 
       // The DraggableFlatList is mocked as a regular FlatList
       // We verify the component renders properly with the reorderAccounts callback available
@@ -1126,16 +1126,16 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      const { getByLabelText, UNSAFE_getAllByType, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, container, getByText } = await render(<AccountsScreen />);
       const { Switch } = require('react-native');
 
       // Open edit modal
       const accountRow = getByLabelText('edit_account');
-      fireEvent.press(accountRow);
+      await fireEvent.press(accountRow);
 
       // Find switches and toggle hidden
       await waitFor(() => {
-        const switches = UNSAFE_getAllByType(Switch);
+        const switches = container.queryAll(n => n.type === 'RCTSwitch');
         expect(switches.length).toBeGreaterThan(0);
       });
     });
@@ -1159,12 +1159,12 @@ describe('AccountsScreen', () => {
         displayedAccounts: mockAccounts,
       }));
 
-      const { getByLabelText, UNSAFE_getAllByType, getByText } = render(<AccountsScreen />);
+      const { getByLabelText, container, getByText } = await render(<AccountsScreen />);
       const { Switch } = require('react-native');
 
       // Open edit modal for existing account
       const accountRow = getByLabelText('edit_account');
-      fireEvent.press(accountRow);
+      await fireEvent.press(accountRow);
 
       // Find adjustment switch (shown only for existing accounts, not new)
       await waitFor(() => {

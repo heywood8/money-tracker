@@ -6,7 +6,7 @@ import getDefaultOperations from '../../app/defaults/defaultOperations';
 
 describe('defaultOperations', () => {
   describe('getDefaultOperations', () => {
-    it('returns operations with today date', () => {
+    it('returns operations with today date', async () => {
       const today = new Date().toISOString().split('T')[0];
       const operations = getDefaultOperations(1);
 
@@ -15,25 +15,25 @@ describe('defaultOperations', () => {
       });
     });
 
-    it('returns 4 operations when no secondary account provided', () => {
+    it('returns 4 operations when no secondary account provided', async () => {
       const operations = getDefaultOperations(1);
 
       expect(operations).toHaveLength(4);
     });
 
-    it('returns 4 operations when secondary account is same as primary', () => {
+    it('returns 4 operations when secondary account is same as primary', async () => {
       const operations = getDefaultOperations(1, 1);
 
       expect(operations).toHaveLength(4);
     });
 
-    it('returns 5 operations when secondary account is different', () => {
+    it('returns 5 operations when secondary account is different', async () => {
       const operations = getDefaultOperations(1, 2);
 
       expect(operations).toHaveLength(5);
     });
 
-    it('includes correct operation types', () => {
+    it('includes correct operation types', async () => {
       const operations = getDefaultOperations(1, 2);
 
       const types = operations.map(op => op.type);
@@ -47,7 +47,7 @@ describe('defaultOperations', () => {
       expect(types.filter(t => t === 'transfer')).toHaveLength(1);
     });
 
-    it('uses provided accountId for all operations', () => {
+    it('uses provided accountId for all operations', async () => {
       const accountId = 123;
       const operations = getDefaultOperations(accountId);
 
@@ -56,7 +56,7 @@ describe('defaultOperations', () => {
       });
     });
 
-    it('uses toAccountId for transfer operation', () => {
+    it('uses toAccountId for transfer operation', async () => {
       const accountId = 1;
       const toAccountId = 2;
       const operations = getDefaultOperations(accountId, toAccountId);
@@ -67,14 +67,14 @@ describe('defaultOperations', () => {
       expect(transfer.toAccountId).toBe(toAccountId);
     });
 
-    it('sets categoryId to null for transfer operation', () => {
+    it('sets categoryId to null for transfer operation', async () => {
       const operations = getDefaultOperations(1, 2);
 
       const transfer = operations.find(op => op.type === 'transfer');
       expect(transfer.categoryId).toBeNull();
     });
 
-    it('includes valid category IDs for non-transfer operations', () => {
+    it('includes valid category IDs for non-transfer operations', async () => {
       const operations = getDefaultOperations(1);
 
       const nonTransfers = operations.filter(op => op.type !== 'transfer');
@@ -84,7 +84,7 @@ describe('defaultOperations', () => {
       });
     });
 
-    it('includes descriptions for all operations', () => {
+    it('includes descriptions for all operations', async () => {
       const operations = getDefaultOperations(1, 2);
 
       operations.forEach(op => {
@@ -93,7 +93,7 @@ describe('defaultOperations', () => {
       });
     });
 
-    it('includes valid amounts as strings', () => {
+    it('includes valid amounts as strings', async () => {
       const operations = getDefaultOperations(1, 2);
 
       operations.forEach(op => {
@@ -102,14 +102,14 @@ describe('defaultOperations', () => {
       });
     });
 
-    it('handles null toAccountId', () => {
+    it('handles null toAccountId', async () => {
       const operations = getDefaultOperations(1, null);
 
       expect(operations).toHaveLength(4);
       expect(operations.every(op => op.type !== 'transfer')).toBe(true);
     });
 
-    it('handles undefined toAccountId', () => {
+    it('handles undefined toAccountId', async () => {
       const operations = getDefaultOperations(1, undefined);
 
       expect(operations).toHaveLength(4);
@@ -117,21 +117,21 @@ describe('defaultOperations', () => {
     });
 
     describe('operation amounts', () => {
-      it('has income amount of 1000.00', () => {
+      it('has income amount of 1000.00', async () => {
         const operations = getDefaultOperations(1);
         const income = operations.find(op => op.type === 'income');
 
         expect(income.amount).toBe('1000.00');
       });
 
-      it('has transfer amount of 100.00', () => {
+      it('has transfer amount of 100.00', async () => {
         const operations = getDefaultOperations(1, 2);
         const transfer = operations.find(op => op.type === 'transfer');
 
         expect(transfer.amount).toBe('100.00');
       });
 
-      it('has expense amounts that sum correctly', () => {
+      it('has expense amounts that sum correctly', async () => {
         const operations = getDefaultOperations(1);
         const expenses = operations.filter(op => op.type === 'expense');
 
@@ -141,28 +141,28 @@ describe('defaultOperations', () => {
     });
 
     describe('category IDs', () => {
-      it('uses income-salary for income operation', () => {
+      it('uses income-salary for income operation', async () => {
         const operations = getDefaultOperations(1);
         const income = operations.find(op => op.type === 'income');
 
         expect(income.categoryId).toBe('income-salary');
       });
 
-      it('uses expense-food-groceries for groceries', () => {
+      it('uses expense-food-groceries for groceries', async () => {
         const operations = getDefaultOperations(1);
         const groceries = operations.find(op => op.description === 'Weekly groceries');
 
         expect(groceries.categoryId).toBe('expense-food-groceries');
       });
 
-      it('uses expense-food-coffee-cafe for coffee', () => {
+      it('uses expense-food-coffee-cafe for coffee', async () => {
         const operations = getDefaultOperations(1);
         const coffee = operations.find(op => op.description === 'Morning coffee');
 
         expect(coffee.categoryId).toBe('expense-food-coffee-cafe');
       });
 
-      it('uses expense-transportation-public-transport for metro', () => {
+      it('uses expense-transportation-public-transport for metro', async () => {
         const operations = getDefaultOperations(1);
         const metro = operations.find(op => op.description === 'Metro pass');
 

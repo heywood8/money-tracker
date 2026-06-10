@@ -77,8 +77,8 @@ describe('BalanceHistoryCard', () => {
   });
 
   describe('Initialization', () => {
-    it('renders without crashing', () => {
-      const { root } = render(
+    it('renders without crashing', async () => {
+      const { root } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -110,8 +110,8 @@ describe('BalanceHistoryCard', () => {
       expect(root).toBeTruthy();
     });
 
-    it('displays balance title', () => {
-      const { getByText } = render(
+    it('displays balance title', async () => {
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -143,8 +143,8 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('BALANCE')).toBeTruthy();
     });
 
-    it('renders account picker with correct props', () => {
-      const { UNSAFE_getByType } = render(
+    it('renders account picker with correct props', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -173,15 +173,15 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const simplePicker = UNSAFE_getByType('SimplePicker');
+      const simplePicker = container.queryAll(n => n.type === 'SimplePicker')[0];
       expect(simplePicker.props.value).toBe('acc1');
       expect(simplePicker.props.items).toEqual(mockAccountItems);
     });
   });
 
   describe('Loading State', () => {
-    it('shows loading indicator when loading', () => {
-      const { UNSAFE_getByType } = render(
+    it('shows loading indicator when loading', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -210,13 +210,13 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const activityIndicator = UNSAFE_getByType('ActivityIndicator');
+      const activityIndicator = container.queryAll(n => n.type === 'ActivityIndicator')[0];
       expect(activityIndicator).toBeTruthy();
       expect(activityIndicator.props.color).toBe(mockColors.primary);
     });
 
-    it('does not show chart when loading', () => {
-      const { UNSAFE_queryByType } = render(
+    it('does not show chart when loading', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -245,13 +245,13 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(UNSAFE_queryByType('LineChart')).toBeNull();
+      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeFalsy();
     });
   });
 
   describe('No Data State', () => {
-    it('shows no data message when no balance history', () => {
-      const { getByText } = render(
+    it('shows no data message when no balance history', async () => {
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -283,8 +283,8 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('No balance history available for this month')).toBeTruthy();
     });
 
-    it('shows no data when actual array is empty', () => {
-      const { getByText } = render(
+    it('shows no data when actual array is empty', async () => {
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -316,8 +316,8 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('No balance history available for this month')).toBeTruthy();
     });
 
-    it('does not show chart when no data', () => {
-      const { UNSAFE_queryByType } = render(
+    it('does not show chart when no data', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -346,7 +346,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(UNSAFE_queryByType('LineChart')).toBeNull();
+      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeFalsy();
     });
   });
 
@@ -370,8 +370,8 @@ describe('BalanceHistoryCard', () => {
       prevMonth: [950, undefined, undefined, undefined, 920, undefined, undefined],
     };
 
-    it('renders chart when data is available', () => {
-      const { UNSAFE_getByType } = render(
+    it('renders chart when data is available', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -394,11 +394,11 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(UNSAFE_getByType('LineChart')).toBeTruthy();
+      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeTruthy();
     });
 
-    it('configures chart with correct data including plain avg line', () => {
-      const { UNSAFE_getByType } = render(
+    it('configures chart with correct data including plain avg line', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -423,14 +423,14 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       expect(lineChart.props.data.labels).toEqual(['1', '5', '10', '15', '20', '25', '28']);
       // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast when not current month)
       expect(lineChart.props.data.datasets).toHaveLength(4);
     });
 
-    it('includes actual dataset with correct styling', () => {
-      const { UNSAFE_getByType } = render(
+    it('includes actual dataset with correct styling', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -453,14 +453,14 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       expect(actualDataset.data).toEqual(mockBalanceHistoryData.actualForChart);
       expect(actualDataset.strokeWidth).toBe(3);
     });
 
-    it('includes plain avg dataset as second dataset', () => {
-      const { UNSAFE_getByType } = render(
+    it('includes plain avg dataset as second dataset', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -485,7 +485,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const plainAvgDataset = lineChart.props.data.datasets[1];
       expect(plainAvgDataset.withDots).toBe(false);
       expect(plainAvgDataset.strokeWidth).toBe(2);
@@ -493,7 +493,7 @@ describe('BalanceHistoryCard', () => {
       expect(plainAvgDataset.color()).toBe('rgba(128, 128, 128, 0.4)');
     });
 
-    it('combines actual and forecast data when isCurrentMonth with spendingPrediction', () => {
+    it('combines actual and forecast data when isCurrentMonth with spendingPrediction', async () => {
       const mockSpendingPrediction = {
         dailyAverage: 100,
         daysInMonth: 31,
@@ -508,7 +508,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 16);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -533,15 +533,15 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       // Should have 4 datasets: combined actual+forecast + plain avg + prevMonth + zero baseline
       expect(lineChart.props.data.datasets).toHaveLength(4);
 
       global.Date.mockRestore();
     });
 
-    it('includes prevMonth dataset when available', () => {
-      const { UNSAFE_getByType } = render(
+    it('includes prevMonth dataset when available', async () => {
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -566,20 +566,20 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       // Should have 4 datasets: actual + plain avg + prevMonth + zero baseline (no forecast)
       expect(lineChart.props.data.datasets).toHaveLength(4);
       const prevMonthDataset = lineChart.props.data.datasets[2];
       expect(prevMonthDataset.withDots).toBe(false);
     });
 
-    it('excludes prevMonth dataset when not available', () => {
+    it('excludes prevMonth dataset when not available', async () => {
       const dataWithoutPrevMonth = {
         ...mockBalanceHistoryData,
         prevMonth: [],
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -602,18 +602,18 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth)
       expect(lineChart.props.data.datasets).toHaveLength(3);
     });
 
-    it('excludes prevMonth dataset when all values are undefined', () => {
+    it('excludes prevMonth dataset when all values are undefined', async () => {
       const dataWithUndefinedPrevMonth = {
         ...mockBalanceHistoryData,
         prevMonth: [undefined, undefined, undefined],
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -636,7 +636,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       // Should have 3 datasets: actual + plain avg + zero baseline (no prevMonth since all undefined)
       expect(lineChart.props.data.datasets).toHaveLength(3);
     });
@@ -657,8 +657,8 @@ describe('BalanceHistoryCard', () => {
       prevMonth: [950, undefined, undefined, undefined, undefined, undefined, 920],
     };
 
-    it('displays legend table headers', () => {
-      const { getByText } = render(
+    it('displays legend table headers', async () => {
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -689,8 +689,8 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('End')).toBeTruthy();
     });
 
-    it('displays legend row labels', () => {
-      const { getByText, queryByText } = render(
+    it('displays legend row labels', async () => {
+      const { getByText, queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -722,7 +722,7 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('Prev Month')).toBeTruthy();
     });
 
-    it('displays legend with combined actual+forecast when isCurrentMonth with spendingPrediction', () => {
+    it('displays legend with combined actual+forecast when isCurrentMonth with spendingPrediction', async () => {
       const mockSpendingPrediction = {
         dailyAverage: 100,
         daysInMonth: 31,
@@ -737,7 +737,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 16);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -770,13 +770,13 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('hides prev month legend row when no prev month data', () => {
+    it('hides prev month legend row when no prev month data', async () => {
       const dataWithoutPrevMonth = {
         ...mockBalanceHistoryData,
         prevMonth: [],
       };
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -806,9 +806,9 @@ describe('BalanceHistoryCard', () => {
   });
 
   describe('Account Selection', () => {
-    it('calls onAccountChange when account is changed', () => {
+    it('calls onAccountChange when account is changed', async () => {
       const mockOnAccountChange = jest.fn();
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -837,7 +837,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const simplePicker = UNSAFE_getByType('SimplePicker');
+      const simplePicker = container.queryAll(n => n.type === 'SimplePicker')[0];
       simplePicker.props.onValueChange('acc2');
 
       expect(mockOnAccountChange).toHaveBeenCalledWith('acc2');
@@ -845,8 +845,8 @@ describe('BalanceHistoryCard', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles undefined selected account gracefully', () => {
-      const { root } = render(
+    it('handles undefined selected account gracefully', async () => {
+      const { root } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -878,8 +878,8 @@ describe('BalanceHistoryCard', () => {
       expect(root).toBeTruthy();
     });
 
-    it('handles empty account items array', () => {
-      const { root } = render(
+    it('handles empty account items array', async () => {
+      const { root } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -911,7 +911,7 @@ describe('BalanceHistoryCard', () => {
       expect(root).toBeTruthy();
     });
 
-    it('handles missing account currency gracefully', () => {
+    it('handles missing account currency gracefully', async () => {
       const accountsWithoutCurrency = [
         { id: 'acc1', name: 'Checking', balance: '1000.00' },
       ];
@@ -919,7 +919,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 31);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -954,11 +954,11 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('handles current month display correctly', () => {
+    it('handles current month display correctly', async () => {
       const mockDate = new Date(2024, 5, 15); // June 15, 2024
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -996,7 +996,7 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('handles large values in chart correctly', () => {
+    it('handles large values in chart correctly', async () => {
       const largeValueData = {
         labels: [1, 2],
         actual: [{ x: 1, y: 1500000 }],
@@ -1005,7 +1005,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1028,7 +1028,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       expect(lineChart).toBeTruthy();
       // Verify formatYLabel function formats large numbers correctly
       const formattedValue = lineChart.props.formatYLabel('1500000');
@@ -1043,7 +1043,7 @@ describe('BalanceHistoryCard', () => {
       }
     });
 
-    it('uses actual day span when data starts mid-month (regression: was dividing by daysInMonth-1)', () => {
+    it('uses actual day span when data starts mid-month (regression: was dividing by daysInMonth-1)', async () => {
       // Bug: when data starts on day 5 (not day 1), the old code divided by (daysInMonth - 1)
       // instead of the real interval between the first and last recorded data points.
       // Data: day 5 = 1000, day 28 = 500 in a 31-day month
@@ -1061,7 +1061,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { getByText, queryByText } = render(
+      const { getByText, queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1092,7 +1092,7 @@ describe('BalanceHistoryCard', () => {
       expect(queryByText('-16.67')).toBeNull();
     });
 
-    it('gives the same result when data spans from day 1 to the last day', () => {
+    it('gives the same result when data spans from day 1 to the last day', async () => {
       // When data starts on day 1 and ends on the last day, the span equals daysInMonth-1
       // so old and new code agree – this is a sanity-check to avoid regressions.
       // Data: day 1 = 1000, day 30 = 700 in a 30-day month
@@ -1109,7 +1109,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1138,7 +1138,7 @@ describe('BalanceHistoryCard', () => {
       expect(getByText('-10.34')).toBeTruthy();
     });
 
-    it('shows 0 for daily avg when only one actual data point exists', () => {
+    it('shows 0 for daily avg when only one actual data point exists', async () => {
       // With a single recorded balance, there is no change to average – daily avg should be 0.
 
       const mockDate = new Date(2026, 1, 19);
@@ -1152,7 +1152,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1184,7 +1184,7 @@ describe('BalanceHistoryCard', () => {
   });
 
   describe('Regression Tests', () => {
-    it('filters undefined values from actualForChart', () => {
+    it('filters undefined values from actualForChart', async () => {
       const dataWithUndefined = {
         labels: [1, 2, 3],
         actual: [{ x: 1, y: 1000 }, { x: 3, y: 1200 }],
@@ -1193,7 +1193,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1216,12 +1216,12 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       expect(actualDataset.data).toEqual([1000, 1200]); // undefined should be filtered
     });
 
-    it('handles zero max value in scale calculation', () => {
+    it('handles zero max value in scale calculation', async () => {
       const zeroValueData = {
         labels: [1],
         actual: [{ x: 1, y: 0 }],
@@ -1230,7 +1230,7 @@ describe('BalanceHistoryCard', () => {
         prevMonth: [],
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1253,12 +1253,12 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       expect(lineChart).toBeTruthy();
       // Should handle zero values without crashing
     });
 
-    it('handles missing currency info gracefully', () => {
+    it('handles missing currency info gracefully', async () => {
       const accountsWithUnknownCurrency = [
         { id: 'acc1', name: 'Checking', currency: 'XYZ', balance: '1000.00' },
       ];
@@ -1266,7 +1266,7 @@ describe('BalanceHistoryCard', () => {
       const mockDate = new Date(2024, 0, 31);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1309,7 +1309,7 @@ describe('BalanceHistoryCard', () => {
       }
     });
 
-    it('shows prev month end value when prev month is shorter than current month (regression)', () => {
+    it('shows prev month end value when prev month is shorter than current month (regression)', async () => {
       // Bug: prevMonth[daysInMonth - 1] used current month's last label as an array index.
       // When current month has 31 days but prev month has 28, index 30 is out of bounds → null → '-'.
       // Fix: find the last non-undefined entry in the prevMonth array.
@@ -1324,7 +1324,7 @@ describe('BalanceHistoryCard', () => {
       for (let i = 1; i < 28; i++) prevMonthData[i] = 5000 - i * 50; // forward-filled-ish
       // indices 28-30 remain undefined (Feb 29-31 don't exist)
 
-      const { getByText, queryByText } = render(
+      const { getByText, queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1369,14 +1369,14 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('calculates prev month daily avg instead of showing hardcoded dash', () => {
+    it('calculates prev month daily avg instead of showing hardcoded dash', async () => {
       const mockDate = new Date(2026, 2, 15); // March 15, 2026
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
       // Simple prev month: day 1 = 1000, day 6 = 750 (5 index steps → avg = -50/step)
       const prevMonthData = [1000, undefined, undefined, undefined, undefined, 750, undefined];
 
-      const { queryAllByText } = render(
+      const { queryAllByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1417,14 +1417,14 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('shows 0 for actual daily avg when only one value in actualForChart (single-entry month)', () => {
+    it('shows 0 for actual daily avg when only one value in actualForChart (single-entry month)', async () => {
       // Bug: actualValues.length <= 1 kept actualDailyAvg as null (showed '-').
       // Fix: change > 1 to >= 1 so the else branch sets it to 0.
 
       const mockDate = new Date(2026, 2, 5); // March 5, 2026
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1486,11 +1486,11 @@ describe('BalanceHistoryCard', () => {
       }
     });
 
-    it('shows all actual data for a past month regardless of current date (day 2)', () => {
+    it('shows all actual data for a past month regardless of current date (day 2)', async () => {
       const mockDate = new Date(2026, 1, 2); // Feb 2
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1515,16 +1515,16 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
-    it('shows all actual data for a past month regardless of current date (day 15)', () => {
+    it('shows all actual data for a past month regardless of current date (day 15)', async () => {
       const mockDate = new Date(2026, 1, 15); // Feb 15
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1549,16 +1549,16 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
-    it('shows all actual data for a past month regardless of current date (day 28)', () => {
+    it('shows all actual data for a past month regardless of current date (day 28)', async () => {
       const mockDate = new Date(2026, 1, 28); // Feb 28
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1583,16 +1583,16 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
-    it('shows only data up to current day for the current month (day 10)', () => {
+    it('shows only data up to current day for the current month (day 10)', async () => {
       const mockDate = new Date(2024, 0, 10); // Jan 10
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1617,17 +1617,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       // Labels are [1, 5, 10, 15, 20, 25, 31] — days 1, 5, 10 are <= 10
       expect(actualDataset.data).toEqual([500, 600, 700]);
     });
 
-    it('shows only first data point for current month when date is early (day 3)', () => {
+    it('shows only first data point for current month when date is early (day 3)', async () => {
       const mockDate = new Date(2024, 0, 3); // Jan 3
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1652,17 +1652,17 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       // Labels are [1, 5, 10, ...] — only day 1 is <= 3
       expect(actualDataset.data).toEqual([500]);
     });
 
-    it('shows all data points for current month at end of month (day 31)', () => {
+    it('shows all data points for current month at end of month (day 31)', async () => {
       const mockDate = new Date(2024, 0, 31); // Jan 31
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1687,13 +1687,13 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       // All labels [1, 5, 10, 15, 20, 25, 31] are <= 31
       expect(actualDataset.data).toEqual([500, 600, 700, 800, 750, 900, 1000]);
     });
 
-    it('includes forecast data after current day for current month', () => {
+    it('includes forecast data after current day for current month', async () => {
       const mockDate = new Date(2024, 0, 16); // Jan 16
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
@@ -1707,7 +1707,7 @@ describe('BalanceHistoryCard', () => {
         percentElapsed: 52,
       };
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1732,7 +1732,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       const actualDataset = lineChart.props.data.datasets[0];
       // Days 1, 5, 10, 15 are <= 16 (actual data), days 20, 25, 31 get forecast values
       // Actual: [500, 600, 700, 800] + forecast for days 20, 25, 31
@@ -1764,11 +1764,11 @@ describe('BalanceHistoryCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('does not render the legend table', () => {
+    it('does not render the legend table', async () => {
       const mockDate = new Date(2026, 1, 19);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1803,11 +1803,11 @@ describe('BalanceHistoryCard', () => {
       global.Date.mockRestore();
     });
 
-    it('still renders the chart (line curves remain visible)', () => {
+    it('still renders the chart (line curves remain visible)', async () => {
       const mockDate = new Date(2026, 1, 19);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1832,16 +1832,16 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      expect(UNSAFE_getByType('LineChart')).toBeTruthy();
+      expect(container.queryAll(n => n.type === 'LineChart')[0]).toBeTruthy();
 
       global.Date.mockRestore();
     });
 
-    it('formatYLabel returns empty string for all values', () => {
+    it('formatYLabel returns empty string for all values', async () => {
       const mockDate = new Date(2026, 1, 19);
       jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1866,7 +1866,7 @@ describe('BalanceHistoryCard', () => {
         />,
       );
 
-      const lineChart = UNSAFE_getByType('LineChart');
+      const lineChart = container.queryAll(n => n.type === 'LineChart')[0];
       expect(lineChart.props.formatYLabel('1000')).toBe('');
       expect(lineChart.props.formatYLabel('1000000')).toBe('');
       expect(lineChart.props.formatYLabel('0')).toBe('');
@@ -1884,8 +1884,8 @@ describe('BalanceHistoryCard', () => {
       prevMonth: [],
     };
 
-    it('renders the calendar toggle button', () => {
-      const { getByTestId } = render(
+    it('renders the calendar toggle button', async () => {
+      const { getByTestId } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1910,8 +1910,8 @@ describe('BalanceHistoryCard', () => {
       expect(getByTestId('calendar-toggle-btn')).toBeTruthy();
     });
 
-    it('does not render the calendar toggle button when there is no balance data', () => {
-      const { queryByTestId } = render(
+    it('does not render the calendar toggle button when there is no balance data', async () => {
+      const { queryByTestId } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1942,9 +1942,9 @@ describe('BalanceHistoryCard', () => {
       expect(queryByTestId('calendar-toggle-btn')).toBeNull();
     });
 
-    it('calls onShowCalendar once when switching to calendar view, not when switching back', () => {
+    it('calls onShowCalendar once when switching to calendar view, not when switching back', async () => {
       const onShowCalendar = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <BalanceHistoryCard
           colors={mockColors}
           t={mockT}
@@ -1966,10 +1966,10 @@ describe('BalanceHistoryCard', () => {
           onShowCalendar={onShowCalendar}
         />,
       );
-      fireEvent.press(getByTestId('calendar-toggle-btn'));
+      await fireEvent.press(getByTestId('calendar-toggle-btn'));
       expect(onShowCalendar).toHaveBeenCalledTimes(1);
       // Pressing again (back to chart) should NOT call onShowCalendar again
-      fireEvent.press(getByTestId('calendar-toggle-btn'));
+      await fireEvent.press(getByTestId('calendar-toggle-btn'));
       expect(onShowCalendar).toHaveBeenCalledTimes(1);
     });
   });

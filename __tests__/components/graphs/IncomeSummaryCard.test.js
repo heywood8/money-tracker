@@ -45,15 +45,15 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders income categories label with abbreviated amount', () => {
-      const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
+    it('renders income categories label with abbreviated amount', async () => {
+      const { getByText } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByText(/\$3\.5K/)).toBeTruthy();
     });
 
-    it('uses translation function for accessibility', () => {
+    it('uses translation function for accessibility', async () => {
       const customT = jest.fn((key) => `translated_${key}`);
-      render(
+      await render(
         <IncomeSummaryCard {...defaultProps} t={customT} />,
       );
 
@@ -62,48 +62,48 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats small amounts with full decimals', () => {
-      const { getByText } = render(
+    it('formats small amounts with full decimals', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={500.5} selectedCurrency="USD" />,
       );
 
       expect(getByText(/\$500\.50/)).toBeTruthy();
     });
 
-    it('abbreviates thousands with K', () => {
-      const { getByText } = render(
+    it('abbreviates thousands with K', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={2500.5} selectedCurrency="USD" />,
       );
 
       expect(getByText(/\$2\.5K/)).toBeTruthy();
     });
 
-    it('abbreviates millions with M', () => {
-      const { getByText } = render(
+    it('abbreviates millions with M', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={1200000} selectedCurrency="EUR" />,
       );
 
       expect(getByText(/€1\.2M/)).toBeTruthy();
     });
 
-    it('formats JPY thousands with K', () => {
-      const { getByText } = render(
+    it('formats JPY thousands with K', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={150000.99} selectedCurrency="JPY" />,
       );
 
       expect(getByText(/¥150\.0K/)).toBeTruthy();
     });
 
-    it('formats BTC with full decimals when small', () => {
-      const { getByText } = render(
+    it('formats BTC with full decimals when small', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={0.12345678} selectedCurrency="BTC" />,
       );
 
       expect(getByText(/₿0\.12345678/)).toBeTruthy();
     });
 
-    it('defaults to currency code for unknown currency', () => {
-      const { getByText } = render(
+    it('defaults to currency code for unknown currency', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} totalIncome={999.999} selectedCurrency="XYZ" />,
       );
 
@@ -112,16 +112,16 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Loading State', () => {
-    it('shows loading indicator when loading', () => {
-      const { getByText } = render(
+    it('shows loading indicator when loading', async () => {
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
       expect(getByText(/\.\.\./)).toBeTruthy();
     });
 
-    it('does not show amount when loading', () => {
-      const { queryByText } = render(
+    it('does not show amount when loading', async () => {
+      const { queryByText } = await render(
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
@@ -130,28 +130,28 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Press Interaction', () => {
-    it('calls onPress when card is pressed', () => {
+    it('calls onPress when card is pressed', async () => {
       const onPress = jest.fn();
-      const { getByRole } = render(
+      const { getByRole } = await render(
         <IncomeSummaryCard {...defaultProps} onPress={onPress} />,
       );
 
       const button = getByRole('button');
-      fireEvent.press(button);
+      await fireEvent.press(button);
 
       expect(onPress).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Accessibility', () => {
-    it('has button accessibility role', () => {
-      const { getByRole } = render(<IncomeSummaryCard {...defaultProps} />);
+    it('has button accessibility role', async () => {
+      const { getByRole } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByRole('button')).toBeTruthy();
     });
 
-    it('has accessibility label', () => {
-      const { getByLabelText } = render(<IncomeSummaryCard {...defaultProps} />);
+    it('has accessibility label', async () => {
+      const { getByLabelText } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByLabelText('income_by_category')).toBeTruthy();
     });
@@ -168,20 +168,20 @@ describe('IncomeSummaryCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('renders \'••••\' instead of the formatted currency amount', () => {
-      const { getByText } = render(<IncomeSummaryCard {...defaultProps} />);
+    it('renders \'••••\' instead of the formatted currency amount', async () => {
+      const { getByText } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(getByText('••••')).toBeTruthy();
     });
 
-    it('does not render the formatted currency amount', () => {
-      const { queryByText } = render(<IncomeSummaryCard {...defaultProps} />);
+    it('does not render the formatted currency amount', async () => {
+      const { queryByText } = await render(<IncomeSummaryCard {...defaultProps} />);
 
       expect(queryByText(/\$3\.5K/)).toBeNull();
     });
 
-    it('does not show loading indicator even when loadingIncome is true', () => {
-      const { getByText, queryByText } = render(
+    it('does not show loading indicator even when loadingIncome is true', async () => {
+      const { getByText, queryByText } = await render(
         <IncomeSummaryCard {...defaultProps} loadingIncome={true} />,
       );
 
@@ -191,12 +191,12 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('Theming', () => {
-    it('applies text color', () => {
+    it('applies text color', async () => {
       const customColors = {
         ...defaultProps.colors,
         text: '#00FF00',
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} colors={customColors} />,
       );
 
@@ -208,16 +208,16 @@ describe('IncomeSummaryCard', () => {
   });
 
   describe('categoryName / onBack overlay', () => {
-    it('shows category chip when both categoryName and onBack are provided', () => {
+    it('shows category chip when both categoryName and onBack are provided', async () => {
       const onBack = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={onBack} />,
       );
       expect(getByText('Salary')).toBeTruthy();
     });
 
-    it('does not show category chip when categoryName provided but onBack is null', () => {
-      const { queryByText } = render(
+    it('does not show category chip when categoryName provided but onBack is null', async () => {
+      const { queryByText } = await render(
         <IncomeSummaryCard {...defaultProps} categoryName="Salary" onBack={null} />,
       );
       expect(queryByText('Salary')).toBeNull();

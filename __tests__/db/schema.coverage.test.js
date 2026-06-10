@@ -89,7 +89,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Accounts Table Definition', () => {
-    it('defines accounts table with all columns and indexes', () => {
+    it('defines accounts table with all columns and indexes', async () => {
       const { accounts } = schema;
 
       // Access all columns to trigger their definition
@@ -109,7 +109,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Categories Table Definition', () => {
-    it('defines categories table with all columns, references, and indexes', () => {
+    it('defines categories table with all columns, references, and indexes', async () => {
       const { categories } = schema;
 
       // Access all columns
@@ -134,7 +134,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Operations Table Definition', () => {
-    it('defines operations table with all columns, references, and indexes', () => {
+    it('defines operations table with all columns, references, and indexes', async () => {
       const { operations } = schema;
 
       // Access all columns
@@ -168,7 +168,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Budgets Table Definition', () => {
-    it('defines budgets table with all columns, references, and indexes', () => {
+    it('defines budgets table with all columns, references, and indexes', async () => {
       const { budgets } = schema;
 
       // Access all columns
@@ -201,7 +201,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('AccountsBalanceHistory Table Definition', () => {
-    it('defines accountsBalanceHistory table with all columns, references, and indexes', () => {
+    it('defines accountsBalanceHistory table with all columns, references, and indexes', async () => {
       const { accountsBalanceHistory } = schema;
 
       // Access all columns
@@ -226,7 +226,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('AppMetadata Table Definition', () => {
-    it('defines appMetadata table with all columns', () => {
+    it('defines appMetadata table with all columns', async () => {
       const { appMetadata } = schema;
 
       expect(appMetadata.key).toBeDefined();
@@ -240,7 +240,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('All Table Exports', () => {
-    it('exports all tables', () => {
+    it('exports all tables', async () => {
       expect(schema.accounts).toBeDefined();
       expect(schema.categories).toBeDefined();
       expect(schema.operations).toBeDefined();
@@ -249,7 +249,7 @@ describe('Database Schema Coverage', () => {
       expect(schema.appMetadata).toBeDefined();
     });
 
-    it('all tables are objects with drizzle symbols', () => {
+    it('all tables are objects with drizzle symbols', async () => {
       const tables = [
         schema.accounts,
         schema.categories,
@@ -267,7 +267,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Reference Column Definitions', () => {
-    it('accesses all reference columns to trigger .references() code', () => {
+    it('accesses all reference columns to trigger .references() code', async () => {
       const { categories, operations, budgets, accountsBalanceHistory } = schema;
 
       // Categories self-reference
@@ -293,7 +293,7 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Column Method Chains', () => {
-    it('accesses columns with chained methods to trigger all code paths', () => {
+    it('accesses columns with chained methods to trigger all code paths', async () => {
       const { accounts, categories, operations, budgets } = schema;
 
       // Columns with .default()
@@ -311,14 +311,14 @@ describe('Database Schema Coverage', () => {
   });
 
   describe('Index Callback Execution', () => {
-    it('executes accounts table index callback', () => {
+    it('executes accounts table index callback', async () => {
       // Access the table to ensure it was defined
       expect(schema.accounts).toBeDefined();
       // Verify index function was called for accounts indexes
       expect(mockIndex).toHaveBeenCalled();
     });
 
-    it('executes categories table index callback', () => {
+    it('executes categories table index callback', async () => {
       expect(schema.categories).toBeDefined();
       // Categories has parentIdx, typeIdx, categoryTypeIdx, shadowIdx
       const indexCalls = mockIndex.mock.calls.map(call => call[0]);
@@ -328,7 +328,7 @@ describe('Database Schema Coverage', () => {
       expect(indexCalls).toContain('idx_categories_is_shadow');
     });
 
-    it('executes operations table index callback', () => {
+    it('executes operations table index callback', async () => {
       expect(schema.operations).toBeDefined();
       // Operations has dateIdx, accountIdx, categoryIdx, typeIdx
       const indexCalls = mockIndex.mock.calls.map(call => call[0]);
@@ -338,7 +338,7 @@ describe('Database Schema Coverage', () => {
       expect(indexCalls).toContain('idx_operations_type');
     });
 
-    it('executes budgets table index callback', () => {
+    it('executes budgets table index callback', async () => {
       expect(schema.budgets).toBeDefined();
       // Budgets has categoryIdx, periodIdx, datesIdx, currencyIdx, recurringIdx
       const indexCalls = mockIndex.mock.calls.map(call => call[0]);
@@ -349,7 +349,7 @@ describe('Database Schema Coverage', () => {
       expect(indexCalls).toContain('idx_budgets_recurring');
     });
 
-    it('executes accountsBalanceHistory table index callback with unique constraint', () => {
+    it('executes accountsBalanceHistory table index callback with unique constraint', async () => {
       expect(schema.accountsBalanceHistory).toBeDefined();
       // Has accountDateIdx, dateIdx, and uniqueAccountDate
       const indexCalls = mockIndex.mock.calls.map(call => call[0]);

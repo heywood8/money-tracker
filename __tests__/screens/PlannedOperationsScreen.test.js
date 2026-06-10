@@ -69,8 +69,8 @@ jest.mock('../../app/components/LoadingView', () => () => null);
 jest.mock('../../app/components/EmptyState', () => () => null);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function renderScreen() {
-  return render(<PlannedOperationsScreen />);
+async function renderScreen() {
+  return await render(<PlannedOperationsScreen />);
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -81,73 +81,73 @@ describe('PlannedOperationsScreen', () => {
   });
 
   describe('Section structure', () => {
-    it('does not render a Recurring tab button', () => {
-      const { queryByText } = renderScreen();
+    it('does not render a Recurring tab button', async () => {
+      const { queryByText } = await renderScreen();
       expect(queryByText('recurring')).toBeNull();
     });
 
-    it('renders Recurring section header', () => {
-      const { getByTestId } = renderScreen();
+    it('renders Recurring section header', async () => {
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('section-header-recurring')).toBeTruthy();
     });
 
-    it('renders One-time section header', () => {
-      const { getByTestId } = renderScreen();
+    it('renders One-time section header', async () => {
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('section-header-one_time')).toBeTruthy();
     });
 
-    it('renders recurring items under Recurring section', () => {
-      const { getByText } = renderScreen();
+    it('renders recurring items under Recurring section', async () => {
+      const { getByText } = await renderScreen();
       expect(getByText('Rent')).toBeTruthy();
       expect(getByText('Salary')).toBeTruthy();
     });
 
-    it('renders one-time items under One-time section', () => {
-      const { getByText } = renderScreen();
+    it('renders one-time items under One-time section', async () => {
+      const { getByText } = await renderScreen();
       expect(getByText('Italy savings')).toBeTruthy();
     });
   });
 
   describe('Summary strip', () => {
-    it('shows pending out amount for un-executed expenses', () => {
-      const { getByTestId } = renderScreen();
+    it('shows pending out amount for un-executed expenses', async () => {
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('summary-pending-out')).toBeTruthy();
     });
 
-    it('shows done count as X / Y', () => {
+    it('shows done count as X / Y', async () => {
       mockIsExecuted.mockImplementation((op) => op.id === 'r2');
-      const { getByTestId } = renderScreen();
+      const { getByTestId } = await renderScreen();
       const counter = getByTestId('summary-done-count');
       expect(counter.props.children).toMatch(/1/);
     });
 
-    it('shows pending in amount for un-executed income', () => {
-      const { getByTestId } = renderScreen();
+    it('shows pending in amount for un-executed income', async () => {
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('summary-pending-in')).toBeTruthy();
     });
 
-    it('renders progress bar', () => {
-      const { getByTestId } = renderScreen();
+    it('renders progress bar', async () => {
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('summary-progress-bar')).toBeTruthy();
     });
   });
 
   describe('Executed item state', () => {
-    it('renders checkmark badge on executed item icon', () => {
+    it('renders checkmark badge on executed item icon', async () => {
       mockIsExecuted.mockImplementation((op) => op.id === 'r2');
-      const { getByTestId } = renderScreen();
+      const { getByTestId } = await renderScreen();
       expect(getByTestId('check-badge-r2')).toBeTruthy();
     });
 
-    it('does not render checkmark badge on un-executed item', () => {
+    it('does not render checkmark badge on un-executed item', async () => {
       mockIsExecuted.mockReturnValue(false);
-      const { queryByTestId } = renderScreen();
+      const { queryByTestId } = await renderScreen();
       expect(queryByTestId('check-badge-r1')).toBeNull();
     });
 
-    it('wraps executed item in low-opacity view', () => {
+    it('wraps executed item in low-opacity view', async () => {
       mockIsExecuted.mockImplementation((op) => op.id === 'r1');
-      const { getByTestId } = renderScreen();
+      const { getByTestId } = await renderScreen();
       const wrapper = getByTestId('item-opacity-r1');
       expect(wrapper.props.style).toEqual(
         expect.objectContaining({ opacity: 0.4 }),
@@ -158,8 +158,8 @@ describe('PlannedOperationsScreen', () => {
   describe('Execute action', () => {
     it('calls executePlannedOperation when execute swipe action is pressed', async () => {
       mockIsExecuted.mockReturnValue(false);
-      const { getByTestId } = renderScreen();
-      fireEvent.press(getByTestId('execute-action-r1'));
+      const { getByTestId } = await renderScreen();
+      await fireEvent.press(getByTestId('execute-action-r1'));
       await waitFor(() => {
         expect(mockExecute).toHaveBeenCalledWith(
           expect.objectContaining({ id: 'r1' }),
@@ -167,9 +167,9 @@ describe('PlannedOperationsScreen', () => {
       });
     });
 
-    it('does not render execute action for executed items', () => {
+    it('does not render execute action for executed items', async () => {
       mockIsExecuted.mockReturnValue(true);
-      const { queryByTestId } = renderScreen();
+      const { queryByTestId } = await renderScreen();
       expect(queryByTestId('execute-action-r1')).toBeNull();
     });
   });

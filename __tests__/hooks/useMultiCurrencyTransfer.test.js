@@ -21,7 +21,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', () => {
+    it('should initialize with default state', async () => {
       const quickAddValues = {
         type: 'expense',
         amount: '',
@@ -29,7 +29,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -39,7 +39,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('isMultiCurrencyTransfer', () => {
-    it('should return false for non-transfer operations', () => {
+    it('should return false for non-transfer operations', async () => {
       const quickAddValues = {
         type: 'expense',
         amount: '100',
@@ -47,14 +47,14 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
       expect(result.current.isMultiCurrencyTransfer).toBe(false);
     });
 
-    it('should return false for same-currency transfers', () => {
+    it('should return false for same-currency transfers', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -62,14 +62,14 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-3',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
       expect(result.current.isMultiCurrencyTransfer).toBe(false);
     });
 
-    it('should return true for multi-currency transfers', () => {
+    it('should return true for multi-currency transfers', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -77,7 +77,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -86,7 +86,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(result.current.destinationAccount.currency).toBe('EUR');
     });
 
-    it('should return false if source account not found', () => {
+    it('should return false if source account not found', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -94,7 +94,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -102,7 +102,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(result.current.sourceAccount).toBeUndefined();
     });
 
-    it('should return false if destination account not found', () => {
+    it('should return false if destination account not found', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -110,7 +110,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'non-existent',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -120,7 +120,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('calculateMultiCurrency', () => {
-    it('should clear exchange rate fields for same-currency transfers', () => {
+    it('should clear exchange rate fields for same-currency transfers', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -130,7 +130,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '120',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -140,7 +140,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.destinationAmount).toBe('');
     });
 
-    it('should not modify values if not multi-currency and no exchange rate fields set', () => {
+    it('should not modify values if not multi-currency and no exchange rate fields set', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -148,7 +148,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-3',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -157,7 +157,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated).toEqual(quickAddValues);
     });
 
-    it('should calculate exchange rate when destination amount is edited', () => {
+    it('should calculate exchange rate when destination amount is edited', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -167,7 +167,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -176,7 +176,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.exchangeRate).toBe('0.850000');
     });
 
-    it('should calculate destination amount when amount is edited', () => {
+    it('should calculate destination amount when amount is edited', async () => {
       Currency.convertAmount.mockReturnValue('85.50');
 
       const quickAddValues = {
@@ -188,7 +188,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -198,7 +198,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.destinationAmount).toBe('85.50');
     });
 
-    it('should calculate destination amount when exchange rate is edited', () => {
+    it('should calculate destination amount when exchange rate is edited', async () => {
       Currency.convertAmount.mockReturnValue('85.50');
 
       const quickAddValues = {
@@ -210,7 +210,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -220,7 +220,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.destinationAmount).toBe('85.50');
     });
 
-    it('should not recalculate if converted amount is same', () => {
+    it('should not recalculate if converted amount is same', async () => {
       Currency.convertAmount.mockReturnValue('85.50');
 
       const quickAddValues = {
@@ -232,7 +232,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85.50',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -242,7 +242,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.destinationAmount).toBe('85.50');
     });
 
-    it('should handle invalid source amount gracefully', () => {
+    it('should handle invalid source amount gracefully', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: 'invalid',
@@ -252,7 +252,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -262,7 +262,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.exchangeRate).toBe('');
     });
 
-    it('should handle zero source amount gracefully', () => {
+    it('should handle zero source amount gracefully', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '0',
@@ -272,7 +272,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -282,7 +282,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.exchangeRate).toBe('');
     });
 
-    it('should only update rate if difference is significant', () => {
+    it('should only update rate if difference is significant', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -292,7 +292,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85.0000001',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -314,7 +314,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -335,7 +335,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-3',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -357,7 +357,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -380,7 +380,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -394,7 +394,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('setLastEditedField', () => {
-    it('should update last edited field', () => {
+    it('should update last edited field', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -402,13 +402,13 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
       expect(result.current.lastEditedField).toBeNull();
 
-      act(() => {
+      await act(async () => {
         result.current.setLastEditedField('amount');
       });
 
@@ -417,7 +417,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle missing accounts array gracefully', () => {
+    it('should handle missing accounts array gracefully', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -425,7 +425,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: 'acc-2',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, []),
       );
 
@@ -434,7 +434,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(result.current.isMultiCurrencyTransfer).toBe(false);
     });
 
-    it('should handle empty quickAddValues gracefully', () => {
+    it('should handle empty quickAddValues gracefully', async () => {
       const quickAddValues = {
         type: '',
         amount: '',
@@ -442,7 +442,7 @@ describe('useMultiCurrencyTransfer', () => {
         toAccountId: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -451,7 +451,7 @@ describe('useMultiCurrencyTransfer', () => {
   });
 
   describe('Regression Tests', () => {
-    it('should handle precision in exchange rate calculation', () => {
+    it('should handle precision in exchange rate calculation', async () => {
       const quickAddValues = {
         type: 'transfer',
         amount: '100',
@@ -461,7 +461,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '85.123456',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 
@@ -471,7 +471,7 @@ describe('useMultiCurrencyTransfer', () => {
       expect(calculated.exchangeRate).toBe('0.851235');
     });
 
-    it('should handle large amounts correctly', () => {
+    it('should handle large amounts correctly', async () => {
       Currency.convertAmount.mockReturnValue('8550000.00');
 
       const quickAddValues = {
@@ -483,7 +483,7 @@ describe('useMultiCurrencyTransfer', () => {
         destinationAmount: '',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useMultiCurrencyTransfer(quickAddValues, mockAccounts),
       );
 

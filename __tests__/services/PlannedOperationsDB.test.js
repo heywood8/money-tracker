@@ -34,12 +34,12 @@ describe('PlannedOperationsDB Service', () => {
       categoryId: 'cat1',
     };
 
-    it('validates a valid expense planned operation', () => {
+    it('validates a valid expense planned operation', async () => {
       const error = PlannedOperationsDB.validatePlannedOperation(validOp);
       expect(error).toBeNull();
     });
 
-    it('validates a valid transfer planned operation', () => {
+    it('validates a valid transfer planned operation', async () => {
       const transferOp = {
         name: 'Savings Transfer',
         type: 'transfer',
@@ -50,72 +50,72 @@ describe('PlannedOperationsDB Service', () => {
       expect(PlannedOperationsDB.validatePlannedOperation(transferOp)).toBeNull();
     });
 
-    it('rejects missing name', () => {
+    it('rejects missing name', async () => {
       const op = { ...validOp, name: '' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('planned_name_required');
     });
 
-    it('rejects whitespace-only name', () => {
+    it('rejects whitespace-only name', async () => {
       const op = { ...validOp, name: '   ' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('planned_name_required');
     });
 
-    it('rejects missing type', () => {
+    it('rejects missing type', async () => {
       const op = { ...validOp, type: null };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('operation_type_required');
     });
 
-    it('rejects invalid type', () => {
+    it('rejects invalid type', async () => {
       const op = { ...validOp, type: 'refund' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('operation_type_required');
     });
 
-    it('rejects zero amount', () => {
+    it('rejects zero amount', async () => {
       const op = { ...validOp, amount: '0' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects negative amount', () => {
+    it('rejects negative amount', async () => {
       const op = { ...validOp, amount: '-50' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects Infinity as amount', () => {
+    it('rejects Infinity as amount', async () => {
       const op = { ...validOp, amount: 'Infinity' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects -Infinity as amount', () => {
+    it('rejects -Infinity as amount', async () => {
       const op = { ...validOp, amount: '-Infinity' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects NaN as amount', () => {
+    it('rejects NaN as amount', async () => {
       const op = { ...validOp, amount: 'NaN' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects amount above 1e12', () => {
+    it('rejects amount above 1e12', async () => {
       const op = { ...validOp, amount: '2000000000000' };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('valid_amount_required');
     });
 
-    it('rejects missing accountId', () => {
+    it('rejects missing accountId', async () => {
       const op = { ...validOp, accountId: null };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('account_required');
     });
 
-    it('rejects expense without categoryId', () => {
+    it('rejects expense without categoryId', async () => {
       const op = { ...validOp, categoryId: null };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('category_required');
     });
 
-    it('rejects transfer without toAccountId', () => {
+    it('rejects transfer without toAccountId', async () => {
       const op = { name: 'Transfer', type: 'transfer', amount: '100', accountId: 1 };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('destination_account_required');
     });
 
-    it('rejects transfer with same accounts', () => {
+    it('rejects transfer with same accounts', async () => {
       const op = { name: 'Transfer', type: 'transfer', amount: '100', accountId: 1, toAccountId: 1 };
       expect(PlannedOperationsDB.validatePlannedOperation(op)).toBe('accounts_must_be_different');
     });

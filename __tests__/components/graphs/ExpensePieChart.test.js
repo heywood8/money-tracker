@@ -36,42 +36,42 @@ const defaultProps = {
 beforeEach(() => jest.clearAllMocks());
 
 describe('ExpensePieChart', () => {
-  it('renders loading state when loading is true', () => {
-    const { getByText } = render(<ExpensePieChart {...defaultProps} loading={true} />);
+  it('renders loading state when loading is true', async () => {
+    const { getByText } = await render(<ExpensePieChart {...defaultProps} loading={true} />);
     expect(getByText('loading_operations')).toBeTruthy();
   });
 
-  it('does not render donut chart when loading', () => {
-    const { queryByTestId } = render(<ExpensePieChart {...defaultProps} loading={true} />);
+  it('does not render donut chart when loading', async () => {
+    const { queryByTestId } = await render(<ExpensePieChart {...defaultProps} loading={true} />);
     expect(queryByTestId('donut-chart')).toBeNull();
   });
 
-  it('renders empty state text when chartData is empty', () => {
-    const { getByText } = render(<ExpensePieChart {...defaultProps} chartData={[]} />);
+  it('renders empty state text when chartData is empty', async () => {
+    const { getByText } = await render(<ExpensePieChart {...defaultProps} chartData={[]} />);
     expect(getByText('no_expense_data')).toBeTruthy();
   });
 
-  it('renders DonutChart when data is present', () => {
-    const { getByTestId } = render(<ExpensePieChart {...defaultProps} />);
+  it('renders DonutChart when data is present', async () => {
+    const { getByTestId } = await render(<ExpensePieChart {...defaultProps} />);
     expect(getByTestId('donut-chart')).toBeTruthy();
   });
 
-  it('renders legend category names', () => {
-    const { getByText } = render(<ExpensePieChart {...defaultProps} />);
+  it('renders legend category names', async () => {
+    const { getByText } = await render(<ExpensePieChart {...defaultProps} />);
     expect(getByText('Food')).toBeTruthy();
     expect(getByText('Transport')).toBeTruthy();
   });
 
-  it('renders arc icons for above-threshold segments', () => {
+  it('renders arc icons for above-threshold segments', async () => {
     // Food 63.6%, Transport 31.8% — both above 10%
-    const { queryAllByTestId } = render(<ExpensePieChart {...defaultProps} />);
+    const { queryAllByTestId } = await render(<ExpensePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-food').length).toBeGreaterThan(0);
     expect(queryAllByTestId('icon-car').length).toBeGreaterThan(0);
   });
 
-  it('does not render arc icon for below-threshold segment', () => {
+  it('does not render arc icon for below-threshold segment', async () => {
     // Other 4.5% — below 10%
-    const { queryAllByTestId } = render(<ExpensePieChart {...defaultProps} />);
+    const { queryAllByTestId } = await render(<ExpensePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-dots-horizontal').length).toBe(0);
   });
 });

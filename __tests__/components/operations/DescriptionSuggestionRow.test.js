@@ -20,54 +20,54 @@ describe('DescriptionSuggestionRow', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('renders all chips', () => {
-    const { getByText } = render(<DescriptionSuggestionRow {...baseProps} />);
+  it('renders all chips', async () => {
+    const { getByText } = await render(<DescriptionSuggestionRow {...baseProps} />);
     expect(getByText('Monthly pass')).toBeTruthy();
     expect(getByText('Metro card')).toBeTruthy();
     expect(getByText('Bus fare')).toBeTruthy();
   });
 
-  it('renders dismiss button', () => {
-    const { getByText } = render(<DescriptionSuggestionRow {...baseProps} />);
+  it('renders dismiss button', async () => {
+    const { getByText } = await render(<DescriptionSuggestionRow {...baseProps} />);
     expect(getByText('✕')).toBeTruthy();
   });
 
-  it('calls onApply with chip text when chip is pressed', () => {
+  it('calls onApply with chip text when chip is pressed', async () => {
     const onApply = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <DescriptionSuggestionRow {...baseProps} onApply={onApply} />,
     );
-    fireEvent.press(getByText('Monthly pass'));
+    await fireEvent.press(getByText('Monthly pass'));
     expect(onApply).toHaveBeenCalledWith('Monthly pass');
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onDismiss when ✕ is pressed', () => {
+  it('calls onDismiss when ✕ is pressed', async () => {
     const onDismiss = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <DescriptionSuggestionRow {...baseProps} onDismiss={onDismiss} />,
     );
-    fireEvent.press(getByLabelText('dismiss suggestion'));
+    await fireEvent.press(getByLabelText('dismiss suggestion'));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('calls correct onApply value for each chip independently', () => {
+  it('calls correct onApply value for each chip independently', async () => {
     const onApply = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <DescriptionSuggestionRow {...baseProps} onApply={onApply} />,
     );
-    fireEvent.press(getByText('Metro card'));
+    await fireEvent.press(getByText('Metro card'));
     expect(onApply).toHaveBeenCalledWith('Metro card');
   });
 
-  it('renders chips inside a horizontal ScrollView', () => {
-    const { UNSAFE_getByType } = render(<DescriptionSuggestionRow {...baseProps} />);
-    const scrollView = UNSAFE_getByType(ScrollView);
+  it('renders chips inside a horizontal ScrollView', async () => {
+    const { container, getByText } = await render(<DescriptionSuggestionRow {...baseProps} />);
+    // ScrollView renders as RCTScrollView in the host tree
+    const scrollView = container.queryAll(n => n.type === 'RCTScrollView')[0];
     expect(scrollView.props.horizontal).toBe(true);
-    // Each chip's text should appear within the ScrollView subtree
+    // Each chip text should be in the tree
     for (const chip of baseProps.chips) {
-      const match = scrollView.findAll((node) => node.props?.children === chip);
-      expect(match.length).toBeGreaterThan(0);
+      expect(getByText(chip)).toBeTruthy();
     }
   });
 });

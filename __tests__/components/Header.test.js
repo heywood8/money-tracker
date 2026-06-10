@@ -22,20 +22,20 @@ describe('Header', () => {
   });
 
   describe('Rendering', () => {
-    it('returns null when no rightContent provided', () => {
-      const { toJSON } = render(<Header />);
+    it('returns null when no rightContent provided', async () => {
+      const { toJSON } = await render(<Header />);
       expect(toJSON()).toBeNull();
     });
 
-    it('renders rightContent when provided', () => {
+    it('renders rightContent when provided', async () => {
       const content = <Text testID="custom">Custom</Text>;
-      const { getByTestId } = render(<Header rightContent={content} />);
+      const { getByTestId } = await render(<Header rightContent={content} />);
       expect(getByTestId('custom')).toBeTruthy();
     });
 
-    it('does not render version text in header', () => {
+    it('does not render version text in header', async () => {
       const content = <Text>Hi</Text>;
-      const { queryByText } = render(<Header rightContent={content} />);
+      const { queryByText } = await render(<Header rightContent={content} />);
       expect(queryByText(/v\d+\.\d+/)).toBeNull();
       expect(queryByText(/DB v/)).toBeNull();
     });

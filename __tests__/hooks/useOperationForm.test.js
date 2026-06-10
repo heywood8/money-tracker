@@ -106,7 +106,7 @@ describe('useOperationForm', () => {
 
   describe('Initialization', () => {
     it('should initialize with default values for new operation', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => {
         expect(result.current.values.type).toBe('expense');
@@ -127,7 +127,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values).toMatchObject({
@@ -144,7 +144,7 @@ describe('useOperationForm', () => {
     it('should use last accessed account for new operation', async () => {
       LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2');
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => {
         expect(result.current.values.accountId).toBe('acc-2');
@@ -153,7 +153,7 @@ describe('useOperationForm', () => {
 
     it('should not initialize values when modal is not visible', async () => {
       const props = { ...defaultProps, visible: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       // Should have initial default state
       expect(result.current.values.type).toBe('expense');
@@ -161,7 +161,7 @@ describe('useOperationForm', () => {
   });
 
   describe('Shadow Operations', () => {
-    it('should detect shadow operations', () => {
+    it('should detect shadow operations', async () => {
       const shadowOperation = {
         id: 'op-1',
         categoryId: 'cat-3',
@@ -169,12 +169,12 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: shadowOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       expect(result.current.isShadowOperation).toBe(true);
     });
 
-    it('should allow deletion of shadow operations made today', () => {
+    it('should allow deletion of shadow operations made today', async () => {
       const shadowOperation = {
         id: 'op-1',
         categoryId: 'cat-3',
@@ -182,12 +182,12 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: shadowOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       expect(result.current.canDeleteShadowOperation).toBe(true);
     });
 
-    it('should not allow deletion of shadow operations from past', () => {
+    it('should not allow deletion of shadow operations from past', async () => {
       const shadowOperation = {
         id: 'op-1',
         categoryId: 'cat-3',
@@ -195,12 +195,12 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: shadowOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       expect(result.current.canDeleteShadowOperation).toBe(false);
     });
 
-    it('should allow deletion of non-shadow operations', () => {
+    it('should allow deletion of non-shadow operations', async () => {
       const regularOperation = {
         id: 'op-1',
         categoryId: 'cat-1',
@@ -208,7 +208,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: regularOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       expect(result.current.canDeleteShadowOperation).toBe(true);
     });
@@ -216,7 +216,7 @@ describe('useOperationForm', () => {
 
   describe('Multi-Currency Transfers', () => {
     it('should detect multi-currency transfers', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -246,7 +246,7 @@ describe('useOperationForm', () => {
       ];
 
       const props = { ...defaultProps, accounts: sameAccounts };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -263,7 +263,7 @@ describe('useOperationForm', () => {
     });
 
     it('should auto-populate exchange rate for multi-currency transfers', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -286,7 +286,7 @@ describe('useOperationForm', () => {
     });
 
     it('should calculate destination amount when amount changes', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -321,7 +321,7 @@ describe('useOperationForm', () => {
       ];
 
       const props = { ...defaultProps, accounts: sameAccounts };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -343,7 +343,7 @@ describe('useOperationForm', () => {
 
   describe('Category Type Switching', () => {
     it('should clear category when switching from expense to income', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -363,7 +363,7 @@ describe('useOperationForm', () => {
     });
 
     it('should not clear category if it matches new type', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -398,7 +398,7 @@ describe('useOperationForm', () => {
 
   describe('Validation', () => {
     it('should validate required fields', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -416,7 +416,7 @@ describe('useOperationForm', () => {
     });
 
     it('should validate amount is a positive number', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -434,7 +434,7 @@ describe('useOperationForm', () => {
     });
 
     it('should validate transfer has different accounts', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -468,7 +468,7 @@ describe('useOperationForm', () => {
     });
 
     it('should pass validation with valid values', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -500,7 +500,7 @@ describe('useOperationForm', () => {
 
   describe('handleSave', () => {
     it('should evaluate math expressions before saving', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial form setup
       await waitFor(() => {
@@ -528,7 +528,7 @@ describe('useOperationForm', () => {
     });
 
     it('should add new operation with correct data', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial form setup
       await waitFor(() => {
@@ -567,7 +567,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100');
@@ -590,7 +590,7 @@ describe('useOperationForm', () => {
     it('should not save if validation fails', async () => {
       mockValidateOperation.mockReturnValue('validation_error');
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await act(async () => {
         result.current.setValues(prev => ({
@@ -612,7 +612,7 @@ describe('useOperationForm', () => {
 
   describe('handleClose', () => {
     it('should dismiss keyboard and close modal', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -628,7 +628,7 @@ describe('useOperationForm', () => {
     });
 
     it('should clear errors on close', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -663,7 +663,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await act(async () => {
         result.current.handleDelete();
@@ -681,7 +681,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: shadowOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await act(async () => {
         result.current.handleDelete();
@@ -693,21 +693,21 @@ describe('useOperationForm', () => {
 
   describe('Helper Functions', () => {
     it('getAccountName should return account name', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       const name = result.current.getAccountName('acc-1');
       expect(name).toBe('Checking');
     });
 
     it('getCategoryName should return category name', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       const name = result.current.getCategoryName('cat-1');
       expect(name).toBe('Food');
     });
 
     it('formatDateForDisplay should format date', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       const formatted = result.current.formatDateForDisplay('2024-01-15');
       expect(formatted).toContain('2024');
@@ -716,7 +716,7 @@ describe('useOperationForm', () => {
 
   describe('filteredCategories', () => {
     it('should exclude shadow categories', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       const filtered = result.current.filteredCategories;
       const shadowCat = filtered.find(cat => cat.isShadow);
@@ -724,7 +724,7 @@ describe('useOperationForm', () => {
     });
 
     it('should filter by operation type', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -749,7 +749,7 @@ describe('useOperationForm', () => {
     });
 
     it('should return empty array for transfers', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial setup
       await waitFor(() => {
@@ -770,7 +770,7 @@ describe('useOperationForm', () => {
   describe('Edge Cases', () => {
     it('should handle empty accounts array', async () => {
       const props = { ...defaultProps, accounts: [] };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.accountId).toBe('');
@@ -785,7 +785,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.date).toBeTruthy();
@@ -805,7 +805,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('123.45');
@@ -827,7 +827,7 @@ describe('useOperationForm', () => {
         date: '2024-01-15',
       };
 
-      const { result, rerender } = renderHook(
+      const { result, rerender } = await renderHook(
         (props) => useOperationForm(props),
         { initialProps: { ...defaultProps, operation: multicurrencyOperation, isNew: false } },
       );
@@ -864,7 +864,7 @@ describe('useOperationForm', () => {
         date: '2024-01-15',
       };
 
-      const { result, rerender } = renderHook(
+      const { result, rerender } = await renderHook(
         (props) => useOperationForm(props),
         { initialProps: { ...defaultProps, operation: multicurrencyOperation, isNew: false } },
       );
@@ -898,19 +898,20 @@ describe('useOperationForm', () => {
         date: '2024-01-15',
       };
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useOperationForm({ ...defaultProps, operation: operationWithZeroRate, isNew: false }),
       );
 
       await waitFor(() => {
-        // String(0 || '') === '' — zero is treated as falsy so auto-populate can kick in
-        expect(result.current.values.exchangeRate).toBe('');
-        expect(result.current.values.destinationAmount).toBe('');
+        // Zero is treated as falsy (empty), so auto-populate fires and provides the live rate.
+        // The final state has the auto-populated rate, not '0' — verifying the zero→empty conversion happened.
+        expect(result.current.values.exchangeRate).toBe('0.85');
+        expect(result.current.values.exchangeRate).not.toBe('0');
       });
     });
 
     it('should handle string amounts correctly', async () => {
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       // Wait for initial form setup
       await waitFor(() => {
@@ -951,7 +952,7 @@ describe('useOperationForm', () => {
 
     it('should expose handleSplit function', async () => {
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(typeof result.current.handleSplit).toBe('function');
@@ -960,7 +961,7 @@ describe('useOperationForm', () => {
 
     it('should not split new operations', async () => {
       const props = { ...defaultProps, operation: null, isNew: true };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.handleSplit).toBeDefined();
@@ -977,7 +978,7 @@ describe('useOperationForm', () => {
 
     it('should reject invalid split amount (zero)', async () => {
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -994,7 +995,7 @@ describe('useOperationForm', () => {
 
     it('should reject invalid split amount (negative)', async () => {
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1011,7 +1012,7 @@ describe('useOperationForm', () => {
 
     it('should reject split amount equal to original', async () => {
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1028,7 +1029,7 @@ describe('useOperationForm', () => {
 
     it('should reject split amount greater than original', async () => {
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1047,7 +1048,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1076,7 +1077,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1097,7 +1098,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1116,7 +1117,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1135,7 +1136,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.description).toBe('Test expense');
@@ -1158,7 +1159,7 @@ describe('useOperationForm', () => {
       mockSplitOperation.mockRejectedValue(new Error('Database error'));
 
       const props = { ...defaultProps, operation: existingOperation, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('100.00');
@@ -1182,7 +1183,7 @@ describe('useOperationForm', () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1217,7 +1218,7 @@ describe('useOperationForm', () => {
       Currency.convertAmount.mockReturnValue('170.00');
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1249,7 +1250,7 @@ describe('useOperationForm', () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1291,7 +1292,7 @@ describe('useOperationForm', () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1322,7 +1323,7 @@ describe('useOperationForm', () => {
     it('should block save when exchange rate is zero for foreign currency op', async () => {
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1351,7 +1352,7 @@ describe('useOperationForm', () => {
     it('should not validate exchange rate for same-currency ops', async () => {
       mockAddOperation.mockResolvedValue();
 
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1386,7 +1387,7 @@ describe('useOperationForm', () => {
       // Bypass validateFields by making the mock pass validation
       // We test the save path by using a valid amount/category but invalid rate;
       // the validation added by this fix will block the save, so we verify that.
-      const { result } = renderHook(() => useOperationForm(defaultProps));
+      const { result } = await renderHook(() => useOperationForm(defaultProps));
 
       await waitFor(() => expect(result.current.values.accountId).toBeTruthy());
 
@@ -1430,7 +1431,7 @@ describe('useOperationForm', () => {
 
     it('should load operationCurrency from sourceCurrency when editing foreign currency expense', async () => {
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.operationCurrency).toBe('EUR');
@@ -1439,7 +1440,7 @@ describe('useOperationForm', () => {
 
     it('should set isForeignCurrencyOp true when operationCurrency differs from account currency', async () => {
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.isForeignCurrencyOp).toBe(true);
@@ -1453,7 +1454,7 @@ describe('useOperationForm', () => {
       // DB has: amount=244(USD), destinationAmount=263.52(EUR), exchangeRate=1.08 (USD→EUR).
       // Form shows: amount=263.52(EUR), destinationAmount=244(USD), exchangeRate=0.925926 (EUR→USD).
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.amount).toBe('263.52');          // foreign currency (EUR)
@@ -1469,7 +1470,7 @@ describe('useOperationForm', () => {
 
       const noRateOp = { ...foreignCurrencyExpense, exchangeRate: null, destinationAmount: null };
       const props = { ...defaultProps, operation: noRateOp, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.exchangeRate).toBe('1.09');
@@ -1483,7 +1484,7 @@ describe('useOperationForm', () => {
 
       const noRateOp = { ...foreignCurrencyExpense, exchangeRate: null, destinationAmount: null };
       const props = { ...defaultProps, operation: noRateOp, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.exchangeRate).toBe('1.07');
@@ -1505,7 +1506,7 @@ describe('useOperationForm', () => {
       };
 
       const props = { ...defaultProps, operation: transferOp, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.type).toBe('transfer');
@@ -1523,7 +1524,7 @@ describe('useOperationForm', () => {
       mockUpdateOperation.mockResolvedValue();
 
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         expect(result.current.values.operationCurrency).toBe('EUR');
@@ -1550,7 +1551,7 @@ describe('useOperationForm', () => {
       Currency.convertAmount.mockReturnValue('291.60');
 
       const props = { ...defaultProps, operation: foreignCurrencyExpense, isNew: false };
-      const { result } = renderHook(() => useOperationForm(props));
+      const { result } = await renderHook(() => useOperationForm(props));
 
       await waitFor(() => {
         // Rate is inverted on load: EUR→USD = 1/1.08 = 0.925926

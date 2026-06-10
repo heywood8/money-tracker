@@ -915,7 +915,7 @@ op-2,income,20,acc-1,cat-1`;
   });
 
   describe('getBackupInfo', () => {
-    it('returns backup information for valid backup', () => {
+    it('returns backup information for valid backup', async () => {
       const backup = {
         version: 1,
         timestamp: '2024-01-01T00:00:00.000Z',
@@ -941,13 +941,13 @@ op-2,income,20,acc-1,cat-1`;
       });
     });
 
-    it('returns null for invalid backup', () => {
+    it('returns null for invalid backup', async () => {
       const info = BackupRestore.getBackupInfo(null);
 
       expect(info).toBeNull();
     });
 
-    it('handles missing platform', () => {
+    it('handles missing platform', async () => {
       const backup = {
         version: 1,
         timestamp: '2024-01-01',
@@ -963,7 +963,7 @@ op-2,income,20,acc-1,cat-1`;
       expect(info.platform).toBe('unknown');
     });
 
-    it('handles missing counts', () => {
+    it('handles missing counts', async () => {
       const backup = {
         version: 1,
         timestamp: '2024-01-01',

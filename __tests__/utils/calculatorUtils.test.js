@@ -2,117 +2,117 @@ import { hasOperation, evaluateExpression } from '../../app/utils/calculatorUtil
 
 describe('calculatorUtils', () => {
   describe('hasOperation', () => {
-    it('should return true for expressions with addition', () => {
+    it('should return true for expressions with addition', async () => {
       expect(hasOperation('10+5')).toBe(true);
     });
 
-    it('should return true for expressions with subtraction', () => {
+    it('should return true for expressions with subtraction', async () => {
       expect(hasOperation('100-20')).toBe(true);
     });
 
-    it('should return true for expressions with multiplication', () => {
+    it('should return true for expressions with multiplication', async () => {
       expect(hasOperation('5×3')).toBe(true);
     });
 
-    it('should return true for expressions with division', () => {
+    it('should return true for expressions with division', async () => {
       expect(hasOperation('100÷4')).toBe(true);
     });
 
-    it('should return false for simple numbers', () => {
+    it('should return false for simple numbers', async () => {
       expect(hasOperation('123')).toBe(false);
       expect(hasOperation('45.67')).toBe(false);
     });
 
-    it('should return false for empty or null values', () => {
+    it('should return false for empty or null values', async () => {
       expect(hasOperation('')).toBe(false);
       expect(hasOperation(null)).toBe(false);
       expect(hasOperation(undefined)).toBe(false);
     });
 
-    it('should return false for non-string values', () => {
+    it('should return false for non-string values', async () => {
       expect(hasOperation(123)).toBe(false);
     });
   });
 
   describe('evaluateExpression', () => {
-    it('should evaluate addition correctly', () => {
+    it('should evaluate addition correctly', async () => {
       expect(evaluateExpression('10+5')).toBe('15');
       expect(evaluateExpression('100+50.5')).toBe('150.5');
     });
 
-    it('should evaluate subtraction correctly', () => {
+    it('should evaluate subtraction correctly', async () => {
       expect(evaluateExpression('100-20')).toBe('80');
       expect(evaluateExpression('50.5-10.25')).toBe('40.25');
     });
 
-    it('should evaluate multiplication correctly', () => {
+    it('should evaluate multiplication correctly', async () => {
       expect(evaluateExpression('5×3')).toBe('15');
       expect(evaluateExpression('2.5×4')).toBe('10');
     });
 
-    it('should evaluate division correctly', () => {
+    it('should evaluate division correctly', async () => {
       expect(evaluateExpression('100÷4')).toBe('25');
       expect(evaluateExpression('50÷2')).toBe('25');
     });
 
-    it('should evaluate complex expressions', () => {
+    it('should evaluate complex expressions', async () => {
       expect(evaluateExpression('10+5×2')).toBe('20');
       expect(evaluateExpression('(10+5)×2')).toBe('30');
       expect(evaluateExpression('100-20+5')).toBe('85');
     });
 
-    it('should handle decimal results with rounding', () => {
+    it('should handle decimal results with rounding', async () => {
       expect(evaluateExpression('10÷3')).toBe('3.33');
       expect(evaluateExpression('7÷2')).toBe('3.5');
     });
 
-    it('should return null for invalid expressions', () => {
+    it('should return null for invalid expressions', async () => {
       expect(evaluateExpression('')).toBe(null);
       expect(evaluateExpression('abc')).toBe(null);
       expect(evaluateExpression('10+')).toBe(null);
     });
 
-    it('should return null for division by zero', () => {
+    it('should return null for division by zero', async () => {
       const result = evaluateExpression('10÷0');
       expect(result).toBe(null); // Infinity is not finite
     });
 
-    it('should handle simple numbers without operations', () => {
+    it('should handle simple numbers without operations', async () => {
       expect(evaluateExpression('123')).toBe('123');
       expect(evaluateExpression('45.67')).toBe('45.67');
     });
 
-    it('should handle negative numbers', () => {
+    it('should handle negative numbers', async () => {
       expect(evaluateExpression('-10')).toBe('-10');
       expect(evaluateExpression('10-15')).toBe('-5');
     });
   });
 
   describe('currency-aware rounding (decimalDigits parameter)', () => {
-    it('rounds to 0 decimal places for zero-decimal currencies (JPY, KRW, AMD)', () => {
+    it('rounds to 0 decimal places for zero-decimal currencies (JPY, KRW, AMD)', async () => {
       expect(evaluateExpression('100÷3', 0)).toBe('33');
       expect(evaluateExpression('50.75+0', 0)).toBe('51');
       expect(evaluateExpression('10÷3', 0)).toBe('3');
     });
 
-    it('rounds to 2 decimal places by default', () => {
+    it('rounds to 2 decimal places by default', async () => {
       expect(evaluateExpression('10÷3')).toBe('3.33');
       expect(evaluateExpression('10÷3', 2)).toBe('3.33');
     });
 
-    it('rounds to 8 decimal places for high-precision currencies', () => {
+    it('rounds to 8 decimal places for high-precision currencies', async () => {
       expect(evaluateExpression('1÷3', 8)).toBe('0.33333333');
       expect(evaluateExpression('0.00000001+0.00000001', 8)).toBe('0.00000002');
     });
 
-    it('does not add trailing zeros when fewer decimals are needed', () => {
+    it('does not add trailing zeros when fewer decimals are needed', async () => {
       expect(evaluateExpression('7÷2', 2)).toBe('3.5');
       expect(evaluateExpression('10+5', 2)).toBe('15');
     });
   });
 
   describe('Regression Tests', () => {
-    it('should evaluate expression before saving operation', () => {
+    it('should evaluate expression before saving operation', async () => {
       // Simulate user entering "10+5" and clicking category
       const expression = '10+5';
       expect(hasOperation(expression)).toBe(true);
@@ -124,7 +124,7 @@ describe('calculatorUtils', () => {
       expect(parseFloat(evaluated)).toBe(15);
     });
 
-    it('should handle calculator expression with multiple operations', () => {
+    it('should handle calculator expression with multiple operations', async () => {
       const expression = '100-20+30';
       expect(hasOperation(expression)).toBe(true);
 
@@ -132,7 +132,7 @@ describe('calculatorUtils', () => {
       expect(evaluated).toBe('110');
     });
 
-    it('should not modify simple amounts', () => {
+    it('should not modify simple amounts', async () => {
       const expression = '50';
       expect(hasOperation(expression)).toBe(false);
 
@@ -141,7 +141,7 @@ describe('calculatorUtils', () => {
       expect(evaluated).toBe('50');
     });
 
-    it('should integrate with Currency.formatAmount correctly', () => {
+    it('should integrate with Currency.formatAmount correctly', async () => {
       const Currency = require('../../app/services/currency');
 
       // Test that unevaluated expression would fail
@@ -159,11 +159,11 @@ describe('calculatorUtils', () => {
   });
 
   describe('Edge cases - uncovered branches', () => {
-    it('handles unary plus prefix (+5 evaluates to 5)', () => {
+    it('handles unary plus prefix (+5 evaluates to 5)', async () => {
       expect(evaluateExpression('+5')).toBe('5');
     });
 
-    it('returns null for expression with unexpected token', () => {
+    it('returns null for expression with unexpected token', async () => {
       // A lone ')' causes primary() to throw "Unexpected token: )"
       expect(evaluateExpression(')')).toBeNull();
     });

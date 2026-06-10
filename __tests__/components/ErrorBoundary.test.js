@@ -35,8 +35,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Normal Rendering', () => {
-    it('renders children when no error occurs', () => {
-      const { getByText, queryByText } = render(
+    it('renders children when no error occurs', async () => {
+      const { getByText, queryByText } = await render(
         <ErrorBoundary>
           <Text>Test content</Text>
         </ErrorBoundary>,
@@ -46,8 +46,8 @@ describe('ErrorBoundary', () => {
       expect(queryByText('Something went wrong')).toBeNull();
     });
 
-    it('renders multiple children when no error occurs', () => {
-      const { getByText } = render(
+    it('renders multiple children when no error occurs', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <Text>First child</Text>
           <Text>Second child</Text>
@@ -58,12 +58,12 @@ describe('ErrorBoundary', () => {
       expect(getByText('Second child')).toBeTruthy();
     });
 
-    it('renders nested components when no error occurs', () => {
+    it('renders nested components when no error occurs', async () => {
       const NestedComponent = () => (
         <Text>Nested component</Text>
       );
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <ErrorBoundary>
           <NestedComponent />
         </ErrorBoundary>,
@@ -74,8 +74,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Error Catching', () => {
-    it('catches error from child component', () => {
-      const { getByText, queryByText } = render(
+    it('catches error from child component', async () => {
+      const { getByText, queryByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -85,8 +85,8 @@ describe('ErrorBoundary', () => {
       expect(queryByText('Normal content')).toBeNull();
     });
 
-    it('displays error message', () => {
-      const { getByText } = render(
+    it('displays error message', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -97,8 +97,8 @@ describe('ErrorBoundary', () => {
       ).toBeTruthy();
     });
 
-    it('displays Try Again button when error occurs', () => {
-      const { getByText } = render(
+    it('displays Try Again button when error occurs', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -107,8 +107,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Try Again')).toBeTruthy();
     });
 
-    it('calls componentDidCatch when error is caught', () => {
-      const { getByText } = render(
+    it('calls componentDidCatch when error is caught', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Custom error message" />
         </ErrorBoundary>,
@@ -118,10 +118,10 @@ describe('ErrorBoundary', () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
-    it('catches errors from nested components', () => {
+    it('catches errors from nested components', async () => {
       const NestedThrowError = () => <ThrowError shouldThrow={true} />;
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <ErrorBoundary>
           <NestedThrowError />
         </ErrorBoundary>,
@@ -130,8 +130,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('catches errors with custom messages', () => {
-      render(
+    it('catches errors with custom messages', async () => {
+      await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Custom error message" />
         </ErrorBoundary>,
@@ -143,8 +143,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Error Recovery', () => {
-    it('has a Try Again button that can be pressed', () => {
-      const { getByText } = render(
+    it('has a Try Again button that can be pressed', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -154,11 +154,11 @@ describe('ErrorBoundary', () => {
 
       // Try Again button should be pressable
       const button = getByText('Try Again');
-      expect(() => fireEvent.press(button)).not.toThrow();
+      await fireEvent.press(button);
     });
 
-    it('catches error again if children still throw after reset', () => {
-      const { getByText } = render(
+    it('catches error again if children still throw after reset', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -167,14 +167,14 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
 
       // Click Try Again - error will occur again
-      fireEvent.press(getByText('Try Again'));
+      await fireEvent.press(getByText('Try Again'));
 
       // Should still show error UI (children still throw)
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('allows multiple button presses', () => {
-      const { getByText } = render(
+    it('allows multiple button presses', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -183,15 +183,15 @@ describe('ErrorBoundary', () => {
       const button = getByText('Try Again');
 
       // Click Try Again multiple times - should not throw
-      expect(() => {
-        fireEvent.press(button);
-        fireEvent.press(button);
-        fireEvent.press(button);
-      }).not.toThrow();
+      await (async () => {
+        await fireEvent.press(button);
+        await fireEvent.press(button);
+        await fireEvent.press(button);
+      })();
     });
 
-    it('handleReset method exists and can be called', () => {
-      const { getByText } = render(
+    it('handleReset method exists and can be called', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -202,7 +202,7 @@ describe('ErrorBoundary', () => {
       // Verify button exists and can be pressed without throwing
       const button = getByText('Try Again');
       expect(button).toBeTruthy();
-      fireEvent.press(button);
+      await fireEvent.press(button);
 
       // Error boundary stays in error state (expected behavior)
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -210,8 +210,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Error State Management', () => {
-    it('initializes with no error state', () => {
-      const { queryByText } = render(
+    it('initializes with no error state', async () => {
+      const { queryByText } = await render(
         <ErrorBoundary>
           <Text>Content</Text>
         </ErrorBoundary>,
@@ -220,8 +220,8 @@ describe('ErrorBoundary', () => {
       expect(queryByText('Something went wrong')).toBeNull();
     });
 
-    it('updates state when error is caught', () => {
-      const { getByText } = render(
+    it('updates state when error is caught', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -231,8 +231,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('maintains error state after catching error', () => {
-      const { getByText } = render(
+    it('maintains error state after catching error', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -242,7 +242,7 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
 
       // Click Try Again - state is cleared but children still throw
-      fireEvent.press(getByText('Try Again'));
+      await fireEvent.press(getByText('Try Again'));
 
       // Error should be caught again and state maintained
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -250,8 +250,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Console Logging', () => {
-    it('logs error to console when caught', () => {
-      render(
+    it('logs error to console when caught', async () => {
+      await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="Test error message" />
         </ErrorBoundary>,
@@ -269,8 +269,8 @@ describe('ErrorBoundary', () => {
       expect(hasErrorBoundaryLog).toBe(true);
     });
 
-    it('logs error details including error info', () => {
-      render(
+    it('logs error details including error info', async () => {
+      await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -282,12 +282,12 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles errors with null message', () => {
+    it('handles errors with null message', async () => {
       const ThrowNullError = () => {
         throw new Error(null);
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowNullError />
         </ErrorBoundary>,
@@ -296,12 +296,12 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('handles errors with undefined message', () => {
+    it('handles errors with undefined message', async () => {
       const ThrowUndefinedError = () => {
         throw new Error(undefined);
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowUndefinedError />
         </ErrorBoundary>,
@@ -310,8 +310,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('handles errors thrown during render', () => {
-      const { getByText } = render(
+    it('handles errors thrown during render', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -320,15 +320,15 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('handles errors from components that mount/unmount', () => {
-      const { getByText, rerender } = render(
+    it('handles errors from components that mount/unmount', async () => {
+      const { getByText, rerender } = await render(
         <ErrorBoundary>
           <Text>Initial content</Text>
         </ErrorBoundary>,
       );
 
       // Replace with error-throwing component
-      rerender(
+      await rerender(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -337,8 +337,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
     });
 
-    it('handles rapidly thrown errors', () => {
-      const { getByText } = render(
+    it('handles rapidly thrown errors', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} message="First error" />
         </ErrorBoundary>,
@@ -348,7 +348,7 @@ describe('ErrorBoundary', () => {
       expect(getByText('Something went wrong')).toBeTruthy();
 
       // Reset
-      fireEvent.press(getByText('Try Again'));
+      await fireEvent.press(getByText('Try Again'));
 
       // Should handle subsequent error
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -356,8 +356,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Multiple Error Boundaries', () => {
-    it('allows nested error boundaries', () => {
-      const { getByText } = render(
+    it('allows nested error boundaries', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <Text>Outer content</Text>
           <ErrorBoundary>
@@ -371,8 +371,8 @@ describe('ErrorBoundary', () => {
       expect(getByText('Outer content')).toBeTruthy();
     });
 
-    it('isolates errors to specific boundaries', () => {
-      const { getByText, getAllByText } = render(
+    it('isolates errors to specific boundaries', async () => {
+      const { getByText, getAllByText } = await render(
         <ErrorBoundary>
           <ErrorBoundary>
             <Text>Safe content 1</Text>
@@ -394,8 +394,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Error Propagation', () => {
-    it('does not propagate error to parent if caught', () => {
-      const { getByText, queryAllByText } = render(
+    it('does not propagate error to parent if caught', async () => {
+      const { getByText, queryAllByText } = await render(
         <ErrorBoundary>
           <Text>Parent content</Text>
           <ErrorBoundary>
@@ -409,7 +409,7 @@ describe('ErrorBoundary', () => {
       expect(getByText('Parent content')).toBeTruthy();
     });
 
-    it('catches errors from any descendant component', () => {
+    it('catches errors from any descendant component', async () => {
       const DeepNested = () => (
         <Text>
           <Text>
@@ -418,7 +418,7 @@ describe('ErrorBoundary', () => {
         </Text>
       );
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <ErrorBoundary>
           <DeepNested />
         </ErrorBoundary>,
@@ -429,8 +429,8 @@ describe('ErrorBoundary', () => {
   });
 
   describe('Accessibility', () => {
-    it('provides accessible error message', () => {
-      const { getByText } = render(
+    it('provides accessible error message', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,
@@ -442,8 +442,8 @@ describe('ErrorBoundary', () => {
       expect(errorMessage).toBeTruthy();
     });
 
-    it('provides accessible Try Again button', () => {
-      const { getByText } = render(
+    it('provides accessible Try Again button', async () => {
+      const { getByText } = await render(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>,

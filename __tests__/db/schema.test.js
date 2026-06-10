@@ -6,7 +6,7 @@ import * as schema from '../../app/db/schema';
 
 describe('Database Schema', () => {
   describe('Schema Exports', () => {
-    it('exports all required tables', () => {
+    it('exports all required tables', async () => {
       expect(schema.appMetadata).toBeDefined();
       expect(schema.accounts).toBeDefined();
       expect(schema.categories).toBeDefined();
@@ -15,7 +15,7 @@ describe('Database Schema', () => {
       expect(schema.accountsBalanceHistory).toBeDefined();
     });
 
-    it('all table exports are objects', () => {
+    it('all table exports are objects', async () => {
       expect(typeof schema.appMetadata).toBe('object');
       expect(typeof schema.accounts).toBe('object');
       expect(typeof schema.categories).toBe('object');
@@ -26,11 +26,11 @@ describe('Database Schema', () => {
   });
 
   describe('appMetadata Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.appMetadata[Symbol.for('drizzle:Name')]).toBe('app_metadata');
     });
 
-    it('defines key, value, and updatedAt columns', () => {
+    it('defines key, value, and updatedAt columns', async () => {
       const columns = schema.appMetadata;
       expect(columns.key).toBeDefined();
       expect(columns.value).toBeDefined();
@@ -39,11 +39,11 @@ describe('Database Schema', () => {
   });
 
   describe('accounts Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.accounts[Symbol.for('drizzle:Name')]).toBe('accounts');
     });
 
-    it('defines all required columns', () => {
+    it('defines all required columns', async () => {
       const columns = schema.accounts;
       expect(columns.id).toBeDefined();
       expect(columns.name).toBeDefined();
@@ -56,7 +56,7 @@ describe('Database Schema', () => {
       expect(columns.updatedAt).toBeDefined();
     });
 
-    it('has correct column types', () => {
+    it('has correct column types', async () => {
       // Check that columns have the expected Drizzle column type
       expect(schema.accounts.id.columnType).toBe('SQLiteInteger');
       expect(schema.accounts.name.columnType).toBe('SQLiteText');
@@ -66,7 +66,7 @@ describe('Database Schema', () => {
       expect(schema.accounts.hidden.columnType).toBe('SQLiteInteger');
     });
 
-    it('has correct default values', () => {
+    it('has correct default values', async () => {
       // Check balance default
       expect(schema.accounts.balance.default).toBeDefined();
 
@@ -77,15 +77,15 @@ describe('Database Schema', () => {
       expect(schema.accounts.hidden.default).toBeDefined();
     });
 
-    it('has primary key on id column', () => {
+    it('has primary key on id column', async () => {
       expect(schema.accounts.id.primary).toBe(true);
     });
 
-    it('has autoIncrement on id column', () => {
+    it('has autoIncrement on id column', async () => {
       expect(schema.accounts.id.autoIncrement).toBe(true);
     });
 
-    it('has notNull constraint on required columns', () => {
+    it('has notNull constraint on required columns', async () => {
       expect(schema.accounts.name.notNull).toBe(true);
       expect(schema.accounts.balance.notNull).toBe(true);
       expect(schema.accounts.currency.notNull).toBe(true);
@@ -95,11 +95,11 @@ describe('Database Schema', () => {
   });
 
   describe('categories Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.categories[Symbol.for('drizzle:Name')]).toBe('categories');
     });
 
-    it('defines all required columns', () => {
+    it('defines all required columns', async () => {
       const columns = schema.categories;
       expect(columns.id).toBeDefined();
       expect(columns.name).toBeDefined();
@@ -113,12 +113,12 @@ describe('Database Schema', () => {
       expect(columns.updatedAt).toBeDefined();
     });
 
-    it('has text primary key', () => {
+    it('has text primary key', async () => {
       expect(schema.categories.id.columnType).toBe('SQLiteText');
       expect(schema.categories.id.primary).toBe(true);
     });
 
-    it('has enum constraints on type and categoryType', () => {
+    it('has enum constraints on type and categoryType', async () => {
       // Type should have 'folder' and 'entry' enum values
       expect(schema.categories.type.enumValues).toEqual(['folder', 'entry']);
 
@@ -126,23 +126,23 @@ describe('Database Schema', () => {
       expect(schema.categories.categoryType.enumValues).toEqual(['expense', 'income']);
     });
 
-    it('has parentId column for hierarchy', () => {
+    it('has parentId column for hierarchy', async () => {
       // parentId is used to create category hierarchy (folder -> entry)
       expect(schema.categories.parentId).toBeDefined();
       expect(schema.categories.parentId.columnType).toBe('SQLiteText');
     });
 
-    it('has correct default values for flags', () => {
+    it('has correct default values for flags', async () => {
       expect(schema.categories.isShadow.default).toBeDefined();
     });
   });
 
   describe('operations Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.operations[Symbol.for('drizzle:Name')]).toBe('operations');
     });
 
-    it('defines all required columns', () => {
+    it('defines all required columns', async () => {
       const columns = schema.operations;
       expect(columns.id).toBeDefined();
       expect(columns.type).toBeDefined();
@@ -159,17 +159,17 @@ describe('Database Schema', () => {
       expect(columns.destinationCurrency).toBeDefined();
     });
 
-    it('has integer primary key with autoIncrement', () => {
+    it('has integer primary key with autoIncrement', async () => {
       expect(schema.operations.id.columnType).toBe('SQLiteInteger');
       expect(schema.operations.id.primary).toBe(true);
       expect(schema.operations.id.autoIncrement).toBe(true);
     });
 
-    it('has enum constraint on type', () => {
+    it('has enum constraint on type', async () => {
       expect(schema.operations.type.enumValues).toEqual(['expense', 'income', 'transfer']);
     });
 
-    it('has account relationship columns', () => {
+    it('has account relationship columns', async () => {
       // accountId is required for all operations
       expect(schema.operations.accountId).toBeDefined();
       expect(schema.operations.accountId.columnType).toBe('SQLiteInteger');
@@ -180,7 +180,7 @@ describe('Database Schema', () => {
       expect(schema.operations.toAccountId.columnType).toBe('SQLiteInteger');
     });
 
-    it('has category relationship column', () => {
+    it('has category relationship column', async () => {
       // categoryId links operations to categories (optional)
       expect(schema.operations.categoryId).toBeDefined();
       expect(schema.operations.categoryId.columnType).toBe('SQLiteText');
@@ -188,7 +188,7 @@ describe('Database Schema', () => {
       expect(schema.operations.categoryId.notNull).toBeFalsy();
     });
 
-    it('has notNull constraint on required fields', () => {
+    it('has notNull constraint on required fields', async () => {
       expect(schema.operations.type.notNull).toBe(true);
       expect(schema.operations.amount.notNull).toBe(true);
       expect(schema.operations.accountId.notNull).toBe(true);
@@ -198,11 +198,11 @@ describe('Database Schema', () => {
   });
 
   describe('budgets Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.budgets[Symbol.for('drizzle:Name')]).toBe('budgets');
     });
 
-    it('defines all required columns', () => {
+    it('defines all required columns', async () => {
       const columns = schema.budgets;
       expect(columns.id).toBeDefined();
       expect(columns.categoryId).toBeDefined();
@@ -217,28 +217,28 @@ describe('Database Schema', () => {
       expect(columns.updatedAt).toBeDefined();
     });
 
-    it('has text primary key', () => {
+    it('has text primary key', async () => {
       expect(schema.budgets.id.columnType).toBe('SQLiteText');
       expect(schema.budgets.id.primary).toBe(true);
     });
 
-    it('has enum constraint on periodType', () => {
+    it('has enum constraint on periodType', async () => {
       expect(schema.budgets.periodType.enumValues).toEqual(['weekly', 'monthly', 'yearly']);
     });
 
-    it('has category relationship column', () => {
+    it('has category relationship column', async () => {
       // categoryId links budgets to categories (required)
       expect(schema.budgets.categoryId).toBeDefined();
       expect(schema.budgets.categoryId.columnType).toBe('SQLiteText');
       expect(schema.budgets.categoryId.notNull).toBe(true);
     });
 
-    it('has correct default values', () => {
+    it('has correct default values', async () => {
       expect(schema.budgets.isRecurring.default).toBeDefined();
       expect(schema.budgets.rolloverEnabled.default).toBeDefined();
     });
 
-    it('has notNull constraint on required fields', () => {
+    it('has notNull constraint on required fields', async () => {
       expect(schema.budgets.categoryId.notNull).toBe(true);
       expect(schema.budgets.amount.notNull).toBe(true);
       expect(schema.budgets.currency.notNull).toBe(true);
@@ -250,11 +250,11 @@ describe('Database Schema', () => {
   });
 
   describe('accountsBalanceHistory Table', () => {
-    it('has correct table name', () => {
+    it('has correct table name', async () => {
       expect(schema.accountsBalanceHistory[Symbol.for('drizzle:Name')]).toBe('accounts_balance_history');
     });
 
-    it('defines all required columns', () => {
+    it('defines all required columns', async () => {
       const columns = schema.accountsBalanceHistory;
       expect(columns.id).toBeDefined();
       expect(columns.accountId).toBeDefined();
@@ -263,20 +263,20 @@ describe('Database Schema', () => {
       expect(columns.createdAt).toBeDefined();
     });
 
-    it('has integer primary key with autoIncrement', () => {
+    it('has integer primary key with autoIncrement', async () => {
       expect(schema.accountsBalanceHistory.id.columnType).toBe('SQLiteInteger');
       expect(schema.accountsBalanceHistory.id.primary).toBe(true);
       expect(schema.accountsBalanceHistory.id.autoIncrement).toBe(true);
     });
 
-    it('has account relationship column', () => {
+    it('has account relationship column', async () => {
       // accountId links balance history to accounts
       expect(schema.accountsBalanceHistory.accountId).toBeDefined();
       expect(schema.accountsBalanceHistory.accountId.columnType).toBe('SQLiteInteger');
       expect(schema.accountsBalanceHistory.accountId.notNull).toBe(true);
     });
 
-    it('has notNull constraint on all columns', () => {
+    it('has notNull constraint on all columns', async () => {
       expect(schema.accountsBalanceHistory.accountId.notNull).toBe(true);
       expect(schema.accountsBalanceHistory.date.notNull).toBe(true);
       expect(schema.accountsBalanceHistory.balance.notNull).toBe(true);
@@ -285,7 +285,7 @@ describe('Database Schema', () => {
   });
 
   describe('Schema Relationships', () => {
-    it('operations has relationship columns to accounts', () => {
+    it('operations has relationship columns to accounts', async () => {
       // Operations must reference an account
       expect(schema.operations.accountId).toBeDefined();
       expect(schema.operations.accountId.columnType).toBe('SQLiteInteger');
@@ -295,24 +295,24 @@ describe('Database Schema', () => {
       expect(schema.operations.toAccountId.columnType).toBe('SQLiteInteger');
     });
 
-    it('operations has relationship column to categories', () => {
+    it('operations has relationship column to categories', async () => {
       expect(schema.operations.categoryId).toBeDefined();
       expect(schema.operations.categoryId.columnType).toBe('SQLiteText');
     });
 
-    it('budgets has relationship column to categories', () => {
+    it('budgets has relationship column to categories', async () => {
       expect(schema.budgets.categoryId).toBeDefined();
       expect(schema.budgets.categoryId.columnType).toBe('SQLiteText');
       expect(schema.budgets.categoryId.notNull).toBe(true);
     });
 
-    it('accountsBalanceHistory has relationship column to accounts', () => {
+    it('accountsBalanceHistory has relationship column to accounts', async () => {
       expect(schema.accountsBalanceHistory.accountId).toBeDefined();
       expect(schema.accountsBalanceHistory.accountId.columnType).toBe('SQLiteInteger');
       expect(schema.accountsBalanceHistory.accountId.notNull).toBe(true);
     });
 
-    it('categories has self-referencing relationship column', () => {
+    it('categories has self-referencing relationship column', async () => {
       // parentId allows categories to form a hierarchy
       expect(schema.categories.parentId).toBeDefined();
       expect(schema.categories.parentId.columnType).toBe('SQLiteText');
@@ -320,7 +320,7 @@ describe('Database Schema', () => {
   });
 
   describe('Data Type Consistency', () => {
-    it('uses text type for currency amounts', () => {
+    it('uses text type for currency amounts', async () => {
       // Currency amounts should be stored as text to avoid floating point errors
       expect(schema.accounts.balance.columnType).toBe('SQLiteText');
       expect(schema.operations.amount.columnType).toBe('SQLiteText');
@@ -328,7 +328,7 @@ describe('Database Schema', () => {
       expect(schema.accountsBalanceHistory.balance.columnType).toBe('SQLiteText');
     });
 
-    it('uses text type for dates', () => {
+    it('uses text type for dates', async () => {
       // Dates should be stored as ISO strings
       expect(schema.accounts.createdAt.columnType).toBe('SQLiteText');
       expect(schema.operations.date.columnType).toBe('SQLiteText');
@@ -336,7 +336,7 @@ describe('Database Schema', () => {
       expect(schema.accountsBalanceHistory.date.columnType).toBe('SQLiteText');
     });
 
-    it('uses integer type for IDs and flags', () => {
+    it('uses integer type for IDs and flags', async () => {
       expect(schema.accounts.id.columnType).toBe('SQLiteInteger');
       expect(schema.accounts.hidden.columnType).toBe('SQLiteInteger');
       expect(schema.operations.id.columnType).toBe('SQLiteInteger');
@@ -346,21 +346,21 @@ describe('Database Schema', () => {
   });
 
   describe('Enum Validations', () => {
-    it('categories.type has valid enum values', () => {
+    it('categories.type has valid enum values', async () => {
       const enumValues = schema.categories.type.enumValues;
       expect(enumValues).toContain('folder');
       expect(enumValues).toContain('entry');
       expect(enumValues.length).toBe(2);
     });
 
-    it('categories.categoryType has valid enum values', () => {
+    it('categories.categoryType has valid enum values', async () => {
       const enumValues = schema.categories.categoryType.enumValues;
       expect(enumValues).toContain('expense');
       expect(enumValues).toContain('income');
       expect(enumValues.length).toBe(2);
     });
 
-    it('operations.type has valid enum values', () => {
+    it('operations.type has valid enum values', async () => {
       const enumValues = schema.operations.type.enumValues;
       expect(enumValues).toContain('expense');
       expect(enumValues).toContain('income');
@@ -368,7 +368,7 @@ describe('Database Schema', () => {
       expect(enumValues.length).toBe(3);
     });
 
-    it('budgets.periodType has valid enum values', () => {
+    it('budgets.periodType has valid enum values', async () => {
       const enumValues = schema.budgets.periodType.enumValues;
       expect(enumValues).toContain('weekly');
       expect(enumValues).toContain('monthly');
@@ -378,7 +378,7 @@ describe('Database Schema', () => {
   });
 
   describe('Default Values', () => {
-    it('accounts has correct defaults', () => {
+    it('accounts has correct defaults', async () => {
       // Balance defaults to '0'
       expect(schema.accounts.balance.default).toBe('0');
 
@@ -389,12 +389,12 @@ describe('Database Schema', () => {
       expect(schema.accounts.hidden.default).toBe(0);
     });
 
-    it('categories has correct defaults for flags', () => {
+    it('categories has correct defaults for flags', async () => {
       // isShadow defaults to 0 (false)
       expect(schema.categories.isShadow.default).toBe(0);
     });
 
-    it('budgets has correct defaults for flags', () => {
+    it('budgets has correct defaults for flags', async () => {
       // isRecurring defaults to 1 (true)
       expect(schema.budgets.isRecurring.default).toBe(1);
 
@@ -404,7 +404,7 @@ describe('Database Schema', () => {
   });
 
   describe('Schema Integrity', () => {
-    it('all tables have createdAt timestamp', () => {
+    it('all tables have createdAt timestamp', async () => {
       expect(schema.accounts.createdAt).toBeDefined();
       expect(schema.categories.createdAt).toBeDefined();
       expect(schema.operations.createdAt).toBeDefined();
@@ -412,14 +412,14 @@ describe('Database Schema', () => {
       expect(schema.accountsBalanceHistory.createdAt).toBeDefined();
     });
 
-    it('tables with updates have updatedAt timestamp', () => {
+    it('tables with updates have updatedAt timestamp', async () => {
       expect(schema.accounts.updatedAt).toBeDefined();
       expect(schema.categories.updatedAt).toBeDefined();
       expect(schema.budgets.updatedAt).toBeDefined();
       expect(schema.appMetadata.updatedAt).toBeDefined();
     });
 
-    it('all timestamps are notNull', () => {
+    it('all timestamps are notNull', async () => {
       expect(schema.accounts.createdAt.notNull).toBe(true);
       expect(schema.accounts.updatedAt.notNull).toBe(true);
       expect(schema.categories.createdAt.notNull).toBe(true);
@@ -428,7 +428,7 @@ describe('Database Schema', () => {
   });
 
   describe('Table Indexes', () => {
-    it('accounts table has performance indexes', () => {
+    it('accounts table has performance indexes', async () => {
       // Access the table symbol to get indexes
       const tableName = schema.accounts[Symbol.for('drizzle:Name')];
       expect(tableName).toBe('accounts');
@@ -444,7 +444,7 @@ describe('Database Schema', () => {
       expect(schema.accounts.hidden).toBeDefined();
     });
 
-    it('categories table has performance indexes', () => {
+    it('categories table has performance indexes', async () => {
       const tableName = schema.categories[Symbol.for('drizzle:Name')];
       expect(tableName).toBe('categories');
 
@@ -455,7 +455,7 @@ describe('Database Schema', () => {
       expect(schema.categories.isShadow).toBeDefined();
     });
 
-    it('operations table has performance indexes', () => {
+    it('operations table has performance indexes', async () => {
       const tableName = schema.operations[Symbol.for('drizzle:Name')];
       expect(tableName).toBe('operations');
 
@@ -466,7 +466,7 @@ describe('Database Schema', () => {
       expect(schema.operations.type).toBeDefined();
     });
 
-    it('budgets table has performance indexes', () => {
+    it('budgets table has performance indexes', async () => {
       const tableName = schema.budgets[Symbol.for('drizzle:Name')];
       expect(tableName).toBe('budgets');
 
@@ -479,7 +479,7 @@ describe('Database Schema', () => {
       expect(schema.budgets.isRecurring).toBeDefined();
     });
 
-    it('accountsBalanceHistory table has performance indexes', () => {
+    it('accountsBalanceHistory table has performance indexes', async () => {
       const tableName = schema.accountsBalanceHistory[Symbol.for('drizzle:Name')];
       expect(tableName).toBe('accounts_balance_history');
 
@@ -490,34 +490,34 @@ describe('Database Schema', () => {
   });
 
   describe('Foreign Key Configurations', () => {
-    it('categories.parentId has cascade delete', () => {
+    it('categories.parentId has cascade delete', async () => {
       // parentId should reference categories.id with cascade delete
       expect(schema.categories.parentId).toBeDefined();
       expect(schema.categories.parentId.columnType).toBe('SQLiteText');
     });
 
-    it('operations.accountId has cascade delete', () => {
+    it('operations.accountId has cascade delete', async () => {
       expect(schema.operations.accountId).toBeDefined();
       expect(schema.operations.accountId.notNull).toBe(true);
     });
 
-    it('operations.categoryId has set null delete', () => {
+    it('operations.categoryId has set null delete', async () => {
       // categoryId should be nullable (set null on delete)
       expect(schema.operations.categoryId).toBeDefined();
       expect(schema.operations.categoryId.notNull).toBeFalsy();
     });
 
-    it('operations.toAccountId has cascade delete', () => {
+    it('operations.toAccountId has cascade delete', async () => {
       expect(schema.operations.toAccountId).toBeDefined();
       expect(schema.operations.toAccountId.columnType).toBe('SQLiteInteger');
     });
 
-    it('budgets.categoryId has cascade delete', () => {
+    it('budgets.categoryId has cascade delete', async () => {
       expect(schema.budgets.categoryId).toBeDefined();
       expect(schema.budgets.categoryId.notNull).toBe(true);
     });
 
-    it('accountsBalanceHistory.accountId has cascade delete', () => {
+    it('accountsBalanceHistory.accountId has cascade delete', async () => {
       expect(schema.accountsBalanceHistory.accountId).toBeDefined();
       expect(schema.accountsBalanceHistory.accountId.notNull).toBe(true);
     });
@@ -527,7 +527,7 @@ describe('Database Schema', () => {
     // These tests exercise the reference callback functions that define foreign key relationships
     // The callbacks are stored in the column's references property which is a function
 
-    it('categories.parentId references categories.id', () => {
+    it('categories.parentId references categories.id', async () => {
       const parentIdColumn = schema.categories.parentId;
       expect(parentIdColumn).toBeDefined();
 
@@ -543,7 +543,7 @@ describe('Database Schema', () => {
       }
     });
 
-    it('operations.accountId references accounts.id', () => {
+    it('operations.accountId references accounts.id', async () => {
       const accountIdColumn = schema.operations.accountId;
       expect(accountIdColumn).toBeDefined();
 
@@ -557,7 +557,7 @@ describe('Database Schema', () => {
       }
     });
 
-    it('operations.categoryId references categories.id with set null', () => {
+    it('operations.categoryId references categories.id with set null', async () => {
       const categoryIdColumn = schema.operations.categoryId;
       expect(categoryIdColumn).toBeDefined();
 
@@ -571,7 +571,7 @@ describe('Database Schema', () => {
       }
     });
 
-    it('operations.toAccountId references accounts.id', () => {
+    it('operations.toAccountId references accounts.id', async () => {
       const toAccountIdColumn = schema.operations.toAccountId;
       expect(toAccountIdColumn).toBeDefined();
 
@@ -585,7 +585,7 @@ describe('Database Schema', () => {
       }
     });
 
-    it('budgets.categoryId references categories.id', () => {
+    it('budgets.categoryId references categories.id', async () => {
       const categoryIdColumn = schema.budgets.categoryId;
       expect(categoryIdColumn).toBeDefined();
 
@@ -599,7 +599,7 @@ describe('Database Schema', () => {
       }
     });
 
-    it('accountsBalanceHistory.accountId references accounts.id', () => {
+    it('accountsBalanceHistory.accountId references accounts.id', async () => {
       const accountIdColumn = schema.accountsBalanceHistory.accountId;
       expect(accountIdColumn).toBeDefined();
 
@@ -617,49 +617,49 @@ describe('Database Schema', () => {
   describe('Table Index Functions', () => {
     // These tests exercise the index definition functions in each table
 
-    it('accounts table index function is defined', () => {
+    it('accounts table index function is defined', async () => {
       // The second argument to sqliteTable is the index function
       // We verify the table has indexes by checking that indexed columns exist
       expect(schema.accounts.displayOrder).toBeDefined();
       expect(schema.accounts.hidden).toBeDefined();
     });
 
-    it('categories table index function creates indexes', () => {
+    it('categories table index function creates indexes', async () => {
       expect(schema.categories.parentId).toBeDefined();
       expect(schema.categories.type).toBeDefined();
       expect(schema.categories.categoryType).toBeDefined();
     });
 
-    it('operations table index function creates indexes', () => {
+    it('operations table index function creates indexes', async () => {
       expect(schema.operations.date).toBeDefined();
       expect(schema.operations.accountId).toBeDefined();
       expect(schema.operations.categoryId).toBeDefined();
     });
 
-    it('budgets table index function creates indexes', () => {
+    it('budgets table index function creates indexes', async () => {
       expect(schema.budgets.categoryId).toBeDefined();
       expect(schema.budgets.periodType).toBeDefined();
     });
 
-    it('accountsBalanceHistory table index function creates indexes', () => {
+    it('accountsBalanceHistory table index function creates indexes', async () => {
       expect(schema.accountsBalanceHistory.accountId).toBeDefined();
       expect(schema.accountsBalanceHistory.date).toBeDefined();
     });
   });
 
   describe('Transfer Operation Fields', () => {
-    it('operations table has exchange rate fields for multi-currency transfers', () => {
+    it('operations table has exchange rate fields for multi-currency transfers', async () => {
       expect(schema.operations.exchangeRate).toBeDefined();
       expect(schema.operations.exchangeRate.columnType).toBe('SQLiteText');
       expect(schema.operations.exchangeRate.notNull).toBeFalsy();
     });
 
-    it('operations table has destination amount field', () => {
+    it('operations table has destination amount field', async () => {
       expect(schema.operations.destinationAmount).toBeDefined();
       expect(schema.operations.destinationAmount.columnType).toBe('SQLiteText');
     });
 
-    it('operations table has currency fields', () => {
+    it('operations table has currency fields', async () => {
       expect(schema.operations.sourceCurrency).toBeDefined();
       expect(schema.operations.destinationCurrency).toBeDefined();
       expect(schema.operations.sourceCurrency.columnType).toBe('SQLiteText');
@@ -668,31 +668,31 @@ describe('Database Schema', () => {
   });
 
   describe('Optional Fields', () => {
-    it('accounts.monthlyTarget is optional', () => {
+    it('accounts.monthlyTarget is optional', async () => {
       expect(schema.accounts.monthlyTarget).toBeDefined();
       expect(schema.accounts.monthlyTarget.notNull).toBeFalsy();
     });
 
-    it('categories icon and color are optional', () => {
+    it('categories icon and color are optional', async () => {
       expect(schema.categories.icon).toBeDefined();
       expect(schema.categories.color).toBeDefined();
       expect(schema.categories.icon.notNull).toBeFalsy();
       expect(schema.categories.color.notNull).toBeFalsy();
     });
 
-    it('operations.description is optional', () => {
+    it('operations.description is optional', async () => {
       expect(schema.operations.description).toBeDefined();
       expect(schema.operations.description.notNull).toBeFalsy();
     });
 
-    it('budgets.endDate is optional', () => {
+    it('budgets.endDate is optional', async () => {
       expect(schema.budgets.endDate).toBeDefined();
       expect(schema.budgets.endDate.notNull).toBeFalsy();
     });
   });
 
   describe('Unique Constraints', () => {
-    it('accountsBalanceHistory has unique constraint on accountId and date', () => {
+    it('accountsBalanceHistory has unique constraint on accountId and date', async () => {
       // This table should only have one balance record per account per date
       expect(schema.accountsBalanceHistory.accountId).toBeDefined();
       expect(schema.accountsBalanceHistory.date).toBeDefined();

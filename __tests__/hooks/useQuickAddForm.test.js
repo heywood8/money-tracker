@@ -65,8 +65,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default values', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with default values', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -84,7 +84,7 @@ describe('useQuickAddForm', () => {
     it('should set operationCurrency to account currency on default account load', async () => {
       const singleAccount = [mockAccounts[0]]; // USD account
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -96,7 +96,7 @@ describe('useQuickAddForm', () => {
     it('should set operationCurrency to last accessed account currency', async () => {
       LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2'); // EUR account
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -108,7 +108,7 @@ describe('useQuickAddForm', () => {
     it('should set default account if only one account exists', async () => {
       const singleAccount = [mockAccounts[0]];
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -120,7 +120,7 @@ describe('useQuickAddForm', () => {
     it('should use last accessed account if available', async () => {
       LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2');
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -132,7 +132,7 @@ describe('useQuickAddForm', () => {
     it('should use first account alphabetically if no last accessed', async () => {
       LastAccount.getLastAccessedAccount.mockResolvedValue(null);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -144,7 +144,7 @@ describe('useQuickAddForm', () => {
     it('should fallback to first account if last accessed not in visible accounts', async () => {
       LastAccount.getLastAccessedAccount.mockResolvedValue('non-existent');
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -155,8 +155,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('getAccountName', () => {
-    it('should return account name for valid account ID', () => {
-      const { result } = renderHook(() =>
+    it('should return account name for valid account ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -164,8 +164,8 @@ describe('useQuickAddForm', () => {
       expect(name).toBe('Checking');
     });
 
-    it('should return "Unknown" for invalid account ID', () => {
-      const { result } = renderHook(() =>
+    it('should return "Unknown" for invalid account ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -175,8 +175,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('getAccountBalance', () => {
-    it('should return formatted balance with currency symbol', () => {
-      const { result } = renderHook(() =>
+    it('should return formatted balance with currency symbol', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -184,8 +184,8 @@ describe('useQuickAddForm', () => {
       expect(balance).toBe('$1000');
     });
 
-    it('should return empty string for invalid account ID', () => {
-      const { result } = renderHook(() =>
+    it('should return empty string for invalid account ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -193,8 +193,8 @@ describe('useQuickAddForm', () => {
       expect(balance).toBe('');
     });
 
-    it('should use EUR symbol for EUR account', () => {
-      const { result } = renderHook(() =>
+    it('should use EUR symbol for EUR account', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -204,12 +204,12 @@ describe('useQuickAddForm', () => {
   });
 
   describe('getCategoryInfo', () => {
-    it('should return category name and icon for valid category', () => {
+    it('should return category name and icon for valid category', async () => {
       const categoriesWithIcon = [
         { id: 'cat-1', name: 'Food', icon: 'food-icon', categoryType: 'expense', isShadow: false },
       ];
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithIcon, mockT),
       );
 
@@ -221,8 +221,8 @@ describe('useQuickAddForm', () => {
       });
     });
 
-    it('should return unknown category for invalid category ID', () => {
-      const { result } = renderHook(() =>
+    it('should return unknown category for invalid category ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -234,8 +234,8 @@ describe('useQuickAddForm', () => {
       });
     });
 
-    it('should use default icon if category has no icon', () => {
-      const { result } = renderHook(() =>
+    it('should use default icon if category has no icon', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -245,8 +245,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('getCategoryName', () => {
-    it('should return category display name for valid category', () => {
-      const { result } = renderHook(() =>
+    it('should return category display name for valid category', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -254,8 +254,8 @@ describe('useQuickAddForm', () => {
       expect(name).toBe('Food');
     });
 
-    it('should return "select_category" for empty category ID', () => {
-      const { result } = renderHook(() =>
+    it('should return "select_category" for empty category ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -263,8 +263,8 @@ describe('useQuickAddForm', () => {
       expect(name).toBe('select_category');
     });
 
-    it('should return "select_category" for null category ID', () => {
-      const { result } = renderHook(() =>
+    it('should return "select_category" for null category ID', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -274,8 +274,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('filteredCategories', () => {
-    it('should filter categories by expense type', () => {
-      const { result } = renderHook(() =>
+    it('should filter categories by expense type', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -286,7 +286,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should filter categories by income type', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -299,8 +299,8 @@ describe('useQuickAddForm', () => {
       expect(filtered).toContainEqual(mockCategories[1]); // Salary
     });
 
-    it('should exclude shadow categories from filtered list', () => {
-      const { result } = renderHook(() =>
+    it('should exclude shadow categories from filtered list', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -310,7 +310,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should return empty array for transfer type', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -343,7 +343,7 @@ describe('useQuickAddForm', () => {
         { categoryId: 'cat-e4', count: 5 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -361,7 +361,7 @@ describe('useQuickAddForm', () => {
     it('should fall back to up to 7 leaf categories when no history for expense', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -378,7 +378,7 @@ describe('useQuickAddForm', () => {
     it('should fall back to up to 7 leaf categories when no history for income', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -397,7 +397,7 @@ describe('useQuickAddForm', () => {
     it('should exclude shadow and folder categories from fallback', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -417,7 +417,7 @@ describe('useQuickAddForm', () => {
         { categoryId: 'cat-i2', count: 5 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -436,7 +436,7 @@ describe('useQuickAddForm', () => {
     it('should return empty array for transfer type even with fallback categories available', async () => {
       mockGetTopCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -454,7 +454,7 @@ describe('useQuickAddForm', () => {
         { categoryId: 'cat-i1', count: 3 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, categoriesWithLeaves, mockT),
       );
 
@@ -480,7 +480,7 @@ describe('useQuickAddForm', () => {
 
   describe('resetForm', () => {
     it('should reset form values but keep type and account', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -525,7 +525,7 @@ describe('useQuickAddForm', () => {
 
   describe('setQuickAddValues', () => {
     it('should update quick add values', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -543,28 +543,28 @@ describe('useQuickAddForm', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty accounts array', () => {
-      const { result } = renderHook(() =>
+    it('should handle empty accounts array', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm([], [], mockCategories, mockT),
       );
 
       expect(result.current.quickAddValues.accountId).toBe('');
     });
 
-    it('should handle empty categories array', () => {
-      const { result } = renderHook(() =>
+    it('should handle empty categories array', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, [], mockT),
       );
 
       expect(result.current.filteredCategories).toEqual([]);
     });
 
-    it('should handle account with unknown currency', () => {
+    it('should handle account with unknown currency', async () => {
       const accountsWithUnknown = [
         { id: 'acc-1', name: 'Unknown', currency: 'XYZ', balance: '100' },
       ];
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(accountsWithUnknown, accountsWithUnknown, mockCategories, mockT),
       );
 
@@ -575,8 +575,8 @@ describe('useQuickAddForm', () => {
   });
 
   describe('topTransferAccountsForForm', () => {
-    it('should return empty array when type is not transfer', () => {
-      const { result } = renderHook(() =>
+    it('should return empty array when type is not transfer', async () => {
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -590,7 +590,7 @@ describe('useQuickAddForm', () => {
         { accountId: 'acc-3', count: 3 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -615,7 +615,7 @@ describe('useQuickAddForm', () => {
         { accountId: 'acc-3', count: 3 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -636,7 +636,7 @@ describe('useQuickAddForm', () => {
     it('should fall back to visible accounts when no history', async () => {
       mockGetTopTransferTargets.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -661,7 +661,7 @@ describe('useQuickAddForm', () => {
         { accountId: 'acc-2', count: 5 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(extraAccounts, extraAccounts, mockCategories, mockT),
       );
 
@@ -689,7 +689,7 @@ describe('useQuickAddForm', () => {
         { accountId: 'acc-2', count: 5 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -732,7 +732,7 @@ describe('useQuickAddForm', () => {
         { accountId: 'acc-10', count: 1 },
       ]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(manyAccounts, manyAccounts, mockCategories, mockT),
       );
 
@@ -750,7 +750,7 @@ describe('useQuickAddForm', () => {
 
   describe('operationCurrency (foreign currency expense/income)', () => {
     it('should reset operationCurrency to new account currency when accountId changes', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -772,7 +772,7 @@ describe('useQuickAddForm', () => {
     it('should not fetch exchange rate when operationCurrency matches account currency', async () => {
       const singleAccount = [mockAccounts[0]]; // USD
 
-      renderHook(() =>
+      await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -784,7 +784,7 @@ describe('useQuickAddForm', () => {
     it('should fetch exchange rate when operationCurrency differs from account currency', async () => {
       const singleAccount = [mockAccounts[0]]; // USD
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -807,7 +807,7 @@ describe('useQuickAddForm', () => {
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '1.08', source: 'live' });
       const singleAccount = [mockAccounts[0]]; // USD
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -831,7 +831,7 @@ describe('useQuickAddForm', () => {
 
       const singleAccount = [mockAccounts[0]]; // USD
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -852,7 +852,7 @@ describe('useQuickAddForm', () => {
     it('should clear foreign rate state when switching back to same currency', async () => {
       const singleAccount = [mockAccounts[0]]; // USD
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -880,7 +880,7 @@ describe('useQuickAddForm', () => {
     it('should reset operationCurrency to account currency on resetForm', async () => {
       const singleAccount = [mockAccounts[0]]; // USD
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(singleAccount, singleAccount, mockCategories, mockT),
       );
 
@@ -913,7 +913,7 @@ describe('useQuickAddForm', () => {
         { id: 'acc-2', name: 'Second', currency: 'USD', balance: '200' },
       ];
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(unsortedAccounts, unsortedAccounts, mockCategories, mockT),
       );
 
@@ -923,7 +923,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should handle category type changes correctly', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -940,7 +940,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should maintain form values during re-renders', async () => {
-      const { result, rerender } = renderHook(() =>
+      const { result, rerender } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -964,7 +964,7 @@ describe('useQuickAddForm', () => {
       mockGetTopCategories.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
-      renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
+      await renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
 
       await waitFor(() => {
         expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
@@ -983,7 +983,7 @@ describe('useQuickAddForm', () => {
       mockGetTopCategories.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
-      const { unmount } = renderHook(() =>
+      const { unmount } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -991,7 +991,7 @@ describe('useQuickAddForm', () => {
         expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
       });
 
-      unmount();
+      await unmount();
       mockGetTopCategories.mockClear();
 
       await act(async () => {
@@ -1005,7 +1005,7 @@ describe('useQuickAddForm', () => {
       mockGetTopCategories.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
-      renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
+      await renderHook(() => useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT));
 
       await waitFor(() => {
         expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
@@ -1024,7 +1024,7 @@ describe('useQuickAddForm', () => {
       mockGetTopCategories.mockResolvedValue([]);
       mockGetTopTransferTargets.mockResolvedValue([]);
 
-      const { unmount } = renderHook(() =>
+      const { unmount } = await renderHook(() =>
         useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
       );
 
@@ -1032,7 +1032,7 @@ describe('useQuickAddForm', () => {
         expect(mockGetTopCategories).toHaveBeenCalledTimes(1);
       });
 
-      unmount();
+      await unmount();
       mockGetTopCategories.mockClear();
 
       await act(async () => {

@@ -112,7 +112,7 @@ describe('Operations Filtering Integration', () => {
 
   describe('Filter State Management', () => {
     it('initializes with empty filters', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -141,7 +141,7 @@ describe('Operations Filtering Integration', () => {
 
       PreferencesDB.getJsonPreference.mockResolvedValue(storedFilters);
 
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -152,7 +152,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('persists filters to PreferencesDB when updated', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -178,7 +178,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('correctly identifies when filters are active', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -205,7 +205,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('counts active filter groups correctly', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -230,7 +230,7 @@ describe('Operations Filtering Integration', () => {
 
   describe('Filter Application', () => {
     it('reloads operations when filters are applied', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -259,7 +259,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('resets to first week when filters change', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -297,7 +297,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('clears filters and reloads all operations', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -334,7 +334,7 @@ describe('Operations Filtering Integration', () => {
 
   describe('Lazy Loading with Filters', () => {
     it('loads more filtered operations on scroll', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -369,7 +369,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('stops loading when no more filtered results', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -393,7 +393,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('deduplicates operations during filtered pagination', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -432,7 +432,7 @@ describe('Operations Filtering Integration', () => {
       };
 
       // First render
-      const { result, unmount } = renderHook(() => useOperations(), {
+      const { result, unmount } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -445,13 +445,13 @@ describe('Operations Filtering Integration', () => {
       });
 
       // Unmount
-      unmount();
+      await unmount();
 
       // Mock PreferencesDB to return the filters on next render
       PreferencesDB.getJsonPreference.mockResolvedValue(filters);
 
       // Remount
-      const { result: result2 } = renderHook(() => useOperations(), {
+      const { result: result2 } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -464,7 +464,7 @@ describe('Operations Filtering Integration', () => {
 
   describe('Edge Cases', () => {
     it('handles empty filter results gracefully', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -488,7 +488,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('handles filter errors gracefully', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -515,7 +515,7 @@ describe('Operations Filtering Integration', () => {
 
   describe('Regression Tests', () => {
     it('uses filtered queries when filters are active', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 
@@ -545,7 +545,7 @@ describe('Operations Filtering Integration', () => {
     });
 
     it('uses unfiltered queries when filters are cleared', async () => {
-      const { result } = renderHook(() => useOperations(), {
+      const { result } = await renderHook(() => useOperations(), {
         wrapper: OperationsProvider,
       });
 

@@ -55,7 +55,7 @@ describe('AccountsContext', () => {
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -79,7 +79,7 @@ describe('AccountsContext', () => {
         .mockResolvedValueOnce(createdAccounts);  // Second call - after operations init
       AccountsDB.createAccount.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -93,7 +93,7 @@ describe('AccountsContext', () => {
       const error = new Error('Load failed');
       AccountsDB.getAllAccounts.mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -114,7 +114,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
       AccountsDB.createAccount.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -142,7 +142,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
       AccountsDB.createAccount.mockResolvedValue({ id: 2, name: 'Test', balance: '100', currency: 'USD' });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -165,7 +165,7 @@ describe('AccountsContext', () => {
       const error = new Error('Add failed');
       AccountsDB.createAccount.mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -201,7 +201,7 @@ describe('AccountsContext', () => {
       AccountsDB.updateAccount.mockResolvedValue(undefined);
       AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -232,7 +232,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValueOnce(mockAccounts).mockResolvedValueOnce(updatedMockAccounts);
       AccountsDB.adjustAccountBalance.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -256,7 +256,7 @@ describe('AccountsContext', () => {
       const error = new Error('Update failed');
       AccountsDB.updateAccount.mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -283,7 +283,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
       AccountsDB.deleteAccount.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -313,7 +313,7 @@ describe('AccountsContext', () => {
         .mockResolvedValue(mockAccountsAfterDelete);
       AccountsDB.deleteAccount.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -339,7 +339,7 @@ describe('AccountsContext', () => {
       const error = new Error('Delete failed');
       AccountsDB.deleteAccount.mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -369,7 +369,7 @@ describe('AccountsContext', () => {
           { id: '2', name: 'Account 2', balance: '200', currency: 'EUR' },
         ]);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -390,7 +390,7 @@ describe('AccountsContext', () => {
         .mockResolvedValueOnce(mockAccounts)
         .mockRejectedValueOnce(new Error('Reload failed'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -413,7 +413,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
       AccountsDB.getOperationCount.mockResolvedValue(5);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -430,7 +430,7 @@ describe('AccountsContext', () => {
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
       AccountsDB.getOperationCount.mockRejectedValue(new Error('Failed'));
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -447,7 +447,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -463,7 +463,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -479,7 +479,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -495,7 +495,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -511,7 +511,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -527,7 +527,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -547,7 +547,7 @@ describe('AccountsContext', () => {
       const mockAccounts = [{ id: '1', name: 'Test', balance: '100', currency: 'USD' }];
       AccountsDB.getAllAccounts.mockResolvedValue(mockAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -582,7 +582,7 @@ describe('AccountsContext', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -630,7 +630,7 @@ describe('AccountsContext', () => {
         .mockResolvedValueOnce(updatedMockAccounts);
       AccountsDB.updateAccount.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

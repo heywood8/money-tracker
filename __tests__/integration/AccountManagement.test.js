@@ -78,7 +78,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -181,7 +181,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -242,7 +242,7 @@ describe('Account Management Integration Tests', () => {
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -273,7 +273,7 @@ describe('Account Management Integration Tests', () => {
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -364,7 +364,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve({ ...account, id: ++idCounter });
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -403,7 +403,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -436,7 +436,7 @@ describe('Account Management Integration Tests', () => {
         .mockResolvedValueOnce(initialAccounts)
         .mockResolvedValueOnce(updatedAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -465,7 +465,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve({ ...account, id: ++idCounter });
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -498,7 +498,7 @@ describe('Account Management Integration Tests', () => {
       ];
       AccountsDB.getAllAccounts.mockResolvedValue(initialAccounts);
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -530,7 +530,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve({ ...account, id: ++idCounter });
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -558,7 +558,7 @@ describe('Account Management Integration Tests', () => {
         return Promise.resolve({ ...account, id: 2 });
       });
 
-      const { result } = renderHook(() => useAccounts(), { wrapper });
+      const { result } = await renderHook(() => useAccounts(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

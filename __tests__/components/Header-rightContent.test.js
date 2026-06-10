@@ -13,14 +13,14 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 }));
 
 describe('Header - rightContent prop', () => {
-  it('returns null when rightContent not provided', () => {
-    const { toJSON } = render(<Header />);
+  it('returns null when rightContent not provided', async () => {
+    const { toJSON } = await render(<Header />);
     expect(toJSON()).toBeNull();
   });
 
-  it('renders rightContent when provided', () => {
+  it('renders rightContent when provided', async () => {
     const customContent = <Text testID="custom-content">Custom</Text>;
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <Header rightContent={customContent} />,
     );
 

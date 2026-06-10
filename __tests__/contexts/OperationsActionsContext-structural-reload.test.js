@@ -102,8 +102,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     <OperationsProvider>{children}</OperationsProvider>
   );
 
-  const setupHook = () =>
-    renderHook(
+  const setupHook = async () => await renderHook(
       () => ({
         data: useOperationsData(),
         actions: useOperationsActions(),
@@ -117,13 +116,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('calls getFilteredOperationsAllDates (not week-offset) when searchText is set', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('coffee');
       });
 
@@ -137,13 +136,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('calls getFilteredOperationsAllDates with the search text in filters', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.setSearchText('Самолет');
       });
 
@@ -157,18 +156,18 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
 
     it('calls getOperationsByWeekOffset when searchText is cleared', async () => {
       OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => { result.current.actions.setSearchText('coffee'); });
+      await act(async () => { result.current.actions.setSearchText('coffee'); });
       await waitFor(() => {
         expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
       });
 
-      act(() => { result.current.actions.setSearchText(''); });
+      await act(async () => { result.current.actions.setSearchText(''); });
       await waitFor(() => {
         // Clearing text restores unfiltered week-based load
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(2);
@@ -178,13 +177,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
 
   describe('structural filter changes trigger DB reload', () => {
     it('triggers reload when types filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
@@ -194,13 +193,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('triggers reload when accountIds filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ accountIds: ['acc-1'] });
       });
 
@@ -210,13 +209,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('triggers reload when categoryIds filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ categoryIds: ['cat-1'] });
       });
 
@@ -226,13 +225,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('triggers reload when dateRange filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({
           dateRange: { startDate: '2026-01-01', endDate: '2026-12-31' },
         });
@@ -244,13 +243,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('triggers reload when amountRange filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({
           amountRange: { min: 10, max: 500 },
         });
@@ -262,13 +261,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('passes the updated filters to the filtered DB query', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['income'] });
       });
 
@@ -284,14 +283,14 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
   describe('text + structural change combination', () => {
     it('text change calls getFilteredOperationsAllDates; adding structural filter also uses it', async () => {
       OperationsDB.getFilteredOperationsAllDates.mockResolvedValue([]);
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
       // Text triggers all-dates query
-      act(() => { result.current.actions.setSearchText('grocery'); });
+      await act(async () => { result.current.actions.setSearchText('grocery'); });
 
       await waitFor(() => {
         expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalledTimes(1);
@@ -299,7 +298,7 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
       expect(OperationsDB.getFilteredOperationsByWeekOffset).not.toHaveBeenCalled();
 
       // Adding a structural filter with text still uses all-dates query (text present)
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
@@ -322,13 +321,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('calls setJsonPreference when searchText changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => { result.current.actions.setSearchText('coffee'); });
+      await act(async () => { result.current.actions.setSearchText('coffee'); });
 
       await waitFor(() => {
         expect(mockSetJsonPreference).toHaveBeenCalledTimes(1);
@@ -341,13 +340,13 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('calls setJsonPreference when structural filter changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => {
+      await act(async () => {
         result.current.actions.updateSearchFilters({ types: ['expense'] });
       });
 
@@ -362,15 +361,15 @@ describe('OperationsActionsContext - structural filter reload detection', () => 
     });
 
     it('calls setJsonPreference once per filter change even for text-only changes', async () => {
-      const { result } = setupHook();
+      const { result } = await setupHook();
 
       await waitFor(() => {
         expect(OperationsDB.getOperationsByWeekOffset).toHaveBeenCalledTimes(1);
       });
 
-      act(() => { result.current.actions.setSearchText('a'); });
-      act(() => { result.current.actions.setSearchText('ab'); });
-      act(() => { result.current.actions.setSearchText('abc'); });
+      await act(async () => { result.current.actions.setSearchText('a'); });
+      await act(async () => { result.current.actions.setSearchText('ab'); });
+      await act(async () => { result.current.actions.setSearchText('abc'); });
 
       await waitFor(() => {
         expect(result.current.data.searchState.text).toBe('abc');

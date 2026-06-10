@@ -103,7 +103,7 @@ describe('OperationsContext', () => {
 
   describe('Initialization', () => {
     it('provides operations context with default values', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -125,7 +125,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -142,7 +142,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(mockOperations);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -155,7 +155,7 @@ describe('OperationsContext', () => {
     it('handles empty operations list', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -168,7 +168,7 @@ describe('OperationsContext', () => {
     it('handles loading error gracefully', async () => {
       OperationsDB.getOperationsByWeekOffset.mockRejectedValue(new Error('Load failed'));
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -181,7 +181,7 @@ describe('OperationsContext', () => {
   describe('CRUD Operations', () => {
     it('adds a new operation', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -223,7 +223,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -246,7 +246,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -267,7 +267,7 @@ describe('OperationsContext', () => {
 
     it('handles add operation error and shows dialog', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -305,7 +305,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -332,7 +332,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -356,7 +356,7 @@ describe('OperationsContext', () => {
 
   describe('Validation', () => {
     it('validates expense operation', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -375,7 +375,7 @@ describe('OperationsContext', () => {
     });
 
     it('validates income operation', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -394,7 +394,7 @@ describe('OperationsContext', () => {
     });
 
     it('validates transfer operation', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -413,7 +413,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects operation without type', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -432,7 +432,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects operation with invalid amount', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -453,7 +453,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects operation without account', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -472,7 +472,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects non-transfer operation without category', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -491,7 +491,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects transfer without toAccountId', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -510,7 +510,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects transfer with same source and destination', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -530,7 +530,7 @@ describe('OperationsContext', () => {
     });
 
     it('rejects operation without date', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -549,7 +549,7 @@ describe('OperationsContext', () => {
     });
 
     it('uses translation function for validation messages', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -578,7 +578,7 @@ describe('OperationsContext', () => {
       // Cache contains all operations (initial + older)
       OperationsDB.getAllOperations.mockResolvedValue([...initialOps, ...olderOps]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -603,7 +603,7 @@ describe('OperationsContext', () => {
       // Cache only has the already-loaded op — nothing older
       OperationsDB.getAllOperations.mockResolvedValue(initialOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -624,7 +624,7 @@ describe('OperationsContext', () => {
       // Cache has op1 and op2; op1 is on the boundary so only op2 is "older"
       OperationsDB.getAllOperations.mockResolvedValue([op1, op2]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -647,7 +647,7 @@ describe('OperationsContext', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
       OperationsDB.getAllOperations.mockResolvedValue(initialOps); // no older data
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -680,7 +680,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -699,7 +699,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -718,7 +718,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -746,7 +746,7 @@ describe('OperationsContext', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
       OperationsDB.getAllOperations.mockResolvedValue(reloadedOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -784,7 +784,7 @@ describe('OperationsContext', () => {
           { id: 1, type: 'expense', amount: '100', accountId: 'acc1', date: '2024-01-15' },
         ]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -816,7 +816,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -832,7 +832,7 @@ describe('OperationsContext', () => {
 
     it('clears save error after successful operation', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -875,7 +875,7 @@ describe('OperationsContext', () => {
 
     it('handles concurrent operation additions', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -921,7 +921,7 @@ describe('OperationsContext', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       OperationsDB.getAllOperations.mockResolvedValue([olderOp]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -944,7 +944,7 @@ describe('OperationsContext', () => {
       ];
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

@@ -34,8 +34,8 @@ describe('FormInput', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders without crashing', () => {
-      const { getByPlaceholderText } = render(
+    it('renders without crashing', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -47,8 +47,8 @@ describe('FormInput', () => {
       expect(getByPlaceholderText('Test')).toBeTruthy();
     });
 
-    it('displays placeholder text', () => {
-      const { getByPlaceholderText } = render(
+    it('displays placeholder text', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -60,8 +60,8 @@ describe('FormInput', () => {
       expect(getByPlaceholderText('Enter name')).toBeTruthy();
     });
 
-    it('displays input value', () => {
-      const { getByDisplayValue } = render(
+    it('displays input value', async () => {
+      const { getByDisplayValue } = await render(
         <FormInput
           value="Test value"
           onChangeText={jest.fn()}
@@ -73,8 +73,8 @@ describe('FormInput', () => {
       expect(getByDisplayValue('Test value')).toBeTruthy();
     });
 
-    it('renders with empty value', () => {
-      const { getByPlaceholderText } = render(
+    it('renders with empty value', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -88,9 +88,9 @@ describe('FormInput', () => {
   });
 
   describe('Text Input', () => {
-    it('calls onChangeText when text changes', () => {
+    it('calls onChangeText when text changes', async () => {
       const onChangeText = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={onChangeText}
@@ -100,14 +100,14 @@ describe('FormInput', () => {
       );
 
       const input = getByPlaceholderText('Test');
-      fireEvent.changeText(input, 'New text');
+      await fireEvent.changeText(input, 'New text');
 
       expect(onChangeText).toHaveBeenCalledWith('New text');
     });
 
-    it('updates value correctly', () => {
+    it('updates value correctly', async () => {
       const onChangeText = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={onChangeText}
@@ -117,16 +117,16 @@ describe('FormInput', () => {
       );
 
       const input = getByPlaceholderText('Test');
-      fireEvent.changeText(input, 'abc');
-      fireEvent.changeText(input, 'abcd');
+      await fireEvent.changeText(input, 'abc');
+      await fireEvent.changeText(input, 'abcd');
 
       expect(onChangeText).toHaveBeenCalledTimes(2);
       expect(onChangeText).toHaveBeenLastCalledWith('abcd');
     });
 
-    it('handles empty string input', () => {
+    it('handles empty string input', async () => {
       const onChangeText = jest.fn();
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <FormInput
           value="text"
           onChangeText={onChangeText}
@@ -136,15 +136,15 @@ describe('FormInput', () => {
       );
 
       const input = getByDisplayValue('text');
-      fireEvent.changeText(input, '');
+      await fireEvent.changeText(input, '');
 
       expect(onChangeText).toHaveBeenCalledWith('');
     });
   });
 
   describe('Left Icon', () => {
-    it('displays left icon when provided', () => {
-      const { getByTestId } = render(
+    it('displays left icon when provided', async () => {
+      const { getByTestId } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -157,8 +157,8 @@ describe('FormInput', () => {
       expect(getByTestId('icon-currency-usd')).toBeTruthy();
     });
 
-    it('does not display icon when not provided', () => {
-      const { queryByTestId } = render(
+    it('does not display icon when not provided', async () => {
+      const { queryByTestId } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -171,8 +171,8 @@ describe('FormInput', () => {
       expect(queryByTestId(/^icon-/)).toBeNull();
     });
 
-    it('renders different icons correctly', () => {
-      const { getByTestId, rerender } = render(
+    it('renders different icons correctly', async () => {
+      const { getByTestId, rerender } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -184,7 +184,7 @@ describe('FormInput', () => {
 
       expect(getByTestId('icon-cash')).toBeTruthy();
 
-      rerender(
+      await rerender(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -198,8 +198,8 @@ describe('FormInput', () => {
   });
 
   describe('Error State', () => {
-    it('displays error message when error is provided', () => {
-      const { getByText } = render(
+    it('displays error message when error is provided', async () => {
+      const { getByText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -212,8 +212,8 @@ describe('FormInput', () => {
       expect(getByText('This field is required')).toBeTruthy();
     });
 
-    it('does not display error when not provided', () => {
-      const { queryByText } = render(
+    it('does not display error when not provided', async () => {
+      const { queryByText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -226,8 +226,8 @@ describe('FormInput', () => {
       expect(queryByText(/required|error|invalid/i)).toBeNull();
     });
 
-    it('toggles error message', () => {
-      const { getByText, queryByText, rerender } = render(
+    it('toggles error message', async () => {
+      const { getByText, queryByText, rerender } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -238,7 +238,7 @@ describe('FormInput', () => {
 
       expect(queryByText('Error message')).toBeNull();
 
-      rerender(
+      await rerender(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -250,8 +250,8 @@ describe('FormInput', () => {
       expect(getByText('Error message')).toBeTruthy();
     });
 
-    it('displays different error messages', () => {
-      const { getByText, rerender } = render(
+    it('displays different error messages', async () => {
+      const { getByText, rerender } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -263,7 +263,7 @@ describe('FormInput', () => {
 
       expect(getByText('Error 1')).toBeTruthy();
 
-      rerender(
+      await rerender(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -277,8 +277,8 @@ describe('FormInput', () => {
   });
 
   describe('Multiline Support', () => {
-    it('renders as multiline when multiline prop is true', () => {
-      const { getByPlaceholderText } = render(
+    it('renders as multiline when multiline prop is true', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -292,8 +292,8 @@ describe('FormInput', () => {
       expect(input.props.multiline).toBe(true);
     });
 
-    it('renders as single line by default', () => {
-      const { getByPlaceholderText } = render(
+    it('renders as single line by default', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -306,8 +306,8 @@ describe('FormInput', () => {
       expect(input.props.multiline).toBeFalsy();
     });
 
-    it('accepts numberOfLines prop for multiline', () => {
-      const { getByPlaceholderText } = render(
+    it('accepts numberOfLines prop for multiline', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -324,8 +324,8 @@ describe('FormInput', () => {
   });
 
   describe('Keyboard Type', () => {
-    it('uses default keyboard type', () => {
-      const { getByPlaceholderText } = render(
+    it('uses default keyboard type', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -338,8 +338,8 @@ describe('FormInput', () => {
       expect(input.props.keyboardType).toBe('default');
     });
 
-    it('accepts numeric keyboard type', () => {
-      const { getByPlaceholderText } = render(
+    it('accepts numeric keyboard type', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -353,8 +353,8 @@ describe('FormInput', () => {
       expect(input.props.keyboardType).toBe('numeric');
     });
 
-    it('accepts email keyboard type', () => {
-      const { getByPlaceholderText } = render(
+    it('accepts email keyboard type', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -370,8 +370,8 @@ describe('FormInput', () => {
   });
 
   describe('Editable State', () => {
-    it('is editable by default', () => {
-      const { getByPlaceholderText } = render(
+    it('is editable by default', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -384,8 +384,8 @@ describe('FormInput', () => {
       expect(input.props.editable).toBe(true);
     });
 
-    it('can be set to non-editable', () => {
-      const { getByPlaceholderText } = render(
+    it('can be set to non-editable', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value="Read only"
           onChangeText={jest.fn()}
@@ -401,8 +401,8 @@ describe('FormInput', () => {
   });
 
   describe('Auto Focus', () => {
-    it('does not auto focus by default', () => {
-      const { getByPlaceholderText } = render(
+    it('does not auto focus by default', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -415,8 +415,8 @@ describe('FormInput', () => {
       expect(input.props.autoFocus).toBe(false);
     });
 
-    it('auto focuses when prop is true', () => {
-      const { getByPlaceholderText } = render(
+    it('auto focuses when prop is true', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -432,8 +432,8 @@ describe('FormInput', () => {
   });
 
   describe('Return Key', () => {
-    it('uses done as default return key', () => {
-      const { getByPlaceholderText } = render(
+    it('uses done as default return key', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -446,8 +446,8 @@ describe('FormInput', () => {
       expect(input.props.returnKeyType).toBe('done');
     });
 
-    it('accepts custom return key type', () => {
-      const { getByPlaceholderText } = render(
+    it('accepts custom return key type', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -461,9 +461,9 @@ describe('FormInput', () => {
       expect(input.props.returnKeyType).toBe('next');
     });
 
-    it('calls onSubmitEditing when return is pressed', () => {
+    it('calls onSubmitEditing when return is pressed', async () => {
       const onSubmitEditing = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -481,8 +481,8 @@ describe('FormInput', () => {
   });
 
   describe('Secure Text Entry', () => {
-    it('does not obscure text by default', () => {
-      const { getByPlaceholderText } = render(
+    it('does not obscure text by default', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value="password"
           onChangeText={jest.fn()}
@@ -495,8 +495,8 @@ describe('FormInput', () => {
       expect(input.props.secureTextEntry).toBe(false);
     });
 
-    it('obscures text when secureTextEntry is true', () => {
-      const { getByPlaceholderText } = render(
+    it('obscures text when secureTextEntry is true', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value="password"
           onChangeText={jest.fn()}
@@ -512,9 +512,9 @@ describe('FormInput', () => {
   });
 
   describe('Custom Styling', () => {
-    it('accepts custom container style', () => {
+    it('accepts custom container style', async () => {
       const customStyle = { marginBottom: 20 };
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -529,9 +529,9 @@ describe('FormInput', () => {
   });
 
   describe('Input Ref', () => {
-    it('accepts and forwards inputRef', () => {
+    it('accepts and forwards inputRef', async () => {
       const ref = React.createRef();
-      render(
+      await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -547,9 +547,9 @@ describe('FormInput', () => {
   });
 
   describe('Regression Tests', () => {
-    it('handles rapid text changes', () => {
+    it('handles rapid text changes', async () => {
       const onChangeText = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={onChangeText}
@@ -559,17 +559,17 @@ describe('FormInput', () => {
       );
 
       const input = getByPlaceholderText('Test');
-      fireEvent.changeText(input, 'a');
-      fireEvent.changeText(input, 'ab');
-      fireEvent.changeText(input, 'abc');
+      await fireEvent.changeText(input, 'a');
+      await fireEvent.changeText(input, 'ab');
+      await fireEvent.changeText(input, 'abc');
 
       expect(onChangeText).toHaveBeenCalledTimes(3);
     });
 
-    it('handles very long text input', () => {
+    it('handles very long text input', async () => {
       const longText = 'a'.repeat(1000);
       const onChangeText = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={onChangeText}
@@ -579,15 +579,15 @@ describe('FormInput', () => {
       );
 
       const input = getByPlaceholderText('Test');
-      fireEvent.changeText(input, longText);
+      await fireEvent.changeText(input, longText);
 
       expect(onChangeText).toHaveBeenCalledWith(longText);
     });
 
-    it('handles special characters in text', () => {
+    it('handles special characters in text', async () => {
       const specialText = '<script>alert("test")</script>';
       const onChangeText = jest.fn();
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={onChangeText}
@@ -597,13 +597,13 @@ describe('FormInput', () => {
       );
 
       const input = getByPlaceholderText('Test');
-      fireEvent.changeText(input, specialText);
+      await fireEvent.changeText(input, specialText);
 
       expect(onChangeText).toHaveBeenCalledWith(specialText);
     });
 
-    it('maintains state across rerenders', () => {
-      const { getByDisplayValue, rerender } = render(
+    it('maintains state across rerenders', async () => {
+      const { getByDisplayValue, rerender } = await render(
         <FormInput
           value="initial"
           onChangeText={jest.fn()}
@@ -614,7 +614,7 @@ describe('FormInput', () => {
 
       expect(getByDisplayValue('initial')).toBeTruthy();
 
-      rerender(
+      await rerender(
         <FormInput
           value="updated"
           onChangeText={jest.fn()}
@@ -627,8 +627,8 @@ describe('FormInput', () => {
   });
 
   describe('Accessibility', () => {
-    it('input is accessible', () => {
-      const { getByPlaceholderText } = render(
+    it('input is accessible', async () => {
+      const { getByPlaceholderText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -640,8 +640,8 @@ describe('FormInput', () => {
       expect(getByPlaceholderText('Accessible input')).toBeTruthy();
     });
 
-    it('error message is visible to screen readers', () => {
-      const { getByText } = render(
+    it('error message is visible to screen readers', async () => {
+      const { getByText } = await render(
         <FormInput
           value=""
           onChangeText={jest.fn()}
@@ -656,7 +656,7 @@ describe('FormInput', () => {
   });
 
   describe('Theme color fallbacks', () => {
-    it('falls back to colors.surface when inputBackground is not in theme', () => {
+    it('falls back to colors.surface when inputBackground is not in theme', async () => {
       const colorsWithoutInputBg = {
         text: '#000',
         mutedText: '#666',
@@ -671,7 +671,7 @@ describe('FormInput', () => {
           {children}
         </ThemeColorsProvider>
       );
-      const { getByPlaceholderText } = render(
+      const { getByPlaceholderText } = await render(
         <FormInput value="" onChangeText={jest.fn()} placeholder="Fallback test" />,
         { wrapper: wrapperNoInputBg },
       );

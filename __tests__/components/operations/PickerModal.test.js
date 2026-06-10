@@ -63,16 +63,16 @@ describe('PickerModal', () => {
   });
 
   describe('Modal rendering', () => {
-    it('renders when visible is true', () => {
-      const { getByText } = render(
+    it('renders when visible is true', async () => {
+      const { getByText } = await render(
         <PickerModal {...defaultProps} pickerType="account" />,
       );
 
       expect(getByText('No accounts')).toBeTruthy();
     });
 
-    it('does not render content when visible is false', () => {
-      const { queryByText } = render(
+    it('does not render content when visible is false', async () => {
+      const { queryByText } = await render(
         <PickerModal {...defaultProps} visible={false} pickerType="account" />,
       );
 
@@ -80,9 +80,9 @@ describe('PickerModal', () => {
       expect(queryByText('No accounts')).toBeNull();
     });
 
-    it('calls onClose when overlay is pressed', () => {
+    it('calls onClose when overlay is pressed', async () => {
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal {...defaultProps} pickerType="account" onClose={onClose} />,
       );
 
@@ -99,8 +99,8 @@ describe('PickerModal', () => {
       { id: 'acc-2', name: 'Savings', balance: 5000, currency: 'EUR' },
     ];
 
-    it('renders account list', () => {
-      const { getByText } = render(
+    it('renders account list', async () => {
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -112,8 +112,8 @@ describe('PickerModal', () => {
       expect(getByText('Savings')).toBeTruthy();
     });
 
-    it('displays account balance with currency symbol', () => {
-      const { getByText } = render(
+    it('displays account balance with currency symbol', async () => {
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -125,10 +125,10 @@ describe('PickerModal', () => {
       expect(getByText('€5000.00')).toBeTruthy();
     });
 
-    it('calls onSelectAccount when account is pressed', () => {
+    it('calls onSelectAccount when account is pressed', async () => {
       const onSelectAccount = jest.fn();
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -138,14 +138,14 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Checking'));
+      await fireEvent.press(getByText('Checking'));
 
       expect(onSelectAccount).toHaveBeenCalledWith('acc-1');
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('shows close button for account picker', () => {
-      const { getByText } = render(
+    it('shows close button for account picker', async () => {
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -156,9 +156,9 @@ describe('PickerModal', () => {
       expect(getByText('Close')).toBeTruthy();
     });
 
-    it('calls onClose when close button is pressed', () => {
+    it('calls onClose when close button is pressed', async () => {
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -167,7 +167,7 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Close'));
+      await fireEvent.press(getByText('Close'));
 
       expect(onClose).toHaveBeenCalled();
     });
@@ -179,10 +179,10 @@ describe('PickerModal', () => {
       { id: 'acc-2', name: 'Savings', balance: 5000, currency: 'USD' },
     ];
 
-    it('calls onSelectToAccount when account is pressed', () => {
+    it('calls onSelectToAccount when account is pressed', async () => {
       const onSelectToAccount = jest.fn();
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="toAccount"
@@ -192,7 +192,7 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Savings'));
+      await fireEvent.press(getByText('Savings'));
 
       expect(onSelectToAccount).toHaveBeenCalledWith('acc-2');
       expect(onClose).toHaveBeenCalled();
@@ -215,8 +215,8 @@ describe('PickerModal', () => {
       categoryId: null,
     };
 
-    it('renders category list', () => {
-      const { getByText } = render(
+    it('renders category list', async () => {
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -231,8 +231,8 @@ describe('PickerModal', () => {
       expect(getByText('Shopping')).toBeTruthy();
     });
 
-    it('renders category icons', () => {
-      const { getByTestId } = render(
+    it('renders category icons', async () => {
+      const { getByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -246,8 +246,8 @@ describe('PickerModal', () => {
       expect(getByTestId('icon-car')).toBeTruthy();
     });
 
-    it('renders folder badge for folder categories', () => {
-      const { getAllByTestId } = render(
+    it('renders folder badge for folder categories', async () => {
+      const { getAllByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -261,9 +261,9 @@ describe('PickerModal', () => {
       expect(folderBadges.length).toBe(1); // Only Shopping folder has badge
     });
 
-    it('calls onNavigateIntoFolder when folder is pressed', () => {
+    it('calls onNavigateIntoFolder when folder is pressed', async () => {
       const onNavigateIntoFolder = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -274,15 +274,15 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Shopping'));
+      await fireEvent.press(getByText('Shopping'));
 
       expect(onNavigateIntoFolder).toHaveBeenCalledWith(categoryData[2]);
     });
 
-    it('calls onSelectCategory when entry category is pressed without amount', () => {
+    it('calls onSelectCategory when entry category is pressed without amount', async () => {
       const onSelectCategory = jest.fn();
       const onClose = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -294,7 +294,7 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       expect(onSelectCategory).toHaveBeenCalledWith('cat-1');
       expect(onClose).toHaveBeenCalled();
@@ -306,7 +306,7 @@ describe('PickerModal', () => {
         amount: '50.00',
         categoryId: null,
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -317,15 +317,15 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       await waitFor(() => {
         expect(onAutoAddWithCategory).toHaveBeenCalledWith('cat-1');
       });
     });
 
-    it('does not show close button for category picker', () => {
-      const { queryByText } = render(
+    it('does not show close button for category picker', async () => {
+      const { queryByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -338,7 +338,7 @@ describe('PickerModal', () => {
       expect(queryByText('Close')).toBeNull();
     });
 
-    it('uses translated nameKey if available', () => {
+    it('uses translated nameKey if available', async () => {
       const categoryWithNameKey = [
         { id: 'cat-1', name: 'Food', nameKey: 'food_category', icon: 'food', type: 'entry' },
       ];
@@ -347,7 +347,7 @@ describe('PickerModal', () => {
         return key;
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -372,8 +372,8 @@ describe('PickerModal', () => {
       categoryId: null,
     };
 
-    it('shows breadcrumb when navigation has items', () => {
-      const { getByText, getByTestId } = render(
+    it('shows breadcrumb when navigation has items', async () => {
+      const { getByText, getByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -387,9 +387,9 @@ describe('PickerModal', () => {
       expect(getByTestId('icon-arrow-left')).toBeTruthy();
     });
 
-    it('does not show breadcrumb when navigation is empty', () => {
+    it('does not show breadcrumb when navigation is empty', async () => {
       const emptyNavigation = { breadcrumb: [] };
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -402,9 +402,9 @@ describe('PickerModal', () => {
       expect(queryByTestId('icon-arrow-left')).toBeNull();
     });
 
-    it('calls onNavigateBack when back button is pressed', () => {
+    it('calls onNavigateBack when back button is pressed', async () => {
       const onNavigateBack = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -415,23 +415,23 @@ describe('PickerModal', () => {
         />,
       );
 
-      fireEvent.press(getByTestId('icon-arrow-left').parent);
+      await fireEvent.press(getByTestId('icon-arrow-left').parent);
 
       expect(onNavigateBack).toHaveBeenCalled();
     });
   });
 
   describe('Empty states', () => {
-    it('shows no accounts message when account list is empty', () => {
-      const { getByText } = render(
+    it('shows no accounts message when account list is empty', async () => {
+      const { getByText } = await render(
         <PickerModal {...defaultProps} pickerType="account" pickerData={[]} />,
       );
 
       expect(getByText('No accounts')).toBeTruthy();
     });
 
-    it('shows no categories message when category list is empty', () => {
-      const { getByText } = render(
+    it('shows no categories message when category list is empty', async () => {
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -446,14 +446,14 @@ describe('PickerModal', () => {
   });
 
   describe('Currency symbol helper', () => {
-    it('shows currency symbol for known currencies', () => {
+    it('shows currency symbol for known currencies', async () => {
       const accountData = [
         { id: 'acc-1', name: 'USD Account', balance: 100, currency: 'USD' },
         { id: 'acc-2', name: 'EUR Account', balance: 200, currency: 'EUR' },
         { id: 'acc-3', name: 'GBP Account', balance: 300, currency: 'GBP' },
       ];
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -466,12 +466,12 @@ describe('PickerModal', () => {
       expect(getByText('£300.00')).toBeTruthy();
     });
 
-    it('shows currency code for unknown currencies', () => {
+    it('shows currency code for unknown currencies', async () => {
       const accountData = [
         { id: 'acc-1', name: 'Unknown Currency', balance: 100, currency: 'XYZ' },
       ];
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -482,12 +482,12 @@ describe('PickerModal', () => {
       expect(getByText('XYZ100.00')).toBeTruthy();
     });
 
-    it('handles missing currency gracefully', () => {
+    it('handles missing currency gracefully', async () => {
       const accountData = [
         { id: 'acc-1', name: 'No Currency', balance: 100, currency: null },
       ];
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="account"
@@ -500,10 +500,10 @@ describe('PickerModal', () => {
   });
 
   describe('Unknown picker type', () => {
-    it('returns null for unknown picker type items', () => {
+    it('returns null for unknown picker type items', async () => {
       const unknownData = [{ id: 'item-1', name: 'Unknown' }];
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="unknown"
@@ -518,7 +518,7 @@ describe('PickerModal', () => {
   });
 
   describe('Selected category highlighting', () => {
-    it('highlights selected category', () => {
+    it('highlights selected category', async () => {
       const categoryData = [
         { id: 'cat-1', name: 'Food', icon: 'food', type: 'entry' },
       ];
@@ -527,7 +527,7 @@ describe('PickerModal', () => {
         categoryId: 'cat-1', // This category is selected
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <PickerModal
           {...defaultProps}
           pickerType="category"
@@ -537,7 +537,7 @@ describe('PickerModal', () => {
         />,
       );
 
-      // Category should render (highlight is applied via style)
+      // Category should await render (highlight is applied via style)
       expect(getByText('Food')).toBeTruthy();
     });
   });

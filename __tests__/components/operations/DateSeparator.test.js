@@ -38,15 +38,15 @@ describe('DateSeparator', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders formatted date uppercased', () => {
-      const { getByText } = render(<DateSeparator {...defaultProps} />);
+    it('renders formatted date uppercased', async () => {
+      const { getByText } = await render(<DateSeparator {...defaultProps} />);
 
       expect(getByText('FORMATTED: 2024-01-15')).toBeTruthy();
     });
 
-    it('renders with custom formatDate function', () => {
+    it('renders with custom formatDate function', async () => {
       const customFormatDate = jest.fn((date) => `Date: ${date}`);
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} formatDate={customFormatDate} />,
       );
 
@@ -54,12 +54,12 @@ describe('DateSeparator', () => {
       expect(getByText('DATE: 2024-01-15')).toBeTruthy();
     });
 
-    it('applies mutedText color to date text', () => {
+    it('applies mutedText color to date text', async () => {
       const customColors = {
         ...defaultProps.colors,
         mutedText: '#999999',
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} colors={customColors} />,
       );
 
@@ -71,43 +71,43 @@ describe('DateSeparator', () => {
   });
 
   describe('Spending Sums Display', () => {
-    it('does not show spending when spendingSums is undefined', () => {
-      const { queryByText } = render(
+    it('does not show spending when spendingSums is undefined', async () => {
+      const { queryByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={undefined} />,
       );
 
       expect(queryByText(/spent_amount/)).toBeNull();
     });
 
-    it('does not show spending when spendingSums is empty object', () => {
-      const { queryByText } = render(
+    it('does not show spending when spendingSums is empty object', async () => {
+      const { queryByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={{}} />,
       );
 
       expect(queryByText(/spent_amount/)).toBeNull();
     });
 
-    it('shows spending for single currency with minus prefix', () => {
+    it('shows spending for single currency with minus prefix', async () => {
       const spendingSums = { USD: 123.45 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-$123.45')).toBeTruthy();
     });
 
-    it('shows spending for multiple currencies each with minus prefix', () => {
+    it('shows spending for multiple currencies each with minus prefix', async () => {
       const spendingSums = { USD: 100.00, EUR: 85.50 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-$100.00, -€85.50')).toBeTruthy();
     });
 
-    it('respects decimal_digits from currency config', () => {
+    it('respects decimal_digits from currency config', async () => {
       const spendingSums = { JPY: 1000, USD: 50.5 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
@@ -115,22 +115,22 @@ describe('DateSeparator', () => {
       expect(getByText('-¥1000, -$50.50')).toBeTruthy();
     });
 
-    it('handles currency with many decimal places (BTC)', () => {
+    it('handles currency with many decimal places (BTC)', async () => {
       const spendingSums = { BTC: 0.00012345 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-₿0.00012345')).toBeTruthy();
     });
 
-    it('applies mutedText color to spending text', () => {
+    it('applies mutedText color to spending text', async () => {
       const customColors = {
         ...defaultProps.colors,
         mutedText: '#777777',
       };
       const spendingSums = { USD: 50 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator
           {...defaultProps}
           colors={customColors}
@@ -146,28 +146,28 @@ describe('DateSeparator', () => {
   });
 
   describe('Currency Symbol Resolution', () => {
-    it('uses currency symbol for known currencies', () => {
+    it('uses currency symbol for known currencies', async () => {
       const spendingSums = { GBP: 75.25 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-£75.25')).toBeTruthy();
     });
 
-    it('uses RUB symbol correctly', () => {
+    it('uses RUB symbol correctly', async () => {
       const spendingSums = { RUB: 1500.50 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-₽1500.50')).toBeTruthy();
     });
 
-    it('falls back to currency code for unknown currencies', () => {
+    it('falls back to currency code for unknown currencies', async () => {
       // Mock an unknown currency with just the entry (no decimal_digits)
       const spendingSums = { XYZ: 100 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
@@ -175,10 +175,10 @@ describe('DateSeparator', () => {
       expect(getByText('-XYZ100.00')).toBeTruthy();
     });
 
-    it('handles empty currency code gracefully', () => {
+    it('handles empty currency code gracefully', async () => {
       // This is an edge case - shouldn't happen in practice
       const spendingSums = { '': 50 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
@@ -188,71 +188,71 @@ describe('DateSeparator', () => {
   });
 
   describe('Press Interaction', () => {
-    it('calls onPress when pressed', () => {
+    it('calls onPress when pressed', async () => {
       const onPress = jest.fn();
-      const { getByRole } = render(
+      const { getByRole } = await render(
         <DateSeparator {...defaultProps} onPress={onPress} />,
       );
 
       const pressable = getByRole('button');
-      fireEvent.press(pressable);
+      await fireEvent.press(pressable);
 
       expect(onPress).toHaveBeenCalledTimes(1);
     });
 
-    it('does not crash when onPress is undefined', () => {
+    it('does not crash when onPress is undefined', async () => {
       const propsWithoutOnPress = { ...defaultProps };
       delete propsWithoutOnPress.onPress;
 
-      const { getByRole } = render(
+      const { getByRole } = await render(
         <DateSeparator {...propsWithoutOnPress} />,
       );
 
       const pressable = getByRole('button');
       // Should not throw
-      fireEvent.press(pressable);
+      await fireEvent.press(pressable);
     });
 
-    it('multiple presses call onPress multiple times', () => {
+    it('multiple presses call onPress multiple times', async () => {
       const onPress = jest.fn();
-      const { getByRole } = render(
+      const { getByRole } = await render(
         <DateSeparator {...defaultProps} onPress={onPress} />,
       );
 
       const pressable = getByRole('button');
-      fireEvent.press(pressable);
-      fireEvent.press(pressable);
-      fireEvent.press(pressable);
+      await fireEvent.press(pressable);
+      await fireEvent.press(pressable);
+      await fireEvent.press(pressable);
 
       expect(onPress).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('Accessibility', () => {
-    it('has button accessibility role', () => {
-      const { getByRole } = render(<DateSeparator {...defaultProps} />);
+    it('has button accessibility role', async () => {
+      const { getByRole } = await render(<DateSeparator {...defaultProps} />);
 
       expect(getByRole('button')).toBeTruthy();
     });
 
-    it('has accessibility label with formatted date (non-uppercased in label)', () => {
-      const { getByLabelText } = render(<DateSeparator {...defaultProps} />);
+    it('has accessibility label with formatted date (non-uppercased in label)', async () => {
+      const { getByLabelText } = await render(<DateSeparator {...defaultProps} />);
 
       expect(
         getByLabelText('Formatted: 2024-01-15, press to select date'),
       ).toBeTruthy();
     });
 
-    it('has accessibility hint for date picker', () => {
-      const { getByA11yHint } = render(<DateSeparator {...defaultProps} />);
+    it('has accessibility hint for date picker', async () => {
+      const { getByA11yHint } = await render(<DateSeparator {...defaultProps} />);
 
       expect(
         getByA11yHint('Opens date picker to jump to a specific date'),
       ).toBeTruthy();
     });
 
-    it('accessibility label updates with different dates', () => {
-      const { getByLabelText, rerender } = render(
+    it('accessibility label updates with different dates', async () => {
+      const { getByLabelText, rerender } = await render(
         <DateSeparator {...defaultProps} date="2024-06-20" />,
       );
 
@@ -260,7 +260,7 @@ describe('DateSeparator', () => {
         getByLabelText('Formatted: 2024-06-20, press to select date'),
       ).toBeTruthy();
 
-      rerender(<DateSeparator {...defaultProps} date="2024-12-25" />);
+      await rerender(<DateSeparator {...defaultProps} date="2024-12-25" />);
 
       expect(
         getByLabelText('Formatted: 2024-12-25, press to select date'),
@@ -269,32 +269,32 @@ describe('DateSeparator', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles very long currency amounts', () => {
+    it('handles very long currency amounts', async () => {
       const spendingSums = { USD: 999999999.99 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-$999999999.99')).toBeTruthy();
     });
 
-    it('handles zero amount', () => {
+    it('handles zero amount', async () => {
       const spendingSums = { USD: 0 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
       expect(getByText('-$0.00')).toBeTruthy();
     });
 
-    it('handles many currencies at once', () => {
+    it('handles many currencies at once', async () => {
       const spendingSums = {
         USD: 100,
         EUR: 85,
         GBP: 70,
         JPY: 10000,
       };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
@@ -303,15 +303,15 @@ describe('DateSeparator', () => {
       ).toBeTruthy();
     });
 
-    it('memoizes correctly (same props)', () => {
-      const { rerender } = render(<DateSeparator {...defaultProps} />);
+    it('memoizes correctly (same props)', async () => {
+      const { rerender } = await render(<DateSeparator {...defaultProps} />);
 
       // Re-render with same props should not cause issues
-      rerender(<DateSeparator {...defaultProps} />);
+      await rerender(<DateSeparator {...defaultProps} />);
     });
 
-    it('handles date that is just a string', () => {
-      const { getByText } = render(
+    it('handles date that is just a string', async () => {
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} date="Today" />,
       );
 
@@ -320,11 +320,11 @@ describe('DateSeparator', () => {
   });
 
   describe('Decimal Digits Fallback', () => {
-    it('defaults to 2 decimal digits when currency has no decimal_digits config', () => {
+    it('defaults to 2 decimal digits when currency has no decimal_digits config', async () => {
       // ABC is not in our mock, so it falls back to currency code
       // and ?? 2 gives 2 decimal digits
       const spendingSums = { ABC: 123.456 };
-      const { getByText } = render(
+      const { getByText } = await render(
         <DateSeparator {...defaultProps} spendingSums={spendingSums} />,
       );
 
