@@ -589,7 +589,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       for (const operation of backup.data.operations) {
         // Map account IDs from old ID to new integer ID
         // First check if we have a mapping, otherwise use the original value
-        let mappedAccountId = accountIdMapping.get(operation.account_id);
+        let mappedAccountId = accountIdMapping.get(String(operation.account_id));
         if (mappedAccountId === undefined) {
           mappedAccountId = operation.account_id;
         }
@@ -603,7 +603,7 @@ export const restoreBackup = async (backup, cancelToken) => {
 
         let mappedToAccountId = null;
         if (operation.to_account_id != null) {
-          mappedToAccountId = accountIdMapping.get(operation.to_account_id);
+          mappedToAccountId = accountIdMapping.get(String(operation.to_account_id));
           if (mappedToAccountId === undefined) {
             mappedToAccountId = operation.to_account_id;
           }
@@ -789,10 +789,10 @@ export const restoreBackup = async (backup, cancelToken) => {
             continue;
           }
 
-          const mappedAccountId = accountIdMapping.get(planned.account_id) ?? planned.account_id;
+          const mappedAccountId = accountIdMapping.get(String(planned.account_id)) ?? planned.account_id;
           let mappedToAccountId = null;
           if (planned.to_account_id != null) {
-            mappedToAccountId = accountIdMapping.get(planned.to_account_id) ?? planned.to_account_id;
+            mappedToAccountId = accountIdMapping.get(String(planned.to_account_id)) ?? planned.to_account_id;
           }
 
           const plannedType = VALID_OPERATION_TYPES.includes(planned.type) ? planned.type : 'expense';
