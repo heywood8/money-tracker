@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.6](https://github.com/heywood8/money-tracker/compare/penny-v0.132.5...penny-v0.132.6) (2026-06-12)
+
+
+### Bug Fixes
+
+* **theme:** derive colorScheme synchronously — remove double-render flash on theme switch ([#919](https://github.com/heywood8/money-tracker/issues/919)) ([#923](https://github.com/heywood8/money-tracker/issues/923)) ([a90e128](https://github.com/heywood8/money-tracker/commit/a90e128bc4306e7780dafc953129950a7f966685))
+
 ## [0.132.5](https://github.com/heywood8/money-tracker/compare/penny-v0.132.4...penny-v0.132.5) (2026-06-12)
 
 
