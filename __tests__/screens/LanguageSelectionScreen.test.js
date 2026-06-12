@@ -34,30 +34,30 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('Initialization', () => {
-    it('renders without crashing', () => {
-      expect(() => render(
+    it('renders without crashing', async () => {
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
 
-    it('displays welcome title', () => {
-      const { getByText } = render(
+    it('displays welcome title', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Welcome to Penny')).toBeTruthy();
     });
 
-    it('displays welcome subtitle', () => {
-      const { getByText } = render(
+    it('displays welcome subtitle', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Please select your preferred language')).toBeTruthy();
     });
 
-    it('displays language options', () => {
-      const { getByText } = render(
+    it('displays language options', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -70,30 +70,30 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('Component Behavior', () => {
-    it('accepts onLanguageSelected callback', () => {
+    it('accepts onLanguageSelected callback', async () => {
       const mockCallback = jest.fn();
 
-      expect(() => render(
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockCallback} />,
-      )).not.toThrow();
+      );
     });
 
-    it('handles missing onLanguageSelected callback gracefully', () => {
-      expect(() => render(
+    it('handles missing onLanguageSelected callback gracefully', async () => {
+      await render(
         <LanguageSelectionScreen />,
-      )).not.toThrow();
+      );
     });
   });
 
   describe('Rendering and UI', () => {
-    it('renders SafeAreaView container', () => {
-      expect(() => render(
+    it('renders SafeAreaView container', async () => {
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
 
-    it('renders both English and Russian options', () => {
-      const { getByText } = render(
+    it('renders both English and Russian options', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -104,8 +104,8 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('🇷🇺')).toBeTruthy();
     });
 
-    it('renders Continue button', () => {
-      const { getByText } = render(
+    it('renders Continue button', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -114,8 +114,8 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('Translation Integration', () => {
-    it('uses translations for UI text', () => {
-      const { getByText } = render(
+    it('uses translations for UI text', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -125,44 +125,44 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('Continue')).toBeTruthy();
     });
 
-    it('provides translation fallback mechanism', () => {
+    it('provides translation fallback mechanism', async () => {
       // Component has internal t() function for translation
-      expect(() => render(
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles null callback', () => {
-      expect(() => render(
+    it('handles null callback', async () => {
+      await render(
         <LanguageSelectionScreen onLanguageSelected={null} />,
-      )).not.toThrow();
+      );
     });
 
-    it('handles undefined callback', () => {
-      expect(() => render(
+    it('handles undefined callback', async () => {
+      await render(
         <LanguageSelectionScreen onLanguageSelected={undefined} />,
-      )).not.toThrow();
+      );
     });
 
-    it('renders correctly without any props', () => {
-      expect(() => render(
+    it('renders correctly without any props', async () => {
+      await render(
         <LanguageSelectionScreen />,
-      )).not.toThrow();
+      );
     });
   });
 
   describe('Accessibility', () => {
-    it('provides accessible structure', () => {
+    it('provides accessible structure', async () => {
       // Component should render without errors
-      expect(() => render(
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
 
-    it('includes text content for screen readers', () => {
-      const { getByText } = render(
+    it('includes text content for screen readers', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -173,8 +173,8 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('Component Integration', () => {
-    it('integrates with i18n data', () => {
-      const { getByText } = render(
+    it('integrates with i18n data', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -182,8 +182,8 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('Welcome to Penny')).toBeTruthy();
     });
 
-    it('renders language flags', () => {
-      const { getByText } = render(
+    it('renders language flags', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -194,24 +194,24 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('State Management', () => {
-    it('manages language selection state internally', () => {
+    it('manages language selection state internally', async () => {
       // Component uses useState for selected language
-      expect(() => render(
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
 
-    it('initializes with no language selected', () => {
+    it('initializes with no language selected', async () => {
       // Component should start with null selection
-      expect(() => render(
+      await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
-      )).not.toThrow();
+      );
     });
   });
 
   describe('Regression Tests', () => {
-    it('handles re-rendering without errors', () => {
-      const { rerender } = render(
+    it('handles re-rendering without errors', async () => {
+      const { rerender } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -220,11 +220,11 @@ describe('LanguageSelectionScreen', () => {
       )).not.toThrow();
     });
 
-    it('maintains stable rendering with different callbacks', () => {
+    it('maintains stable rendering with different callbacks', async () => {
       const callback1 = jest.fn();
       const callback2 = jest.fn();
 
-      const { rerender } = render(
+      const { rerender } = await render(
         <LanguageSelectionScreen onLanguageSelected={callback1} />,
       );
 
@@ -233,8 +233,8 @@ describe('LanguageSelectionScreen', () => {
       )).not.toThrow();
     });
 
-    it('displays correct default language (English)', () => {
-      const { getByText } = render(
+    it('displays correct default language (English)', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -245,8 +245,8 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('UI Components', () => {
-    it('renders language selection buttons', () => {
-      const { getByText } = render(
+    it('renders language selection buttons', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -255,16 +255,16 @@ describe('LanguageSelectionScreen', () => {
       expect(getByText('🇬🇧')).toBeTruthy();
     });
 
-    it('renders action button', () => {
-      const { getByText } = render(
+    it('renders action button', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       expect(getByText('Continue')).toBeTruthy();
     });
 
-    it('includes all required UI elements', () => {
-      const { getByText } = render(
+    it('includes all required UI elements', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -277,32 +277,32 @@ describe('LanguageSelectionScreen', () => {
   });
 
   describe('Interaction - language selection', () => {
-    it('calls onLanguageSelected when a language is selected and Continue is pressed', () => {
-      const { getByText, getByLabelText } = render(
+    it('calls onLanguageSelected when a language is selected and Continue is pressed', async () => {
+      const { getByText, getByLabelText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Select English via accessibility label (nativeName == name, both 'English')
-      fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText('Select English'));
 
       // Press continue
-      fireEvent.press(getByText('Continue'));
+      await fireEvent.press(getByText('Continue'));
 
       expect(mockOnLanguageSelected).toHaveBeenCalledWith('en');
     });
 
-    it('does not call onLanguageSelected when Continue is pressed without selection', () => {
-      const { getByText } = render(
+    it('does not call onLanguageSelected when Continue is pressed without selection', async () => {
+      const { getByText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
-      fireEvent.press(getByText('Continue'));
+      await fireEvent.press(getByText('Continue'));
 
       expect(mockOnLanguageSelected).not.toHaveBeenCalled();
     });
 
-    it('shows checkmark after selecting a language', () => {
-      const { getByText, queryByText, getByLabelText } = render(
+    it('shows checkmark after selecting a language', async () => {
+      const { getByText, queryByText, getByLabelText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
@@ -310,48 +310,48 @@ describe('LanguageSelectionScreen', () => {
       expect(queryByText('✓')).toBeNull();
 
       // Select English
-      fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText('Select English'));
 
       // Checkmark should appear
       expect(getByText('✓')).toBeTruthy();
     });
 
-    it('calls onLanguageSelected with Russian when Russian is selected', () => {
-      const { getByText, getByLabelText } = render(
+    it('calls onLanguageSelected with Russian when Russian is selected', async () => {
+      const { getByText, getByLabelText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
-      fireEvent.press(getByLabelText('Select Russian'));
-      fireEvent.press(getByText('Продолжить'));
+      await fireEvent.press(getByLabelText('Select Russian'));
+      await fireEvent.press(getByText('Продолжить'));
 
       expect(mockOnLanguageSelected).toHaveBeenCalledWith('ru');
     });
 
-    it('switches selection when another language is pressed', () => {
-      const { getByText, getAllByText, getByLabelText } = render(
+    it('switches selection when another language is pressed', async () => {
+      const { getByText, getAllByText, getByLabelText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Select English first
-      fireEvent.press(getByLabelText('Select English'));
+      await fireEvent.press(getByLabelText('Select English'));
       expect(getAllByText('✓')).toHaveLength(1);
 
       // Select Russian
-      fireEvent.press(getByLabelText('Select Russian'));
+      await fireEvent.press(getByLabelText('Select Russian'));
       expect(getAllByText('✓')).toHaveLength(1);
 
       // Continue uses the latest selection
-      fireEvent.press(getByText('Продолжить'));
+      await fireEvent.press(getByText('Продолжить'));
       expect(mockOnLanguageSelected).toHaveBeenCalledWith('ru');
     });
 
-    it('t() falls back to key when translation is missing', () => {
-      const { getByText, getByLabelText } = render(
+    it('t() falls back to key when translation is missing', async () => {
+      const { getByText, getByLabelText } = await render(
         <LanguageSelectionScreen onLanguageSelected={mockOnLanguageSelected} />,
       );
 
       // Select German (mocked with empty translations)
-      fireEvent.press(getByLabelText('Select German'));
+      await fireEvent.press(getByLabelText('Select German'));
 
       // 'welcome_title' is not in the de.json mock → key is returned as-is
       expect(getByText('welcome_title')).toBeTruthy();

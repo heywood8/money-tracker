@@ -27,8 +27,8 @@ describe('ThemeContext', () => {
   const wrapper = ({ children }) => <ThemeProvider>{children}</ThemeProvider>;
 
   describe('Initialization', () => {
-    it('provides theme context with default values', () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+    it('provides theme context with default values', async () => {
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       expect(result.current.theme).toBe('system');
       expect(result.current.colorScheme).toBeDefined();
@@ -36,10 +36,10 @@ describe('ThemeContext', () => {
       expect(result.current.setTheme).toBeDefined();
     });
 
-    it('uses OS color scheme as default', () => {
+    it('uses OS color scheme as default', async () => {
       Appearance.getColorScheme.mockReturnValue('dark');
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       expect(result.current.colorScheme).toBe('dark');
     });
@@ -47,7 +47,7 @@ describe('ThemeContext', () => {
     it('loads saved theme preference from PreferencesDB', async () => {
       PreferencesDB.getPreference.mockResolvedValue('dark');
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.theme).toBe('dark');
@@ -57,7 +57,7 @@ describe('ThemeContext', () => {
     it('falls back to system when no preference is saved', async () => {
       PreferencesDB.getPreference.mockResolvedValue(null);
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       expect(result.current.theme).toBe('system');
     });
@@ -65,7 +65,7 @@ describe('ThemeContext', () => {
 
   describe('Theme Switching', () => {
     it('switches to light theme', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('light');
@@ -77,7 +77,7 @@ describe('ThemeContext', () => {
     });
 
     it('switches to dark theme', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('dark');
@@ -91,7 +91,7 @@ describe('ThemeContext', () => {
     it('switches to system theme', async () => {
       Appearance.getColorScheme.mockReturnValue('dark');
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('system');
@@ -102,7 +102,7 @@ describe('ThemeContext', () => {
     });
 
     it('persists theme preference to PreferencesDB', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('dark');
@@ -119,7 +119,7 @@ describe('ThemeContext', () => {
     it('follows OS color scheme when theme is system', async () => {
       Appearance.getColorScheme.mockReturnValue('light');
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('system');
@@ -136,7 +136,7 @@ describe('ThemeContext', () => {
         return { remove: jest.fn() };
       });
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('system');
@@ -145,7 +145,7 @@ describe('ThemeContext', () => {
       expect(result.current.colorScheme).toBe('light');
 
       // Simulate OS color scheme change
-      act(() => {
+      await act(async () => {
         changeListener({ colorScheme: 'dark' });
       });
 
@@ -159,7 +159,7 @@ describe('ThemeContext', () => {
         return { remove: jest.fn() };
       });
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('light');
@@ -168,7 +168,7 @@ describe('ThemeContext', () => {
       expect(result.current.colorScheme).toBe('light');
 
       // Simulate OS color scheme change
-      act(() => {
+      await act(async () => {
         changeListener({ colorScheme: 'dark' });
       });
 
@@ -179,7 +179,7 @@ describe('ThemeContext', () => {
 
   describe('Theme Colors', () => {
     it('provides light theme colors when colorScheme is light', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('light');
@@ -191,7 +191,7 @@ describe('ThemeContext', () => {
     });
 
     it('provides dark theme colors when colorScheme is dark', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('dark');
@@ -203,7 +203,7 @@ describe('ThemeContext', () => {
     });
 
     it('includes all required color keys', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       const requiredKeys = [
         'background',
@@ -231,13 +231,13 @@ describe('ThemeContext', () => {
   });
 
   describe('Listener Cleanup', () => {
-    it('removes appearance listener on unmount', () => {
+    it('removes appearance listener on unmount', async () => {
       const mockRemove = jest.fn();
       Appearance.addChangeListener.mockReturnValue({ remove: mockRemove });
 
-      const { unmount } = renderHook(() => useTheme(), { wrapper });
+      const { unmount } = await renderHook(() => useTheme(), { wrapper });
 
-      unmount();
+      await unmount();
 
       expect(mockRemove).toHaveBeenCalled();
     });
@@ -245,16 +245,16 @@ describe('ThemeContext', () => {
 
   // Regression tests
   describe('Regression Tests', () => {
-    it('handles missing OS color scheme gracefully', () => {
+    it('handles missing OS color scheme gracefully', async () => {
       Appearance.getColorScheme.mockReturnValue(null);
 
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       expect(result.current.colorScheme).toBe('light'); // Falls back to light
     });
 
     it('maintains theme consistency after multiple changes', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('dark');
@@ -278,7 +278,7 @@ describe('ThemeContext', () => {
     });
 
     it('colors object remains immutable between renders', async () => {
-      const { result, rerender } = renderHook(() => useTheme(), { wrapper });
+      const { result, rerender } = await renderHook(() => useTheme(), { wrapper });
 
       const initialColors = result.current.colors;
       rerender();
@@ -288,7 +288,7 @@ describe('ThemeContext', () => {
     });
 
     it('handles rapid theme changes', async () => {
-      const { result } = renderHook(() => useTheme(), { wrapper });
+      const { result } = await renderHook(() => useTheme(), { wrapper });
 
       await act(async () => {
         await result.current.setTheme('light');

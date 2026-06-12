@@ -36,42 +36,42 @@ const defaultProps = {
 beforeEach(() => jest.clearAllMocks());
 
 describe('IncomePieChart', () => {
-  it('renders loading state when loadingIncome is true', () => {
-    const { getByText } = render(<IncomePieChart {...defaultProps} loadingIncome={true} />);
+  it('renders loading state when loadingIncome is true', async () => {
+    const { getByText } = await render(<IncomePieChart {...defaultProps} loadingIncome={true} />);
     expect(getByText('loading_operations')).toBeTruthy();
   });
 
-  it('does not render donut chart when loading', () => {
-    const { queryByTestId } = render(<IncomePieChart {...defaultProps} loadingIncome={true} />);
+  it('does not render donut chart when loading', async () => {
+    const { queryByTestId } = await render(<IncomePieChart {...defaultProps} loadingIncome={true} />);
     expect(queryByTestId('donut-chart')).toBeNull();
   });
 
-  it('renders empty state text when incomeChartData is empty', () => {
-    const { getByText } = render(<IncomePieChart {...defaultProps} incomeChartData={[]} />);
+  it('renders empty state text when incomeChartData is empty', async () => {
+    const { getByText } = await render(<IncomePieChart {...defaultProps} incomeChartData={[]} />);
     expect(getByText('no_income_data')).toBeTruthy();
   });
 
-  it('renders DonutChart when data is present', () => {
-    const { getByTestId } = render(<IncomePieChart {...defaultProps} />);
+  it('renders DonutChart when data is present', async () => {
+    const { getByTestId } = await render(<IncomePieChart {...defaultProps} />);
     expect(getByTestId('donut-chart')).toBeTruthy();
   });
 
-  it('renders legend category names', () => {
-    const { getByText } = render(<IncomePieChart {...defaultProps} />);
+  it('renders legend category names', async () => {
+    const { getByText } = await render(<IncomePieChart {...defaultProps} />);
     expect(getByText('Salary')).toBeTruthy();
     expect(getByText('Freelance')).toBeTruthy();
   });
 
-  it('renders arc icons for above-threshold segments', () => {
+  it('renders arc icons for above-threshold segments', async () => {
     // Salary 77.9%, Freelance 20.8% — both above 10%
-    const { queryAllByTestId } = render(<IncomePieChart {...defaultProps} />);
+    const { queryAllByTestId } = await render(<IncomePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-briefcase').length).toBeGreaterThan(0);
     expect(queryAllByTestId('icon-laptop').length).toBeGreaterThan(0);
   });
 
-  it('does not render arc icon for below-threshold segment', () => {
+  it('does not render arc icon for below-threshold segment', async () => {
     // Other 1.6% — below 10%
-    const { queryAllByTestId } = render(<IncomePieChart {...defaultProps} />);
+    const { queryAllByTestId } = await render(<IncomePieChart {...defaultProps} />);
     expect(queryAllByTestId('icon-dots-horizontal').length).toBe(0);
   });
 });

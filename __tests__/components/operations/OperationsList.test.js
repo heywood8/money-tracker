@@ -8,8 +8,23 @@
 
 import React from 'react';
 import { render, act } from '@testing-library/react-native';
-import { ActivityIndicator, SectionList } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import OperationsList from '../../../app/components/operations/OperationsList';
+
+// Intercept SectionList to capture its props for direct callback testing.
+// RNTL v14 no longer exposes composite elements, so we capture props this way.
+// Use a Proxy to avoid triggering lazy getters on the real react-native module.
+let _capturedSLProps = null;
+jest.mock('react-native', () => {
+  const RN = jest.requireActual('react-native');
+  const MockSectionList = (props) => { _capturedSLProps = props; return null; };
+  return new Proxy(RN, {
+    get(target, prop) {
+      if (prop === 'SectionList') return MockSectionList;
+      return Reflect.get(target, prop);
+    },
+  });
+});
 
 jest.mock('../../../app/components/operations/DateSeparator', () => {
   const React = require('react');
@@ -104,10 +119,10 @@ const defaultProps = {
 // Render OperationsList and return the underlying SectionList's props so we can
 // invoke renderItem / renderSectionHeader / ListFooterComponent without relying
 // on SectionList scroll.
-function getSectionListProps(extraProps = {}) {
-  const utils = render(<OperationsList {...defaultProps} {...extraProps} />);
-  const slEl = utils.UNSAFE_getByType(SectionList);
-  return { ...utils, sp: slEl.props };
+async function getSectionListProps(extraProps = {}) {
+  _capturedSLProps = null;
+  const utils = await render(<OperationsList {...defaultProps} {...extraProps} />);
+  return { ...utils, sp: _capturedSLProps };
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -120,15 +135,15 @@ describe('OperationsList', () => {
   // ── initialLoading: ListEmptyComponent branch ─────────────────────────────
 
   describe('initialLoading prop', () => {
-    it('ListEmptyComponent shows skeleton placeholder when initialLoading=true', () => {
-      const { sp } = getSectionListProps({ initialLoading: true });
-      const { getByTestId } = render(sp.ListEmptyComponent);
+    it('ListEmptyComponent shows skeleton placeholder when initialLoading=true', async () => {
+      const { sp } = await getSectionListProps({ initialLoading: true });
+      const { getByTestId } = await render(sp.ListEmptyComponent);
       expect(getByTestId('operations-list-placeholder')).toBeTruthy();
     });
 
-    it('ListEmptyComponent shows empty-state text when initialLoading=false', () => {
-      const { sp } = getSectionListProps({ initialLoading: false });
-      const { getByText } = render(sp.ListEmptyComponent);
+    it('ListEmptyComponent shows empty-state text when initialLoading=false', async () => {
+      const { sp } = await getSectionListProps({ initialLoading: false });
+      const { getByText } = await render(sp.ListEmptyComponent);
       expect(getByText('no_operations')).toBeTruthy();
     });
   });
@@ -136,141 +151,141 @@ describe('OperationsList', () => {
   // ── renderItem callbacks ──────────────────────────────────────────────────
 
   describe('renderItem — date label', () => {
-    it('handles today date', () => {
+    it('handles today date', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-t', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
       const item = section.data[0];
       // render the section header to exercise formatDate
-      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
+      await render(sp.renderSectionHeader({ section }));
       // render each item
-      expect(() => render(sp.renderItem({ item, index: 0, section }))).not.toThrow();
+      await render(sp.renderItem({ item, index: 0, section }));
     });
 
-    it('handles yesterday date', () => {
+    it('handles yesterday date', async () => {
       const group = makeGroup(YESTERDAY, [
         { id: 'op-y', type: 'income', amount: '200.00', accountId: 'acc-usd', categoryId: 'cat-key' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderSectionHeader({ section }));
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('handles older date', () => {
+    it('handles older date', async () => {
       const group = makeGroup(OLD_DATE, [
         { id: 'op-o', type: 'expense', amount: '75.00', accountId: 'acc-usd', categoryId: 'cat-child' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderSectionHeader({ section }))).not.toThrow();
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderSectionHeader({ section }));
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
   });
 
   describe('renderItem — category resolution', () => {
-    it('uses plain category name', () => {
+    it('uses plain category name', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-1', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('uses nameKey translation', () => {
+    it('uses nameKey translation', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-2', type: 'income', amount: '100.00', accountId: 'acc-usd', categoryId: 'cat-key' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('builds parent / child category path', () => {
+    it('builds parent / child category path', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-3', type: 'expense', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-child' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('falls back for unknown category', () => {
+    it('falls back for unknown category', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-4', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'no-such' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
   });
 
   describe('renderItem — currency formatting', () => {
-    it('formats USD amount', () => {
+    it('formats USD amount', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-usd', type: 'expense', amount: '99.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('formats EUR amount', () => {
+    it('formats EUR amount', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-eur', type: 'expense', amount: '50.00', accountId: 'acc-eur', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('falls back for unknown account', () => {
+    it('falls back for unknown account', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-na', type: 'expense', amount: '10.00', accountId: 'no-such', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('falls back for invalid amount', () => {
+    it('falls back for invalid amount', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-bad', type: 'expense', amount: 'NaN', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('handles account without currency field', () => {
+    it('handles account without currency field', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-nc', type: 'expense', amount: '5.00', accountId: 'acc-nc', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
   });
 
   // ── ListFooterComponent (renderFooter) ────────────────────────────────────
 
   describe('ListFooterComponent', () => {
-    it('shows ActivityIndicator when loadingMore=true', () => {
-      const { sp } = getSectionListProps({ loadingMore: true });
+    it('shows ActivityIndicator when loadingMore=true', async () => {
+      const { sp } = await getSectionListProps({ loadingMore: true });
       const footerEl = typeof sp.ListFooterComponent === 'function'
         ? sp.ListFooterComponent()
         : sp.ListFooterComponent;
       if (footerEl) {
-        const { UNSAFE_getAllByType } = render(footerEl);
-        expect(UNSAFE_getAllByType(ActivityIndicator).length).toBeGreaterThan(0);
+        const { container } = await render(footerEl);
+        expect(container.queryAll(n => n.type === 'ActivityIndicator').length).toBeGreaterThan(0);
       }
     });
 
-    it('returns null when loadingMore=false', () => {
-      const { sp } = getSectionListProps({ loadingMore: false });
+    it('returns null when loadingMore=false', async () => {
+      const { sp } = await getSectionListProps({ loadingMore: false });
       const footerEl = typeof sp.ListFooterComponent === 'function'
         ? sp.ListFooterComponent()
         : sp.ListFooterComponent;
@@ -281,24 +296,24 @@ describe('OperationsList', () => {
   // ── onEndReached (handleEndReached) ──────────────────────────────────────
 
   describe('onEndReached', () => {
-    it('calls onLoadMore when not loading and more ops exist', () => {
+    it('calls onLoadMore when not loading and more ops exist', async () => {
       const mockLoadMore = jest.fn();
-      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: false });
-      act(() => { sp.onEndReached(); });
+      const { sp } = await getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: false });
+      await act(async () => { sp.onEndReached(); });
       expect(mockLoadMore).toHaveBeenCalledTimes(1);
     });
 
-    it('does NOT call onLoadMore when loadingMore=true', () => {
+    it('does NOT call onLoadMore when loadingMore=true', async () => {
       const mockLoadMore = jest.fn();
-      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: true });
-      act(() => { sp.onEndReached(); });
+      const { sp } = await getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: true, loadingMore: true });
+      await act(async () => { sp.onEndReached(); });
       expect(mockLoadMore).not.toHaveBeenCalled();
     });
 
-    it('does NOT call onLoadMore when hasMoreOperations=false', () => {
+    it('does NOT call onLoadMore when hasMoreOperations=false', async () => {
       const mockLoadMore = jest.fn();
-      const { sp } = getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: false, loadingMore: false });
-      act(() => { sp.onEndReached(); });
+      const { sp } = await getSectionListProps({ onLoadMore: mockLoadMore, hasMoreOperations: false, loadingMore: false });
+      await act(async () => { sp.onEndReached(); });
       expect(mockLoadMore).not.toHaveBeenCalled();
     });
   });
@@ -306,45 +321,45 @@ describe('OperationsList', () => {
   // ── general rendering ─────────────────────────────────────────────────────
 
   describe('general rendering', () => {
-    it('renders without crashing with empty data', () => {
-      expect(() => render(<OperationsList {...defaultProps} />)).not.toThrow();
+    it('renders without crashing with empty data', async () => {
+      await render(<OperationsList {...defaultProps} />);
     });
 
-    it('renders without crashing with multiple groups', () => {
+    it('renders without crashing with multiple groups', async () => {
       const groups = [
         makeGroup(TODAY, [{ id: 'a', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' }]),
         makeGroup(OLD_DATE, [{ id: 'b', type: 'income', amount: '500.00', accountId: 'acc-eur', categoryId: 'cat-key' }]),
       ];
-      expect(() => render(<OperationsList {...defaultProps} groupedOperations={groups} />)).not.toThrow();
+      await render(<OperationsList {...defaultProps} groupedOperations={groups} />);
     });
 
-    it('renders section footer without crashing', () => {
+    it('renders section footer without crashing', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-sf', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
-      expect(() => render(sp.renderSectionFooter({ section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
+      await render(sp.renderSectionFooter({ section }));
     });
   });
 
   // ── additional branch coverage ────────────────────────────────────────────
 
   describe('branch coverage — getCurrencySymbol fallback (unknown currency)', () => {
-    it('falls back to currency code for unknown currency', () => {
+    it('falls back to currency code for unknown currency', async () => {
       // 'XYZ' is not in the currencies mock → getCurrencySymbol returns 'XYZ'
       const accsWithUnknown = [...accounts, { id: 'acc-xyz', name: 'Exotic', currency: 'XYZ' }];
       const group = makeGroup(TODAY, [
         { id: 'op-xyz', type: 'expense', amount: '10.00', accountId: 'acc-xyz', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group], accounts: accsWithUnknown });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group], accounts: accsWithUnknown });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
   });
 
   describe('branch coverage — getCategoryInfo parent resolution', () => {
-    it('returns name when category has orphaned parentId (parent not found)', () => {
+    it('returns name when category has orphaned parentId (parent not found)', async () => {
       const catsWithOrphan = [
         ...categories,
         { id: 'cat-orphan', name: 'Orphan', icon: 'help', parentId: 'nonexistent-parent' },
@@ -353,11 +368,11 @@ describe('OperationsList', () => {
         { id: 'op-orphan', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-orphan' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsWithOrphan });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group], categories: catsWithOrphan });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('uses nameKey for parent category when parent has nameKey', () => {
+    it('uses nameKey for parent category when parent has nameKey', async () => {
       const catsWithKeyedParent = [
         ...categories,
         { id: 'cat-parent-key', nameKey: 'parent_key', icon: 'folder' },
@@ -367,11 +382,11 @@ describe('OperationsList', () => {
         { id: 'op-kp', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-child-of-key' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsWithKeyedParent });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group], categories: catsWithKeyedParent });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
 
-    it('falls back icon to help-circle when category has no icon field', () => {
+    it('falls back icon to help-circle when category has no icon field', async () => {
       const catsNoIcon = [
         ...categories,
         { id: 'cat-noicon', name: 'NoIcon' }, // no icon field
@@ -380,37 +395,37 @@ describe('OperationsList', () => {
         { id: 'op-ni', type: 'expense', amount: '5.00', accountId: 'acc-usd', categoryId: 'cat-noicon' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group], categories: catsNoIcon });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
+      const { sp } = await getSectionListProps({ groupedOperations: [group], categories: catsNoIcon });
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
     });
   });
 
   describe('branch coverage — pendingSuggestionId match', () => {
-    it('passes pendingSuggestions to matching operation', () => {
+    it('passes pendingSuggestions to matching operation', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-match', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
         { id: 'op-other', type: 'income', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({
+      const { sp } = await getSectionListProps({
         groupedOperations: [group],
         pendingSuggestionId: 'op-match',
         pendingSuggestions: ['Groceries', 'Food'],
       });
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
-      expect(() => render(sp.renderItem({ item: section.data[1], index: 1, section }))).not.toThrow();
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
+      await render(sp.renderItem({ item: section.data[1], index: 1, section }));
     });
 
-    it('isLast is true for last item in section', () => {
+    it('isLast is true for last item in section', async () => {
       const group = makeGroup(TODAY, [
         { id: 'op-a', type: 'expense', amount: '10.00', accountId: 'acc-usd', categoryId: 'cat-1' },
         { id: 'op-b', type: 'income', amount: '20.00', accountId: 'acc-usd', categoryId: 'cat-1' },
       ]);
       const section = toSection(group);
-      const { sp } = getSectionListProps({ groupedOperations: [group] });
+      const { sp } = await getSectionListProps({ groupedOperations: [group] });
       // should not throw for either index
-      expect(() => render(sp.renderItem({ item: section.data[0], index: 0, section }))).not.toThrow();
-      expect(() => render(sp.renderItem({ item: section.data[1], index: 1, section }))).not.toThrow();
+      await render(sp.renderItem({ item: section.data[0], index: 0, section }));
+      await render(sp.renderItem({ item: section.data[1], index: 1, section }));
     });
   });
 });

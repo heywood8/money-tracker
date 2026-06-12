@@ -85,8 +85,8 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Rendering', () => {
-    it('renders category picker button with selected category name', () => {
-      const { getByText } = render(
+    it('renders category picker button with selected category name', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
@@ -94,31 +94,31 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('renders bar chart SVG with 12 months of bars', () => {
-      const { UNSAFE_getByType } = render(
+    it('renders bar chart SVG with 12 months of bars', async () => {
+      const { container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const svg = UNSAFE_getByType('Svg');
+      const svg = container.queryAll(n => n.type === 'Svg')[0];
       expect(svg).toBeTruthy();
     });
 
-    it('shows loading indicator when loading', () => {
+    it('shows loading indicator when loading', async () => {
       useCategoryMonthlySpending.mockReturnValue({
         monthlyData: [],
         loading: true,
         loadData: jest.fn(),
       });
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      const activityIndicator = UNSAFE_getByType('ActivityIndicator');
+      const activityIndicator = container.queryAll(n => n.type === 'ActivityIndicator')[0];
       expect(activityIndicator).toBeTruthy();
     });
 
-    it('shows empty state when no data', () => {
+    it('shows empty state when no data', async () => {
       const emptyData = generateMonthlyData().map(item => ({ ...item, total: 0 }));
 
       useCategoryMonthlySpending.mockReturnValue({
@@ -127,16 +127,16 @@ describe('CategorySpendingCard', () => {
         loadData: jest.fn(),
       });
 
-      const { getByText, UNSAFE_queryByType } = render(
+      const { getByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(getByText('no_spending_data')).toBeTruthy();
-      expect(UNSAFE_queryByType('Svg')).toBeFalsy();
+      expect(container.queryAll(n => n.type === 'Svg')[0]).toBeFalsy();
     });
 
-    it('renders null when no parent expense categories', () => {
-      const { toJSON } = render(
+    it('renders null when no parent expense categories', async () => {
+      const { toJSON } = await render(
         <CategorySpendingCard
           {...defaultProps}
           categories={[
@@ -148,8 +148,8 @@ describe('CategorySpendingCard', () => {
       expect(toJSON()).toBeNull();
     });
 
-    it('renders vs selector button with plus icon and "vs" label', () => {
-      const { getByText } = render(
+    it('renders vs selector button with plus icon and "vs" label', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
@@ -158,25 +158,25 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Category Selection', () => {
-    it('opens picker modal when button is pressed', () => {
-      const { getByText, queryByText } = render(
+    it('opens picker modal when button is pressed', async () => {
+      const { getByText, queryByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Initially modal content should not be visible (parent categories in modal)
       // The selected category "Food" is visible in the button, but not the full list
       const pickerButton = getByText('Food');
-      fireEvent.press(pickerButton);
+      await fireEvent.press(pickerButton);
 
       // After pressing, modal should show parent categories
       // Transport should appear in the modal list
       expect(queryByText('Transport')).toBeTruthy();
     });
 
-    it('calls onCategoryChange when category is selected', () => {
+    it('calls onCategoryChange when category is selected', async () => {
       const onCategoryChange = jest.fn();
 
-      const { getByText, getAllByText } = render(
+      const { getByText, getAllByText } = await render(
         <CategorySpendingCard
           {...defaultProps}
           onCategoryChange={onCategoryChange}
@@ -184,17 +184,17 @@ describe('CategorySpendingCard', () => {
       );
 
       // Open the picker
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       // Select Transport
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]); // Press the one in the modal
+      await fireEvent.press(transportItems[transportItems.length - 1]); // Press the one in the modal
 
       expect(onCategoryChange).toHaveBeenCalledWith('cat-transport');
     });
 
-    it('defaults to first parent category if none selected', () => {
-      const { getByText } = render(
+    it('defaults to first parent category if none selected', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard
           {...defaultProps}
           selectedCategory={null}
@@ -205,23 +205,23 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('shows expand icon for categories with children', () => {
-      const { getByText, UNSAFE_getAllByType } = render(
+    it('shows expand icon for categories with children', async () => {
+      const { getByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Open the picker
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       // Food has children, so there should be chevron icons
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       const chevronIcons = icons.filter(icon =>
         icon.props.name === 'chevron-right' || icon.props.name === 'chevron-down',
       );
       expect(chevronIcons.length).toBeGreaterThan(0);
     });
 
-    it('collapses previous parent when expanding another one', () => {
+    it('collapses previous parent when expanding another one', async () => {
       // Categories with two parents that have children
       const categoriesWithTwoParents = [
         { id: 'cat-food', name: 'Food', parentId: null, categoryType: 'expense', isShadow: false },
@@ -230,7 +230,7 @@ describe('CategorySpendingCard', () => {
         { id: 'cat-gas', name: 'Gas', parentId: 'cat-transport', categoryType: 'expense', isShadow: false },
       ];
 
-      const { getByText, queryByText, UNSAFE_getAllByType } = render(
+      const { getByText, queryByText, container } = await render(
         <CategorySpendingCard
           {...defaultProps}
           categories={categoriesWithTwoParents}
@@ -238,16 +238,16 @@ describe('CategorySpendingCard', () => {
       );
 
       // Open the picker
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       // Find and click the expand chevron for Food
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
 
       // Click the first chevron-right to expand Food
       const chevronButtons = icons.filter(icon => icon.props.name === 'chevron-right');
       if (chevronButtons.length > 0) {
         // Find the touchable parent of the first chevron
-        fireEvent.press(chevronButtons[0].parent);
+        await fireEvent.press(chevronButtons[0].parent);
       }
 
       // Groceries should now be visible (Food is expanded)
@@ -256,10 +256,10 @@ describe('CategorySpendingCard', () => {
       expect(queryByText('Gas')).toBeFalsy();
 
       // Now expand Transport by clicking its chevron
-      const updatedIcons = UNSAFE_getAllByType('Icon');
+      const updatedIcons = container.queryAll(n => n.type === 'Icon');
       const transportChevrons = updatedIcons.filter(icon => icon.props.name === 'chevron-right');
       if (transportChevrons.length > 0) {
-        fireEvent.press(transportChevrons[0].parent);
+        await fireEvent.press(transportChevrons[0].parent);
       }
 
       // Gas should now be visible (Transport is expanded)
@@ -270,8 +270,8 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Currency Formatting', () => {
-    it('formats current month amount with currency symbol for USD', () => {
-      const { getByText } = render(
+    it('formats current month amount with currency symbol for USD', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
@@ -279,7 +279,7 @@ describe('CategorySpendingCard', () => {
       expect(getByText('$200.00')).toBeTruthy();
     });
 
-    it('formats current month amount with currency symbol for JPY (0 decimals)', () => {
+    it('formats current month amount with currency symbol for JPY (0 decimals)', async () => {
       const jpyData = generateMonthlyData().map((item, i) =>
         i === 11 ? { ...item, total: 5000 } : item,
       );
@@ -289,7 +289,7 @@ describe('CategorySpendingCard', () => {
         loadData: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <CategorySpendingCard
           {...defaultProps}
           selectedCurrency="JPY"
@@ -301,21 +301,21 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Theming', () => {
-    it('applies theme colors to card', () => {
+    it('applies theme colors to card', async () => {
       const customColors = {
         ...defaultColors,
         altRow: '#EEEEEE',
         border: '#AAAAAA',
       };
 
-      const { UNSAFE_getAllByType } = render(
+      const { container } = await render(
         <CategorySpendingCard
           {...defaultProps}
           colors={customColors}
         />,
       );
 
-      const views = UNSAFE_getAllByType('View');
+      const views = container.queryAll(n => n.type === 'View');
       const cardView = views[0];
 
       expect(cardView.props.style).toEqual(
@@ -327,16 +327,16 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('Title and Labels', () => {
-    it('displays spending trend title uppercased', () => {
-      const { getByText } = render(
+    it('displays spending trend title uppercased', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(getByText('CATEGORY_SPENDING_TREND')).toBeTruthy();
     });
 
-    it('displays this_month label for current month', () => {
-      const { getByText } = render(
+    it('displays this_month label for current month', async () => {
+      const { getByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
@@ -355,26 +355,26 @@ describe('CategorySpendingCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('does not render the amount', () => {
-      const { queryByText } = render(
+    it('does not render the amount', async () => {
+      const { queryByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(queryByText('$200.00')).toBeFalsy();
     });
 
-    it('still renders the bar chart', () => {
-      const { UNSAFE_getByType } = render(
+    it('still renders the bar chart', async () => {
+      const { container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      expect(UNSAFE_getByType('Svg')).toBeTruthy();
+      expect(container.queryAll(n => n.type === 'Svg')[0]).toBeTruthy();
     });
   });
 
   describe('Hook Integration', () => {
-    it('passes correct parameters to hook', () => {
-      render(
+    it('passes correct parameters to hook', async () => {
+      await render(
         <CategorySpendingCard
           {...defaultProps}
           selectedCurrency="EUR"
@@ -389,8 +389,8 @@ describe('CategorySpendingCard', () => {
       );
     });
 
-    it('uses first category when selectedCategory is invalid', () => {
-      render(
+    it('uses first category when selectedCategory is invalid', async () => {
+      await render(
         <CategorySpendingCard
           {...defaultProps}
           selectedCategory="non-existent"
@@ -404,8 +404,8 @@ describe('CategorySpendingCard', () => {
       );
     });
 
-    it('calls hook twice: once for primary and once for vs category', () => {
-      render(<CategorySpendingCard {...defaultProps} />);
+    it('calls hook twice: once for primary and once for vs category', async () => {
+      await render(<CategorySpendingCard {...defaultProps} />);
 
       // Called twice per render: primary + vs (null by default)
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
@@ -422,31 +422,31 @@ describe('CategorySpendingCard', () => {
   });
 
   describe('VS Category Comparison', () => {
-    it('shows vs selector button by default', () => {
-      const { getByText, UNSAFE_getAllByType } = render(
+    it('shows vs selector button by default', async () => {
+      const { getByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(getByText('vs')).toBeTruthy();
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       const plusIcon = icons.find(icon => icon.props.name === 'plus-circle-outline');
       expect(plusIcon).toBeTruthy();
     });
 
-    it('opens picker in vs mode when vs selector is pressed', () => {
-      const { getByText, getAllByText } = render(
+    it('opens picker in vs mode when vs selector is pressed', async () => {
+      const { getByText, getAllByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Press the "vs" button
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
 
       // Modal should open showing category list (Transport should appear)
       expect(getAllByText('Transport').length).toBeGreaterThan(0);
     });
 
-    it('shows vs category name and amount after selection', () => {
-      const { getByText, getAllByText, queryAllByText } = render(
+    it('shows vs category name and amount after selection', async () => {
+      const { getByText, getAllByText, queryAllByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
@@ -454,9 +454,9 @@ describe('CategorySpendingCard', () => {
       expect(queryAllByText('$200.00').length).toBe(1);
 
       // Open vs picker and select Transport
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // Now both primary and vs amounts shown (both return same mock data: $200.00)
       expect(queryAllByText('$200.00').length).toBe(2);
@@ -465,56 +465,56 @@ describe('CategorySpendingCard', () => {
       expect(getByText('Transport')).toBeTruthy();
     });
 
-    it('shows X button to clear vs category after selection', () => {
-      const { getByText, getAllByText, UNSAFE_getAllByType } = render(
+    it('shows X button to clear vs category after selection', async () => {
+      const { getByText, getAllByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Before selection: no close icon
-      const initialIcons = UNSAFE_getAllByType('Icon');
+      const initialIcons = container.queryAll(n => n.type === 'Icon');
       expect(initialIcons.find(i => i.props.name === 'close')).toBeFalsy();
 
       // Select a vs category
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // After selection: close icon should appear
-      const updatedIcons = UNSAFE_getAllByType('Icon');
+      const updatedIcons = container.queryAll(n => n.type === 'Icon');
       expect(updatedIcons.find(i => i.props.name === 'close')).toBeTruthy();
     });
 
-    it('clears vs category when X button is pressed', () => {
-      const { getByText, getAllByText, queryAllByText, UNSAFE_getAllByType } = render(
+    it('clears vs category when X button is pressed', async () => {
+      const { getByText, getAllByText, queryAllByText, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Select Transport as vs category
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // Verify two amounts are shown
       expect(queryAllByText('$200.00').length).toBe(2);
 
       // Press the X button to clear vs category
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       const closeIcon = icons.find(i => i.props.name === 'close');
-      fireEvent.press(closeIcon.parent);
+      await fireEvent.press(closeIcon.parent);
 
       // Only primary amount should remain
       expect(queryAllByText('$200.00').length).toBe(1);
     });
 
-    it('passes vs category to hook after selection', () => {
-      const { getByText, getAllByText } = render(
+    it('passes vs category to hook after selection', async () => {
+      const { getByText, getAllByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Select Transport as vs category
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // Hook should now be called with Transport for vs
       expect(useCategoryMonthlySpending).toHaveBeenCalledWith(
@@ -524,18 +524,18 @@ describe('CategorySpendingCard', () => {
       );
     });
 
-    it('does not show vs amounts when hideBalances is true', () => {
+    it('does not show vs amounts when hideBalances is true', async () => {
       const { useDisplaySettings } = require('../../../app/contexts/DisplaySettingsContext');
       useDisplaySettings.mockReturnValue({ hideBalances: true });
 
-      const { getByText, getAllByText, queryAllByText } = render(
+      const { getByText, getAllByText, queryAllByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Select a vs category
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // No amounts shown when hideBalances is true
       expect(queryAllByText('$200.00').length).toBe(0);
@@ -543,145 +543,145 @@ describe('CategorySpendingCard', () => {
       useDisplaySettings.mockReturnValue({ hideBalances: false });
     });
 
-    it('resets expanded state when opening vs picker', () => {
+    it('resets expanded state when opening vs picker', async () => {
       const categoriesWithChildren = [
         { id: 'cat-food', name: 'Food', parentId: null, categoryType: 'expense', isShadow: false },
         { id: 'cat-groceries', name: 'Groceries', parentId: 'cat-food', categoryType: 'expense', isShadow: false },
         { id: 'cat-transport', name: 'Transport', parentId: null, categoryType: 'expense', isShadow: false },
       ];
 
-      const { getByText, getAllByText, queryByText, UNSAFE_getAllByType } = render(
+      const { getByText, getAllByText, queryByText, container } = await render(
         <CategorySpendingCard {...defaultProps} categories={categoriesWithChildren} />,
       );
 
       // Open primary picker and expand Food
-      fireEvent.press(getByText('Food'));
-      const icons = UNSAFE_getAllByType('Icon');
+      await fireEvent.press(getByText('Food'));
+      const icons = container.queryAll(n => n.type === 'Icon');
       const chevrons = icons.filter(i => i.props.name === 'chevron-right');
       if (chevrons.length > 0) {
-        fireEvent.press(chevrons[0].parent);
+        await fireEvent.press(chevrons[0].parent);
       }
       // Close primary picker by selecting a category
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // Open vs picker - expansion should be reset
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       // Groceries should NOT be visible (expansion was reset when openPicker was called)
       expect(queryByText('Groceries')).toBeFalsy();
     });
   });
 
   describe('Stacked Bar Toggle', () => {
-    const selectVsCategory = ({ getByText, getAllByText }) => {
-      fireEvent.press(getByText('vs'));
+    const selectVsCategory = async ({ getByText, getAllByText }) => {
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
     };
 
-    it('does not show stacked toggle button when no vs category is selected', () => {
-      const { queryByTestId } = render(
+    it('does not show stacked toggle button when no vs category is selected', async () => {
+      const { queryByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
     });
 
-    it('shows stacked toggle button when vs category is active', () => {
-      const { getByText, getAllByText, getByTestId } = render(
+    it('shows stacked toggle button when vs category is active', async () => {
+      const { getByText, getAllByText, getByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
+      await selectVsCategory({ getByText, getAllByText });
 
       expect(getByTestId('stacked-bar-toggle-btn')).toBeTruthy();
     });
 
-    it('toggle button uses chart-bar-stacked icon when in side-by-side mode', () => {
-      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+    it('toggle button uses chart-bar-stacked icon when in side-by-side mode', async () => {
+      const { getByText, getAllByText, getByTestId, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
+      await selectVsCategory({ getByText, getAllByText });
 
       const btn = getByTestId('stacked-bar-toggle-btn');
       expect(btn).toBeTruthy();
 
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       const stackedIcon = icons.find(i => i.props.name === 'chart-bar-stacked');
       expect(stackedIcon).toBeTruthy();
     });
 
-    it('switches to chart-bar icon after toggling to stacked mode', () => {
-      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+    it('switches to chart-bar icon after toggling to stacked mode', async () => {
+      const { getByText, getAllByText, getByTestId, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
-      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      await selectVsCategory({ getByText, getAllByText });
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
 
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       expect(icons.find(i => i.props.name === 'chart-bar')).toBeTruthy();
       expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeFalsy();
     });
 
-    it('pressing toggle again returns to side-by-side mode', () => {
-      const { getByText, getAllByText, getByTestId, UNSAFE_getAllByType } = render(
+    it('pressing toggle again returns to side-by-side mode', async () => {
+      const { getByText, getAllByText, getByTestId, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
-      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      await selectVsCategory({ getByText, getAllByText });
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
 
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       expect(icons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
     });
 
-    it('clearing vs category hides the toggle button', () => {
-      const { getByText, getAllByText, UNSAFE_getAllByType, queryByTestId } = render(
+    it('clearing vs category hides the toggle button', async () => {
+      const { getByText, getAllByText, container, queryByTestId } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
+      await selectVsCategory({ getByText, getAllByText });
       expect(queryByTestId('stacked-bar-toggle-btn')).toBeTruthy();
 
-      const icons = UNSAFE_getAllByType('Icon');
+      const icons = container.queryAll(n => n.type === 'Icon');
       const closeIcon = icons.find(i => i.props.name === 'close');
-      fireEvent.press(closeIcon.parent);
+      await fireEvent.press(closeIcon.parent);
 
       expect(queryByTestId('stacked-bar-toggle-btn')).toBeFalsy();
     });
 
-    it('clearing vs category resets stacked mode so toggle shows chart-bar-stacked next time', () => {
-      const { getByText, getAllByText, getByTestId, queryByTestId, UNSAFE_getAllByType } = render(
+    it('clearing vs category resets stacked mode so toggle shows chart-bar-stacked next time', async () => {
+      const { getByText, getAllByText, getByTestId, queryByTestId, container } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
       // Select vs, toggle to stacked, then clear vs
-      selectVsCategory({ getByText, getAllByText });
-      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
-      const icons = UNSAFE_getAllByType('Icon');
+      await selectVsCategory({ getByText, getAllByText });
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      const icons = container.queryAll(n => n.type === 'Icon');
       const closeIcon = icons.find(i => i.props.name === 'close');
-      fireEvent.press(closeIcon.parent);
+      await fireEvent.press(closeIcon.parent);
 
       // Re-select vs category
-      fireEvent.press(getByText('vs'));
+      await fireEvent.press(getByText('vs'));
       const transportItems = getAllByText('Transport');
-      fireEvent.press(transportItems[transportItems.length - 1]);
+      await fireEvent.press(transportItems[transportItems.length - 1]);
 
       // Toggle should show chart-bar-stacked (stacked mode was reset on clear)
-      const updatedIcons = UNSAFE_getAllByType('Icon');
+      const updatedIcons = container.queryAll(n => n.type === 'Icon');
       expect(updatedIcons.find(i => i.props.name === 'chart-bar-stacked')).toBeTruthy();
     });
 
-    it('renders percentage y-axis labels (0%, 25%, 50%, 75%, 100%) in stacked mode', () => {
-      const { getByText, getAllByText, getByTestId, queryByText } = render(
+    it('renders percentage y-axis labels (0%, 25%, 50%, 75%, 100%) in stacked mode', async () => {
+      const { getByText, getAllByText, getByTestId, queryByText } = await render(
         <CategorySpendingCard {...defaultProps} />,
       );
 
-      selectVsCategory({ getByText, getAllByText });
-      fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
+      await selectVsCategory({ getByText, getAllByText });
+      await fireEvent.press(getByTestId('stacked-bar-toggle-btn'));
 
       expect(queryByText('0%')).toBeTruthy();
       expect(queryByText('50%')).toBeTruthy();

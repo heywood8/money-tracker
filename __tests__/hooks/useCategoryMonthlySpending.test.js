@@ -43,11 +43,12 @@ describe('useCategoryMonthlySpending', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with loading=true and empty data', () => {
-      CategoriesDB.getAllDescendants.mockResolvedValue([]);
-      OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
+    it('should initialize with loading=true and empty data', async () => {
+      // Use a pending promise so effects never complete, keeping loading=true
+      CategoriesDB.getAllDescendants.mockReturnValue(new Promise(() => {}));
+      OperationsDB.getLast12MonthsSpendingByCategories.mockReturnValue(new Promise(() => {}));
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -72,7 +73,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue(mockDescendants);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -93,7 +94,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -116,7 +117,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue(mockDescendants);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -135,7 +136,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      renderHook(() =>
+      await renderHook(() =>
         useCategoryMonthlySpending('EUR', mockCategoryId, mockCategories),
       );
 
@@ -161,7 +162,7 @@ describe('useCategoryMonthlySpending', () => {
 
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -180,7 +181,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      renderHook(() =>
+      await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -197,11 +198,11 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { unmount } = renderHook(() =>
+      const { unmount } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
-      unmount();
+      await unmount();
 
       expect(unsubscribe).toHaveBeenCalled();
     });
@@ -212,7 +213,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, []),
       );
 
@@ -224,7 +225,7 @@ describe('useCategoryMonthlySpending', () => {
     });
 
     it('should handle null selectedCategoryId', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, null, mockCategories),
       );
 
@@ -237,7 +238,7 @@ describe('useCategoryMonthlySpending', () => {
     });
 
     it('should handle empty currency', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending('', mockCategoryId, mockCategories),
       );
 
@@ -252,7 +253,7 @@ describe('useCategoryMonthlySpending', () => {
     it('should handle database errors gracefully', async () => {
       CategoriesDB.getAllDescendants.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -273,7 +274,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useCategoryMonthlySpending(mockCurrency, mockCategoryId, mockCategories),
       );
 
@@ -298,7 +299,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { rerender } = renderHook(
+      const { rerender } = await renderHook(
         ({ currency }) => useCategoryMonthlySpending(currency, mockCategoryId, mockCategories),
         { initialProps: { currency: 'USD' } },
       );
@@ -328,7 +329,7 @@ describe('useCategoryMonthlySpending', () => {
       CategoriesDB.getAllDescendants.mockResolvedValue([]);
       OperationsDB.getLast12MonthsSpendingByCategories.mockResolvedValue([]);
 
-      const { rerender } = renderHook(
+      const { rerender } = await renderHook(
         ({ categoryId }) => useCategoryMonthlySpending(mockCurrency, categoryId, mockCategories),
         { initialProps: { categoryId: 'cat-food' } },
       );

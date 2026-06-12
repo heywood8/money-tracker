@@ -40,10 +40,10 @@ describe('IconPicker', () => {
   });
 
   describe('Visibility', () => {
-    it('renders when visible is true', () => {
+    it('renders when visible is true', async () => {
       // Modal content doesn't render in test environment
       // Just verify component doesn't throw
-      const { toJSON } = render(
+      const { toJSON } = await render(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -56,8 +56,8 @@ describe('IconPicker', () => {
       expect(toJSON).toBeDefined();
     });
 
-    it('does not render when visible is false', () => {
-      const { toJSON } = render(
+    it('does not render when visible is false', async () => {
+      const { toJSON } = await render(
         <IconPicker
           visible={false}
           onClose={jest.fn()}
@@ -70,8 +70,8 @@ describe('IconPicker', () => {
       expect(toJSON()).toBeNull();
     });
 
-    it('toggles visibility correctly', () => {
-      const { toJSON, rerender } = render(
+    it('toggles visibility correctly', async () => {
+      const { toJSON, rerender } = await render(
         <IconPicker
           visible={false}
           onClose={jest.fn()}
@@ -82,7 +82,7 @@ describe('IconPicker', () => {
 
       expect(toJSON()).toBeNull();
 
-      rerender(
+      await rerender(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -96,26 +96,24 @@ describe('IconPicker', () => {
   });
 
   describe('Header', () => {
-    it('displays title', () => {
+    it('displays title', async () => {
       // Modal content doesn't render in test environment
       // Verify component renders without error
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
 
-    it('displays close button', () => {
+    it('displays close button', async () => {
       // Modal content doesn't render in test environment
       // Verify component has close handler
       const onClose = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={onClose}
@@ -128,11 +126,11 @@ describe('IconPicker', () => {
       expect(onClose).toBeDefined();
     });
 
-    it('calls onClose when close button is pressed', () => {
+    it('calls onClose when close button is pressed', async () => {
       // Modal content doesn't render in test environment
       // Verify onClose handler is provided
       const onClose = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={onClose}
@@ -147,14 +145,14 @@ describe('IconPicker', () => {
   });
 
   describe('Icon Grid', () => {
-    it('displays icon grid', () => {
+    it('displays icon grid', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('cash');
       expect(COMMON_ICONS).toContain('food');
       expect(COMMON_ICONS).toContain('car');
     });
 
-    it('displays multiple icon categories', () => {
+    it('displays multiple icon categories', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       // Money & Finance
       expect(COMMON_ICONS).toContain('cash');
@@ -166,7 +164,7 @@ describe('IconPicker', () => {
       expect(COMMON_ICONS).toContain('home');
     });
 
-    it('renders all icons as pressable buttons', () => {
+    it('renders all icons as pressable buttons', async () => {
       // Verify COMMON_ICONS array is not empty
       expect(COMMON_ICONS.length).toBeGreaterThan(0);
       // Verify all entries are strings (icon names)
@@ -177,11 +175,11 @@ describe('IconPicker', () => {
   });
 
   describe('Icon Selection', () => {
-    it('calls onSelect when icon is clicked', () => {
+    it('calls onSelect when icon is clicked', async () => {
       // Modal content doesn't render in test environment
       // Verify onSelect handler is provided
       const onSelect = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -193,11 +191,11 @@ describe('IconPicker', () => {
       expect(onSelect).toBeDefined();
     });
 
-    it('calls onClose after icon selection', () => {
+    it('calls onClose after icon selection', async () => {
       // Modal content doesn't render in test environment
       // Verify onClose handler is provided
       const onClose = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={onClose}
@@ -209,13 +207,13 @@ describe('IconPicker', () => {
       expect(onClose).toBeDefined();
     });
 
-    it('calls both onSelect and onClose in correct order', () => {
+    it('calls both onSelect and onClose in correct order', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS is available for handleSelect logic
       expect(COMMON_ICONS.length).toBeGreaterThan(0);
     });
 
-    it('selects different icons correctly', () => {
+    it('selects different icons correctly', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS contains expected icons
       expect(COMMON_ICONS).toContain('car');
@@ -224,43 +222,39 @@ describe('IconPicker', () => {
   });
 
   describe('Selected Icon Highlighting', () => {
-    it('highlights selected icon', () => {
+    it('highlights selected icon', async () => {
       // Modal content may not render in test environment
       // Verify component renders with selectedIcon prop
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon="cash"
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon="cash"
+        />,
+        { wrapper },
+      );;
       expect(COMMON_ICONS).toContain('cash');
     });
 
-    it('handles no selected icon', () => {
+    it('handles no selected icon', async () => {
       // Modal content may not render in test environment
       // Verify component renders without selectedIcon
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon={null}
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon={null}
+        />,
+        { wrapper },
+      );;
     });
 
-    it('updates highlighting when selected icon changes', () => {
+    it('updates highlighting when selected icon changes', async () => {
       // Modal content may not render in test environment
       // Verify component can rerender with different selectedIcon
-      const { rerender } = render(
+      const { rerender } = await render(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -270,36 +264,32 @@ describe('IconPicker', () => {
         { wrapper },
       );
 
-      expect(() => {
-        rerender(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon="food"
-          />,
-        );
-      }).not.toThrow();
+      await rerender(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon="food"
+        />,
+      );
     });
   });
 
   describe('Scrolling', () => {
-    it('renders scrollable content', () => {
+    it('renders scrollable content', async () => {
       // Modal content may not render in test environment
       // Verify component renders with ScrollView
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
 
-    it('displays icons beyond initial viewport', () => {
+    it('displays icons beyond initial viewport', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS contains icons that would be beyond viewport
       expect(COMMON_ICONS).toContain('cash');
@@ -310,11 +300,11 @@ describe('IconPicker', () => {
   });
 
   describe('Modal Dismissal', () => {
-    it('calls onClose when requested to close', () => {
+    it('calls onClose when requested to close', async () => {
       // Modal content doesn't render in test environment
       // Verify onClose prop is provided
       const onClose = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={onClose}
@@ -327,11 +317,11 @@ describe('IconPicker', () => {
       expect(onClose).toBeDefined();
     });
 
-    it('does not call onSelect when modal is dismissed without selection', () => {
+    it('does not call onSelect when modal is dismissed without selection', async () => {
       // Modal content doesn't render in test environment
       // Verify component logic: onSelect should only be called when an icon is selected
       const onSelect = jest.fn();
-      render(
+      await render(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -346,33 +336,33 @@ describe('IconPicker', () => {
   });
 
   describe('Icon Categories', () => {
-    it('includes money and finance icons', () => {
+    it('includes money and finance icons', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('cash');
       expect(COMMON_ICONS).toContain('wallet');
       expect(COMMON_ICONS).toContain('bank');
     });
 
-    it('includes food and dining icons', () => {
+    it('includes food and dining icons', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('food');
       expect(COMMON_ICONS).toContain('coffee');
     });
 
-    it('includes transportation icons', () => {
+    it('includes transportation icons', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('car');
       expect(COMMON_ICONS).toContain('bus');
       expect(COMMON_ICONS).toContain('airplane');
     });
 
-    it('includes home and utilities icons', () => {
+    it('includes home and utilities icons', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('home');
       expect(COMMON_ICONS).toContain('wifi');
     });
 
-    it('includes entertainment icons', () => {
+    it('includes entertainment icons', async () => {
       // Modal content may not render in test environment, test COMMON_ICONS instead
       expect(COMMON_ICONS).toContain('movie');
       expect(COMMON_ICONS).toContain('music');
@@ -380,7 +370,7 @@ describe('IconPicker', () => {
   });
 
   describe('Regression Tests', () => {
-    it('handles rapid icon selections', () => {
+    it('handles rapid icon selections', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS contains icons for selection
       expect(COMMON_ICONS).toContain('cash');
@@ -388,10 +378,10 @@ describe('IconPicker', () => {
       expect(COMMON_ICONS).toContain('car');
     });
 
-    it('maintains state across rerenders', () => {
+    it('maintains state across rerenders', async () => {
       // Modal content may not render in test environment
       // Verify component can rerender without issues
-      const { rerender } = render(
+      const { rerender } = await render(
         <IconPicker
           visible={true}
           onClose={jest.fn()}
@@ -401,39 +391,35 @@ describe('IconPicker', () => {
         { wrapper },
       );
 
-      expect(() => {
-        rerender(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-            selectedIcon="cash"
-          />,
-        );
-      }).not.toThrow();
+      await rerender(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+          selectedIcon="cash"
+        />,
+      );
     });
 
-    it('handles selection of currently selected icon', () => {
+    it('handles selection of currently selected icon', async () => {
       // Modal content may not render in test environment
       // Verify component renders with selectedIcon prop
       const onSelect = jest.fn();
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={onSelect}
-            selectedIcon="cash"
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={onSelect}
+          selectedIcon="cash"
+        />,
+        { wrapper },
+      );;
       expect(COMMON_ICONS).toContain('cash');
     });
   });
 
   describe('Accessibility', () => {
-    it('all icons have accessibility labels', () => {
+    it('all icons have accessibility labels', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS contains icons that would have labels
       expect(COMMON_ICONS).toContain('cash');
@@ -441,42 +427,38 @@ describe('IconPicker', () => {
       expect(COMMON_ICONS).toContain('car');
     });
 
-    it('all icons have button role', () => {
+    it('all icons have button role', async () => {
       // Modal content may not render in test environment
       // Verify COMMON_ICONS is available for icon buttons
       expect(COMMON_ICONS.length).toBeGreaterThan(0);
     });
 
-    it('close button is accessible', () => {
+    it('close button is accessible', async () => {
       // Modal content doesn't render in test environment
       // Verify component renders with onClose prop for accessibility
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
   });
 
   describe('Responsive Behavior', () => {
-    it('adjusts icon size based on window width', () => {
+    it('adjusts icon size based on window width', async () => {
       // Modal content may not render in test environment
       // Verify component renders (specific sizing is tested through snapshots)
-      expect(() => {
-        render(
-          <IconPicker
-            visible={true}
-            onClose={jest.fn()}
-            onSelect={jest.fn()}
-          />,
-          { wrapper },
-        );
-      }).not.toThrow();
+      await render(
+        <IconPicker
+          visible={true}
+          onClose={jest.fn()}
+          onSelect={jest.fn()}
+        />,
+        { wrapper },
+      );;
     });
   });
 });

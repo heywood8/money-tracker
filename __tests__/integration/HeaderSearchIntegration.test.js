@@ -20,20 +20,20 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 }));
 
 describe('Header Search Integration', () => {
-  it('does not render search bar (search now lives in OperationsScreen)', () => {
-    const { queryByTestId } = render(<Header />);
+  it('does not render search bar (search now lives in OperationsScreen)', async () => {
+    const { queryByTestId } = await render(<Header />);
     expect(queryByTestId('search-bar-container')).toBeNull();
     expect(queryByTestId('search-input-container')).toBeNull();
   });
 
-  it('returns null when no rightContent is passed', () => {
-    const { toJSON } = render(<Header />);
+  it('returns null when no rightContent is passed', async () => {
+    const { toJSON } = await render(<Header />);
     expect(toJSON()).toBeNull();
   });
 
-  it('renders rightContent when provided', () => {
+  it('renders rightContent when provided', async () => {
     const content = <Text testID="rc">hi</Text>;
-    const { getByTestId } = render(<Header rightContent={content} />);
+    const { getByTestId } = await render(<Header rightContent={content} />);
     expect(getByTestId('rc')).toBeTruthy();
   });
 });

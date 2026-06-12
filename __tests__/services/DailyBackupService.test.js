@@ -116,7 +116,7 @@ describe('DailyBackupService', () => {
   // ── getTodayDateString ─────────────────────────────────────────────────────
 
   describe('getTodayDateString', () => {
-    it('returns a string matching YYYY-MM-DD', () => {
+    it('returns a string matching YYYY-MM-DD', async () => {
       expect(getTodayDateString()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
@@ -124,11 +124,11 @@ describe('DailyBackupService', () => {
   // ── getISOWeekString ───────────────────────────────────────────────────────
 
   describe('getISOWeekString', () => {
-    it('returns a string matching YYYY-WNN', () => {
+    it('returns a string matching YYYY-WNN', async () => {
       expect(getISOWeekString()).toMatch(/^\d{4}-W\d{2}$/);
     });
 
-    it('is consistent with getTodayDateString for the same instant', () => {
+    it('is consistent with getTodayDateString for the same instant', async () => {
       const today = getTodayDateString();
       const week = getISOWeekString();
       // Both are produced from the same "now", so year should match

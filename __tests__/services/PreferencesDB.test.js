@@ -40,23 +40,23 @@ describe('PreferencesDB', () => {
   });
 
   describe('PREF_KEYS', () => {
-    it('exports THEME key', () => {
+    it('exports THEME key', async () => {
       expect(PREF_KEYS.THEME).toBe('theme_preference');
     });
 
-    it('exports LANGUAGE key', () => {
+    it('exports LANGUAGE key', async () => {
       expect(PREF_KEYS.LANGUAGE).toBe('app_language');
     });
 
-    it('exports LAST_ACCOUNT key', () => {
+    it('exports LAST_ACCOUNT key', async () => {
       expect(PREF_KEYS.LAST_ACCOUNT).toBe('last_accessed_account_id');
     });
 
-    it('exports OPERATIONS_FILTERS key', () => {
+    it('exports OPERATIONS_FILTERS key', async () => {
       expect(PREF_KEYS.OPERATIONS_FILTERS).toBe('operations_active_filters');
     });
 
-    it('has all expected keys', () => {
+    it('has all expected keys', async () => {
       expect(Object.keys(PREF_KEYS)).toEqual([
         'THEME',
         'LANGUAGE',

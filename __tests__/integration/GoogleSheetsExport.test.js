@@ -201,18 +201,17 @@ describe('GoogleSheetsExport integration', () => {
     jest.clearAllMocks();
   });
 
-  const renderModal = () =>
-    render(<SettingsScreen setSubPanelActive={jest.fn()} />);
+  const renderModal = async () => await render(<SettingsScreen setSubPanelActive={jest.fn()} />);
 
   it('shows inline Open button after successful export (already signed in)', async () => {
     getValidAccessToken.mockResolvedValue('access-token');
     exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-123');
 
-    const { getByTestId, getByText } = renderModal();
-    fireEvent.press(getByTestId('settings-export-row'));
+    const { getByTestId, getByText } = await renderModal();
+    await fireEvent.press(getByTestId('settings-export-row'));
 
-    await waitFor(() => {
-      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    await waitFor(async () => {
+      await fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
 
     await waitFor(() => {
@@ -231,11 +230,11 @@ describe('GoogleSheetsExport integration', () => {
     signIn.mockResolvedValue('new-access-token');
     exportToSheets.mockResolvedValue('https://docs.google.com/spreadsheets/d/sheet-456');
 
-    const { getByTestId, getByText } = renderModal();
-    fireEvent.press(getByTestId('settings-export-row'));
+    const { getByTestId, getByText } = await renderModal();
+    await fireEvent.press(getByTestId('settings-export-row'));
 
-    await waitFor(() => {
-      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    await waitFor(async () => {
+      await fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
 
     await waitFor(() => {
@@ -248,11 +247,11 @@ describe('GoogleSheetsExport integration', () => {
     getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
     signIn.mockRejectedValue(new Error('auth_failed'));
 
-    const { getByTestId, getByText } = renderModal();
-    fireEvent.press(getByTestId('settings-export-row'));
+    const { getByTestId, getByText } = await renderModal();
+    await fireEvent.press(getByTestId('settings-export-row'));
 
-    await waitFor(() => {
-      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    await waitFor(async () => {
+      await fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
 
     await waitFor(() => {
@@ -264,11 +263,11 @@ describe('GoogleSheetsExport integration', () => {
   it('shows revoked-access error inline when refresh fails', async () => {
     getValidAccessToken.mockRejectedValue(new Error('refresh_failed'));
 
-    const { getByTestId, getByText } = renderModal();
-    fireEvent.press(getByTestId('settings-export-row'));
+    const { getByTestId, getByText } = await renderModal();
+    await fireEvent.press(getByTestId('settings-export-row'));
 
-    await waitFor(() => {
-      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    await waitFor(async () => {
+      await fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
 
     await waitFor(() => {
@@ -281,11 +280,11 @@ describe('GoogleSheetsExport integration', () => {
     getValidAccessToken.mockRejectedValue(new Error('not_signed_in'));
     signIn.mockRejectedValue(new Error('sign_in_cancelled'));
 
-    const { getByTestId } = renderModal();
-    fireEvent.press(getByTestId('settings-export-row'));
+    const { getByTestId } = await renderModal();
+    await fireEvent.press(getByTestId('settings-export-row'));
 
-    await waitFor(() => {
-      fireEvent.press(getByTestId('settings-export-google-sheets'));
+    await waitFor(async () => {
+      await fireEvent.press(getByTestId('settings-export-google-sheets'));
     });
 
     await waitFor(() => {
@@ -304,10 +303,10 @@ describe('From Google Sheets import', () => {
   });
 
   it('renders From Google Sheets row in import subpanel', async () => {
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId } = await render(
       <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
-    fireEvent.press(getByText('import'));
+    await fireEvent.press(getByText('import'));
     await waitFor(() => {
       expect(getByTestId('settings-import-google-sheets')).toBeTruthy();
     });
@@ -315,12 +314,12 @@ describe('From Google Sheets import', () => {
 
   it('shows no-spreadsheet message when no spreadsheet ID is saved', async () => {
     getPreference.mockResolvedValue(null);
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId } = await render(
       <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
-    fireEvent.press(getByText('import'));
+    await fireEvent.press(getByText('import'));
     await waitFor(() => getByTestId('settings-import-google-sheets'));
-    fireEvent.press(getByTestId('settings-import-google-sheets'));
+    await fireEvent.press(getByTestId('settings-import-google-sheets'));
     await waitFor(() => {
       expect(getByTestId('settings-import-no-spreadsheet')).toBeTruthy();
     });
@@ -337,12 +336,12 @@ describe('From Google Sheets import', () => {
     });
     restoreBackup.mockResolvedValue();
 
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId } = await render(
       <SettingsScreen setSubPanelActive={jest.fn()} />,
     );
-    fireEvent.press(getByText('import'));
+    await fireEvent.press(getByText('import'));
     await waitFor(() => getByTestId('settings-import-google-sheets'));
-    fireEvent.press(getByTestId('settings-import-google-sheets'));
+    await fireEvent.press(getByTestId('settings-import-google-sheets'));
 
     await waitFor(() => {
       expect(importFromSheets).toHaveBeenCalledWith('token', expect.any(Function));

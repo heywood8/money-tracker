@@ -37,27 +37,27 @@ describe('categoryUtils', () => {
       },
     ];
 
-    it('should return category name for root category with nameKey', () => {
+    it('should return category name for root category with nameKey', async () => {
       const result = getCategoryDisplayName('cat-1', mockCategories, mockT);
       expect(result).toBe('category_food');
     });
 
-    it('should return category name for root category without nameKey', () => {
+    it('should return category name for root category without nameKey', async () => {
       const result = getCategoryDisplayName('cat-4', mockCategories, mockT);
       expect(result).toBe('Transport');
     });
 
-    it('should return category name with parent in brackets for subcategory with nameKey', () => {
+    it('should return category name with parent in brackets for subcategory with nameKey', async () => {
       const result = getCategoryDisplayName('cat-2', mockCategories, mockT);
       expect(result).toBe('category_groceries (category_food)');
     });
 
-    it('should return category name with parent in brackets for subcategory without nameKey', () => {
+    it('should return category name with parent in brackets for subcategory without nameKey', async () => {
       const result = getCategoryDisplayName('cat-5', mockCategories, mockT);
       expect(result).toBe('Public Transport (Transport)');
     });
 
-    it('should handle multiple subcategories under same parent', () => {
+    it('should handle multiple subcategories under same parent', async () => {
       const result1 = getCategoryDisplayName('cat-2', mockCategories, mockT);
       const result2 = getCategoryDisplayName('cat-3', mockCategories, mockT);
 
@@ -65,22 +65,22 @@ describe('categoryUtils', () => {
       expect(result2).toBe('category_restaurants (category_food)');
     });
 
-    it('should return empty string for null categoryId', () => {
+    it('should return empty string for null categoryId', async () => {
       const result = getCategoryDisplayName(null, mockCategories, mockT);
       expect(result).toBe('');
     });
 
-    it('should return empty string for undefined categoryId', () => {
+    it('should return empty string for undefined categoryId', async () => {
       const result = getCategoryDisplayName(undefined, mockCategories, mockT);
       expect(result).toBe('');
     });
 
-    it('should return empty string for non-existent categoryId', () => {
+    it('should return empty string for non-existent categoryId', async () => {
       const result = getCategoryDisplayName('non-existent', mockCategories, mockT);
       expect(result).toBe('');
     });
 
-    it('should handle category with missing parent gracefully', () => {
+    it('should handle category with missing parent gracefully', async () => {
       const categoriesWithMissingParent = [
         {
           id: 'cat-orphan',
@@ -94,7 +94,7 @@ describe('categoryUtils', () => {
       expect(result).toBe('Orphan Category');
     });
 
-    it('should use translated names when translation function is provided', () => {
+    it('should use translated names when translation function is provided', async () => {
       const mockTranslate = (key) => {
         const translations = {
           'category_food': 'Comida',
@@ -107,12 +107,12 @@ describe('categoryUtils', () => {
       expect(result).toBe('Compras (Comida)');
     });
 
-    it('should handle empty categories array', () => {
+    it('should handle empty categories array', async () => {
       const result = getCategoryDisplayName('cat-1', [], mockT);
       expect(result).toBe('');
     });
 
-    it('should handle category with null nameKey', () => {
+    it('should handle category with null nameKey', async () => {
       const categoriesWithNull = [
         {
           id: 'cat-null',
@@ -126,7 +126,7 @@ describe('categoryUtils', () => {
       expect(result).toBe('Category with Null NameKey');
     });
 
-    it('should handle parent category with nameKey and child without', () => {
+    it('should handle parent category with nameKey and child without', async () => {
       const mixedCategories = [
         {
           id: 'parent',
@@ -183,7 +183,7 @@ describe('categoryUtils', () => {
       },
     ];
 
-    it('should return empty categoryName and null parentName for null categoryId', () => {
+    it('should return empty categoryName and null parentName for null categoryId', async () => {
       const result = getCategoryNames(null, mockCategories, mockT);
       expect(result).toEqual({
         categoryName: '',
@@ -191,7 +191,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return empty categoryName and null parentName for undefined categoryId', () => {
+    it('should return empty categoryName and null parentName for undefined categoryId', async () => {
       const result = getCategoryNames(undefined, mockCategories, mockT);
       expect(result).toEqual({
         categoryName: '',
@@ -199,7 +199,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return unknown_category and null parentName for non-existent categoryId', () => {
+    it('should return unknown_category and null parentName for non-existent categoryId', async () => {
       const result = getCategoryNames('non-existent', mockCategories, mockT);
       expect(result).toEqual({
         categoryName: 'unknown_category',
@@ -207,7 +207,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return category name and null parentName for root category with nameKey', () => {
+    it('should return category name and null parentName for root category with nameKey', async () => {
       const result = getCategoryNames('cat-1', mockCategories, mockT);
       expect(result).toEqual({
         categoryName: 'category_food',
@@ -215,7 +215,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return category name and null parentName for root category without nameKey', () => {
+    it('should return category name and null parentName for root category without nameKey', async () => {
       const result = getCategoryNames('cat-4', mockCategories, mockT);
       expect(result).toEqual({
         categoryName: 'Transport',
@@ -223,7 +223,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return category name and parent name for subcategory with nameKey', () => {
+    it('should return category name and parent name for subcategory with nameKey', async () => {
       const result = getCategoryNames('cat-2', mockCategories, mockT);
       expect(result).toEqual({
         categoryName: 'category_groceries',
@@ -231,7 +231,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return category name and parent name for subcategory without nameKey', () => {
+    it('should return category name and parent name for subcategory without nameKey', async () => {
       const result = getCategoryNames('cat-5', mockCategories, mockT);
       expect(result).toEqual({
         categoryName: 'Public Transport',
@@ -239,7 +239,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should handle multiple subcategories under same parent', () => {
+    it('should handle multiple subcategories under same parent', async () => {
       const result1 = getCategoryNames('cat-2', mockCategories, mockT);
       const result2 = getCategoryNames('cat-3', mockCategories, mockT);
 
@@ -253,7 +253,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should return category name and null parentName when parent is missing', () => {
+    it('should return category name and null parentName when parent is missing', async () => {
       const categoriesWithMissingParent = [
         {
           id: 'cat-orphan',
@@ -270,7 +270,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should use translated names when translation function is provided', () => {
+    it('should use translated names when translation function is provided', async () => {
       const mockTranslate = (key) => {
         const translations = {
           'category_food': 'Comida',
@@ -286,7 +286,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should handle empty categories array', () => {
+    it('should handle empty categories array', async () => {
       const result = getCategoryNames('cat-1', [], mockT);
       expect(result).toEqual({
         categoryName: 'unknown_category',
@@ -294,7 +294,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should handle category with null nameKey', () => {
+    it('should handle category with null nameKey', async () => {
       const categoriesWithNull = [
         {
           id: 'cat-null',
@@ -311,7 +311,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should handle parent category with nameKey and child without', () => {
+    it('should handle parent category with nameKey and child without', async () => {
       const mixedCategories = [
         {
           id: 'parent',
@@ -334,7 +334,7 @@ describe('categoryUtils', () => {
       });
     });
 
-    it('should handle parent category without nameKey and child with nameKey', () => {
+    it('should handle parent category without nameKey and child with nameKey', async () => {
       const mixedCategories = [
         {
           id: 'parent',

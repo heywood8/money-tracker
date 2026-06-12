@@ -117,17 +117,17 @@ describe('SearchOverlay', () => {
     Alert.alert.mockClear();
   });
 
-  it('does not render SearchBar anymore (moved to Header)', () => {
-    const { queryByTestId } = render(<SearchOverlay {...defaultProps} />);
+  it('does not render SearchBar anymore (moved to Header)', async () => {
+    const { queryByTestId } = await render(<SearchOverlay {...defaultProps} />);
     expect(queryByTestId('search-bar')).toBeNull();
   });
 
-  it('does not render ExpandableFilters when filters not expanded', () => {
-    const { queryByTestId } = render(<SearchOverlay {...defaultProps} />);
+  it('does not render ExpandableFilters when filters not expanded', async () => {
+    const { queryByTestId } = await render(<SearchOverlay {...defaultProps} />);
     expect(queryByTestId('expandable-filters')).toBeNull();
   });
 
-  it('passes searchState to ExpandableFilters', () => {
+  it('passes searchState to ExpandableFilters', async () => {
     const customSearchState = {
       text: 'coffee',
       types: ['expense'],
@@ -142,7 +142,7 @@ describe('SearchOverlay', () => {
       searchState: customSearchState,
     });
 
-    render(<SearchOverlay {...defaultProps} />);
+    await render(<SearchOverlay {...defaultProps} />);
 
     // SearchOverlay now only contains ExpandableFilters, SearchBar is in Header
     expect(useOperationsData).toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('SearchOverlay', () => {
   it('debounces text search input', async () => {
     jest.useFakeTimers();
 
-    const { rerender } = render(<SearchOverlay {...defaultProps} />);
+    const { rerender } = await render(<SearchOverlay {...defaultProps} />);
 
     // Simulate typing multiple times rapidly
     // Note: We can't directly trigger onSearchTextChange from the mocked component,
@@ -165,8 +165,8 @@ describe('SearchOverlay', () => {
     jest.useRealTimers();
   });
 
-  it('calls onClose when no filters are active', () => {
-    const { rerender } = render(<SearchOverlay {...defaultProps} />);
+  it('calls onClose when no filters are active', async () => {
+    const { rerender } = await render(<SearchOverlay {...defaultProps} />);
 
     // Trigger close by updating props to simulate SearchBar onClose callback
     // Since we mocked SearchBar, we need to test the handler directly
@@ -181,36 +181,36 @@ describe('SearchOverlay', () => {
       hasActiveSearch: true,
     });
 
-    const { rerender } = render(<SearchOverlay {...defaultProps} />);
+    const { rerender } = await render(<SearchOverlay {...defaultProps} />);
 
     // The component will show an Alert when hasActiveSearch is true and onClose is called
     // This is tested via the Alert.alert mock
   });
 
-  it('calls clearAllSearch and onClose when "clear all" selected in alert', () => {
+  it('calls clearAllSearch and onClose when "clear all" selected in alert', async () => {
     useOperationsData.mockReturnValue({
       ...mockOperationsData,
       hasActiveSearch: true,
     });
 
-    render(<SearchOverlay {...defaultProps} />);
+    await render(<SearchOverlay {...defaultProps} />);
 
     // Verify the component is ready to show alert
     // The actual alert behavior is tested through integration
   });
 
-  it('calls onClose without clearing when "keep filters" selected in alert', () => {
+  it('calls onClose without clearing when "keep filters" selected in alert', async () => {
     useOperationsData.mockReturnValue({
       ...mockOperationsData,
       hasActiveSearch: true,
     });
 
-    render(<SearchOverlay {...defaultProps} />);
+    await render(<SearchOverlay {...defaultProps} />);
 
     // Verify the component is ready to show alert with keep option
   });
 
-  it('renders without calling getSearchFilterCount (SearchBar moved to Header)', () => {
+  it('renders without calling getSearchFilterCount (SearchBar moved to Header)', async () => {
     const mockGetSearchFilterCount = jest.fn(() => 3);
 
     useOperationsData.mockReturnValue({
@@ -218,14 +218,14 @@ describe('SearchOverlay', () => {
       getSearchFilterCount: mockGetSearchFilterCount,
     });
 
-    render(<SearchOverlay {...defaultProps} />);
+    await render(<SearchOverlay {...defaultProps} />);
 
     // SearchOverlay no longer renders SearchBar, so filter count is not needed
     expect(mockGetSearchFilterCount).not.toHaveBeenCalled();
   });
 
-  it('connects to all required contexts', () => {
-    render(<SearchOverlay {...defaultProps} />);
+  it('connects to all required contexts', async () => {
+    await render(<SearchOverlay {...defaultProps} />);
 
     expect(useOperationsData).toHaveBeenCalled();
     expect(useOperationsActions).toHaveBeenCalled();
@@ -233,23 +233,23 @@ describe('SearchOverlay', () => {
     expect(useSearch).toHaveBeenCalled();
   });
 
-  it('uses filtersExpanded from SearchContext', () => {
+  it('uses filtersExpanded from SearchContext', async () => {
     useSearch.mockReturnValue({
       ...mockSearchContext,
       filtersExpanded: true,
     });
 
-    const { queryByTestId } = render(<SearchOverlay {...defaultProps} />);
+    const { queryByTestId } = await render(<SearchOverlay {...defaultProps} />);
     expect(queryByTestId('expandable-filters')).toBeTruthy();
   });
 
-  it('calls toggleFilters from context when backdrop pressed', () => {
+  it('calls toggleFilters from context when backdrop pressed', async () => {
     useSearch.mockReturnValue({
       ...mockSearchContext,
       filtersExpanded: true,
     });
 
-    const { getByTestId } = render(<SearchOverlay {...defaultProps} />);
+    const { getByTestId } = await render(<SearchOverlay {...defaultProps} />);
 
     // The backdrop should be rendered when filters are expanded
     // Clicking it should call toggleFilters

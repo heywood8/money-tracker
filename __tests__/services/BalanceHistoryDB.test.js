@@ -28,22 +28,22 @@ describe('BalanceHistoryDB', () => {
   });
 
   describe('formatDate', () => {
-    it('formats date to YYYY-MM-DD string', () => {
+    it('formats date to YYYY-MM-DD string', async () => {
       const date = new Date(2024, 0, 15); // January 15, 2024
       expect(BalanceHistoryDB.formatDate(date)).toBe('2024-01-15');
     });
 
-    it('pads single digit months with zero', () => {
+    it('pads single digit months with zero', async () => {
       const date = new Date(2024, 4, 5); // May 5, 2024
       expect(BalanceHistoryDB.formatDate(date)).toBe('2024-05-05');
     });
 
-    it('pads single digit days with zero', () => {
+    it('pads single digit days with zero', async () => {
       const date = new Date(2024, 11, 1); // December 1, 2024
       expect(BalanceHistoryDB.formatDate(date)).toBe('2024-12-01');
     });
 
-    it('handles end of year dates', () => {
+    it('handles end of year dates', async () => {
       const date = new Date(2024, 11, 31); // December 31, 2024
       expect(BalanceHistoryDB.formatDate(date)).toBe('2024-12-31');
     });

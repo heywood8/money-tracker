@@ -141,7 +141,7 @@ describe('GoogleSheetsService', () => {
       },
     };
 
-    it('returns 6 sheets with correct titles', () => {
+    it('returns 6 sheets with correct titles', async () => {
       const sheets = buildSheetsData(mockBackup);
       const titles = sheets.map(s => s.range.split('!')[0]);
       expect(titles).toEqual([
@@ -149,7 +149,7 @@ describe('GoogleSheetsService', () => {
       ]);
     });
 
-    it('maps Accounts sheet with correct headers and data row', () => {
+    it('maps Accounts sheet with correct headers and data row', async () => {
       const sheets = buildSheetsData(mockBackup);
       const accounts = sheets.find(s => s.range.startsWith('Accounts'));
       expect(accounts.values[0]).toContain('id');
@@ -162,7 +162,7 @@ describe('GoogleSheetsService', () => {
       expect(accounts.values[1]).toContain('USD');
     });
 
-    it('maps Operations sheet with human-readable account and category names', () => {
+    it('maps Operations sheet with human-readable account and category names', async () => {
       const sheets = buildSheetsData(mockBackup);
       const ops = sheets.find(s => s.range.startsWith('Operations'));
       expect(ops.values[0]).toContain('id');
@@ -182,19 +182,19 @@ describe('GoogleSheetsService', () => {
       expect(ops.values[1][idxToAccount]).toBe('');
     });
 
-    it('includes all categories including shadow ones', () => {
+    it('includes all categories including shadow ones', async () => {
       const sheets = buildSheetsData(mockBackup);
       const cats = sheets.find(s => s.range.startsWith('Categories'));
       expect(cats.values).toHaveLength(3); // header + 2 categories
     });
 
-    it('maps Budgets sheet with category name instead of id', () => {
+    it('maps Budgets sheet with category name instead of id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const budgets = sheets.find(s => s.range.startsWith('Budgets'));
       expect(budgets.values[1][1]).toBe('Food');
     });
 
-    it('maps Planned Operations with account and category names', () => {
+    it('maps Planned Operations with account and category names', async () => {
       const sheets = buildSheetsData(mockBackup);
       const planned = sheets.find(s => s.range.startsWith('Planned Operations'));
       expect(planned.values[1][1]).toBe('Rent');
@@ -202,7 +202,7 @@ describe('GoogleSheetsService', () => {
       expect(planned.values[1][5]).toBe('Food');
     });
 
-    it('maps Balance History with account name instead of id', () => {
+    it('maps Balance History with account name instead of id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const history = sheets.find(s => s.range.startsWith('Balance History'));
       expect(history.values[0]).toContain('account');
@@ -236,7 +236,7 @@ describe('GoogleSheetsService', () => {
       },
     };
 
-    it('Accounts sheet includes display_order, hidden, monthly_target', () => {
+    it('Accounts sheet includes display_order, hidden, monthly_target', async () => {
       const sheets = buildSheetsData(mockBackup);
       const accounts = sheets.find(s => s.range === 'Accounts!A1');
       expect(accounts.values[0]).toContain('display_order');
@@ -247,7 +247,7 @@ describe('GoogleSheetsService', () => {
       expect(accounts.values[1]).toContain('500'); // monthly_target value
     });
 
-    it('Categories sheet includes parent_id, color, is_shadow', () => {
+    it('Categories sheet includes parent_id, color, is_shadow', async () => {
       const sheets = buildSheetsData(mockBackup);
       const cats = sheets.find(s => s.range === 'Categories!A1');
       expect(cats.values[0]).toContain('parent_id');
@@ -258,7 +258,7 @@ describe('GoogleSheetsService', () => {
       expect(cats.values[1]).toContain(0);
     });
 
-    it('Operations sheet includes account_id, category_id, to_account_id, exchange_rate, destination_amount, destination_currency', () => {
+    it('Operations sheet includes account_id, category_id, to_account_id, exchange_rate, destination_amount, destination_currency', async () => {
       const sheets = buildSheetsData(mockBackup);
       const ops = sheets.find(s => s.range === 'Operations!A1');
       expect(ops.values[0]).toContain('account_id');
@@ -271,14 +271,14 @@ describe('GoogleSheetsService', () => {
       expect(ops.values[1]).toContain('cat-1'); // category_id value
     });
 
-    it('Budgets sheet includes category_id', () => {
+    it('Budgets sheet includes category_id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const budgets = sheets.find(s => s.range === 'Budgets!A1');
       expect(budgets.values[0]).toContain('category_id');
       expect(budgets.values[1]).toContain('cat-1');
     });
 
-    it('Planned Operations sheet includes account_id, category_id, to_account_id', () => {
+    it('Planned Operations sheet includes account_id, category_id, to_account_id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const planned = sheets.find(s => s.range === 'Planned Operations!A1');
       expect(planned.values[0]).toContain('account_id');
@@ -288,7 +288,7 @@ describe('GoogleSheetsService', () => {
       expect(planned.values[1]).toContain('cat-1');
     });
 
-    it('Balance History sheet includes account_id', () => {
+    it('Balance History sheet includes account_id', async () => {
       const sheets = buildSheetsData(mockBackup);
       const history = sheets.find(s => s.range === 'Balance History!A1');
       expect(history.values[0]).toContain('account_id');

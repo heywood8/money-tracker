@@ -119,24 +119,24 @@ describe('AppInitializer', () => {
   });
 
   describe('Initialization', () => {
-    it('renders without crashing', () => {
-      const { getByTestId } = render(<AppInitializer />);
+    it('renders without crashing', async () => {
+      const { getByTestId } = await render(<AppInitializer />);
       expect(getByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('shows main app when not first launch', () => {
+    it('shows main app when not first launch', async () => {
       mockLocalizationContext.isFirstLaunch = false;
 
-      const { getByTestId, queryByTestId } = render(<AppInitializer />);
+      const { getByTestId, queryByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('simple-tabs')).toBeTruthy();
       expect(queryByTestId('language-selection-screen')).toBeNull();
     });
 
-    it('shows language selection on first launch', () => {
+    it('shows language selection on first launch', async () => {
       mockLocalizationContext.isFirstLaunch = true;
 
-      const { getByTestId, queryByTestId } = render(<AppInitializer />);
+      const { getByTestId, queryByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('language-selection-screen')).toBeTruthy();
       expect(queryByTestId('simple-tabs')).toBeNull();
@@ -144,15 +144,15 @@ describe('AppInitializer', () => {
   });
 
   describe('First Launch Flow', () => {
-    it('shows language selection screen when isFirstLaunch is true', () => {
+    it('shows language selection screen when isFirstLaunch is true', async () => {
       mockLocalizationContext.isFirstLaunch = true;
 
-      const { getByTestId } = render(<AppInitializer />);
+      const { getByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('language-selection-screen')).toBeTruthy();
     });
 
-    it('passes onLanguageSelected callback to LanguageSelectionScreen', () => {
+    it('passes onLanguageSelected callback to LanguageSelectionScreen', async () => {
       mockLocalizationContext.isFirstLaunch = true;
 
       const LanguageSelectionScreen = require('../../app/screens/LanguageSelectionScreen').default;
@@ -165,13 +165,13 @@ describe('AppInitializer', () => {
         return null;
       });
 
-      render(<AppInitializer />);
+      await render(<AppInitializer />);
     });
   });
 
   describe('Component Integration', () => {
-    it('uses LocalizationContext for first launch detection', () => {
-      render(<AppInitializer />);
+    it('uses LocalizationContext for first launch detection', async () => {
+      await render(<AppInitializer />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
@@ -202,52 +202,52 @@ describe('AppInitializer', () => {
         return MockLanguageSelectionScreen;
       });
 
-      const { getByTestId } = render(<AppInitializer />);
+      const { getByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('language-selection-screen')).toBeTruthy();
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles missing isFirstLaunch gracefully', () => {
+    it('handles missing isFirstLaunch gracefully', async () => {
       mockLocalizationContext.isFirstLaunch = undefined;
 
-      const { queryByTestId } = render(<AppInitializer />);
+      const { queryByTestId } = await render(<AppInitializer />);
 
       // Should default to showing main app when isFirstLaunch is undefined/false
       expect(queryByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('handles null language value', () => {
+    it('handles null language value', async () => {
       mockLocalizationContext.language = null;
 
-      const { getByTestId } = render(<AppInitializer />);
+      const { getByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('renders correctly with different language values', () => {
+    it('renders correctly with different language values', async () => {
       mockLocalizationContext.language = 'ru';
 
-      const { getByTestId } = render(<AppInitializer />);
+      const { getByTestId } = await render(<AppInitializer />);
 
       expect(getByTestId('simple-tabs')).toBeTruthy();
     });
   });
 
   describe('Theme Integration', () => {
-    it('uses theme colors for loading indicator', () => {
+    it('uses theme colors for loading indicator', async () => {
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      render(<AppInitializer />);
+      await render(<AppInitializer />);
 
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('applies theme background color to loading container', () => {
+    it('applies theme background color to loading container', async () => {
       mockLocalizationContext.isFirstLaunch = true;
 
-      render(<AppInitializer />);
+      await render(<AppInitializer />);
 
       // The component should use colors from ThemeColorsContext
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
@@ -256,38 +256,38 @@ describe('AppInitializer', () => {
   });
 
   describe('Regression Tests', () => {
-    it('does not show loading indicator when not initializing', () => {
+    it('does not show loading indicator when not initializing', async () => {
       mockLocalizationContext.isFirstLaunch = false;
 
-      const { queryByTestId } = render(<AppInitializer />);
+      const { queryByTestId } = await render(<AppInitializer />);
 
       // Should show main app, not loading indicator
       expect(queryByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('shows correct screen based on first launch state', () => {
+    it('shows correct screen based on first launch state', async () => {
       // Test both states
       mockLocalizationContext.isFirstLaunch = true;
-      const { rerender, getByTestId, queryByTestId } = render(<AppInitializer />);
+      const { rerender, getByTestId, queryByTestId } = await render(<AppInitializer />);
       expect(getByTestId('language-selection-screen')).toBeTruthy();
 
       mockLocalizationContext.isFirstLaunch = false;
-      rerender(<AppInitializer />);
+      await rerender(<AppInitializer />);
       expect(queryByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('handles rapid state changes gracefully', () => {
-      const { rerender } = render(<AppInitializer />);
+    it('handles rapid state changes gracefully', async () => {
+      const { rerender } = await render(<AppInitializer />);
 
       // Rapidly change first launch state
       mockLocalizationContext.isFirstLaunch = true;
-      rerender(<AppInitializer />);
+      await rerender(<AppInitializer />);
 
       mockLocalizationContext.isFirstLaunch = false;
-      rerender(<AppInitializer />);
+      await rerender(<AppInitializer />);
 
       mockLocalizationContext.isFirstLaunch = true;
-      rerender(<AppInitializer />);
+      await rerender(<AppInitializer />);
 
       // Should not crash
       expect(true).toBe(true);
@@ -295,17 +295,17 @@ describe('AppInitializer', () => {
   });
 
   describe('Accessibility', () => {
-    it('provides accessible structure for screen readers', () => {
-      const { getByTestId } = render(<AppInitializer />);
+    it('provides accessible structure for screen readers', async () => {
+      const { getByTestId } = await render(<AppInitializer />);
 
       // Main content should be accessible
       expect(getByTestId('simple-tabs')).toBeTruthy();
     });
 
-    it('maintains accessibility during first launch flow', () => {
+    it('maintains accessibility during first launch flow', async () => {
       mockLocalizationContext.isFirstLaunch = true;
 
-      const { getByTestId } = render(<AppInitializer />);
+      const { getByTestId } = await render(<AppInitializer />);
 
       // Language selection should be accessible
       expect(getByTestId('language-selection-screen')).toBeTruthy();

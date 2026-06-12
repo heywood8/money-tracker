@@ -107,9 +107,12 @@ jest.mock('../../app/modals/OperationModal', () => {
 jest.mock('../../app/components/operations/OperationsList', () => {
   const React = require('react');
   return React.forwardRef(function MockOperationsList(props, ref) {
+    React.useImperativeHandle(ref, () => ({
+      scrollToOffset: jest.fn(),
+      scrollToIndex: jest.fn(),
+    }));
     return React.createElement('OperationsList', {
       testID: 'operations-list',
-      ref: ref,
       initialLoading: props.initialLoading,
       onEditOperation: props.onEditOperation,
       onDateSeparatorPress: props.onDateSeparatorPress,
@@ -226,70 +229,70 @@ describe('OperationsScreen', () => {
   });
 
   describe('Component Structure', () => {
-    it('renders without crashing', () => {
+    it('renders without crashing', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('uses ThemeContext for styling', () => {
+    it('uses ThemeContext for styling', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('uses OperationsContext for operation data', () => {
+    it('uses OperationsContext for operation data', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useOperationsData).toHaveBeenCalled();
     });
 
-    it('uses AccountsContext for account data', () => {
+    it('uses AccountsContext for account data', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useAccountsData).toHaveBeenCalled();
     });
 
-    it('uses CategoriesContext for category data', () => {
+    it('uses CategoriesContext for category data', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useCategories).toHaveBeenCalled();
     });
 
-    it('uses DialogContext for dialogs', () => {
+    it('uses DialogContext for dialogs', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useDialog } = require('../../app/contexts/DialogContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useDialog).toHaveBeenCalled();
     });
 
-    it('uses LocalizationContext for translations', () => {
+    it('uses LocalizationContext for translations', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
   });
 
   describe('Integration with Contexts', () => {
-    it('handles empty operations list', () => {
+    it('handles empty operations list', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -307,10 +310,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles loading state', () => {
+    it('handles loading state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -328,10 +331,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations list with data', () => {
+    it('handles operations list with data', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -367,10 +370,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles transfer operations', () => {
+    it('handles transfer operations', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -397,12 +400,12 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Account and Category Integration', () => {
-    it('handles operations with accounts', () => {
+    it('handles operations with accounts', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -417,10 +420,10 @@ describe('OperationsScreen', () => {
         loading: false,
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with categories', () => {
+    it('handles operations with categories', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -433,10 +436,10 @@ describe('OperationsScreen', () => {
         categories: mockCategories,
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles empty accounts list', () => {
+    it('handles empty accounts list', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
 
@@ -446,10 +449,10 @@ describe('OperationsScreen', () => {
         loading: false,
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles empty categories list', () => {
+    it('handles empty categories list', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
 
@@ -457,42 +460,42 @@ describe('OperationsScreen', () => {
         categories: [],
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('State Management', () => {
-    it('manages operation modal visibility state', () => {
+    it('manages operation modal visibility state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should manage modal state internally
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('manages quick add form state', () => {
+    it('manages quick add form state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should manage quick add form state
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('manages filter state', () => {
+    it('manages filter state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should manage filter (account/category) state
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('manages picker modal state', () => {
+    it('manages picker modal state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should manage account/category picker modals
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Lazy Loading', () => {
-    it('handles hasMore flag for pagination', () => {
+    it('handles hasMore flag for pagination', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -507,10 +510,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles end of operations list', () => {
+    it('handles end of operations list', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -525,12 +528,12 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Theme Integration', () => {
-    it('applies theme colors to components', () => {
+    it('applies theme colors to components', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -550,11 +553,11 @@ describe('OperationsScreen', () => {
 
       useThemeColors.mockReturnValue({ colors: mockColors });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
       expect(useThemeColors).toHaveBeenCalled();
     });
 
-    it('handles dark theme', () => {
+    it('handles dark theme', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useThemeColors } = require('../../app/contexts/ThemeColorsContext');
 
@@ -569,12 +572,12 @@ describe('OperationsScreen', () => {
         },
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Localization Integration', () => {
-    it('uses translation function for UI text', () => {
+    it('uses translation function for UI text', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -584,12 +587,12 @@ describe('OperationsScreen', () => {
         language: 'en',
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(useLocalization).toHaveBeenCalled();
     });
 
-    it('handles different languages', () => {
+    it('handles different languages', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useLocalization } = require('../../app/contexts/LocalizationContext');
 
@@ -598,12 +601,12 @@ describe('OperationsScreen', () => {
         language: 'ru',
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles empty operations array when context provides empty state', () => {
+    it('handles empty operations array when context provides empty state', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -619,10 +622,10 @@ describe('OperationsScreen', () => {
       });
 
       // Context should always provide an array, even when empty
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles initial loading state with empty operations', () => {
+    it('handles initial loading state with empty operations', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -637,10 +640,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with missing properties', () => {
+    it('handles operations with missing properties', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -660,10 +663,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with invalid dates', () => {
+    it('handles operations with invalid dates', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -683,10 +686,10 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles very large operation amounts', () => {
+    it('handles very large operation amounts', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -705,20 +708,20 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Regression Tests', () => {
-    it('handles re-rendering without errors', () => {
+    it('handles re-rendering without errors', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
-      const { rerender } = render(<OperationsScreen />);
+      const { rerender } = await render(<OperationsScreen />);
 
       expect(() => rerender(<OperationsScreen />)).not.toThrow();
     });
 
-    it('maintains stability when operations change', () => {
+    it('maintains stability when operations change', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -739,7 +742,7 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      const { rerender } = render(<OperationsScreen />);
+      const { rerender } = await render(<OperationsScreen />);
 
       useOperationsData.mockReturnValue({
         operations: updatedOperations,
@@ -754,7 +757,7 @@ describe('OperationsScreen', () => {
       expect(() => rerender(<OperationsScreen />)).not.toThrow();
     });
 
-    it('handles rapid loading state changes', () => {
+    it('handles rapid loading state changes', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -769,7 +772,7 @@ describe('OperationsScreen', () => {
         deleteOperation: jest.fn(),
       });
 
-      const { rerender } = render(<OperationsScreen />);
+      const { rerender } = await render(<OperationsScreen />);
 
       useOperationsData.mockReturnValue({
         operations: [],
@@ -786,25 +789,25 @@ describe('OperationsScreen', () => {
   });
 
   describe('Component Integration Points', () => {
-    it('provides necessary props to child components', () => {
+    it('provides necessary props to child components', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should pass proper props to OperationModal, Calculator, etc.
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('integrates with OperationModal', () => {
+    it('integrates with OperationModal', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component uses OperationModal for editing operations
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('integrates with Calculator component', () => {
+    it('integrates with Calculator component', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component uses Calculator for amount input
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
@@ -844,14 +847,14 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
 
       // Get the OperationsList component which has the onEditOperation prop
       const operationsList = getByTestId('operations-list');
       expect(operationsList).toBeTruthy();
 
       // Invoke the handleEditOperation handler directly
-      act(() => {
+      await act(async () => {
         operationsList.props.onEditOperation({ id: '1', type: 'expense', amount: '100.00' });
       });
 
@@ -889,13 +892,13 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
 
       // Get the OperationModal component which has the onDelete prop
       const modal = getByTestId('operation-modal');
 
       // Invoke the handleDeleteOperation handler
-      act(() => {
+      await act(async () => {
         modal.props.onDelete({ id: '1', type: 'expense', amount: '100.00' });
       });
 
@@ -903,7 +906,7 @@ describe('OperationsScreen', () => {
       expect(mockShowDialog).toHaveBeenCalled();
     });
 
-    it('handleCloseOperationModal sets operation modal not visible', () => {
+    it('handleCloseOperationModal sets operation modal not visible', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -928,11 +931,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const modal = getByTestId('operation-modal');
 
       // Invoke onClose handler
-      act(() => {
+      await act(async () => {
         modal.props.onClose();
       });
 
@@ -940,7 +943,7 @@ describe('OperationsScreen', () => {
       expect(getByTestId('operation-modal').props.visible).toBe(false);
     });
 
-    it('handleSelectAccount updates account selection', () => {
+    it('handleSelectAccount updates account selection', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -978,18 +981,18 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
 
       // Invoke handleSelectAccount
-      act(() => {
+      await act(async () => {
         pickerModal.props.onSelectAccount('acc-2');
       });
 
       expect(mockSetQuickAddValues).toHaveBeenCalled();
     });
 
-    it('handleSelectCategory updates category selection', () => {
+    it('handleSelectCategory updates category selection', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1027,11 +1030,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
 
       // Invoke handleSelectCategory
-      act(() => {
+      await act(async () => {
         pickerModal.props.onSelectCategory('cat-1');
       });
 
@@ -1097,7 +1100,7 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
 
       // Invoke handleAutoAddWithCategory
@@ -1113,7 +1116,7 @@ describe('OperationsScreen', () => {
   describe('Scroll Handlers', () => {
     const { act } = require('@testing-library/react-native');
 
-    it('handleScroll updates showScrollToTop state when scrolled down', () => {
+    it('handleScroll updates showScrollToTop state when scrolled down', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1138,11 +1141,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId, queryByLabelText } = render(<OperationsScreen />);
+      const { getByTestId, queryByLabelText } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Invoke onScroll with high offset to show scroll-to-top button
-      act(() => {
+      await act(async () => {
         operationsList.props.onScroll({
           nativeEvent: { contentOffset: { y: 300 } },
         });
@@ -1153,7 +1156,7 @@ describe('OperationsScreen', () => {
       expect(scrollToTopButton).toBeTruthy();
     });
 
-    it('handleScroll hides scroll button when scrolled up', () => {
+    it('handleScroll hides scroll button when scrolled up', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1178,11 +1181,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId, queryByLabelText } = render(<OperationsScreen />);
+      const { getByTestId, queryByLabelText } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Invoke onScroll with low offset to hide scroll-to-top button
-      act(() => {
+      await act(async () => {
         operationsList.props.onScroll({
           nativeEvent: { contentOffset: { y: 100 } },
         });
@@ -1193,7 +1196,7 @@ describe('OperationsScreen', () => {
       expect(scrollToTopButton).toBeNull();
     });
 
-    it('handleScrollToIndexFailed handles scroll index errors gracefully', () => {
+    it('handleScrollToIndexFailed handles scroll index errors gracefully', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1221,11 +1224,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Invoke onScrollToIndexFailed
-      act(() => {
+      await act(async () => {
         operationsList.props.onScrollToIndexFailed({ index: 10 });
       });
 
@@ -1239,7 +1242,7 @@ describe('OperationsScreen', () => {
       consoleSpy.mockRestore();
     });
 
-    it('handleContentSizeChange is passed to OperationsList', () => {
+    it('handleContentSizeChange is passed to OperationsList', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1264,18 +1267,18 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       expect(operationsList.props.onContentSizeChange).toBeDefined();
 
       // Invoke onContentSizeChange
-      act(() => {
+      await act(async () => {
         operationsList.props.onContentSizeChange(400, 2000);
       });
     });
 
-    it('scrollToTop scrolls list to top when button pressed', () => {
+    it('scrollToTop scrolls list to top when button pressed', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1301,11 +1304,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId, getByLabelText } = render(<OperationsScreen />);
+      const { getByTestId, getByLabelText } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Scroll down to show the button
-      act(() => {
+      await act(async () => {
         operationsList.props.onScroll({
           nativeEvent: { contentOffset: { y: 300 } },
         });
@@ -1313,7 +1316,7 @@ describe('OperationsScreen', () => {
 
       // Press scroll to top button
       const scrollToTopButton = getByLabelText('Scroll to top');
-      fireEvent.press(scrollToTopButton);
+      await fireEvent.press(scrollToTopButton);
 
       // Button should still be visible (will be hidden after scroll completes)
       expect(scrollToTopButton).toBeTruthy();
@@ -1323,7 +1326,7 @@ describe('OperationsScreen', () => {
   describe('Date Picker', () => {
     const { act } = require('@testing-library/react-native');
 
-    it('handleDateSeparatorPress opens date picker', () => {
+    it('handleDateSeparatorPress opens date picker', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1348,11 +1351,11 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId, queryByTestId, UNSAFE_root } = render(<OperationsScreen />);
+      const { getByTestId, queryByTestId, container } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Invoke handleDateSeparatorPress
-      act(() => {
+      await act(async () => {
         operationsList.props.onDateSeparatorPress('2024-01-15');
       });
 
@@ -1365,7 +1368,7 @@ describe('OperationsScreen', () => {
   describe('Amount Change Handlers', () => {
     const { act } = require('@testing-library/react-native');
 
-    it('handleAmountChange updates quick add values', () => {
+    it('handleAmountChange updates quick add values', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1416,7 +1419,7 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       // The handlers are created internally and passed to child components
       // Verify that the necessary hooks were called
@@ -1424,7 +1427,7 @@ describe('OperationsScreen', () => {
       expect(useMultiCurrencyTransfer).toHaveBeenCalled();
     });
 
-    it('handleExchangeRateChange updates exchange rate', () => {
+    it('handleExchangeRateChange updates exchange rate', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1475,7 +1478,7 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       // Verify multi-currency hooks are used
       expect(useMultiCurrencyTransfer).toHaveBeenCalled();
@@ -1483,7 +1486,7 @@ describe('OperationsScreen', () => {
   });
 
   describe('Picker Modal', () => {
-    it('renders PickerModal component', () => {
+    it('renders PickerModal component', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1508,12 +1511,12 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
       expect(pickerModal).toBeTruthy();
     });
 
-    it('PickerModal has onAutoAddWithCategory handler', () => {
+    it('PickerModal has onAutoAddWithCategory handler', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1538,37 +1541,37 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
       expect(pickerModal.props.onAutoAddWithCategory).toBeDefined();
     });
   });
 
   describe('Quick Add Form', () => {
-    it('manages quick add form state for expenses', () => {
+    it('manages quick add form state for expenses', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should have QuickAddForm for quick expense entry
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('manages quick add form state for income', () => {
+    it('manages quick add form state for income', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should support quick income entry
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('manages quick add form state for transfers', () => {
+    it('manages quick add form state for transfers', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       // Component should support quick transfer entry
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Operations Grouping and Spending Sums', () => {
-    it('groups operations by date and calculates spending sums', () => {
+    it('groups operations by date and calculates spending sums', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1613,10 +1616,10 @@ describe('OperationsScreen', () => {
       });
 
       // Component should render without errors with operations
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with different currencies in spending sums', () => {
+    it('handles operations with different currencies in spending sums', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1660,10 +1663,10 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with missing account data', () => {
+    it('handles operations with missing account data', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1704,10 +1707,10 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations without currency in account', () => {
+    it('handles operations without currency in account', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1747,10 +1750,10 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('excludes income and transfer operations from spending sums', () => {
+    it('excludes income and transfer operations from spending sums', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1793,10 +1796,10 @@ describe('OperationsScreen', () => {
       });
 
       // Only expense operations should be counted in spending sums
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('handles operations with invalid amount values', () => {
+    it('handles operations with invalid amount values', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1839,12 +1842,12 @@ describe('OperationsScreen', () => {
       });
 
       // Should handle invalid amounts gracefully
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
   describe('Loading States', () => {
-    it('passes initialLoading=true to OperationsList when operations are loading', () => {
+    it('passes initialLoading=true to OperationsList when operations are loading', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1869,14 +1872,14 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
       // Operations list is pre-rendered immediately; inline spinner shown via initialLoading
       expect(operationsList.props.initialLoading).toBe(true);
     });
 
-    it('pre-renders screen normally when accounts are loading', () => {
+    it('pre-renders screen normally when accounts are loading', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
@@ -1908,13 +1911,13 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
 
       // Screen pre-renders; no full-screen loading blocker while accounts load
       expect(getByTestId('operations-list')).toBeTruthy();
     });
 
-    it('pre-renders screen normally when categories are loading', () => {
+    it('pre-renders screen normally when categories are loading', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useCategories } = require('../../app/contexts/CategoriesContext');
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
@@ -1945,7 +1948,7 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
 
       // Screen pre-renders; no full-screen loading blocker while categories load
       expect(getByTestId('operations-list')).toBeTruthy();
@@ -1953,7 +1956,7 @@ describe('OperationsScreen', () => {
   });
 
   describe('Filter Badge', () => {
-    it('shows filter count when filters are active', () => {
+    it('shows filter count when filters are active', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -1978,10 +1981,10 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 2),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
 
-    it('does not show filter badge when no filters active', () => {
+    it('does not show filter badge when no filters active', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
@@ -2006,7 +2009,7 @@ describe('OperationsScreen', () => {
         getActiveFilterCount: jest.fn(() => 0),
       });
 
-      expect(() => render(<OperationsScreen />)).not.toThrow();
+      await render(<OperationsScreen />);
     });
   });
 
@@ -2078,7 +2081,7 @@ describe('OperationsScreen', () => {
 
       Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.920000', source: 'live' });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       await waitFor(() => {
         expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('USD', 'EUR');
@@ -2087,7 +2090,7 @@ describe('OperationsScreen', () => {
       });
     });
 
-    it('does not overwrite existing exchange rate', () => {
+    it('does not overwrite existing exchange rate', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       useQuickAddFormMock.mockReturnValue({
@@ -2112,13 +2115,13 @@ describe('OperationsScreen', () => {
         setRateSource: jest.fn(),
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       // Should not call fetchLiveExchangeRate when rate already exists
       expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
     });
 
-    it('calculates destination amount when amount or exchange rate is edited', () => {
+    it('calculates destination amount when amount or exchange rate is edited', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       useQuickAddFormMock.mockReturnValue({
@@ -2145,14 +2148,14 @@ describe('OperationsScreen', () => {
 
       Currency.convertAmount.mockReturnValue('92.00');
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       expect(Currency.convertAmount).toHaveBeenCalledWith('100', 'USD', 'EUR', '0.92');
       // setQuickAddValues should be called to set destinationAmount
       expect(mockSetQuickAddValues).toHaveBeenCalled();
     });
 
-    it('back-calculates exchange rate when destination amount is edited', () => {
+    it('back-calculates exchange rate when destination amount is edited', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       useQuickAddFormMock.mockReturnValue({
@@ -2177,7 +2180,7 @@ describe('OperationsScreen', () => {
         setRateSource: jest.fn(),
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       // Should calculate rate = 85 / 100 = 0.850000
       expect(mockSetQuickAddValues).toHaveBeenCalled();
@@ -2191,7 +2194,7 @@ describe('OperationsScreen', () => {
       expect(updater).toBeTruthy();
     });
 
-    it('clears exchange fields when switching to same-currency transfer', () => {
+    it('clears exchange fields when switching to same-currency transfer', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
 
       useQuickAddFormMock.mockReturnValue({
@@ -2216,7 +2219,7 @@ describe('OperationsScreen', () => {
         setRateSource: jest.fn(),
       });
 
-      render(<OperationsScreen />);
+      await render(<OperationsScreen />);
 
       // Should clear exchangeRate and destinationAmount
       expect(mockSetQuickAddValues).toHaveBeenCalled();
@@ -2260,7 +2263,7 @@ describe('OperationsScreen', () => {
         jumpToDate: jest.fn(),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       // onAutoAddWithCategory is exposed on the PickerModal mock and routes through handleQuickAdd
       const pickerModal = getByTestId('picker-modal');
 
@@ -2294,7 +2297,7 @@ describe('OperationsScreen', () => {
         jumpToDate: jest.fn(),
       });
 
-      const { getByTestId } = render(<OperationsScreen />);
+      const { getByTestId } = await render(<OperationsScreen />);
       const pickerModal = getByTestId('picker-modal');
 
       // Passing a real categoryId: category check passes → dialog shown for other error

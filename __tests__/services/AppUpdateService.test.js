@@ -118,35 +118,35 @@ describe('AppUpdateService', () => {
   });
 
   describe('parseVersionFromRelease', () => {
-    it('parses plain semver tag', () => {
+    it('parses plain semver tag', async () => {
       expect(parseVersionFromRelease({ tag_name: 'v1.2.3' })).toBe('1.2.3');
     });
 
-    it('parses prefixed tag name', () => {
+    it('parses prefixed tag name', async () => {
       expect(parseVersionFromRelease({ tag_name: 'penny-v0.50.4' })).toBe('0.50.4');
     });
 
-    it('falls back to release name when tag is invalid', () => {
+    it('falls back to release name when tag is invalid', async () => {
       expect(parseVersionFromRelease({ tag_name: 'latest', name: 'Release 2.1.0' })).toBe('2.1.0');
     });
   });
 
   describe('compareVersions', () => {
-    it('returns 1 when left version is newer', () => {
+    it('returns 1 when left version is newer', async () => {
       expect(compareVersions('1.3.0', '1.2.9')).toBe(1);
     });
 
-    it('returns -1 when left version is older', () => {
+    it('returns -1 when left version is older', async () => {
       expect(compareVersions('0.49.9', '0.50.0')).toBe(-1);
     });
 
-    it('returns 0 for equivalent normalized versions', () => {
+    it('returns 0 for equivalent normalized versions', async () => {
       expect(compareVersions('v1.2.3', 'release-1.2.3')).toBe(0);
     });
   });
 
   describe('extractApkAsset', () => {
-    it('returns first valid apk asset', () => {
+    it('returns first valid apk asset', async () => {
       const asset = extractApkAsset([
         { name: 'notes.txt', browser_download_url: 'https://example.com/notes.txt' },
         { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
@@ -155,7 +155,7 @@ describe('AppUpdateService', () => {
       expect(asset.browser_download_url).toBe('https://example.com/penny.apk');
     });
 
-    it('returns null when no apk assets exist', () => {
+    it('returns null when no apk assets exist', async () => {
       expect(extractApkAsset([{ name: 'archive.zip', browser_download_url: 'https://example.com/archive.zip' }])).toBeNull();
     });
   });
@@ -564,11 +564,11 @@ describe('AppUpdateService', () => {
   });
 
   describe('sanitizeFilename', () => {
-    it('passes through a safe APK filename unchanged', () => {
+    it('passes through a safe APK filename unchanged', async () => {
       expect(sanitizeFilename('penny-v1.2.3.apk')).toBe('penny-v1.2.3.apk');
     });
 
-    it('removes path separators preventing traversal outside the cache directory', () => {
+    it('removes path separators preventing traversal outside the cache directory', async () => {
       const result = sanitizeFilename('../../../evil.apk');
       // The slash is stripped so the result is a flat filename, not a traversal path.
       expect(result).not.toContain('/');
@@ -577,27 +577,27 @@ describe('AppUpdateService', () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it('replaces path separators in filenames', () => {
+    it('replaces path separators in filenames', async () => {
       const result = sanitizeFilename('foo/bar.apk');
       expect(result).not.toContain('/');
       expect(result).toBe('foo_bar.apk');
     });
 
-    it('returns default when result has no .apk extension', () => {
+    it('returns default when result has no .apk extension', async () => {
       expect(sanitizeFilename('malicious')).toBe('penny-update.apk');
     });
 
-    it('returns default for null input', () => {
+    it('returns default for null input', async () => {
       expect(sanitizeFilename(null)).toBe('penny-update.apk');
     });
 
-    it('returns default for empty string', () => {
+    it('returns default for empty string', async () => {
       expect(sanitizeFilename('')).toBe('penny-update.apk');
     });
   });
 
   describe('extractChecksumAsset', () => {
-    it('finds a checksum asset matching the APK filename', () => {
+    it('finds a checksum asset matching the APK filename', async () => {
       const assets = [
         { name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' },
         { name: 'penny-v1.0.0.apk.sha256', browser_download_url: 'https://example.com/penny.apk.sha256' },
@@ -606,12 +606,12 @@ describe('AppUpdateService', () => {
       expect(asset.browser_download_url).toBe('https://example.com/penny.apk.sha256');
     });
 
-    it('returns null when no checksum asset is present', () => {
+    it('returns null when no checksum asset is present', async () => {
       const assets = [{ name: 'penny-v1.0.0.apk', browser_download_url: 'https://example.com/penny.apk' }];
       expect(extractChecksumAsset(assets, 'penny-v1.0.0.apk')).toBeNull();
     });
 
-    it('returns null when apkFilename is missing', () => {
+    it('returns null when apkFilename is missing', async () => {
       expect(extractChecksumAsset([], null)).toBeNull();
     });
   });

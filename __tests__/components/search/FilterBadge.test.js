@@ -8,23 +8,23 @@ describe('FilterBadge', () => {
     background: '#FFFFFF',
   };
 
-  it('renders badge with count', () => {
-    const { getByText } = render(<FilterBadge count={3} colors={mockColors} />);
+  it('renders badge with count', async () => {
+    const { getByText } = await render(<FilterBadge count={3} colors={mockColors} />);
     expect(getByText('3')).toBeTruthy();
   });
 
-  it('does not render when count is 0', () => {
-    const { queryByTestId } = render(<FilterBadge count={0} colors={mockColors} />);
+  it('does not render when count is 0', async () => {
+    const { queryByTestId } = await render(<FilterBadge count={0} colors={mockColors} />);
     expect(queryByTestId('filter-badge')).toBeNull();
   });
 
-  it('does not render when count is null', () => {
-    const { queryByTestId } = render(<FilterBadge count={null} colors={mockColors} />);
+  it('does not render when count is null', async () => {
+    const { queryByTestId } = await render(<FilterBadge count={null} colors={mockColors} />);
     expect(queryByTestId('filter-badge')).toBeNull();
   });
 
-  it('applies primary color to badge background', () => {
-    const { getByTestId } = render(<FilterBadge count={5} colors={mockColors} />);
+  it('applies primary color to badge background', async () => {
+    const { getByTestId } = await render(<FilterBadge count={5} colors={mockColors} />);
     const badge = getByTestId('filter-badge');
     const styleArray = Array.isArray(badge.props.style)
       ? badge.props.style

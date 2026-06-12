@@ -34,8 +34,8 @@ describe('MaterialDialog', () => {
   });
 
   describe('Visibility', () => {
-    it('renders when visible is true', () => {
-      const { getByText } = render(
+    it('renders when visible is true', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test Dialog"
@@ -49,8 +49,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Test message')).toBeTruthy();
     });
 
-    it('does not render when visible is false', () => {
-      const { queryByText } = render(
+    it('does not render when visible is false', async () => {
+      const { queryByText } = await render(
         <MaterialDialog
           visible={false}
           title="Test Dialog"
@@ -64,8 +64,8 @@ describe('MaterialDialog', () => {
       expect(queryByText('Test message')).toBeNull();
     });
 
-    it('toggles visibility correctly', () => {
-      const { getByText, queryByText, rerender } = render(
+    it('toggles visibility correctly', async () => {
+      const { getByText, queryByText, rerender } = await render(
         <MaterialDialog
           visible={false}
           title="Test Dialog"
@@ -77,7 +77,7 @@ describe('MaterialDialog', () => {
 
       expect(queryByText('Test Dialog')).toBeNull();
 
-      rerender(
+      await rerender(
         <MaterialDialog
           visible={true}
           title="Test Dialog"
@@ -91,8 +91,8 @@ describe('MaterialDialog', () => {
   });
 
   describe('Content Display', () => {
-    it('displays title', () => {
-      const { getByText } = render(
+    it('displays title', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Important Message"
@@ -104,8 +104,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Important Message')).toBeTruthy();
     });
 
-    it('displays message', () => {
-      const { getByText } = render(
+    it('displays message', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           message="This is a test message"
@@ -117,8 +117,8 @@ describe('MaterialDialog', () => {
       expect(getByText('This is a test message')).toBeTruthy();
     });
 
-    it('displays both title and message', () => {
-      const { getByText } = render(
+    it('displays both title and message', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Title"
@@ -132,8 +132,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Message')).toBeTruthy();
     });
 
-    it('renders without title', () => {
-      const { getByText, queryByText } = render(
+    it('renders without title', async () => {
+      const { getByText, queryByText } = await render(
         <MaterialDialog
           visible={true}
           message="Message only"
@@ -146,8 +146,8 @@ describe('MaterialDialog', () => {
       // No title should be rendered
     });
 
-    it('renders without message', () => {
-      const { getByText } = render(
+    it('renders without message', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Title only"
@@ -159,8 +159,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Title only')).toBeTruthy();
     });
 
-    it('renders with empty strings', () => {
-      const { root } = render(
+    it('renders with empty strings', async () => {
+      const { root } = await render(
         <MaterialDialog
           visible={true}
           title=""
@@ -175,8 +175,8 @@ describe('MaterialDialog', () => {
   });
 
   describe('Buttons', () => {
-    it('renders single button', () => {
-      const { getByText } = render(
+    it('renders single button', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -190,8 +190,8 @@ describe('MaterialDialog', () => {
       expect(getByText('OK')).toBeTruthy();
     });
 
-    it('renders multiple buttons', () => {
-      const { getByText } = render(
+    it('renders multiple buttons', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -207,9 +207,9 @@ describe('MaterialDialog', () => {
       expect(getByText('OK')).toBeTruthy();
     });
 
-    it('calls button onPress handler', () => {
+    it('calls button onPress handler', async () => {
       const onPress = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -220,14 +220,14 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      fireEvent.press(getByText('OK'));
+      await fireEvent.press(getByText('OK'));
 
       expect(onPress).toHaveBeenCalled();
     });
 
-    it('calls onDismiss when button is pressed', () => {
+    it('calls onDismiss when button is pressed', async () => {
       const onDismiss = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -239,16 +239,16 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      fireEvent.press(getByText('OK'));
+      await fireEvent.press(getByText('OK'));
 
       expect(onDismiss).toHaveBeenCalled();
     });
 
-    it('calls both button onPress and onDismiss', () => {
+    it('calls both button onPress and onDismiss', async () => {
       const buttonOnPress = jest.fn();
       const onDismiss = jest.fn();
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -260,15 +260,15 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      fireEvent.press(getByText('OK'));
+      await fireEvent.press(getByText('OK'));
 
       expect(buttonOnPress).toHaveBeenCalled();
       expect(onDismiss).toHaveBeenCalled();
     });
 
-    it('handles button without onPress', () => {
+    it('handles button without onPress', async () => {
       const onDismiss = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -280,14 +280,14 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      expect(() => fireEvent.press(getByText('OK'))).not.toThrow();
+      await fireEvent.press(getByText('OK'));
       expect(onDismiss).toHaveBeenCalled();
     });
   });
 
   describe('Button Styles', () => {
-    it('renders default button style', () => {
-      const { getByText } = render(
+    it('renders default button style', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -301,8 +301,8 @@ describe('MaterialDialog', () => {
       expect(getByText('OK')).toBeTruthy();
     });
 
-    it('renders cancel button style', () => {
-      const { getByText } = render(
+    it('renders cancel button style', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -316,8 +316,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Cancel')).toBeTruthy();
     });
 
-    it('renders destructive button style', () => {
-      const { getByText } = render(
+    it('renders destructive button style', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm Delete"
@@ -331,8 +331,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Delete')).toBeTruthy();
     });
 
-    it('handles multiple buttons with different styles', () => {
-      const { getByText } = render(
+    it('handles multiple buttons with different styles', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Confirm"
@@ -352,9 +352,9 @@ describe('MaterialDialog', () => {
   });
 
   describe('Dismiss Behavior', () => {
-    it('calls onDismiss when overlay is pressed', () => {
+    it('calls onDismiss when overlay is pressed', async () => {
       const onDismiss = jest.fn();
-      const { getByTestId, UNSAFE_getAllByType } = render(
+      const { getByTestId, container } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -365,14 +365,14 @@ describe('MaterialDialog', () => {
       // Find the overlay Pressable by testID
       const overlay = getByTestId('material-dialog-overlay');
 
-      fireEvent.press(overlay);
+      await fireEvent.press(overlay);
 
       expect(onDismiss).toHaveBeenCalled();
     });
 
-    it('does not dismiss when dialog content is pressed', () => {
+    it('does not dismiss when dialog content is pressed', async () => {
       const onDismiss = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -385,14 +385,14 @@ describe('MaterialDialog', () => {
       // Find the dialog content Pressable by testID
       const dialogContent = getByTestId('material-dialog-content');
 
-      fireEvent.press(dialogContent);
+      await fireEvent.press(dialogContent);
 
       // Should not dismiss when clicking inside dialog
       expect(onDismiss).not.toHaveBeenCalled();
     });
 
-    it('handles onDismiss not provided', () => {
-      const { getByText } = render(
+    it('handles onDismiss not provided', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -404,13 +404,13 @@ describe('MaterialDialog', () => {
       );
 
       // Should not crash without onDismiss
-      expect(() => fireEvent.press(getByText('OK'))).not.toThrow();
+      await fireEvent.press(getByText('OK'));
     });
   });
 
   describe('Empty States', () => {
-    it('renders with no buttons', () => {
-      const { getByText } = render(
+    it('renders with no buttons', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="No Buttons"
@@ -423,8 +423,8 @@ describe('MaterialDialog', () => {
       expect(getByText('No Buttons')).toBeTruthy();
     });
 
-    it('renders with undefined buttons', () => {
-      const { getByText } = render(
+    it('renders with undefined buttons', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Undefined Buttons"
@@ -438,13 +438,13 @@ describe('MaterialDialog', () => {
   });
 
   describe('Default Props', () => {
-    it('uses default visible value', () => {
+    it('uses default visible value', async () => {
       // Default visible is false
       expect(MaterialDialog.defaultProps.visible).toBe(false);
     });
 
-    it('uses default buttons array', () => {
-      const { getByText } = render(
+    it('uses default buttons array', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -457,9 +457,9 @@ describe('MaterialDialog', () => {
   });
 
   describe('Regression Tests', () => {
-    it('handles rapid button presses', () => {
+    it('handles rapid button presses', async () => {
       const onPress = jest.fn();
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -471,16 +471,16 @@ describe('MaterialDialog', () => {
       );
 
       const button = getByText('OK');
-      fireEvent.press(button);
-      fireEvent.press(button);
-      fireEvent.press(button);
+      await fireEvent.press(button);
+      await fireEvent.press(button);
+      await fireEvent.press(button);
 
       expect(onPress).toHaveBeenCalledTimes(3);
     });
 
-    it('handles long text in title', () => {
+    it('handles long text in title', async () => {
       const longTitle = 'This is a very long title that might wrap to multiple lines';
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title={longTitle}
@@ -491,9 +491,9 @@ describe('MaterialDialog', () => {
       expect(getByText(longTitle)).toBeTruthy();
     });
 
-    it('handles long text in message', () => {
+    it('handles long text in message', async () => {
       const longMessage = 'This is a very long message that contains a lot of text and might wrap to multiple lines in the dialog';
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           message={longMessage}
@@ -504,8 +504,8 @@ describe('MaterialDialog', () => {
       expect(getByText(longMessage)).toBeTruthy();
     });
 
-    it('handles special characters in text', () => {
-      const { getByText } = render(
+    it('handles special characters in text', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title={"Special < > & \" '"}
@@ -517,8 +517,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Special < > & " \'')).toBeTruthy();
     });
 
-    it('maintains state across rerenders', () => {
-      const { getByText, rerender } = render(
+    it('maintains state across rerenders', async () => {
+      const { getByText, rerender } = await render(
         <MaterialDialog
           visible={true}
           title="First Title"
@@ -528,7 +528,7 @@ describe('MaterialDialog', () => {
 
       expect(getByText('First Title')).toBeTruthy();
 
-      rerender(
+      await rerender(
         <MaterialDialog
           visible={true}
           title="Second Title"
@@ -540,8 +540,8 @@ describe('MaterialDialog', () => {
   });
 
   describe('Accessibility', () => {
-    it('buttons are pressable', () => {
-      const { getByText } = render(
+    it('buttons are pressable', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -553,11 +553,11 @@ describe('MaterialDialog', () => {
       );
 
       const button = getByText('OK');
-      expect(() => fireEvent.press(button)).not.toThrow();
+      await fireEvent.press(button);
     });
 
-    it('title is visible to screen readers', () => {
-      const { getByText } = render(
+    it('title is visible to screen readers', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Accessible Title"
@@ -568,8 +568,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Accessible Title')).toBeTruthy();
     });
 
-    it('message is visible to screen readers', () => {
-      const { getByText } = render(
+    it('message is visible to screen readers', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           message="Accessible message"
@@ -582,12 +582,12 @@ describe('MaterialDialog', () => {
   });
 
   describe('Button Interaction', () => {
-    it('executes button actions in correct order', () => {
+    it('executes button actions in correct order', async () => {
       const actions = [];
       const buttonOnPress = () => actions.push('button');
       const onDismiss = () => actions.push('dismiss');
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -599,7 +599,7 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      fireEvent.press(getByText('OK'));
+      await fireEvent.press(getByText('OK'));
 
       // Button onPress should be called before onDismiss
       expect(actions).toEqual(['button', 'dismiss']);
@@ -610,7 +610,7 @@ describe('MaterialDialog', () => {
         await new Promise(resolve => setTimeout(resolve, 100));
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Test"
@@ -621,14 +621,14 @@ describe('MaterialDialog', () => {
         { wrapper },
       );
 
-      fireEvent.press(getByText('OK'));
+      await fireEvent.press(getByText('OK'));
 
       expect(asyncHandler).toHaveBeenCalled();
     });
   });
 
   describe('Color fallbacks', () => {
-    it('falls back to hardcoded color when colors.delete is not in theme', () => {
+    it('falls back to hardcoded color when colors.delete is not in theme', async () => {
       const colorsWithoutDelete = {
         text: '#000',
         card: '#fff',
@@ -642,7 +642,7 @@ describe('MaterialDialog', () => {
           {children}
         </ThemeColorsProvider>
       );
-      const { getByText } = render(
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Delete?"
@@ -653,8 +653,8 @@ describe('MaterialDialog', () => {
       expect(getByText('Delete')).toBeTruthy();
     });
 
-    it('applies pressed background style when button is pressed in', () => {
-      const { getByText } = render(
+    it('applies pressed background style when button is pressed in', async () => {
+      const { getByText } = await render(
         <MaterialDialog
           visible={true}
           title="Press test"

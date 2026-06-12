@@ -34,19 +34,17 @@ describe('ImportProgressContext', () => {
   );
 
   describe('useImportProgress hook', () => {
-    it('throws error when used outside of provider', () => {
+    it('throws error when used outside of provider', async () => {
       // Suppress console.error for this test
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      expect(() => {
-        renderHook(() => useImportProgress());
-      }).toThrow('useImportProgress must be used within ImportProgressProvider');
+      await expect(renderHook(() => useImportProgress())).rejects.toThrow('useImportProgress must be used within ImportProgressProvider');
 
       consoleSpy.mockRestore();
     });
 
-    it('returns context value when used inside provider', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('returns context value when used inside provider', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       expect(result.current).toBeDefined();
       expect(result.current.isImporting).toBe(false);
@@ -61,8 +59,8 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Initial state', () => {
-    it('has correct initial state', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('has correct initial state', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       expect(result.current.isImporting).toBe(false);
       expect(result.current.steps).toEqual([]);
@@ -71,20 +69,20 @@ describe('ImportProgressContext', () => {
   });
 
   describe('startImport', () => {
-    it('sets isImporting to true', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets isImporting to true', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       expect(result.current.isImporting).toBe(true);
     });
 
-    it('initializes all import steps', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('initializes all import steps', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -103,20 +101,20 @@ describe('ImportProgressContext', () => {
       });
     });
 
-    it('sets currentStep to format', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets currentStep to format', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       expect(result.current.currentStep).toBe('format');
     });
 
-    it('initializes all expected step IDs', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('initializes all expected step IDs', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -140,14 +138,14 @@ describe('ImportProgressContext', () => {
   });
 
   describe('updateStep', () => {
-    it('updates step status', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('updates step status', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.updateStep('format', 'completed');
       });
 
@@ -155,15 +153,15 @@ describe('ImportProgressContext', () => {
       expect(formatStep.status).toBe('completed');
     });
 
-    it('updates step with data', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('updates step with data', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       const testData = { count: 10, total: 100 };
-      act(() => {
+      await act(async () => {
         result.current.updateStep('accounts', 'in_progress', testData);
       });
 
@@ -172,24 +170,24 @@ describe('ImportProgressContext', () => {
       expect(accountsStep.data).toEqual(testData);
     });
 
-    it('sets currentStep when status is in_progress', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets currentStep when status is in_progress', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.updateStep('import', 'in_progress');
       });
 
       expect(result.current.currentStep).toBe('import');
     });
 
-    it('does not change currentStep when status is completed', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('does not change currentStep when status is completed', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -197,22 +195,22 @@ describe('ImportProgressContext', () => {
       expect(result.current.currentStep).toBe('format');
 
       // Complete format - should not change currentStep
-      act(() => {
+      await act(async () => {
         result.current.updateStep('format', 'completed');
       });
 
       expect(result.current.currentStep).toBe('format');
     });
 
-    it('handles updating non-existent step gracefully', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('handles updating non-existent step gracefully', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       // This should not throw
-      act(() => {
+      await act(async () => {
         result.current.updateStep('nonexistent', 'completed');
       });
 
@@ -222,28 +220,28 @@ describe('ImportProgressContext', () => {
   });
 
   describe('completeImport', () => {
-    it('sets currentStep to complete', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets currentStep to complete', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.completeImport();
       });
 
       expect(result.current.currentStep).toBe('complete');
     });
 
-    it('marks complete step as completed', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('marks complete step as completed', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.completeImport();
       });
 
@@ -251,14 +249,14 @@ describe('ImportProgressContext', () => {
       expect(completeStep.status).toBe('completed');
     });
 
-    it('does not auto-close modal (isImporting remains true)', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('does not auto-close modal (isImporting remains true)', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.completeImport();
       });
 
@@ -268,48 +266,48 @@ describe('ImportProgressContext', () => {
   });
 
   describe('cancelImport', () => {
-    it('sets isImporting to false', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets isImporting to false', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       expect(result.current.isImporting).toBe(true);
 
-      act(() => {
+      await act(async () => {
         result.current.cancelImport();
       });
 
       expect(result.current.isImporting).toBe(false);
     });
 
-    it('clears steps array', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('clears steps array', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       expect(result.current.steps.length).toBeGreaterThan(0);
 
-      act(() => {
+      await act(async () => {
         result.current.cancelImport();
       });
 
       expect(result.current.steps).toEqual([]);
     });
 
-    it('resets currentStep to null', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('resets currentStep to null', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       expect(result.current.currentStep).not.toBeNull();
 
-      act(() => {
+      await act(async () => {
         result.current.cancelImport();
       });
 
@@ -318,42 +316,42 @@ describe('ImportProgressContext', () => {
   });
 
   describe('finishImport', () => {
-    it('sets isImporting to false', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets isImporting to false', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.finishImport();
       });
 
       expect(result.current.isImporting).toBe(false);
     });
 
-    it('clears steps array', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('clears steps array', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.finishImport();
       });
 
       expect(result.current.steps).toEqual([]);
     });
 
-    it('resets currentStep to null', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('resets currentStep to null', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.finishImport();
       });
 
@@ -362,8 +360,8 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Event listener', () => {
-    it('subscribes to IMPORT_PROGRESS_EVENT on mount', () => {
-      renderHook(() => useImportProgress(), { wrapper });
+    it('subscribes to IMPORT_PROGRESS_EVENT on mount', async () => {
+      await renderHook(() => useImportProgress(), { wrapper });
 
       expect(appEvents.on).toHaveBeenCalledWith(
         IMPORT_PROGRESS_EVENT,
@@ -371,32 +369,32 @@ describe('ImportProgressContext', () => {
       );
     });
 
-    it('unsubscribes on unmount', () => {
+    it('unsubscribes on unmount', async () => {
       const mockUnsubscribe = jest.fn();
       appEvents.on.mockReturnValue(mockUnsubscribe);
 
-      const { unmount } = renderHook(() => useImportProgress(), { wrapper });
+      const { unmount } = await renderHook(() => useImportProgress(), { wrapper });
 
-      unmount();
+      await unmount();
 
       expect(mockUnsubscribe).toHaveBeenCalled();
     });
 
-    it('handles progress events by updating steps', () => {
+    it('handles progress events by updating steps', async () => {
       let eventHandler;
       appEvents.on.mockImplementation((event, handler) => {
         eventHandler = handler;
         return jest.fn();
       });
 
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       // Simulate receiving a progress event
-      act(() => {
+      await act(async () => {
         eventHandler({
           stepId: 'accounts',
           status: 'in_progress',
@@ -412,17 +410,17 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Full import flow', () => {
-    it('handles complete import workflow', () => {
+    it('handles complete import workflow', async () => {
       let eventHandler;
       appEvents.on.mockImplementation((event, handler) => {
         eventHandler = handler;
         return jest.fn();
       });
 
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       // Start import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -432,19 +430,19 @@ describe('ImportProgressContext', () => {
       // Progress through steps via events
       const stepIds = ['format', 'import', 'restore', 'clear', 'accounts', 'categories', 'operations'];
 
-      stepIds.forEach(stepId => {
-        act(() => {
+      for (const stepId of stepIds) {
+        await act(async () => {
           eventHandler({ stepId, status: 'in_progress', data: null });
         });
         expect(result.current.currentStep).toBe(stepId);
 
-        act(() => {
+        await act(async () => {
           eventHandler({ stepId, status: 'completed', data: null });
         });
-      });
+      }
 
       // Complete the import
-      act(() => {
+      await act(async () => {
         result.current.completeImport();
       });
 
@@ -452,7 +450,7 @@ describe('ImportProgressContext', () => {
       expect(result.current.isImporting).toBe(true);
 
       // User presses OK button
-      act(() => {
+      await act(async () => {
         result.current.finishImport();
       });
 
@@ -461,22 +459,22 @@ describe('ImportProgressContext', () => {
       expect(result.current.currentStep).toBeNull();
     });
 
-    it('handles cancelled import', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('handles cancelled import', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       // Start import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       // Update some steps
-      act(() => {
+      await act(async () => {
         result.current.updateStep('format', 'completed');
         result.current.updateStep('import', 'in_progress');
       });
 
       // Cancel
-      act(() => {
+      await act(async () => {
         result.current.cancelImport();
       });
 
@@ -485,20 +483,20 @@ describe('ImportProgressContext', () => {
       expect(result.current.currentStep).toBeNull();
     });
 
-    it('can restart import after cancellation', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('can restart import after cancellation', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       // First import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.cancelImport();
       });
 
       // Second import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -507,24 +505,24 @@ describe('ImportProgressContext', () => {
       expect(result.current.currentStep).toBe('format');
     });
 
-    it('can restart import after completion', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('can restart import after completion', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
       // First import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.completeImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.finishImport();
       });
 
       // Second import
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
@@ -535,52 +533,52 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Step data handling', () => {
-    it('handles various data types in step updates', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('handles various data types in step updates', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       // Object data
-      act(() => {
+      await act(async () => {
         result.current.updateStep('accounts', 'in_progress', { count: 5 });
       });
       expect(result.current.steps.find(s => s.id === 'accounts').data).toEqual({ count: 5 });
 
       // String data
-      act(() => {
+      await act(async () => {
         result.current.updateStep('format', 'completed', 'json');
       });
       expect(result.current.steps.find(s => s.id === 'format').data).toBe('json');
 
       // Number data
-      act(() => {
+      await act(async () => {
         result.current.updateStep('operations', 'in_progress', 100);
       });
       expect(result.current.steps.find(s => s.id === 'operations').data).toBe(100);
 
       // Null data (default)
-      act(() => {
+      await act(async () => {
         result.current.updateStep('categories', 'completed');
       });
       expect(result.current.steps.find(s => s.id === 'categories').data).toBeNull();
     });
 
-    it('preserves data when updating status only', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('preserves data when updating status only', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
       // Set initial data
-      act(() => {
+      await act(async () => {
         result.current.updateStep('accounts', 'in_progress', { processed: 50 });
       });
 
       // Update status with new data (should replace)
-      act(() => {
+      await act(async () => {
         result.current.updateStep('accounts', 'completed', { processed: 100 });
       });
 
@@ -589,14 +587,14 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Multiple step updates', () => {
-    it('handles rapid sequential updates', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('handles rapid sequential updates', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => {
+      await act(async () => {
         result.current.startImport();
       });
 
-      act(() => {
+      await act(async () => {
         result.current.updateStep('format', 'in_progress');
         result.current.updateStep('format', 'completed');
         result.current.updateStep('import', 'in_progress');
@@ -612,74 +610,74 @@ describe('ImportProgressContext', () => {
   });
 
   describe('requestCancel', () => {
-    it('sets isCancelling to true', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('sets isCancelling to true', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
 
       expect(result.current.isCancelling).toBe(false);
 
-      act(() => { result.current.requestCancel(); });
+      await act(async () => { result.current.requestCancel(); });
 
       expect(result.current.isCancelling).toBe(true);
     });
 
-    it('marks the cancel token as cancelled', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('marks the cancel token as cancelled', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
 
       const token = result.current.getCancelToken();
       expect(token.cancelled).toBe(false);
 
-      act(() => { result.current.requestCancel(); });
+      await act(async () => { result.current.requestCancel(); });
 
       expect(token.cancelled).toBe(true);
     });
 
-    it('isCancelling resets to false after cancelImport', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('isCancelling resets to false after cancelImport', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
-      act(() => { result.current.requestCancel(); });
+      await act(async () => { result.current.startImport(); });
+      await act(async () => { result.current.requestCancel(); });
 
       expect(result.current.isCancelling).toBe(true);
 
-      act(() => { result.current.cancelImport(); });
+      await act(async () => { result.current.cancelImport(); });
 
       expect(result.current.isCancelling).toBe(false);
     });
 
-    it('isCancelling resets to false after finishImport', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('isCancelling resets to false after finishImport', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
-      act(() => { result.current.requestCancel(); });
-      act(() => { result.current.finishImport(); });
+      await act(async () => { result.current.startImport(); });
+      await act(async () => { result.current.requestCancel(); });
+      await act(async () => { result.current.finishImport(); });
 
       expect(result.current.isCancelling).toBe(false);
     });
   });
 
   describe('getCancelToken', () => {
-    it('returns a fresh non-cancelled token after startImport', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('returns a fresh non-cancelled token after startImport', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
 
       const token = result.current.getCancelToken();
       expect(token).toBeDefined();
       expect(token.cancelled).toBe(false);
     });
 
-    it('returns a new token on each startImport call', () => {
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+    it('returns a new token on each startImport call', async () => {
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
       const firstToken = result.current.getCancelToken();
 
-      act(() => { result.current.cancelImport(); });
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.cancelImport(); });
+      await act(async () => { result.current.startImport(); });
       const secondToken = result.current.getCancelToken();
 
       expect(secondToken.cancelled).toBe(false);
@@ -689,36 +687,36 @@ describe('ImportProgressContext', () => {
   });
 
   describe('Event listener complete branch', () => {
-    it('sets currentStep to complete when complete event fires with completed status', () => {
+    it('sets currentStep to complete when complete event fires with completed status', async () => {
       let eventHandler;
       appEvents.on.mockImplementation((event, handler) => {
         eventHandler = handler;
         return jest.fn();
       });
 
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
 
-      act(() => {
+      await act(async () => {
         eventHandler({ stepId: 'complete', status: 'completed', data: null });
       });
 
       expect(result.current.currentStep).toBe('complete');
     });
 
-    it('does not set currentStep to complete when complete event fires with non-completed status', () => {
+    it('does not set currentStep to complete when complete event fires with non-completed status', async () => {
       let eventHandler;
       appEvents.on.mockImplementation((event, handler) => {
         eventHandler = handler;
         return jest.fn();
       });
 
-      const { result } = renderHook(() => useImportProgress(), { wrapper });
+      const { result } = await renderHook(() => useImportProgress(), { wrapper });
 
-      act(() => { result.current.startImport(); });
+      await act(async () => { result.current.startImport(); });
 
-      act(() => {
+      await act(async () => {
         eventHandler({ stepId: 'complete', status: 'in_progress', data: null });
       });
 

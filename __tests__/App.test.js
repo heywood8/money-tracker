@@ -164,7 +164,7 @@ describe('App', () => {
 
   describe('Rendering', () => {
     it('renders without crashing', async () => {
-      const { toJSON } = render(<App />);
+      const { toJSON } = await render(<App />);
 
       await waitFor(() => {
         expect(toJSON()).toBeTruthy();
@@ -172,7 +172,7 @@ describe('App', () => {
     });
 
     it('renders with ErrorBoundary wrapper', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('error-boundary')).toBeTruthy();
@@ -180,7 +180,7 @@ describe('App', () => {
     });
 
     it('renders GestureHandlerRootView', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('gesture-handler-root')).toBeTruthy();
@@ -188,7 +188,7 @@ describe('App', () => {
     });
 
     it('renders SafeAreaProvider', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('safe-area-provider')).toBeTruthy();
@@ -196,7 +196,7 @@ describe('App', () => {
     });
 
     it('renders PaperProvider', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('paper-provider')).toBeTruthy();
@@ -204,7 +204,7 @@ describe('App', () => {
     });
 
     it('renders AppInitializer', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('app-initializer')).toBeTruthy();
@@ -212,7 +212,7 @@ describe('App', () => {
     });
 
     it('renders ImportProgressModal', async () => {
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         expect(getByTestId('import-progress-modal')).toBeTruthy();
@@ -228,7 +228,7 @@ describe('App', () => {
         setTheme: jest.fn(),
       });
 
-      render(<App />);
+      await render(<App />);
 
       await waitFor(() => {
         expect(setBarStyleSpy).toHaveBeenCalledWith('dark-content', true);
@@ -252,7 +252,7 @@ describe('App', () => {
         },
       });
 
-      render(<App />);
+      await render(<App />);
 
       await waitFor(() => {
         expect(setBarStyleSpy).toHaveBeenCalledWith('light-content', true);
@@ -282,7 +282,7 @@ describe('App', () => {
         },
       });
 
-      render(<App />);
+      await render(<App />);
 
       await waitFor(() => {
         expect(setBackgroundColorSpy).toHaveBeenCalledWith('#FFFFFF', true);
@@ -306,7 +306,7 @@ describe('App', () => {
         },
       });
 
-      render(<App />);
+      await render(<App />);
 
       await waitFor(() => {
         expect(setBackgroundColorSpy).toHaveBeenCalledWith('#121212', true);
@@ -315,16 +315,16 @@ describe('App', () => {
   });
 
   describe('ThemedStatusBar error handling', () => {
-    it('handles StatusBar.setBarStyle errors gracefully', () => {
+    it('handles StatusBar.setBarStyle errors gracefully', async () => {
       setBarStyleSpy.mockImplementation(() => {
         throw new Error('StatusBar error');
       });
 
       // Should not throw
-      expect(() => render(<App />)).not.toThrow();
+      await render(<App />);
     });
 
-    it('handles StatusBar.setBackgroundColor errors gracefully', () => {
+    it('handles StatusBar.setBackgroundColor errors gracefully', async () => {
       const originalPlatform = Platform.OS;
       Platform.OS = 'android';
 
@@ -333,7 +333,7 @@ describe('App', () => {
       });
 
       // Should not throw
-      expect(() => render(<App />)).not.toThrow();
+      await render(<App />);
 
       Platform.OS = originalPlatform;
     });
@@ -341,7 +341,7 @@ describe('App', () => {
 
   describe('Provider hierarchy', () => {
     it('provides all necessary contexts', async () => {
-      const { toJSON } = render(<App />);
+      const { toJSON } = await render(<App />);
 
       await waitFor(() => {
         const tree = toJSON();
@@ -362,7 +362,7 @@ describe('App', () => {
       };
       useMaterialTheme.mockReturnValue(mockTheme);
 
-      const { getByTestId } = render(<App />);
+      const { getByTestId } = await render(<App />);
 
       await waitFor(() => {
         const paperProvider = getByTestId('paper-provider');
@@ -380,7 +380,7 @@ describe('App', () => {
         decrement: jest.fn(),
       });
 
-      const { toJSON } = render(<App />);
+      const { toJSON } = await render(<App />);
       await waitFor(() => {
         expect(toJSON()).toBeTruthy();
       });

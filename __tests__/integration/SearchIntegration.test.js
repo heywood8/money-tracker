@@ -68,23 +68,23 @@ describe('Search Integration', () => {
   });
 
   describe('SearchOverlay Visibility', () => {
-    it('does not render when visible is false', () => {
-      const { queryByTestId } = render(
+    it('does not render when visible is false', async () => {
+      const { queryByTestId } = await render(
         <SearchOverlay visible={false} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(queryByTestId('expandable-filters')).toBeNull();
     });
 
-    it('does not render filters when filtersExpanded is false', () => {
-      const { queryByTestId } = render(
+    it('does not render filters when filtersExpanded is false', async () => {
+      const { queryByTestId } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(queryByTestId('expandable-filters')).toBeNull();
     });
 
-    it('renders filters when filtersExpanded is true', () => {
+    it('renders filters when filtersExpanded is true', async () => {
       useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(queryByTestId('expandable-filters')).toBeTruthy();
@@ -96,8 +96,8 @@ describe('Search Integration', () => {
       useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
     });
 
-    it('renders all filter sections when expanded', () => {
-      const { getByText } = render(
+    it('renders all filter sections when expanded', async () => {
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(getByText('operation_type')).toBeTruthy();
@@ -106,8 +106,8 @@ describe('Search Integration', () => {
       expect(getByText('accounts')).toBeTruthy();
     });
 
-    it('renders type filter chips', () => {
-      const { getByText } = render(
+    it('renders type filter chips', async () => {
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(getByText('expense')).toBeTruthy();
@@ -115,8 +115,8 @@ describe('Search Integration', () => {
       expect(getByText('transfer')).toBeTruthy();
     });
 
-    it('renders account chips for each visible account', () => {
-      const { getByText } = render(
+    it('renders account chips for each visible account', async () => {
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
       expect(getByText('Checking')).toBeTruthy();
@@ -129,69 +129,69 @@ describe('Search Integration', () => {
       useSearch.mockReturnValue({ filtersExpanded: true, toggleFilters: jest.fn() });
     });
 
-    it('selects a type filter when chip is pressed', () => {
-      const { getByText } = render(
+    it('selects a type filter when chip is pressed', async () => {
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByText('expense'));
+      await fireEvent.press(getByText('expense'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: ['expense'] });
     });
 
-    it('allows multiple type filters to be selected', () => {
+    it('allows multiple type filters to be selected', async () => {
       useOperationsData.mockReturnValue({
         searchState: { ...defaultSearchState, types: ['expense'] },
         hasActiveSearch: true,
         getSearchFilterCount: jest.fn(() => 1),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByText('income'));
+      await fireEvent.press(getByText('income'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: ['expense', 'income'] });
     });
 
-    it('deselects a type filter when selected chip is pressed again', () => {
+    it('deselects a type filter when selected chip is pressed again', async () => {
       useOperationsData.mockReturnValue({
         searchState: { ...defaultSearchState, types: ['expense'] },
         hasActiveSearch: true,
         getSearchFilterCount: jest.fn(() => 1),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByText('expense'));
+      await fireEvent.press(getByText('expense'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ types: [] });
     });
 
-    it('toggles account filter on', () => {
-      const { getByText } = render(
+    it('toggles account filter on', async () => {
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByText('Checking'));
+      await fireEvent.press(getByText('Checking'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ accountIds: ['acc-1'] });
     });
 
-    it('toggles account filter off when already selected', () => {
+    it('toggles account filter off when already selected', async () => {
       useOperationsData.mockReturnValue({
         searchState: { ...defaultSearchState, accountIds: ['acc-1'] },
         hasActiveSearch: true,
         getSearchFilterCount: jest.fn(() => 1),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByText('Checking'));
+      await fireEvent.press(getByText('Checking'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({ accountIds: [] });
     });
 
-    it('clear all button resets all filters via updateSearchFilters', () => {
-      const { getByTestId } = render(
+    it('clear all button resets all filters via updateSearchFilters', async () => {
+      const { getByTestId } = await render(
         <SearchOverlay visible={true} onClose={jest.fn()} colors={mockColors} t={mockT} />,
       );
-      fireEvent.press(getByTestId('clear-all-button'));
+      await fireEvent.press(getByTestId('clear-all-button'));
       expect(mockUpdateSearchFilters).toHaveBeenCalledWith({
         text: '',
         types: [],

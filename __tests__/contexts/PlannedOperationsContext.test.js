@@ -72,7 +72,7 @@ describe('PlannedOperationsContext', () => {
       ];
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue(mockOps);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -85,7 +85,7 @@ describe('PlannedOperationsContext', () => {
     it('sets loading state correctly', async () => {
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([]);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -95,7 +95,7 @@ describe('PlannedOperationsContext', () => {
     it('handles load error', async () => {
       PlannedOperationsDB.getAllPlannedOperations.mockRejectedValue(new Error('DB error'));
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -108,7 +108,7 @@ describe('PlannedOperationsContext', () => {
 
   describe('CRUD Operations', () => {
     it('adds a planned operation', async () => {
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -136,7 +136,7 @@ describe('PlannedOperationsContext', () => {
         { id: '1', name: 'Rent', type: 'expense', amount: '500', accountId: 1, categoryId: 'cat1', isRecurring: true },
       ]);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -152,7 +152,7 @@ describe('PlannedOperationsContext', () => {
         { id: '1', name: 'Rent', type: 'expense', amount: '500', accountId: 1, categoryId: 'cat1', isRecurring: true },
       ]);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -179,7 +179,7 @@ describe('PlannedOperationsContext', () => {
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
       PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100, type: 'expense' });
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -215,7 +215,7 @@ describe('PlannedOperationsContext', () => {
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
       PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100 });
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -240,7 +240,7 @@ describe('PlannedOperationsContext', () => {
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
       PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 101 });
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -271,7 +271,7 @@ describe('PlannedOperationsContext', () => {
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
       PlannedOperationsDB.executeAndMark.mockResolvedValue({ id: 100 });
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
@@ -286,14 +286,14 @@ describe('PlannedOperationsContext', () => {
   describe('isExecutedThisMonth', () => {
     it('returns true when executed this month', async () => {
       const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.isExecutedThisMonth({ lastExecutedMonth: currentMonth })).toBe(true);
     });
 
     it('returns false when not executed this month', async () => {
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.isExecutedThisMonth({ lastExecutedMonth: '2025-01' })).toBe(false);
@@ -303,7 +303,7 @@ describe('PlannedOperationsContext', () => {
 
   describe('Event Listeners', () => {
     it('subscribes to RELOAD_ALL and DATABASE_RESET events', async () => {
-      renderHook(() => usePlannedOperations(), { wrapper });
+      await renderHook(() => usePlannedOperations(), { wrapper });
 
       await waitFor(() => {
         expect(appEvents.on).toHaveBeenCalledWith(EVENTS.RELOAD_ALL, expect.any(Function));
@@ -323,7 +323,7 @@ describe('PlannedOperationsContext', () => {
         .mockResolvedValueOnce([]) // initial load
         .mockResolvedValueOnce(reloaded); // after RELOAD_ALL
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(reloadCallback).toBeDefined();
@@ -348,22 +348,20 @@ describe('PlannedOperationsContext', () => {
       const initial = [{ id: '1', name: 'Op', type: 'expense', amount: '100', accountId: 1 }];
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue(initial);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.plannedOperations).toHaveLength(1));
 
       expect(resetCallback).toBeDefined();
 
-      act(() => {
+      await act(async () => {
         resetCallback();
       });
 
       expect(result.current.plannedOperations).toHaveLength(0);
     });
 
-    it('usePlannedOperations throws when used outside provider', () => {
-      expect(() => {
-        renderHook(() => usePlannedOperations());
-      }).toThrow('usePlannedOperations must be used within a PlannedOperationsProvider');
+    it('usePlannedOperations throws when used outside provider', async () => {
+      await expect(renderHook(() => usePlannedOperations())).rejects.toThrow('usePlannedOperations must be used within a PlannedOperationsProvider');
     });
   });
 
@@ -371,7 +369,7 @@ describe('PlannedOperationsContext', () => {
     it('sets saveError and empty operations when DB fails', async () => {
       PlannedOperationsDB.getAllPlannedOperations.mockRejectedValue(new Error('DB down'));
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.plannedOperations).toEqual([]);
@@ -383,7 +381,7 @@ describe('PlannedOperationsContext', () => {
     it('shows dialog and re-throws when DB create fails', async () => {
       PlannedOperationsDB.createPlannedOperation.mockRejectedValue(new Error('create failed'));
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       let caughtError;
@@ -403,7 +401,7 @@ describe('PlannedOperationsContext', () => {
     it('shows dialog and re-throws when validation fails', async () => {
       PlannedOperationsDB.validatePlannedOperation.mockReturnValue('name_required');
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       let caughtError;
@@ -427,7 +425,7 @@ describe('PlannedOperationsContext', () => {
       ]);
       PlannedOperationsDB.updatePlannedOperation.mockRejectedValue(new Error('update failed'));
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       let caughtError;
@@ -452,7 +450,7 @@ describe('PlannedOperationsContext', () => {
       ]);
       PlannedOperationsDB.deletePlannedOperation.mockRejectedValue(new Error('delete failed'));
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       let caughtError;
@@ -480,7 +478,7 @@ describe('PlannedOperationsContext', () => {
       };
       PlannedOperationsDB.getAllPlannedOperations.mockResolvedValue([plannedOp]);
 
-      const { result } = renderHook(() => usePlannedOperations(), { wrapper });
+      const { result } = await renderHook(() => usePlannedOperations(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       let caughtError;

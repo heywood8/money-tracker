@@ -8,8 +8,8 @@ import { useBackShrink } from '../../app/hooks/useBackShrink';
 
 describe('useBackShrink', () => {
   describe('Shape', () => {
-    it('exposes the documented API', () => {
-      const { result } = renderHook(() => useBackShrink());
+    it('exposes the documented API', async () => {
+      const { result } = await renderHook(() => useBackShrink());
 
       expect(result.current.progress).toBeDefined();
       expect(result.current.animatedStyle).toBeDefined();
@@ -20,54 +20,54 @@ describe('useBackShrink', () => {
       expect(typeof result.current.commit).toBe('function');
     });
 
-    it('starts at rest (progress 0)', () => {
-      const { result } = renderHook(() => useBackShrink());
+    it('starts at rest (progress 0)', async () => {
+      const { result } = await renderHook(() => useBackShrink());
       expect(result.current.progress.value).toBe(0);
     });
   });
 
   describe('originStyle', () => {
-    it('anchors the shrink to the bottom-right by default', () => {
-      const { result } = renderHook(() => useBackShrink());
+    it('anchors the shrink to the bottom-right by default', async () => {
+      const { result } = await renderHook(() => useBackShrink());
       expect(result.current.originStyle.transformOrigin).toBe('right bottom');
     });
 
-    it('honors a custom origin', () => {
-      const { result } = renderHook(() => useBackShrink({ origin: 'left top' }));
+    it('honors a custom origin', async () => {
+      const { result } = await renderHook(() => useBackShrink({ origin: 'left top' }));
       expect(result.current.originStyle.transformOrigin).toBe('left top');
     });
   });
 
   describe('Controls', () => {
-    it('setProgress drives the progress value directly', () => {
-      const { result } = renderHook(() => useBackShrink());
-      act(() => result.current.setProgress(0.5));
+    it('setProgress drives the progress value directly', async () => {
+      const { result } = await renderHook(() => useBackShrink());
+      await act(() => result.current.setProgress(0.5));
       expect(result.current.progress.value).toBe(0.5);
     });
 
-    it('reset snaps progress back to 0', () => {
-      const { result } = renderHook(() => useBackShrink());
-      act(() => result.current.setProgress(0.8));
-      act(() => result.current.reset());
+    it('reset snaps progress back to 0', async () => {
+      const { result } = await renderHook(() => useBackShrink());
+      await act(() => result.current.setProgress(0.8));
+      await act(() => result.current.reset());
       expect(result.current.progress.value).toBe(0);
     });
 
-    it('commit animates progress toward 1 (fully shrunk)', () => {
-      const { result } = renderHook(() => useBackShrink());
-      act(() => result.current.commit());
+    it('commit animates progress toward 1 (fully shrunk)', async () => {
+      const { result } = await renderHook(() => useBackShrink());
+      await act(() => result.current.commit());
       expect(result.current.progress.value).toBe(1);
     });
 
-    it('commit accepts an onDone callback without throwing', () => {
+    it('commit accepts an onDone callback without throwing', async () => {
       const onDone = jest.fn();
-      const { result } = renderHook(() => useBackShrink());
-      expect(() => act(() => result.current.commit(onDone))).not.toThrow();
+      const { result } = await renderHook(() => useBackShrink());
+      await act(() => result.current.commit(onDone));
     });
 
-    it('cancel animates progress back toward 0', () => {
-      const { result } = renderHook(() => useBackShrink());
-      act(() => result.current.setProgress(0.6));
-      act(() => result.current.cancel());
+    it('cancel animates progress back toward 0', async () => {
+      const { result } = await renderHook(() => useBackShrink());
+      await act(() => result.current.setProgress(0.6));
+      await act(() => result.current.cancel());
       expect(result.current.progress.value).toBe(0);
     });
   });

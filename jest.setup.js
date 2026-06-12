@@ -612,7 +612,7 @@ jest.mock('@expo/vector-icons', () => {
   const PropTypes = require('prop-types');
 
   const MockIcon = ({ name, size, color, testID, ...props }) =>
-    React.createElement(Text, { ...props, testID: testID || `icon-${name}` }, name);
+    React.createElement(Text, { ...props, testID: testID || `icon-${name}`, name, size, color }, name);
   MockIcon.propTypes = {
     name: PropTypes.string,
     size: PropTypes.number,

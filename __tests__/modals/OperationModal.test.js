@@ -225,8 +225,8 @@ describe('OperationModal', () => {
   });
 
   describe('Rendering', () => {
-    it('renders correctly when visible for new operation', () => {
-      const { getByText, getByTestId } = render(
+    it('renders correctly when visible for new operation', async () => {
+      const { getByText, getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -234,7 +234,7 @@ describe('OperationModal', () => {
       expect(getByTestId('operation-form-fields')).toBeTruthy();
     });
 
-    it('renders correctly when visible for editing operation', () => {
+    it('renders correctly when visible for editing operation', async () => {
       const mockOperation = {
         id: 'op1',
         type: 'expense',
@@ -245,7 +245,7 @@ describe('OperationModal', () => {
         description: 'Lunch',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -259,15 +259,15 @@ describe('OperationModal', () => {
       expect(getByText('delete_operation')).toBeTruthy();
     });
 
-    it('does not render when not visible', () => {
-      const { queryByText } = render(
+    it('does not render when not visible', async () => {
+      const { queryByText } = await render(
         <OperationModal visible={false} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(queryByText('add_operation')).toBeFalsy();
     });
 
-    it('does not show title when editing', () => {
+    it('does not show title when editing', async () => {
       const mockOperation = {
         id: 'op1',
         type: 'expense',
@@ -277,7 +277,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -292,18 +292,18 @@ describe('OperationModal', () => {
   });
 
   describe('Operation Type Selection', () => {
-    it('passes showTypeSelector=true to OperationFormFields', () => {
+    it('passes showTypeSelector=true to OperationFormFields', async () => {
       const MockFormFields = require('../../app/components/operations/OperationFormFields');
-      render(
+      await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(MockFormFields._lastProps.showTypeSelector).toBe(true);
     });
 
-    it('passes TYPES array to OperationFormFields', () => {
+    it('passes TYPES array to OperationFormFields', async () => {
       const MockFormFields = require('../../app/components/operations/OperationFormFields');
-      render(
+      await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -316,8 +316,8 @@ describe('OperationModal', () => {
   });
 
   describe('Date Selection', () => {
-    it('displays date picker button', () => {
-      const { getByTestId } = render(
+    it('displays date picker button', async () => {
+      const { getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -325,7 +325,7 @@ describe('OperationModal', () => {
       expect(dateInput).toBeTruthy();
     });
 
-    it('opens date picker when date button is pressed', () => {
+    it('opens date picker when date button is pressed', async () => {
       const mockSetShowDatePicker = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -333,12 +333,12 @@ describe('OperationModal', () => {
         setShowDatePicker: mockSetShowDatePicker,
       });
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const dateInput = getByTestId('date-input');
-      fireEvent.press(dateInput);
+      await fireEvent.press(dateInput);
 
       // Handler should be called (but hook is mocked)
       expect(dateInput).toBeTruthy();
@@ -346,7 +346,7 @@ describe('OperationModal', () => {
   });
 
   describe('Description Field', () => {
-    it('shows description field only in edit mode', () => {
+    it('shows description field only in edit mode', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -370,7 +370,7 @@ describe('OperationModal', () => {
         description: 'Test description',
       };
 
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -382,8 +382,8 @@ describe('OperationModal', () => {
       expect(getByDisplayValue('Test description')).toBeTruthy();
     });
 
-    it('shows description field for new operations', () => {
-      const { queryByPlaceholderText } = render(
+    it('shows description field for new operations', async () => {
+      const { queryByPlaceholderText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -393,8 +393,8 @@ describe('OperationModal', () => {
   });
 
   describe('Save Operations', () => {
-    it('shows save button', () => {
-      const { getByText } = render(
+    it('shows save button', async () => {
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -402,7 +402,7 @@ describe('OperationModal', () => {
       expect(saveButton).toBeTruthy();
     });
 
-    it('calls handleSave when save button is pressed', () => {
+    it('calls handleSave when save button is pressed', async () => {
       const mockHandleSave = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -410,19 +410,19 @@ describe('OperationModal', () => {
         handleSave: mockHandleSave,
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const saveButton = getByText('save');
-      fireEvent.press(saveButton);
+      await fireEvent.press(saveButton);
 
       expect(mockHandleSave).toHaveBeenCalled();
     });
   });
 
   describe('Delete Operation', () => {
-    it('shows delete button only when editing and onDelete is provided', () => {
+    it('shows delete button only when editing and onDelete is provided', async () => {
       const mockOperation = {
         id: 'op1',
         type: 'expense',
@@ -432,7 +432,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -445,15 +445,15 @@ describe('OperationModal', () => {
       expect(getByText('delete_operation')).toBeTruthy();
     });
 
-    it('does not show delete button for new operations', () => {
-      const { queryByText } = render(
+    it('does not show delete button for new operations', async () => {
+      const { queryByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(queryByText('delete_operation')).toBeFalsy();
     });
 
-    it('does not show delete button when onDelete is not provided', () => {
+    it('does not show delete button when onDelete is not provided', async () => {
       const mockOperation = {
         id: 'op1',
         type: 'expense',
@@ -463,7 +463,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -476,7 +476,7 @@ describe('OperationModal', () => {
       expect(queryByText('delete_operation')).toBeFalsy();
     });
 
-    it('calls handleDelete when delete button is pressed', () => {
+    it('calls handleDelete when delete button is pressed', async () => {
       const mockHandleDelete = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -493,7 +493,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -504,12 +504,12 @@ describe('OperationModal', () => {
       );
 
       const deleteButton = getByText('delete_operation');
-      fireEvent.press(deleteButton);
+      await fireEvent.press(deleteButton);
 
       expect(mockHandleDelete).toHaveBeenCalled();
     });
 
-    it('disables delete button for shadow operations that cannot be deleted', () => {
+    it('disables delete button for shadow operations that cannot be deleted', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -527,7 +527,7 @@ describe('OperationModal', () => {
         isShadowTransfer: true,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -553,19 +553,19 @@ describe('OperationModal', () => {
         handleClose: mockHandleClose,
       });
 
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       const cancelButtons = getAllByText('cancel');
-      fireEvent.press(cancelButtons[0]);
+      await fireEvent.press(cancelButtons[0]);
 
       await waitFor(() => {
         expect(mockHandleClose).toHaveBeenCalled();
       });
     });
 
-    it('shows close button instead of cancel for shadow operations', () => {
+    it('shows close button instead of cancel for shadow operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -582,7 +582,7 @@ describe('OperationModal', () => {
         isShadowTransfer: true,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -596,7 +596,7 @@ describe('OperationModal', () => {
   });
 
   describe('Shadow Operation Handling', () => {
-    it('disables inputs for shadow operations', () => {
+    it('disables inputs for shadow operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -613,7 +613,7 @@ describe('OperationModal', () => {
         isShadowTransfer: true,
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -626,7 +626,7 @@ describe('OperationModal', () => {
       expect(getByText('close')).toBeTruthy();
     });
 
-    it('does not show save button for shadow operations', () => {
+    it('does not show save button for shadow operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -643,7 +643,7 @@ describe('OperationModal', () => {
         isShadowTransfer: true,
       };
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -657,7 +657,7 @@ describe('OperationModal', () => {
   });
 
   describe('Picker Interactions', () => {
-    it('shows unified picker when picker state is visible', () => {
+    it('shows unified picker when picker state is visible', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -682,7 +682,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -690,7 +690,7 @@ describe('OperationModal', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('shows breadcrumb navigation for category picker', () => {
+    it('shows breadcrumb navigation for category picker', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -707,7 +707,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -715,7 +715,7 @@ describe('OperationModal', () => {
       expect(getByText('Food')).toBeTruthy();
     });
 
-    it('shows close button for non-category pickers', () => {
+    it('shows close button for non-category pickers', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -732,7 +732,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getAllByText } = render(
+      const { getAllByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -744,7 +744,7 @@ describe('OperationModal', () => {
   });
 
   describe('Multi-Currency Transfer', () => {
-    it('shows exchange rate fields for multi-currency transfers', () => {
+    it('shows exchange rate fields for multi-currency transfers', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -762,7 +762,7 @@ describe('OperationModal', () => {
         destinationAccount: { id: 'acc2', name: 'Savings', currency: 'EUR' },
       });
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -772,32 +772,32 @@ describe('OperationModal', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles missing operation data gracefully', () => {
-      const { getByText } = render(
+    it('handles missing operation data gracefully', async () => {
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} operation={null} isNew={true} />,
       );
 
       expect(getByText('add_operation')).toBeTruthy();
     });
 
-    it('handles empty accounts list', () => {
+    it('handles empty accounts list', async () => {
       jest.spyOn(require('../../app/contexts/AccountsDataContext'), 'useAccountsData').mockReturnValue({
         visibleAccounts: [],
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(getByText('add_operation')).toBeTruthy();
     });
 
-    it('handles empty categories list', () => {
+    it('handles empty categories list', async () => {
       jest.spyOn(require('../../app/contexts/CategoriesContext'), 'useCategories').mockReturnValue({
         categories: [],
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -806,7 +806,7 @@ describe('OperationModal', () => {
   });
 
   describe('Callback Handlers', () => {
-    it('handles amount change when not shadow operation', () => {
+    it('handles amount change when not shadow operation', async () => {
       const mockSetValues = jest.fn();
       const mockSetLastEditedField = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
@@ -817,7 +817,7 @@ describe('OperationModal', () => {
         isShadowOperation: false,
       });
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -826,7 +826,7 @@ describe('OperationModal', () => {
       expect(getByTestId('operation-form-fields')).toBeTruthy();
     });
 
-    it('does not update amount for shadow operations', () => {
+    it('does not update amount for shadow operations', async () => {
       const mockSetValues = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -845,7 +845,7 @@ describe('OperationModal', () => {
         isShadowTransfer: true,
       };
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -859,9 +859,9 @@ describe('OperationModal', () => {
   });
 
   describe('Type Selection via OperationFormFields', () => {
-    it('delegates type selection to OperationFormFields with inline type selector', () => {
+    it('delegates type selection to OperationFormFields with inline type selector', async () => {
       const MockFormFields = require('../../app/components/operations/OperationFormFields');
-      render(
+      await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -871,9 +871,9 @@ describe('OperationModal', () => {
       expect(MockFormFields._lastProps.TYPES.map(t => t.key)).toEqual(['expense', 'income', 'transfer']);
     });
 
-    it('passes setValues to OperationFormFields for type changes', () => {
+    it('passes setValues to OperationFormFields for type changes', async () => {
       const MockFormFields = require('../../app/components/operations/OperationFormFields');
-      render(
+      await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -881,7 +881,7 @@ describe('OperationModal', () => {
       expect(typeof MockFormFields._lastProps.setValues).toBe('function');
     });
 
-    it('passes disabled=true for shadow operations', () => {
+    it('passes disabled=true for shadow operations', async () => {
       const MockFormFields = require('../../app/components/operations/OperationFormFields');
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
@@ -889,7 +889,7 @@ describe('OperationModal', () => {
         isShadowOperation: true,
       });
 
-      render(
+      await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={false} operation={{ id: 'op1', type: 'expense', amount: '50', accountId: 'acc1', date: '2024-01-15' }} />,
       );
 
@@ -898,7 +898,7 @@ describe('OperationModal', () => {
   });
 
   describe('Account Picker Rendering', () => {
-    it('renders account picker items correctly', () => {
+    it('renders account picker items correctly', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -918,7 +918,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -926,7 +926,7 @@ describe('OperationModal', () => {
       expect(getByText('Savings')).toBeTruthy();
     });
 
-    it('selects account when account option is pressed', () => {
+    it('selects account when account option is pressed', async () => {
       const mockSetValues = jest.fn();
       const mockClosePicker = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
@@ -953,17 +953,17 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      fireEvent.press(getByText('Checking'));
+      await fireEvent.press(getByText('Checking'));
 
       expect(mockSetValues).toHaveBeenCalled();
       expect(mockClosePicker).toHaveBeenCalled();
     });
 
-    it('renders toAccount picker and selects correctly', () => {
+    it('renders toAccount picker and selects correctly', async () => {
       const mockSetValues = jest.fn();
       const mockClosePicker = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
@@ -990,11 +990,11 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      fireEvent.press(getByText('Savings'));
+      await fireEvent.press(getByText('Savings'));
 
       // setValues should be called to set toAccountId
       expect(mockSetValues).toHaveBeenCalled();
@@ -1003,7 +1003,7 @@ describe('OperationModal', () => {
   });
 
   describe('Category Picker Rendering', () => {
-    it('renders category picker with folder and entry items', () => {
+    it('renders category picker with folder and entry items', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -1023,7 +1023,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -1031,7 +1031,7 @@ describe('OperationModal', () => {
       expect(getByText('Groceries')).toBeTruthy();
     });
 
-    it('navigates into folder when folder is pressed', () => {
+    it('navigates into folder when folder is pressed', async () => {
       const mockNavigateIntoFolder = jest.fn();
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
@@ -1051,16 +1051,16 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      fireEvent.press(getByText('Food'));
+      await fireEvent.press(getByText('Food'));
 
       expect(mockNavigateIntoFolder).toHaveBeenCalledWith({ id: 'cat1', name: 'Food', type: 'folder', icon: 'food' });
     });
 
-    it('selects category entry when entry is pressed', () => {
+    it('selects category entry when entry is pressed', async () => {
       const mockSetValues = jest.fn();
       const mockClosePicker = jest.fn();
       const useOperationForm = require('../../app/hooks/useOperationForm');
@@ -1094,17 +1094,17 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      fireEvent.press(getByText('Groceries'));
+      await fireEvent.press(getByText('Groceries'));
 
       expect(mockSetValues).toHaveBeenCalled();
       expect(mockClosePicker).toHaveBeenCalled();
     });
 
-    it('displays translated category name when nameKey is provided', () => {
+    it('displays translated category name when nameKey is provided', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -1123,7 +1123,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -1168,11 +1168,11 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      fireEvent.press(getByText('Groceries'));
+      await fireEvent.press(getByText('Groceries'));
 
       await waitFor(() => {
         expect(mockSetValues).toHaveBeenCalled();
@@ -1223,7 +1223,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1232,7 +1232,7 @@ describe('OperationModal', () => {
         />,
       );
 
-      fireEvent.press(getByText('Groceries'));
+      await fireEvent.press(getByText('Groceries'));
 
       await waitFor(() => {
         // Should still select category but not auto-add
@@ -1245,25 +1245,25 @@ describe('OperationModal', () => {
   });
 
   describe('Date Picker Interaction', () => {
-    it('shows date picker when showDatePicker is true', () => {
+    it('shows date picker when showDatePicker is true', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
         showDatePicker: true,
       });
 
-      const { UNSAFE_getByType } = render(
+      const { container } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // DateTimePicker should be rendered
       const DateTimePicker = require('@react-native-community/datetimepicker').default;
-      expect(UNSAFE_getByType(DateTimePicker)).toBeTruthy();
+      expect(container.queryAll(n => n.type === 'DateTimePicker')[0]).toBeTruthy();
     });
   });
 
   describe('Split Button', () => {
-    it('shows split button when editing expense operation', () => {
+    it('shows split button when editing expense operation', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1286,7 +1286,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1299,7 +1299,7 @@ describe('OperationModal', () => {
       expect(getByTestId('split-button')).toBeTruthy();
     });
 
-    it('shows split button when editing income operation', () => {
+    it('shows split button when editing income operation', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1322,7 +1322,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1335,7 +1335,7 @@ describe('OperationModal', () => {
       expect(getByTestId('split-button')).toBeTruthy();
     });
 
-    it('does not show split button for new operations', () => {
+    it('does not show split button for new operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1349,14 +1349,14 @@ describe('OperationModal', () => {
         },
       });
 
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(queryByTestId('split-button')).toBeNull();
     });
 
-    it('does not show split button for transfer operations', () => {
+    it('does not show split button for transfer operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1379,7 +1379,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1392,7 +1392,7 @@ describe('OperationModal', () => {
       expect(queryByTestId('split-button')).toBeNull();
     });
 
-    it('does not show split button for shadow operations', () => {
+    it('does not show split button for shadow operations', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1416,7 +1416,7 @@ describe('OperationModal', () => {
         isShadow: true,
       };
 
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1429,7 +1429,7 @@ describe('OperationModal', () => {
       expect(queryByTestId('split-button')).toBeNull();
     });
 
-    it('does not show split button when amount is zero', () => {
+    it('does not show split button when amount is zero', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -1452,7 +1452,7 @@ describe('OperationModal', () => {
         date: '2024-01-15',
       };
 
-      const { queryByTestId } = render(
+      const { queryByTestId } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -1467,7 +1467,7 @@ describe('OperationModal', () => {
   });
 
   describe('Key Extractor', () => {
-    it('returns id for unknown picker type', () => {
+    it('returns id for unknown picker type', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -1487,7 +1487,7 @@ describe('OperationModal', () => {
       });
 
       // This tests the fallback path in keyExtractor
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -1498,7 +1498,7 @@ describe('OperationModal', () => {
   });
 
   describe('Empty States', () => {
-    it('shows no categories message when category picker is empty', () => {
+    it('shows no categories message when category picker is empty', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -1515,14 +1515,14 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       expect(getByText('no_categories')).toBeTruthy();
     });
 
-    it('shows no accounts message when account picker is empty', () => {
+    it('shows no accounts message when account picker is empty', async () => {
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
         pickerState: {
@@ -1539,7 +1539,7 @@ describe('OperationModal', () => {
         navigateBack: jest.fn(),
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
@@ -1548,7 +1548,7 @@ describe('OperationModal', () => {
   });
 
   describe('Breadcrumb Navigation', () => {
-    it('calls navigateBack when back button is pressed', () => {
+    it('calls navigateBack when back button is pressed', async () => {
       const mockNavigateBack = jest.fn();
       const useOperationPicker = require('../../app/hooks/useOperationPicker');
       useOperationPicker.mockReturnValue({
@@ -1568,21 +1568,21 @@ describe('OperationModal', () => {
         navigateBack: mockNavigateBack,
       });
 
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
       // Find the back button by its icon
       const backIcon = getByTestId('icon-arrow-left');
-      fireEvent.press(backIcon.parent);
+      await fireEvent.press(backIcon.parent);
 
       expect(mockNavigateBack).toHaveBeenCalled();
     });
   });
 
   describe('Description field keyboard integration', () => {
-    it('passes an onFocus function prop to DescriptionAutocomplete when editing', () => {
-      const { UNSAFE_getByType } = render(
+    it('passes an onFocus function prop to DescriptionAutocomplete when editing', async () => {
+      const { getByTestId } = await render(
         <OperationModal
           visible={true}
           isNew={false}
@@ -1598,7 +1598,9 @@ describe('OperationModal', () => {
           }}
         />,
       );
-      const descInput = UNSAFE_getByType(DescriptionAutocomplete);
+      // DescriptionAutocomplete renders a TextInput with testID="description-input";
+      // verify it has an onFocus handler (forwarded from OperationModal's handleDescriptionFocus)
+      const descInput = getByTestId('description-input');
       expect(typeof descInput.props.onFocus).toBe('function');
     });
   });

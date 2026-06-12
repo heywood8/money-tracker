@@ -51,15 +51,15 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Rendering', () => {
-    it('returns null when no budget status', () => {
+    it('returns null when no budget status', async () => {
       mockGetBudgetStatus.mockReturnValue(null);
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(toJSON()).toBeNull();
     });
 
-    it('renders progress bar when status exists', () => {
+    it('renders progress bar when status exists', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -70,12 +70,12 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(toJSON()).not.toBeNull();
     });
 
-    it('renders with custom style', () => {
+    it('renders with custom style', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -87,7 +87,7 @@ describe('BudgetProgressBar', () => {
       });
 
       const customStyle = { marginTop: 20 };
-      const { toJSON } = render(
+      const { toJSON } = await render(
         <BudgetProgressBar budgetId="budget-1" style={customStyle} />,
       );
 
@@ -96,7 +96,7 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Progress colors', () => {
-    it('shows green color for safe status', () => {
+    it('shows green color for safe status', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 30,
@@ -107,7 +107,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       // Find the progress fill view and check its background color
@@ -117,7 +117,7 @@ describe('BudgetProgressBar', () => {
       );
     });
 
-    it('shows yellow color for warning status', () => {
+    it('shows yellow color for warning status', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'warning',
         percentage: 70,
@@ -128,7 +128,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -137,7 +137,7 @@ describe('BudgetProgressBar', () => {
       );
     });
 
-    it('shows orange color for danger status', () => {
+    it('shows orange color for danger status', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'danger',
         percentage: 90,
@@ -148,7 +148,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -157,7 +157,7 @@ describe('BudgetProgressBar', () => {
       );
     });
 
-    it('shows red color for exceeded status', () => {
+    it('shows red color for exceeded status', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'exceeded',
         percentage: 120,
@@ -168,7 +168,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: true,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -177,7 +177,7 @@ describe('BudgetProgressBar', () => {
       );
     });
 
-    it('shows primary color for unknown status', () => {
+    it('shows primary color for unknown status', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'unknown',
         percentage: 50,
@@ -188,7 +188,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -199,7 +199,7 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Progress width', () => {
-    it('shows correct progress width for percentage', () => {
+    it('shows correct progress width for percentage', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 45,
@@ -210,7 +210,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -219,7 +219,7 @@ describe('BudgetProgressBar', () => {
       );
     });
 
-    it('caps progress width at 100% for exceeded budgets', () => {
+    it('caps progress width at 100% for exceeded budgets', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'exceeded',
         percentage: 150,
@@ -230,7 +230,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: true,
       });
 
-      const { toJSON } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { toJSON } = await render(<BudgetProgressBar budgetId="budget-1" />);
       const tree = toJSON();
 
       const progressFill = findProgressFill(tree);
@@ -241,7 +241,7 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Details display', () => {
-    it('shows spent and total amounts', () => {
+    it('shows spent and total amounts', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -252,12 +252,12 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { getByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { getByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(getByText('USD 500.00 / 1000.00')).toBeTruthy();
     });
 
-    it('shows remaining amount when not exceeded', () => {
+    it('shows remaining amount when not exceeded', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -268,12 +268,12 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { getByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { getByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(getByText('Remaining: USD 500.00')).toBeTruthy();
     });
 
-    it('shows over budget message when exceeded', () => {
+    it('shows over budget message when exceeded', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'exceeded',
         percentage: 120,
@@ -284,12 +284,12 @@ describe('BudgetProgressBar', () => {
         isExceeded: true,
       });
 
-      const { getByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { getByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(getByText('Over budget by USD 200.00')).toBeTruthy();
     });
 
-    it('hides details when showDetails is false', () => {
+    it('hides details when showDetails is false', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -300,7 +300,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { queryByText } = render(
+      const { queryByText } = await render(
         <BudgetProgressBar budgetId="budget-1" showDetails={false} />,
       );
 
@@ -310,7 +310,7 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Compact mode', () => {
-    it('shows percentage badge in compact mode', () => {
+    it('shows percentage badge in compact mode', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 45.7,
@@ -321,14 +321,14 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BudgetProgressBar budgetId="budget-1" compact />,
       );
 
       expect(getByText('46%')).toBeTruthy();
     });
 
-    it('does not show percentage badge when not compact', () => {
+    it('does not show percentage badge when not compact', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 45.7,
@@ -339,16 +339,16 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { queryByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { queryByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       // Should not find the standalone percentage badge
       // (percentage might appear in other text, so we check specifically for the badge format)
-      const tree = render(<BudgetProgressBar budgetId="budget-1" />).toJSON();
+      const tree = (await render(<BudgetProgressBar budgetId="budget-1" />)).toJSON();
       const percentageBadge = findPercentageBadge(tree);
       expect(percentageBadge).toBeNull();
     });
 
-    it('shows exceeded percentage with red color in compact mode', () => {
+    it('shows exceeded percentage with red color in compact mode', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'exceeded',
         percentage: 120,
@@ -359,7 +359,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: true,
       });
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <BudgetProgressBar budgetId="budget-1" compact />,
       );
 
@@ -369,7 +369,7 @@ describe('BudgetProgressBar', () => {
   });
 
   describe('Currency formatting', () => {
-    it('uses default USD currency when not specified', () => {
+    it('uses default USD currency when not specified', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -380,12 +380,12 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { getByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { getByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(getByText('USD 500.00 / 1000.00')).toBeTruthy();
     });
 
-    it('uses specified currency', () => {
+    it('uses specified currency', async () => {
       mockGetBudgetStatus.mockReturnValue({
         status: 'safe',
         percentage: 50,
@@ -396,7 +396,7 @@ describe('BudgetProgressBar', () => {
         isExceeded: false,
       });
 
-      const { getByText } = render(<BudgetProgressBar budgetId="budget-1" />);
+      const { getByText } = await render(<BudgetProgressBar budgetId="budget-1" />);
 
       expect(getByText('EUR 500.00 / 1000.00')).toBeTruthy();
     });

@@ -24,7 +24,7 @@ describe('LocalizationContext', () => {
 
   describe('Initialization', () => {
     it('provides localization context with default values', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -39,7 +39,7 @@ describe('LocalizationContext', () => {
     it('loads saved language from PreferencesDB', async () => {
       PreferencesDB.getPreference.mockResolvedValue('ru');
 
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.language).toBe('ru');
@@ -49,7 +49,7 @@ describe('LocalizationContext', () => {
     it('uses default language when no preference is saved', async () => {
       PreferencesDB.getPreference.mockResolvedValue(null);
 
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -60,7 +60,7 @@ describe('LocalizationContext', () => {
     it('ignores invalid language from PreferencesDB', async () => {
       PreferencesDB.getPreference.mockResolvedValue('invalid-lang');
 
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.language).toBe('en'); // Falls back to default
@@ -70,7 +70,7 @@ describe('LocalizationContext', () => {
 
   describe('Language Switching', () => {
     it('switches to Russian', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -86,7 +86,7 @@ describe('LocalizationContext', () => {
     it('switches to English', async () => {
       PreferencesDB.getPreference.mockResolvedValue('ru');
 
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.language).toBe('ru');
@@ -100,7 +100,7 @@ describe('LocalizationContext', () => {
     });
 
     it('persists language preference to PreferencesDB', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -119,7 +119,7 @@ describe('LocalizationContext', () => {
 
   describe('Translation Function', () => {
     it('translates keys to English', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -132,7 +132,7 @@ describe('LocalizationContext', () => {
     });
 
     it('translates keys to Russian when language is ru', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -147,7 +147,7 @@ describe('LocalizationContext', () => {
     });
 
     it('returns key itself when translation is missing', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -158,7 +158,7 @@ describe('LocalizationContext', () => {
     });
 
     it('handles undefined or null keys gracefully', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -171,7 +171,7 @@ describe('LocalizationContext', () => {
 
   describe('Available Languages', () => {
     it('provides list of available languages', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -183,7 +183,7 @@ describe('LocalizationContext', () => {
     });
 
     it('has at least 2 languages (en and ru)', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -195,7 +195,7 @@ describe('LocalizationContext', () => {
 
   describe('Translation Keys Coverage', () => {
     it('has translations for all main screens', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -211,7 +211,7 @@ describe('LocalizationContext', () => {
     });
 
     it('has translations for common UI elements', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -226,7 +226,7 @@ describe('LocalizationContext', () => {
     });
 
     it('provides same keys in both languages', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -256,7 +256,7 @@ describe('LocalizationContext', () => {
   // Regression tests
   describe('Regression Tests', () => {
     it('maintains language consistency after multiple changes', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -279,7 +279,7 @@ describe('LocalizationContext', () => {
     });
 
     it('translations update immediately after language change', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -297,7 +297,7 @@ describe('LocalizationContext', () => {
     });
 
     it('handles rapid language switches', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -313,7 +313,7 @@ describe('LocalizationContext', () => {
     });
 
     it('gracefully handles PreferencesDB errors', async () => {
-      const { result } = renderHook(() => useLocalization(), { wrapper });
+      const { result } = await renderHook(() => useLocalization(), { wrapper });
 
       await waitFor(() => {
         expect(result.current).not.toBeNull();
@@ -338,9 +338,9 @@ describe('LocalizationContext', () => {
         () => new Promise(resolve => { resolvePreference = resolve; }),
       );
 
-      const { unmount } = renderHook(() => useLocalization(), { wrapper });
+      const { unmount } = await renderHook(() => useLocalization(), { wrapper });
 
-      unmount();
+      await unmount();
 
       await act(async () => {
         resolvePreference('fr');

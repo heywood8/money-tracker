@@ -11,69 +11,69 @@ import { normalizeSearchText } from '../../app/services/searchNormalize';
 
 describe('normalizeSearchText', () => {
   describe('null/undefined handling', () => {
-    it('returns null for null', () => {
+    it('returns null for null', async () => {
       expect(normalizeSearchText(null)).toBeNull();
     });
 
-    it('returns null for undefined', () => {
+    it('returns null for undefined', async () => {
       expect(normalizeSearchText(undefined)).toBeNull();
     });
 
-    it('returns empty string for empty string', () => {
+    it('returns empty string for empty string', async () => {
       expect(normalizeSearchText('')).toBe('');
     });
   });
 
   describe('case folding', () => {
-    it('lowercases ASCII', () => {
+    it('lowercases ASCII', async () => {
       expect(normalizeSearchText('COFFEE')).toBe('coffee');
       expect(normalizeSearchText('Mixed Case')).toBe('mixed case');
     });
 
-    it('lowercases Cyrillic (which SQLite LOWER() does not)', () => {
+    it('lowercases Cyrillic (which SQLite LOWER() does not)', async () => {
       expect(normalizeSearchText('Транспорт')).toBe('транспорт');
       expect(normalizeSearchText('САМОЛЕТ')).toBe('самолет');
       expect(normalizeSearchText('Путешествия')).toBe('путешествия');
     });
 
-    it('lowercases accented Latin', () => {
+    it('lowercases accented Latin', async () => {
       expect(normalizeSearchText('Café')).toBe('café');
       expect(normalizeSearchText('München')).toBe('münchen');
     });
   });
 
   describe('ё → е folding (Russian yo-folding)', () => {
-    it('folds lowercase ё', () => {
+    it('folds lowercase ё', async () => {
       expect(normalizeSearchText('ёжик')).toBe('ежик');
       expect(normalizeSearchText('самолёт')).toBe('самолет');
     });
 
-    it('folds uppercase Ё by way of lowercasing first', () => {
+    it('folds uppercase Ё by way of lowercasing first', async () => {
       expect(normalizeSearchText('Ёлка')).toBe('елка');
       expect(normalizeSearchText('САМОЛЁТ')).toBe('самолет');
     });
 
-    it('makes "Самолет" and "Самолёт" compare equal', () => {
+    it('makes "Самолет" and "Самолёт" compare equal', async () => {
       // Regression: this is the screenshot bug — Russian keyboard autocomplete
       // swaps е for ё (or vice versa) and the search stops matching.
       expect(normalizeSearchText('Самолет')).toBe(normalizeSearchText('Самолёт'));
       expect(normalizeSearchText('САМОЛЕТ')).toBe(normalizeSearchText('самолёт'));
     });
 
-    it('leaves regular е untouched', () => {
+    it('leaves regular е untouched', async () => {
       expect(normalizeSearchText('еда')).toBe('еда');
     });
   });
 
   describe('Unicode NFC normalization', () => {
-    it('composes decomposed ё (е + combining diaeresis) into the precomposed form', () => {
+    it('composes decomposed ё (е + combining diaeresis) into the precomposed form', async () => {
       // Decomposed: U+0435 (е) + U+0308 (combining diaeresis)
       const decomposed = 'ё';
       // After NFC composition this becomes U+0451 (ё), then ё→е folds to е
       expect(normalizeSearchText(decomposed)).toBe('е');
     });
 
-    it('normalizes decomposed Latin diacritics', () => {
+    it('normalizes decomposed Latin diacritics', async () => {
       // "café" with combining acute on e
       const decomposed = 'café';
       // After NFC, this is the precomposed "café"
@@ -82,12 +82,12 @@ describe('normalizeSearchText', () => {
   });
 
   describe('non-string input coercion', () => {
-    it('coerces numbers to strings', () => {
+    it('coerces numbers to strings', async () => {
       expect(normalizeSearchText(123)).toBe('123');
       expect(normalizeSearchText(3.14)).toBe('3.14');
     });
 
-    it('coerces booleans to strings', () => {
+    it('coerces booleans to strings', async () => {
       expect(normalizeSearchText(true)).toBe('true');
     });
   });

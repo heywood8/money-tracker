@@ -302,8 +302,8 @@ describe('SettingsScreen', () => {
   });
 
   describe('Basic Rendering', () => {
-    it('renders the settings rows', () => {
-      const { getByTestId } = render(
+    it('renders the settings rows', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
@@ -311,46 +311,46 @@ describe('SettingsScreen', () => {
       expect(getByTestId('settings-export-row')).toBeTruthy();
     });
 
-    it('renders accounts row', () => {
-      const { getByTestId } = render(
+    it('renders accounts row', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByTestId('settings-accounts-row')).toBeTruthy();
     });
 
-    it('opens the accounts subpanel when the accounts row is pressed', () => {
-      const { getByTestId } = render(
+    it('opens the accounts subpanel when the accounts row is pressed', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByTestId('settings-accounts-row'));
+      await fireEvent.press(getByTestId('settings-accounts-row'));
 
       expect(getByTestId('accounts-screen')).toBeTruthy();
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
-    it('renders categories row', () => {
-      const { getByTestId } = render(
+    it('renders categories row', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByTestId('settings-categories-row')).toBeTruthy();
     });
 
-    it('opens categories subpanel when categories row is pressed', () => {
-      const { getByTestId } = render(
+    it('opens categories subpanel when categories row is pressed', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByTestId('settings-categories-row'));
+      await fireEvent.press(getByTestId('settings-categories-row'));
 
       expect(getByTestId('categories-screen')).toBeTruthy();
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
-    it('renders language row', () => {
-      const { getAllByText } = render(
+    it('renders language row', async () => {
+      const { getAllByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
@@ -358,40 +358,40 @@ describe('SettingsScreen', () => {
       expect(getAllByText('language').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders database section label', () => {
-      const { getByText } = render(
+    it('renders database section label', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('database')).toBeTruthy();
     });
 
-    it('renders export row', () => {
-      const { getByText } = render(
+    it('renders export row', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('export')).toBeTruthy();
     });
 
-    it('renders import row', () => {
-      const { getByText } = render(
+    it('renders import row', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('import')).toBeTruthy();
     });
 
-    it('renders reset database row', () => {
-      const { getByText } = render(
+    it('renders reset database row', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('reset_database')).toBeTruthy();
     });
 
-    it('renders English language value', () => {
-      const { getAllByText } = render(
+    it('renders English language value', async () => {
+      const { getAllByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
@@ -400,66 +400,66 @@ describe('SettingsScreen', () => {
   });
 
   describe('setSubPanelActive signalling', () => {
-    it('calls setSubPanelActive(false) on initial mount (no subpanel open)', () => {
-      render(<SettingsScreen setSubPanelActive={mockSetSubPanelActive} />);
+    it('calls setSubPanelActive(false) on initial mount (no subpanel open)', async () => {
+      await render(<SettingsScreen setSubPanelActive={mockSetSubPanelActive} />);
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(false);
     });
 
-    it('calls setSubPanelActive(true) when a subpanel opens', () => {
-      const { getByTestId } = render(
+    it('calls setSubPanelActive(true) when a subpanel opens', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       mockSetSubPanelActive.mockClear();
 
-      fireEvent.press(getByTestId('settings-language-row'));
+      await fireEvent.press(getByTestId('settings-language-row'));
 
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
 
-    it('calls setSubPanelActive(true) when export subpanel opens', () => {
-      const { getByTestId } = render(
+    it('calls setSubPanelActive(true) when export subpanel opens', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       mockSetSubPanelActive.mockClear();
 
-      fireEvent.press(getByTestId('settings-export-row'));
+      await fireEvent.press(getByTestId('settings-export-row'));
 
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
     });
   });
 
   describe('Language Selection', () => {
-    it('displays current language with flag in the row', () => {
-      const { getAllByText } = render(
+    it('displays current language with flag in the row', async () => {
+      const { getAllByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getAllByText(/English/).length).toBeGreaterThanOrEqual(1);
     });
 
-    it('opens language modal when language row is pressed', () => {
-      const { getByTestId } = render(
+    it('opens language modal when language row is pressed', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      act(() => {
-        fireEvent.press(getByTestId('settings-language-row'));
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-language-row'));
       });
     });
 
-    it('applies language immediately on selection', () => {
-      const { getByTestId, getByText } = render(
+    it('applies language immediately on selection', async () => {
+      const { getByTestId, getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       // Open language modal
-      act(() => {
-        fireEvent.press(getByTestId('settings-language-row'));
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-language-row'));
       });
 
       // Select Spanish
-      act(() => {
-        fireEvent.press(getByText(/Español/));
+      await act(async () => {
+        await fireEvent.press(getByText(/Español/));
       });
 
       expect(mockSetLanguage).toHaveBeenCalledWith('es');
@@ -467,40 +467,40 @@ describe('SettingsScreen', () => {
   });
 
   describe('Database Operations', () => {
-    it('shows reset confirmation subpanel when reset row is pressed', () => {
-      const { getByText } = render(
+    it('shows reset confirmation subpanel when reset row is pressed', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('reset_database'));
+      await fireEvent.press(getByText('reset_database'));
 
       expect(getByText('reset_database_confirm')).toBeTruthy();
       expect(getByText('reset')).toBeTruthy();
     });
 
-    it('shows import source picker when import row is pressed', () => {
-      const { getByText } = render(
+    it('shows import source picker when import row is pressed', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('import'));
+      await fireEvent.press(getByText('import'));
 
       expect(getByText('import_from_file')).toBeTruthy();
       expect(getByText('import_from_local')).toBeTruthy();
     });
 
     it('performs import when confirm button is pressed after selecting from file', async () => {
-      const { getByText, getByTestId } = render(
+      const { getByText, getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('import'));
-      fireEvent.press(getByText('import_from_file'));
+      await fireEvent.press(getByText('import'));
+      await fireEvent.press(getByText('import_from_file'));
 
       expect(getByText('restore_confirm')).toBeTruthy();
 
       await act(async () => {
-        fireEvent.press(getByTestId('confirm-import-file-btn'));
+        await fireEvent.press(getByTestId('confirm-import-file-btn'));
       });
 
       expect(mockPickImportFile).toHaveBeenCalled();
@@ -513,14 +513,14 @@ describe('SettingsScreen', () => {
     });
 
     it('performs reset when subpanel confirm button is pressed', async () => {
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('reset_database'));
+      await fireEvent.press(getByText('reset_database'));
 
       await act(async () => {
-        fireEvent.press(getByText('reset'));
+        await fireEvent.press(getByText('reset'));
       });
 
       expect(mockResetDatabase).toHaveBeenCalled();
@@ -528,23 +528,23 @@ describe('SettingsScreen', () => {
   });
 
   describe('Export Functionality', () => {
-    it('opens export format modal when export row is pressed', () => {
-      const { getByText } = render(
+    it('opens export format modal when export row is pressed', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      act(() => {
-        fireEvent.press(getByText('export'));
+      await act(async () => {
+        await fireEvent.press(getByText('export'));
       });
     });
 
     it('shows export format options when export is pressed', async () => {
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      act(() => {
-        fireEvent.press(getByText('export'));
+      await act(async () => {
+        await fireEvent.press(getByText('export'));
       });
 
       expect(getByText('Save externally to JSON')).toBeTruthy();
@@ -552,13 +552,13 @@ describe('SettingsScreen', () => {
       expect(getByText('Save externally to SQLite')).toBeTruthy();
     });
 
-    it('renders export format descriptions', () => {
-      const { getByText } = render(
+    it('renders export format descriptions', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      act(() => {
-        fireEvent.press(getByText('export'));
+      await act(async () => {
+        await fireEvent.press(getByText('export'));
       });
 
       expect(getByText('json_description')).toBeTruthy();
@@ -568,14 +568,14 @@ describe('SettingsScreen', () => {
 
     it('shows success state after SQLite export completes', async () => {
       mockExportBackup.mockResolvedValue();
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       await act(async () => {
-        fireEvent.press(getByText('Save externally to SQLite'));
+        await fireEvent.press(getByText('Save externally to SQLite'));
       });
 
       expect(mockExportBackup).toHaveBeenCalledWith('sqlite');
@@ -584,14 +584,14 @@ describe('SettingsScreen', () => {
 
     it('shows success state after CSV export completes', async () => {
       mockExportBackup.mockResolvedValue();
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       await act(async () => {
-        fireEvent.press(getByText('Save externally to CSV'));
+        await fireEvent.press(getByText('Save externally to CSV'));
       });
 
       expect(mockExportBackup).toHaveBeenCalledWith('csv');
@@ -600,14 +600,14 @@ describe('SettingsScreen', () => {
 
     it('shows success state after JSON export completes', async () => {
       mockExportBackup.mockResolvedValue();
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       await act(async () => {
-        fireEvent.press(getByText('Save externally to JSON'));
+        await fireEvent.press(getByText('Save externally to JSON'));
       });
 
       expect(mockExportBackup).toHaveBeenCalledWith('json');
@@ -616,14 +616,14 @@ describe('SettingsScreen', () => {
 
     it('shows error dialog when an external export fails', async () => {
       mockExportBackup.mockRejectedValue(new Error('Export failed'));
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       await act(async () => {
-        fireEvent.press(getByText('Save externally to SQLite'));
+        await fireEvent.press(getByText('Save externally to SQLite'));
       });
 
       expect(mockShowDialog).toHaveBeenCalled();
@@ -633,79 +633,72 @@ describe('SettingsScreen', () => {
       let resolveExport;
       mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
-      fireEvent.press(getByText('export'));
-
-      act(() => {
-        fireEvent.press(getByText('Save externally to SQLite'));
-      });
+      await fireEvent.press(getByText('export'));
+      // Do NOT await — the export never resolves until we call resolveExport,
+      // and act() would block forever waiting for the hanging Promise.
+      fireEvent.press(getByText('Save externally to SQLite'));
 
       await waitFor(() => expect(getByText('exporting')).toBeTruthy());
 
       await act(async () => { resolveExport(); });
-      expect(getByText('export_success')).toBeTruthy();
+      await waitFor(() => expect(getByText('export_success')).toBeTruthy());
     });
 
     it('shows loading indicator while CSV export is in progress', async () => {
       let resolveExport;
       mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
-      fireEvent.press(getByText('export'));
-
-      act(() => {
-        fireEvent.press(getByText('Save externally to CSV'));
-      });
+      await fireEvent.press(getByText('export'));
+      fireEvent.press(getByText('Save externally to CSV'));
 
       await waitFor(() => expect(getByText('exporting')).toBeTruthy());
 
       await act(async () => { resolveExport(); });
-      expect(getByText('export_success')).toBeTruthy();
+      await waitFor(() => expect(getByText('export_success')).toBeTruthy());
     });
 
     it('shows loading indicator while JSON export is in progress', async () => {
       let resolveExport;
       mockExportBackup.mockReturnValue(new Promise(resolve => { resolveExport = resolve; }));
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
-      fireEvent.press(getByText('export'));
-
-      act(() => {
-        fireEvent.press(getByText('Save externally to JSON'));
-      });
+      await fireEvent.press(getByText('export'));
+      fireEvent.press(getByText('Save externally to JSON'));
 
       await waitFor(() => expect(getByText('exporting')).toBeTruthy());
 
       await act(async () => { resolveExport(); });
-      expect(getByText('export_success')).toBeTruthy();
+      await waitFor(() => expect(getByText('export_success')).toBeTruthy());
     });
   });
 
   describe('Developer Section', () => {
-    it('renders developer section label', () => {
-      const { getByText } = render(
+    it('renders developer section label', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByText('developer')).toBeTruthy();
     });
 
-    it('renders logs row', () => {
-      const { getByTestId } = render(
+    it('renders logs row', async () => {
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       expect(getByTestId('logs-row')).toBeTruthy();
     });
 
-    it('renders logs label text', () => {
-      const { getAllByText } = render(
+    it('renders logs label text', async () => {
+      const { getAllByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
@@ -715,48 +708,48 @@ describe('SettingsScreen', () => {
   });
 
   describe('Import Flow', () => {
-    it('shows three source options in the source picker', () => {
-      const { getByText } = render(
+    it('shows three source options in the source picker', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('import'));
+      await fireEvent.press(getByText('import'));
 
       expect(getByText('import_from_file')).toBeTruthy();
       expect(getByText('import_from_local')).toBeTruthy();
     });
 
-    it('shows confirm step after selecting from file', () => {
-      const { getByText } = render(
+    it('shows confirm step after selecting from file', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('import'));
-      fireEvent.press(getByText('import_from_file'));
+      await fireEvent.press(getByText('import'));
+      await fireEvent.press(getByText('import_from_file'));
 
       expect(getByText('restore_confirm')).toBeTruthy();
     });
 
-    it('back button from confirm-file returns to source picker', () => {
-      const { getByText, getByTestId } = render(
+    it('back button from confirm-file returns to source picker', async () => {
+      const { getByText, getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('import'));
-      fireEvent.press(getByText('import_from_file'));
-      fireEvent.press(getByTestId('settings-subpanel-back'));
+      await fireEvent.press(getByText('import'));
+      await fireEvent.press(getByText('import_from_file'));
+      await fireEvent.press(getByTestId('settings-subpanel-back'));
 
       expect(getByText('import_from_file')).toBeTruthy();
     });
   });
 
   describe('Save Local Backup', () => {
-    it('shows save local backup option in export panel', () => {
-      const { getByText } = render(
+    it('shows save local backup option in export panel', async () => {
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       expect(getByText('save_local_backup')).toBeTruthy();
     });
@@ -764,14 +757,14 @@ describe('SettingsScreen', () => {
     it('calls createBackup when save local backup row is pressed', async () => {
       mockCreateBackup.mockResolvedValue({ version: 1, data: {} });
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
-      fireEvent.press(getByText('export'));
+      await fireEvent.press(getByText('export'));
 
       await act(async () => {
-        fireEvent.press(getByTestId('settings-export-save-local-backup'));
+        await fireEvent.press(getByTestId('settings-export-save-local-backup'));
       });
 
       expect(mockCreateBackup).toHaveBeenCalled();
@@ -783,12 +776,12 @@ describe('SettingsScreen', () => {
       displaySettingsMockState.hideBalances = true;
       mockAuthenticateWithBiometrics.mockResolvedValue('not_available');
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       await act(async () => {
-        fireEvent.press(getByText('hide_balances'));
+        await fireEvent.press(getByText('hide_balances'));
       });
 
       expect(mockShowDialog).not.toHaveBeenCalled();
@@ -799,12 +792,12 @@ describe('SettingsScreen', () => {
       displaySettingsMockState.hideBalances = true;
       mockAuthenticateWithBiometrics.mockResolvedValue('not_enrolled');
 
-      const { getByText } = render(
+      const { getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
 
       await act(async () => {
-        fireEvent.press(getByText('hide_balances'));
+        await fireEvent.press(getByText('hide_balances'));
       });
 
       expect(mockShowDialog).not.toHaveBeenCalled();

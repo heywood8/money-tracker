@@ -58,8 +58,8 @@ describe('useExpenseData', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default state', () => {
-      const { result } = renderHook(() =>
+    it('should initialize with default state', async () => {
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -71,7 +71,7 @@ describe('useExpenseData', () => {
 
   describe('loadExpenseData', () => {
     it('should return early if no currency selected', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, null, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -91,7 +91,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -118,7 +118,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, null, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -145,7 +145,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -174,7 +174,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
       );
 
@@ -200,7 +200,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -225,7 +225,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
       );
 
@@ -250,7 +250,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -275,7 +275,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -298,7 +298,7 @@ describe('useExpenseData', () => {
     it('should handle errors gracefully', async () => {
       OperationsDB.getSpendingByCategoryAndCurrency.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -322,7 +322,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -337,8 +337,8 @@ describe('useExpenseData', () => {
       expect(result.current.totalExpenses).toBe(800);
     });
 
-    it('should return 0 for empty chart data', () => {
-      const { result } = renderHook(() =>
+    it('should return 0 for empty chart data', async () => {
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -350,7 +350,7 @@ describe('useExpenseData', () => {
     it('should handle empty spending data', async () => {
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -372,7 +372,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -396,7 +396,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -418,7 +418,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -441,7 +441,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -460,7 +460,7 @@ describe('useExpenseData', () => {
     it('should query all accounts for the currency without an account ID filter', async () => {
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -488,7 +488,7 @@ describe('useExpenseData', () => {
 
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 
@@ -520,7 +520,7 @@ describe('useExpenseData', () => {
       ];
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', deepCategories, mockColors, mockT),
       );
 
@@ -543,7 +543,7 @@ describe('useExpenseData', () => {
       ];
       OperationsDB.getSpendingByCategoryAndCurrency.mockResolvedValue(mockSpending);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'cat-1', mockCategories, mockColors, mockT),
       );
 
@@ -564,7 +564,7 @@ describe('useExpenseData', () => {
         .mockResolvedValueOnce([{ category_id: 'cat-3', total: '100' }])
         .mockResolvedValueOnce([{ category_id: 'cat-3', total: '999' }]);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useExpenseData(mockYear, mockMonth, mockCurrency, 'all', mockCategories, mockColors, mockT),
       );
 

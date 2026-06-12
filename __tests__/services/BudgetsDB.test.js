@@ -22,7 +22,7 @@ describe('BudgetsDB Service', () => {
   });
 
   describe('Validation', () => {
-    it('validates budget with all required fields', () => {
+    it('validates budget with all required fields', async () => {
       const validBudget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -35,7 +35,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBeNull();
     });
 
-    it('rejects budget without category', () => {
+    it('rejects budget without category', async () => {
       const budget = {
         amount: '100.00',
         currency: 'USD',
@@ -47,7 +47,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Category is required');
     });
 
-    it('rejects budget without amount', () => {
+    it('rejects budget without amount', async () => {
       const budget = {
         categoryId: 'cat1',
         currency: 'USD',
@@ -59,7 +59,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Amount must be greater than zero');
     });
 
-    it('rejects budget with zero amount', () => {
+    it('rejects budget with zero amount', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '0',
@@ -72,7 +72,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Amount must be greater than zero');
     });
 
-    it('rejects budget with negative amount', () => {
+    it('rejects budget with negative amount', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '-100',
@@ -85,7 +85,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Amount must be greater than zero');
     });
 
-    it('rejects budget without currency', () => {
+    it('rejects budget without currency', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -97,7 +97,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Currency is required');
     });
 
-    it('rejects budget with invalid period type', () => {
+    it('rejects budget with invalid period type', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -110,7 +110,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Invalid period type');
     });
 
-    it('accepts valid period types', () => {
+    it('accepts valid period types', async () => {
       const periodTypes = ['weekly', 'monthly', 'yearly'];
 
       periodTypes.forEach(periodType => {
@@ -127,7 +127,7 @@ describe('BudgetsDB Service', () => {
       });
     });
 
-    it('rejects budget without start date', () => {
+    it('rejects budget without start date', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -139,7 +139,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('Start date is required');
     });
 
-    it('rejects budget with end date before start date', () => {
+    it('rejects budget with end date before start date', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -153,7 +153,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('End date must be after start date');
     });
 
-    it('rejects budget with end date equal to start date', () => {
+    it('rejects budget with end date equal to start date', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -167,7 +167,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBe('End date must be after start date');
     });
 
-    it('accepts budget with valid end date', () => {
+    it('accepts budget with valid end date', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -181,7 +181,7 @@ describe('BudgetsDB Service', () => {
       expect(error).toBeNull();
     });
 
-    it('accepts budget without end date (indefinite)', () => {
+    it('accepts budget without end date (indefinite)', async () => {
       const budget = {
         categoryId: 'cat1',
         amount: '100.00',
@@ -721,48 +721,48 @@ describe('BudgetsDB Service', () => {
 
   describe('Period Date Calculations', () => {
     describe('getWeekStartDay', () => {
-      it('returns 7 (Sunday) for en-US', () => {
+      it('returns 7 (Sunday) for en-US', async () => {
         expect(BudgetsDB.getWeekStartDay('en-US')).toBe(7);
       });
 
-      it('returns 1 (Monday) for en-GB', () => {
+      it('returns 1 (Monday) for en-GB', async () => {
         expect(BudgetsDB.getWeekStartDay('en-GB')).toBe(1);
       });
 
-      it('returns 1 (Monday) for ru', () => {
+      it('returns 1 (Monday) for ru', async () => {
         expect(BudgetsDB.getWeekStartDay('ru')).toBe(1);
       });
 
-      it('returns 1 (Monday) for unknown locale (ISO 8601 default)', () => {
+      it('returns 1 (Monday) for unknown locale (ISO 8601 default)', async () => {
         expect(BudgetsDB.getWeekStartDay('xx-UNKNOWN')).toBe(1);
       });
 
-      it('returns 1 (Monday) for null locale (ISO 8601 default)', () => {
+      it('returns 1 (Monday) for null locale (ISO 8601 default)', async () => {
         expect(BudgetsDB.getWeekStartDay(null)).toBe(1);
       });
 
-      it('returns 1 (Monday) for undefined locale (ISO 8601 default)', () => {
+      it('returns 1 (Monday) for undefined locale (ISO 8601 default)', async () => {
         expect(BudgetsDB.getWeekStartDay(undefined)).toBe(1);
       });
 
-      it('returns locale-determined day for en (generic English, engine-dependent)', () => {
+      it('returns locale-determined day for en (generic English, engine-dependent)', async () => {
         // 'en' without a region subtag is ambiguous — different JS engines may resolve
         // it to en-US (Sunday=7) or en-001 (Monday=1). Just verify it returns a valid value.
         const result = BudgetsDB.getWeekStartDay('en');
         expect([1, 7]).toContain(result);
       });
 
-      it('returns 1 (Monday) for fr', () => {
+      it('returns 1 (Monday) for fr', async () => {
         expect(BudgetsDB.getWeekStartDay('fr')).toBe(1);
       });
 
-      it('returns 1 (Monday) for de', () => {
+      it('returns 1 (Monday) for de', async () => {
         expect(BudgetsDB.getWeekStartDay('de')).toBe(1);
       });
     });
 
     describe('getCurrentPeriodDates', () => {
-      it('calculates weekly period dates defaulting to Monday start (ISO 8601)', () => {
+      it('calculates weekly period dates defaulting to Monday start (ISO 8601)', async () => {
         // 2025-12-10 is a Wednesday; Monday of that week is Dec 8, Sunday is Dec 14
         const referenceDate = new Date('2025-12-10');
         const { start, end } = BudgetsDB.getCurrentPeriodDates('weekly', referenceDate);
@@ -771,7 +771,7 @@ describe('BudgetsDB Service', () => {
         expect(end.getDay()).toBe(0);   // Sunday
       });
 
-      it('calculates weekly period dates with Sunday start for en-US locale', () => {
+      it('calculates weekly period dates with Sunday start for en-US locale', async () => {
         // 2025-12-10 is a Wednesday; Sunday of that week is Dec 7, Saturday is Dec 13
         const referenceDate = new Date('2025-12-10');
         const { start, end } = BudgetsDB.getCurrentPeriodDates('weekly', referenceDate, 'en-US');
@@ -780,7 +780,7 @@ describe('BudgetsDB Service', () => {
         expect(end.getDay()).toBe(6);   // Saturday
       });
 
-      it('calculates monthly period dates', () => {
+      it('calculates monthly period dates', async () => {
         const referenceDate = new Date('2025-12-15');
         const { start, end } = BudgetsDB.getCurrentPeriodDates('monthly', referenceDate);
 
@@ -788,7 +788,7 @@ describe('BudgetsDB Service', () => {
         expect(end.getDate()).toBe(31); // December has 31 days
       });
 
-      it('calculates yearly period dates', () => {
+      it('calculates yearly period dates', async () => {
         const referenceDate = new Date('2025-06-15');
         const { start, end } = BudgetsDB.getCurrentPeriodDates('yearly', referenceDate);
 
@@ -798,7 +798,7 @@ describe('BudgetsDB Service', () => {
         expect(end.getDate()).toBe(31);
       });
 
-      it('throws error for invalid period type', () => {
+      it('throws error for invalid period type', async () => {
         expect(() => {
           BudgetsDB.getCurrentPeriodDates('invalid');
         }).toThrow('Invalid period type: invalid');
@@ -806,7 +806,7 @@ describe('BudgetsDB Service', () => {
     });
 
     describe('getNextPeriodDates', () => {
-      it('calculates next weekly period (Monday-start default)', () => {
+      it('calculates next weekly period (Monday-start default)', async () => {
         // 2025-12-08 is a Monday — start of the week with ISO 8601 default
         const currentStart = new Date('2025-12-08');
         const { start } = BudgetsDB.getNextPeriodDates('weekly', currentStart);
@@ -815,7 +815,7 @@ describe('BudgetsDB Service', () => {
         expect(start.getDay()).toBe(1);
       });
 
-      it('calculates next monthly period', () => {
+      it('calculates next monthly period', async () => {
         const currentStart = new Date('2025-12-01');
         const { start } = BudgetsDB.getNextPeriodDates('monthly', currentStart);
 
@@ -823,7 +823,7 @@ describe('BudgetsDB Service', () => {
         expect(start.getFullYear()).toBe(2026);
       });
 
-      it('calculates next yearly period', () => {
+      it('calculates next yearly period', async () => {
         const currentStart = new Date('2025-01-01');
         const { start } = BudgetsDB.getNextPeriodDates('yearly', currentStart);
 
@@ -832,7 +832,7 @@ describe('BudgetsDB Service', () => {
     });
 
     describe('getPreviousPeriodDates', () => {
-      it('calculates previous weekly period (Monday-start default)', () => {
+      it('calculates previous weekly period (Monday-start default)', async () => {
         // 2025-12-08 is a Monday; previous week's Monday is Dec 1
         const currentStart = new Date('2025-12-08');
         const { start } = BudgetsDB.getPreviousPeriodDates('weekly', currentStart);
@@ -841,14 +841,14 @@ describe('BudgetsDB Service', () => {
         expect(start.getDay()).toBe(1);   // Monday
       });
 
-      it('calculates previous monthly period', () => {
+      it('calculates previous monthly period', async () => {
         const currentStart = new Date('2025-12-01');
         const { start } = BudgetsDB.getPreviousPeriodDates('monthly', currentStart);
 
         expect(start.getMonth()).toBe(10); // November (previous month)
       });
 
-      it('calculates previous yearly period', () => {
+      it('calculates previous yearly period', async () => {
         const currentStart = new Date('2025-01-01');
         const { start } = BudgetsDB.getPreviousPeriodDates('yearly', currentStart);
 
@@ -1103,7 +1103,7 @@ describe('BudgetsDB Service', () => {
       await expect(BudgetsDB.createBudget(validBudget)).rejects.toThrow('Insert failed');
     });
 
-    it('handles null values in field mapping', () => {
+    it('handles null values in field mapping', async () => {
       // This is tested internally but good to verify the mapBudgetFields function handles null
       const mockBudget = {
         id: 'budget1',

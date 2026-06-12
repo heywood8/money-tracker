@@ -116,7 +116,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -193,7 +193,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -218,7 +218,7 @@ describe('Operation Management Integration Tests', () => {
     });
 
     it('validates transfer requires different accounts', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -248,7 +248,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -283,7 +283,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -316,7 +316,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -343,7 +343,7 @@ describe('Operation Management Integration Tests', () => {
 
   describe('Validation', () => {
     it('validates required fields', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -363,7 +363,7 @@ describe('Operation Management Integration Tests', () => {
     });
 
     it('validates amount is positive', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -382,7 +382,7 @@ describe('Operation Management Integration Tests', () => {
     });
 
     it('validates transfer requires toAccountId', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -400,7 +400,7 @@ describe('Operation Management Integration Tests', () => {
     });
 
     it('validates expense/income requires categoryId', async () => {
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -437,7 +437,7 @@ describe('Operation Management Integration Tests', () => {
 
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -459,7 +459,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getNextOldestOperation.mockResolvedValue({ date: '2025-01-08' });
       jest.spyOn(OperationsDB, 'getOperationsByWeekFromDate').mockResolvedValue(week2Ops);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -486,7 +486,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(initialOps);
       OperationsDB.getNextOldestOperation.mockResolvedValue(null);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -509,7 +509,7 @@ describe('Operation Management Integration Tests', () => {
     it('subscribes to OPERATION_CHANGED events', async () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -523,7 +523,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       jest.spyOn(OperationsDB, 'getAllOperations').mockResolvedValue([]);
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -539,7 +539,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue([]);
       OperationsDB.createOperation.mockRejectedValue(new Error('Database error'));
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -572,7 +572,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
       OperationsDB.updateOperation.mockRejectedValue(new Error('Update failed'));
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -599,7 +599,7 @@ describe('Operation Management Integration Tests', () => {
       OperationsDB.getOperationsByWeekOffset.mockResolvedValue(existingOps);
       OperationsDB.deleteOperation.mockRejectedValue(new Error('Delete failed'));
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -636,7 +636,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -668,7 +668,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -714,7 +714,7 @@ describe('Operation Management Integration Tests', () => {
         return Promise.resolve(undefined);
       });
 
-      const { result } = renderHook(() => useOperations(), { wrapper });
+      const { result } = await renderHook(() => useOperations(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
