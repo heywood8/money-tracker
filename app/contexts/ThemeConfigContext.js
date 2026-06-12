@@ -8,8 +8,6 @@ const ThemeConfigContext = createContext();
 export const ThemeConfigProvider = ({ children }) => {
   const [theme, setTheme] = useState('system'); // 'light' | 'dark' | 'system'
   const [osColorScheme, setOsColorScheme] = useState(Appearance.getColorScheme() || 'light');
-  const [colorScheme, setColorScheme] = useState('light'); // Effective color scheme
-
   // Load theme preference from storage
   useEffect(() => {
     getPreference(PREF_KEYS.THEME, 'system').then(stored => {
@@ -24,14 +22,7 @@ export const ThemeConfigProvider = ({ children }) => {
     return () => sub.remove();
   }, []);
 
-  // Compute effective color scheme: if user selected 'system', use OS scheme
-  useEffect(() => {
-    if (theme === 'system') {
-      setColorScheme(osColorScheme);
-    } else {
-      setColorScheme(theme);
-    }
-  }, [theme, osColorScheme]);
+  const colorScheme = theme === 'system' ? osColorScheme : theme;
 
   const updateTheme = async (newTheme) => {
     setTheme(newTheme);
