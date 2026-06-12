@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.5](https://github.com/heywood8/money-tracker/compare/penny-v0.132.4...penny-v0.132.5) (2026-06-12)
+
+
+### Tests
+
+* migrate to @testing-library/react-native v14 ([#908](https://github.com/heywood8/money-tracker/issues/908)) ([66adf9f](https://github.com/heywood8/money-tracker/commit/66adf9f55229bc0402be16e69c8ecd2506a1cd0b))
+
 ## [0.132.4](https://github.com/heywood8/money-tracker/compare/penny-v0.132.3...penny-v0.132.4) (2026-06-09)
 
 
