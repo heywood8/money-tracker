@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.8](https://github.com/heywood8/money-tracker/compare/penny-v0.132.7...penny-v0.132.8) (2026-06-13)
+
+
+### Performance Improvements
+
+* **localization:** stabilize t() with useCallback, memoize provider value ([#912](https://github.com/heywood8/money-tracker/issues/912)) ([#929](https://github.com/heywood8/money-tracker/issues/929)) ([072c0f2](https://github.com/heywood8/money-tracker/commit/072c0f2f0bad09ca4b7a7edeeb3b34dafee724b3))
+
 ## [0.132.7](https://github.com/heywood8/money-tracker/compare/penny-v0.132.6...penny-v0.132.7) (2026-06-13)
 
 
