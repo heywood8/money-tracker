@@ -135,7 +135,6 @@ export const OperationsDataProvider = ({ children }) => {
   // not when balances change. Prevents filteredOperations from recomputing on every
   // operation add/edit (which triggers an account balance reload).
   const accountNamesKey = accounts.map(a => `${a.id}:${a.name}`).join('|');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const accountNameById = useMemo(() => new Map(accounts.map(a => [a.id, a.name])), [accountNamesKey]);
 
   // Filtered operations based on search state
