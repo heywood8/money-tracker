@@ -397,6 +397,10 @@ export const OperationsActionsProvider = ({ children }) => {
   // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
 
   const addOperation = useCallback(async (operation) => {
+    const tempId = `_temp_${Date.now()}`;
+    const optimisticOp = { ...operation, id: tempId };
+    _setOperations(prev => [optimisticOp, ...prev]);
+
     try {
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
@@ -406,20 +410,15 @@ export const OperationsActionsProvider = ({ children }) => {
         allOpsCacheRef.current = [createdOperation, ...allOpsCacheRef.current];
       }
 
-      // Reload operations to include the new one (without showing loading spinner)
-      // Note: We reload to ensure consistency with lazy-loaded week ranges
       await loadInitialOperations(activeFiltersRef.current, false);
 
       _setSaveError(null);
-
-      // Reload accounts to reflect balance changes
       await reloadAccounts();
-
-      // Emit event to refresh budget statuses
       appEvents.emit(EVENTS.OPERATION_CHANGED);
 
       return createdOperation;
     } catch (error) {
+      _setOperations(prev => prev.filter(op => op.id !== tempId));
       console.error('Failed to add operation:', error);
       _setSaveError(error.message);
       showDialog(
@@ -429,7 +428,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _setOperations]);
 
   const splitOperation = useCallback(async (id, updates, newOperationData) => {
     try {
