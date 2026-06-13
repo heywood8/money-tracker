@@ -355,9 +355,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     try {
       await resetDatabase();
     } catch (error) {
-      // Error already handled in resetDatabase
+      console.error('[Settings] Database reset failed:', error);
+      showDialog(t('error') || 'Error', error.message || 'Database reset failed', [{ text: 'OK' }]);
     }
-  }, [closeSubPanel, resetDatabase]);
+  }, [closeSubPanel, resetDatabase, showDialog, t]);
 
   const confirmImportBackup = useCallback(async () => {
     if (importPickInProgress.current) return;
@@ -470,9 +471,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
       cancelImport();
       if (!(restoreError instanceof CancelledImportError)) {
         console.error('[SheetsImport] restore error:', restoreError);
+        showDialog(t('error') || 'Error', restoreError.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
       }
     }
-  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken]);
+  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, showDialog]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
