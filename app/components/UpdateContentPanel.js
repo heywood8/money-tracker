@@ -70,7 +70,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
               <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
                 {t('whats_new') || "What's new"}
               </Text>
-              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                 {releaseNotes.map(({ version, notes }) => (
                   <View key={version} style={styles.changelogSection}>
                     <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
@@ -167,7 +167,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
               <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
                 {t('release_history') || 'Release history'}
               </Text>
-              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                 {updateResult.recentReleaseNotes.map(({ version, notes }) => (
                   <View key={version} style={styles.changelogSection}>
                     <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>

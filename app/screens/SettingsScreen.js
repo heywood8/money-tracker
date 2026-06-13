@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, LayoutAnimation } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, LayoutAnimation, RefreshControl } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
@@ -579,10 +579,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, [showDialog, t]);
 
-  const handleCheckForUpdates = useCallback(async () => {
+  const runUpdateCheck = useCallback(async () => {
     setUpdateResult(null);
     setIsCheckingUpdate(true);
-    openSubPanel('update');
     loadDownloadedApks();
     try {
       const result = await checkForAppUpdate();
@@ -612,12 +611,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
         });
       }
     } catch (error) {
-      console.error('Manual update check failed:', error);
       setUpdateResult({ type: 'error', errorCode: null });
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [openSubPanel, loadDownloadedApks]);
+  }, [loadDownloadedApks]);
+
+  const handleCheckForUpdates = useCallback(() => {
+    openSubPanel('update');
+    runUpdateCheck();
+  }, [openSubPanel, runUpdateCheck]);
 
   const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl) => {
     if (updateResult) {
@@ -1240,7 +1243,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
 
           {activeSubPanel === 'update' && (
-            <View style={styles.updatePanelWrapper}>
+            <ScrollView
+              style={styles.updatePanelWrapper}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isCheckingUpdate}
+                  onRefresh={runUpdateCheck}
+                  colors={[colors.primary]}
+                />
+              }
+            >
               <UpdateContentPanel
                 isChecking={isCheckingUpdate}
                 updateResult={updateResult}
@@ -1248,7 +1260,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 onUpdate={handleUpdateFromSettings}
                 onInstallApk={handleInstallApk}
               />
-            </View>
+            </ScrollView>
           )}
         </View>
       </Animated.View>
