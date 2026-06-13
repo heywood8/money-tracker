@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.1](https://github.com/heywood8/money-tracker/compare/penny-v0.133.0...penny-v0.133.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **i18n:** complete translations across all 11 languages ([#944](https://github.com/heywood8/money-tracker/issues/944)) ([e9d5cd9](https://github.com/heywood8/money-tracker/commit/e9d5cd9e90ca1b3574dd5a4b53e72e015ced7d15))
+
 ## [0.133.0](https://github.com/heywood8/money-tracker/compare/penny-v0.132.8...penny-v0.133.0) (2026-06-13)
 
 
