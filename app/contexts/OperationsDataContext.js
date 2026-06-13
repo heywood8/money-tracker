@@ -131,6 +131,13 @@ export const OperationsDataProvider = ({ children }) => {
     );
   }, [searchState]);
 
+  // Stable account name lookup — only rebuilds when account IDs or names change,
+  // not when balances change. Prevents filteredOperations from recomputing on every
+  // operation add/edit (which triggers an account balance reload).
+  const accountNamesKey = accounts.map(a => `${a.id}:${a.name}`).join('|');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const accountNameById = useMemo(() => new Map(accounts.map(a => [a.id, a.name])), [accountNamesKey]);
+
   // Filtered operations based on search state
   const filteredOperations = useMemo(() => {
     let result = operations;
@@ -158,8 +165,8 @@ export const OperationsDataProvider = ({ children }) => {
         }
 
         // match account name
-        const account = accounts.find(acc => acc.id === op.accountId);
-        if (account && normalizeSearchText(account.name).includes(searchLower)) {
+        const accountName = accountNameById.get(op.accountId);
+        if (accountName && normalizeSearchText(accountName).includes(searchLower)) {
           return true;
         }
 
@@ -230,7 +237,7 @@ export const OperationsDataProvider = ({ children }) => {
     }
 
     return result;
-  }, [operations, searchState, accounts, getCategoryPath, t]);
+  }, [operations, searchState, accountNameById, getCategoryPath, t]);
 
   // Count active filter groups (excluding text search)
   const getSearchFilterCount = useCallback(() => {
