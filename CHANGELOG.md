@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.3](https://github.com/heywood8/money-tracker/compare/penny-v0.133.2...penny-v0.133.3) (2026-06-13)
+
+
+### Bug Fixes
+
+* **backup:** normalize accountIdMapping keys to String — prevent silent data loss on restore ([#871](https://github.com/heywood8/money-tracker/issues/871)) ([#926](https://github.com/heywood8/money-tracker/issues/926)) ([77fdfb9](https://github.com/heywood8/money-tracker/commit/77fdfb900a92948cf22b639782220035860c8995))
+
 ## [0.133.2](https://github.com/heywood8/money-tracker/compare/penny-v0.133.1...penny-v0.133.2) (2026-06-13)
 
 
