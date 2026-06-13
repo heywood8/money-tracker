@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.2](https://github.com/heywood8/money-tracker/compare/penny-v0.133.1...penny-v0.133.2) (2026-06-13)
+
+
+### Bug Fixes
+
+* show release list instead of error when releases have no APKs ([#947](https://github.com/heywood8/money-tracker/issues/947)) ([6aeaf4b](https://github.com/heywood8/money-tracker/commit/6aeaf4bc874fe237e59dfb726d10af9cd714ffd4))
+
 ## [0.133.1](https://github.com/heywood8/money-tracker/compare/penny-v0.133.0...penny-v0.133.1) (2026-06-13)
 
 
