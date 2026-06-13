@@ -228,6 +228,22 @@ jest.mock('../../app/services/AppUpdateService', () => ({
   checkAlreadyDownloaded: jest.fn(() => Promise.resolve(null)),
 }));
 
+const mockGetDefaultAccountId = jest.fn(() => Promise.resolve(null));
+const mockSetDefaultAccountId = jest.fn(() => Promise.resolve());
+const mockVisibleAccounts = [
+  { id: 1, name: 'Savings', currency: 'USD', balance: '100' },
+  { id: 2, name: 'Checking', currency: 'EUR', balance: '200' },
+];
+
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: () => ({
+    visibleAccounts: [
+      { id: 1, name: 'Savings', currency: 'USD', balance: '100' },
+      { id: 2, name: 'Checking', currency: 'EUR', balance: '200' },
+    ],
+  }),
+}));
+
 // Mock PreferencesDB
 jest.mock('../../app/services/PreferencesDB', () => ({
   getPreference: jest.fn(() => Promise.resolve(null)),
@@ -235,6 +251,8 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   PREF_KEYS: {
     GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   },
+  getDefaultAccountId: jest.fn(() => Promise.resolve(null)),
+  setDefaultAccountId: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock GoogleSheetsService
@@ -802,6 +820,67 @@ describe('SettingsScreen', () => {
 
       expect(mockShowDialog).not.toHaveBeenCalled();
       expect(mockSetHideBalances).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('Default account setting', () => {
+    let preferencesDB;
+    beforeEach(() => {
+      preferencesDB = require('../../app/services/PreferencesDB');
+      jest.clearAllMocks();
+      preferencesDB.getDefaultAccountId.mockResolvedValue(null);
+    });
+
+    it('renders the default account settings row', async () => {
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('settings-default-account-row')).toBeTruthy();
+      });
+    });
+
+    it('shows latest_used subtitle when no account is pinned', async () => {
+      preferencesDB.getDefaultAccountId.mockResolvedValue(null);
+      const { getByTestId, getByText } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await waitFor(() => getByTestId('settings-default-account-row'));
+      expect(getByText('latest_used')).toBeTruthy();
+    });
+
+    it('opens defaultAccount subpanel when row is tapped', async () => {
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await waitFor(() => getByTestId('settings-default-account-row'));
+      fireEvent.press(getByTestId('settings-default-account-row'));
+      await waitFor(() => {
+        expect(getByTestId('settings-default-account-panel')).toBeTruthy();
+      });
+    });
+
+    it('shows Latest used option in subpanel', async () => {
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await waitFor(() => getByTestId('settings-default-account-row'));
+      fireEvent.press(getByTestId('settings-default-account-row'));
+      await waitFor(() => {
+        expect(getByTestId('default-account-option-null')).toBeTruthy();
+      });
+    });
+
+    it('shows an option for each visible account in the subpanel', async () => {
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+      await waitFor(() => getByTestId('settings-default-account-row'));
+      fireEvent.press(getByTestId('settings-default-account-row'));
+      await waitFor(() => {
+        expect(getByTestId('default-account-option-1')).toBeTruthy();
+        expect(getByTestId('default-account-option-2')).toBeTruthy();
+      });
     });
   });
 });

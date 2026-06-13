@@ -25,13 +25,14 @@ import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk, checkAlreadyDownloaded } from '../services/AppUpdateService';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import AccountsScreen from './AccountsScreen';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import CategoriesScreen from './CategoriesScreen';
 
 const SHEETS_STEPS = [
@@ -70,7 +71,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload } = useUpdateDownload();
+  const { visibleAccounts } = useAccountsData();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
+  const [pinnedAccountId, setPinnedAccountId] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -102,6 +105,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
   const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
   const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
+  const defaultAccountName = pinnedAccountId
+    ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
+    : t('latest_used');
 
   // Toggle animations using reanimated shared values
   const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
@@ -217,6 +223,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const closeWithShrink = useCallback(() => {
     commitShrink(closeSubPanel);
   }, [commitShrink, closeSubPanel]);
+
+  useEffect(() => {
+    getDefaultAccountId().then(id => setPinnedAccountId(id));
+  }, []);
+
+  const handleDefaultAccountSelect = useCallback(async (id) => {
+    await setDefaultAccountId(id);
+    setPinnedAccountId(id);
+    closeSubPanel();
+  }, [closeSubPanel]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -756,6 +772,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const subPanelTitle = useMemo(() => {
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
     if (activeSubPanel === 'categories') return t('categories') || 'Categories';
+    if (activeSubPanel === 'defaultAccount') return t('default_account') || 'Default Account';
     if (activeSubPanel === 'language') return t('language');
     if (activeSubPanel === 'export') {
       return exportStep === 'sheets-progress' ? 'Google Sheets' : (t('export_format') || 'Export Format');
@@ -831,6 +848,41 @@ export default function SettingsScreen({ setSubPanelActive }) {
         ]}>
           {activeSubPanel === 'accounts' && <AccountsScreen />}
           {activeSubPanel === 'categories' && <CategoriesScreen />}
+
+          {activeSubPanel === 'defaultAccount' && (
+            <ScrollView
+              style={styles.listContainer}
+              testID="settings-default-account-panel"
+            >
+              <TouchableRipple
+                onPress={() => handleDefaultAccountSelect(null)}
+                style={styles.listItem}
+                testID="default-account-option-null"
+              >
+                <View style={styles.listItemContent}>
+                  <Text style={[styles.listItemText, { color: colors.text }]}>{t('latest_used')}</Text>
+                  {pinnedAccountId === null && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </View>
+              </TouchableRipple>
+              {visibleAccounts.map(acc => (
+                <TouchableRipple
+                  key={acc.id}
+                  onPress={() => handleDefaultAccountSelect(acc.id)}
+                  style={styles.listItem}
+                  testID={`default-account-option-${acc.id}`}
+                >
+                  <View style={styles.listItemContent}>
+                    <Text style={[styles.listItemText, { color: colors.text }]}>{acc.name}</Text>
+                    {pinnedAccountId === acc.id && (
+                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                    )}
+                  </View>
+                </TouchableRipple>
+              ))}
+            </ScrollView>
+          )}
 
           {activeSubPanel === 'language' && (
             <ScrollView style={styles.listContainer}>
@@ -1335,6 +1387,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
                   {t('accounts_hint') || 'Manage your accounts and balances'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
+
+        <TouchableRipple
+          onPress={() => openSubPanel('defaultAccount')}
+          style={styles.settingsRow}
+          testID="settings-default-account-row"
+        >
+          <View style={styles.settingsRowContent}>
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="bookmark-outline" size={22} color={colors.text} />
+              <View style={styles.settingsRowText}>
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('default_account')}</Text>
+                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                  {defaultAccountName}
                 </Text>
               </View>
             </View>

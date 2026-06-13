@@ -6,6 +6,9 @@
 jest.unmock('../../app/contexts/AccountsDataContext');
 jest.unmock('../../app/contexts/AccountsActionsContext');
 
+// Mock PreferencesDB for the split context tests below
+jest.mock('../../app/services/PreferencesDB');
+
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AccountsProvider, useAccounts } from '../../app/contexts/AccountsContext';
@@ -508,5 +511,53 @@ describe('AccountsActionsContext', () => {
 
       expect(result.current.showHiddenAccounts).toBe(false);
     });
+  });
+});
+
+// Tests for split contexts: PreferencesDB integration with deleteAccount
+describe('deleteAccount — default account preference cleanup', () => {
+  const PreferencesDB = require('../../app/services/PreferencesDB');
+
+  // This test uses the real AccountsProvider wrapper from earlier tests
+  // We just need to mock PreferencesDB behavior
+  const existingAccount = { id: 'acc-1', name: 'Cash', balance: '100', currency: 'USD' };
+  const existingAccount2 = { id: 'acc-2', name: 'Bank', balance: '500', currency: 'USD' };
+
+  const wrapper = ({ children }) => <AccountsProvider>{children}</AccountsProvider>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    AccountsDB.getAllAccounts.mockResolvedValue([existingAccount, existingAccount2]);
+    AccountsDB.deleteAccount.mockResolvedValue(undefined);
+    PreferencesDB.getDefaultAccountId.mockClear();
+    PreferencesDB.setDefaultAccountId.mockClear();
+  });
+
+  it('clears default account pref when deleted account is the pinned default', async () => {
+    PreferencesDB.getDefaultAccountId.mockResolvedValue('acc-1');
+    PreferencesDB.setDefaultAccountId.mockResolvedValue(undefined);
+
+    const { result } = await renderHook(() => useAccounts(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.deleteAccount('acc-1');
+    });
+
+    expect(PreferencesDB.setDefaultAccountId).toHaveBeenCalledWith(null);
+  });
+
+  it('does not touch default account pref when a different account is deleted', async () => {
+    PreferencesDB.getDefaultAccountId.mockResolvedValue('acc-1');
+    PreferencesDB.setDefaultAccountId.mockResolvedValue(undefined);
+
+    const { result } = await renderHook(() => useAccounts(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.deleteAccount('acc-2');
+    });
+
+    expect(PreferencesDB.setDefaultAccountId).not.toHaveBeenCalled();
   });
 });

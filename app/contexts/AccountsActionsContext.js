@@ -7,6 +7,7 @@ import { forceDeleteDatabase } from '../utils/emergencyReset';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { useDialog } from './DialogContext';
 import { useAccountsData } from './AccountsDataContext';
+import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 
 const AccountsActionsContext = createContext();
 
@@ -126,6 +127,11 @@ export const AccountsActionsProvider = ({ children }) => {
     try {
       await AccountsDB.deleteAccount(id, transferToAccountId);
       _setAccounts(accs => accs.filter(a => a.id !== id));
+
+      const currentDefault = await getDefaultAccountId();
+      if (currentDefault === id) {
+        await setDefaultAccountId(null);
+      }
 
       // If operations were transferred, reload all accounts to reflect balance changes
       if (transferToAccountId) {

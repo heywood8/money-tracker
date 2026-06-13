@@ -345,6 +345,8 @@
   "tap_for_details": "Toca para detalles",
   "all_categories": "Todas las categorías",
   "all_accounts": "Todas las cuentas",
+  "default_account": "Cuenta predeterminada",
+  "latest_used": "Último usado",
   "developer": "Desarrollador",
   "logs": "Registros",
   "no_logs": "Sin registros aún",

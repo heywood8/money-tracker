@@ -11,6 +11,7 @@ export const PREF_KEYS = {
   UPDATE_SKIP_UNTIL: 'update_skip_until',
   HIDE_BALANCES: 'hide_balances',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
+  DEFAULT_ACCOUNT_ID: 'default_account_id',
 };
 
 /**
@@ -132,5 +133,34 @@ export const getAllPreferences = async () => {
   } catch (error) {
     console.error('[PreferencesDB] Error getting all preferences:', error);
     return {};
+  }
+};
+
+/**
+ * Get the pinned default account ID for QuickAdd
+ * @returns {Promise<number|null>} Account ID or null ("Latest used" mode)
+ */
+export const getDefaultAccountId = async () => {
+  try {
+    return await getNumberPreference(PREF_KEYS.DEFAULT_ACCOUNT_ID, null);
+  } catch (e) {
+    console.error('[PreferencesDB] Failed to get default account:', e);
+    return null;
+  }
+};
+
+/**
+ * Set the pinned default account ID for QuickAdd
+ * @param {number|null} id - Account ID to pin, or null to revert to "Latest used"
+ */
+export const setDefaultAccountId = async (id) => {
+  try {
+    if (id === null) {
+      await deletePreference(PREF_KEYS.DEFAULT_ACCOUNT_ID);
+    } else {
+      await setPreference(PREF_KEYS.DEFAULT_ACCOUNT_ID, String(id));
+    }
+  } catch (e) {
+    console.error('[PreferencesDB] Failed to set default account:', e);
   }
 };

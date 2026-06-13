@@ -349,6 +349,8 @@
   "tap_for_details": "Tap for details",
   "all_categories": "All categories",
   "all_accounts": "All accounts",
+  "default_account": "Default account",
+  "latest_used": "Latest used",
   "developer": "Developer",
   "logs": "Logs",
   "no_logs": "No logs yet",

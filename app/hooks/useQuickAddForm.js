@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getLastAccessedAccount } from '../services/LastAccount';
+import { getDefaultAccountId } from '../services/PreferencesDB';
 import { getCategoryDisplayName, getCategoryNames } from '../utils/categoryUtils';
 import * as Currency from '../services/currency';
 import * as OperationsDB from '../services/OperationsDB';
@@ -44,12 +45,17 @@ const useQuickAddForm = (visibleAccounts, accounts, categories, t) => {
         const acc = visibleAccounts[0];
         setQuickAddValues(v => ({ ...v, accountId: acc.id, operationCurrency: acc.currency || v.operationCurrency }));
       } else if (visibleAccounts.length > 1) {
-        const lastId = await getLastAccessedAccount();
+        const defaultId = await getDefaultAccountId();
         let resolvedAcc;
-        if (lastId && visibleAccounts.some(acc => acc.id === lastId)) {
-          resolvedAcc = visibleAccounts.find(acc => acc.id === lastId);
+        if (defaultId && visibleAccounts.some(acc => acc.id === defaultId)) {
+          resolvedAcc = visibleAccounts.find(acc => acc.id === defaultId);
         } else {
-          resolvedAcc = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+          const lastId = await getLastAccessedAccount();
+          if (lastId && visibleAccounts.some(acc => acc.id === lastId)) {
+            resolvedAcc = visibleAccounts.find(acc => acc.id === lastId);
+          } else {
+            resolvedAcc = visibleAccounts.slice().sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+          }
         }
         setQuickAddValues(v => ({ ...v, accountId: resolvedAcc.id, operationCurrency: resolvedAcc.currency || v.operationCurrency }));
       }
