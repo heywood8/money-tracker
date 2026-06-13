@@ -1,0 +1,52 @@
+// scripts/e2e-agent/src/agent/planner.js
+
+export const ALL_SCENARIOS = [
+  { id: 'add-operation',    name: 'Add expense operation',           description: 'Tap the FAB on Operations tab. Fill amount 45.50, select Groceries category, Checking account, tap Save. Verify the new operation appears at the top of the list.' },
+  { id: 'add-income',       name: 'Add income operation',            description: 'Add an income: amount 500, Salary category, Checking account. Verify it appears in the list.' },
+  { id: 'edit-operation',   name: 'Edit existing operation',         description: 'Tap an operation in the list to open edit modal. Change the amount, save. Verify the change is reflected.' },
+  { id: 'delete-operation', name: 'Delete operation',                description: 'Open an operation, find and tap the delete button, confirm. Verify it is removed from the list.' },
+  { id: 'operations-list',  name: 'Operations list loads',           description: 'Open Operations tab. Verify the list is not empty and shows entries with dates and amounts.' },
+  { id: 'quick-add',        name: 'Quick-add form',                  description: 'Use the quick-add bar at the bottom of Operations. Type amount 12.50, select a category, tap add. Verify the operation appears.' },
+  { id: 'search-filter',    name: 'Search operations',               description: 'Tap search on Operations tab. Type "Groceries". Verify only matching operations appear.' },
+  { id: 'accounts-list',    name: 'Accounts list loads',             description: 'Tap Accounts tab. Verify at least one account is visible with name and balance.' },
+  { id: 'add-account',      name: 'Add account',                     description: 'Tap FAB on Accounts. Fill name "Test Account", balance 100.00, currency USD. Save. Verify it appears.' },
+  { id: 'edit-account',     name: 'Edit account',                    description: 'Tap an existing account. Change the name. Save. Verify updated name appears in the list.' },
+  { id: 'transfer',         name: 'Transfer between accounts',       description: 'Add a transfer from Checking to Cash, amount 50.00. Verify both account balances reflect the change.' },
+  { id: 'categories-list',  name: 'Categories list loads',           description: 'Tap Categories tab. Verify the category grid is not empty.' },
+  { id: 'add-category',     name: 'Add category',                    description: 'Tap FAB on Categories. Enter name "Test Category", select an icon, save. Verify it appears in the grid.' },
+  { id: 'graphs',           name: 'Graphs screen loads',             description: 'Tap Graphs tab. Verify at least one chart is visible without error.' },
+  { id: 'planned-list',     name: 'Planned operations loads',        description: 'Tap Planned tab. Verify the screen loads without error and shows planned items.' },
+  { id: 'add-planned',      name: 'Add planned operation',           description: 'Tap FAB on Planned. Fill name "Monthly test", amount 100, select category, save. Verify it appears.' },
+  { id: 'empty-search',     name: 'Search with no results',          description: 'Search for "xyzzy123". Verify an empty state message appears rather than a crash.' },
+  { id: 'back-navigation',  name: 'Back navigation from modals',     description: 'Open add-operation modal, press Android back button. Verify modal closes and list is still visible.' },
+  { id: 'balance-update',   name: 'Balance updates after operation', description: 'Note Checking balance on Accounts tab. Add expense of 25.00 from Checking. Return to Accounts. Verify balance decreased by 25.00.' },
+  { id: 'budgets',          name: 'Budget progress visible',         description: 'Open Graphs tab. Find budget progress bars. Verify Groceries budget shows spending (seed data includes grocery expenses).' },
+];
+
+function matchesPattern(filePath, pattern) {
+  const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*'));
+  return regex.test(filePath);
+}
+
+export function matchDiffToScenarios(diffText, appMap) {
+  const changedFiles = [];
+  for (const line of diffText.split('\n')) {
+    const m = line.match(/^diff --git a\/(.+) b\/.+/);
+    if (m) changedFiles.push(m[1]);
+  }
+
+  const matchedIds = new Set();
+  for (const file of changedFiles) {
+    for (const [pattern, ids] of Object.entries(appMap)) {
+      if (matchesPattern(file, pattern)) {
+        for (const id of ids) matchedIds.add(id);
+      }
+    }
+  }
+
+  return ALL_SCENARIOS.filter(s => matchedIds.has(s.id));
+}
+
+export function generateComprehensivePlan() {
+  return ALL_SCENARIOS;
+}
