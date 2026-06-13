@@ -27,6 +27,7 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
+import { seedDatabase } from '../services/SeedService';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
@@ -107,6 +108,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [csvExportSuccess, setCsvExportSuccess] = useState(false);
   const [jsonExportLoading, setJsonExportLoading] = useState(false);
   const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedDone, setSeedDone] = useState(false);
   const [expandedLogIds, setExpandedLogIds] = useState(new Set());
 
   const saveLocalBackupColor = saveLocalBackupSuccess ? '#4caf50' : colors.text;
@@ -418,6 +421,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
       dismissPanel();
     }
   }, [exportStep, sheetsSteps, dismissPanel]);
+
+  const handleSeedDatabase = useCallback(async () => {
+    setSeeding(true);
+    setSeedDone(false);
+    try {
+      await seedDatabase();
+      setSeedDone(true);
+    } catch (e) {
+      showDialog(t('error') || 'Error', e.message || 'Seed failed', [{ text: 'OK' }]);
+    } finally {
+      setSeeding(false);
+    }
+  }, [showDialog, t]);
 
   const confirmResetDatabase = useCallback(async () => {
     closeSubPanel();
@@ -1585,6 +1601,24 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
           </View>
         </TouchableRipple>
+
+        {__DEV__ && (
+          <TouchableRipple
+            testID="seed-demo-data"
+            onPress={seeding ? undefined : handleSeedDatabase}
+            disabled={seeding}
+            style={styles.settingsRow}
+          >
+            <View style={styles.settingsRowContent}>
+              <View style={styles.settingsRowLeft}>
+                <Ionicons name="flask-outline" size={22} color={colors.primary} />
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                  {seeding ? 'Seeding…' : seedDone ? '✓ Demo data loaded' : 'Reset to Demo Data'}
+                </Text>
+              </View>
+            </View>
+          </TouchableRipple>
+        )}
 
         <View style={styles.resetSpacer} />
 
