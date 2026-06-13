@@ -71,6 +71,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload } = useUpdateDownload();
+  const { visibleAccounts } = useAccountsData();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
   const [pinnedAccountId, setPinnedAccountId] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
@@ -104,6 +105,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
   const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
   const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
+  const defaultAccountName = pinnedAccountId
+    ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
+    : t('latest_used');
 
   // Toggle animations using reanimated shared values
   const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
@@ -800,12 +804,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return false;
   }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
 
-
-  const { visibleAccounts } = useAccountsData();
-
-  const defaultAccountName = pinnedAccountId
-    ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
-    : t('latest_used');
 
   // ─── RENDER ───
   if (activeSubPanel !== null) {
