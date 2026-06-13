@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, FlatList, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -51,16 +51,44 @@ export const COMMON_ICONS = [
   'bookmark', 'star', 'flag',
 ];
 
+const NUM_COLUMNS = 6;
+
 export default function IconPicker({ visible, onClose, onSelect, selectedIcon }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { width } = useWindowDimensions();
-  const iconSize = Math.floor((width - 64) / 6); // 6 icons per row with padding
+  const iconSize = Math.floor((width - 64) / NUM_COLUMNS);
 
-  const handleSelect = (icon) => {
+  const handleSelect = useCallback((icon) => {
     onSelect(icon);
     onClose();
-  };
+  }, [onSelect, onClose]);
+
+  const renderItem = useCallback(({ item: iconName }) => {
+    const isSelected = selectedIcon === iconName;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.iconButton,
+          {
+            width: iconSize,
+            height: iconSize,
+            backgroundColor: isSelected ? colors.primary + '22' : colors.background,
+            borderColor: isSelected ? colors.primary : 'transparent',
+          },
+        ]}
+        onPress={() => handleSelect(iconName)}
+        accessibilityLabel={iconName}
+        accessibilityRole="button"
+      >
+        <Icon
+          name={iconName}
+          size={28}
+          color={isSelected ? colors.primary : colors.text}
+        />
+      </TouchableOpacity>
+    );
+  }, [selectedIcon, colors, iconSize, handleSelect]);
 
   return (
     <>
@@ -82,33 +110,14 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <View style={styles.iconsGrid}>
-                {COMMON_ICONS.map((iconName) => (
-                  <TouchableOpacity
-                    key={iconName}
-                    style={[
-                      styles.iconButton,
-                      {
-                        backgroundColor: colors.background,
-                        width: iconSize,
-                        height: iconSize,
-                      },
-                      selectedIcon === iconName && styles.selectedIconOverlay,
-                    ]}
-                    onPress={() => handleSelect(iconName)}
-                    accessibilityLabel={iconName}
-                    accessibilityRole="button"
-                  >
-                    <Icon
-                      name={iconName}
-                      size={28}
-                      color={selectedIcon === iconName ? colors.primary : colors.text}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <FlatList
+              data={COMMON_ICONS}
+              keyExtractor={(item) => item}
+              numColumns={NUM_COLUMNS}
+              renderItem={renderItem}
+              contentContainerStyle={styles.listContent}
+              columnWrapperStyle={styles.row}
+            />
           </View>
         </View>
       </Modal>
@@ -132,22 +141,19 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: 'center',
     borderRadius: 8,
+    borderWidth: 2,
     justifyContent: 'center',
+    margin: 3,
   },
-  iconsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  listContent: {
+    padding: 10,
   },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  scrollContent: {
-    padding: 16,
-  },
-  selectedIconOverlay: {
-    opacity: 0.3,
+  row: {
+    justifyContent: 'flex-start',
   },
   title: {
     fontSize: 18,
