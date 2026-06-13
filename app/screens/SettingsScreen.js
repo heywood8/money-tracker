@@ -588,7 +588,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
 
       if (!result.success) {
-        setUpdateResult({ type: 'error', errorCode: result.errorCode });
+        setUpdateResult({
+          type: 'error',
+          errorCode: result.errorCode,
+          releaseNotes: result.releaseNotes || null,
+          releasesUrl: result.releasesUrl || null,
+        });
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({
           type: 'up_to_date',
