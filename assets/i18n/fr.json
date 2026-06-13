@@ -349,6 +349,8 @@
   "tap_for_details": "Appuyez pour les détails",
   "all_categories": "Toutes les catégories",
   "all_accounts": "Tous les comptes",
+  "default_account": "Compte par défaut",
+  "latest_used": "Dernier utilisé",
   "developer": "Développeur",
   "logs": "Journaux",
   "no_logs": "Pas encore de journaux",

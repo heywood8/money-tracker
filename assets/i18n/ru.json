@@ -349,6 +349,8 @@
   "tap_for_details": "Нажмите для деталей",
   "all_categories": "Все категории",
   "all_accounts": "Все счета",
+  "default_account": "Счёт по умолчанию",
+  "latest_used": "Последний использованный",
   "developer": "Разработчик",
   "logs": "Логи",
   "no_logs": "Логов пока нет",

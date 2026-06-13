@@ -349,6 +349,8 @@
   "tap_for_details": "상세 보기를 탭하세요",
   "all_categories": "모든 카테고리",
   "all_accounts": "모든 계정",
+  "default_account": "기본 계좌",
+  "latest_used": "최근 사용",
   "developer": "개발자",
   "logs": "로그",
   "no_logs": "로그가 아직 없습니다",

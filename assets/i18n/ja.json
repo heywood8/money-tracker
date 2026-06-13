@@ -349,6 +349,8 @@
   "tap_for_details": "タップして詳細を表示",
   "all_categories": "すべてのカテゴリー",
   "all_accounts": "すべての口座",
+  "default_account": "デフォルト口座",
+  "latest_used": "最後に使用",
   "developer": "開発者",
   "logs": "ログ",
   "no_logs": "ログがまだありません",

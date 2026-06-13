@@ -345,6 +345,8 @@
   "tap_for_details": "Tippen für Details",
   "all_categories": "Alle Kategorien",
   "all_accounts": "Alle Konten",
+  "default_account": "Standardkonto",
+  "latest_used": "Zuletzt verwendet",
   "developer": "Entwickler",
   "logs": "Protokolle",
   "no_logs": "Noch keine Protokolle",
