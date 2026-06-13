@@ -1,111 +1,122 @@
-/**
- * generateSeedData — pure function that produces demo data templates.
- *
- * Returns account templates, category IDs, and operation templates
- * relative to a given reference date. All output is deterministic for
- * the same input so tests can rely on stable snapshots.
- *
- * @param {Date} today - Reference date (default: current date)
- * @returns {{ accountTemplates: object[], categories: string[], operationTemplates: object[] }}
- */
-export function generateSeedData(today = new Date()) {
-  const accountTemplates = [
-    { name: 'Checking', balance: '2400.00', currency: 'USD' },
-    { name: 'Savings',  balance: '8500.00', currency: 'USD' },
-    { name: 'Cash',     balance: '150.00',  currency: 'USD' },
-  ];
+// app/defaults/seedData.js
 
-  const categories = [
-    'expense-food-groceries',
-    'expense-food-restaurants',
-    'expense-food-coffee-cafe',
-    'expense-transportation-public-transport',
-    'expense-transportation-taxi',
-    'expense-monthly-rent',
-    'expense-monthly-subscriptions',
-    'expense-entertainment-movies',
-    'expense-shopping-clothing',
-    'income-salary',
-  ];
+const ACCOUNT_TEMPLATES = [
+  { name: 'Checking', balance: '0.00', currency: 'USD' },
+  { name: 'Savings',  balance: '0.00', currency: 'USD' },
+  { name: 'Cash',     balance: '0.00', currency: 'USD' },
+];
 
-  // Build a date helper: offset days from today (0 = today, -1 = yesterday …)
-  const dateStr = (offsetDays) => {
+// accountIndex: 0=Checking, 1=Savings, 2=Cash
+const OPERATION_TEMPLATES = [
+  // --- Month 1: days 60-31 ago ---
+  { daysAgo: 60, type: 'income',   amount: '3500.00', description: 'Monthly salary',    accountIndex: 0, categoryId: 'seed-cat-salary',        toAccountIndex: null },
+  { daysAgo: 59, type: 'expense',  amount: '1200.00', description: 'Rent',              accountIndex: 0, categoryId: 'seed-cat-rent',          toAccountIndex: null },
+  { daysAgo: 57, type: 'expense',  amount: '89.50',   description: 'Weekly groceries',  accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 56, type: 'expense',  amount: '42.00',   description: 'Gas station',       accountIndex: 0, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo: 54, type: 'expense',  amount: '28.50',   description: 'Restaurant',        accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 53, type: 'expense',  amount: '15.99',   description: 'Netflix',           accountIndex: 0, categoryId: 'seed-cat-entertainment', toAccountIndex: null },
+  { daysAgo: 52, type: 'expense',  amount: '23.00',   description: 'Pharmacy',          accountIndex: 2, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 51, type: 'expense',  amount: '6.50',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 50, type: 'transfer', amount: '300.00',  description: 'ATM withdrawal',    accountIndex: 0, categoryId: null,                     toAccountIndex: 2    },
+  { daysAgo: 49, type: 'expense',  amount: '76.30',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 48, type: 'expense',  amount: '45.00',   description: 'Monthly bus pass',  accountIndex: 0, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo: 47, type: 'expense',  amount: '30.00',   description: 'Gym membership',    accountIndex: 0, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 46, type: 'expense',  amount: '52.00',   description: 'Dinner out',        accountIndex: 0, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 45, type: 'expense',  amount: '67.99',   description: 'Amazon order',      accountIndex: 0, categoryId: 'seed-cat-shopping',      toAccountIndex: null },
+  { daysAgo: 44, type: 'expense',  amount: '85.00',   description: 'Electricity bill',  accountIndex: 0, categoryId: 'seed-cat-utilities',     toAccountIndex: null },
+  { daysAgo: 43, type: 'income',   amount: '800.00',  description: 'Freelance project', accountIndex: 0, categoryId: 'seed-cat-freelance',     toAccountIndex: null },
+  { daysAgo: 42, type: 'expense',  amount: '5.50',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 41, type: 'expense',  amount: '93.20',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 40, type: 'expense',  amount: '150.00',  description: 'Dentist',           accountIndex: 0, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 39, type: 'expense',  amount: '38.50',   description: 'Restaurant',        accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 38, type: 'expense',  amount: '45.00',   description: 'Phone bill',        accountIndex: 0, categoryId: 'seed-cat-utilities',     toAccountIndex: null },
+  { daysAgo: 37, type: 'expense',  amount: '29.99',   description: 'Bookstore',         accountIndex: 0, categoryId: 'seed-cat-shopping',      toAccountIndex: null },
+  { daysAgo: 36, type: 'expense',  amount: '7.00',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 35, type: 'expense',  amount: '81.70',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 34, type: 'expense',  amount: '48.00',   description: 'Gas station',       accountIndex: 0, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo: 33, type: 'expense',  amount: '24.00',   description: 'Movie tickets',     accountIndex: 0, categoryId: 'seed-cat-entertainment', toAccountIndex: null },
+  { daysAgo: 32, type: 'transfer', amount: '200.00',  description: 'Savings transfer',  accountIndex: 0, categoryId: null,                     toAccountIndex: 1    },
+  { daysAgo: 31, type: 'expense',  amount: '44.00',   description: 'Restaurant',        accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  // --- Month 2: days 30-0 ago ---
+  { daysAgo: 30, type: 'income',   amount: '3500.00', description: 'Monthly salary',    accountIndex: 0, categoryId: 'seed-cat-salary',        toAccountIndex: null },
+  { daysAgo: 29, type: 'expense',  amount: '1200.00', description: 'Rent',              accountIndex: 0, categoryId: 'seed-cat-rent',          toAccountIndex: null },
+  { daysAgo: 28, type: 'expense',  amount: '59.99',   description: 'Internet bill',     accountIndex: 0, categoryId: 'seed-cat-utilities',     toAccountIndex: null },
+  { daysAgo: 27, type: 'expense',  amount: '88.40',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 26, type: 'expense',  amount: '5.00',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 25, type: 'expense',  amount: '39.00',   description: 'Gas station',       accountIndex: 0, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo: 24, type: 'expense',  amount: '62.00',   description: 'Dinner',            accountIndex: 0, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 23, type: 'expense',  amount: '35.00',   description: 'Haircut',           accountIndex: 2, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 22, type: 'expense',  amount: '30.00',   description: 'Gym membership',    accountIndex: 0, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 21, type: 'expense',  amount: '125.00',  description: 'Clothes shopping',  accountIndex: 0, categoryId: 'seed-cat-shopping',      toAccountIndex: null },
+  { daysAgo: 20, type: 'expense',  amount: '71.90',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 19, type: 'expense',  amount: '6.00',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 18, type: 'expense',  amount: '18.00',   description: 'Cinema',            accountIndex: 0, categoryId: 'seed-cat-entertainment', toAccountIndex: null },
+  { daysAgo: 17, type: 'expense',  amount: '15.50',   description: 'Pharmacy',          accountIndex: 2, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo: 16, type: 'transfer', amount: '500.00',  description: 'Savings transfer',  accountIndex: 0, categoryId: null,                     toAccountIndex: 1    },
+  { daysAgo: 15, type: 'expense',  amount: '48.50',   description: 'Restaurant',        accountIndex: 0, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 14, type: 'expense',  amount: '95.60',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo: 13, type: 'income',   amount: '450.00',  description: 'Freelance payment', accountIndex: 0, categoryId: 'seed-cat-freelance',     toAccountIndex: null },
+  { daysAgo: 12, type: 'expense',  amount: '3.50',    description: 'Bus ticket',        accountIndex: 2, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo: 11, type: 'expense',  amount: '5.50',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo: 10, type: 'expense',  amount: '199.99',  description: 'Headphones',        accountIndex: 0, categoryId: 'seed-cat-shopping',      toAccountIndex: null },
+  { daysAgo:  9, type: 'expense',  amount: '33.00',   description: 'Restaurant',        accountIndex: 0, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo:  8, type: 'expense',  amount: '82.30',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo:  7, type: 'expense',  amount: '51.00',   description: 'Gas station',       accountIndex: 0, categoryId: 'seed-cat-transport',     toAccountIndex: null },
+  { daysAgo:  6, type: 'expense',  amount: '4.50',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo:  5, type: 'expense',  amount: '120.00',  description: 'Car insurance',     accountIndex: 0, categoryId: 'seed-cat-utilities',     toAccountIndex: null },
+  { daysAgo:  4, type: 'expense',  amount: '29.00',   description: 'Restaurant',        accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo:  3, type: 'expense',  amount: '66.20',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo:  2, type: 'expense',  amount: '6.00',    description: 'Coffee',            accountIndex: 2, categoryId: 'seed-cat-dining',        toAccountIndex: null },
+  { daysAgo:  1, type: 'expense',  amount: '12.00',   description: 'Pharmacy',          accountIndex: 2, categoryId: 'seed-cat-health',        toAccountIndex: null },
+  { daysAgo:  0, type: 'expense',  amount: '44.80',   description: 'Groceries',         accountIndex: 0, categoryId: 'seed-cat-groceries',     toAccountIndex: null },
+  { daysAgo:  0, type: 'income',   amount: '250.00',  description: 'Side project',      accountIndex: 0, categoryId: 'seed-cat-freelance',     toAccountIndex: null },
+];
+
+export function generateSeedData(today) {
+  const daysAgo = (n) => {
     const d = new Date(today);
-    d.setDate(d.getDate() + offsetDays);
+    d.setDate(d.getDate() - n);
     return d.toISOString().slice(0, 10);
   };
 
-  // 60 operation templates spread across the last ~60 days.
-  // Each entry: { type, amount, accountIndex, categoryIndex|null, date, description, [toAccountIndex] }
-  const operationTemplates = [
-    // --- month-ago block (days -57 to -45) ---
-    { type: 'income',   amount: '3200.00', accountIndex: 0, categoryIndex: 9,    date: dateStr(-57), description: 'Monthly salary' },
-    { type: 'expense',  amount: '1100.00', accountIndex: 0, categoryIndex: 5,    date: dateStr(-56), description: 'Rent' },
-    { type: 'expense',  amount: '62.40',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-55), description: 'Grocery run' },
-    { type: 'expense',  amount: '4.80',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-54), description: 'Morning coffee' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-53), description: 'Weekly transit pass' },
-    { type: 'transfer', amount: '500.00',  accountIndex: 0, categoryIndex: null, date: dateStr(-52), description: 'Move to savings', toAccountIndex: 1 },
-    { type: 'expense',  amount: '28.50',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-51), description: 'Dinner out' },
-    { type: 'expense',  amount: '9.99',    accountIndex: 0, categoryIndex: 6,    date: dateStr(-50), description: 'Streaming subscription' },
-    { type: 'expense',  amount: '23.00',   accountIndex: 2, categoryIndex: 0,    date: dateStr(-49), description: 'Farmers market' },
-    { type: 'expense',  amount: '18.50',   accountIndex: 0, categoryIndex: 4,    date: dateStr(-48), description: 'Taxi to airport' },
-    { type: 'expense',  amount: '11.00',   accountIndex: 0, categoryIndex: 7,    date: dateStr(-47), description: 'Cinema ticket' },
-    { type: 'expense',  amount: '3.50',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-46), description: 'Espresso' },
-    { type: 'expense',  amount: '79.90',   accountIndex: 0, categoryIndex: 8,    date: dateStr(-45), description: 'Jeans' },
+  const ts = today.toISOString();
 
-    // --- three weeks ago block (days -44 to -30) ---
-    { type: 'expense',  amount: '4.20',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-44), description: 'Coffee' },
-    { type: 'expense',  amount: '55.30',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-43), description: 'Weekly groceries' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-42), description: 'Bus pass' },
-    { type: 'expense',  amount: '32.00',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-41), description: 'Lunch with team' },
-    { type: 'expense',  amount: '9.99',    accountIndex: 0, categoryIndex: 6,    date: dateStr(-40), description: 'Music service' },
-    { type: 'income',   amount: '250.00',  accountIndex: 1, categoryIndex: 9,    date: dateStr(-39), description: 'Freelance payment' },
-    { type: 'expense',  amount: '7.50',    accountIndex: 0, categoryIndex: 4,    date: dateStr(-38), description: 'Taxi' },
-    { type: 'expense',  amount: '3.80',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-37), description: 'Flat white' },
-    { type: 'expense',  amount: '22.00',   accountIndex: 0, categoryIndex: 7,    date: dateStr(-36), description: 'Theatre tickets' },
-    { type: 'expense',  amount: '46.00',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-35), description: 'Supermarket' },
-    { type: 'transfer', amount: '200.00',  accountIndex: 0, categoryIndex: null, date: dateStr(-34), description: 'Top up cash wallet', toAccountIndex: 2 },
-    { type: 'expense',  amount: '5.00',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-33), description: 'Coffee shop' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-32), description: 'Monthly transit' },
-    { type: 'expense',  amount: '38.90',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-31), description: 'Restaurant dinner' },
-    { type: 'expense',  amount: '120.00',  accountIndex: 0, categoryIndex: 8,    date: dateStr(-30), description: 'Winter jacket' },
-
-    // --- two weeks ago block (days -29 to -15) ---
-    { type: 'income',   amount: '3200.00', accountIndex: 0, categoryIndex: 9,    date: dateStr(-29), description: 'Salary' },
-    { type: 'expense',  amount: '1100.00', accountIndex: 0, categoryIndex: 5,    date: dateStr(-28), description: 'Rent payment' },
-    { type: 'transfer', amount: '600.00',  accountIndex: 0, categoryIndex: null, date: dateStr(-27), description: 'Monthly savings transfer', toAccountIndex: 1 },
-    { type: 'expense',  amount: '58.20',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-26), description: 'Groceries' },
-    { type: 'expense',  amount: '4.50',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-25), description: 'Morning coffee' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-24), description: 'Transit pass' },
-    { type: 'expense',  amount: '9.99',    accountIndex: 0, categoryIndex: 6,    date: dateStr(-23), description: 'Video streaming' },
-    { type: 'expense',  amount: '26.00',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-22), description: 'Pizza night' },
-    { type: 'expense',  amount: '12.00',   accountIndex: 0, categoryIndex: 7,    date: dateStr(-21), description: 'Concert ticket' },
-    { type: 'expense',  amount: '44.70',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-20), description: 'Weekly shop' },
-    { type: 'expense',  amount: '3.60',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-19), description: 'Takeaway coffee' },
-    { type: 'expense',  amount: '8.00',    accountIndex: 0, categoryIndex: 4,    date: dateStr(-18), description: 'Rideshare' },
-    { type: 'expense',  amount: '34.00',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-17), description: 'Sushi dinner' },
-    { type: 'income',   amount: '180.00',  accountIndex: 1, categoryIndex: 9,    date: dateStr(-16), description: 'Side project' },
-    { type: 'expense',  amount: '95.00',   accountIndex: 0, categoryIndex: 8,    date: dateStr(-15), description: 'Sneakers' },
-
-    // --- last two weeks (days -14 to 0) ---
-    { type: 'expense',  amount: '52.10',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-14), description: 'Grocery haul' },
-    { type: 'expense',  amount: '4.80',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-13), description: 'Coffee' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-12), description: 'Bus pass' },
-    { type: 'expense',  amount: '9.99',    accountIndex: 0, categoryIndex: 6,    date: dateStr(-11), description: 'Podcast subscription' },
-    { type: 'expense',  amount: '19.50',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-10), description: 'Ramen lunch' },
-    { type: 'transfer', amount: '100.00',  accountIndex: 0, categoryIndex: null, date: dateStr(-9),  description: 'Cash top-up', toAccountIndex: 2 },
-    { type: 'expense',  amount: '40.30',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-8),  description: 'Supermarket' },
-    { type: 'expense',  amount: '3.90',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-7),  description: 'Espresso' },
-    { type: 'expense',  amount: '11.00',   accountIndex: 0, categoryIndex: 7,    date: dateStr(-6),  description: 'Movie night' },
-    { type: 'expense',  amount: '6.50',    accountIndex: 0, categoryIndex: 4,    date: dateStr(-5),  description: 'Taxi home' },
-    { type: 'expense',  amount: '29.90',   accountIndex: 0, categoryIndex: 1,    date: dateStr(-4),  description: 'Brunch' },
-    { type: 'expense',  amount: '48.60',   accountIndex: 0, categoryIndex: 0,    date: dateStr(-3),  description: 'Weekly groceries' },
-    { type: 'expense',  amount: '4.20',    accountIndex: 2, categoryIndex: 2,    date: dateStr(-2),  description: 'Morning coffee' },
-    { type: 'expense',  amount: '14.00',   accountIndex: 0, categoryIndex: 3,    date: dateStr(-1),  description: 'Transit card' },
-    { type: 'income',   amount: '3200.00', accountIndex: 0, categoryIndex: 9,    date: dateStr(0),   description: 'Salary deposit' },
-    { type: 'expense',  amount: '1100.00', accountIndex: 0, categoryIndex: 5,    date: dateStr(0),   description: 'Rent' },
-    { type: 'transfer', amount: '400.00',  accountIndex: 0, categoryIndex: null, date: dateStr(0),   description: 'Savings deposit', toAccountIndex: 1 },
+  const categories = [
+    { id: 'seed-cat-groceries',     name: 'Groceries',    type: 'entry', categoryType: 'expense', icon: 'cart',                  isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-dining',        name: 'Dining',        type: 'entry', categoryType: 'expense', icon: 'silverware-fork-knife', isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-transport',     name: 'Transport',     type: 'entry', categoryType: 'expense', icon: 'car',                   isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-utilities',     name: 'Utilities',     type: 'entry', categoryType: 'expense', icon: 'lightning-bolt',        isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-entertainment', name: 'Entertainment', type: 'entry', categoryType: 'expense', icon: 'movie',                 isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-health',        name: 'Health',        type: 'entry', categoryType: 'expense', icon: 'heart-pulse',           isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-shopping',      name: 'Shopping',      type: 'entry', categoryType: 'expense', icon: 'shopping',              isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-rent',          name: 'Rent',          type: 'entry', categoryType: 'expense', icon: 'home',                  isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-salary',        name: 'Salary',        type: 'entry', categoryType: 'income',  icon: 'cash',                  isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
+    { id: 'seed-cat-freelance',     name: 'Freelance',     type: 'entry', categoryType: 'income',  icon: 'laptop',                isShadow: 0, parentId: null, createdAt: ts, updatedAt: ts },
   ];
 
-  return { accountTemplates, categories, operationTemplates };
+  const operationTemplates = OPERATION_TEMPLATES.map(t => ({
+    ...t,
+    date: daysAgo(t.daysAgo),
+    createdAt: ts,
+  }));
+
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+
+  const budgets = [
+    { id: 'seed-bgt-groceries', categoryId: 'seed-cat-groceries', amount: '400.00', currency: 'USD', periodType: 'monthly', startDate: startOfMonth, endDate: null, isRecurring: 1, rolloverEnabled: 0, createdAt: ts, updatedAt: ts },
+    { id: 'seed-bgt-dining',    categoryId: 'seed-cat-dining',    amount: '200.00', currency: 'USD', periodType: 'monthly', startDate: startOfMonth, endDate: null, isRecurring: 1, rolloverEnabled: 0, createdAt: ts, updatedAt: ts },
+  ];
+
+  const plannedOperations = [
+    { id: 'seed-pln-salary', name: 'Monthly salary', type: 'income',  amount: '3500.00', accountIndex: 0, categoryId: 'seed-cat-salary', toAccountIndex: null, description: 'Regular monthly income', isRecurring: 1, createdAt: ts, updatedAt: ts },
+    { id: 'seed-pln-rent',   name: 'Rent',           type: 'expense', amount: '1200.00', accountIndex: 0, categoryId: 'seed-cat-rent',   toAccountIndex: null, description: 'Monthly rent payment',  isRecurring: 1, createdAt: ts, updatedAt: ts },
+  ];
+
+  return {
+    accountTemplates: ACCOUNT_TEMPLATES,
+    categories,
+    operationTemplates,
+    budgets,
+    plannedOperations,
+  };
 }
