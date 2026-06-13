@@ -237,7 +237,10 @@ const mockVisibleAccounts = [
 
 jest.mock('../../app/contexts/AccountsDataContext', () => ({
   useAccountsData: () => ({
-    visibleAccounts: mockVisibleAccounts,
+    visibleAccounts: [
+      { id: 1, name: 'Savings', currency: 'USD', balance: '100' },
+      { id: 2, name: 'Checking', currency: 'EUR', balance: '200' },
+    ],
   }),
 }));
 
@@ -248,8 +251,8 @@ jest.mock('../../app/services/PreferencesDB', () => ({
   PREF_KEYS: {
     GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   },
-  getDefaultAccountId: (...args) => mockGetDefaultAccountId(...args),
-  setDefaultAccountId: (...args) => mockSetDefaultAccountId(...args),
+  getDefaultAccountId: jest.fn(() => Promise.resolve(null)),
+  setDefaultAccountId: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock GoogleSheetsService
@@ -821,9 +824,11 @@ describe('SettingsScreen', () => {
   });
 
   describe('Default account setting', () => {
+    let preferencesDB;
     beforeEach(() => {
+      preferencesDB = require('../../app/services/PreferencesDB');
       jest.clearAllMocks();
-      mockGetDefaultAccountId.mockResolvedValue(null);
+      preferencesDB.getDefaultAccountId.mockResolvedValue(null);
     });
 
     it('renders the default account settings row', async () => {
@@ -836,7 +841,7 @@ describe('SettingsScreen', () => {
     });
 
     it('shows latest_used subtitle when no account is pinned', async () => {
-      mockGetDefaultAccountId.mockResolvedValue(null);
+      preferencesDB.getDefaultAccountId.mockResolvedValue(null);
       const { getByTestId, getByText } = render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
