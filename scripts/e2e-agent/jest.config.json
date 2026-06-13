@@ -1,0 +1,5 @@
+{
+  "transform": {},
+  "extensionsToTreatAsEsm": [".js"],
+  "testMatch": ["**/__tests__/**/*.test.js"]
+}
