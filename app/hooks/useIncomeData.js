@@ -17,7 +17,7 @@ const CHART_COLORS = [
  */
 const useIncomeData = (selectedYear, selectedMonth, selectedCurrency, selectedIncomeCategory, categories, colors, t) => {
   const [rawIncome, setRawIncome] = useState(null);
-  const [loadingIncome, setLoadingIncome] = useState(true);
+  const [loadingIncome, setLoadingIncome] = useState(false);
 
   const loadIncomeData = useCallback(async () => {
     if (!selectedCurrency) return;

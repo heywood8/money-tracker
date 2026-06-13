@@ -14,7 +14,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  */
 const useCategoryMonthlySpending = (selectedCurrency, selectedCategoryId, categories) => {
   const [monthlyData, setMonthlyData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Generate the last 12 months as YYYY-MM strings
   const last12Months = useMemo(() => {

@@ -9,7 +9,7 @@ import { appEvents, EVENTS } from '../services/eventEmitter';
  */
 const useBalanceHistory = (selectedAccount, selectedYear, selectedMonth) => {
   const [balanceHistoryData, setBalanceHistoryData] = useState({ labels: [] });
-  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(true);
+  const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
   const [balanceHistoryTableData, setBalanceHistoryTableData] = useState([]);
   const [editingBalanceRow, setEditingBalanceRow] = useState(null);
   const [editingBalanceValue, setEditingBalanceValue] = useState('');
