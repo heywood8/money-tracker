@@ -276,7 +276,36 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         </View>
       )}
 
-      {updateResult.type === 'error' && (
+      {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && updateResult.releaseNotes ? (
+        <View style={styles.upToDateContent}>
+          <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
+            {t('release_history') || 'Release history'}
+          </Text>
+          <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            {updateResult.releaseNotes.map(({ version, notes, hasApk }) => (
+              <View key={version} style={styles.changelogSection}>
+                <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                  v{version}{!hasApk ? ` · ${t('no_apk_attached') || 'no APK'}` : ''}
+                </Text>
+                <Text style={[styles.changelogText, { color: colors.text }]}>
+                  {stripMarkdown(notes)}
+                </Text>
+              </View>
+            ))}
+            {updateResult.releasesUrl && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(updateResult.releasesUrl)}
+                style={styles.moreReleasesLink}
+              >
+                <Text style={[styles.moreReleasesLinkText, { color: colors.primary }]}>
+                  {t('more_releases') || 'More on GitHub'}
+                </Text>
+                <Ionicons name="open-outline" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      ) : updateResult.type === 'error' && (
         <View style={styles.errorContent}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedText} style={styles.centeredIcon} />
           <Text style={[styles.updateVersionText, { color: colors.text }]}>
@@ -301,6 +330,7 @@ UpdateContentPanel.propTypes = {
     releaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
       notes: PropTypes.string,
+      hasApk: PropTypes.bool,
     })),
     recentReleaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
