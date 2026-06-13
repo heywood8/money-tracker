@@ -276,16 +276,26 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         </View>
       )}
 
-      {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && updateResult.releaseNotes ? (
+      {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && (updateResult.releaseNotes || updateResult.recentReleaseNotes) ? (
         <View style={styles.upToDateContent}>
           <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
             {t('release_history') || 'Release history'}
           </Text>
           <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-            {updateResult.releaseNotes.map(({ version, notes, hasApk }) => (
+            {(updateResult.releaseNotes || []).map(({ version, notes, hasApk }) => (
               <View key={version} style={styles.changelogSection}>
                 <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                  v{version}{!hasApk ? ` · ${t('no_apk_attached') || 'no APK'}` : ''}
+                  v{version}{!hasApk ? ` · ${t('no_apk_attached') || 'NO_APK_ATTACHED'}` : ''}
+                </Text>
+                <Text style={[styles.changelogText, { color: colors.text }]}>
+                  {stripMarkdown(notes)}
+                </Text>
+              </View>
+            ))}
+            {(updateResult.recentReleaseNotes || []).map(({ version, notes }) => (
+              <View key={version} style={styles.changelogSection}>
+                <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                  v{version}
                 </Text>
                 <Text style={[styles.changelogText, { color: colors.text }]}>
                   {stripMarkdown(notes)}

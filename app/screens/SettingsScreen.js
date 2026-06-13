@@ -592,6 +592,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           type: 'error',
           errorCode: result.errorCode,
           releaseNotes: result.releaseNotes || null,
+          recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
         });
       } else if (!result.isUpdateAvailable) {

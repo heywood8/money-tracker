@@ -220,6 +220,7 @@ export const checkForAppUpdate = async ({
           currentVersion: currentNormalized,
           errorCode: 'releases_without_apks',
           releaseNotes: releaseNotes.length > 0 ? releaseNotes : null,
+          recentReleaseNotes: recentReleasesWithApk.length > 0 ? recentReleasesWithApk : null,
           releasesUrl,
         };
       }
