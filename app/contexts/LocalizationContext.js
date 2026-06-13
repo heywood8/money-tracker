@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import enTranslations from '../../assets/i18n/en.json';
 import itTranslations from '../../assets/i18n/it.json';
@@ -112,7 +112,16 @@ export function LocalizationProvider({ children }) {
     }
   }, []);
 
-  const t = (key) => i18nData[language]?.[key] || key;
+  const t = useCallback((key) => i18nData[language]?.[key] || key, [language]);
+
+  const contextValue = useMemo(() => ({
+    t,
+    language,
+    setLanguage,
+    availableLanguages: Object.keys(i18nData),
+    isFirstLaunch,
+    setFirstLaunchComplete,
+  }), [t, language, setLanguage, isFirstLaunch, setFirstLaunchComplete]);
 
   // Don't render children until we've checked if this is first launch
   if (isLoading) {
@@ -120,14 +129,7 @@ export function LocalizationProvider({ children }) {
   }
 
   return (
-    <LocalizationContext.Provider value={{
-      t,
-      language,
-      setLanguage,
-      availableLanguages: Object.keys(i18nData),
-      isFirstLaunch,
-      setFirstLaunchComplete,
-    }}>
+    <LocalizationContext.Provider value={contextValue}>
       {children}
     </LocalizationContext.Provider>
   );
