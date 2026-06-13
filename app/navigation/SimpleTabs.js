@@ -208,6 +208,9 @@ export default function SimpleTabs() {
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
+  // Track which tab indices have been visited so we lazy-mount their screens.
+  // Index 0 (Operations) is pre-visited so it renders immediately on cold start.
+  const [visited, setVisited] = React.useState(() => ({ 0: true }));
 
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
@@ -267,6 +270,8 @@ export default function SimpleTabs() {
 
     const distance = Math.abs(newIndex - oldIndex);
 
+    // Mark target tab visited before animation so the screen mounts in time.
+    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
     setActive(tabKey);
     activeIndex.value = newIndex;
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
@@ -371,6 +376,7 @@ export default function SimpleTabs() {
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
           pillPosition.value = withTiming(newIndex, PILL_TIMING);
+          runOnJS(setVisited)((prev) => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
           translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING, (isFinished) => {
             if (isFinished) {
               runOnJS(setActive)(TABS[newIndex].key);
@@ -407,20 +413,20 @@ export default function SimpleTabs() {
     return (
       <>
         <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          <OperationsScreen />
+          {visited[0] ? <OperationsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          <GraphsScreen />
+          {visited[1] ? <GraphsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          <PlannedOperationsScreen />
+          {visited[2] ? <PlannedOperationsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          <SettingsScreen setSubPanelActive={setSubPanelActive} />
+          {visited[3] ? <SettingsScreen setSubPanelActive={setSubPanelActive} /> : null}
         </Animated.View>
       </>
     );
-  }, [setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
+  }, [visited, setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
   const displayedTab = active;
 

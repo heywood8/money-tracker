@@ -328,13 +328,21 @@ describe('SimpleTabs Component Rendering', () => {
     expect(getByText('settings')).toBeTruthy();
   });
 
-  it('renders all four screens', async () => {
+  it('renders all four screens after visiting each tab', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
+    // Operations mounts immediately (index 0 pre-visited)
     expect(getByTestId('operations-screen')).toBeTruthy();
-    expect(getByTestId('graphs-screen')).toBeTruthy();
-    expect(getByTestId('planned-screen')).toBeTruthy();
-    expect(getByTestId('settings-screen')).toBeTruthy();
+
+    // Visit remaining tabs via pressIn to trigger lazy mount
+    await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
+    await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
+
+    await act(async () => { fireEvent(getByTestId('tab-Planned'), 'pressIn'); });
+    await waitFor(() => expect(getByTestId('planned-screen')).toBeTruthy());
+
+    await act(async () => { fireEvent(getByTestId('tab-settings'), 'pressIn'); });
+    await waitFor(() => expect(getByTestId('settings-screen')).toBeTruthy());
   });
 
   it('switches active tab when tab is pressed', async () => {
@@ -415,11 +423,15 @@ describe('SimpleTabs Component Rendering', () => {
   it('handles tab press callback correctly', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
-    // Press Graphs tab
-    await fireEvent.press(getByTestId('tab-Graphs'));
+    // pressIn matches the actual onPressIn handler on TabButton
+    await act(async () => {
+      fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+    });
 
-    // Component should still be rendered
-    expect(getByTestId('graphs-screen')).toBeTruthy();
+    // Wait for Graphs screen to mount after lazy-visit
+    await waitFor(() => {
+      expect(getByTestId('graphs-screen')).toBeTruthy();
+    });
   });
 
   it('renders with correct initial active tab (Operations)', async () => {
@@ -441,11 +453,25 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('renders all screen content areas', async () => {
-    const { getByText } = await render(<SimpleTabs />);
+  it('renders only the initial Operations screen on cold start (lazy mount)', async () => {
+    const { getByText, queryByText } = await render(<SimpleTabs />);
 
+    // Only Operations (index 0) should be mounted initially
     expect(getByText('Operations Screen')).toBeTruthy();
-    expect(getByText('Graphs Screen')).toBeTruthy();
+    // Graphs (index 1) is lazy — not mounted until visited
+    expect(queryByText('Graphs Screen')).toBeNull();
+  });
+
+  it('mounts Graphs screen after navigating to it', async () => {
+    const { getByText, getByTestId } = await render(<SimpleTabs />);
+
+    await act(async () => {
+      fireEvent(getByTestId('tab-Graphs'), 'pressIn');
+    });
+
+    await waitFor(() => {
+      expect(getByText('Graphs Screen')).toBeTruthy();
+    });
   });
 
   it('handles tab bar layout event', async () => {
