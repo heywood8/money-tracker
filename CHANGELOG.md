@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.0](https://github.com/heywood8/money-tracker/compare/penny-v0.133.3...penny-v0.134.0) (2026-06-13)
+
+
+### Features
+
+* default account setting for QuickAdd ([#950](https://github.com/heywood8/money-tracker/issues/950)) ([05d2a3f](https://github.com/heywood8/money-tracker/commit/05d2a3f5c69e2062dfd8b730d52d9be86660b43c))
+
 ## [0.133.3](https://github.com/heywood8/money-tracker/compare/penny-v0.133.2...penny-v0.133.3) (2026-06-13)
 
 
