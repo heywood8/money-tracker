@@ -144,7 +144,7 @@ export default function ModalShell({
         transparent={true}
         onRequestClose={handleBackDismiss}
       >
-        <KeyboardAvoidingView behavior="padding" style={styles.flex1}>
+        <KeyboardAvoidingView style={styles.flex1}>
           <Pressable style={styles.overlay} onPress={() => animateOut(onDismiss)}>
             <Animated.View style={{ transform: [{ translateY }] }}>
               <Reanimated.View style={[originStyle, shrinkStyle]}>
