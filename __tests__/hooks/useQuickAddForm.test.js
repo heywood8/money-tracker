@@ -3,6 +3,7 @@ import useQuickAddForm from '../../app/hooks/useQuickAddForm';
 import * as LastAccount from '../../app/services/LastAccount';
 import * as Currency from '../../app/services/currency';
 import { appEvents, EVENTS } from '../../app/services/eventEmitter';
+import * as PreferencesDB from '../../app/services/PreferencesDB';
 
 // Mock OperationsDB
 const mockGetTopCategories = jest.fn().mockResolvedValue([]);
@@ -15,6 +16,10 @@ jest.mock('../../app/services/OperationsDB', () => ({
 // Mock dependencies
 jest.mock('../../app/services/LastAccount', () => ({
   getLastAccessedAccount: jest.fn(),
+}));
+
+jest.mock('../../app/services/PreferencesDB', () => ({
+  getDefaultAccountId: jest.fn(),
 }));
 
 jest.mock('../../app/services/currency', () => ({
@@ -94,6 +99,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should set operationCurrency to last accessed account currency', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
       LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2'); // EUR account
 
       const { result } = await renderHook(() =>
@@ -118,6 +124,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should use last accessed account if available', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
       LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2');
 
       const { result } = await renderHook(() =>
@@ -130,6 +137,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should use first account alphabetically if no last accessed', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
       LastAccount.getLastAccessedAccount.mockResolvedValue(null);
 
       const { result } = await renderHook(() =>
@@ -142,6 +150,7 @@ describe('useQuickAddForm', () => {
     });
 
     it('should fallback to first account if last accessed not in visible accounts', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
       LastAccount.getLastAccessedAccount.mockResolvedValue('non-existent');
 
       const { result } = await renderHook(() =>
@@ -150,6 +159,65 @@ describe('useQuickAddForm', () => {
 
       await waitFor(() => {
         expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+    });
+  });
+
+  describe('default account selection — pinned default priority', () => {
+    beforeEach(() => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+    });
+
+    it('should select pinned default account when it is set and visible', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue('acc-2');
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-1');
+
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-2');
+      });
+    });
+
+    it('should fall back to last-accessed when pinned default is not in visible list', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue('non-existent');
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2');
+
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-2');
+      });
+    });
+
+    it('should fall back to first-by-id when neither default nor last-accessed is valid', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
+      LastAccount.getLastAccessedAccount.mockResolvedValue(null);
+
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-1');
+      });
+    });
+
+    it('should prioritize pinned default over last-accessed even if both exist', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue('acc-3');
+      LastAccount.getLastAccessedAccount.mockResolvedValue('acc-2');
+
+      const { result } = await renderHook(() =>
+        useQuickAddForm(mockAccounts, mockAccounts, mockCategories, mockT),
+      );
+
+      await waitFor(() => {
+        expect(result.current.quickAddValues.accountId).toBe('acc-3');
       });
     });
   });
@@ -905,6 +973,7 @@ describe('useQuickAddForm', () => {
 
   describe('Regression Tests', () => {
     it('should properly sort accounts alphabetically by ID', async () => {
+      PreferencesDB.getDefaultAccountId.mockResolvedValue(null);
       LastAccount.getLastAccessedAccount.mockResolvedValue(null);
 
       const unsortedAccounts = [
