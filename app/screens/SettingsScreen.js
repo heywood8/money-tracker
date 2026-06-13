@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, LayoutAnimation, RefreshControl } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, LayoutAnimation } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
@@ -1249,24 +1249,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
 
           {activeSubPanel === 'update' && (
-            <ScrollView
-              style={styles.updatePanelWrapper}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isCheckingUpdate}
-                  onRefresh={runUpdateCheck}
-                  colors={[colors.primary]}
-                />
-              }
-            >
+            <View style={styles.updatePanelWrapper}>
               <UpdateContentPanel
                 isChecking={isCheckingUpdate}
                 updateResult={updateResult}
                 downloadedApks={downloadedApks}
                 onUpdate={handleUpdateFromSettings}
                 onInstallApk={handleInstallApk}
+                onRefresh={runUpdateCheck}
               />
-            </ScrollView>
+            </View>
           )}
         </View>
       </Animated.View>
