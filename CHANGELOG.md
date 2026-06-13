@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.132.7](https://github.com/heywood8/money-tracker/compare/penny-v0.132.6...penny-v0.132.7) (2026-06-13)
+
+
+### Bug Fixes
+
+* **settings:** show error dialogs on database reset and Sheets restore failure ([#836](https://github.com/heywood8/money-tracker/issues/836) [#837](https://github.com/heywood8/money-tracker/issues/837)) ([#925](https://github.com/heywood8/money-tracker/issues/925)) ([6a8a645](https://github.com/heywood8/money-tracker/commit/6a8a64554c380521d737d785d0004a8b829be47d))
+
 ## [0.132.6](https://github.com/heywood8/money-tracker/compare/penny-v0.132.5...penny-v0.132.6) (2026-06-12)
 
 
