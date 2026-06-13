@@ -29,6 +29,7 @@ module.exports = [
         ...globals.browser,
         ...globals.node,
         ...globals.jest,
+        __DEV__: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: {
