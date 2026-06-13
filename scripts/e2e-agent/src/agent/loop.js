@@ -1,7 +1,7 @@
 // scripts/e2e-agent/src/agent/loop.js
 import Anthropic from '@anthropic-ai/sdk';
 import { join } from 'path';
-import { takeScreenshot, dumpUITree, tap, typeText, pressBack, swipe, isAppRunning, launchApp } from '../android/adb.js';
+import { takeScreenshot, dumpUITree, tap, typeText, pressBack, swipe, isAppRunning, launchApp } from '../adb/adb.js';
 import { resizeBuffer, toBase64, savePng } from '../utils/screenshot.js';
 import { parseUITree } from '../utils/ui-tree.js';
 import { buildMessages, parseAction, SYSTEM_PROMPT } from './prompts.js';
