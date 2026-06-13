@@ -832,7 +832,7 @@ describe('SettingsScreen', () => {
     });
 
     it('renders the default account settings row', async () => {
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       await waitFor(() => {
@@ -842,7 +842,7 @@ describe('SettingsScreen', () => {
 
     it('shows latest_used subtitle when no account is pinned', async () => {
       preferencesDB.getDefaultAccountId.mockResolvedValue(null);
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       await waitFor(() => getByTestId('settings-default-account-row'));
@@ -850,7 +850,7 @@ describe('SettingsScreen', () => {
     });
 
     it('opens defaultAccount subpanel when row is tapped', async () => {
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       await waitFor(() => getByTestId('settings-default-account-row'));
@@ -861,7 +861,7 @@ describe('SettingsScreen', () => {
     });
 
     it('shows Latest used option in subpanel', async () => {
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       await waitFor(() => getByTestId('settings-default-account-row'));
@@ -872,7 +872,7 @@ describe('SettingsScreen', () => {
     });
 
     it('shows an option for each visible account in the subpanel', async () => {
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
       );
       await waitFor(() => getByTestId('settings-default-account-row'));
