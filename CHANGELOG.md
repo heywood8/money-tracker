@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.133.0](https://github.com/heywood8/money-tracker/compare/penny-v0.132.8...penny-v0.133.0) (2026-06-13)
+
+
+### Features
+
+* **updates:** pull-to-refresh on check for updates panel ([#940](https://github.com/heywood8/money-tracker/issues/940)) ([d9aeeda](https://github.com/heywood8/money-tracker/commit/d9aeedabf76f9a0278e906f41c2b9c96327f50f3))
+
 ## [0.132.8](https://github.com/heywood8/money-tracker/compare/penny-v0.132.7...penny-v0.132.8) (2026-06-13)
 
 
