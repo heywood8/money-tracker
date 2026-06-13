@@ -1,0 +1,15 @@
+{
+  "name": "penny-e2e-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --experimental-vm-modules ../../node_modules/.bin/jest --config jest.config.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "commander": "^12.0.0",
+    "fast-xml-parser": "^4.4.0",
+    "sharp": "^0.33.0"
+  }
+}
