@@ -1362,7 +1362,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <View style={styles.settingsRowText}>
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {colorScheme === 'dark' ? 'Dark' : 'Light'}
+                  {colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
                 </Text>
               </View>
             </View>

@@ -8,6 +8,8 @@
   "settings": "Configurações",
   "language": "Idioma",
   "theme": "Tema",
+  "theme_dark": "Escuro",
+  "theme_light": "Claro",
   "hide_balances": "Ocultar saldos",
   "hide_balances_hint": "Mascarar saldos de contas por privacidade",
   "cancel": "Cancelar",

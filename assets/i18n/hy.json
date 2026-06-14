@@ -8,6 +8,8 @@
   "settings": "Կարգավորումներ",
   "language": "Լեզու",
   "theme": "Թեմա",
+  "theme_dark": "Մութ",
+  "theme_light": "Պայծառ",
   "hide_balances": "Թաքցնել մնացորդները",
   "hide_balances_hint": "Ծածկել հաշվի մնացորդները գաղտնիության համար",
   "cancel": "Չեղարկել",

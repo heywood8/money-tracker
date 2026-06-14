@@ -8,6 +8,8 @@
   "settings": "Einstellungen",
   "language": "Sprache",
   "theme": "Design",
+  "theme_dark": "Dunkel",
+  "theme_light": "Hell",
   "hide_balances": "Guthaben verbergen",
   "hide_balances_hint": "Kontoguthaben aus Datenschutzgründen maskieren",
   "cancel": "Abbrechen",

@@ -8,6 +8,8 @@
   "settings": "Paramètres",
   "language": "Langue",
   "theme": "Thème",
+  "theme_dark": "Sombre",
+  "theme_light": "Clair",
   "hide_balances": "Masquer les soldes",
   "hide_balances_hint": "Masquer les soldes des comptes pour la confidentialité",
   "cancel": "Annuler",
