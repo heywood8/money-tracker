@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Modal, Pressable, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -39,6 +39,83 @@ const PickerModal = ({
   onAutoAddWithCategory,
   onAutoAddWithAccount,
 }) => {
+  const renderItem = useCallback(({ item }) => {
+    if (pickerType === 'account' || pickerType === 'toAccount') {
+      return (
+        <Pressable
+          onPress={() => {
+            if (pickerType === 'account') {
+              onSelectAccount(item.id);
+              onClose();
+            } else {
+              const hasValidAmount = quickAddValues?.amount &&
+              quickAddValues.amount.trim() !== '';
+              if (hasValidAmount && onAutoAddWithAccount) {
+                onAutoAddWithAccount(item.id);
+              } else {
+                onSelectToAccount(item.id);
+                onClose();
+              }
+            }
+          }}
+          style={({ pressed }) => [
+            styles.pickerOption,
+            { borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <View style={styles.accountOption}>
+            <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
+              {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    } else if (pickerType === 'category') {
+      const isFolder = item.type === 'folder';
+      const isSelected = !isFolder && quickAddValues?.categoryId === item.id;
+      const name = item.nameKey ? t(item.nameKey) : item.name;
+
+      return (
+        <Pressable
+          onPress={() => {
+            if (isFolder) {
+              onNavigateIntoFolder(item);
+            } else {
+              const hasValidAmount = quickAddValues?.amount &&
+              quickAddValues.amount.trim() !== '';
+
+              if (hasValidAmount) {
+                onAutoAddWithCategory(item.id);
+              } else {
+                onSelectCategory(item.id);
+                onClose();
+              }
+            }
+          }}
+          style={({ pressed }) => [
+            styles.gridCell,
+            { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
+            pressed && { backgroundColor: colors.selected },
+          ]}
+        >
+          <Icon name={item.icon} size={24} color={colors.text} />
+          <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
+            {name}
+          </Text>
+          {isFolder && (
+            <View style={styles.folderBadge}>
+              <Icon name="folder-outline" size={12} color={colors.mutedText} />
+            </View>
+          )}
+        </Pressable>
+      );
+    }
+    return null;
+  }, [pickerType, quickAddValues, colors, t, onClose, onSelectAccount, onSelectToAccount,
+    onAutoAddWithAccount, onNavigateIntoFolder, onAutoAddWithCategory, onSelectCategory, onNavigateBack]);
+
   return (
     <>
       {visible && <ModalBlurOverlay />}
@@ -68,82 +145,7 @@ const PickerModal = ({
               numColumns={pickerType === 'category' ? 3 : 1}
               columnWrapperStyle={pickerType === 'category' ? styles.gridRow : undefined}
               contentContainerStyle={pickerType === 'category' ? styles.gridContent : undefined}
-              renderItem={({ item }) => {
-                if (pickerType === 'account' || pickerType === 'toAccount') {
-                  return (
-                    <Pressable
-                      onPress={async () => {
-                        if (pickerType === 'account') {
-                          onSelectAccount(item.id);
-                          onClose();
-                        } else {
-                        // toAccount: auto-add if amount is set
-                          const hasValidAmount = quickAddValues?.amount &&
-                          quickAddValues.amount.trim() !== '';
-                          if (hasValidAmount && onAutoAddWithAccount) {
-                            await onAutoAddWithAccount(item.id);
-                          } else {
-                            onSelectToAccount(item.id);
-                            onClose();
-                          }
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        styles.pickerOption,
-                        { borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <View style={styles.accountOption}>
-                        <Text style={[styles.pickerOptionText, styles.accountName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-                        <Text style={[styles.pickerSmallText, { color: colors.mutedText }]} numberOfLines={1}>
-                          {getCurrencySymbol(item.currency)}{Currency.formatAmount(item.balance, item.currency)}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                } else if (pickerType === 'category') {
-                  const isFolder = item.type === 'folder';
-                  const isSelected = !isFolder && quickAddValues?.categoryId === item.id;
-                  const name = item.nameKey ? t(item.nameKey) : item.name;
-
-                  return (
-                    <Pressable
-                      onPress={async () => {
-                        if (isFolder) {
-                          onNavigateIntoFolder(item);
-                        } else {
-                          const hasValidAmount = quickAddValues?.amount &&
-                          quickAddValues.amount.trim() !== '';
-
-                          if (hasValidAmount) {
-                            await onAutoAddWithCategory(item.id);
-                          } else {
-                            onSelectCategory(item.id);
-                            onClose();
-                          }
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        styles.gridCell,
-                        { backgroundColor: isSelected ? colors.selected : colors.altRow, borderColor: colors.border },
-                        pressed && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <Icon name={item.icon} size={24} color={colors.text} />
-                      <Text style={[styles.gridCellName, { color: colors.text }]} numberOfLines={2}>
-                        {name}
-                      </Text>
-                      {isFolder && (
-                        <View style={styles.folderBadge}>
-                          <Icon name="folder-outline" size={12} color={colors.mutedText} />
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                }
-                return null;
-              }}
+              renderItem={renderItem}
               ListEmptyComponent={
                 <Text style={[styles.centeredPaddedText, { color: colors.mutedText }]}>
                   {pickerType === 'category' ? t('no_categories') : t('no_accounts')}
