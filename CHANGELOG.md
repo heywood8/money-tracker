@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.2](https://github.com/heywood8/money-tracker/compare/penny-v0.134.1...penny-v0.134.2) (2026-06-14)
+
+
+### Performance Improvements
+
+* **picker-modal:** memoize renderItem, make onPress synchronous ([#921](https://github.com/heywood8/money-tracker/issues/921)) ([#935](https://github.com/heywood8/money-tracker/issues/935)) ([f1daa2c](https://github.com/heywood8/money-tracker/commit/f1daa2ccbefa35448b3b4bffd8d103a1633a60cb))
+
 ## [0.134.1](https://github.com/heywood8/money-tracker/compare/penny-v0.134.0...penny-v0.134.1) (2026-06-14)
 
 
