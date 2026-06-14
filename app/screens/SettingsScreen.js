@@ -70,7 +70,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
-  const { startDownload } = useUpdateDownload();
+  const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const { visibleAccounts } = useAccountsData();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
   const [pinnedAccountId, setPinnedAccountId] = useState(null);
@@ -1459,19 +1459,39 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </View>
         </TouchableRipple>
 
-        <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+        <TouchableRipple
+          onPress={isDownloading ? undefined : handleCheckForUpdates}
+          style={[styles.settingsRow, isDownloading && styles.settingsRowDisabled]}
+          disabled={isDownloading}
+          testID="check-updates-row"
+        >
           <View style={styles.settingsRowContent}>
             <View style={styles.settingsRowLeft}>
-              <Ionicons name="download-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+              <Ionicons name="download-outline" size={22} color={isDownloading ? colors.mutedText : colors.text} />
+              <Text style={[styles.settingsRowLabel, { color: isDownloading ? colors.mutedText : colors.text }]}>
                 {t('check_updates') || 'Check for updates'}
               </Text>
             </View>
             <View style={styles.updateRowRight}>
-              <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
-                {`v${require('../../package.json').version}`}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              {isDownloading ? (
+                <>
+                  <Text style={[styles.versionLabel, { color: colors.primary }]}>
+                    {downloadPhase === 'verifying'
+                      ? (t('update_phase_verifying') || 'Verifying APK…')
+                      : downloadPhase === 'backing_up'
+                        ? (t('update_phase_backing_up') || 'Backing up…')
+                        : `${Math.round((downloadProgress ?? 0) * 100)}%`}
+                  </Text>
+                  <ActivityIndicator size={16} color={colors.primary} style={styles.updateRowSpinner} />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
+                    {`v${require('../../package.json').version}`}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                </>
+              )}
             </View>
           </View>
         </TouchableRipple>
@@ -1698,6 +1718,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: SPACING.md,
   },
+  settingsRowDisabled: {
+    opacity: 0.6,
+  },
   settingsRowLabel: {
     fontSize: 16,
   },
@@ -1810,6 +1833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 4,
+  },
+  updateRowSpinner: {
+    marginLeft: 2,
   },
   versionLabel: {
     fontSize: 13,
