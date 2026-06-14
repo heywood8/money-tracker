@@ -570,16 +570,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  tabLabel: {
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
   tabGradientOverlay: {
     bottom: 0,
     height: TAB_OVERLAY_HEIGHT,
     left: 0,
     position: 'absolute',
     right: 0,
+  },
+  tabLabel: {
+    fontSize: 11,
+    letterSpacing: 0.2,
   },
   tabsRow: {
     flexDirection: 'row',
