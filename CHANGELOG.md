@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.3](https://github.com/heywood8/money-tracker/compare/penny-v0.134.2...penny-v0.134.3) (2026-06-14)
+
+
+### Bug Fixes
+
+* **i18n:** translate dark/light theme label for all 11 languages ([#956](https://github.com/heywood8/money-tracker/issues/956)) ([f7530a6](https://github.com/heywood8/money-tracker/commit/f7530a66f050ae17f583904832053d88db084578))
+
 ## [0.134.2](https://github.com/heywood8/money-tracker/compare/penny-v0.134.1...penny-v0.134.2) (2026-06-14)
 
 
