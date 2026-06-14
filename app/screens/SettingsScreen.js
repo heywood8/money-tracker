@@ -1718,6 +1718,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: SPACING.md,
   },
+  settingsRowDisabled: {
+    opacity: 0.6,
+  },
   settingsRowLabel: {
     fontSize: 16,
   },
@@ -1825,9 +1828,6 @@ const styles = StyleSheet.create({
   },
   updatePanelWrapper: {
     flex: 1,
-  },
-  settingsRowDisabled: {
-    opacity: 0.6,
   },
   updateRowRight: {
     alignItems: 'center',
