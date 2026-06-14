@@ -382,11 +382,12 @@ describe('AppUpdateService', () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ([
-          { tag_name: 'v0.50.5', assets: [] },
+          { tag_name: 'v0.50.5', assets: [], body: 'Notes for 0.50.5' },
           { tag_name: 'v0.50.4', assets: [{ name: 'notes.txt', browser_download_url: 'https://example.com/notes.txt' }] },
           { tag_name: 'v0.50.3', assets: [] },
-          { tag_name: 'v0.50.2', assets: [] },
-          { tag_name: 'v0.50.1', assets: [] },
+          // 0.50.0 = current version — has APK, should appear in recentReleaseNotes
+          { tag_name: 'v0.50.0', assets: [{ name: 'penny-0.50.0.apk', browser_download_url: 'https://example.com/penny-0.50.0.apk' }], body: 'Notes for 0.50.0' },
+          { tag_name: 'v0.49.9', assets: [{ name: 'penny-0.49.9.apk', browser_download_url: 'https://example.com/penny-0.49.9.apk' }], body: 'Notes for 0.49.9' },
         ]),
       });
 
@@ -397,6 +398,10 @@ describe('AppUpdateService', () => {
 
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('releases_without_apks');
+      expect(result.recentReleaseNotes).not.toBeNull();
+      expect(result.recentReleaseNotes.length).toBe(2);
+      expect(result.recentReleaseNotes[0].version).toBe('0.50.0');
+      expect(result.recentReleaseNotes[1].version).toBe('0.49.9');
     });
 
     it('returns invalid_release_data when releases list is empty', async () => {

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Linking } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Linking, RefreshControl } from 'react-native';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -23,7 +23,7 @@ const formatApkDate = (modificationTime) => {
   return new Date(modificationTime * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-export default function UpdateContentPanel({ isChecking, updateResult, downloadedApks, onUpdate, onInstallApk }) {
+export default function UpdateContentPanel({ isChecking, updateResult, downloadedApks, onUpdate, onInstallApk, onRefresh }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -70,7 +70,11 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
               <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
                 {t('whats_new') || "What's new"}
               </Text>
-              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <ScrollView
+                style={styles.changelogScroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
+              >
                 {releaseNotes.map(({ version, notes }) => (
                   <View key={version} style={styles.changelogSection}>
                     <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
@@ -167,7 +171,11 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
               <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
                 {t('release_history') || 'Release history'}
               </Text>
-              <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <ScrollView
+                style={styles.changelogScroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
+              >
                 {updateResult.recentReleaseNotes.map(({ version, notes }) => (
                   <View key={version} style={styles.changelogSection}>
                     <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
@@ -276,16 +284,30 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         </View>
       )}
 
-      {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && updateResult.releaseNotes ? (
+      {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && (updateResult.releaseNotes || updateResult.recentReleaseNotes) ? (
         <View style={styles.upToDateContent}>
           <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
             {t('release_history') || 'Release history'}
           </Text>
-          <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-            {updateResult.releaseNotes.map(({ version, notes, hasApk }) => (
+          <ScrollView
+            style={styles.changelogScroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
+          >
+            {(updateResult.releaseNotes || []).map(({ version, notes, hasApk }) => (
               <View key={version} style={styles.changelogSection}>
                 <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
-                  v{version}{!hasApk ? ` · ${t('no_apk_attached') || 'no APK'}` : ''}
+                  v{version}{!hasApk ? ` · ${t('no_apk_attached') || 'NO_APK_ATTACHED'}` : ''}
+                </Text>
+                <Text style={[styles.changelogText, { color: colors.text }]}>
+                  {stripMarkdown(notes)}
+                </Text>
+              </View>
+            ))}
+            {(updateResult.recentReleaseNotes || []).map(({ version, notes }) => (
+              <View key={version} style={styles.changelogSection}>
+                <Text style={[styles.changelogVersion, { color: colors.mutedText }]}>
+                  v{version}
                 </Text>
                 <Text style={[styles.changelogText, { color: colors.text }]}>
                   {stripMarkdown(notes)}
@@ -344,6 +366,7 @@ UpdateContentPanel.propTypes = {
   downloadedApks: PropTypes.array,
   onUpdate: PropTypes.func,
   onInstallApk: PropTypes.func,
+  onRefresh: PropTypes.func,
 };
 
 UpdateContentPanel.defaultProps = {
@@ -352,6 +375,7 @@ UpdateContentPanel.defaultProps = {
   downloadedApks: [],
   onUpdate: () => {},
   onInstallApk: () => {},
+  onRefresh: null,
 };
 
 const styles = StyleSheet.create({
