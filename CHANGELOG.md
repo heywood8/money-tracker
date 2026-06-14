@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.4](https://github.com/heywood8/money-tracker/compare/penny-v0.134.3...penny-v0.134.4) (2026-06-14)
+
+
+### Bug Fixes
+
+* disable update button and show download progress during APK download ([#955](https://github.com/heywood8/money-tracker/issues/955)) ([c5b1e0c](https://github.com/heywood8/money-tracker/commit/c5b1e0c06f44a28ca03464b8fd8189070d9beeb2))
+
 ## [0.134.3](https://github.com/heywood8/money-tracker/compare/penny-v0.134.2...penny-v0.134.3) (2026-06-14)
 
 
