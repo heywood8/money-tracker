@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.5](https://github.com/heywood8/money-tracker/compare/penny-v0.134.4...penny-v0.134.5) (2026-06-14)
+
+
+### Bug Fixes
+
+* block accidental touches and add dark gradient in tab bar area ([#958](https://github.com/heywood8/money-tracker/issues/958)) ([628b610](https://github.com/heywood8/money-tracker/commit/628b610f9142aecf0f61fdbe39a465ee7ca0891c))
+
 ## [0.134.4](https://github.com/heywood8/money-tracker/compare/penny-v0.134.3...penny-v0.134.4) (2026-06-14)
 
 
