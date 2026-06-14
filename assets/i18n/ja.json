@@ -8,6 +8,8 @@
   "settings": "設定",
   "language": "言語",
   "theme": "テーマ",
+  "theme_dark": "ダーク",
+  "theme_light": "ライト",
   "hide_balances": "残高を隠す",
   "hide_balances_hint": "プライバシーのため口座残高を非表示にする",
   "cancel": "キャンセル",

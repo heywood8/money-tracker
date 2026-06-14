@@ -8,6 +8,8 @@
   "settings": "Settings",
   "language": "Language",
   "theme": "Theme",
+  "theme_dark": "Dark",
+  "theme_light": "Light",
   "hide_balances": "Hide balances",
   "hide_balances_hint": "Mask account balances for privacy",
   "cancel": "Cancel",

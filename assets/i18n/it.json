@@ -8,6 +8,8 @@
   "settings": "Impostazioni",
   "language": "Lingua",
   "theme": "Tema",
+  "theme_dark": "Scuro",
+  "theme_light": "Chiaro",
   "hide_balances": "Nascondi saldi",
   "hide_balances_hint": "Maschera i saldi dei conti per la privacy",
   "cancel": "Annulla",

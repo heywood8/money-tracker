@@ -8,6 +8,8 @@
   "settings": "Настройки",
   "language": "Язык",
   "theme": "Тема",
+  "theme_dark": "Тёмная",
+  "theme_light": "Светлая",
   "hide_balances": "Скрыть балансы",
   "hide_balances_hint": "Маскировать балансы счетов для конфиденциальности",
   "cancel": "Отмена",
