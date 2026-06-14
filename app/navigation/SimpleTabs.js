@@ -201,6 +201,33 @@ TabButton.defaultProps = {
   updateProgress: null,
 };
 
+// Pre-computed gradient steps: transparent → very dark black overlay
+// Cubic ease-in gives a natural-looking gradient
+const TAB_OVERLAY_HEIGHT = 130;
+const GRADIENT_STEPS = 20;
+const gradientStepColors = Array.from({ length: GRADIENT_STEPS }, (_, i) => {
+  const t = i / (GRADIENT_STEPS - 1);
+  const easedT = t * t * t; // cubic ease-in
+  const opacity = (easedT * 0.82).toFixed(3);
+  return `rgba(0, 0, 0, ${opacity})`;
+});
+
+// Covers the tab bar region, blocks accidental touches falling through
+// to the list content below, and shows a darkening gradient as a visual cue.
+// Rendered before floatingBarWrapper so tab buttons (higher z-order) remain clickable.
+const TabGradientBlocker = memo(() => {
+  const stepHeight = TAB_OVERLAY_HEIGHT / GRADIENT_STEPS;
+  return (
+    <View style={styles.tabGradientOverlay}>
+      {gradientStepColors.map((color, i) => (
+        <View key={i} style={{ height: stepHeight, backgroundColor: color }} />
+      ))}
+    </View>
+  );
+});
+
+TabGradientBlocker.displayName = 'TabGradientBlocker';
+
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -434,6 +461,10 @@ export default function SimpleTabs() {
           </Animated.View>
         </GestureDetector>
       </View>
+      {/* Gradient touch blocker — rendered before floatingBarWrapper so the
+          tab buttons (higher z-order, box-none wrapper) remain clickable while
+          the empty space around the pill catches accidental taps */}
+      <TabGradientBlocker />
       {/* Floating bar overlays content so screen shows through behind it */}
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
         <View
@@ -538,6 +569,13 @@ const styles = StyleSheet.create({
     gap: 3,
     justifyContent: 'center',
     paddingVertical: 8,
+  },
+  tabGradientOverlay: {
+    bottom: 0,
+    height: TAB_OVERLAY_HEIGHT,
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   tabLabel: {
     fontSize: 11,
