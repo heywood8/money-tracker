@@ -1826,6 +1826,9 @@ const styles = StyleSheet.create({
   updatePanelWrapper: {
     flex: 1,
   },
+  settingsRowDisabled: {
+    opacity: 0.6,
+  },
   updateRowRight: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1833,9 +1836,6 @@ const styles = StyleSheet.create({
   },
   updateRowSpinner: {
     marginLeft: 2,
-  },
-  settingsRowDisabled: {
-    opacity: 0.6,
   },
   versionLabel: {
     fontSize: 13,
