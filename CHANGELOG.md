@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.10](https://github.com/heywood8/money-tracker/compare/penny-v0.134.9...penny-v0.134.10) (2026-06-15)
+
+
+### Performance Improvements
+
+* **graphs:** remove loading spinner flash on Graphs screen mount ([#915](https://github.com/heywood8/money-tracker/issues/915)) ([#933](https://github.com/heywood8/money-tracker/issues/933)) ([d9222d1](https://github.com/heywood8/money-tracker/commit/d9222d15986980ad05dd826648ca000bea8bdf9f))
+
 ## [0.134.9](https://github.com/heywood8/money-tracker/compare/penny-v0.134.8...penny-v0.134.9) (2026-06-15)
 
 
