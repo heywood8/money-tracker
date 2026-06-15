@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.7](https://github.com/heywood8/money-tracker/compare/penny-v0.134.6...penny-v0.134.7) (2026-06-15)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump amannn/action-semantic-pull-request from 5 to 6 ([#959](https://github.com/heywood8/money-tracker/issues/959)) ([6915a9f](https://github.com/heywood8/money-tracker/commit/6915a9f1872cd3f92ec7a7613c35248daa7144a6))
+
 ## [0.134.6](https://github.com/heywood8/money-tracker/compare/penny-v0.134.5...penny-v0.134.6) (2026-06-15)
 
 
