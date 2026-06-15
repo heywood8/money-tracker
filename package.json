@@ -63,7 +63,7 @@
     "jest-expo": "~54.0.14",
     "prop-types": "^15.8.1",
     "react-test-renderer": "19.1.0",
-    "test-renderer": "1.1"
+    "test-renderer": "1.2"
   },
   "private": true,
   "overrides": {
