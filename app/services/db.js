@@ -358,6 +358,35 @@ const detectAppliedMigrations = async (rawDb) => {
 };
 
 /**
+ * Dump all user tables to a JSON file before a destructive schema reset.
+ * Uses a dynamic import so expo-file-system is never loaded during normal startup.
+ * Returns the saved file path on success, null on failure.
+ */
+const saveEmergencyBackup = async (rawDb) => {
+  try {
+    const FileSystem = await import('expo-file-system/legacy');
+    const tables = await rawDb.getAllAsync(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+    const data = {};
+    for (const { name } of tables) {
+      try {
+        data[name] = await rawDb.getAllAsync(`SELECT * FROM "${name}"`);
+      } catch {
+        data[name] = null;
+      }
+    }
+    const filename = `penny_emergency_backup_${Date.now()}.json`;
+    const path = `${FileSystem.documentDirectory}${filename}`;
+    await FileSystem.writeAsStringAsync(path, JSON.stringify({ timestamp: new Date().toISOString(), data }));
+    return path;
+  } catch (err) {
+    console.error('[DB] Emergency backup failed:', err);
+    return null;
+  }
+};
+
+/**
  * Check if database is in a corrupted migration state
  */
 const isDatabaseCorrupted = async (rawDb) => {
@@ -411,8 +440,16 @@ const initializeDatabase = async (rawDb, db) => {
     // Check for corrupted migration state
     const isCorrupted = await isDatabaseCorrupted(rawDb);
     if (isCorrupted) {
-      console.warn('Database is in a corrupted state - attempting recovery...');
-      console.warn('This will reset all data. To avoid this, please use Settings > Reset Database before updating the app.');
+      console.warn('[DB] Corrupted schema detected (text account IDs — migration 0002 not applied)');
+      console.warn('[DB] Saving emergency backup before schema reset...');
+
+      const backupPath = await saveEmergencyBackup(rawDb);
+      if (backupPath) {
+        console.warn(`[DB] Emergency backup saved: ${backupPath}`);
+        console.warn('[DB] To recover data: Settings → Import → Restore from file');
+      } else {
+        console.warn('[DB] Emergency backup could not be saved — data will be lost after reset');
+      }
 
       // Drop all tables and start fresh
       await rawDb.runAsync('PRAGMA foreign_keys = OFF');
@@ -423,7 +460,7 @@ const initializeDatabase = async (rawDb, db) => {
         await rawDb.runAsync(`DROP TABLE IF EXISTS "${table.name}"`);
       }
       await rawDb.runAsync('PRAGMA foreign_keys = ON');
-      console.log('All tables dropped for recovery');
+      console.log('[DB] Schema reset complete');
     }
 
     // Check current migration state before running
