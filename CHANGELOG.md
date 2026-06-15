@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.8](https://github.com/heywood8/money-tracker/compare/penny-v0.134.7...penny-v0.134.8) (2026-06-15)
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump test-renderer from 1.1.0 to 1.2.0 ([#960](https://github.com/heywood8/money-tracker/issues/960)) ([782b20a](https://github.com/heywood8/money-tracker/commit/782b20a66fffe72ebebb212173528a1d6d096810))
+
 ## [0.134.7](https://github.com/heywood8/money-tracker/compare/penny-v0.134.6...penny-v0.134.7) (2026-06-15)
 
 
