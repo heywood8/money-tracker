@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.9](https://github.com/heywood8/money-tracker/compare/penny-v0.134.8...penny-v0.134.9) (2026-06-15)
+
+
+### Bug Fixes
+
+* **modal:** stop keyboard double-push on Android by removing KAV behavior ([#918](https://github.com/heywood8/money-tracker/issues/918)) ([#936](https://github.com/heywood8/money-tracker/issues/936)) ([509e5a8](https://github.com/heywood8/money-tracker/commit/509e5a827dee5ee342e761c3e943ec9c7b3966db))
+
 ## [0.134.8](https://github.com/heywood8/money-tracker/compare/penny-v0.134.7...penny-v0.134.8) (2026-06-15)
 
 
