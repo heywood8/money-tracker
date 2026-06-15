@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.6](https://github.com/heywood8/money-tracker/compare/penny-v0.134.5...penny-v0.134.6) (2026-06-15)
+
+
+### Bug Fixes
+
+* **db:** save emergency backup before corruption recovery wipes all tables ([#873](https://github.com/heywood8/money-tracker/issues/873)) ([#927](https://github.com/heywood8/money-tracker/issues/927)) ([22f3a85](https://github.com/heywood8/money-tracker/commit/22f3a851b0ebb2739c84f8de961e26899f94874f))
+
 ## [0.134.5](https://github.com/heywood8/money-tracker/compare/penny-v0.134.4...penny-v0.134.5) (2026-06-14)
 
 
