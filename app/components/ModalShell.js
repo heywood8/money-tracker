@@ -10,6 +10,7 @@ import {
   PanResponder,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import Reanimated from 'react-native-reanimated';
 import { Text, TouchableRipple } from 'react-native-paper';
@@ -144,7 +145,10 @@ export default function ModalShell({
         transparent={true}
         onRequestClose={handleBackDismiss}
       >
-        <KeyboardAvoidingView style={styles.flex1}>
+        <KeyboardAvoidingView
+          style={styles.flex1}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <Pressable style={styles.overlay} onPress={() => animateOut(onDismiss)}>
             <Animated.View style={{ transform: [{ translateY }] }}>
               <Reanimated.View style={[originStyle, shrinkStyle]}>
