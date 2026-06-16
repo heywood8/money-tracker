@@ -43,7 +43,9 @@ describe('useBalanceHistory', () => {
       const { result } = await renderHook(() => useBalanceHistory(mockAccountId, mockYear, mockMonth));
 
       expect(result.current.balanceHistoryData).toEqual({ labels: [] });
-      expect(result.current.loadingBalanceHistory).toBe(true);
+      // loading starts false — the mount spinner was removed in #933 to avoid
+      // a loading flash on the Graphs screen; load() flips it true on demand.
+      expect(result.current.loadingBalanceHistory).toBe(false);
       expect(result.current.balanceHistoryTableData).toEqual([]);
       expect(result.current.editingBalanceRow).toBeNull();
       expect(result.current.editingBalanceValue).toBe('');
