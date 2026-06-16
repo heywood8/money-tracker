@@ -64,7 +64,9 @@ describe('useExpenseData', () => {
       );
 
       expect(result.current.chartData).toEqual([]);
-      expect(result.current.loading).toBe(true);
+      // loading starts false — the mount spinner was removed in #933 to avoid
+      // a loading flash on the Graphs screen; load() flips it true on demand.
+      expect(result.current.loading).toBe(false);
       expect(result.current.totalExpenses).toBe(0);
     });
   });
@@ -80,7 +82,8 @@ describe('useExpenseData', () => {
       });
 
       expect(OperationsDB.getSpendingByCategoryAndCurrency).not.toHaveBeenCalled();
-      expect(result.current.loading).toBe(true);
+      // Early return on missing currency never sets loading true
+      expect(result.current.loading).toBe(false);
     });
 
     it('should load expense data for a single month', async () => {
