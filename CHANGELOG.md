@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.12](https://github.com/heywood8/money-tracker/compare/penny-v0.134.11...penny-v0.134.12) (2026-06-16)
+
+
+### Bug Fixes
+
+* keyboard overlapping input when editing operation description ([#968](https://github.com/heywood8/money-tracker/issues/968)) ([1d8fd10](https://github.com/heywood8/money-tracker/commit/1d8fd103c47f779b5052dbcbcb7a2b93054d6dd8))
+
 ## [0.134.11](https://github.com/heywood8/money-tracker/compare/penny-v0.134.10...penny-v0.134.11) (2026-06-16)
 
 
