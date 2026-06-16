@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.11](https://github.com/heywood8/money-tracker/compare/penny-v0.134.10...penny-v0.134.11) (2026-06-16)
+
+
+### Tests
+
+* **graphs:** align hook loading expectations with [#933](https://github.com/heywood8/money-tracker/issues/933) ([#969](https://github.com/heywood8/money-tracker/issues/969)) ([19b762e](https://github.com/heywood8/money-tracker/commit/19b762e68ef7721e918d589505ba35b00ff27071))
+
 ## [0.134.10](https://github.com/heywood8/money-tracker/compare/penny-v0.134.9...penny-v0.134.10) (2026-06-15)
 
 
