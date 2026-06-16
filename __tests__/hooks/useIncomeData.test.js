@@ -62,7 +62,9 @@ describe('useIncomeData', () => {
       );
 
       expect(result.current.incomeChartData).toEqual([]);
-      expect(result.current.loadingIncome).toBe(true);
+      // loading starts false — the mount spinner was removed in #933 to avoid
+      // a loading flash on the Graphs screen; load() flips it true on demand.
+      expect(result.current.loadingIncome).toBe(false);
       expect(result.current.totalIncome).toBe(0);
     });
   });
@@ -78,7 +80,8 @@ describe('useIncomeData', () => {
       });
 
       expect(OperationsDB.getIncomeByCategoryAndCurrency).not.toHaveBeenCalled();
-      expect(result.current.loadingIncome).toBe(true);
+      // Early return on missing currency never sets loading true
+      expect(result.current.loadingIncome).toBe(false);
     });
 
     it('should load income data for a single month', async () => {
