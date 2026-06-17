@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.17](https://github.com/heywood8/money-tracker/compare/penny-v0.134.16...penny-v0.134.17) (2026-06-17)
+
+
+### Bug Fixes
+
+* lift modal above keyboard and glue it back to bottom on dismiss ([#976](https://github.com/heywood8/money-tracker/issues/976)) ([2c891e0](https://github.com/heywood8/money-tracker/commit/2c891e0da30024b24a2dde36bf6c7d2037262cce))
+
 ## [0.134.16](https://github.com/heywood8/money-tracker/compare/penny-v0.134.15...penny-v0.134.16) (2026-06-17)
 
 
