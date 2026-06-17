@@ -71,13 +71,35 @@ const ExpandableFilters = ({
     onFilterChange({ accountIds: newAccountIds });
   };
 
+  // Case-insensitive toggle — labels are matched case-insensitively everywhere
+  // else (matchesAllLabels, getDistinctLabels de-dup), so the filter UI must be
+  // consistent or a label can end up both "selected" and re-addable.
   const toggleLabel = (label) => {
     const current = filters.labels || [];
-    const newLabels = current.includes(label)
-      ? current.filter(l => l !== label)
+    const key = label.toLowerCase();
+    const exists = current.some(l => l.toLowerCase() === key);
+    const newLabels = exists
+      ? current.filter(l => l.toLowerCase() !== key)
       : [...current, label];
     onFilterChange({ labels: newLabels });
   };
+
+  // Show every available label plus any currently-selected label that is no longer
+  // in availableLabels (e.g. the only operation carrying it was deleted, or casing
+  // drifted). Without this a stale selected label keeps filtering to zero results
+  // with no chip to toggle it off. De-duplicated case-insensitively, selected first.
+  const selectedLabels = filters.labels || [];
+  const labelsToShow = (() => {
+    const seen = new Set();
+    const out = [];
+    for (const l of [...selectedLabels, ...availableLabels]) {
+      const key = l.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(l);
+    }
+    return out;
+  })();
 
   const handleStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
@@ -249,14 +271,14 @@ const ExpandableFilters = ({
         </View>
 
         {/* Labels Section */}
-        {availableLabels.length > 0 && (
+        {labelsToShow.length > 0 && (
           <View style={[styles.section, { borderBottomColor: colors.border }]}>
             <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
               {t('labels')}
             </Text>
             <View style={styles.chipContainer}>
-              {availableLabels.map(label => {
-                const isSelected = (filters.labels || []).includes(label);
+              {labelsToShow.map(label => {
+                const isSelected = selectedLabels.some(l => l.toLowerCase() === label.toLowerCase());
                 const chipTextColor = isSelected ? '#fff' : colors.text;
                 return (
                   <TouchableOpacity

@@ -4,6 +4,7 @@ import {
   MAX_LABELS,
   MAX_LABEL_LENGTH,
   isSystemDescription,
+  normalizeLabel,
   sanitizeLabel,
   parseLabels,
   serializeLabels,
@@ -37,6 +38,48 @@ describe('labelUtils', () => {
 
     it('returns empty string for whitespace-only input', () => {
       expect(sanitizeLabel('   ')).toBe('');
+    });
+  });
+
+  describe('normalizeLabel', () => {
+    it('trims, collapses whitespace and strips the delimiter without clamping length', () => {
+      expect(normalizeLabel('  work   trip ')).toBe('work trip');
+      expect(normalizeLabel('a|b')).toBe('a b');
+    });
+
+    it('preserves labels longer than MAX_LABEL_LENGTH (unlike sanitizeLabel)', () => {
+      const long = 'x'.repeat(MAX_LABEL_LENGTH + 20);
+      expect(normalizeLabel(long)).toHaveLength(MAX_LABEL_LENGTH + 20);
+    });
+
+    it('returns empty string for non-strings', () => {
+      expect(normalizeLabel(null)).toBe('');
+      expect(normalizeLabel(42)).toBe('');
+    });
+  });
+
+  // Guard: a pre-existing (legacy) free-text description longer than the cap must
+  // round-trip without being silently truncated. The length cap applies only to
+  // newly entered labels (addLabel / sanitizeLabel), never to stored data.
+  describe('non-destructive round-trip of legacy descriptions', () => {
+    const longNote = 'Dinner with the whole team at the Italian place near the office downtown';
+
+    it('parseLabels does not truncate a long legacy description', () => {
+      expect(parseLabels(longNote)).toEqual([longNote]);
+    });
+
+    it('serializeLabels does not truncate already-stored long labels', () => {
+      expect(serializeLabels([longNote])).toBe(longNote);
+      expect(parseLabels(serializeLabels([longNote]))).toEqual([longNote]);
+    });
+
+    it('still caps a newly typed long label via addLabel', () => {
+      const long = 'y'.repeat(MAX_LABEL_LENGTH + 20);
+      expect(addLabel([], long)[0]).toHaveLength(MAX_LABEL_LENGTH);
+    });
+
+    it('matches a long legacy label in the filter without truncation mismatch', () => {
+      expect(matchesAllLabels(longNote, [longNote])).toBe(true);
     });
   });
 

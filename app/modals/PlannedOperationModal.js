@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -56,6 +56,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   const [accountPickerVisible, setAccountPickerVisible] = useState(false);
   const [toAccountPickerVisible, setToAccountPickerVisible] = useState(false);
   const [labelSuggestions, setLabelSuggestions] = useState([]);
+  const labelInputRef = useRef(null);
 
   // Distinct labels for autocomplete in the label editor (category-first).
   useEffect(() => {
@@ -153,6 +154,10 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
     Keyboard.dismiss();
     if (!validateForm()) return;
 
+    // Flush any half-typed label so it isn't lost when saving without committing it.
+    const flushedDescription = labelInputRef.current?.flush();
+    const description = flushedDescription != null ? flushedDescription : values.description;
+
     try {
       const data = {
         name: values.name.trim(),
@@ -161,7 +166,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
         accountId: values.accountId,
         categoryId: values.type === 'transfer' ? null : values.categoryId,
         toAccountId: values.type === 'transfer' ? values.toAccountId : null,
-        description: values.description.trim() || null,
+        description: description.trim() || null,
         isRecurring: values.isRecurring,
       };
 
@@ -401,6 +406,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
           {(t('labels') || 'Labels').toUpperCase()}
         </Text>
         <LabelInput
+          ref={labelInputRef}
           value={values.description}
           onChangeText={text => setValues(v => ({ ...v, description: text }))}
           suggestions={labelSuggestions}

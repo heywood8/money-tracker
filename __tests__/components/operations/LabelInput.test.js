@@ -107,4 +107,41 @@ describe('LabelInput', () => {
     expect(queryByTestId('label-remove-work')).toBeNull();
     expect(getByText('work')).toBeTruthy();
   });
+
+  describe('imperative flush()', () => {
+    it('flush() returns current labels when there is no pending text', async () => {
+      const onChangeText = jest.fn();
+      const ref = React.createRef();
+      await render(
+        <LabelInput
+          ref={ref}
+          value="work | food"
+          onChangeText={onChangeText}
+          colors={mockColors}
+          t={(k) => k}
+        />,
+      );
+      expect(ref.current.flush()).toBe('work | food');
+      expect(onChangeText).not.toHaveBeenCalled();
+    });
+
+    it('flush() commits pending typed text and returns it merged', async () => {
+      const onChangeText = jest.fn();
+      const ref = React.createRef();
+      const { getByTestId } = await render(
+        <LabelInput
+          ref={ref}
+          value="work"
+          onChangeText={onChangeText}
+          colors={mockColors}
+          t={(k) => k}
+        />,
+      );
+      // type without committing (no delimiter / submit / blur)
+      await fireEvent.changeText(getByTestId('label-input-field'), 'food');
+      const result = ref.current.flush();
+      expect(result).toBe('work | food');
+      expect(onChangeText).toHaveBeenCalledWith('work | food');
+    });
+  });
 });
