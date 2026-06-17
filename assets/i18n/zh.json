@@ -416,5 +416,18 @@
   "offline_rate": "离线",
   "rate_unavailable": "汇率不可用",
   "exchange_rate_unavailable": "汇率不可用，请检查网络连接后重试。",
-  "exchange_rate_required": "外币操作需要提供汇率"
+  "exchange_rate_required": "外币操作需要提供汇率",
+  "exporting": "正在导出…",
+  "export_success": "导出完成",
+  "add_account_hint": "打开创建新账户的表单",
+  "add_category_hint": "打开创建新分类的表单",
+  "back": "返回",
+  "currency": "货币",
+  "drag_to_reorder": "拖动以重新排序",
+  "error_loading_accounts": "加载账户失败",
+  "execute": "执行",
+  "loading_accounts": "正在加载账户...",
+  "loading_categories": "正在加载分类...",
+  "none": "无",
+  "update_download_failed": "无法下载更新。请重试。"
 }

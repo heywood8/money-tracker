@@ -416,5 +416,18 @@
   "pending_in": "Предстоящий доход",
   "done_this_month": "Выполнено в этом месяце",
   "done": "Готово",
-  "remaining": "остаток"
+  "remaining": "остаток",
+  "exporting": "Экспорт…",
+  "export_success": "Экспорт завершён",
+  "add_account_hint": "Открывает форму создания нового счёта",
+  "add_category_hint": "Открывает форму создания новой категории",
+  "back": "Назад",
+  "currency": "Валюта",
+  "drag_to_reorder": "Перетащите для изменения порядка",
+  "error_loading_accounts": "Не удалось загрузить счета",
+  "execute": "Выполнить",
+  "loading_accounts": "Загрузка счетов...",
+  "loading_categories": "Загрузка категорий...",
+  "none": "Нет",
+  "update_download_failed": "Не удалось загрузить обновление. Попробуйте ещё раз."
 }

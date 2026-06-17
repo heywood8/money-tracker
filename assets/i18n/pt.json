@@ -416,5 +416,18 @@
   "pending_in": "Entrada pendente",
   "done_this_month": "Feito este mês",
   "done": "Pronto",
-  "remaining": "restante"
+  "remaining": "restante",
+  "exporting": "Exportando…",
+  "export_success": "Exportação concluída",
+  "add_account_hint": "Abre o formulário para criar uma nova conta",
+  "add_category_hint": "Abre o formulário para criar uma nova categoria",
+  "back": "Voltar",
+  "currency": "Moeda",
+  "drag_to_reorder": "Arraste para reordenar",
+  "error_loading_accounts": "Falha ao carregar as contas",
+  "execute": "Executar",
+  "loading_accounts": "Carregando contas...",
+  "loading_categories": "Carregando categorias...",
+  "none": "Nenhum",
+  "update_download_failed": "Não foi possível baixar a atualização. Tente novamente."
 }
