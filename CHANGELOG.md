@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.13](https://github.com/heywood8/money-tracker/compare/penny-v0.134.12...penny-v0.134.13) (2026-06-17)
+
+
+### Bug Fixes
+
+* bottom sheet staying lifted after keyboard dismiss on Android ([#972](https://github.com/heywood8/money-tracker/issues/972)) ([f8cf572](https://github.com/heywood8/money-tracker/commit/f8cf5726b006667001b9571cba5afe911e685cd0))
+
 ## [0.134.12](https://github.com/heywood8/money-tracker/compare/penny-v0.134.11...penny-v0.134.12) (2026-06-16)
 
 
