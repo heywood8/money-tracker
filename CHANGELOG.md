@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.1](https://github.com/heywood8/money-tracker/compare/penny-v0.136.0...penny-v0.136.1) (2026-06-17)
+
+
+### Performance Improvements
+
+* **tabs:** lazy-mount tab screens on first visit ([#910](https://github.com/heywood8/money-tracker/issues/910)) ([#932](https://github.com/heywood8/money-tracker/issues/932)) ([0a0afa6](https://github.com/heywood8/money-tracker/commit/0a0afa6313f861e8c64d44b9ffa6652d657a42c5))
+
 ## [0.136.0](https://github.com/heywood8/money-tracker/compare/penny-v0.135.0...penny-v0.136.0) (2026-06-17)
 
 
