@@ -263,11 +263,14 @@ jest.mock('../../app/services/GoogleSheetsService', () => ({
   importFromSheets: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock UpdateContentPanel
+// Mock UpdateContentPanel — capture the props it receives so tests can assert
+// what the screen forwards (e.g. currentVersion for installed-version highlighting).
+const updatePanelProps = { last: null };
 jest.mock('../../app/components/UpdateContentPanel', () => {
   const React = require('react');
   const { View } = require('react-native');
-  return function UpdateContentPanel() {
+  return function UpdateContentPanel(props) {
+    updatePanelProps.last = props;
     return React.createElement(View, { testID: 'update-content-panel' });
   };
 });
@@ -881,6 +884,37 @@ describe('SettingsScreen', () => {
         expect(getByTestId('default-account-option-1')).toBeTruthy();
         expect(getByTestId('default-account-option-2')).toBeTruthy();
       });
+    });
+  });
+
+  describe('Update check', () => {
+    // eslint-disable-next-line global-require
+    const { checkForAppUpdate } = require('../../app/services/AppUpdateService');
+
+    it('forwards currentVersion to the panel when up to date so the latest card can be highlighted', async () => {
+      checkForAppUpdate.mockResolvedValueOnce({
+        success: true,
+        isUpdateAvailable: false,
+        currentVersion: '1.2.3',
+        recentReleaseNotes: [{ version: '1.2.3', notes: 'Latest release' }],
+        releasesUrl: 'https://github.com/example/releases',
+      });
+
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      await act(async () => {
+        fireEvent.press(getByTestId('check-updates-row'));
+      });
+
+      await waitFor(() => {
+        expect(updatePanelProps.last?.updateResult?.type).toBe('up_to_date');
+      });
+      // Regression: the up_to_date result must carry currentVersion, otherwise the
+      // installed/latest release is never matched to its card and the confirmation
+      // falls back to a standalone bottom block instead of the green card hint.
+      expect(updatePanelProps.last.updateResult.currentVersion).toBe('1.2.3');
     });
   });
 });

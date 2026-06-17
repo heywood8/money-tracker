@@ -607,6 +607,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         setUpdateResult({
           type: 'error',
           errorCode: result.errorCode,
+          currentVersion: result.currentVersion,
           releaseNotes: result.releaseNotes || null,
           recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
@@ -614,6 +615,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({
           type: 'up_to_date',
+          currentVersion: result.currentVersion,
           recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
         });
