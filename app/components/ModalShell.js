@@ -5,12 +5,11 @@ import {
   Modal as RNModal,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
   ScrollView,
   PanResponder,
   Animated,
   Dimensions,
-  Platform,
+  Keyboard,
 } from 'react-native';
 import Reanimated from 'react-native-reanimated';
 import { Text, TouchableRipple } from 'react-native-paper';
@@ -22,6 +21,9 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
 import { useBackShrink } from '../hooks/useBackShrink';
 import ModalBlurOverlay from './ModalBlurOverlay';
+
+// Pressable that can animate layout props (paddingBottom) for keyboard avoidance.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * ModalShell — shared bottom-sheet wrapper for all modals.
@@ -57,6 +59,36 @@ export default function ModalShell({
   const screenHeight = Dimensions.get('window').height;
   // Start offscreen so the first render is invisible — eliminates open flicker
   const translateY = useRef(new Animated.Value(screenHeight)).current;
+
+  // Keyboard avoidance. With edge-to-edge enabled (SDK 54) the Modal window no
+  // longer resizes for the IME, so we lift the bottom sheet ourselves: the
+  // overlay is justifyContent: 'flex-end', so animating its paddingBottom to the
+  // keyboard height raises the card to sit just above the keyboard. Resetting to
+  // 0 on hide guarantees the sheet is glued back to the bottom (no residual
+  // offset, the bug the old behavior="height" KeyboardAvoidingView left behind).
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const onShow = (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: e?.endCoordinates?.height ?? 0,
+        duration: e?.duration || 220,
+        useNativeDriver: false,
+      }).start();
+    };
+    const onHide = (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: e?.duration || 180,
+        useNativeDriver: false,
+      }).start();
+    };
+    const showSub = Keyboard.addListener('keyboardDidShow', onShow);
+    const hideSub = Keyboard.addListener('keyboardDidHide', onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardOffset]);
   // Use a ref so the PanResponder closure always calls the latest onDismiss
   const onDismissRef = useRef(onDismiss);
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
@@ -73,6 +105,7 @@ export default function ModalShell({
       // Always start offscreen and un-shrunk so the open animation is correct
       // no matter how the sheet was previously dismissed (slide or shrink).
       translateY.setValue(screenHeight);
+      keyboardOffset.setValue(0);
       resetShrink();
       Animated.spring(translateY, {
         toValue: 0,
@@ -81,7 +114,7 @@ export default function ModalShell({
         speed: 14,
       }).start();
     }
-  }, [visible, translateY, screenHeight, resetShrink]);
+  }, [visible, translateY, screenHeight, resetShrink, keyboardOffset]);
 
   // Back button / gesture: play the shrink, then dismiss.
   const handleBackDismiss = useCallback(() => {
@@ -145,115 +178,105 @@ export default function ModalShell({
         transparent={true}
         onRequestClose={handleBackDismiss}
       >
-        <KeyboardAvoidingView
-          style={styles.flex1}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          // On Android, RN's Modal window already uses SOFT_INPUT_ADJUST_RESIZE,
-          // so its content area shrinks above the keyboard on its own. Adding a
-          // `behavior="height"` KeyboardAvoidingView on top double-adjusts the
-          // layout and leaves the bottom sheet "stuck" slightly lifted after the
-          // keyboard is dismissed (e.g. via the back button). Disable the KAV on
-          // Android and let the native resize handle it; the overlay's
-          // justifyContent: 'flex-end' keeps the card riding above the keyboard.
-          enabled={Platform.OS === 'ios'}
+        <AnimatedPressable
+          style={[styles.overlay, { paddingBottom: keyboardOffset }]}
+          onPress={() => animateOut(onDismiss)}
         >
-          <Pressable style={styles.overlay} onPress={() => animateOut(onDismiss)}>
-            <Animated.View style={{ transform: [{ translateY }] }}>
-              <Reanimated.View style={[originStyle, shrinkStyle]}>
-                <Pressable
-                  style={[styles.card, { backgroundColor: colors.card, maxHeight: Dimensions.get('window').height * 0.88 }]}
-                  onPress={() => {}}
-                >
-                  {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
-                  <View {...panResponder.panHandlers}>
-                    <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+          <Animated.View style={{ transform: [{ translateY }] }}>
+            <Reanimated.View style={[originStyle, shrinkStyle]}>
+              <Pressable
+                style={[styles.card, { backgroundColor: colors.card, maxHeight: Dimensions.get('window').height * 0.88 }]}
+                onPress={() => {}}
+              >
+                {/* Drag zone: handle + header — touch here to dismiss by dragging down */}
+                <View {...panResponder.panHandlers}>
+                  <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-                    {/* Header */}
-                    <View style={styles.header}>
-                      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-                      {subtitle ? (
-                        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-                          {subtitle}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-
-                  {/* Scrollable form content */}
-                  <ScrollView
-                    ref={scrollRef}
-                    style={styles.scroll}
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {children}
-                  </ScrollView>
-
-                  {/* Secondary actions: delete + extra actions in one compact row */}
-                  {(onDelete || extraActions) ? (
-                    <View style={styles.deleteWrapper}>
-                      {onDelete ? (
-                        <TouchableRipple
-                          onPress={deleteDisabled ? undefined : onDelete}
-                          disabled={deleteDisabled}
-                          rippleColor={colors.delete + '18'}
-                          style={[
-                            styles.btn,
-                            styles.deleteRow,
-                            { borderColor: colors.delete + '40' },
-                            deleteDisabled && styles.disabled,
-                          ]}
-                          borderless={false}
-                        >
-                          <View style={styles.deleteRowContent}>
-                            <Icon name="delete-outline" size={18} color={colors.delete} />
-                            <Text style={[styles.deleteRowText, { color: colors.delete }]}>
-                              {deleteLabel || t('delete')}
-                            </Text>
-                          </View>
-                        </TouchableRipple>
-                      ) : null}
-                      {extraActions || null}
-                    </View>
-                  ) : null}
-
-                  {/* Cancel / Save (or full-width Cancel when onSave is absent) */}
-                  <View style={[styles.actions, { borderTopColor: colors.border, paddingBottom: SPACING.md + insets.bottom }]}>
-                    <TouchableRipple
-                      onPress={() => animateOut(onCancel)}
-                      style={[
-                        styles.btn,
-                        styles.cancelBtn,
-                        { borderColor: colors.border },
-                        !onSave && styles.fullWidthBtn,
-                      ]}
-                      rippleColor="rgba(0,0,0,0.05)"
-                      borderless={false}
-                    >
-                      <Text style={[styles.btnText, { color: colors.text }]}>
-                        {cancelLabel || t('cancel')}
+                  {/* Header */}
+                  <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+                    {subtitle ? (
+                      <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+                        {subtitle}
                       </Text>
-                    </TouchableRipple>
-
-                    {onSave ? (
-                      <TouchableRipple
-                        onPress={onSave}
-                        style={[styles.btn, { backgroundColor: colors.primary }]}
-                        rippleColor="rgba(255,255,255,0.2)"
-                        borderless={false}
-                      >
-                        <Text style={[styles.btnText, styles.saveBtnText]}>
-                          {saveLabel || t('save')}
-                        </Text>
-                      </TouchableRipple>
                     ) : null}
                   </View>
-                </Pressable>
-              </Reanimated.View>
-            </Animated.View>
-          </Pressable>
-        </KeyboardAvoidingView>
+                </View>
+
+                {/* Scrollable form content */}
+                <ScrollView
+                  ref={scrollRef}
+                  style={styles.scroll}
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {children}
+                </ScrollView>
+
+                {/* Secondary actions: delete + extra actions in one compact row */}
+                {(onDelete || extraActions) ? (
+                  <View style={styles.deleteWrapper}>
+                    {onDelete ? (
+                      <TouchableRipple
+                        onPress={deleteDisabled ? undefined : onDelete}
+                        disabled={deleteDisabled}
+                        rippleColor={colors.delete + '18'}
+                        style={[
+                          styles.btn,
+                          styles.deleteRow,
+                          { borderColor: colors.delete + '40' },
+                          deleteDisabled && styles.disabled,
+                        ]}
+                        borderless={false}
+                      >
+                        <View style={styles.deleteRowContent}>
+                          <Icon name="delete-outline" size={18} color={colors.delete} />
+                          <Text style={[styles.deleteRowText, { color: colors.delete }]}>
+                            {deleteLabel || t('delete')}
+                          </Text>
+                        </View>
+                      </TouchableRipple>
+                    ) : null}
+                    {extraActions || null}
+                  </View>
+                ) : null}
+
+                {/* Cancel / Save (or full-width Cancel when onSave is absent) */}
+                <View style={[styles.actions, { borderTopColor: colors.border, paddingBottom: SPACING.md + insets.bottom }]}>
+                  <TouchableRipple
+                    onPress={() => animateOut(onCancel)}
+                    style={[
+                      styles.btn,
+                      styles.cancelBtn,
+                      { borderColor: colors.border },
+                      !onSave && styles.fullWidthBtn,
+                    ]}
+                    rippleColor="rgba(0,0,0,0.05)"
+                    borderless={false}
+                  >
+                    <Text style={[styles.btnText, { color: colors.text }]}>
+                      {cancelLabel || t('cancel')}
+                    </Text>
+                  </TouchableRipple>
+
+                  {onSave ? (
+                    <TouchableRipple
+                      onPress={onSave}
+                      style={[styles.btn, { backgroundColor: colors.primary }]}
+                      rippleColor="rgba(255,255,255,0.2)"
+                      borderless={false}
+                    >
+                      <Text style={[styles.btnText, styles.saveBtnText]}>
+                        {saveLabel || t('save')}
+                      </Text>
+                    </TouchableRipple>
+                  ) : null}
+                </View>
+              </Pressable>
+            </Reanimated.View>
+          </Animated.View>
+        </AnimatedPressable>
       </RNModal>
     </>
   );
@@ -346,9 +369,6 @@ const styles = StyleSheet.create({
     height: 4,
     marginBottom: SPACING.md,
     width: 44,
-  },
-  flex1: {
-    flex: 1,
   },
   fullWidthBtn: {
     flex: 1,
