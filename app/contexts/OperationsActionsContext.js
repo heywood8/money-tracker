@@ -361,6 +361,7 @@ export const OperationsActionsProvider = ({ children }) => {
       || prev.types !== activeFilters.types
       || prev.accountIds !== activeFilters.accountIds
       || prev.categoryIds !== activeFilters.categoryIds
+      || prev.labels !== activeFilters.labels
       || prev.dateRange !== activeFilters.dateRange
       || prev.amountRange !== activeFilters.amountRange
       || prev.searchText !== activeFilters.searchText;
@@ -539,6 +540,7 @@ export const OperationsActionsProvider = ({ children }) => {
         types: newFilters.types || [],
         accountIds: newFilters.accountIds || [],
         categoryIds: newFilters.categoryIds || [],
+        labels: newFilters.labels || [],
         dateRange: newFilters.dateRange || { startDate: null, endDate: null },
         amountRange: newFilters.amountRange || { min: null, max: null },
       });
@@ -562,6 +564,7 @@ export const OperationsActionsProvider = ({ children }) => {
       types: [],
       accountIds: [],
       categoryIds: [],
+      labels: [],
       searchText: '',
       dateRange: { startDate: null, endDate: null },
       amountRange: { min: null, max: null },
@@ -674,6 +677,7 @@ export const OperationsActionsProvider = ({ children }) => {
     if (f.types.length > 0) count++;
     if (f.accountIds.length > 0) count++;
     if (f.categoryIds.length > 0) count++;
+    if ((f.labels?.length ?? 0) > 0) count++;
     if (f.searchText.trim().length > 0) count++;
     if (f.dateRange.startDate || f.dateRange.endDate) count++;
     if (f.amountRange.min !== null || f.amountRange.max !== null) count++;

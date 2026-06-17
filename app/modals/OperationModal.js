@@ -18,10 +18,10 @@ import { useOperationsActions } from '../contexts/OperationsActionsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
-import DescriptionAutocomplete from '../components/DescriptionAutocomplete';
+import LabelInput from '../components/operations/LabelInput';
 import OperationFormFields from '../components/operations/OperationFormFields';
 import SplitOperationModal from '../components/operations/SplitOperationModal';
-import { getDistinctDescriptions } from '../services/OperationsDB';
+import { getDistinctLabels } from '../services/OperationsDB';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -124,22 +124,19 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   // Scroll ref for auto-scrolling to description field on keyboard focus
   const scrollViewRef = useRef(null);
 
-  // Autocomplete suggestions for description field
-  const [descriptionSuggestions, setDescriptionSuggestions] = useState([]);
+  // Autocomplete suggestions for the label editor (distinct labels, category-first)
+  const [labelSuggestions, setLabelSuggestions] = useState([]);
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    const numericAmount = parseFloat(values.amount);
-    getDistinctDescriptions(
-      100,
-      values.categoryId || null,
-      isNaN(numericAmount) ? null : numericAmount,
-    ).then(results => {
-      if (!cancelled) setDescriptionSuggestions(results);
-    }).catch(() => {});
+    getDistinctLabels(50, values.categoryId || null)
+      .then(results => {
+        if (!cancelled) setLabelSuggestions(results);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
-  }, [visible, values.categoryId, values.amount]);
+  }, [visible, values.categoryId]);
 
   // Determine if split button should be shown
   // Only for editing expense/income (not transfers, not shadow operations, not new)
@@ -495,14 +492,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           </View>
         </View>
 
-        {/* Description with autocomplete */}
-        <DescriptionAutocomplete
+        {/* Labels editor (stored in the description field) */}
+        <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+          {(t('labels') || 'Labels').toUpperCase()}
+        </Text>
+        <LabelInput
           value={values.description || ''}
           onChangeText={handleDescriptionChange}
-          suggestions={descriptionSuggestions}
-          placeholder={t('description')}
+          suggestions={labelSuggestions}
+          placeholder={t('add_label_placeholder')}
           editable={!isShadowOperation}
           colors={colors}
+          t={t}
           onFocus={handleDescriptionFocus}
         />
 

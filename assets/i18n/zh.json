@@ -429,5 +429,7 @@
   "loading_accounts": "正在加载账户...",
   "loading_categories": "正在加载分类...",
   "none": "无",
-  "update_download_failed": "无法下载更新。请重试。"
+  "update_download_failed": "无法下载更新。请重试。",
+  "labels": "标签",
+  "add_label_placeholder": "添加标签…"
 }

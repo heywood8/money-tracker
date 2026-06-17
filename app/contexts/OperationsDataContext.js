@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { appEvents, EVENTS } from '../services/eventEmitter';
 import { getJsonPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { normalizeSearchText } from '../services/searchNormalize';
+import { matchesAllLabels } from '../utils/labelUtils';
 import { useAccountsData } from './AccountsDataContext';
 import { useCategories } from './CategoriesContext';
 import { useLocalization } from './LocalizationContext';
@@ -50,6 +51,7 @@ export const OperationsDataProvider = ({ children }) => {
     types: [],
     accountIds: [],
     categoryIds: [],
+    labels: [],
     dateRange: { startDate: null, endDate: null },
     amountRange: { min: null, max: null },
   });
@@ -63,6 +65,7 @@ export const OperationsDataProvider = ({ children }) => {
     types: searchState.types,
     accountIds: searchState.accountIds,
     categoryIds: searchState.categoryIds,
+    labels: searchState.labels,
     searchText: searchState.text,
     dateRange: searchState.dateRange,
     amountRange: searchState.amountRange,
@@ -74,6 +77,7 @@ export const OperationsDataProvider = ({ children }) => {
       filters.types.length > 0 ||
       filters.accountIds.length > 0 ||
       filters.categoryIds.length > 0 ||
+      (filters.labels?.length ?? 0) > 0 ||
       filters.searchText.trim().length > 0 ||
       filters.dateRange.startDate !== null ||
       filters.dateRange.endDate !== null ||
@@ -103,6 +107,7 @@ export const OperationsDataProvider = ({ children }) => {
       types: [],
       accountIds: [],
       categoryIds: [],
+      labels: [],
       dateRange: { startDate: null, endDate: null },
       amountRange: { min: null, max: null },
     });
@@ -115,6 +120,7 @@ export const OperationsDataProvider = ({ children }) => {
       searchState.types.length > 0 ||
       searchState.accountIds.length > 0 ||
       searchState.categoryIds.length > 0 ||
+      (searchState.labels?.length ?? 0) > 0 ||
       searchState.dateRange.startDate !== null ||
       searchState.dateRange.endDate !== null ||
       searchState.amountRange.min !== null ||
@@ -188,6 +194,12 @@ export const OperationsDataProvider = ({ children }) => {
       result = result.filter(op => searchState.categoryIds.includes(op.categoryId));
     }
 
+    // label filter — operation must carry every selected label (AND semantics).
+    // Labels live inside op.description as a delimited list (see labelUtils).
+    if (searchState.labels && searchState.labels.length > 0) {
+      result = result.filter(op => matchesAllLabels(op.description, searchState.labels));
+    }
+
     // date range filter — string compare YYYY-MM-DD to avoid timezone issues from new Date(...)
     if (searchState.dateRange.startDate || searchState.dateRange.endDate) {
       // Extract just the date portion (in case op.date includes a time component)
@@ -229,6 +241,7 @@ export const OperationsDataProvider = ({ children }) => {
     if (searchState.types.length > 0) count++;
     if (searchState.accountIds.length > 0) count++;
     if (searchState.categoryIds.length > 0) count++;
+    if ((searchState.labels?.length ?? 0) > 0) count++;
     if (searchState.dateRange.startDate !== null || searchState.dateRange.endDate !== null) count++;
     if (searchState.amountRange.min !== null || searchState.amountRange.max !== null) count++;
     return count;
@@ -247,6 +260,7 @@ export const OperationsDataProvider = ({ children }) => {
             types: filters.types || [],
             accountIds: filters.accountIds || [],
             categoryIds: filters.categoryIds || [],
+            labels: filters.labels || [],
             dateRange: filters.dateRange || { startDate: null, endDate: null },
             amountRange: filters.amountRange || { min: null, max: null },
           };
@@ -255,6 +269,7 @@ export const OperationsDataProvider = ({ children }) => {
             types: normalized.types,
             accountIds: normalized.accountIds,
             categoryIds: normalized.categoryIds,
+            labels: normalized.labels,
             searchText: normalized.text,
             dateRange: normalized.dateRange,
             amountRange: normalized.amountRange,

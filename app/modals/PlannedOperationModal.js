@@ -20,6 +20,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
+import LabelInput from '../components/operations/LabelInput';
+import { getDistinctLabels } from '../services/OperationsDB';
 import ModalShell from '../components/ModalShell';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
@@ -53,6 +55,17 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   const [errors, setErrors] = useState({});
   const [accountPickerVisible, setAccountPickerVisible] = useState(false);
   const [toAccountPickerVisible, setToAccountPickerVisible] = useState(false);
+  const [labelSuggestions, setLabelSuggestions] = useState([]);
+
+  // Distinct labels for autocomplete in the label editor (category-first).
+  useEffect(() => {
+    if (!visible) return undefined;
+    let cancelled = false;
+    getDistinctLabels(50, values.categoryId || null)
+      .then(labels => { if (!cancelled) setLabelSuggestions(labels); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible, values.categoryId]);
 
   // Hierarchical category picker via useOperationPicker
   const {
@@ -383,19 +396,17 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
           />
         </View>
 
-        {/* Description */}
+        {/* Labels (stored in the description field) */}
         <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('description') || 'Description').toUpperCase()}
+          {(t('labels') || 'Labels').toUpperCase()}
         </Text>
-        <PaperTextInput
-          mode="outlined"
-          multiline
-          numberOfLines={2}
+        <LabelInput
           value={values.description}
           onChangeText={text => setValues(v => ({ ...v, description: text }))}
-          placeholder={t('description')}
-          theme={paperInputTheme}
-          style={modalSharedStyles.textInput}
+          suggestions={labelSuggestions}
+          placeholder={t('add_label_placeholder')}
+          colors={colors}
+          t={t}
         />
       </ModalShell>
 

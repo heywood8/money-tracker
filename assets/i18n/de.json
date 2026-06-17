@@ -429,5 +429,7 @@
   "loading_accounts": "Konten werden geladen...",
   "loading_categories": "Kategorien werden geladen...",
   "none": "Keine",
-  "update_download_failed": "Update konnte nicht heruntergeladen werden. Bitte erneut versuchen."
+  "update_download_failed": "Update konnte nicht heruntergeladen werden. Bitte erneut versuchen.",
+  "labels": "Labels",
+  "add_label_placeholder": "Label hinzufügen…"
 }

@@ -429,5 +429,7 @@
   "loading_accounts": "Chargement des comptes...",
   "loading_categories": "Chargement des catégories...",
   "none": "Aucun",
-  "update_download_failed": "Impossible de télécharger la mise à jour. Veuillez réessayer."
+  "update_download_failed": "Impossible de télécharger la mise à jour. Veuillez réessayer.",
+  "labels": "Étiquettes",
+  "add_label_placeholder": "Ajouter une étiquette…"
 }

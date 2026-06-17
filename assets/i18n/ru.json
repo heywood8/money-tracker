@@ -429,5 +429,7 @@
   "loading_accounts": "Загрузка счетов...",
   "loading_categories": "Загрузка категорий...",
   "none": "Нет",
-  "update_download_failed": "Не удалось загрузить обновление. Попробуйте ещё раз."
+  "update_download_failed": "Не удалось загрузить обновление. Попробуйте ещё раз.",
+  "labels": "Метки",
+  "add_label_placeholder": "Добавить метку…"
 }

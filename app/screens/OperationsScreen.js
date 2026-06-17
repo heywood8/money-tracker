@@ -13,7 +13,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
-import { getDistinctDescriptions } from '../services/OperationsDB';
+import { getDistinctLabels } from '../services/OperationsDB';
+import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
 import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
@@ -533,13 +534,16 @@ const OperationsScreen = () => {
 
       Keyboard.dismiss();
 
-      // Check for matching description suggestions for this category
+      // Offer quick label tagging for the freshly-created operation. Suggestions are
+      // distinct labels (category-first), minus any already present on the operation.
       const effectiveCategoryId = operationData.categoryId;
-      if (effectiveCategoryId && createdOperation?.id) {
-        const suggestions = await getDistinctDescriptions(8, effectiveCategoryId);
-        if (suggestions.length > 0) {
+      if (createdOperation?.id) {
+        const suggestions = await getDistinctLabels(8, effectiveCategoryId || null);
+        const existing = parseLabels(createdOperation.description);
+        const filtered = suggestions.filter(label => !hasLabel(existing, label));
+        if (filtered.length > 0) {
           setPendingSuggestionId(createdOperation.id);
-          setPendingSuggestions(suggestions);
+          setPendingSuggestions(filtered);
         }
       }
     } catch (error) {
@@ -567,27 +571,43 @@ const OperationsScreen = () => {
     await handleQuickAdd(undefined, toAccountId);
   }, [resetForm, closePicker, handleQuickAdd]);
 
-  const handleApplySuggestion = useCallback(async (description) => {
+  // Apply a suggested label by APPENDING it to the operation's existing labels.
+  // The row stays open so the user can add several labels in a row; the applied
+  // chip is removed from the suggestion list, and the row auto-dismisses once no
+  // suggestions remain.
+  const handleApplySuggestion = useCallback(async (label) => {
     if (!pendingSuggestionId) return;
     const idToUpdate = pendingSuggestionId;
-    // Clear state optimistically before the await — if updateOperation fails,
-    // the dialog from OperationsActionsContext will show the error, but the
-    // suggestion row stays dismissed (intentional: avoids a broken retry loop).
-    setPendingSuggestionId(null);
-    setPendingSuggestions([]);
-    await updateOperation(idToUpdate, { description });
-  }, [pendingSuggestionId, updateOperation]);
+    const op = operations.find(o => o.id === idToUpdate);
+    if (!op) {
+      setPendingSuggestionId(null);
+      setPendingSuggestions([]);
+      return;
+    }
+
+    const merged = serializeLabels(addLabel(parseLabels(op.description), label));
+
+    setPendingSuggestions((prev) => {
+      const remaining = prev.filter(l => l.toLowerCase() !== label.toLowerCase());
+      if (remaining.length === 0) {
+        setPendingSuggestionId(null);
+      }
+      return remaining;
+    });
+
+    await updateOperation(idToUpdate, { description: merged });
+  }, [pendingSuggestionId, operations, updateOperation]);
 
   const handleDismissSuggestion = useCallback(() => {
     setPendingSuggestionId(null);
     setPendingSuggestions([]);
   }, []);
 
-  // Auto-dismiss suggestion if the pending operation gets a description (e.g. via edit modal)
+  // Clear the suggestion row if its operation disappears (e.g. deleted elsewhere).
   useEffect(() => {
     if (!pendingSuggestionId) return;
-    const op = operations.find(o => o.id === pendingSuggestionId);
-    if (op?.description) {
+    const stillExists = operations.some(o => o.id === pendingSuggestionId);
+    if (!stillExists) {
       setPendingSuggestionId(null);
       setPendingSuggestions([]);
     }
@@ -658,6 +678,7 @@ const OperationsScreen = () => {
       amountRange: { amountRange: { min: null, max: null } },
       accountIds: { accountIds: [] },
       categoryIds: { categoryIds: [] },
+      labels: { labels: [] },
     };
     updateSearchFilters(clearValues[groupKey]);
   }, [updateSearchFilters]);
@@ -668,6 +689,7 @@ const OperationsScreen = () => {
         (searchState?.types?.length > 0) ||
         (searchState?.accountIds?.length > 0) ||
         (searchState?.categoryIds?.length > 0) ||
+        (searchState?.labels?.length > 0) ||
         !!searchState?.dateRange?.startDate ||
         !!searchState?.dateRange?.endDate ||
         (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||

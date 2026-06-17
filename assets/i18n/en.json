@@ -429,5 +429,7 @@
   "loading_accounts": "Loading accounts...",
   "loading_categories": "Loading categories...",
   "none": "None",
-  "update_download_failed": "Could not download the update. Please try again."
+  "update_download_failed": "Could not download the update. Please try again.",
+  "labels": "Labels",
+  "add_label_placeholder": "Add a label…"
 }

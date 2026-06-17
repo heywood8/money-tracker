@@ -429,5 +429,7 @@
   "loading_accounts": "アカウントを読み込み中...",
   "loading_categories": "カテゴリを読み込み中...",
   "none": "なし",
-  "update_download_failed": "更新をダウンロードできませんでした。もう一度お試しください。"
+  "update_download_failed": "更新をダウンロードできませんでした。もう一度お試しください。",
+  "labels": "ラベル",
+  "add_label_placeholder": "ラベルを追加…"
 }

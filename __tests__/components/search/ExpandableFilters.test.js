@@ -99,6 +99,7 @@ describe('ExpandableFilters', () => {
       types: [],
       accountIds: [],
       categoryIds: [],
+      labels: [],
       dateRange: { startDate: null, endDate: null },
       amountRange: { min: null, max: null },
     });
