@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.135.0](https://github.com/heywood8/money-tracker/compare/penny-v0.134.17...penny-v0.135.0) (2026-06-17)
+
+
+### Features
+
+* rework update panel with per-release cards, PR links and inline APKs ([#979](https://github.com/heywood8/money-tracker/issues/979)) ([6334ba4](https://github.com/heywood8/money-tracker/commit/6334ba4f7f7e17396e93050e2f23edc22d35f957))
+
 ## [0.134.17](https://github.com/heywood8/money-tracker/compare/penny-v0.134.16...penny-v0.134.17) (2026-06-17)
 
 
