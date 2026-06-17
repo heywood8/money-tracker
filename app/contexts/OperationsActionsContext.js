@@ -1,3 +1,4 @@
+/* global __DEV__ */
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import PropTypes from 'prop-types';
@@ -95,7 +96,7 @@ export const OperationsActionsProvider = ({ children }) => {
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
     const effectiveFilters = filters ?? activeFiltersRef.current;
-    console.debug('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
+    if (__DEV__) console.debug('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
 
@@ -128,7 +129,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Check if this request is still the latest (ignore stale results)
       if (requestId !== loadRequestIdRef.current) {
-        console.debug(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
+        if (__DEV__) console.debug(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
         return;
       }
 
@@ -337,7 +338,6 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load operations on mount
   useEffect(() => {
-    console.debug('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
     loadInitialOperations();
   }, [loadInitialOperations]);
 
@@ -377,7 +377,6 @@ export const OperationsActionsProvider = ({ children }) => {
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading operations due to RELOAD_ALL event');
       allOpsCacheRef.current = null; // data may have changed; rebuild on next text search
       loadInitialOperations();
     });
@@ -399,20 +398,8 @@ export const OperationsActionsProvider = ({ children }) => {
 
   const addOperation = useCallback(async (operation) => {
     try {
-      console.debug('[OperationsContext] addOperation called with:', {
-        type: operation.type,
-        amount: operation.amount,
-        accountId: operation.accountId,
-        toAccountId: operation.toAccountId,
-        categoryId: operation.categoryId,
-        date: operation.date,
-        description: operation.description,
-      });
-
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
-
-      console.debug('[OperationsContext] Operation created successfully:', createdOperation?.id);
 
       // Keep cache in sync so text search reflects the new operation immediately
       if (allOpsCacheRef.current !== null && createdOperation) {
