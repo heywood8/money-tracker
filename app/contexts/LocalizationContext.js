@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import PropTypes from 'prop-types';
 import enTranslations from '../../assets/i18n/en.json';
 import itTranslations from '../../assets/i18n/it.json';
@@ -114,7 +115,14 @@ export function LocalizationProvider({ children }) {
 
   const t = useCallback((key) => i18nData[language]?.[key] || key, [language]);
 
-  const contextValue = useMemo(() => ({
+  // Hide splash screen once language preference has been loaded
+  useEffect(() => {
+    if (!isLoading) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading]);
+
+  const value = useMemo(() => ({
     t,
     language,
     setLanguage,
@@ -123,13 +131,8 @@ export function LocalizationProvider({ children }) {
     setFirstLaunchComplete,
   }), [t, language, setLanguage, isFirstLaunch, setFirstLaunchComplete]);
 
-  // Don't render children until we've checked if this is first launch
-  if (isLoading) {
-    return null;
-  }
-
   return (
-    <LocalizationContext.Provider value={contextValue}>
+    <LocalizationContext.Provider value={value}>
       {children}
     </LocalizationContext.Provider>
   );
