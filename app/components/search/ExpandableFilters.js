@@ -10,6 +10,7 @@ const ExpandableFilters = ({
   filters,
   onFilterChange,
   accounts,
+  availableLabels = [],
   colors,
   t,
   isExpanded,
@@ -68,6 +69,14 @@ const ExpandableFilters = ({
       ? filters.accountIds.filter(id => id !== accountId)
       : [...filters.accountIds, accountId];
     onFilterChange({ accountIds: newAccountIds });
+  };
+
+  const toggleLabel = (label) => {
+    const current = filters.labels || [];
+    const newLabels = current.includes(label)
+      ? current.filter(l => l !== label)
+      : [...current, label];
+    onFilterChange({ labels: newLabels });
   };
 
   const handleStartDateChange = (event, selectedDate) => {
@@ -239,6 +248,36 @@ const ExpandableFilters = ({
           </View>
         </View>
 
+        {/* Labels Section */}
+        {availableLabels.length > 0 && (
+          <View style={[styles.section, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
+              {t('labels')}
+            </Text>
+            <View style={styles.chipContainer}>
+              {availableLabels.map(label => {
+                const isSelected = (filters.labels || []).includes(label);
+                const chipTextColor = isSelected ? '#fff' : colors.text;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    testID={`filter-label-${label}`}
+                    style={[styles.chip, {
+                      backgroundColor: isSelected ? colors.primary : colors.inputBackground,
+                      borderColor: colors.border,
+                    }]}
+                    onPress={() => toggleLabel(label)}
+                  >
+                    <Text style={[styles.chipText, { color: chipTextColor }]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         <TouchableOpacity
           testID="clear-all-button"
           style={styles.clearAllButton}
@@ -247,6 +286,7 @@ const ExpandableFilters = ({
             types: [],
             accountIds: [],
             categoryIds: [],
+            labels: [],
             dateRange: { startDate: null, endDate: null },
             amountRange: { min: null, max: null },
           })}
@@ -283,6 +323,7 @@ ExpandableFilters.propTypes = {
     types: PropTypes.array,
     accountIds: PropTypes.array,
     categoryIds: PropTypes.array,
+    labels: PropTypes.array,
     dateRange: PropTypes.object,
     amountRange: PropTypes.object,
   }).isRequired,
@@ -291,6 +332,7 @@ ExpandableFilters.propTypes = {
     id: PropTypes.string,
     name: PropTypes.string,
   })).isRequired,
+  availableLabels: PropTypes.arrayOf(PropTypes.string),
   colors: PropTypes.shape({
     background: PropTypes.string,
     text: PropTypes.string,

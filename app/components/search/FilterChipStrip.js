@@ -57,6 +57,13 @@ const FilterChipStrip = ({ searchState, onClearGroup, colors, t }) => {
     chips.push({ key: 'accountIds', label: `${t('accounts')}: ${searchState.accountIds.length}` });
   }
 
+  if (searchState.labels && searchState.labels.length > 0) {
+    const label = searchState.labels.length === 1
+      ? searchState.labels[0]
+      : `${t('labels')}: ${searchState.labels.length}`;
+    chips.push({ key: 'labels', label });
+  }
+
   if (chips.length === 0) {
     return null;
   }
@@ -97,6 +104,7 @@ FilterChipStrip.propTypes = {
     types: PropTypes.array.isRequired,
     accountIds: PropTypes.array.isRequired,
     categoryIds: PropTypes.array.isRequired,
+    labels: PropTypes.array,
     dateRange: PropTypes.shape({
       startDate: PropTypes.string,
       endDate: PropTypes.string,

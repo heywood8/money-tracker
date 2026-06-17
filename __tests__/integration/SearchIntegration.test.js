@@ -197,6 +197,7 @@ describe('Search Integration', () => {
         types: [],
         accountIds: [],
         categoryIds: [],
+        labels: [],
         dateRange: { startDate: null, endDate: null },
         amountRange: { min: null, max: null },
       });
