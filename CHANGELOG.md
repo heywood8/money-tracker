@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.14](https://github.com/heywood8/money-tracker/compare/penny-v0.134.13...penny-v0.134.14) (2026-06-17)
+
+
+### Performance Improvements
+
+* remove console logs from render/keystroke hot paths ([#913](https://github.com/heywood8/money-tracker/issues/913)) ([#931](https://github.com/heywood8/money-tracker/issues/931)) ([40ab9ac](https://github.com/heywood8/money-tracker/commit/40ab9ace0a5eecbb531d657143a93e4a424ac52d))
+
 ## [0.134.13](https://github.com/heywood8/money-tracker/compare/penny-v0.134.12...penny-v0.134.13) (2026-06-17)
 
 
