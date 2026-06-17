@@ -389,6 +389,8 @@
   "update_phase_backing_up": "正在备份…",
   "update_install_now": "立即安装",
   "downloaded_apks": "已下载 APK",
+  "installed": "已安装",
+  "installed_latest_hint": "您使用的是最新版本。",
   "release_history": "版本历史",
   "no_apk_attached": "无 APK",
   "more_releases": "更多内容见 GitHub",
