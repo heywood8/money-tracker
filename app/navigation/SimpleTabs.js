@@ -284,70 +284,33 @@ export default function SimpleTabs() {
   const screenAdjustedStyle2 = useAnimatedStyle(() => ({ opacity: screenOpacity2.value, transform: [{ translateX: screenAdjust2.value }] }));
   const screenAdjustedStyle3 = useAnimatedStyle(() => ({ opacity: screenOpacity3.value, transform: [{ translateX: screenAdjust3.value }] }));
 
-  // Called on JS thread when a non-adjacent transition finishes.
-  const clearTransitioningRef = useCallback(() => {
-    isTransitioningRef.current = false;
-  }, []);
-
   const handleTabPress = useCallback((tabKey) => {
-    if (isTransitioningRef.current) return;
     const newIndex = TABS.findIndex(tab => tab.key === tabKey);
     const oldIndex = TABS.findIndex(tab => tab.key === active);
     if (newIndex === -1 || newIndex === oldIndex) return;
 
-    const distance = Math.abs(newIndex - oldIndex);
-
-    // Mark target tab visited before animation so the screen mounts in time.
+    // Mark target tab visited so the screen mounts.
     setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
     setActive(tabKey);
     activeIndex.value = newIndex;
-    pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
-    if (distance === 1) {
-      translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING);
-      return;
-    }
-
-    // ---- Non-adjacent tab ----
-    // Reposition the target screen to sit immediately adjacent to the source
-    // on the worklet thread (zero React overhead). The strip then animates
-    // exactly 1 screen width — identical feel to adjacent. On completion the
-    // strip snaps to the real resting position and the per-screen offset is
-    // zeroed simultaneously, both on the worklet thread — no visual jump.
-    const direction = newIndex > oldIndex ? 1 : -1;
-    // How far to shift the target so it appears one screen width past the source.
-    const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
-    const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
-    const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3];
-    const targetAdjust = adjSharedValues[newIndex];
-
-    isTransitioningShared.value = true;
-    isTransitioningRef.current = true;
-
-    // Hide intermediate screens so they don't bleed through when the repositioned
-    // target overlaps their strip position (all worklet-thread, no React render).
-    for (let i = 0; i < 4; i++) {
-      if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
-    }
-
-    targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
-    translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
-      'worklet';
-      if (!finished) return;
-      // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
-      translateX.value = -newIndex * SCREEN_WIDTH;
-      targetAdjust.value = 0;
-      opacityValues[0].value = 1;
-      opacityValues[1].value = 1;
-      opacityValues[2].value = 1;
-      opacityValues[3].value = 1;
-      isTransitioningShared.value = false;
-      runOnJS(clearTransitioningRef)();
-    });
-  }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
+    // Switch instantly — no slide animation. The strip and pill jump straight
+    // to the target position on the worklet thread so there is no perceived
+    // delay between tapping a tab and the new screen appearing. Any per-screen
+    // offset/opacity left over from a prior swipe is reset to its resting state.
+    pillPosition.value = newIndex;
+    translateX.value = -newIndex * SCREEN_WIDTH;
+    screenAdjust0.value = 0;
+    screenAdjust1.value = 0;
+    screenAdjust2.value = 0;
+    screenAdjust3.value = 0;
+    screenOpacity0.value = 1;
+    screenOpacity1.value = 1;
+    screenOpacity2.value = 1;
+    screenOpacity3.value = 1;
+  }, [TABS, active, activeIndex, translateX, pillPosition,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
-    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
-    clearTransitioningRef]);
+    screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3]);
 
   // Android hardware back button navigates to Operations from any other tab
   React.useEffect(() => {
