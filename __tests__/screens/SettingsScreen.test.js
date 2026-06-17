@@ -888,7 +888,6 @@ describe('SettingsScreen', () => {
   });
 
   describe('Update check', () => {
-    // eslint-disable-next-line global-require
     const { checkForAppUpdate } = require('../../app/services/AppUpdateService');
 
     it('forwards currentVersion to the panel when up to date so the latest card can be highlighted', async () => {
