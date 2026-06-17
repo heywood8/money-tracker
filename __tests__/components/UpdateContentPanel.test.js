@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 // fireEvent is used for update button press tests
-import UpdateContentPanel from '../../app/components/UpdateContentPanel';
+import UpdateContentPanel, { parseReleaseNotes } from '../../app/components/UpdateContentPanel';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -21,6 +22,27 @@ const baseProps = {
   onUpdate: jest.fn(),
   onInstallApk: jest.fn(),
 };
+
+describe('parseReleaseNotes', () => {
+  it('lifts the date out of a semantic-release heading and removes the duplicate line', () => {
+    const notes = '## 0.134.15 (2026-06-17)\n\n### Performance Improvements\n\n* icon-picker tweak';
+    const { date, body } = parseReleaseNotes(notes, '0.134.15');
+    expect(date).toBe('2026-06-17');
+    expect(body).not.toContain('0.134.15');
+    expect(body).toContain('Performance Improvements');
+    expect(body).toContain('icon-picker tweak');
+  });
+
+  it('keeps the whole body and returns no date when there is no version heading', () => {
+    const { date, body } = parseReleaseNotes('Bug fix release', '1.2.0');
+    expect(date).toBeNull();
+    expect(body).toBe('Bug fix release');
+  });
+
+  it('handles empty notes gracefully', () => {
+    expect(parseReleaseNotes('', '1.0.0')).toEqual({ date: null, body: '' });
+  });
+});
 
 describe('UpdateContentPanel', () => {
   beforeEach(() => {
@@ -83,8 +105,8 @@ describe('UpdateContentPanel', () => {
       expect(getByText('more_releases')).toBeTruthy();
     });
 
-    it('shows downloaded APKs list when present', async () => {
-      const { getByText } = await render(
+    it('shows an inline install button on the release matching a downloaded APK', async () => {
+      const { getByLabelText, queryByText } = await render(
         <UpdateContentPanel
           {...baseProps}
           updateResult={{
@@ -93,6 +115,41 @@ describe('UpdateContentPanel', () => {
             releasesUrl: null,
           }}
           downloadedApks={[{ uri: 'file:///cache/penny-1.0.0.apk', version: '1.0.0', filename: 'penny-1.0.0.apk', modificationTime: 1700000000 }]}
+        />,
+      );
+      // Matching APK is shown inline on its release, not in a separate list.
+      expect(getByLabelText('Install version 1.0.0')).toBeTruthy();
+      expect(queryByText('downloaded_apks')).toBeNull();
+    });
+
+    it('installs the matching APK when its inline button is pressed', async () => {
+      const onInstallApk = jest.fn();
+      const { getByLabelText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          onInstallApk={onInstallApk}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [{ version: '1.0.0', notes: 'Notes' }],
+            releasesUrl: null,
+          }}
+          downloadedApks={[{ uri: 'file:///cache/penny-1.0.0.apk', version: '1.0.0', filename: 'penny-1.0.0.apk', modificationTime: 1700000000 }]}
+        />,
+      );
+      fireEvent.press(getByLabelText('Install version 1.0.0'));
+      expect(onInstallApk).toHaveBeenCalledWith('file:///cache/penny-1.0.0.apk');
+    });
+
+    it('lists downloaded APKs that do not match any displayed release', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [{ version: '1.0.0', notes: 'Notes' }],
+            releasesUrl: null,
+          }}
+          downloadedApks={[{ uri: 'file:///cache/penny-0.9.0.apk', version: '0.9.0', filename: 'penny-0.9.0.apk', modificationTime: 1700000000 }]}
         />,
       );
       expect(getByText('downloaded_apks')).toBeTruthy();
@@ -249,6 +306,25 @@ describe('UpdateContentPanel', () => {
         />,
       );
       expect(getByText('update_install_hint')).toBeTruthy();
+    });
+
+    it('renders #PR references as links to the GitHub pull request', async () => {
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
+      const { getByLabelText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            ...availableResult,
+            releasesUrl: 'https://github.com/heywood8/money-tracker/releases',
+            releaseNotes: [{ version: '2.0.0', notes: 'Fix crash (#916)', hasApk: true }],
+          }}
+        />,
+      );
+      const link = getByLabelText('Pull request 916');
+      expect(link).toBeTruthy();
+      fireEvent.press(link);
+      expect(openURL).toHaveBeenCalledWith('https://github.com/heywood8/money-tracker/pull/916');
+      openURL.mockRestore();
     });
 
     it('uses recentReleaseNotes when releaseNotes is null but recentReleaseNotes is present', async () => {
