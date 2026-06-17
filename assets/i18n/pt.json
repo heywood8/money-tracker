@@ -393,6 +393,8 @@
   "update_phase_backing_up": "Criando backup…",
   "update_install_now": "Instalar agora",
   "downloaded_apks": "APKs baixados",
+  "installed": "Instalada",
+  "installed_latest_hint": "Você está na versão mais recente.",
   "release_history": "Histórico de versões",
   "no_apk_attached": "Sem APK",
   "more_releases": "Mais no GitHub",

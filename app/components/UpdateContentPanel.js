@@ -103,10 +103,20 @@ const formatApkDate = (modificationTime) => {
   return new Date(modificationTime * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk, colors }) {
+// Green used for the "installed / up to date" status, matching the checkmark elsewhere in this panel.
+const INSTALLED_GREEN = '#4caf50';
+
+function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled }) {
   const { date, body } = parseReleaseNotes(notes, version);
+  const accent = isLatestInstalled ? INSTALLED_GREEN : colors.primary;
   return (
-    <View style={[styles.releaseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.releaseCard,
+        { backgroundColor: colors.surface, borderColor: isInstalled ? accent : colors.border },
+        isInstalled && styles.releaseCardInstalled,
+      ]}
+    >
       <View style={styles.releaseHeader}>
         <View style={styles.releaseHeaderLeft}>
           <Text style={[styles.releaseVersion, { color: colors.text }]}>v{version}</Text>
@@ -117,6 +127,22 @@ function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk
             <Text style={[styles.releaseBadge, { color: colors.mutedText, borderColor: colors.border }]}>
               {badge}
             </Text>
+          ) : null}
+          {isInstalled ? (
+            <View
+              style={[styles.installedChip, { borderColor: accent }]}
+              accessibilityRole="text"
+              accessibilityLabel={isLatestInstalled
+                ? (t('installed_latest_hint') || 'Installed — you are on the latest version')
+                : (t('installed') || 'Installed')}
+            >
+              {isLatestInstalled ? (
+                <Ionicons name="checkmark-circle" size={13} color={accent} />
+              ) : null}
+              <Text style={[styles.installedChipText, { color: accent }]}>
+                {t('installed') || 'Installed'}
+              </Text>
+            </View>
           ) : null}
         </View>
         {matchedApk ? (
@@ -131,6 +157,14 @@ function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk
           </TouchableOpacity>
         ) : null}
       </View>
+      {isLatestInstalled ? (
+        <View style={styles.installedHintRow}>
+          <Ionicons name="information-circle-outline" size={13} color={INSTALLED_GREEN} />
+          <Text style={[styles.installedHintText, { color: INSTALLED_GREEN }]}>
+            {t('installed_latest_hint') || "You're on the latest version."}
+          </Text>
+        </View>
+      ) : null}
       {body ? (
         <Text style={[styles.releaseBody, { color: colors.text }]}>
           {renderNotesWithLinks(body, repoBase, colors.primary)}
@@ -148,6 +182,9 @@ ReleaseCard.propTypes = {
   repoBase: PropTypes.string,
   onInstallApk: PropTypes.func,
   colors: PropTypes.object,
+  t: PropTypes.func,
+  isInstalled: PropTypes.bool,
+  isLatestInstalled: PropTypes.bool,
 };
 
 function MoreReleasesLink({ url, colors, t }) {
@@ -259,18 +296,29 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
   const repoBase = repoBaseFromReleasesUrl(updateResult.releasesUrl);
   const apkLookup = buildApkLookup(downloadedApks);
 
-  const renderReleaseCards = (releases) => releases.map((release) => (
-    <ReleaseCard
-      key={release.version}
-      version={release.version}
-      notes={release.notes}
-      badge={release.badge}
-      matchedApk={apkLookup.get(release.version)}
-      repoBase={repoBase}
-      onInstallApk={onInstallApk}
-      colors={colors}
-    />
-  ));
+  // The currently installed app version. When there is no newer release (up_to_date),
+  // the installed version is also the latest one and earns the green checkmark + hint.
+  const installedVersion = updateResult.currentVersion;
+  const installedIsLatest = updateResult.type === 'up_to_date';
+
+  const renderReleaseCards = (releases) => releases.map((release) => {
+    const isInstalled = !!installedVersion && release.version === installedVersion;
+    return (
+      <ReleaseCard
+        key={release.version}
+        version={release.version}
+        notes={release.notes}
+        badge={release.badge}
+        matchedApk={apkLookup.get(release.version)}
+        repoBase={repoBase}
+        onInstallApk={onInstallApk}
+        colors={colors}
+        t={t}
+        isInstalled={isInstalled}
+        isLatestInstalled={isInstalled && installedIsLatest}
+      />
+    );
+  });
 
   return (
     <Animated.View style={[styles.resultContainer, { opacity: contentAnim }]}>
@@ -543,6 +591,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING * 2,
     paddingVertical: SPACING.xl,
   },
+  installedChip: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 2,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 1,
+  },
+  installedChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  installedHintRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+    paddingLeft: SPACING.sm,
+  },
+  installedHintText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   moreReleasesLink: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -587,6 +661,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
+  },
+  releaseCardInstalled: {
+    borderWidth: 1.5,
   },
   releaseDate: {
     fontSize: 12,

@@ -341,4 +341,68 @@ describe('UpdateContentPanel', () => {
       expect(getByText('Recent release notes')).toBeTruthy();
     });
   });
+
+  describe('installed version highlighting', () => {
+    it('marks the installed version as latest with a checkmark hint when up to date', async () => {
+      const { getAllByText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '1.2.0',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Latest release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // The installed (and latest) release shows the "Installed" chip and the latest hint.
+      expect(getAllByText('installed').length).toBeGreaterThan(0);
+      expect(getByText('installed_latest_hint')).toBeTruthy();
+    });
+
+    it('marks the installed version without the latest hint when an update is available', async () => {
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'available',
+            latestVersion: '2.0.0',
+            currentVersion: '1.9.0',
+            downloadUrl: 'https://example.com/penny-2.0.0.apk',
+            checksumUrl: null,
+            releaseNotes: null,
+            recentReleaseNotes: [
+              { version: '2.0.0', notes: 'New release' },
+              { version: '1.9.0', notes: 'Installed release' },
+            ],
+            releasesUrl: null,
+            alreadyDownloaded: false,
+            localUri: null,
+          }}
+        />,
+      );
+      // Installed version is highlighted, but it is not the latest, so no green hint.
+      expect(getByText('installed')).toBeTruthy();
+      expect(queryByText('installed_latest_hint')).toBeNull();
+    });
+
+    it('does not highlight any release when the installed version is not in the list', async () => {
+      const { queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '9.9.9',
+            recentReleaseNotes: [{ version: '1.2.0', notes: 'Latest release' }],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(queryByText('installed')).toBeNull();
+      expect(queryByText('installed_latest_hint')).toBeNull();
+    });
+  });
 });

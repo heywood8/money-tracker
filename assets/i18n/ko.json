@@ -393,6 +393,8 @@
   "update_phase_backing_up": "백업 생성 중…",
   "update_install_now": "지금 설치",
   "downloaded_apks": "다운로드된 APK",
+  "installed": "설치됨",
+  "installed_latest_hint": "최신 버전입니다.",
   "release_history": "릴리스 기록",
   "no_apk_attached": "APK 없음",
   "more_releases": "GitHub에서 더 보기",

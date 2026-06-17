@@ -389,6 +389,8 @@
   "update_phase_backing_up": "Sicherung wird erstellt…",
   "update_install_now": "Jetzt installieren",
   "downloaded_apks": "Heruntergeladene APKs",
+  "installed": "Installiert",
+  "installed_latest_hint": "Du hast die neueste Version.",
   "release_history": "Versionsverlauf",
   "no_apk_attached": "Kein APK",
   "more_releases": "Mehr auf GitHub",
