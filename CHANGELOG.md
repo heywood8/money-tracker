@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.16](https://github.com/heywood8/money-tracker/compare/penny-v0.134.15...penny-v0.134.16) (2026-06-17)
+
+
+### Performance Improvements
+
+* **operations:** optimistic insert in addOperation, rollback on error ([#911](https://github.com/heywood8/money-tracker/issues/911)) ([#938](https://github.com/heywood8/money-tracker/issues/938)) ([91d420a](https://github.com/heywood8/money-tracker/commit/91d420a6d7454681eb0f8ff2937e6df060dbc5f0))
+
 ## [0.134.15](https://github.com/heywood8/money-tracker/compare/penny-v0.134.14...penny-v0.134.15) (2026-06-17)
 
 
