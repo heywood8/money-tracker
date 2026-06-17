@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.3](https://github.com/heywood8/money-tracker/compare/penny-v0.136.2...penny-v0.136.3) (2026-06-17)
+
+
+### Bug Fixes
+
+* **update:** move up-to-date confirmation onto highlighted latest release card ([#989](https://github.com/heywood8/money-tracker/issues/989)) ([176f93f](https://github.com/heywood8/money-tracker/commit/176f93fe02b79d80da545a5e9419496dde8be8ec))
+
 ## [0.136.2](https://github.com/heywood8/money-tracker/compare/penny-v0.136.1...penny-v0.136.2) (2026-06-17)
 
 
