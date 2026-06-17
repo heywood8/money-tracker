@@ -309,9 +309,42 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
+// Mock OperationsDataContext — `loading` drives the progressive pre-warm.
+// Defaults to true (cold start) so lazy-mount behavior is exercised; individual
+// tests can flip mockOperationsLoading to false to exercise pre-warming.
+let mockOperationsLoading = true;
+jest.mock('../../app/contexts/OperationsDataContext', () => ({
+  useOperationsData: () => ({ loading: mockOperationsLoading }),
+}));
+
 describe('SimpleTabs Component Rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockOperationsLoading = true;
+  });
+
+  afterEach(() => {
+    mockOperationsLoading = true;
+  });
+
+  it('progressively pre-warms remaining screens once operations finish loading', async () => {
+    mockOperationsLoading = false;
+    const { getByText } = await render(<SimpleTabs />);
+
+    // Operations is mounted immediately; the rest are mounted lazily during
+    // idle time after loading completes — without any tab being pressed.
+    expect(getByText('Operations Screen')).toBeTruthy();
+    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
+    await waitFor(() => expect(getByText('Planned Screen')).toBeTruthy());
+  });
+
+  it('does not pre-warm screens while operations are still loading', async () => {
+    mockOperationsLoading = true;
+    const { getByText, queryByText } = await render(<SimpleTabs />);
+
+    expect(getByText('Operations Screen')).toBeTruthy();
+    // Graphs stays unmounted because the first screen hasn't finished loading.
+    expect(queryByText('Graphs Screen')).toBeNull();
   });
 
   it('renders without crashing', async () => {

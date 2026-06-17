@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -24,6 +24,7 @@ import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { useOperationsData } from '../contexts/OperationsDataContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -232,6 +233,9 @@ export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
+  // Drives progressive pre-warming: once the first screen's operations have
+  // finished loading we mount the remaining screens during idle time.
+  const { loading: operationsLoading } = useOperationsData();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
@@ -374,6 +378,36 @@ export default function SimpleTabs() {
     });
     return () => subscription.remove();
   }, [active, handleTabPress]);
+
+  // ---- Progressive idle pre-warm ----
+  // Once the first (Operations) screen's data has loaded, mount the remaining
+  // screens one at a time during idle time so later tab switches are instant
+  // and already populated — without paying their mount cost at cold start.
+  // runAfterInteractions waits until the initial render/touch interactions
+  // settle; staggering each mount onto its own frame keeps any single heavy
+  // screen from janking. If the user taps a not-yet-warmed tab first,
+  // handleTabPress still mounts it on demand.
+  const prewarmStartedRef = useRef(false);
+  React.useEffect(() => {
+    if (operationsLoading || prewarmStartedRef.current) return;
+    prewarmStartedRef.current = true;
+
+    let cancelled = false;
+    const order = [1, 2, 3]; // Graphs, Planned, Settings
+    let i = 0;
+    const mountNext = () => {
+      if (cancelled || i >= order.length) return;
+      const idx = order[i++];
+      setVisited(prev => (prev[idx] ? prev : { ...prev, [idx]: true }));
+      requestAnimationFrame(mountNext);
+    };
+    const task = InteractionManager.runAfterInteractions(mountNext);
+
+    return () => {
+      cancelled = true;
+      if (task && task.cancel) task.cancel();
+    };
+  }, [operationsLoading]);
 
   // Pan gesture for swipe navigation with real-time feedback.
   // isTransitioningShared guards against swipe during non-adjacent transitions
