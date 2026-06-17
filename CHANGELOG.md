@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.134.15](https://github.com/heywood8/money-tracker/compare/penny-v0.134.14...penny-v0.134.15) (2026-06-17)
+
+
+### Performance Improvements
+
+* **icon-picker:** virtualize grid with FlatList, fix selected icon highlight ([#916](https://github.com/heywood8/money-tracker/issues/916)) ([#934](https://github.com/heywood8/money-tracker/issues/934)) ([171003e](https://github.com/heywood8/money-tracker/commit/171003ee13c5909555074512d4c4ccf3fe5e88c1))
+
 ## [0.134.14](https://github.com/heywood8/money-tracker/compare/penny-v0.134.13...penny-v0.134.14) (2026-06-17)
 
 
