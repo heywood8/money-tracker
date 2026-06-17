@@ -147,7 +147,15 @@ export default function ModalShell({
       >
         <KeyboardAvoidingView
           style={styles.flex1}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // On Android, RN's Modal window already uses SOFT_INPUT_ADJUST_RESIZE,
+          // so its content area shrinks above the keyboard on its own. Adding a
+          // `behavior="height"` KeyboardAvoidingView on top double-adjusts the
+          // layout and leaves the bottom sheet "stuck" slightly lifted after the
+          // keyboard is dismissed (e.g. via the back button). Disable the KAV on
+          // Android and let the native resize handle it; the overlay's
+          // justifyContent: 'flex-end' keeps the card riding above the keyboard.
+          enabled={Platform.OS === 'ios'}
         >
           <Pressable style={styles.overlay} onPress={() => animateOut(onDismiss)}>
             <Animated.View style={{ transform: [{ translateY }] }}>
