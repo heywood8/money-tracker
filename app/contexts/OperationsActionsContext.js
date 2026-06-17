@@ -1,3 +1,4 @@
+/* global __DEV__ */
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import PropTypes from 'prop-types';
