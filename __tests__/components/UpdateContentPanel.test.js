@@ -404,5 +404,42 @@ describe('UpdateContentPanel', () => {
       expect(queryByText('installed')).toBeNull();
       expect(queryByText('installed_latest_hint')).toBeNull();
     });
+
+    it('puts the up-to-date confirmation on the highlighted latest card, not at the bottom', async () => {
+      const { queryByText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '1.2.0',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Latest release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // The confirmation lives on the green latest-release card...
+      expect(getByText('installed_latest_hint')).toBeTruthy();
+      // ...and the standalone bottom status is gone.
+      expect(queryByText('up_to_date')).toBeNull();
+    });
+
+    it('falls back to the bottom up-to-date status when the latest version is not shown as a card', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '9.9.9',
+            recentReleaseNotes: [{ version: '1.2.0', notes: 'Latest release' }],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // No card matches the installed version, so the confirmation falls back to the bottom.
+      expect(getByText('up_to_date')).toBeTruthy();
+    });
   });
 });
