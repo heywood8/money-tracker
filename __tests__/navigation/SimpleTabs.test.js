@@ -347,6 +347,19 @@ describe('SimpleTabs Component Rendering', () => {
     expect(queryByText('Graphs Screen')).toBeNull();
   });
 
+  it('pre-warms after loading transitions from true to false', async () => {
+    // Cold start: loading true, nothing pre-warmed yet.
+    mockOperationsLoading = true;
+    const { rerender, getByText, queryByText } = await render(<SimpleTabs />);
+    expect(queryByText('Graphs Screen')).toBeNull();
+
+    // Operations data finishes loading — pre-warm should now mount the rest.
+    mockOperationsLoading = false;
+    rerender(<SimpleTabs />);
+    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
+    await waitFor(() => expect(getByText('Planned Screen')).toBeTruthy());
+  });
+
   it('renders without crashing', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
     expect(getByTestId('mock-header')).toBeTruthy();

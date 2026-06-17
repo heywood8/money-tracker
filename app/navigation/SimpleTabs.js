@@ -387,10 +387,13 @@ export default function SimpleTabs() {
   // settle; staggering each mount onto its own frame keeps any single heavy
   // screen from janking. If the user taps a not-yet-warmed tab first,
   // handleTabPress still mounts it on demand.
-  const prewarmStartedRef = useRef(false);
+  //
+  // Guarded on completion (all screens visited) rather than a fire-once flag:
+  // `loading` can flip back to true on a data reload (import/restore, filter
+  // re-query), so a one-shot latch would cancel an in-flight warm and never
+  // restart. Re-running until every screen is mounted is resilient to that.
   React.useEffect(() => {
-    if (operationsLoading || prewarmStartedRef.current) return;
-    prewarmStartedRef.current = true;
+    if (operationsLoading || (visited[1] && visited[2] && visited[3])) return;
 
     let cancelled = false;
     const order = [1, 2, 3]; // Graphs, Planned, Settings
@@ -407,7 +410,7 @@ export default function SimpleTabs() {
       cancelled = true;
       if (task && task.cancel) task.cancel();
     };
-  }, [operationsLoading]);
+  }, [operationsLoading, visited]);
 
   // Pan gesture for swipe navigation with real-time feedback.
   // isTransitioningShared guards against swipe during non-adjacent transitions
