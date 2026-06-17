@@ -141,7 +141,6 @@ SimpleTabs was moved here from `components/` to resolve a circular dependency. N
 - `AddFAB.js` - Floating action button for adding items
 - `BudgetProgressBar.js` - Budget progress visualization
 - `Calculator.js` - Calculator widget for amount entry
-- `DescriptionAutocomplete.js` - Autocomplete for operation descriptions
 - `EmptyState.js` - Empty list placeholder
 - `ErrorBoundary.js` - React error boundary wrapper
 - `FormInput.js` - Styled form input component

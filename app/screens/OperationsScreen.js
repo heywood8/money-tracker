@@ -548,7 +548,7 @@ const OperationsScreen = () => {
       }
     } catch (error) {
       // Errors from addOperation are already shown via dialog.
-      // Errors from getDistinctDescriptions are non-critical — suggestion row simply won't appear.
+      // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
   }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
 
@@ -587,6 +587,9 @@ const OperationsScreen = () => {
 
     const merged = serializeLabels(addLabel(parseLabels(op.description), label));
 
+    // Remove the chip optimistically before the await. If updateOperation fails,
+    // its error surfaces via the dialog in OperationsActionsContext; the chip stays
+    // dismissed rather than re-appearing, which avoids a confusing retry loop.
     setPendingSuggestions((prev) => {
       const remaining = prev.filter(l => l.toLowerCase() !== label.toLowerCase());
       if (remaining.length === 0) {
