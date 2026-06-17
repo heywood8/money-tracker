@@ -391,6 +391,11 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
           {updateResult.recentReleaseNotes ? (() => {
             const releases = updateResult.recentReleaseNotes;
             const unmatched = unmatchedApksFor(downloadedApks, releases);
+            // The installed version is also the latest one here, so it is rendered as a
+            // green-highlighted card carrying the "you're on the latest version" hint inline.
+            // Only fall back to a standalone bottom status when that card is absent (the
+            // installed version isn't among the listed releases).
+            const latestShownOnCard = !!installedVersion && releases.some((r) => r.version === installedVersion);
             return (
               <>
                 <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
@@ -406,16 +411,22 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                     <MoreReleasesLink url={updateResult.releasesUrl} colors={colors} t={t} />
                   )}
                 </ScrollView>
-                <Divider style={styles.updateDivider} />
-                <View style={styles.updateBottomRow}>
-                  <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
-                  <View style={styles.upToDateBottomRight}>
-                    <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
-                    <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
-                      {t('up_to_date') || 'You already have the latest version installed.'}
-                    </Text>
-                  </View>
-                </View>
+                {(unmatched.length > 0 || !latestShownOnCard) && (
+                  <>
+                    <Divider style={styles.updateDivider} />
+                    <View style={styles.updateBottomRow}>
+                      <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
+                      {!latestShownOnCard ? (
+                        <View style={styles.upToDateBottomRight}>
+                          <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
+                          <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
+                            {t('up_to_date') || 'You already have the latest version installed.'}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </>
+                )}
               </>
             );
           })() : (
