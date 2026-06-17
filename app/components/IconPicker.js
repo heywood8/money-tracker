@@ -66,17 +66,15 @@ export default function IconPicker({ visible, onClose, onSelect, selectedIcon })
 
   const renderItem = useCallback(({ item: iconName }) => {
     const isSelected = selectedIcon === iconName;
+    const dynamicStyle = {
+      width: iconSize,
+      height: iconSize,
+      backgroundColor: isSelected ? colors.primary + '22' : colors.background,
+      borderColor: isSelected ? colors.primary : 'transparent',
+    };
     return (
       <TouchableOpacity
-        style={[
-          styles.iconButton,
-          {
-            width: iconSize,
-            height: iconSize,
-            backgroundColor: isSelected ? colors.primary + '22' : colors.background,
-            borderColor: isSelected ? colors.primary : 'transparent',
-          },
-        ]}
+        style={[styles.iconButton, dynamicStyle]}
         onPress={() => handleSelect(iconName)}
         accessibilityLabel={iconName}
         accessibilityRole="button"
