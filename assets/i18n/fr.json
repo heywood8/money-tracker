@@ -414,5 +414,18 @@
   "pending_in": "Entrée en attente",
   "done_this_month": "Fait ce mois-ci",
   "done": "Terminé",
-  "remaining": "restant"
+  "remaining": "restant",
+  "exporting": "Exportation…",
+  "export_success": "Exportation terminée",
+  "add_account_hint": "Ouvre le formulaire pour créer un nouveau compte",
+  "add_category_hint": "Ouvre le formulaire pour créer une nouvelle catégorie",
+  "back": "Retour",
+  "currency": "Devise",
+  "drag_to_reorder": "Glisser pour réorganiser",
+  "error_loading_accounts": "Échec du chargement des comptes",
+  "execute": "Exécuter",
+  "loading_accounts": "Chargement des comptes...",
+  "loading_categories": "Chargement des catégories...",
+  "none": "Aucun",
+  "update_download_failed": "Impossible de télécharger la mise à jour. Veuillez réessayer."
 }

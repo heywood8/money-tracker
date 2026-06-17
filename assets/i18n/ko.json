@@ -414,5 +414,18 @@
   "pending_in": "수입 예정",
   "done_this_month": "이번 달 완료",
   "done": "완료",
-  "remaining": "남은 금액"
+  "remaining": "남은 금액",
+  "exporting": "내보내는 중…",
+  "export_success": "내보내기 완료",
+  "add_account_hint": "새 계정을 만드는 양식을 엽니다",
+  "add_category_hint": "새 카테고리를 만드는 양식을 엽니다",
+  "back": "뒤로",
+  "currency": "통화",
+  "drag_to_reorder": "드래그하여 순서 변경",
+  "error_loading_accounts": "계정을 불러오지 못했습니다",
+  "execute": "실행",
+  "loading_accounts": "계정 불러오는 중...",
+  "loading_categories": "카테고리 불러오는 중...",
+  "none": "없음",
+  "update_download_failed": "업데이트를 다운로드할 수 없습니다. 다시 시도해 주세요."
 }

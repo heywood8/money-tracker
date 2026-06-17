@@ -414,5 +414,18 @@
   "offline_rate": "offline",
   "rate_unavailable": "Kurs nicht verfügbar",
   "exchange_rate_unavailable": "Wechselkurs nicht verfügbar. Bitte Verbindung prüfen und erneut versuchen.",
-  "exchange_rate_required": "Wechselkurs ist für Fremdwährungstransaktionen erforderlich"
+  "exchange_rate_required": "Wechselkurs ist für Fremdwährungstransaktionen erforderlich",
+  "exporting": "Exportieren…",
+  "export_success": "Export abgeschlossen",
+  "add_account_hint": "Öffnet das Formular zum Erstellen eines neuen Kontos",
+  "add_category_hint": "Öffnet das Formular zum Erstellen einer neuen Kategorie",
+  "back": "Zurück",
+  "currency": "Währung",
+  "drag_to_reorder": "Zum Neuordnen ziehen",
+  "error_loading_accounts": "Konten konnten nicht geladen werden",
+  "execute": "Ausführen",
+  "loading_accounts": "Konten werden geladen...",
+  "loading_categories": "Kategorien werden geladen...",
+  "none": "Keine",
+  "update_download_failed": "Update konnte nicht heruntergeladen werden. Bitte erneut versuchen."
 }

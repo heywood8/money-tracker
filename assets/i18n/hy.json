@@ -414,5 +414,18 @@
   "offline_rate": "artakain",
   "rate_unavailable": "Kurs hasaneli che",
   "exchange_rate_unavailable": "Poharzheku hasaneli che: Xndrum enk stavrel kapoghutyuny ev krkin forcel:",
-  "exchange_rate_required": "Փոխարժեքը պարտադիր է արտաքին արժույթով գործողությունների համար"
+  "exchange_rate_required": "Փոխարժեքը պարտադիր է արտաքին արժույթով գործողությունների համար",
+  "exporting": "Արտահանում…",
+  "export_success": "Արտահանումն ավարտված է",
+  "add_account_hint": "Բացում է նոր հաշիվ ստեղծելու ձևը",
+  "add_category_hint": "Բացում է նոր կատեգորիա ստեղծելու ձևը",
+  "back": "Հետ",
+  "currency": "Արժույթ",
+  "drag_to_reorder": "Քաշեք՝ վերադասավորելու համար",
+  "error_loading_accounts": "Չհաջողվեց բեռնել հաշիվները",
+  "execute": "Կատարել",
+  "loading_accounts": "Հաշիվների բեռնում...",
+  "loading_categories": "Կատեգորիաների բեռնում...",
+  "none": "Չկա",
+  "update_download_failed": "Չհաջողվեց ներբեռնել թարմացումը։ Խնդրում ենք նորից փորձել։"
 }

@@ -414,5 +414,18 @@
   "pending_in": "Pending in",
   "done_this_month": "Done this month",
   "done": "Done",
-  "remaining": "remaining"
+  "remaining": "remaining",
+  "exporting": "Exporting…",
+  "export_success": "Export complete",
+  "add_account_hint": "Opens form to create a new account",
+  "add_category_hint": "Opens form to create a new category",
+  "back": "Back",
+  "currency": "Currency",
+  "drag_to_reorder": "Drag to reorder",
+  "error_loading_accounts": "Failed to load accounts",
+  "execute": "Execute",
+  "loading_accounts": "Loading accounts...",
+  "loading_categories": "Loading categories...",
+  "none": "None",
+  "update_download_failed": "Could not download the update. Please try again."
 }

@@ -414,5 +414,18 @@
   "pending_in": "In entrata",
   "done_this_month": "Fatto questo mese",
   "done": "Fatto",
-  "remaining": "rimanente"
+  "remaining": "rimanente",
+  "exporting": "Esportazione…",
+  "export_success": "Esportazione completata",
+  "add_account_hint": "Apre il modulo per creare un nuovo conto",
+  "add_category_hint": "Apre il modulo per creare una nuova categoria",
+  "back": "Indietro",
+  "currency": "Valuta",
+  "drag_to_reorder": "Trascina per riordinare",
+  "error_loading_accounts": "Impossibile caricare i conti",
+  "execute": "Esegui",
+  "loading_accounts": "Caricamento conti...",
+  "loading_categories": "Caricamento categorie...",
+  "none": "Nessuno",
+  "update_download_failed": "Impossibile scaricare l'aggiornamento. Riprova."
 }
