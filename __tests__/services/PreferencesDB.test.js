@@ -14,6 +14,8 @@ import {
   setJsonPreference,
   deletePreference,
   getAllPreferences,
+  getDefaultAccountId,
+  setDefaultAccountId,
 } from '../../app/services/PreferencesDB';
 import { queryFirst, executeQuery, queryAll } from '../../app/services/db';
 
@@ -67,6 +69,7 @@ describe('PreferencesDB', () => {
         'UPDATE_SKIP_UNTIL',
         'HIDE_BALANCES',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
+        'DEFAULT_ACCOUNT_ID',
       ]);
     });
   });
@@ -494,6 +497,52 @@ describe('PreferencesDB', () => {
       const result = await getJsonPreference(PREF_KEYS.OPERATIONS_FILTERS);
 
       expect(result).toEqual(filters);
+    });
+  });
+
+  describe('DEFAULT_ACCOUNT_ID key', () => {
+    it('is defined in PREF_KEYS', () => {
+      expect(PREF_KEYS.DEFAULT_ACCOUNT_ID).toBe('default_account_id');
+    });
+  });
+
+  describe('getDefaultAccountId', () => {
+    it('returns null when preference is not set', async () => {
+      queryFirst.mockResolvedValueOnce(null);
+      const result = await getDefaultAccountId();
+      expect(result).toBeNull();
+    });
+
+    it('returns numeric id when preference is set', async () => {
+      queryFirst.mockResolvedValueOnce({ value: '42' });
+      const result = await getDefaultAccountId();
+      expect(result).toBe(42);
+    });
+
+    it('returns null on db error', async () => {
+      queryFirst.mockRejectedValueOnce(new Error('db error'));
+      const result = await getDefaultAccountId();
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('setDefaultAccountId', () => {
+    it('stores id as string in app_metadata when id is provided', async () => {
+      executeQuery.mockResolvedValueOnce(undefined);
+      await setDefaultAccountId(42);
+      expect(executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR REPLACE INTO app_metadata'),
+        ['default_account_id', '42', expect.any(String)],
+      );
+    });
+
+    it('deletes preference when id is null', async () => {
+      executeQuery.mockResolvedValueOnce(undefined);
+      await setDefaultAccountId(null);
+      expect(executeQuery).toHaveBeenCalledWith(
+        'DELETE FROM app_metadata WHERE key = ?',
+        ['default_account_id'],
+      );
     });
   });
 });

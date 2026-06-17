@@ -25,13 +25,14 @@ import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { checkForAppUpdate, listDownloadedApks, installApk, checkAlreadyDownloaded } from '../services/AppUpdateService';
-import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
+import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import AccountsScreen from './AccountsScreen';
+import { useAccountsData } from '../contexts/AccountsDataContext';
 import CategoriesScreen from './CategoriesScreen';
 
 const SHEETS_STEPS = [
@@ -69,8 +70,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
-  const { startDownload } = useUpdateDownload();
+  const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
+  const { visibleAccounts } = useAccountsData();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
+  const [pinnedAccountId, setPinnedAccountId] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -102,6 +105,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const sqliteColor = sqliteExportSuccess ? '#4caf50' : colors.text;
   const csvColor = csvExportSuccess ? '#4caf50' : colors.text;
   const jsonColor = jsonExportSuccess ? '#4caf50' : colors.text;
+  const defaultAccountName = pinnedAccountId
+    ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
+    : t('latest_used');
 
   // Toggle animations using reanimated shared values
   const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
@@ -217,6 +223,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const closeWithShrink = useCallback(() => {
     commitShrink(closeSubPanel);
   }, [commitShrink, closeSubPanel]);
+
+  useEffect(() => {
+    getDefaultAccountId().then(id => setPinnedAccountId(id));
+  }, []);
+
+  const handleDefaultAccountSelect = useCallback(async (id) => {
+    await setDefaultAccountId(id);
+    setPinnedAccountId(id);
+    closeSubPanel();
+  }, [closeSubPanel]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -355,9 +371,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     try {
       await resetDatabase();
     } catch (error) {
-      // Error already handled in resetDatabase
+      console.error('[Settings] Database reset failed:', error);
+      showDialog(t('error') || 'Error', error.message || 'Database reset failed', [{ text: 'OK' }]);
     }
-  }, [closeSubPanel, resetDatabase]);
+  }, [closeSubPanel, resetDatabase, showDialog, t]);
 
   const confirmImportBackup = useCallback(async () => {
     if (importPickInProgress.current) return;
@@ -470,9 +487,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
       cancelImport();
       if (!(restoreError instanceof CancelledImportError)) {
         console.error('[SheetsImport] restore error:', restoreError);
+        showDialog(t('error') || 'Error', restoreError.message || t('restore_error') || 'Failed to restore backup', [{ text: 'OK' }]);
       }
     }
-  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken]);
+  }, [t, closeSubPanel, startImport, completeImport, cancelImport, getCancelToken, showDialog]);
 
   const handleImportLocalBackupSelect = useCallback((item) => {
     setImportSelectedBackup(item);
@@ -577,17 +595,22 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, [showDialog, t]);
 
-  const handleCheckForUpdates = useCallback(async () => {
+  const runUpdateCheck = useCallback(async () => {
     setUpdateResult(null);
     setIsCheckingUpdate(true);
-    openSubPanel('update');
     loadDownloadedApks();
     try {
       const result = await checkForAppUpdate();
       await setPreference(PREF_KEYS.UPDATE_LAST_CHECK_AT, new Date().toISOString());
 
       if (!result.success) {
-        setUpdateResult({ type: 'error', errorCode: result.errorCode });
+        setUpdateResult({
+          type: 'error',
+          errorCode: result.errorCode,
+          releaseNotes: result.releaseNotes || null,
+          recentReleaseNotes: result.recentReleaseNotes || null,
+          releasesUrl: result.releasesUrl || null,
+        });
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({
           type: 'up_to_date',
@@ -610,12 +633,16 @@ export default function SettingsScreen({ setSubPanelActive }) {
         });
       }
     } catch (error) {
-      console.error('Manual update check failed:', error);
       setUpdateResult({ type: 'error', errorCode: null });
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, [openSubPanel, loadDownloadedApks]);
+  }, [loadDownloadedApks]);
+
+  const handleCheckForUpdates = useCallback(() => {
+    openSubPanel('update');
+    runUpdateCheck();
+  }, [openSubPanel, runUpdateCheck]);
 
   const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl) => {
     if (updateResult) {
@@ -746,6 +773,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const subPanelTitle = useMemo(() => {
     if (activeSubPanel === 'accounts') return t('accounts') || 'Accounts';
     if (activeSubPanel === 'categories') return t('categories') || 'Categories';
+    if (activeSubPanel === 'defaultAccount') return t('default_account') || 'Default Account';
     if (activeSubPanel === 'language') return t('language');
     if (activeSubPanel === 'export') {
       return exportStep === 'sheets-progress' ? 'Google Sheets' : (t('export_format') || 'Export Format');
@@ -821,6 +849,41 @@ export default function SettingsScreen({ setSubPanelActive }) {
         ]}>
           {activeSubPanel === 'accounts' && <AccountsScreen />}
           {activeSubPanel === 'categories' && <CategoriesScreen />}
+
+          {activeSubPanel === 'defaultAccount' && (
+            <ScrollView
+              style={styles.listContainer}
+              testID="settings-default-account-panel"
+            >
+              <TouchableRipple
+                onPress={() => handleDefaultAccountSelect(null)}
+                style={styles.listItem}
+                testID="default-account-option-null"
+              >
+                <View style={styles.listItemContent}>
+                  <Text style={[styles.listItemText, { color: colors.text }]}>{t('latest_used')}</Text>
+                  {pinnedAccountId === null && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </View>
+              </TouchableRipple>
+              {visibleAccounts.map(acc => (
+                <TouchableRipple
+                  key={acc.id}
+                  onPress={() => handleDefaultAccountSelect(acc.id)}
+                  style={styles.listItem}
+                  testID={`default-account-option-${acc.id}`}
+                >
+                  <View style={styles.listItemContent}>
+                    <Text style={[styles.listItemText, { color: colors.text }]}>{acc.name}</Text>
+                    {pinnedAccountId === acc.id && (
+                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                    )}
+                  </View>
+                </TouchableRipple>
+              ))}
+            </ScrollView>
+          )}
 
           {activeSubPanel === 'language' && (
             <ScrollView style={styles.listContainer}>
@@ -1245,6 +1308,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 downloadedApks={downloadedApks}
                 onUpdate={handleUpdateFromSettings}
                 onInstallApk={handleInstallApk}
+                onRefresh={runUpdateCheck}
               />
             </View>
           )}
@@ -1298,7 +1362,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
               <View style={styles.settingsRowText}>
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {colorScheme === 'dark' ? 'Dark' : 'Light'}
+                  {colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
                 </Text>
               </View>
             </View>
@@ -1316,6 +1380,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('accounts') || 'Accounts'}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
                   {t('accounts_hint') || 'Manage your accounts and balances'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
+
+        <TouchableRipple
+          onPress={() => openSubPanel('defaultAccount')}
+          style={styles.settingsRow}
+          testID="settings-default-account-row"
+        >
+          <View style={styles.settingsRowContent}>
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="bookmark-outline" size={22} color={colors.text} />
+              <View style={styles.settingsRowText}>
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('default_account')}</Text>
+                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                  {defaultAccountName}
                 </Text>
               </View>
             </View>
@@ -1376,19 +1459,39 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </View>
         </TouchableRipple>
 
-        <TouchableRipple onPress={handleCheckForUpdates} style={styles.settingsRow} testID="check-updates-row">
+        <TouchableRipple
+          onPress={isDownloading ? undefined : handleCheckForUpdates}
+          style={[styles.settingsRow, isDownloading && styles.settingsRowDisabled]}
+          disabled={isDownloading}
+          testID="check-updates-row"
+        >
           <View style={styles.settingsRowContent}>
             <View style={styles.settingsRowLeft}>
-              <Ionicons name="download-outline" size={22} color={colors.text} />
-              <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+              <Ionicons name="download-outline" size={22} color={isDownloading ? colors.mutedText : colors.text} />
+              <Text style={[styles.settingsRowLabel, { color: isDownloading ? colors.mutedText : colors.text }]}>
                 {t('check_updates') || 'Check for updates'}
               </Text>
             </View>
             <View style={styles.updateRowRight}>
-              <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
-                {`v${require('../../package.json').version}`}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+              {isDownloading ? (
+                <>
+                  <Text style={[styles.versionLabel, { color: colors.primary }]}>
+                    {downloadPhase === 'verifying'
+                      ? (t('update_phase_verifying') || 'Verifying APK…')
+                      : downloadPhase === 'backing_up'
+                        ? (t('update_phase_backing_up') || 'Backing up…')
+                        : `${Math.round((downloadProgress ?? 0) * 100)}%`}
+                  </Text>
+                  <ActivityIndicator size={16} color={colors.primary} style={styles.updateRowSpinner} />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.versionLabel, { color: colors.mutedText }]}>
+                    {`v${require('../../package.json').version}`}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                </>
+              )}
             </View>
           </View>
         </TouchableRipple>
@@ -1615,6 +1718,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: SPACING.md,
   },
+  settingsRowDisabled: {
+    opacity: 0.6,
+  },
   settingsRowLabel: {
     fontSize: 16,
   },
@@ -1727,6 +1833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 4,
+  },
+  updateRowSpinner: {
+    marginLeft: 2,
   },
   versionLabel: {
     fontSize: 13,

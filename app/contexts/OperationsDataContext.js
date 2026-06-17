@@ -25,8 +25,6 @@ export const useOperationsData = () => {
 };
 
 export const OperationsDataProvider = ({ children }) => {
-  console.debug('[OperationsDataProvider] Component rendered');
-
   // Dependencies from other contexts
   const { accounts } = useAccountsData();
   const { categories, getCategoryPath } = useCategories();
@@ -55,11 +53,6 @@ export const OperationsDataProvider = ({ children }) => {
     dateRange: { startDate: null, endDate: null },
     amountRange: { min: null, max: null },
   });
-
-  // Track searchState changes
-  useEffect(() => {
-    console.debug('[OperationsDataContext] searchState changed:', searchState);
-  }, [searchState]);
 
   // Legacy filter state tracking (for backwards compatibility)
   const [filtersActive, setFiltersActive] = useState(false);
@@ -94,10 +87,8 @@ export const OperationsDataProvider = ({ children }) => {
     setSearchState(prev => {
       // Don't update if text hasn't changed (prevents infinite loop)
       if (prev.text === text) {
-        console.debug('[OperationsDataContext] setSearchText called but text unchanged, skipping update');
         return prev;
       }
-      console.debug('[OperationsDataContext] setSearchText updating from', prev.text, 'to', text);
       return { ...prev, text };
     });
   }, []);

@@ -201,6 +201,33 @@ TabButton.defaultProps = {
   updateProgress: null,
 };
 
+// Pre-computed gradient steps: transparent → very dark black overlay
+// Cubic ease-in gives a natural-looking gradient
+const TAB_OVERLAY_HEIGHT = 130;
+const GRADIENT_STEPS = 20;
+const gradientStepColors = Array.from({ length: GRADIENT_STEPS }, (_, i) => {
+  const t = i / (GRADIENT_STEPS - 1);
+  const easedT = t * t * t; // cubic ease-in
+  const opacity = (easedT * 0.82).toFixed(3);
+  return `rgba(0, 0, 0, ${opacity})`;
+});
+
+// Covers the tab bar region, blocks accidental touches falling through
+// to the list content below, and shows a darkening gradient as a visual cue.
+// Rendered before floatingBarWrapper so tab buttons (higher z-order) remain clickable.
+const TabGradientBlocker = memo(() => {
+  const stepHeight = TAB_OVERLAY_HEIGHT / GRADIENT_STEPS;
+  return (
+    <View style={styles.tabGradientOverlay}>
+      {gradientStepColors.map((color, i) => (
+        <View key={i} style={{ height: stepHeight, backgroundColor: color }} />
+      ))}
+    </View>
+  );
+});
+
+TabGradientBlocker.displayName = 'TabGradientBlocker';
+
 export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -208,6 +235,9 @@ export default function SimpleTabs() {
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
+  // Track which tab indices have been visited so we lazy-mount their screens.
+  // Index 0 (Operations) is pre-visited so it renders immediately on cold start.
+  const [visited, setVisited] = React.useState(() => ({ 0: true }));
 
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
@@ -267,6 +297,8 @@ export default function SimpleTabs() {
 
     const distance = Math.abs(newIndex - oldIndex);
 
+    // Mark target tab visited before animation so the screen mounts in time.
+    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
     setActive(tabKey);
     activeIndex.value = newIndex;
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
@@ -371,6 +403,7 @@ export default function SimpleTabs() {
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
           pillPosition.value = withTiming(newIndex, PILL_TIMING);
+          runOnJS(setVisited)((prev) => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
           translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING, (isFinished) => {
             if (isFinished) {
               runOnJS(setActive)(TABS[newIndex].key);
@@ -407,20 +440,20 @@ export default function SimpleTabs() {
     return (
       <>
         <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          <OperationsScreen />
+          {visited[0] ? <OperationsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          <GraphsScreen />
+          {visited[1] ? <GraphsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          <PlannedOperationsScreen />
+          {visited[2] ? <PlannedOperationsScreen /> : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          <SettingsScreen setSubPanelActive={setSubPanelActive} />
+          {visited[3] ? <SettingsScreen setSubPanelActive={setSubPanelActive} /> : null}
         </Animated.View>
       </>
     );
-  }, [setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
+  }, [visited, setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
   const displayedTab = active;
 
@@ -434,6 +467,10 @@ export default function SimpleTabs() {
           </Animated.View>
         </GestureDetector>
       </View>
+      {/* Gradient touch blocker — rendered before floatingBarWrapper so the
+          tab buttons (higher z-order, box-none wrapper) remain clickable while
+          the empty space around the pill catches accidental taps */}
+      <TabGradientBlocker />
       {/* Floating bar overlays content so screen shows through behind it */}
       <SafeAreaView edges={['bottom']} style={styles.floatingBarWrapper} pointerEvents="box-none">
         <View
@@ -538,6 +575,13 @@ const styles = StyleSheet.create({
     gap: 3,
     justifyContent: 'center',
     paddingVertical: 8,
+  },
+  tabGradientOverlay: {
+    bottom: 0,
+    height: TAB_OVERLAY_HEIGHT,
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   tabLabel: {
     fontSize: 11,

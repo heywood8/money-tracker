@@ -210,11 +210,25 @@ export const checkForAppUpdate = async ({
     }
 
     if (!bestRelease) {
+      if (foundReleasesWithoutApk) {
+        const releaseNotes = newerReleases
+          .filter((r) => r.notes)
+          .map((r) => ({ version: r.version, notes: r.notes, hasApk: r.hasApk }));
+        return {
+          success: false,
+          isUpdateAvailable: false,
+          currentVersion: currentNormalized,
+          errorCode: 'releases_without_apks',
+          releaseNotes: releaseNotes.length > 0 ? releaseNotes : null,
+          recentReleaseNotes: recentReleasesWithApk.length > 0 ? recentReleasesWithApk : null,
+          releasesUrl,
+        };
+      }
       return {
         success: false,
         isUpdateAvailable: false,
         currentVersion: currentNormalized,
-        errorCode: foundReleasesWithoutApk ? 'releases_without_apks' : 'invalid_release_data',
+        errorCode: 'invalid_release_data',
       };
     }
 

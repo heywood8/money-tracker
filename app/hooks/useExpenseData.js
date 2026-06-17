@@ -17,7 +17,7 @@ const CHART_COLORS = [
  */
 const useExpenseData = (selectedYear, selectedMonth, selectedCurrency, selectedCategory, categories, colors, t) => {
   const [rawSpending, setRawSpending] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const loadExpenseData = useCallback(async () => {
     if (!selectedCurrency) return;

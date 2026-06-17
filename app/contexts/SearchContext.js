@@ -13,24 +13,20 @@ export const SearchProvider = ({ children }) => {
       console.warn('[SearchContext] Invalid searchMode:', mode);
       return;
     }
-    console.debug('[SearchContext] setSearchMode:', mode);
     setInternalSearchMode(mode);
   }, []);
 
   const openSearch = useCallback(() => {
-    console.debug('[SearchContext] openSearch called');
     setInternalSearchMode('open');
   }, []);
 
   const closeSearch = useCallback((hasActiveFilters) => {
-    console.debug('[SearchContext] closeSearch called, hasActiveFilters:', hasActiveFilters);
     const newMode = hasActiveFilters ? 'collapsed' : 'closed';
     setInternalSearchMode(newMode);
     setFiltersExpanded(false);
   }, []);
 
   const reopenSearch = useCallback((hasTextFilter, hasOtherFilters, onShouldExpandFilters) => {
-    console.debug('[SearchContext] reopenSearch called, hasText:', hasTextFilter, 'hasOther:', hasOtherFilters);
     setInternalSearchMode('open');
 
     // Auto-expand filters if other filters (non-text) are present

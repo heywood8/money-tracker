@@ -1,3 +1,4 @@
+/* global __DEV__ */
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import PropTypes from 'prop-types';
@@ -95,7 +96,7 @@ export const OperationsActionsProvider = ({ children }) => {
   // Load initial week of operations
   const loadInitialOperations = useCallback(async (filters, showLoading = true) => {
     const effectiveFilters = filters ?? activeFiltersRef.current;
-    console.debug('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
+    if (__DEV__) console.debug('[OperationsActionsContext] loadInitialOperations called, requestId:', loadRequestIdRef.current + 1);
     // Increment request ID to track this specific call
     const requestId = ++loadRequestIdRef.current;
 
@@ -128,7 +129,7 @@ export const OperationsActionsProvider = ({ children }) => {
 
       // Check if this request is still the latest (ignore stale results)
       if (requestId !== loadRequestIdRef.current) {
-        console.debug(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
+        if (__DEV__) console.debug(`[OperationsActionsContext] Ignoring stale request ${requestId}, current is ${loadRequestIdRef.current}`);
         return;
       }
 
@@ -337,7 +338,6 @@ export const OperationsActionsProvider = ({ children }) => {
 
   // Load operations on mount
   useEffect(() => {
-    console.debug('[OperationsActionsContext] loadInitialOperations dependency changed, calling it');
     loadInitialOperations();
   }, [loadInitialOperations]);
 
@@ -377,7 +377,6 @@ export const OperationsActionsProvider = ({ children }) => {
   // Listen for reload events
   useEffect(() => {
     const unsubscribe = appEvents.on(EVENTS.RELOAD_ALL, () => {
-      console.log('Reloading operations due to RELOAD_ALL event');
       allOpsCacheRef.current = null; // data may have changed; rebuild on next text search
       loadInitialOperations();
     });
@@ -398,41 +397,28 @@ export const OperationsActionsProvider = ({ children }) => {
   // after default accounts are created, then RELOAD_ALL is emitted to refresh everything.
 
   const addOperation = useCallback(async (operation) => {
-    try {
-      console.debug('[OperationsContext] addOperation called with:', {
-        type: operation.type,
-        amount: operation.amount,
-        accountId: operation.accountId,
-        toAccountId: operation.toAccountId,
-        categoryId: operation.categoryId,
-        date: operation.date,
-        description: operation.description,
-      });
+    const tempId = `_temp_${Date.now()}`;
+    const optimisticOp = { ...operation, id: tempId };
+    _setOperations(prev => [optimisticOp, ...prev]);
 
+    try {
       // Create operation in DB (ID will be auto-generated, handles balance updates automatically)
       const createdOperation = await OperationsDB.createOperation(operation);
-
-      console.debug('[OperationsContext] Operation created successfully:', createdOperation?.id);
 
       // Keep cache in sync so text search reflects the new operation immediately
       if (allOpsCacheRef.current !== null && createdOperation) {
         allOpsCacheRef.current = [createdOperation, ...allOpsCacheRef.current];
       }
 
-      // Reload operations to include the new one (without showing loading spinner)
-      // Note: We reload to ensure consistency with lazy-loaded week ranges
       await loadInitialOperations(activeFiltersRef.current, false);
 
       _setSaveError(null);
-
-      // Reload accounts to reflect balance changes
       await reloadAccounts();
-
-      // Emit event to refresh budget statuses
       appEvents.emit(EVENTS.OPERATION_CHANGED);
 
       return createdOperation;
     } catch (error) {
+      _setOperations(prev => prev.filter(op => op.id !== tempId));
       console.error('Failed to add operation:', error);
       _setSaveError(error.message);
       showDialog(
@@ -442,7 +428,7 @@ export const OperationsActionsProvider = ({ children }) => {
       );
       throw error;
     }
-  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError]);
+  }, [reloadAccounts, showDialog, loadInitialOperations, _setSaveError, _setOperations]);
 
   const splitOperation = useCallback(async (id, updates, newOperationData) => {
     try {

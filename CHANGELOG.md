@@ -1,5 +1,199 @@
 # Changelog
 
+## [0.136.1](https://github.com/heywood8/money-tracker/compare/penny-v0.136.0...penny-v0.136.1) (2026-06-17)
+
+
+### Performance Improvements
+
+* **tabs:** lazy-mount tab screens on first visit ([#910](https://github.com/heywood8/money-tracker/issues/910)) ([#932](https://github.com/heywood8/money-tracker/issues/932)) ([0a0afa6](https://github.com/heywood8/money-tracker/commit/0a0afa6313f861e8c64d44b9ffa6652d657a42c5))
+
+## [0.136.0](https://github.com/heywood8/money-tracker/compare/penny-v0.135.0...penny-v0.136.0) (2026-06-17)
+
+
+### Features
+
+* highlight installed version in update release list ([#981](https://github.com/heywood8/money-tracker/issues/981)) ([c30c2a1](https://github.com/heywood8/money-tracker/commit/c30c2a19342d33ae638b45e9e85de934d88d7080))
+
+
+### Bug Fixes
+
+* **i18n:** add missing translation keys across all 11 languages ([#982](https://github.com/heywood8/money-tracker/issues/982)) ([8f1323c](https://github.com/heywood8/money-tracker/commit/8f1323c8ab7ffa63bb1f3c03a01fc3833f1ea343))
+
+## [0.135.0](https://github.com/heywood8/money-tracker/compare/penny-v0.134.17...penny-v0.135.0) (2026-06-17)
+
+
+### Features
+
+* rework update panel with per-release cards, PR links and inline APKs ([#979](https://github.com/heywood8/money-tracker/issues/979)) ([6334ba4](https://github.com/heywood8/money-tracker/commit/6334ba4f7f7e17396e93050e2f23edc22d35f957))
+
+## [0.134.17](https://github.com/heywood8/money-tracker/compare/penny-v0.134.16...penny-v0.134.17) (2026-06-17)
+
+
+### Bug Fixes
+
+* lift modal above keyboard and glue it back to bottom on dismiss ([#976](https://github.com/heywood8/money-tracker/issues/976)) ([2c891e0](https://github.com/heywood8/money-tracker/commit/2c891e0da30024b24a2dde36bf6c7d2037262cce))
+
+## [0.134.16](https://github.com/heywood8/money-tracker/compare/penny-v0.134.15...penny-v0.134.16) (2026-06-17)
+
+
+### Performance Improvements
+
+* **operations:** optimistic insert in addOperation, rollback on error ([#911](https://github.com/heywood8/money-tracker/issues/911)) ([#938](https://github.com/heywood8/money-tracker/issues/938)) ([91d420a](https://github.com/heywood8/money-tracker/commit/91d420a6d7454681eb0f8ff2937e6df060dbc5f0))
+
+## [0.134.15](https://github.com/heywood8/money-tracker/compare/penny-v0.134.14...penny-v0.134.15) (2026-06-17)
+
+
+### Performance Improvements
+
+* **icon-picker:** virtualize grid with FlatList, fix selected icon highlight ([#916](https://github.com/heywood8/money-tracker/issues/916)) ([#934](https://github.com/heywood8/money-tracker/issues/934)) ([171003e](https://github.com/heywood8/money-tracker/commit/171003ee13c5909555074512d4c4ccf3fe5e88c1))
+
+## [0.134.14](https://github.com/heywood8/money-tracker/compare/penny-v0.134.13...penny-v0.134.14) (2026-06-17)
+
+
+### Performance Improvements
+
+* remove console logs from render/keystroke hot paths ([#913](https://github.com/heywood8/money-tracker/issues/913)) ([#931](https://github.com/heywood8/money-tracker/issues/931)) ([40ab9ac](https://github.com/heywood8/money-tracker/commit/40ab9ace0a5eecbb531d657143a93e4a424ac52d))
+
+## [0.134.13](https://github.com/heywood8/money-tracker/compare/penny-v0.134.12...penny-v0.134.13) (2026-06-17)
+
+
+### Bug Fixes
+
+* bottom sheet staying lifted after keyboard dismiss on Android ([#972](https://github.com/heywood8/money-tracker/issues/972)) ([f8cf572](https://github.com/heywood8/money-tracker/commit/f8cf5726b006667001b9571cba5afe911e685cd0))
+
+## [0.134.12](https://github.com/heywood8/money-tracker/compare/penny-v0.134.11...penny-v0.134.12) (2026-06-16)
+
+
+### Bug Fixes
+
+* keyboard overlapping input when editing operation description ([#968](https://github.com/heywood8/money-tracker/issues/968)) ([1d8fd10](https://github.com/heywood8/money-tracker/commit/1d8fd103c47f779b5052dbcbcb7a2b93054d6dd8))
+
+## [0.134.11](https://github.com/heywood8/money-tracker/compare/penny-v0.134.10...penny-v0.134.11) (2026-06-16)
+
+
+### Tests
+
+* **graphs:** align hook loading expectations with [#933](https://github.com/heywood8/money-tracker/issues/933) ([#969](https://github.com/heywood8/money-tracker/issues/969)) ([19b762e](https://github.com/heywood8/money-tracker/commit/19b762e68ef7721e918d589505ba35b00ff27071))
+
+## [0.134.10](https://github.com/heywood8/money-tracker/compare/penny-v0.134.9...penny-v0.134.10) (2026-06-15)
+
+
+### Performance Improvements
+
+* **graphs:** remove loading spinner flash on Graphs screen mount ([#915](https://github.com/heywood8/money-tracker/issues/915)) ([#933](https://github.com/heywood8/money-tracker/issues/933)) ([d9222d1](https://github.com/heywood8/money-tracker/commit/d9222d15986980ad05dd826648ca000bea8bdf9f))
+
+## [0.134.9](https://github.com/heywood8/money-tracker/compare/penny-v0.134.8...penny-v0.134.9) (2026-06-15)
+
+
+### Bug Fixes
+
+* **modal:** stop keyboard double-push on Android by removing KAV behavior ([#918](https://github.com/heywood8/money-tracker/issues/918)) ([#936](https://github.com/heywood8/money-tracker/issues/936)) ([509e5a8](https://github.com/heywood8/money-tracker/commit/509e5a827dee5ee342e761c3e943ec9c7b3966db))
+
+## [0.134.8](https://github.com/heywood8/money-tracker/compare/penny-v0.134.7...penny-v0.134.8) (2026-06-15)
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump test-renderer from 1.1.0 to 1.2.0 ([#960](https://github.com/heywood8/money-tracker/issues/960)) ([782b20a](https://github.com/heywood8/money-tracker/commit/782b20a66fffe72ebebb212173528a1d6d096810))
+
+## [0.134.7](https://github.com/heywood8/money-tracker/compare/penny-v0.134.6...penny-v0.134.7) (2026-06-15)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump amannn/action-semantic-pull-request from 5 to 6 ([#959](https://github.com/heywood8/money-tracker/issues/959)) ([6915a9f](https://github.com/heywood8/money-tracker/commit/6915a9f1872cd3f92ec7a7613c35248daa7144a6))
+
+## [0.134.6](https://github.com/heywood8/money-tracker/compare/penny-v0.134.5...penny-v0.134.6) (2026-06-15)
+
+
+### Bug Fixes
+
+* **db:** save emergency backup before corruption recovery wipes all tables ([#873](https://github.com/heywood8/money-tracker/issues/873)) ([#927](https://github.com/heywood8/money-tracker/issues/927)) ([22f3a85](https://github.com/heywood8/money-tracker/commit/22f3a851b0ebb2739c84f8de961e26899f94874f))
+
+## [0.134.5](https://github.com/heywood8/money-tracker/compare/penny-v0.134.4...penny-v0.134.5) (2026-06-14)
+
+
+### Bug Fixes
+
+* block accidental touches and add dark gradient in tab bar area ([#958](https://github.com/heywood8/money-tracker/issues/958)) ([628b610](https://github.com/heywood8/money-tracker/commit/628b610f9142aecf0f61fdbe39a465ee7ca0891c))
+
+## [0.134.4](https://github.com/heywood8/money-tracker/compare/penny-v0.134.3...penny-v0.134.4) (2026-06-14)
+
+
+### Bug Fixes
+
+* disable update button and show download progress during APK download ([#955](https://github.com/heywood8/money-tracker/issues/955)) ([c5b1e0c](https://github.com/heywood8/money-tracker/commit/c5b1e0c06f44a28ca03464b8fd8189070d9beeb2))
+
+## [0.134.3](https://github.com/heywood8/money-tracker/compare/penny-v0.134.2...penny-v0.134.3) (2026-06-14)
+
+
+### Bug Fixes
+
+* **i18n:** translate dark/light theme label for all 11 languages ([#956](https://github.com/heywood8/money-tracker/issues/956)) ([f7530a6](https://github.com/heywood8/money-tracker/commit/f7530a66f050ae17f583904832053d88db084578))
+
+## [0.134.2](https://github.com/heywood8/money-tracker/compare/penny-v0.134.1...penny-v0.134.2) (2026-06-14)
+
+
+### Performance Improvements
+
+* **picker-modal:** memoize renderItem, make onPress synchronous ([#921](https://github.com/heywood8/money-tracker/issues/921)) ([#935](https://github.com/heywood8/money-tracker/issues/935)) ([f1daa2c](https://github.com/heywood8/money-tracker/commit/f1daa2ccbefa35448b3b4bffd8d103a1633a60cb))
+
+## [0.134.1](https://github.com/heywood8/money-tracker/compare/penny-v0.134.0...penny-v0.134.1) (2026-06-14)
+
+
+### Bug Fixes
+
+* show full release history when latest release has no APK ([#951](https://github.com/heywood8/money-tracker/issues/951)) ([d45b361](https://github.com/heywood8/money-tracker/commit/d45b361046abdaee7d087797a788bf58b7b26645))
+
+## [0.134.0](https://github.com/heywood8/money-tracker/compare/penny-v0.133.3...penny-v0.134.0) (2026-06-13)
+
+
+### Features
+
+* default account setting for QuickAdd ([#950](https://github.com/heywood8/money-tracker/issues/950)) ([05d2a3f](https://github.com/heywood8/money-tracker/commit/05d2a3f5c69e2062dfd8b730d52d9be86660b43c))
+
+## [0.133.3](https://github.com/heywood8/money-tracker/compare/penny-v0.133.2...penny-v0.133.3) (2026-06-13)
+
+
+### Bug Fixes
+
+* **backup:** normalize accountIdMapping keys to String — prevent silent data loss on restore ([#871](https://github.com/heywood8/money-tracker/issues/871)) ([#926](https://github.com/heywood8/money-tracker/issues/926)) ([77fdfb9](https://github.com/heywood8/money-tracker/commit/77fdfb900a92948cf22b639782220035860c8995))
+
+## [0.133.2](https://github.com/heywood8/money-tracker/compare/penny-v0.133.1...penny-v0.133.2) (2026-06-13)
+
+
+### Bug Fixes
+
+* show release list instead of error when releases have no APKs ([#947](https://github.com/heywood8/money-tracker/issues/947)) ([6aeaf4b](https://github.com/heywood8/money-tracker/commit/6aeaf4bc874fe237e59dfb726d10af9cd714ffd4))
+
+## [0.133.1](https://github.com/heywood8/money-tracker/compare/penny-v0.133.0...penny-v0.133.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **i18n:** complete translations across all 11 languages ([#944](https://github.com/heywood8/money-tracker/issues/944)) ([e9d5cd9](https://github.com/heywood8/money-tracker/commit/e9d5cd9e90ca1b3574dd5a4b53e72e015ced7d15))
+
+## [0.133.0](https://github.com/heywood8/money-tracker/compare/penny-v0.132.8...penny-v0.133.0) (2026-06-13)
+
+
+### Features
+
+* **updates:** pull-to-refresh on check for updates panel ([#940](https://github.com/heywood8/money-tracker/issues/940)) ([d9aeeda](https://github.com/heywood8/money-tracker/commit/d9aeedabf76f9a0278e906f41c2b9c96327f50f3))
+
+## [0.132.8](https://github.com/heywood8/money-tracker/compare/penny-v0.132.7...penny-v0.132.8) (2026-06-13)
+
+
+### Performance Improvements
+
+* **localization:** stabilize t() with useCallback, memoize provider value ([#912](https://github.com/heywood8/money-tracker/issues/912)) ([#929](https://github.com/heywood8/money-tracker/issues/929)) ([072c0f2](https://github.com/heywood8/money-tracker/commit/072c0f2f0bad09ca4b7a7edeeb3b34dafee724b3))
+
+## [0.132.7](https://github.com/heywood8/money-tracker/compare/penny-v0.132.6...penny-v0.132.7) (2026-06-13)
+
+
+### Bug Fixes
+
+* **settings:** show error dialogs on database reset and Sheets restore failure ([#836](https://github.com/heywood8/money-tracker/issues/836) [#837](https://github.com/heywood8/money-tracker/issues/837)) ([#925](https://github.com/heywood8/money-tracker/issues/925)) ([6a8a645](https://github.com/heywood8/money-tracker/commit/6a8a64554c380521d737d785d0004a8b829be47d))
+
 ## [0.132.6](https://github.com/heywood8/money-tracker/compare/penny-v0.132.5...penny-v0.132.6) (2026-06-12)
 
 

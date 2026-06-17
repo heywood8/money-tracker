@@ -24,6 +24,14 @@ jest.mock('../../app/services/PreferencesDB', () => ({
     UPDATE_LAST_CHECK_AT: 'update_last_check_at',
     GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   },
+  getDefaultAccountId: jest.fn().mockResolvedValue(null),
+  setDefaultAccountId: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../app/contexts/AccountsDataContext', () => ({
+  useAccountsData: () => ({
+    visibleAccounts: [],
+  }),
 }));
 
 jest.mock('../../app/hooks/useLogEntries', () => ({
