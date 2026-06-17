@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.136.0](https://github.com/heywood8/money-tracker/compare/penny-v0.135.0...penny-v0.136.0) (2026-06-17)
+
+
+### Features
+
+* highlight installed version in update release list ([#981](https://github.com/heywood8/money-tracker/issues/981)) ([c30c2a1](https://github.com/heywood8/money-tracker/commit/c30c2a19342d33ae638b45e9e85de934d88d7080))
+
+
+### Bug Fixes
+
+* **i18n:** add missing translation keys across all 11 languages ([#982](https://github.com/heywood8/money-tracker/issues/982)) ([8f1323c](https://github.com/heywood8/money-tracker/commit/8f1323c8ab7ffa63bb1f3c03a01fc3833f1ea343))
+
 ## [0.135.0](https://github.com/heywood8/money-tracker/compare/penny-v0.134.17...penny-v0.135.0) (2026-06-17)
 
 
