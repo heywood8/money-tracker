@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.2](https://github.com/heywood8/money-tracker/compare/penny-v0.136.1...penny-v0.136.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **splash:** hold splash screen until app ready ([#909](https://github.com/heywood8/money-tracker/issues/909)) — conflicts resolved ([#986](https://github.com/heywood8/money-tracker/issues/986)) ([1446057](https://github.com/heywood8/money-tracker/commit/144605768257bbe04ddc6cd0ccff6460fa59f6c6))
+
 ## [0.136.1](https://github.com/heywood8/money-tracker/compare/penny-v0.136.0...penny-v0.136.1) (2026-06-17)
 
 
