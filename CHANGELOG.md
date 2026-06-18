@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.137.4](https://github.com/heywood8/money-tracker/compare/penny-v0.137.3...penny-v0.137.4) (2026-06-18)
+
+
+### Bug Fixes
+
+* keep all tab screens mounted to stop blank screens on swipe ([#1001](https://github.com/heywood8/money-tracker/issues/1001)) ([f5b3db5](https://github.com/heywood8/money-tracker/commit/f5b3db5b4dc52e7d10154964df977876d8224ded))
+
 ## [0.137.3](https://github.com/heywood8/money-tracker/compare/penny-v0.137.2...penny-v0.137.3) (2026-06-18)
 
 
