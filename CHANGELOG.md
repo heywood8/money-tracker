@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.136.4](https://github.com/heywood8/money-tracker/compare/penny-v0.136.3...penny-v0.136.4) (2026-06-18)
+
+
+### Bug Fixes
+
+* **update:** pass currentVersion to panel when up to date ([#992](https://github.com/heywood8/money-tracker/issues/992)) ([0c94653](https://github.com/heywood8/money-tracker/commit/0c9465307890ebea5b9f25f5b1564384d2bb5286))
+
 ## [0.136.3](https://github.com/heywood8/money-tracker/compare/penny-v0.136.2...penny-v0.136.3) (2026-06-17)
 
 
