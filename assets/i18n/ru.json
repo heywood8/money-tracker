@@ -394,6 +394,7 @@
   "update_install_now": "Установить сейчас",
   "downloaded_apks": "Загруженные APK",
   "installed": "Установлено",
+  "update_candidate": "Доступно",
   "installed_latest_hint": "У вас последняя версия.",
   "release_history": "История версий",
   "no_apk_attached": "Нет APK",
