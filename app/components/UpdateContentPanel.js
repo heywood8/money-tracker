@@ -331,10 +331,14 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
   const repoBase = repoBaseFromReleasesUrl(updateResult.releasesUrl);
   const apkLookup = buildApkLookup(downloadedApks);
 
-  // The currently installed app version. When there is no newer release (up_to_date),
-  // the installed version is also the latest one and earns the green checkmark + hint.
+  // The currently installed app version. We treat it as the latest — green checkmark + hint —
+  // whenever there is no newer *installable* release. That covers two cases: being fully up to
+  // date, and a newer release existing but having no APK attached yet (CI build still running).
+  // In the latter case the user still holds the newest installable APK, so the installed version
+  // is the latest one they can actually run.
   const installedVersion = updateResult.currentVersion;
-  const installedIsLatest = updateResult.type === 'up_to_date';
+  const installedIsLatest = updateResult.type === 'up_to_date'
+    || (updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks');
   // When an update is available, the release we want the user to install is the highlighted
   // one — not the version they already have.
   const candidateVersion = updateResult.type === 'available' ? updateResult.latestVersion : null;

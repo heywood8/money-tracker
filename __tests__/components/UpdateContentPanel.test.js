@@ -291,6 +291,29 @@ describe('UpdateContentPanel', () => {
       );
       expect(getByText('more_releases')).toBeTruthy();
     });
+
+    it('marks the installed version as latest with the green hint when newer releases lack an APK', async () => {
+      // The newest release (1.3.0) has no downloadable APK yet, so the installed 1.2.0 remains
+      // the latest version the user can actually run — it should get the green "latest" treatment.
+      const { getAllByText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            currentVersion: '1.2.0',
+            releaseNotes: [{ version: '1.3.0', notes: 'New release, no APK yet', hasApk: false }],
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Installed release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(getAllByText('installed').length).toBeGreaterThan(0);
+      expect(getByText('installed_latest_hint')).toBeTruthy();
+    });
   });
 
   describe('available', () => {
