@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.137.0](https://github.com/heywood8/money-tracker/compare/penny-v0.136.4...penny-v0.137.0) (2026-06-18)
+
+
+### Features
+
+* highlight install candidate instead of installed version ([#995](https://github.com/heywood8/money-tracker/issues/995)) ([a199f17](https://github.com/heywood8/money-tracker/commit/a199f1717f73f85a634c2a06276f9302e39786ed))
+
 ## [0.136.4](https://github.com/heywood8/money-tracker/compare/penny-v0.136.3...penny-v0.136.4) (2026-06-18)
 
 
