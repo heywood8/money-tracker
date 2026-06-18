@@ -353,16 +353,16 @@ export default function SimpleTabs() {
     }
 
     // ---- React state AFTER the animation is scheduled ----
-    // setActive is cheap (pill/label highlight). The lazy-mount of the target
-    // screen is deferred to the next frame so the mounting work can't block the
-    // slide we just started; the screen fills in a frame later as it slides in.
+    // Mount the destination synchronously so its content is on-screen and
+    // slides in together with the strip. Deferring the mount (e.g. to the next
+    // frame) leaves the target blank while the strip moves, so the content just
+    // pops in at the end — which looks like an instant switch, not a slide.
+    // The animation was already scheduled above, so it starts immediately on
+    // the UI thread regardless of this mount; and because the screens are
+    // pre-warmed this is usually a no-op anyway.
+    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
     setActive(tabKey);
-    if (!visited[newIndex]) {
-      requestAnimationFrame(() => {
-        setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
-      });
-    }
-  }, [TABS, active, visited, activeIndex, translateX, pillPosition, isTransitioningShared,
+  }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
     clearTransitioningRef]);
