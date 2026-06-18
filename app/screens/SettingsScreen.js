@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler, LayoutAnimation } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import { Text, Divider, TouchableRipple } from 'react-native-paper';
@@ -11,7 +11,8 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { useBackShrink } from '../hooks/useBackShrink';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useThemeConfig } from '../contexts/ThemeConfigContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -59,6 +60,11 @@ const LOG_LEVEL_COLORS = {
 const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
+
+// Left-edge region (px) from which a swipe can dismiss panels that embed their
+// own horizontal/drag gestures (Accounts, Categories), so a body drag isn't
+// hijacked by the dismiss gesture.
+const EDGE_SWIPE_WIDTH = 48;
 
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 30000;
@@ -183,30 +189,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, []);
 
-  // Telegram-style predictive "back" shrink for the active subpanel.
-  const {
-    animatedStyle: shrinkStyle,
-    originStyle: shrinkOrigin,
-    reset: resetShrink,
-    commit: commitShrink,
-  } = useBackShrink();
-
-  const openSubPanel = useCallback((panel) => {
-    if (panel === 'import') {
-      setImportStep('source');
-      setImportSelectedBackup(null);
-      loadStoredBackups();
-    }
-    if (panel === 'export') {
-      setExportStep('list');
-    }
-    resetShrink();
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setActiveSubPanel(panel);
-  }, [loadStoredBackups, resetShrink]);
-
+  // Resets all subpanel state and unmounts it. Called once the slide-away
+  // animation has played (or immediately when another flow takes over).
   const closeSubPanel = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveSubPanel(null);
     setUpdateResult(null);
     setImportStep('source');
@@ -222,10 +207,42 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setDownloadedApks([]);
   }, []);
 
-  // Back-gesture close: play the Telegram-style shrink, then dismiss the panel.
-  const closeWithShrink = useCallback(() => {
-    commitShrink(closeSubPanel);
-  }, [commitShrink, closeSubPanel]);
+  // Back navigation is locked while a long async step (Sheets export/import) runs,
+  // so the swipe-to-dismiss gesture is disabled then too.
+  const isBackDisabled = useMemo(() => {
+    if (activeSubPanel === 'export' && exportStep === 'sheets-progress') {
+      return sheetsSteps.some(s => s.status === 'in_progress');
+    }
+    if (activeSubPanel === 'import' && importStep === 'sheets-progress') {
+      return sheetsImportSteps.some(s => s.status === 'in_progress');
+    }
+    return false;
+  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
+
+  // Telegram-style interactive swipe: drag the subpanel right and it follows the
+  // finger, sliding away to reveal the main settings list behind it. The Accounts
+  // and Categories panels embed a drag-to-reorder list, so their swipe is limited
+  // to a left-edge start (edgeWidth) to avoid stealing reorder/body drags.
+  const isEmbeddedScreenPanel = activeSubPanel === 'accounts' || activeSubPanel === 'categories';
+  const { gesture: swipeGesture, animatedStyle: swipeStyle, open: openPanelAnim, dismiss: dismissPanel } =
+    useSwipeDismiss({
+      onDismiss: closeSubPanel,
+      enabled: !isBackDisabled,
+      edgeWidth: isEmbeddedScreenPanel ? EDGE_SWIPE_WIDTH : 0,
+    });
+
+  const openSubPanel = useCallback((panel) => {
+    if (panel === 'import') {
+      setImportStep('source');
+      setImportSelectedBackup(null);
+      loadStoredBackups();
+    }
+    if (panel === 'export') {
+      setExportStep('list');
+    }
+    setActiveSubPanel(panel);
+    openPanelAnim();
+  }, [loadStoredBackups, openPanelAnim]);
 
   useEffect(() => {
     getDefaultAccountId().then(id => setPinnedAccountId(id));
@@ -234,8 +251,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const handleDefaultAccountSelect = useCallback(async (id) => {
     await setDefaultAccountId(id);
     setPinnedAccountId(id);
-    closeSubPanel();
-  }, [closeSubPanel]);
+    dismissPanel();
+  }, [dismissPanel]);
 
   useEffect(() => {
     setSubPanelActive(activeSubPanel !== null);
@@ -245,16 +262,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
   useEffect(() => {
     if (!activeSubPanel) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      closeWithShrink();
+      if (isBackDisabled) return true;
+      dismissPanel();
       return true;
     });
     return () => subscription.remove();
-  }, [activeSubPanel, closeWithShrink]);
+  }, [activeSubPanel, isBackDisabled, dismissPanel]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
-    closeSubPanel();
-  }, [setLanguage, closeSubPanel]);
+    dismissPanel();
+  }, [setLanguage, dismissPanel]);
 
   const nativeLanguageNames = {
     en: 'English',
@@ -365,9 +383,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
       setSheetsSuccessUrl(null);
       setSheetsError(null);
     } else {
-      closeSubPanel();
+      dismissPanel();
     }
-  }, [exportStep, sheetsSteps, closeSubPanel]);
+  }, [exportStep, sheetsSteps, dismissPanel]);
 
   const confirmResetDatabase = useCallback(async () => {
     closeSubPanel();
@@ -502,7 +520,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
   const handleImportBack = useCallback(() => {
     if (importStep === 'source') {
-      closeSubPanel();
+      dismissPanel();
     } else if (importStep === 'local-list') {
       setImportStep('source');
     } else if (importStep === 'confirm-file') {
@@ -514,7 +532,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       setImportStep('source');
       setSheetsImportError(null);
     }
-  }, [importStep, closeSubPanel]);
+  }, [importStep, dismissPanel]);
 
   const confirmRestoreLocalBackup = useCallback(async () => {
     if (!importSelectedBackup) return;
@@ -821,25 +839,18 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const handleSubPanelBack = useMemo(() => {
     if (activeSubPanel === 'import') return handleImportBack;
     if (activeSubPanel === 'export') return handleExportBack;
-    return closeWithShrink;
-  }, [activeSubPanel, handleImportBack, handleExportBack, closeWithShrink]);
-
-  const isBackDisabled = useMemo(() => {
-    if (activeSubPanel === 'export' && exportStep === 'sheets-progress') {
-      return sheetsSteps.some(s => s.status === 'in_progress');
-    }
-    if (activeSubPanel === 'import' && importStep === 'sheets-progress') {
-      return sheetsImportSteps.some(s => s.status === 'in_progress');
-    }
-    return false;
-  }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
+    return dismissPanel;
+  }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
 
 
   // ─── RENDER ───
-  if (activeSubPanel !== null) {
-    return (
+  // The subpanel is an overlay that slides over the main settings list. Keeping
+  // the list mounted behind it lets a rightward swipe (or the back arrow) reveal
+  // it Telegram-style as the panel follows the finger off the right edge.
+  const subPanelOverlay = activeSubPanel !== null ? (
+    <GestureDetector gesture={swipeGesture}>
       <Animated.View
-        style={[styles.container, styles.subPanelShrink, { backgroundColor: colors.background }, shrinkOrigin, shrinkStyle]}
+        style={[styles.subPanelOverlay, { backgroundColor: colors.background }, swipeStyle]}
       >
         {/* Subpanel header */}
         <View style={styles.subPanelHeader}>
@@ -1338,10 +1349,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
         </View>
       </Animated.View>
-    );
-  }
+    </GestureDetector>
+  ) : null;
 
-  // ─── Main settings list ───
+  // ─── Main settings list (base layer) + subpanel overlay ───
   return (
     <View
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -1531,6 +1542,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </View>
         </TouchableRipple>
       </ScrollView>
+      {subPanelOverlay}
     </View>
   );
 }
@@ -1827,11 +1839,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingVertical: SPACING.lg,
   },
-  subPanelShrink: {
-    // Clip content to the rounded corners while the panel shrinks, and lift it
-    // off the backdrop so the Telegram-style shrink reads clearly.
+  subPanelOverlay: {
+    // Covers the settings list while open; the swipe slides it off to the right
+    // to reveal the list behind. Elevation lifts it above the base layer.
+    ...StyleSheet.absoluteFillObject,
     elevation: 8,
-    overflow: 'hidden',
   },
   subPanelTitle: {
     fontWeight: '600',
