@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.137.1](https://github.com/heywood8/money-tracker/compare/penny-v0.137.0...penny-v0.137.1) (2026-06-18)
+
+
+### Performance Improvements
+
+* **operations:** decouple filteredOperations from account balance changes ([#914](https://github.com/heywood8/money-tracker/issues/914)) ([#937](https://github.com/heywood8/money-tracker/issues/937)) ([59a5722](https://github.com/heywood8/money-tracker/commit/59a57220962bbc4d1fd647bc9dfe678dfa6dc435))
+
 ## [0.137.0](https://github.com/heywood8/money-tracker/compare/penny-v0.136.4...penny-v0.137.0) (2026-06-18)
 
 
