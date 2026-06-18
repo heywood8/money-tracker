@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.137.3](https://github.com/heywood8/money-tracker/compare/penny-v0.137.2...penny-v0.137.3) (2026-06-18)
+
+
+### Performance Improvements
+
+* remove lag before tab-switch animation starts ([#987](https://github.com/heywood8/money-tracker/issues/987)) ([60fb683](https://github.com/heywood8/money-tracker/commit/60fb6839912b0f3b6aa92219e3f4d0676e485268))
+
 ## [0.137.2](https://github.com/heywood8/money-tracker/compare/penny-v0.137.1...penny-v0.137.2) (2026-06-18)
 
 
