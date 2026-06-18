@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.138.0](https://github.com/heywood8/money-tracker/compare/penny-v0.137.4...penny-v0.138.0) (2026-06-18)
+
+
+### Features
+
+* show CI build progress when a release APK is not yet available ([#1003](https://github.com/heywood8/money-tracker/issues/1003)) ([c862e20](https://github.com/heywood8/money-tracker/commit/c862e20252e7e87a29d6bf8bf14950a60a4e5dfc))
+
 ## [0.137.4](https://github.com/heywood8/money-tracker/compare/penny-v0.137.3...penny-v0.137.4) (2026-06-18)
 
 
