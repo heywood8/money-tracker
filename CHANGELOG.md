@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.138.1](https://github.com/heywood8/money-tracker/compare/penny-v0.138.0...penny-v0.138.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* mark installed version as latest when newer release has no APK ([#1006](https://github.com/heywood8/money-tracker/issues/1006)) ([c1e05a9](https://github.com/heywood8/money-tracker/commit/c1e05a9efeaf5110628b48bbed6887528a5fd0b4))
+
 ## [0.138.0](https://github.com/heywood8/money-tracker/compare/penny-v0.137.4...penny-v0.138.0) (2026-06-18)
 
 
