@@ -394,6 +394,7 @@
   "update_install_now": "지금 설치",
   "downloaded_apks": "다운로드된 APK",
   "installed": "설치됨",
+  "update_candidate": "사용 가능",
   "installed_latest_hint": "최신 버전입니다.",
   "release_history": "릴리스 기록",
   "no_apk_attached": "APK 없음",
