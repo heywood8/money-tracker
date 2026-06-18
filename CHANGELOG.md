@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.139.0](https://github.com/heywood8/money-tracker/compare/penny-v0.138.1...penny-v0.139.0) (2026-06-18)
+
+
+### Features
+
+* add Telegram-style swipe-to-dismiss for settings subpanels ([#1005](https://github.com/heywood8/money-tracker/issues/1005)) ([0137345](https://github.com/heywood8/money-tracker/commit/0137345208330d1fea09a9ce9f8e69677a7c650f))
+
 ## [0.138.1](https://github.com/heywood8/money-tracker/compare/penny-v0.138.0...penny-v0.138.1) (2026-06-18)
 
 
