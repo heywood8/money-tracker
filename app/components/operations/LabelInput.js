@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   TextInput,
@@ -29,7 +29,7 @@ const COMMIT_SPLIT = /[|,\n]/;
  * Existing labels render as removable chips; a trailing text input adds new ones
  * (on submit, on typing a delimiter/comma, or by tapping an autocomplete chip).
  */
-const LabelInput = ({
+const LabelInput = forwardRef(({
   value = '',
   onChangeText,
   suggestions = [],
@@ -39,7 +39,7 @@ const LabelInput = ({
   containerStyle,
   onFocus,
   t,
-}) => {
+}, ref) => {
   const labels = useMemo(() => parseLabels(value), [value]);
   const [input, setInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -58,6 +58,27 @@ const LabelInput = ({
       commitLabels(next);
     }
   }, [labels, commitLabels]);
+
+  // Imperative flush for the parent's Save handler. Tapping Save does not reliably
+  // blur the TextInput before onPress fires, and even when it does the blur's
+  // onChangeText -> setValues update is async and won't be visible to the save
+  // closure in the same tick. flush() commits any half-typed label synchronously
+  // (still firing onChangeText so the field stays in sync) AND returns the resulting
+  // description string so the caller can persist it directly without the race.
+  useImperativeHandle(ref, () => ({
+    flush: () => {
+      const pending = input.trim();
+      if (pending) {
+        const next = addLabel(labels, pending);
+        setInput('');
+        if (next.length !== labels.length) {
+          commitLabels(next);
+          return serializeLabels(next);
+        }
+      }
+      return serializeLabels(labels);
+    },
+  }), [input, labels, commitLabels]);
 
   // Suggestions: not already applied, and substring-matching the current input.
   const filteredSuggestions = useMemo(() => {
@@ -221,7 +242,9 @@ const LabelInput = ({
       </Animated.View>
     </View>
   );
-};
+});
+
+LabelInput.displayName = 'LabelInput';
 
 LabelInput.propTypes = {
   value: PropTypes.string,

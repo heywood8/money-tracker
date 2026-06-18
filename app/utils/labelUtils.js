@@ -36,20 +36,32 @@ export const isSystemDescription = (description) =>
   typeof description === 'string' && description.startsWith(SYSTEM_PREFIX);
 
 /**
- * Normalise a single label: drop the delimiter, collapse internal whitespace,
- * trim, and clamp to the maximum length. Returns '' for anything unusable.
+ * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
+ * collapse internal whitespace, and trim. Returns '' for anything unusable.
+ *
+ * This is used when parsing/serialising values that are already stored, so a
+ * pre-existing (legacy) free-text description longer than MAX_LABEL_LENGTH is
+ * preserved intact on read/round-trip instead of being silently truncated. The
+ * length cap is only applied to NEWLY entered labels (see sanitizeLabel).
  * @param {*} label
  * @returns {string}
  */
-export const sanitizeLabel = (label) => {
+export const normalizeLabel = (label) => {
   if (typeof label !== 'string') return '';
   return label
     .split(LABEL_DELIMITER).join(' ') // a label can never contain the delimiter
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_LABEL_LENGTH)
     .trim();
 };
+
+/**
+ * Normalise a single label AND clamp it to MAX_LABEL_LENGTH. Used at input time
+ * (typing / addLabel) so a freshly created label can never be pathologically
+ * long, while leaving already-stored labels untouched. Returns '' for unusable input.
+ * @param {*} label
+ * @returns {string}
+ */
+export const sanitizeLabel = (label) => normalizeLabel(label).slice(0, MAX_LABEL_LENGTH).trim();
 
 /**
  * Parse a description string into an ordered, de-duplicated list of labels.
@@ -65,7 +77,7 @@ export const parseLabels = (description) => {
   const seen = new Set();
   const result = [];
   for (const piece of description.split(LABEL_DELIMITER)) {
-    const clean = sanitizeLabel(piece);
+    const clean = normalizeLabel(piece);
     if (!clean) continue;
     const key = clean.toLowerCase();
     if (seen.has(key)) continue;
@@ -88,7 +100,7 @@ export const serializeLabels = (labels) => {
   const seen = new Set();
   const result = [];
   for (const raw of labels) {
-    const clean = sanitizeLabel(raw);
+    const clean = normalizeLabel(raw);
     if (!clean) continue;
     const key = clean.toLowerCase();
     if (seen.has(key)) continue;
@@ -106,9 +118,9 @@ export const serializeLabels = (labels) => {
  * @returns {boolean}
  */
 export const hasLabel = (labels, target) => {
-  const clean = sanitizeLabel(target).toLowerCase();
+  const clean = normalizeLabel(target).toLowerCase();
   if (!clean || !Array.isArray(labels)) return false;
-  return labels.some((l) => sanitizeLabel(l).toLowerCase() === clean);
+  return labels.some((l) => normalizeLabel(l).toLowerCase() === clean);
 };
 
 /**
@@ -136,9 +148,9 @@ export const addLabel = (labels, newLabel) => {
  */
 export const removeLabel = (labels, target) => {
   if (!Array.isArray(labels)) return [];
-  const clean = sanitizeLabel(target).toLowerCase();
+  const clean = normalizeLabel(target).toLowerCase();
   if (!clean) return labels.slice();
-  return labels.filter((l) => sanitizeLabel(l).toLowerCase() !== clean);
+  return labels.filter((l) => normalizeLabel(l).toLowerCase() !== clean);
 };
 
 /**
@@ -153,5 +165,5 @@ export const matchesAllLabels = (opDescription, filterLabels) => {
   const opLabels = parseLabels(opDescription).map((l) => l.toLowerCase());
   if (opLabels.length === 0) return false;
   const opSet = new Set(opLabels);
-  return filterLabels.every((l) => opSet.has(sanitizeLabel(l).toLowerCase()));
+  return filterLabels.every((l) => opSet.has(normalizeLabel(l).toLowerCase()));
 };

@@ -1988,11 +1988,19 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
  */
 export const getDistinctLabels = async (limit = 50, categoryId = null) => {
   try {
+    // Bound the work: take the most-used distinct (description, category) groups
+    // rather than scanning and parsing the entire history in JS on every modal/
+    // overlay open. The cap is well above any realistic distinct-description count
+    // for personal use, and ordering by frequency keeps the labels users actually
+    // care about (the most common ones) within the window.
+    const SCAN_GROUP_LIMIT = 2000;
     const rows = await queryAll(
       `SELECT description, category_id, COUNT(*) AS cnt
        FROM operations
        WHERE description IS NOT NULL AND description != '' AND description NOT LIKE '[MoneyOK]%'
-       GROUP BY description, category_id`,
+       GROUP BY description, category_id
+       ORDER BY cnt DESC
+       LIMIT ${SCAN_GROUP_LIMIT}`,
     );
 
     // Aggregate per-label frequency (summed across descriptions) and whether the

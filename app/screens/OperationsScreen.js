@@ -70,6 +70,10 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  // Latest known description for the operation the suggestion row targets. Kept in
+  // a ref so applying a label does not depend on the freshly-created operation
+  // having already been re-loaded into `operations` (which is async).
+  const pendingOpDescRef = useRef('');
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(0);
   const [flashCategoryErrorCount, setFlashCategoryErrorCount] = useState(0);
@@ -542,6 +546,7 @@ const OperationsScreen = () => {
         const existing = parseLabels(createdOperation.description);
         const filtered = suggestions.filter(label => !hasLabel(existing, label));
         if (filtered.length > 0) {
+          pendingOpDescRef.current = createdOperation.description || '';
           setPendingSuggestionId(createdOperation.id);
           setPendingSuggestions(filtered);
         }
@@ -578,14 +583,12 @@ const OperationsScreen = () => {
   const handleApplySuggestion = useCallback(async (label) => {
     if (!pendingSuggestionId) return;
     const idToUpdate = pendingSuggestionId;
-    const op = operations.find(o => o.id === idToUpdate);
-    if (!op) {
-      setPendingSuggestionId(null);
-      setPendingSuggestions([]);
-      return;
-    }
 
-    const merged = serializeLabels(addLabel(parseLabels(op.description), label));
+    // Append against the latest known description from the ref rather than looking
+    // the operation up in `operations` — the freshly-created op may not have been
+    // re-loaded into that list yet, which previously made the first tap a no-op.
+    const merged = serializeLabels(addLabel(parseLabels(pendingOpDescRef.current), label));
+    pendingOpDescRef.current = merged;
 
     // Remove the chip optimistically before the await. If updateOperation fails,
     // its error surfaces via the dialog in OperationsActionsContext; the chip stays
@@ -599,21 +602,31 @@ const OperationsScreen = () => {
     });
 
     await updateOperation(idToUpdate, { description: merged });
-  }, [pendingSuggestionId, operations, updateOperation]);
+  }, [pendingSuggestionId, updateOperation]);
 
   const handleDismissSuggestion = useCallback(() => {
     setPendingSuggestionId(null);
     setPendingSuggestions([]);
   }, []);
 
-  // Clear the suggestion row if its operation disappears (e.g. deleted elsewhere).
+  // Keep the suggestion row in sync with the operation's current labels. When the
+  // op is (re)loaded, refresh the ref and drop any suggestions already applied —
+  // whether via this row or the edit modal — so the row reflects reality and
+  // auto-dismisses once nothing is left to add. We intentionally do NOT clear the
+  // row merely because the op is absent: right after creation it may not be in
+  // `operations` yet, and clearing then would hide the row before the user sees it.
   useEffect(() => {
     if (!pendingSuggestionId) return;
-    const stillExists = operations.some(o => o.id === pendingSuggestionId);
-    if (!stillExists) {
-      setPendingSuggestionId(null);
-      setPendingSuggestions([]);
-    }
+    const op = operations.find(o => o.id === pendingSuggestionId);
+    if (!op) return;
+    pendingOpDescRef.current = op.description || '';
+    const opLabels = parseLabels(op.description);
+    setPendingSuggestions((prev) => {
+      const remaining = prev.filter(s => !hasLabel(opLabels, s));
+      if (remaining.length === prev.length) return prev;
+      if (remaining.length === 0) setPendingSuggestionId(null);
+      return remaining;
+    });
   }, [operations, pendingSuggestionId]);
 
   const TYPES = useMemo(() => [

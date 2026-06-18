@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -59,9 +59,12 @@ const OperationListItem = ({
 
   // The description column holds a delimited list of labels (see labelUtils).
   // Shadow/system descriptions are not user labels and are never shown as chips.
-  const labels = isSystemDescription(operation.description)
-    ? []
-    : parseLabels(operation.description);
+  // Memoised so the regex parse only re-runs when the description string changes,
+  // not on every re-render of this memoised row (scroll, theme, selection, …).
+  const labels = useMemo(
+    () => (isSystemDescription(operation.description) ? [] : parseLabels(operation.description)),
+    [operation.description],
+  );
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
   const overflowCount = labels.length - visibleLabels.length;
 

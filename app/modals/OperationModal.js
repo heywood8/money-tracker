@@ -127,6 +127,14 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   // Autocomplete suggestions for the label editor (distinct labels, category-first)
   const [labelSuggestions, setLabelSuggestions] = useState([]);
 
+  // Ref to the label editor so Save can flush a half-typed label synchronously
+  // (avoids losing a label the user typed but did not commit before tapping Save).
+  const labelInputRef = useRef(null);
+  const handleSaveWithLabels = useCallback(() => {
+    const flushed = labelInputRef.current?.flush();
+    return handleSave(flushed != null ? { description: flushed || null } : undefined);
+  }, [handleSave]);
+
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
@@ -373,7 +381,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         visible={visible}
         onDismiss={handleClose}
         title={isNew ? t('add_operation') : t('edit_operation')}
-        onSave={isShadowOperation ? undefined : handleSave}
+        onSave={isShadowOperation ? undefined : handleSaveWithLabels}
         onCancel={handleClose}
         cancelLabel={isShadowOperation ? t('close') : t('cancel')}
         onDelete={!isNew && onDelete ? handleDelete : undefined}
@@ -497,6 +505,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           {(t('labels') || 'Labels').toUpperCase()}
         </Text>
         <LabelInput
+          ref={labelInputRef}
           value={values.description || ''}
           onChangeText={handleDescriptionChange}
           suggestions={labelSuggestions}
