@@ -309,55 +309,19 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   }),
 }));
 
-// Mock OperationsDataContext — `loading` drives the progressive pre-warm.
-// Defaults to true (cold start) so lazy-mount behavior is exercised; individual
-// tests can flip mockOperationsLoading to false to exercise pre-warming.
-let mockOperationsLoading = true;
-jest.mock('../../app/contexts/OperationsDataContext', () => ({
-  useOperationsData: () => ({ loading: mockOperationsLoading }),
-}));
-
 describe('SimpleTabs Component Rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockOperationsLoading = true;
   });
 
-  afterEach(() => {
-    mockOperationsLoading = true;
-  });
-
-  it('progressively pre-warms remaining screens once operations finish loading', async () => {
-    mockOperationsLoading = false;
+  it('mounts all four screens immediately (no lazy mount)', async () => {
+    // Every screen stays mounted so a swipe never reveals an unmounted
+    // (blank/black) screen — no tab press or data load required.
     const { getByText } = await render(<SimpleTabs />);
 
-    // Operations is mounted immediately; the rest are mounted lazily during
-    // idle time after loading completes — without any tab being pressed.
     expect(getByText('Operations Screen')).toBeTruthy();
-    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
-    await waitFor(() => expect(getByText('Planned Screen')).toBeTruthy());
-  });
-
-  it('does not pre-warm screens while operations are still loading', async () => {
-    mockOperationsLoading = true;
-    const { getByText, queryByText } = await render(<SimpleTabs />);
-
-    expect(getByText('Operations Screen')).toBeTruthy();
-    // Graphs stays unmounted because the first screen hasn't finished loading.
-    expect(queryByText('Graphs Screen')).toBeNull();
-  });
-
-  it('pre-warms after loading transitions from true to false', async () => {
-    // Cold start: loading true, nothing pre-warmed yet.
-    mockOperationsLoading = true;
-    const { rerender, getByText, queryByText } = await render(<SimpleTabs />);
-    expect(queryByText('Graphs Screen')).toBeNull();
-
-    // Operations data finishes loading — pre-warm should now mount the rest.
-    mockOperationsLoading = false;
-    rerender(<SimpleTabs />);
-    await waitFor(() => expect(getByText('Graphs Screen')).toBeTruthy());
-    await waitFor(() => expect(getByText('Planned Screen')).toBeTruthy());
+    expect(getByText('Graphs Screen')).toBeTruthy();
+    expect(getByText('Planned Screen')).toBeTruthy();
   });
 
   it('renders without crashing', async () => {
@@ -377,10 +341,10 @@ describe('SimpleTabs Component Rendering', () => {
   it('renders all four screens after visiting each tab', async () => {
     const { getByTestId } = await render(<SimpleTabs />);
 
-    // Operations mounts immediately (index 0 pre-visited)
+    // All screens are mounted up front
     expect(getByTestId('operations-screen')).toBeTruthy();
 
-    // Visit remaining tabs via pressIn to trigger lazy mount
+    // Switching tabs keeps each screen present
     await act(async () => { fireEvent(getByTestId('tab-Graphs'), 'pressIn'); });
     await waitFor(() => expect(getByTestId('graphs-screen')).toBeTruthy());
 
@@ -474,7 +438,7 @@ describe('SimpleTabs Component Rendering', () => {
       fireEvent(getByTestId('tab-Graphs'), 'pressIn');
     });
 
-    // Wait for Graphs screen to mount after lazy-visit
+    // Graphs screen is present after activating its tab
     await waitFor(() => {
       expect(getByTestId('graphs-screen')).toBeTruthy();
     });
@@ -499,13 +463,13 @@ describe('SimpleTabs Component Rendering', () => {
     });
   });
 
-  it('renders only the initial Operations screen on cold start (lazy mount)', async () => {
-    const { getByText, queryByText } = await render(<SimpleTabs />);
+  it('keeps every screen mounted on cold start (no lazy mount)', async () => {
+    const { getByText } = await render(<SimpleTabs />);
 
-    // Only Operations (index 0) should be mounted initially
+    // All screens are mounted up front so a swipe never reveals a blank screen.
     expect(getByText('Operations Screen')).toBeTruthy();
-    // Graphs (index 1) is lazy — not mounted until visited
-    expect(queryByText('Graphs Screen')).toBeNull();
+    expect(getByText('Graphs Screen')).toBeTruthy();
+    expect(getByText('Planned Screen')).toBeTruthy();
   });
 
   it('mounts Graphs screen after navigating to it', async () => {

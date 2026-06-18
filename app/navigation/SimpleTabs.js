@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform, BackHandler, InteractionManager } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -24,7 +24,6 @@ import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
-import { useOperationsData } from '../contexts/OperationsDataContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -233,15 +232,9 @@ export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
-  // Drives progressive pre-warming: once the first screen's operations have
-  // finished loading we mount the remaining screens during idle time.
-  const { loading: operationsLoading } = useOperationsData();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
-  // Track which tab indices have been visited so we lazy-mount their screens.
-  // Index 0 (Operations) is pre-visited so it renders immediately on cold start.
-  const [visited, setVisited] = React.useState(() => ({ 0: true }));
 
   // Guard ref — updated synchronously so handleTabPress never reads stale state.
   const isTransitioningRef = useRef(false);
@@ -301,13 +294,10 @@ export default function SimpleTabs() {
 
     const distance = Math.abs(newIndex - oldIndex);
 
-    // ---- Start the animation FIRST, before any React state update ----
+    // ---- Start the animation FIRST, before the setActive React update ----
     // Writing shared values schedules the slide/pill animation directly on the
-    // UI thread and does not depend on a React render. Previously setVisited +
-    // setActive ran first; mounting the (heavy) destination screen and
-    // re-rendering blocked the JS thread, so the slide only began *after* that
-    // work finished — the lag between tapping a tab and the animation starting.
-    // Scheduling the animation up front makes it start on the very next frame.
+    // UI thread and does not depend on a React render, so it starts on the very
+    // next frame instead of waiting for React to commit the tab-highlight change.
     activeIndex.value = newIndex;
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
@@ -353,14 +343,8 @@ export default function SimpleTabs() {
     }
 
     // ---- React state AFTER the animation is scheduled ----
-    // Mount the destination synchronously so its content is on-screen and
-    // slides in together with the strip. Deferring the mount (e.g. to the next
-    // frame) leaves the target blank while the strip moves, so the content just
-    // pops in at the end — which looks like an instant switch, not a slide.
-    // The animation was already scheduled above, so it starts immediately on
-    // the UI thread regardless of this mount; and because the screens are
-    // pre-warmed this is usually a no-op anyway.
-    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
+    // Only the tab highlight changes; all screens are already mounted, so the
+    // destination content is on-screen and slides in together with the strip.
     setActive(tabKey);
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
@@ -378,39 +362,6 @@ export default function SimpleTabs() {
     });
     return () => subscription.remove();
   }, [active, handleTabPress]);
-
-  // ---- Progressive idle pre-warm ----
-  // Once the first (Operations) screen's data has loaded, mount the remaining
-  // screens one at a time during idle time so later tab switches are instant
-  // and already populated — without paying their mount cost at cold start.
-  // runAfterInteractions waits until the initial render/touch interactions
-  // settle; staggering each mount onto its own frame keeps any single heavy
-  // screen from janking. If the user taps a not-yet-warmed tab first,
-  // handleTabPress still mounts it on demand.
-  //
-  // Guarded on completion (all screens visited) rather than a fire-once flag:
-  // `loading` can flip back to true on a data reload (import/restore, filter
-  // re-query), so a one-shot latch would cancel an in-flight warm and never
-  // restart. Re-running until every screen is mounted is resilient to that.
-  React.useEffect(() => {
-    if (operationsLoading || (visited[1] && visited[2] && visited[3])) return;
-
-    let cancelled = false;
-    const order = [1, 2, 3]; // Graphs, Planned, Settings
-    let i = 0;
-    const mountNext = () => {
-      if (cancelled || i >= order.length) return;
-      const idx = order[i++];
-      setVisited(prev => (prev[idx] ? prev : { ...prev, [idx]: true }));
-      requestAnimationFrame(mountNext);
-    };
-    const task = InteractionManager.runAfterInteractions(mountNext);
-
-    return () => {
-      cancelled = true;
-      if (task && task.cancel) task.cancel();
-    };
-  }, [operationsLoading, visited]);
 
   // Pan gesture for swipe navigation with real-time feedback.
   // isTransitioningShared guards against swipe during non-adjacent transitions
@@ -454,7 +405,6 @@ export default function SimpleTabs() {
         if (newIndex !== currentIndex) {
           activeIndex.value = newIndex;
           pillPosition.value = withTiming(newIndex, PILL_TIMING);
-          runOnJS(setVisited)((prev) => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
           translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING, (isFinished) => {
             if (isFinished) {
               runOnJS(setActive)(TABS[newIndex].key);
@@ -487,13 +437,15 @@ export default function SimpleTabs() {
     };
   });
 
-  // Memoize each screen element so SimpleTabs re-renders (active-tab highlight,
-  // tab-bar layout, pre-warm mounts, swipe completion) don't re-render the heavy
-  // screen subtrees. A stable element reference lets React skip reconciling them
-  // entirely — without this, setActive at the end of a tab-switch/swipe animation
-  // re-renders all four mounted screens and drops frames, causing a stutter as
-  // the slide settles. Lazy mount is preserved: the element only mounts when its
-  // `visited` flag flips it in.
+  // All four screens stay mounted for the whole session. Navigation only ever
+  // moves the strip (swipe to a neighbour, tap to any tab), so every screen
+  // must already be on-screen — lazy mounting left a not-yet-mounted screen
+  // blank/black when a swipe revealed it before its mount committed.
+  //
+  // Each screen element is memoized so SimpleTabs re-renders (active-tab
+  // highlight, tab-bar layout) don't re-render the heavy screen subtrees: a
+  // stable element reference lets React skip reconciling them, which avoids a
+  // frame drop / stutter as a switch animation settles.
   const operationsScreen = useMemo(() => <OperationsScreen />, []);
   const graphsScreen = useMemo(() => <GraphsScreen />, []);
   const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
@@ -506,20 +458,20 @@ export default function SimpleTabs() {
     return (
       <>
         <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          {visited[0] ? operationsScreen : null}
+          {operationsScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          {visited[1] ? graphsScreen : null}
+          {graphsScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          {visited[2] ? plannedScreen : null}
+          {plannedScreen}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          {visited[3] ? settingsScreen : null}
+          {settingsScreen}
         </Animated.View>
       </>
     );
-  }, [visited, operationsScreen, graphsScreen, plannedScreen, settingsScreen,
+  }, [operationsScreen, graphsScreen, plannedScreen, settingsScreen,
     screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
   const displayedTab = active;
