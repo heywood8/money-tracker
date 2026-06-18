@@ -240,6 +240,42 @@ describe('UpdateContentPanel', () => {
       expect(getByText('update_releases_without_apks')).toBeTruthy();
     });
 
+    it('shows the CI build progress chip on the newest no-APK release', async () => {
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{ version: '1.3.0', notes: 'Build still running', hasApk: false }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: { percent: 45, status: 'in_progress' },
+          }}
+        />,
+      );
+      // The mock t() returns the key (no interpolation), so the chip surfaces as its key.
+      expect(getByText('build_in_progress')).toBeTruthy();
+      expect(queryByText('No APK')).toBeNull(); // sanity: still the no-APK branch
+    });
+
+    it('does not show a build progress chip when buildProgress is null', async () => {
+      const { queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{ version: '1.3.0', notes: 'No APK', hasApk: false }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: null,
+          }}
+        />,
+      );
+      expect(queryByText('build_in_progress')).toBeNull();
+    });
+
     it('shows more_releases link when releasesUrl is present', async () => {
       const { getByText } = await render(
         <UpdateContentPanel

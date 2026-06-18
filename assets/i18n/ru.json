@@ -398,6 +398,7 @@
   "installed_latest_hint": "У вас последняя версия.",
   "release_history": "История версий",
   "no_apk_attached": "Нет APK",
+  "build_in_progress": "Сборка {percent}%",
   "more_releases": "Больше на GitHub",
   "update_releases_without_apks": "Найдены релизы, но без APK-файлов. Проверьте последний релиз на GitHub.",
   "later": "Позже",
