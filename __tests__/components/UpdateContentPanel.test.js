@@ -240,6 +240,42 @@ describe('UpdateContentPanel', () => {
       expect(getByText('update_releases_without_apks')).toBeTruthy();
     });
 
+    it('shows the CI build progress chip on the newest no-APK release', async () => {
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{ version: '1.3.0', notes: 'Build still running', hasApk: false }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: { percent: 45, status: 'in_progress' },
+          }}
+        />,
+      );
+      // The mock t() returns the key (no interpolation), so the chip surfaces as its key.
+      expect(getByText('build_in_progress')).toBeTruthy();
+      expect(queryByText('No APK')).toBeNull(); // sanity: still the no-APK branch
+    });
+
+    it('does not show a build progress chip when buildProgress is null', async () => {
+      const { queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [{ version: '1.3.0', notes: 'No APK', hasApk: false }],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: null,
+          }}
+        />,
+      );
+      expect(queryByText('build_in_progress')).toBeNull();
+    });
+
     it('shows more_releases link when releasesUrl is present', async () => {
       const { getByText } = await render(
         <UpdateContentPanel
@@ -254,6 +290,29 @@ describe('UpdateContentPanel', () => {
         />,
       );
       expect(getByText('more_releases')).toBeTruthy();
+    });
+
+    it('marks the installed version as latest with the green hint when newer releases lack an APK', async () => {
+      // The newest release (1.3.0) has no downloadable APK yet, so the installed 1.2.0 remains
+      // the latest version the user can actually run — it should get the green "latest" treatment.
+      const { getAllByText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            currentVersion: '1.2.0',
+            releaseNotes: [{ version: '1.3.0', notes: 'New release, no APK yet', hasApk: false }],
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Installed release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(getAllByText('installed').length).toBeGreaterThan(0);
+      expect(getByText('installed_latest_hint')).toBeTruthy();
     });
   });
 

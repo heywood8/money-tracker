@@ -102,6 +102,84 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = UPDATE_CHECK_TIME
 const MAX_RELEASES_TO_CHECK = 20;
 const MAX_CHANGELOG_ENTRIES = 10;
 
+// The workflow that builds and attaches the release APK. When a release tag exists but no APK
+// is attached yet, this build is usually still running on CI.
+const BUILD_WORKFLOW_FILE = 'build-release-apk.yml';
+// A full APK build takes ~17 minutes on the GitHub Actions runner; we treat that as 100%.
+const BUILD_DURATION_MINUTES = 17;
+
+// Queries the GitHub Actions API for the most recent in-progress run of the APK build workflow
+// and derives a rough completion percentage from how long it has been running. Used to show the
+// user that a release's APK is on its way when the tag exists but the asset is not uploaded yet.
+//
+// Returns null when there is no active run, when the API is unreachable, or when the timing data
+// is unusable — callers should treat null as "no progress information available".
+export const fetchBuildProgress = async ({
+  owner = DEFAULT_GITHUB_OWNER,
+  repo = DEFAULT_GITHUB_REPO,
+  fetchImpl = fetch,
+  now = Date.now(),
+  expectedDurationMinutes = BUILD_DURATION_MINUTES,
+} = {}) => {
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${BUILD_WORKFLOW_FILE}/runs?per_page=10`;
+
+  try {
+    const response = await fetchWithTimeout(
+      endpoint,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `Penny/${APP_VERSION}`,
+          'X-GitHub-Api-Version': GITHUB_API_VERSION,
+        },
+      },
+      UPDATE_CHECK_TIMEOUT_MS,
+      fetchImpl,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
+
+    // A run is "active" until GitHub marks it completed (queued / in_progress / waiting / etc.).
+    const activeRuns = runs.filter((run) => run && run.status && run.status !== 'completed');
+    if (activeRuns.length === 0) {
+      return null;
+    }
+
+    const startedMs = (run) => new Date(run.run_started_at || run.created_at || 0).getTime();
+    activeRuns.sort((a, b) => startedMs(b) - startedMs(a));
+    const run = activeRuns[0];
+
+    const startMs = startedMs(run);
+    if (!Number.isFinite(startMs) || startMs <= 0) {
+      return null;
+    }
+
+    const elapsedMinutes = (now - startMs) / 60000;
+    if (elapsedMinutes < 0) {
+      return null;
+    }
+
+    // Cap below 100%: the build is by definition not finished (no APK yet), so never show 100%.
+    const rawPercent = Math.round((elapsedMinutes / expectedDurationMinutes) * 100);
+    const percent = Math.min(99, Math.max(0, rawPercent));
+
+    return {
+      percent,
+      elapsedMinutes: Math.floor(elapsedMinutes),
+      status: run.status,
+      startedAt: run.run_started_at || run.created_at || null,
+      htmlUrl: run.html_url || null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const checkForAppUpdate = async ({
   currentVersion = APP_VERSION,
   owner = DEFAULT_GITHUB_OWNER,
@@ -214,6 +292,9 @@ export const checkForAppUpdate = async ({
         const releaseNotes = newerReleases
           .filter((r) => r.notes)
           .map((r) => ({ version: r.version, notes: r.notes, hasApk: r.hasApk }));
+        // The newer release(s) have no APK yet — the CI build is likely still running. Surface
+        // how far along that build is so the user knows the APK is on its way.
+        const buildProgress = await fetchBuildProgress({ owner, repo, fetchImpl });
         return {
           success: false,
           isUpdateAvailable: false,
@@ -222,6 +303,7 @@ export const checkForAppUpdate = async ({
           releaseNotes: releaseNotes.length > 0 ? releaseNotes : null,
           recentReleaseNotes: recentReleasesWithApk.length > 0 ? recentReleasesWithApk : null,
           releasesUrl,
+          buildProgress,
         };
       }
       return {

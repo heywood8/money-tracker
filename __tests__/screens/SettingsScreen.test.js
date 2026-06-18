@@ -915,5 +915,105 @@ describe('SettingsScreen', () => {
       // falls back to a standalone bottom block instead of the green card hint.
       expect(updatePanelProps.last.updateResult.currentVersion).toBe('1.2.3');
     });
+
+    it('re-polls build progress on an interval while a release awaits its CI build', async () => {
+      jest.useFakeTimers();
+      try {
+        checkForAppUpdate
+          .mockResolvedValueOnce({
+            success: false,
+            errorCode: 'releases_without_apks',
+            currentVersion: '1.2.3',
+            releaseNotes: [{ version: '1.3.0', notes: 'Building', hasApk: false }],
+            releasesUrl: 'https://github.com/example/releases',
+            buildProgress: { percent: 40, status: 'in_progress' },
+          })
+          .mockResolvedValueOnce({
+            success: false,
+            errorCode: 'releases_without_apks',
+            currentVersion: '1.2.3',
+            releaseNotes: [{ version: '1.3.0', notes: 'Building', hasApk: false }],
+            releasesUrl: 'https://github.com/example/releases',
+            buildProgress: { percent: 50, status: 'in_progress' },
+          });
+
+        const { getByTestId } = await render(
+          <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+        );
+
+        await act(async () => {
+          fireEvent.press(getByTestId('check-updates-row'));
+        });
+
+        await waitFor(() => {
+          expect(updatePanelProps.last?.updateResult?.buildProgress?.percent).toBe(40);
+        });
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(1);
+
+        // Advancing past the poll interval triggers a silent re-check that updates the percent.
+        await act(async () => {
+          jest.advanceTimersByTime(30000);
+        });
+
+        await waitFor(() => {
+          expect(updatePanelProps.last?.updateResult?.buildProgress?.percent).toBe(50);
+        });
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('stops polling once the build finishes and an APK becomes available', async () => {
+      jest.useFakeTimers();
+      try {
+        checkForAppUpdate
+          .mockResolvedValueOnce({
+            success: false,
+            errorCode: 'releases_without_apks',
+            currentVersion: '1.2.3',
+            releaseNotes: [{ version: '1.3.0', notes: 'Building', hasApk: false }],
+            releasesUrl: 'https://github.com/example/releases',
+            buildProgress: { percent: 90, status: 'in_progress' },
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            isUpdateAvailable: true,
+            latestVersion: '1.3.0',
+            currentVersion: '1.2.3',
+            downloadUrl: 'https://example.com/penny-1.3.0.apk',
+            releasesUrl: 'https://github.com/example/releases',
+          });
+
+        const { getByTestId } = await render(
+          <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+        );
+
+        await act(async () => {
+          fireEvent.press(getByTestId('check-updates-row'));
+        });
+
+        await waitFor(() => {
+          expect(updatePanelProps.last?.updateResult?.buildProgress?.percent).toBe(90);
+        });
+
+        await act(async () => {
+          jest.advanceTimersByTime(30000);
+        });
+
+        await waitFor(() => {
+          expect(updatePanelProps.last?.updateResult?.type).toBe('available');
+        });
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(2);
+
+        // The build is done — no further polling should occur.
+        await act(async () => {
+          jest.advanceTimersByTime(60000);
+        });
+        expect(checkForAppUpdate).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

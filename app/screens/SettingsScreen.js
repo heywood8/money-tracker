@@ -66,6 +66,9 @@ const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 // hijacked by the dismiss gesture.
 const EDGE_SWIPE_WIDTH = 48;
 
+// How often to re-poll CI build progress while the update panel shows an in-progress build.
+const BUILD_PROGRESS_POLL_MS = 30000;
+
 
 export default function SettingsScreen({ setSubPanelActive }) {
   const insets = useSafeAreaInsets();
@@ -613,9 +616,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
   }, [showDialog, t]);
 
-  const runUpdateCheck = useCallback(async () => {
-    setUpdateResult(null);
-    setIsCheckingUpdate(true);
+  const runUpdateCheck = useCallback(async ({ silent = false } = {}) => {
+    // A silent re-check (used by the build-progress poller) keeps the current panel content
+    // in place and skips the loading spinner, so the build percentage updates without flicker.
+    if (!silent) {
+      setUpdateResult(null);
+      setIsCheckingUpdate(true);
+    }
     loadDownloadedApks();
     try {
       const result = await checkForAppUpdate();
@@ -629,6 +636,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           releaseNotes: result.releaseNotes || null,
           recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
+          buildProgress: result.buildProgress || null,
         });
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({
@@ -653,11 +661,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
         });
       }
     } catch (error) {
-      setUpdateResult({ type: 'error', errorCode: null });
+      if (!silent) setUpdateResult({ type: 'error', errorCode: null });
     } finally {
-      setIsCheckingUpdate(false);
+      if (!silent) setIsCheckingUpdate(false);
     }
   }, [loadDownloadedApks]);
+
+  // While the update panel is open and a release is still waiting on its CI build, poll the
+  // build progress so the "Building N%" chip advances and flips to "Update now" once the APK
+  // is published. Polling stops as soon as the build finishes or the panel closes.
+  useEffect(() => {
+    if (activeSubPanel !== 'update') return undefined;
+    const buildInProgress = updateResult?.errorCode === 'releases_without_apks'
+      && !!updateResult?.buildProgress;
+    if (!buildInProgress) return undefined;
+    const intervalId = setInterval(() => {
+      runUpdateCheck({ silent: true });
+    }, BUILD_PROGRESS_POLL_MS);
+    return () => clearInterval(intervalId);
+  }, [activeSubPanel, updateResult, runUpdateCheck]);
 
   const handleCheckForUpdates = useCallback(() => {
     openSubPanel('update');

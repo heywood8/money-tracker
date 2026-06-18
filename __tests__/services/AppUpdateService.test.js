@@ -10,6 +10,7 @@ import {
   fetchExpectedChecksum,
   computeSha256,
   downloadAndInstallApk,
+  fetchBuildProgress,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -804,6 +805,98 @@ describe('AppUpdateService', () => {
 
       expect(onPhaseChange).toHaveBeenCalledWith('backing_up');
       expect(onPhaseChange).not.toHaveBeenCalledWith('verifying');
+    });
+  });
+
+  describe('fetchBuildProgress', () => {
+    const MINUTE = 60000;
+    const now = new Date('2026-06-18T12:00:00Z').getTime();
+
+    const runsResponse = (runs) => ({
+      ok: true,
+      json: async () => ({ workflow_runs: runs }),
+    });
+
+    it('derives a percentage from how long the active run has been going (17 min = 100%)', async () => {
+      // Started ~8.5 minutes ago → roughly 50%.
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', run_started_at: new Date(now - 8.5 * MINUTE).toISOString(), html_url: 'https://gh/run/1' },
+      ]));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result).not.toBeNull();
+      expect(result.percent).toBe(50);
+      expect(result.status).toBe('in_progress');
+      expect(result.htmlUrl).toBe('https://gh/run/1');
+    });
+
+    it('queries the build-release-apk workflow runs endpoint', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'queued', run_started_at: new Date(now).toISOString() },
+      ]));
+
+      await fetchBuildProgress({ fetchImpl, now });
+
+      expect(fetchImpl).toHaveBeenCalledWith(
+        expect.stringContaining('/actions/workflows/build-release-apk.yml/runs'),
+        expect.any(Object),
+      );
+    });
+
+    it('caps the percentage at 99% even when the build runs longer than expected', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', run_started_at: new Date(now - 40 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result.percent).toBe(99);
+    });
+
+    it('picks the most recently started active run', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', run_started_at: new Date(now - 15 * MINUTE).toISOString() },
+        { status: 'in_progress', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result.percent).toBe(10);
+    });
+
+    it('returns null when there are no active runs', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'completed', run_started_at: new Date(now - 5 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the API responds with an error', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false, status: 404 });
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the request throws', async () => {
+      const fetchImpl = jest.fn().mockRejectedValue(new Error('network error'));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the payload has no workflow_runs array', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result).toBeNull();
     });
   });
 });

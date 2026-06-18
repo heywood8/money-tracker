@@ -398,6 +398,7 @@
   "installed_latest_hint": "最新バージョンです。",
   "release_history": "リリース履歴",
   "no_apk_attached": "APKなし",
+  "build_in_progress": "ビルド中 {percent}%",
   "more_releases": "GitHubで詳細を見る",
   "update_releases_without_apks": "リリースは見つかりましたが、APKが添付されていません。GitHubで最新リリースを確認してください。",
   "later": "後で",

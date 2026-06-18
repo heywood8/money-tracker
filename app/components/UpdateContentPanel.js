@@ -106,7 +106,7 @@ const formatApkDate = (modificationTime) => {
 // Green used for the "installed / up to date" status, matching the checkmark elsewhere in this panel.
 const INSTALLED_GREEN = '#4caf50';
 
-function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
+function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
   // We highlight a single card: the candidate for installation when an update is available,
   // otherwise the installed-and-latest card when we are already up to date. The candidate
@@ -134,6 +134,18 @@ function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk
             <Text style={[styles.releaseBadge, { color: colors.mutedText, borderColor: colors.border }]}>
               {badge}
             </Text>
+          ) : null}
+          {buildProgress && typeof buildProgress.percent === 'number' ? (
+            <View
+              style={[styles.buildProgressChip, { borderColor: colors.primary }]}
+              accessibilityRole="text"
+              accessibilityLabel={(t('build_in_progress') || 'Building {percent}%').replace('{percent}', String(buildProgress.percent))}
+            >
+              <Ionicons name="sync-outline" size={13} color={colors.primary} />
+              <Text style={[styles.buildProgressText, { color: colors.primary }]}>
+                {(t('build_in_progress') || 'Building {percent}%').replace('{percent}', String(buildProgress.percent))}
+              </Text>
+            </View>
           ) : null}
           {isUpdateCandidate ? (
             <View
@@ -197,6 +209,9 @@ ReleaseCard.propTypes = {
   version: PropTypes.string,
   notes: PropTypes.string,
   badge: PropTypes.string,
+  buildProgress: PropTypes.shape({
+    percent: PropTypes.number,
+  }),
   matchedApk: PropTypes.object,
   repoBase: PropTypes.string,
   onInstallApk: PropTypes.func,
@@ -316,10 +331,14 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
   const repoBase = repoBaseFromReleasesUrl(updateResult.releasesUrl);
   const apkLookup = buildApkLookup(downloadedApks);
 
-  // The currently installed app version. When there is no newer release (up_to_date),
-  // the installed version is also the latest one and earns the green checkmark + hint.
+  // The currently installed app version. We treat it as the latest — green checkmark + hint —
+  // whenever there is no newer *installable* release. That covers two cases: being fully up to
+  // date, and a newer release existing but having no APK attached yet (CI build still running).
+  // In the latter case the user still holds the newest installable APK, so the installed version
+  // is the latest one they can actually run.
   const installedVersion = updateResult.currentVersion;
-  const installedIsLatest = updateResult.type === 'up_to_date';
+  const installedIsLatest = updateResult.type === 'up_to_date'
+    || (updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks');
   // When an update is available, the release we want the user to install is the highlighted
   // one — not the version they already have.
   const candidateVersion = updateResult.type === 'available' ? updateResult.latestVersion : null;
@@ -333,6 +352,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         version={release.version}
         notes={release.notes}
         badge={release.badge}
+        buildProgress={release.buildProgress}
         matchedApk={apkLookup.get(release.version)}
         repoBase={repoBase}
         onInstallApk={onInstallApk}
@@ -476,11 +496,19 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
       )}
 
       {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && (updateResult.releaseNotes || updateResult.recentReleaseNotes) ? (() => {
-        const noApkReleases = (updateResult.releaseNotes || []).map((r) => ({
-          version: r.version,
-          notes: r.notes,
-          badge: !r.hasApk ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
-        }));
+        // Surface CI build progress on the newest release awaiting its APK — that is the build
+        // currently running. Older no-APK releases (if any) get no progress chip.
+        let buildProgressShown = false;
+        const noApkReleases = (updateResult.releaseNotes || []).map((r) => {
+          const showProgress = !r.hasApk && !buildProgressShown && !!updateResult.buildProgress;
+          if (showProgress) buildProgressShown = true;
+          return {
+            version: r.version,
+            notes: r.notes,
+            badge: !r.hasApk ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
+            buildProgress: showProgress ? updateResult.buildProgress : null,
+          };
+        });
         const recentReleases = updateResult.recentReleaseNotes || [];
         return (
           <View style={styles.upToDateContent}>
@@ -535,6 +563,9 @@ UpdateContentPanel.propTypes = {
     alreadyDownloaded: PropTypes.bool,
     localUri: PropTypes.string,
     errorCode: PropTypes.string,
+    buildProgress: PropTypes.shape({
+      percent: PropTypes.number,
+    }),
   }),
   downloadedApks: PropTypes.array,
   onUpdate: PropTypes.func,
@@ -570,6 +601,21 @@ const styles = StyleSheet.create({
   },
   apkListContent: {
     paddingHorizontal: SPACING.sm,
+  },
+  buildProgressChip: {
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 2,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 1,
+  },
+  buildProgressText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   centeredIcon: {
     marginBottom: SPACING.lg,

@@ -398,6 +398,7 @@
   "installed_latest_hint": "최신 버전입니다.",
   "release_history": "릴리스 기록",
   "no_apk_attached": "APK 없음",
+  "build_in_progress": "빌드 중 {percent}%",
   "more_releases": "GitHub에서 더 보기",
   "update_releases_without_apks": "릴리스를 찾았지만 APK가 첨부되지 않았습니다. GitHub에서 최신 릴리스를 확인하세요.",
   "later": "나중에",
