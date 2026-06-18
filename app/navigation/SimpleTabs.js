@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import PropTypes from 'prop-types';
-import { View, StyleSheet, Dimensions, Platform, BackHandler } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, BackHandler, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableRipple, Text } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -24,6 +24,7 @@ import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { useOperationsData } from '../contexts/OperationsDataContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -232,6 +233,9 @@ export default function SimpleTabs() {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const { isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
+  // Drives progressive pre-warming: once the first screen's operations have
+  // finished loading we mount the remaining screens during idle time.
+  const { loading: operationsLoading } = useOperationsData();
   const [active, setActive] = React.useState('Operations');
   const [subPanelActive, setSubPanelActive] = React.useState(false);
   const [tabBarWidth, setTabBarWidth] = React.useState(SCREEN_WIDTH);
@@ -297,53 +301,67 @@ export default function SimpleTabs() {
 
     const distance = Math.abs(newIndex - oldIndex);
 
-    // Mark target tab visited before animation so the screen mounts in time.
-    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
-    setActive(tabKey);
+    // ---- Start the animation FIRST, before any React state update ----
+    // Writing shared values schedules the slide/pill animation directly on the
+    // UI thread and does not depend on a React render. Previously setVisited +
+    // setActive ran first; mounting the (heavy) destination screen and
+    // re-rendering blocked the JS thread, so the slide only began *after* that
+    // work finished — the lag between tapping a tab and the animation starting.
+    // Scheduling the animation up front makes it start on the very next frame.
     activeIndex.value = newIndex;
     pillPosition.value = withTiming(newIndex, PILL_TIMING);
 
     if (distance === 1) {
       translateX.value = withTiming(-newIndex * SCREEN_WIDTH, SCREEN_TIMING);
-      return;
+    } else {
+      // ---- Non-adjacent tab ----
+      // Reposition the target screen to sit immediately adjacent to the source
+      // on the worklet thread (zero React overhead). The strip then animates
+      // exactly 1 screen width — identical feel to adjacent. On completion the
+      // strip snaps to the real resting position and the per-screen offset is
+      // zeroed simultaneously, both on the worklet thread — no visual jump.
+      const direction = newIndex > oldIndex ? 1 : -1;
+      // How far to shift the target so it appears one screen width past the source.
+      const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
+      const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
+      const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3];
+      const targetAdjust = adjSharedValues[newIndex];
+
+      isTransitioningShared.value = true;
+      isTransitioningRef.current = true;
+
+      // Hide intermediate screens so they don't bleed through when the repositioned
+      // target overlaps their strip position (all worklet-thread, no React render).
+      for (let i = 0; i < 4; i++) {
+        if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
+      }
+
+      targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
+      translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
+        'worklet';
+        if (!finished) return;
+        // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
+        translateX.value = -newIndex * SCREEN_WIDTH;
+        targetAdjust.value = 0;
+        opacityValues[0].value = 1;
+        opacityValues[1].value = 1;
+        opacityValues[2].value = 1;
+        opacityValues[3].value = 1;
+        isTransitioningShared.value = false;
+        runOnJS(clearTransitioningRef)();
+      });
     }
 
-    // ---- Non-adjacent tab ----
-    // Reposition the target screen to sit immediately adjacent to the source
-    // on the worklet thread (zero React overhead). The strip then animates
-    // exactly 1 screen width — identical feel to adjacent. On completion the
-    // strip snaps to the real resting position and the per-screen offset is
-    // zeroed simultaneously, both on the worklet thread — no visual jump.
-    const direction = newIndex > oldIndex ? 1 : -1;
-    // How far to shift the target so it appears one screen width past the source.
-    const adjacentOffset = (oldIndex + direction - newIndex) * SCREEN_WIDTH;
-    const adjSharedValues = [screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3];
-    const opacityValues = [screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3];
-    const targetAdjust = adjSharedValues[newIndex];
-
-    isTransitioningShared.value = true;
-    isTransitioningRef.current = true;
-
-    // Hide intermediate screens so they don't bleed through when the repositioned
-    // target overlaps their strip position (all worklet-thread, no React render).
-    for (let i = 0; i < 4; i++) {
-      if (i !== oldIndex && i !== newIndex) opacityValues[i].value = 0;
-    }
-
-    targetAdjust.value = adjacentOffset; // instant reposition on worklet thread
-    translateX.value = withTiming(-(oldIndex + direction) * SCREEN_WIDTH, SCREEN_TIMING, (finished) => {
-      'worklet';
-      if (!finished) return;
-      // Snap strip, zero offset, restore opacities — all on worklet thread, no flash.
-      translateX.value = -newIndex * SCREEN_WIDTH;
-      targetAdjust.value = 0;
-      opacityValues[0].value = 1;
-      opacityValues[1].value = 1;
-      opacityValues[2].value = 1;
-      opacityValues[3].value = 1;
-      isTransitioningShared.value = false;
-      runOnJS(clearTransitioningRef)();
-    });
+    // ---- React state AFTER the animation is scheduled ----
+    // Mount the destination synchronously so its content is on-screen and
+    // slides in together with the strip. Deferring the mount (e.g. to the next
+    // frame) leaves the target blank while the strip moves, so the content just
+    // pops in at the end — which looks like an instant switch, not a slide.
+    // The animation was already scheduled above, so it starts immediately on
+    // the UI thread regardless of this mount; and because the screens are
+    // pre-warmed this is usually a no-op anyway.
+    setVisited(prev => prev[newIndex] ? prev : { ...prev, [newIndex]: true });
+    setActive(tabKey);
   }, [TABS, active, activeIndex, translateX, pillPosition, isTransitioningShared,
     screenAdjust0, screenAdjust1, screenAdjust2, screenAdjust3,
     screenOpacity0, screenOpacity1, screenOpacity2, screenOpacity3,
@@ -360,6 +378,39 @@ export default function SimpleTabs() {
     });
     return () => subscription.remove();
   }, [active, handleTabPress]);
+
+  // ---- Progressive idle pre-warm ----
+  // Once the first (Operations) screen's data has loaded, mount the remaining
+  // screens one at a time during idle time so later tab switches are instant
+  // and already populated — without paying their mount cost at cold start.
+  // runAfterInteractions waits until the initial render/touch interactions
+  // settle; staggering each mount onto its own frame keeps any single heavy
+  // screen from janking. If the user taps a not-yet-warmed tab first,
+  // handleTabPress still mounts it on demand.
+  //
+  // Guarded on completion (all screens visited) rather than a fire-once flag:
+  // `loading` can flip back to true on a data reload (import/restore, filter
+  // re-query), so a one-shot latch would cancel an in-flight warm and never
+  // restart. Re-running until every screen is mounted is resilient to that.
+  React.useEffect(() => {
+    if (operationsLoading || (visited[1] && visited[2] && visited[3])) return;
+
+    let cancelled = false;
+    const order = [1, 2, 3]; // Graphs, Planned, Settings
+    let i = 0;
+    const mountNext = () => {
+      if (cancelled || i >= order.length) return;
+      const idx = order[i++];
+      setVisited(prev => (prev[idx] ? prev : { ...prev, [idx]: true }));
+      requestAnimationFrame(mountNext);
+    };
+    const task = InteractionManager.runAfterInteractions(mountNext);
+
+    return () => {
+      cancelled = true;
+      if (task && task.cancel) task.cancel();
+    };
+  }, [operationsLoading, visited]);
 
   // Pan gesture for swipe navigation with real-time feedback.
   // isTransitioningShared guards against swipe during non-adjacent transitions
@@ -436,24 +487,40 @@ export default function SimpleTabs() {
     };
   });
 
+  // Memoize each screen element so SimpleTabs re-renders (active-tab highlight,
+  // tab-bar layout, pre-warm mounts, swipe completion) don't re-render the heavy
+  // screen subtrees. A stable element reference lets React skip reconciling them
+  // entirely — without this, setActive at the end of a tab-switch/swipe animation
+  // re-renders all four mounted screens and drops frames, causing a stutter as
+  // the slide settles. Lazy mount is preserved: the element only mounts when its
+  // `visited` flag flips it in.
+  const operationsScreen = useMemo(() => <OperationsScreen />, []);
+  const graphsScreen = useMemo(() => <GraphsScreen />, []);
+  const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
+  const settingsScreen = useMemo(
+    () => <SettingsScreen setSubPanelActive={setSubPanelActive} />,
+    [setSubPanelActive],
+  );
+
   const renderScreens = useCallback(() => {
     return (
       <>
         <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          {visited[0] ? <OperationsScreen /> : null}
+          {visited[0] ? operationsScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          {visited[1] ? <GraphsScreen /> : null}
+          {visited[1] ? graphsScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          {visited[2] ? <PlannedOperationsScreen /> : null}
+          {visited[2] ? plannedScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          {visited[3] ? <SettingsScreen setSubPanelActive={setSubPanelActive} /> : null}
+          {visited[3] ? settingsScreen : null}
         </Animated.View>
       </>
     );
-  }, [visited, setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
+  }, [visited, operationsScreen, graphsScreen, plannedScreen, settingsScreen,
+    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
   const displayedTab = active;
 
