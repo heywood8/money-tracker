@@ -487,24 +487,40 @@ export default function SimpleTabs() {
     };
   });
 
+  // Memoize each screen element so SimpleTabs re-renders (active-tab highlight,
+  // tab-bar layout, pre-warm mounts, swipe completion) don't re-render the heavy
+  // screen subtrees. A stable element reference lets React skip reconciling them
+  // entirely — without this, setActive at the end of a tab-switch/swipe animation
+  // re-renders all four mounted screens and drops frames, causing a stutter as
+  // the slide settles. Lazy mount is preserved: the element only mounts when its
+  // `visited` flag flips it in.
+  const operationsScreen = useMemo(() => <OperationsScreen />, []);
+  const graphsScreen = useMemo(() => <GraphsScreen />, []);
+  const plannedScreen = useMemo(() => <PlannedOperationsScreen />, []);
+  const settingsScreen = useMemo(
+    () => <SettingsScreen setSubPanelActive={setSubPanelActive} />,
+    [setSubPanelActive],
+  );
+
   const renderScreens = useCallback(() => {
     return (
       <>
         <Animated.View style={[styles.screen, screenAdjustedStyle0]}>
-          {visited[0] ? <OperationsScreen /> : null}
+          {visited[0] ? operationsScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle1]}>
-          {visited[1] ? <GraphsScreen /> : null}
+          {visited[1] ? graphsScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle2]}>
-          {visited[2] ? <PlannedOperationsScreen /> : null}
+          {visited[2] ? plannedScreen : null}
         </Animated.View>
         <Animated.View style={[styles.screen, screenAdjustedStyle3]}>
-          {visited[3] ? <SettingsScreen setSubPanelActive={setSubPanelActive} /> : null}
+          {visited[3] ? settingsScreen : null}
         </Animated.View>
       </>
     );
-  }, [visited, setSubPanelActive, screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
+  }, [visited, operationsScreen, graphsScreen, plannedScreen, settingsScreen,
+    screenAdjustedStyle0, screenAdjustedStyle1, screenAdjustedStyle2, screenAdjustedStyle3]);
 
   const displayedTab = active;
 
