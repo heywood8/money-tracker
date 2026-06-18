@@ -33,14 +33,29 @@ describe('useSwipeDismiss', () => {
       expect(Gesture.Pan).toHaveBeenCalled();
     });
 
-    it('honors the enabled flag', async () => {
+    it('configures rightward-only activation and vertical fail offsets', async () => {
       const panBuilder = Gesture.Pan();
       Gesture.Pan.mockClear();
       Gesture.Pan.mockReturnValueOnce(panBuilder);
 
-      await renderHook(() => useSwipeDismiss({ onDismiss: jest.fn(), enabled: false }));
+      await renderHook(() => useSwipeDismiss({ onDismiss: jest.fn() }));
 
-      expect(panBuilder.enabled).toHaveBeenCalledWith(false);
+      expect(panBuilder.activeOffsetX).toHaveBeenCalledWith(16);
+      expect(panBuilder.failOffsetY).toHaveBeenCalledWith([-18, 18]);
+    });
+
+    it('does not throw when disabled (gating is via a shared value, not .enabled())', async () => {
+      const { result } = await renderHook(() =>
+        useSwipeDismiss({ onDismiss: jest.fn(), enabled: false }),
+      );
+      expect(result.current.gesture).toBeDefined();
+    });
+
+    it('accepts an edgeWidth for edge-only dismissal', async () => {
+      const { result } = await renderHook(() =>
+        useSwipeDismiss({ onDismiss: jest.fn(), edgeWidth: 48 }),
+      );
+      expect(result.current.gesture).toBeDefined();
     });
   });
 

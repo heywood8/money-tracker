@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import { Dimensions } from 'react-native';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import {
   useSharedValue,
@@ -9,12 +9,11 @@ import {
   Easing,
 } from 'react-native-reanimated';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const ENTER_DURATION = 260;
 const EXIT_DURATION = 220;
 const ENTER_EASING = Easing.out(Easing.cubic);
 const EXIT_EASING = Easing.in(Easing.cubic);
+const ACTIVE_OFFSET_X = 16;
 
 /**
  * useSwipeDismiss — Telegram-style interactive swipe-to-dismiss for a panel that
@@ -30,28 +29,55 @@ const EXIT_EASING = Easing.in(Easing.cubic);
  *
  * Only rightward movement is honoured (offset is clamped at 0) and vertical
  * movement yields to scrollables via `failOffsetY`, so lists inside the panel
- * keep scrolling normally.
+ * keep scrolling normally. The translation is rebased at activation so the panel
+ * tracks the finger from 0 instead of snapping by the `activeOffsetX` slop.
  *
  * @param {object}   options
  * @param {Function} options.onDismiss  Called once the panel has slid fully away.
- * @param {boolean}  [options.enabled=true]  Disables the gesture (e.g. mid-operation).
- * @param {number}   [options.width=SCREEN_WIDTH]  Distance the panel travels off-screen.
+ * @param {boolean}  [options.enabled=true]  Gates the gesture (e.g. mid-operation).
+ *   Read from a shared value inside the worklets so toggling it never rebuilds
+ *   the native recognizer (which would jitter an in-flight gesture).
+ * @param {number}   [options.width]  Distance the panel travels off-screen.
+ *   Defaults to the live window width (updates on rotation / resize).
+ * @param {number}   [options.edgeWidth=0]  When > 0, only swipes that BEGIN within
+ *   this many px of the left edge dismiss. Use for panels that embed their own
+ *   horizontal gestures (e.g. a drag-to-reorder list) so a body drag can't be
+ *   stolen by the dismiss gesture. 0 = the whole surface is swipeable.
  * @returns {{ gesture: object, animatedStyle: object, open: () => void, dismiss: () => void }}
  */
-export function useSwipeDismiss({ onDismiss, enabled = true, width = SCREEN_WIDTH }) {
+export function useSwipeDismiss({ onDismiss, enabled = true, width: widthProp, edgeWidth = 0 } = {}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const width = widthProp ?? windowWidth;
+
   // 0 = panel fully open, `width` = panel fully off the right edge.
   const translateX = useSharedValue(0);
+  // Translation captured at activation; subtracted so the panel tracks the
+  // finger from 0 rather than jumping by the activation slop (activeOffsetX).
+  const dragStart = useSharedValue(0);
+  // Whether the active gesture is a valid dismiss (enabled, not mid-dismiss, and
+  // — when edgeWidth is set — started within the left edge region).
+  const valid = useSharedValue(false);
+  // Guards against overlapping dismiss animations / a double onDismiss.
+  const dismissing = useSharedValue(false);
+  // Read inside worklets so flipping `enabled` doesn't rebuild the recognizer.
+  const enabledShared = useSharedValue(enabled);
+  useEffect(() => {
+    enabledShared.value = enabled;
+  }, [enabled, enabledShared]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
 
   const open = useCallback(() => {
+    dismissing.value = false;
     translateX.value = width;
     translateX.value = withTiming(0, { duration: ENTER_DURATION, easing: ENTER_EASING });
-  }, [translateX, width]);
+  }, [translateX, dismissing, width]);
 
   const dismiss = useCallback(() => {
+    if (dismissing.value) return;
+    dismissing.value = true;
     translateX.value = withTiming(
       width,
       { duration: EXIT_DURATION, easing: EXIT_EASING },
@@ -61,40 +87,43 @@ export function useSwipeDismiss({ onDismiss, enabled = true, width = SCREEN_WIDT
         }
       },
     );
-  }, [translateX, width, onDismiss]);
+  }, [translateX, dismissing, width, onDismiss]);
 
   const gesture = useMemo(() => {
     const DISTANCE_THRESHOLD = width * 0.32;
     const VELOCITY_THRESHOLD = 800;
     return Gesture.Pan()
-      .enabled(enabled)
       // Only a rightward drag (>16px) activates; vertical drags fail so inner
       // scroll views / lists keep working.
-      .activeOffsetX(16)
+      .activeOffsetX(ACTIVE_OFFSET_X)
       .failOffsetY([-18, 18])
+      .onStart((event) => {
+        'worklet';
+        dragStart.value = event.translationX;
+        // start x = current location − distance travelled since touch-down.
+        const startX = event.x - event.translationX;
+        valid.value =
+          enabledShared.value &&
+          !dismissing.value &&
+          (edgeWidth <= 0 || startX <= edgeWidth);
+      })
       .onUpdate((event) => {
         'worklet';
-        translateX.value = Math.max(0, event.translationX);
+        if (!valid.value) return;
+        translateX.value = Math.max(0, event.translationX - dragStart.value);
       })
       .onEnd((event) => {
         'worklet';
-        const shouldDismiss =
-          event.translationX > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD;
-        if (shouldDismiss) {
-          translateX.value = withTiming(
-            width,
-            { duration: EXIT_DURATION, easing: EXIT_EASING },
-            (finished) => {
-              if (finished && onDismiss) {
-                runOnJS(onDismiss)();
-              }
-            },
-          );
+        if (!valid.value) return;
+        const dx = event.translationX - dragStart.value;
+        if (dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD) {
+          // Reuse dismiss() so the completion + re-entrancy guard live in one place.
+          runOnJS(dismiss)();
         } else {
           translateX.value = withTiming(0, { duration: EXIT_DURATION, easing: ENTER_EASING });
         }
       });
-  }, [translateX, width, enabled, onDismiss]);
+  }, [translateX, dragStart, valid, dismissing, enabledShared, width, edgeWidth, dismiss]);
 
   return { gesture, animatedStyle, open, dismiss };
 }
