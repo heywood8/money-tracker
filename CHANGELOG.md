@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.137.2](https://github.com/heywood8/money-tracker/compare/penny-v0.137.1...penny-v0.137.2) (2026-06-18)
+
+
+### Bug Fixes
+
+* **expo:** align packages to SDK 54 for Expo Go compatibility ([#998](https://github.com/heywood8/money-tracker/issues/998)) ([db184e4](https://github.com/heywood8/money-tracker/commit/db184e4384e4bafe5adeb57358c7154a04047a93))
+
 ## [0.137.1](https://github.com/heywood8/money-tracker/compare/penny-v0.137.0...penny-v0.137.1) (2026-06-18)
 
 
