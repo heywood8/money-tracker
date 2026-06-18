@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.137.1](https://github.com/heywood8/money-tracker/compare/penny-v0.137.0...penny-v0.137.1) (2026-06-18)
+
+
+### Performance Improvements
+
+* **operations:** decouple filteredOperations from account balance changes ([#914](https://github.com/heywood8/money-tracker/issues/914)) ([#937](https://github.com/heywood8/money-tracker/issues/937)) ([59a5722](https://github.com/heywood8/money-tracker/commit/59a57220962bbc4d1fd647bc9dfe678dfa6dc435))
+
+## [0.137.0](https://github.com/heywood8/money-tracker/compare/penny-v0.136.4...penny-v0.137.0) (2026-06-18)
+
+
+### Features
+
+* highlight install candidate instead of installed version ([#995](https://github.com/heywood8/money-tracker/issues/995)) ([a199f17](https://github.com/heywood8/money-tracker/commit/a199f1717f73f85a634c2a06276f9302e39786ed))
+
+## [0.136.4](https://github.com/heywood8/money-tracker/compare/penny-v0.136.3...penny-v0.136.4) (2026-06-18)
+
+
+### Bug Fixes
+
+* **update:** pass currentVersion to panel when up to date ([#992](https://github.com/heywood8/money-tracker/issues/992)) ([0c94653](https://github.com/heywood8/money-tracker/commit/0c9465307890ebea5b9f25f5b1564384d2bb5286))
+
+## [0.136.3](https://github.com/heywood8/money-tracker/compare/penny-v0.136.2...penny-v0.136.3) (2026-06-17)
+
+
+### Bug Fixes
+
+* **update:** move up-to-date confirmation onto highlighted latest release card ([#989](https://github.com/heywood8/money-tracker/issues/989)) ([176f93f](https://github.com/heywood8/money-tracker/commit/176f93fe02b79d80da545a5e9419496dde8be8ec))
+
+## [0.136.2](https://github.com/heywood8/money-tracker/compare/penny-v0.136.1...penny-v0.136.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **splash:** hold splash screen until app ready ([#909](https://github.com/heywood8/money-tracker/issues/909)) — conflicts resolved ([#986](https://github.com/heywood8/money-tracker/issues/986)) ([1446057](https://github.com/heywood8/money-tracker/commit/144605768257bbe04ddc6cd0ccff6460fa59f6c6))
+
 ## [0.136.1](https://github.com/heywood8/money-tracker/compare/penny-v0.136.0...penny-v0.136.1) (2026-06-17)
 
 

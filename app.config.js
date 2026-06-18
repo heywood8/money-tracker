@@ -6,7 +6,7 @@ module.exports = {
   expo: {
     name: 'Penny',
     slug: 'app',
-    version: '0.136.1', // x-release-please-version
+    version: '0.137.1', // x-release-please-version
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -39,6 +39,7 @@ module.exports = {
     plugins: [
       'expo-sqlite',
       '@react-native-google-signin/google-signin',
+      '@react-native-community/datetimepicker',
       [
         'expo-build-properties',
         {

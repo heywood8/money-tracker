@@ -384,9 +384,55 @@ describe('UpdateContentPanel', () => {
           }}
         />,
       );
-      // Installed version is highlighted, but it is not the latest, so no green hint.
+      // Installed version still carries its informational chip, but with no green latest hint.
       expect(getByText('installed')).toBeTruthy();
       expect(queryByText('installed_latest_hint')).toBeNull();
+    });
+
+    it('highlights the candidate for installation, not the installed version, when an update is available', async () => {
+      const { getByText, getByLabelText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'available',
+            latestVersion: '2.0.0',
+            currentVersion: '1.9.0',
+            downloadUrl: 'https://example.com/penny-2.0.0.apk',
+            checksumUrl: null,
+            releaseNotes: null,
+            recentReleaseNotes: [
+              { version: '2.0.0', notes: 'New release' },
+              { version: '1.9.0', notes: 'Installed release' },
+            ],
+            releasesUrl: null,
+            alreadyDownloaded: false,
+            localUri: null,
+          }}
+        />,
+      );
+      // The newest release is flagged as the install candidate...
+      expect(getByText('update_candidate')).toBeTruthy();
+      expect(getByLabelText('update_candidate')).toBeTruthy();
+      // ...while the installed version keeps only its informational chip.
+      expect(getByText('installed')).toBeTruthy();
+    });
+
+    it('does not show an install candidate chip when already up to date', async () => {
+      const { queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '1.2.0',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Latest release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(queryByText('update_candidate')).toBeNull();
     });
 
     it('does not highlight any release when the installed version is not in the list', async () => {
@@ -403,6 +449,43 @@ describe('UpdateContentPanel', () => {
       );
       expect(queryByText('installed')).toBeNull();
       expect(queryByText('installed_latest_hint')).toBeNull();
+    });
+
+    it('puts the up-to-date confirmation on the highlighted latest card, not at the bottom', async () => {
+      const { queryByText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '1.2.0',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Latest release' },
+              { version: '1.1.0', notes: 'Older release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // The confirmation lives on the green latest-release card...
+      expect(getByText('installed_latest_hint')).toBeTruthy();
+      // ...and the standalone bottom status is gone.
+      expect(queryByText('up_to_date')).toBeNull();
+    });
+
+    it('falls back to the bottom up-to-date status when the latest version is not shown as a card', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            currentVersion: '9.9.9',
+            recentReleaseNotes: [{ version: '1.2.0', notes: 'Latest release' }],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // No card matches the installed version, so the confirmation falls back to the bottom.
+      expect(getByText('up_to_date')).toBeTruthy();
     });
   });
 });

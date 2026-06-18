@@ -1,5 +1,7 @@
 import { logService } from './app/services/LogService';
 logService.install();
+import * as SplashScreen from 'expo-splash-screen';
+SplashScreen.preventAutoHideAsync().catch(() => {});
 import React from 'react';
 import AppInitializer from './app/screens/AppInitializer';
 import { ThemeConfigProvider } from './app/contexts/ThemeConfigContext';

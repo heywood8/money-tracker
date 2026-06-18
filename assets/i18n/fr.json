@@ -394,6 +394,7 @@
   "update_install_now": "Installer maintenant",
   "downloaded_apks": "APKs téléchargés",
   "installed": "Installée",
+  "update_candidate": "Disponible",
   "installed_latest_hint": "Vous avez la dernière version.",
   "release_history": "Historique des versions",
   "no_apk_attached": "Pas d'APK",

@@ -106,15 +106,22 @@ const formatApkDate = (modificationTime) => {
 // Green used for the "installed / up to date" status, matching the checkmark elsewhere in this panel.
 const INSTALLED_GREEN = '#4caf50';
 
-function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled }) {
+function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
+  // We highlight a single card: the candidate for installation when an update is available,
+  // otherwise the installed-and-latest card when we are already up to date. The candidate
+  // takes the primary accent; the up-to-date installed card keeps the green "latest" accent.
+  const highlighted = isUpdateCandidate || isLatestInstalled;
   const accent = isLatestInstalled ? INSTALLED_GREEN : colors.primary;
+  // Once an update is available the installed card is no longer the highlighted one, so its
+  // "Installed" chip recedes to a muted, purely informational treatment.
+  const installedChipColor = isLatestInstalled ? accent : colors.mutedText;
   return (
     <View
       style={[
         styles.releaseCard,
-        { backgroundColor: colors.surface, borderColor: isInstalled ? accent : colors.border },
-        isInstalled && styles.releaseCardInstalled,
+        { backgroundColor: colors.surface, borderColor: highlighted ? accent : colors.border },
+        highlighted && styles.releaseCardHighlighted,
       ]}
     >
       <View style={styles.releaseHeader}>
@@ -128,9 +135,21 @@ function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk
               {badge}
             </Text>
           ) : null}
+          {isUpdateCandidate ? (
+            <View
+              style={[styles.installedChip, { borderColor: colors.primary }]}
+              accessibilityRole="text"
+              accessibilityLabel={t('update_candidate') || 'Available to install'}
+            >
+              <Ionicons name="arrow-up-circle" size={13} color={colors.primary} />
+              <Text style={[styles.installedChipText, { color: colors.primary }]}>
+                {t('update_candidate') || 'Available'}
+              </Text>
+            </View>
+          ) : null}
           {isInstalled ? (
             <View
-              style={[styles.installedChip, { borderColor: accent }]}
+              style={[styles.installedChip, { borderColor: installedChipColor }]}
               accessibilityRole="text"
               accessibilityLabel={isLatestInstalled
                 ? (t('installed_latest_hint') || 'Installed — you are on the latest version')
@@ -139,7 +158,7 @@ function ReleaseCard({ version, notes, badge, matchedApk, repoBase, onInstallApk
               {isLatestInstalled ? (
                 <Ionicons name="checkmark-circle" size={13} color={accent} />
               ) : null}
-              <Text style={[styles.installedChipText, { color: accent }]}>
+              <Text style={[styles.installedChipText, { color: installedChipColor }]}>
                 {t('installed') || 'Installed'}
               </Text>
             </View>
@@ -185,6 +204,7 @@ ReleaseCard.propTypes = {
   t: PropTypes.func,
   isInstalled: PropTypes.bool,
   isLatestInstalled: PropTypes.bool,
+  isUpdateCandidate: PropTypes.bool,
 };
 
 function MoreReleasesLink({ url, colors, t }) {
@@ -300,9 +320,13 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
   // the installed version is also the latest one and earns the green checkmark + hint.
   const installedVersion = updateResult.currentVersion;
   const installedIsLatest = updateResult.type === 'up_to_date';
+  // When an update is available, the release we want the user to install is the highlighted
+  // one — not the version they already have.
+  const candidateVersion = updateResult.type === 'available' ? updateResult.latestVersion : null;
 
   const renderReleaseCards = (releases) => releases.map((release) => {
     const isInstalled = !!installedVersion && release.version === installedVersion;
+    const isUpdateCandidate = !!candidateVersion && release.version === candidateVersion;
     return (
       <ReleaseCard
         key={release.version}
@@ -316,6 +340,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         t={t}
         isInstalled={isInstalled}
         isLatestInstalled={isInstalled && installedIsLatest}
+        isUpdateCandidate={isUpdateCandidate}
       />
     );
   });
@@ -391,6 +416,11 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
           {updateResult.recentReleaseNotes ? (() => {
             const releases = updateResult.recentReleaseNotes;
             const unmatched = unmatchedApksFor(downloadedApks, releases);
+            // The installed version is also the latest one here, so it is rendered as a
+            // green-highlighted card carrying the "you're on the latest version" hint inline.
+            // Only fall back to a standalone bottom status when that card is absent (the
+            // installed version isn't among the listed releases).
+            const latestShownOnCard = !!installedVersion && releases.some((r) => r.version === installedVersion);
             return (
               <>
                 <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
@@ -406,16 +436,22 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                     <MoreReleasesLink url={updateResult.releasesUrl} colors={colors} t={t} />
                   )}
                 </ScrollView>
-                <Divider style={styles.updateDivider} />
-                <View style={styles.updateBottomRow}>
-                  <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
-                  <View style={styles.upToDateBottomRight}>
-                    <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
-                    <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
-                      {t('up_to_date') || 'You already have the latest version installed.'}
-                    </Text>
-                  </View>
-                </View>
+                {(unmatched.length > 0 || !latestShownOnCard) && (
+                  <>
+                    <Divider style={styles.updateDivider} />
+                    <View style={styles.updateBottomRow}>
+                      <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
+                      {!latestShownOnCard ? (
+                        <View style={styles.upToDateBottomRight}>
+                          <Ionicons name="checkmark-circle-outline" size={24} color="#4caf50" />
+                          <Text style={[styles.upToDateHeaderText, { color: colors.text }]}>
+                            {t('up_to_date') || 'You already have the latest version installed.'}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </>
+                )}
               </>
             );
           })() : (
@@ -662,7 +698,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
   },
-  releaseCardInstalled: {
+  releaseCardHighlighted: {
     borderWidth: 1.5,
   },
   releaseDate: {
