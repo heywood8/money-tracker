@@ -39,6 +39,7 @@ module.exports = {
     plugins: [
       'expo-sqlite',
       '@react-native-google-signin/google-signin',
+      '@react-native-community/datetimepicker',
       [
         'expo-build-properties',
         {
