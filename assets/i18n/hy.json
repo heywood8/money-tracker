@@ -394,6 +394,7 @@
   "installed_latest_hint": "Դուք ունեք վերջին տարբերակը։",
   "release_history": "Թողարկումների պատմություն",
   "no_apk_attached": "APK չկա",
+  "build_in_progress": "Կառուցում {percent}%",
   "more_releases": "Ավելին GitHub-ում",
   "update_releases_without_apks": "Թողարկումները գտնված են, բայց APK-ներ կցված չեն։ Ստուգեք վերջին թողարկումը GitHub-ում։",
   "later": "Aveli usherin",

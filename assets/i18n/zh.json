@@ -394,6 +394,7 @@
   "installed_latest_hint": "您使用的是最新版本。",
   "release_history": "版本历史",
   "no_apk_attached": "无 APK",
+  "build_in_progress": "构建中 {percent}%",
   "more_releases": "更多内容见 GitHub",
   "update_releases_without_apks": "找到了版本但没有附带 APK。请在 GitHub 查看最新版本。",
   "later": "稍后",

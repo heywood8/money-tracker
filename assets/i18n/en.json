@@ -398,6 +398,7 @@
   "installed_latest_hint": "You're on the latest version.",
   "release_history": "Release history",
   "no_apk_attached": "No APK",
+  "build_in_progress": "Building {percent}%",
   "more_releases": "More on GitHub",
   "update_releases_without_apks": "Found releases but no APKs attached. Check GitHub for the latest release.",
   "later": "Later",

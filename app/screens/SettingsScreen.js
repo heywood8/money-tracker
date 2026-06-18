@@ -611,6 +611,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           releaseNotes: result.releaseNotes || null,
           recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
+          buildProgress: result.buildProgress || null,
         });
       } else if (!result.isUpdateAvailable) {
         setUpdateResult({
