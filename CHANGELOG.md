@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.141.3](https://github.com/heywood8/money-tracker/compare/penny-v0.141.2...penny-v0.141.3) (2026-06-19)
+
+
+### Bug Fixes
+
+* put quick-add category gap between rows, not between tiles ([#1022](https://github.com/heywood8/money-tracker/issues/1022)) ([806f199](https://github.com/heywood8/money-tracker/commit/806f199eee05fbfe5bb0768567f849cbed4dce7b))
+
 ## [0.141.2](https://github.com/heywood8/money-tracker/compare/penny-v0.141.1...penny-v0.141.2) (2026-06-19)
 
 
