@@ -101,25 +101,21 @@ const OperationFormFields = memo(({
   // Local state for currency picker visibility
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  // Animated value for category chip error flash (0 = normal, 1 = error red)
-  const categoryErrorAnim = useRef(new Animated.Value(0)).current;
+  // Category chip error flash: briefly outline the category chips in red when
+  // the user tries to add without selecting a category. Driven by state (not an
+  // animated value) so each chip stays a single Pressable — wrapping a chip in
+  // an extra view to host an animated border collapses its height and hides the
+  // label.
+  const [categoryFlashing, setCategoryFlashing] = useState(false);
 
   useEffect(() => {
-    if (!flashCategoryError) return;
-    categoryErrorAnim.setValue(1);
-    Animated.timing(categoryErrorAnim, {
-      toValue: 0,
-      duration: 2000,
-      useNativeDriver: false,
-    }).start();
-  }, [flashCategoryError, categoryErrorAnim]);
+    if (!flashCategoryError) return undefined;
+    setCategoryFlashing(true);
+    const timer = setTimeout(() => setCategoryFlashing(false), 1500);
+    return () => clearTimeout(timer);
+  }, [flashCategoryError]);
 
-  const chipErrorBorderColor = useMemo(() =>
-    categoryErrorAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [colors.border, '#ef4444'],
-    }),
-  [categoryErrorAnim, colors.border]);
+  const chipBorderColor = categoryFlashing ? '#ef4444' : colors.border;
 
   // Inline "All categories" browser state — replaces the bottom-sheet picker in
   // QuickAdd. We render the category hierarchy in-place using chips that look
@@ -437,9 +433,8 @@ const OperationFormFields = memo(({
 
   // Shared category chip — used by both the suggestion shortcuts and the inline
   // browser so styling, selection colours, name resolution and the error-flash
-  // border stay in one place. A plain Pressable wraps an Animated.View: the
-  // Pressable keeps presses testable while the Animated.View carries the
-  // (non-native-driver) animated border for the error flash.
+  // border stay in one place. Rendered as a single Pressable so the layout
+  // matches the original chips (a nested wrapper collapses the height).
   const renderCategoryChip = (item, { testID, numberOfLines = 1, onPress, isFolder = false }) => {
     const info = getCategoryInfo
       ? getCategoryInfo(item.id)
@@ -451,32 +446,28 @@ const OperationFormFields = memo(({
       <Pressable
         key={item.id}
         testID={testID}
-        style={styles.categoryChipPressable}
+        style={[
+          styles.categoryShortcutButton,
+          compact && styles.categoryShortcutButtonCompact,
+          { backgroundColor: isSelected ? colors.primary : colors.inputBackground, borderColor: chipBorderColor },
+          disabledStyle,
+        ]}
         onPress={onPress}
         disabled={disabled}
       >
-        <Animated.View
-          style={[
-            styles.categoryShortcutButton,
-            compact && styles.categoryShortcutButtonCompact,
-            { backgroundColor: isSelected ? colors.primary : colors.inputBackground, borderColor: chipErrorBorderColor },
-            disabledStyle,
-          ]}
+        <Icon name={info.icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
+        <Text
+          style={[styles.categoryShortcutText, { color: textColor }]}
+          numberOfLines={numberOfLines}
+          ellipsizeMode="tail"
         >
-          <Icon name={info.icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
-          <Text
-            style={[styles.categoryShortcutText, { color: textColor }]}
-            numberOfLines={numberOfLines}
-            ellipsizeMode="tail"
-          >
-            {info.name}
-          </Text>
-          {isFolder && (
-            <View style={styles.browseFolderBadge}>
-              <Icon name="folder-outline" size={11} color={isSelected ? 'rgba(255,255,255,0.85)' : colors.mutedText} />
-            </View>
-          )}
-        </Animated.View>
+          {info.name}
+        </Text>
+        {isFolder && (
+          <View style={styles.browseFolderBadge}>
+            <Icon name="folder-outline" size={11} color={isSelected ? 'rgba(255,255,255,0.85)' : colors.mutedText} />
+          </View>
+        )}
       </Pressable>
     );
   };
@@ -485,18 +476,16 @@ const OperationFormFields = memo(({
   const renderAllCategoriesButton = () => (
     <Pressable
       testID="all-categories-button"
-      style={styles.categoryPickerPressable}
+      style={[styles.categoryPickerButton, inputStyle, { borderColor: chipBorderColor }, disabledStyle]}
       onPress={handleAllCategoriesPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={t('all_categories')}
     >
-      <Animated.View style={[styles.categoryPickerButton, inputStyle, { borderColor: chipErrorBorderColor }, disabledStyle]}>
-        <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
-        <Text style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]} numberOfLines={2}>
-          {t('all_categories')}
-        </Text>
-      </Animated.View>
+      <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
+      <Text style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]} numberOfLines={2}>
+        {t('all_categories')}
+      </Text>
     </Pressable>
   );
 
@@ -988,9 +977,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xs,
   },
-  categoryChipPressable: {
-    flex: 1,
-  },
   categoryPickerButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -1001,9 +987,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.xs,
     paddingVertical: SPACING.xs,
-  },
-  categoryPickerPressable: {
-    flex: 1,
   },
   categoryPickerText: {
     fontSize: FONT_SIZE.xs,
