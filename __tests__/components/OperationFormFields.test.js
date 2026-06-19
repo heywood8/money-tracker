@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import OperationFormFields from '../../app/components/operations/OperationFormFields';
 
 // Mock dependencies
@@ -582,6 +582,109 @@ describe('OperationFormFields', () => {
         values: { ...defaultProps.values, categoryId: '' },
       };
       await render(<OperationFormFields {...props} />);
+    });
+  });
+
+  describe('Inline All-Categories Browser', () => {
+    const browseCategories = [
+      { id: 'folder-food', name: 'Food', icon: 'food', type: 'folder', categoryType: 'expense' },
+      { id: 'cat-groceries', name: 'Groceries', icon: 'cart', type: 'entry', categoryType: 'expense', parentId: 'folder-food' },
+      { id: 'cat-restaurant', name: 'Restaurant', icon: 'silverware', type: 'entry', categoryType: 'expense', parentId: 'folder-food' },
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `root-cat-${i}`,
+        name: `Root ${i}`,
+        icon: 'tag',
+        type: 'entry',
+        categoryType: 'expense',
+      })),
+    ];
+
+    const browseProps = (overrides = {}) => ({
+      ...defaultProps,
+      categories: browseCategories,
+      topCategoriesForType: browseCategories.filter(c => c.type !== 'folder').slice(0, 8),
+      getCategoryInfo: (id) => {
+        const cat = browseCategories.find(c => c.id === id);
+        return { name: cat?.name || 'Unknown', icon: cat?.icon || 'tag', parentName: null };
+      },
+      onAutoAddWithCategory: jest.fn(),
+      openPicker: jest.fn(),
+      values: { ...defaultProps.values, categoryId: '', amount: '' },
+      ...overrides,
+    });
+
+    it('opens the inline browser instead of the bottom-sheet picker', async () => {
+      const props = browseProps();
+      const { getByText, getByTestId, findByTestId } = await render(<OperationFormFields {...props} />);
+
+      // "All categories" button is present (>8 leaf categories)
+      fireEvent.press(getByTestId('all-categories-button'));
+
+      // Inline browser renders a back chip (state flushes async under concurrent React)
+      expect(await findByTestId('category-browse-back')).toBeTruthy();
+      // Should NOT fall back to the modal picker
+      expect(props.openPicker).not.toHaveBeenCalled();
+      // Root folder is shown as a chip
+      expect(getByText('Food')).toBeTruthy();
+    });
+
+    it('drills into a folder and shows its children', async () => {
+      const props = browseProps();
+      const { getByText, queryByText, getByTestId, findByTestId } = await render(<OperationFormFields {...props} />);
+
+      fireEvent.press(getByTestId('all-categories-button'));
+      fireEvent.press(await findByTestId('category-browse-folder-food'));
+
+      // Children of the folder are now visible
+      expect(await findByTestId('category-browse-cat-groceries')).toBeTruthy();
+      expect(getByText('Groceries')).toBeTruthy();
+      expect(getByText('Restaurant')).toBeTruthy();
+      // Root sibling no longer shown at this level
+      expect(queryByText('Root 0')).toBeNull();
+    });
+
+    it('returns to the suggestions grid via the back chip', async () => {
+      const props = browseProps();
+      const { getByTestId, findByTestId, queryByTestId } = await render(<OperationFormFields {...props} />);
+
+      fireEvent.press(getByTestId('all-categories-button'));
+      fireEvent.press(await findByTestId('category-browse-back'));
+
+      // Back to suggestions: the all-categories button is shown again
+      expect(await findByTestId('all-categories-button')).toBeTruthy();
+      await waitFor(() => expect(queryByTestId('category-browse-back')).toBeNull());
+    });
+
+    it('auto-adds a leaf category when an amount is present', async () => {
+      const onAutoAddWithCategory = jest.fn();
+      const props = browseProps({
+        onAutoAddWithCategory,
+        values: { ...defaultProps.values, categoryId: '', amount: '100' },
+      });
+      const { getByTestId, findByTestId } = await render(<OperationFormFields {...props} />);
+
+      fireEvent.press(getByTestId('all-categories-button'));
+      fireEvent.press(await findByTestId('category-browse-folder-food'));
+      fireEvent.press(await findByTestId('category-browse-cat-groceries'));
+
+      await waitFor(() => expect(onAutoAddWithCategory).toHaveBeenCalledWith('cat-groceries'));
+    });
+
+    it('selects a leaf category without amount via setValues', async () => {
+      const setValues = jest.fn();
+      const props = browseProps({
+        setValues,
+        onAutoAddWithCategory: jest.fn(),
+        values: { ...defaultProps.values, categoryId: '', amount: '' },
+      });
+      const { getByTestId, findByTestId } = await render(<OperationFormFields {...props} />);
+
+      fireEvent.press(getByTestId('all-categories-button'));
+      fireEvent.press(await findByTestId('category-browse-folder-food'));
+      fireEvent.press(await findByTestId('category-browse-cat-groceries'));
+
+      await waitFor(() => expect(setValues).toHaveBeenCalled());
+      expect(props.onAutoAddWithCategory).not.toHaveBeenCalled();
     });
   });
 
