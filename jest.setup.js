@@ -722,6 +722,8 @@ jest.mock('react-native-reanimated', () => {
     },
     FadeIn: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     FadeOut: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    FadeInRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    FadeInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SlideInRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SlideInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SlideOutLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
