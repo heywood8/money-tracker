@@ -25,7 +25,7 @@ import { useLogEntries } from '../hooks/useLogEntries';
 import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { checkForAppUpdate, listDownloadedApks, installApk, checkAlreadyDownloaded } from '../services/AppUpdateService';
+import { checkForAppUpdate, listDownloadedApks, installApk, verifyCachedApk } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
@@ -673,7 +673,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
           releasesUrl: result.releasesUrl || null,
         });
       } else {
-        const alreadyDownloadedUri = await checkAlreadyDownloaded(result.downloadUrl);
+        // Verify any cached APK against the release checksum. A corrupt leftover download is
+        // deleted here so we offer a fresh "Update now" (re-download) instead of an "Install now"
+        // that would launch a broken installer.
+        const cached = await verifyCachedApk(result.downloadUrl, { checksumUrl: result.checksumUrl });
         setUpdateResult({
           type: 'available',
           latestVersion: result.latestVersion,
@@ -683,8 +686,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
           releaseNotes: result.releaseNotes || null,
           recentReleaseNotes: result.recentReleaseNotes || null,
           releasesUrl: result.releasesUrl || null,
-          alreadyDownloaded: !!alreadyDownloadedUri,
-          localUri: alreadyDownloadedUri,
+          alreadyDownloaded: cached.exists,
+          localUri: cached.exists ? cached.uri : null,
+          previousDownloadCorrupted: !!cached.corrupted,
         });
       }
     } catch (error) {

@@ -409,6 +409,58 @@ export const checkAlreadyDownloaded = async (downloadUrl, cacheDir = FileSystem.
   }
 };
 
+// Verifies the integrity of an APK already sitting in the cache for the given download URL.
+// A previous download can be left truncated or corrupt (interrupted transfer, full disk), in
+// which case offering "Install now" would launch a broken installer. When a checksum is
+// available we hash the cached file and, on mismatch, delete it so callers re-download cleanly.
+//
+// Returns one of:
+//   { exists: false }                          — no usable cached file (absent or zero-size)
+//   { exists: false, corrupted: true }         — cached file failed the checksum and was deleted
+//   { exists: true, uri, verified: true }      — checksum matched
+//   { exists: true, uri, verified: false }     — present but integrity could not be confirmed
+//                                                 (no checksum, unfetchable checksum, or hash error)
+export const verifyCachedApk = async (
+  downloadUrl,
+  { checksumUrl = null, cacheDir = FileSystem.cacheDirectory, fetchImpl = fetch } = {},
+) => {
+  const localUri = await checkAlreadyDownloaded(downloadUrl, cacheDir);
+  if (!localUri) {
+    return { exists: false };
+  }
+
+  // Without a checksum we can confirm the file is present and non-empty, but not prove
+  // integrity — treat it as usable but unverified.
+  if (!checksumUrl) {
+    return { exists: true, uri: localUri, verified: false };
+  }
+
+  const filename = localUri.split('/').pop();
+  const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
+  if (!expectedHash) {
+    // Checksum file unavailable or unparseable — cannot verify, keep the file.
+    return { exists: true, uri: localUri, verified: false };
+  }
+
+  let actualHash;
+  try {
+    actualHash = await computeSha256(localUri);
+  } catch (e) {
+    // Hashing can OOM on large APKs (reads the whole file into the JS heap). A failure here
+    // means "unable to verify", not "corrupt" — keep the file rather than discarding a good one.
+    console.warn('[AppUpdate] cached APK checksum computation failed; skipping verification', e.message);
+    return { exists: true, uri: localUri, verified: false };
+  }
+
+  if (actualHash !== expectedHash) {
+    await FileSystem.deleteAsync(localUri, { idempotent: true });
+    console.warn('[AppUpdate] cached APK failed checksum; deleted corrupt file', localUri);
+    return { exists: false, corrupted: true };
+  }
+
+  return { exists: true, uri: localUri, verified: true };
+};
+
 // Pre-built lookup table for base64 → 6-bit value. Avoids atob() + charCodeAt loop.
 const BASE64_LOOKUP = (() => {
   const t = new Uint8Array(256);

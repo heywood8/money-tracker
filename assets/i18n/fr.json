@@ -392,6 +392,7 @@
   "update_phase_verifying": "Vérification APK…",
   "update_phase_backing_up": "Sauvegarde…",
   "update_install_now": "Installer maintenant",
+  "apk_corrupt_redownload": "Le téléchargement précédent était endommagé et a été supprimé. Touchez Mettre à jour maintenant pour le télécharger à nouveau.",
   "downloaded_apks": "APKs téléchargés",
   "installed": "Installée",
   "update_candidate": "Disponible",

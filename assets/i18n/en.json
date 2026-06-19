@@ -392,6 +392,7 @@
   "update_phase_verifying": "Verifying APK…",
   "update_phase_backing_up": "Backing up…",
   "update_install_now": "Install now",
+  "apk_corrupt_redownload": "The previous download was damaged and was removed. Tap Update now to download it again.",
   "downloaded_apks": "Downloaded APKs",
   "installed": "Installed",
   "update_candidate": "Available",
