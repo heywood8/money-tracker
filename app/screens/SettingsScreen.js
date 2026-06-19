@@ -62,7 +62,7 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
-const BUILD_PROGRESS_POLL_MS = 30000;
+const BUILD_PROGRESS_POLL_MS = 5000;
 
 
 export default function SettingsScreen({ setSubPanelActive }) {
