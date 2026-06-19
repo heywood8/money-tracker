@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.141.2](https://github.com/heywood8/money-tracker/compare/penny-v0.141.1...penny-v0.141.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* space out quick-add category tiles and de-stutter level transitions ([#1020](https://github.com/heywood8/money-tracker/issues/1020)) ([9a2a01f](https://github.com/heywood8/money-tracker/commit/9a2a01f9448feabd2273b8bdf640e97c46442180))
+
 ## [0.141.1](https://github.com/heywood8/money-tracker/compare/penny-v0.141.0...penny-v0.141.1) (2026-06-19)
 
 
