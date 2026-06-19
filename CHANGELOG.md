@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.139.1](https://github.com/heywood8/money-tracker/compare/penny-v0.139.0...penny-v0.139.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* make swipe-to-dismiss consistent across all subpanels (incl. nested steps) ([#1009](https://github.com/heywood8/money-tracker/issues/1009)) ([2ae3d6c](https://github.com/heywood8/money-tracker/commit/2ae3d6caae158e54a48eb7868ddf890ef56a28d1))
+
 ## [0.139.0](https://github.com/heywood8/money-tracker/compare/penny-v0.138.1...penny-v0.139.0) (2026-06-18)
 
 
