@@ -214,6 +214,21 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return false;
   }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
 
+  // Multi-step panels (Import / Export) have parent steps; a swipe on a nested
+  // step should go one level up (like the back arrow), not close the whole panel.
+  const canSwipeStepBack = useMemo(() => {
+    if (activeSubPanel === 'import') return importStep !== 'source';
+    if (activeSubPanel === 'export') return exportStep !== 'list';
+    return false;
+  }, [activeSubPanel, importStep, exportStep]);
+
+  // The step-back handler is defined further down (it depends on dismissPanel,
+  // which this hook returns), so reach it through a ref kept current each render.
+  const subPanelBackRef = useRef(null);
+  const handleSwipeStepBack = useCallback(() => {
+    subPanelBackRef.current?.();
+  }, []);
+
   // Telegram-style interactive swipe: drag the subpanel right and it follows the
   // finger, sliding away to reveal the main settings list behind it. Every panel
   // is swipeable from anywhere on its surface; inside the Accounts/Categories
@@ -223,6 +238,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { gesture: swipeGesture, animatedStyle: swipeStyle, open: openPanelAnim, dismiss: dismissPanel } =
     useSwipeDismiss({
       onDismiss: closeSubPanel,
+      onStepBack: handleSwipeStepBack,
+      canStepBack: canSwipeStepBack,
       enabled: !isBackDisabled,
     });
 
@@ -836,6 +853,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
     if (activeSubPanel === 'export') return handleExportBack;
     return dismissPanel;
   }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
+
+  // Keep the swipe's step-back ref pointing at the current back handler. The
+  // swipe only invokes this when canSwipeStepBack is true (a nested step), where
+  // handleImportBack/handleExportBack step up one level rather than dismiss.
+  subPanelBackRef.current = handleSubPanelBack;
 
 
   // ─── RENDER ───

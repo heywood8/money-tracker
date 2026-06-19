@@ -57,6 +57,14 @@ describe('useSwipeDismiss', () => {
       );
       expect(result.current.gesture).toBeDefined();
     });
+
+    it('accepts canStepBack / onStepBack for one-level-up navigation', async () => {
+      const onStepBack = jest.fn();
+      const { result } = await renderHook(() =>
+        useSwipeDismiss({ onDismiss: jest.fn(), canStepBack: true, onStepBack }),
+      );
+      expect(result.current.gesture).toBeDefined();
+    });
   });
 
   describe('Controls', () => {
