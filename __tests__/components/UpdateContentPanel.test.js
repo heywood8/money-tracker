@@ -357,6 +357,29 @@ describe('UpdateContentPanel', () => {
       expect(getByText('update_install_now')).toBeTruthy();
     });
 
+    it('shows the corrupt-redownload note and an Update now button when the cached APK was damaged', async () => {
+      const { getByText, queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{ ...availableResult, alreadyDownloaded: false, localUri: null, previousDownloadCorrupted: true }}
+        />,
+      );
+      expect(getByText('apk_corrupt_redownload')).toBeTruthy();
+      // The damaged file was discarded, so we offer a fresh re-download, not an install.
+      expect(getByText('update_now')).toBeTruthy();
+      expect(queryByText('update_install_now')).toBeNull();
+    });
+
+    it('does not show the corrupt-redownload note when the cached APK is valid', async () => {
+      const { queryByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{ ...availableResult, alreadyDownloaded: true, localUri: 'file:///cache/penny-2.0.0.apk' }}
+        />,
+      );
+      expect(queryByText('apk_corrupt_redownload')).toBeNull();
+    });
+
     it('shows install hint when no releaseNotes', async () => {
       const { getByText } = await render(
         <UpdateContentPanel

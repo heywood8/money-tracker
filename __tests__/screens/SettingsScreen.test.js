@@ -226,6 +226,7 @@ jest.mock('../../app/services/AppUpdateService', () => ({
   listDownloadedApks: jest.fn(() => Promise.resolve([])),
   installApk: jest.fn(() => Promise.resolve()),
   checkAlreadyDownloaded: jest.fn(() => Promise.resolve(null)),
+  verifyCachedApk: jest.fn(() => Promise.resolve({ exists: false })),
 }));
 
 const mockGetDefaultAccountId = jest.fn(() => Promise.resolve(null));

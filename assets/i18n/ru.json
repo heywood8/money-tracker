@@ -392,6 +392,7 @@
   "update_phase_verifying": "Проверка APK…",
   "update_phase_backing_up": "Создание резервной копии…",
   "update_install_now": "Установить сейчас",
+  "apk_corrupt_redownload": "Предыдущая загрузка была повреждена и удалена. Нажмите «Обновить сейчас», чтобы загрузить заново.",
   "downloaded_apks": "Загруженные APK",
   "installed": "Установлено",
   "update_candidate": "Доступно",

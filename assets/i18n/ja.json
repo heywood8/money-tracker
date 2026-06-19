@@ -392,6 +392,7 @@
   "update_phase_verifying": "APK検証中…",
   "update_phase_backing_up": "バックアップ作成中…",
   "update_install_now": "今すぐインストール",
+  "apk_corrupt_redownload": "前回のダウンロードは破損していたため削除されました。「今すぐ更新」をタップして再ダウンロードしてください。",
   "downloaded_apks": "ダウンロード済みAPK",
   "installed": "インストール済み",
   "update_candidate": "利用可能",

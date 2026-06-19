@@ -105,6 +105,8 @@ const formatApkDate = (modificationTime) => {
 
 // Green used for the "installed / up to date" status, matching the checkmark elsewhere in this panel.
 const INSTALLED_GREEN = '#4caf50';
+// Amber used to warn that a corrupt cached download was discarded and is being re-downloaded.
+const WARNING_AMBER = '#f0a500';
 
 function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
@@ -395,6 +397,14 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
               </Text>
             )}
             <Divider style={styles.updateDivider} />
+            {updateResult.previousDownloadCorrupted ? (
+              <View style={styles.corruptNoteRow} accessibilityRole="text">
+                <Ionicons name="alert-circle-outline" size={14} color={WARNING_AMBER} />
+                <Text style={[styles.corruptNoteText, { color: WARNING_AMBER }]}>
+                  {t('apk_corrupt_redownload') || 'The previous download was damaged and was removed. Tap Update now to download it again.'}
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.updateBottomRow}>
               {releaseNotes ? (
                 <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
@@ -562,6 +572,7 @@ UpdateContentPanel.propTypes = {
     releasesUrl: PropTypes.string,
     alreadyDownloaded: PropTypes.bool,
     localUri: PropTypes.string,
+    previousDownloadCorrupted: PropTypes.bool,
     errorCode: PropTypes.string,
     buildProgress: PropTypes.shape({
       percent: PropTypes.number,
@@ -642,6 +653,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  corruptNoteRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingTop: SPACING.sm,
+  },
+  corruptNoteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
   },
   downloadedApksCompact: {
     flex: 1,
