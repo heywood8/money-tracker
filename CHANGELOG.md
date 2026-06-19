@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.141.0](https://github.com/heywood8/money-tracker/compare/penny-v0.140.0...penny-v0.141.0) (2026-06-19)
+
+
+### Features
+
+* re-download corrupt cached APK on the updates page ([#1017](https://github.com/heywood8/money-tracker/issues/1017)) ([bb46663](https://github.com/heywood8/money-tracker/commit/bb4666329f8876046f21974a888e48ec93fa5be4))
+
 ## [0.140.0](https://github.com/heywood8/money-tracker/compare/penny-v0.139.2...penny-v0.140.0) (2026-06-19)
 
 
