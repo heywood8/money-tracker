@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
-import Reanimated, { LinearTransition } from 'react-native-reanimated';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import Reanimated, { LinearTransition, FadeInRight, FadeInLeft } from 'react-native-reanimated';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
@@ -15,9 +15,6 @@ const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
-
-// Horizontal slide distance (px) for the category browser push/pop transition.
-const CATEGORY_SLIDE_DISTANCE = 28;
 
 /**
  * OperationFormFields Component
@@ -131,10 +128,9 @@ const OperationFormFields = memo(({
     ? categoryBrowse.breadcrumb[categoryBrowse.breadcrumb.length - 1].id
     : null;
 
-  // Animated values shared across suggestion/browse renders so the same wrapper
-  // slides + fades as content swaps (native-thread driven).
-  const browseOpacity = useRef(new Animated.Value(1)).current;
-  const browseTranslateX = useRef(new Animated.Value(0)).current;
+  // Direction of the last level change, used to pick the enter animation.
+  // 'none' on the initial render so the grid doesn't animate on mount.
+  const browseDirRef = useRef('none');
 
   // Categories at the current browser level (root = no parent). Memoized so the
   // O(n) scan only re-runs when the data or level changes, not on every render.
@@ -153,64 +149,46 @@ const OperationFormFields = memo(({
   // Reset the browser whenever the operation type changes — a leftover folder
   // from a previous type would otherwise filter to nothing.
   useEffect(() => {
+    browseDirRef.current = 'none';
     setCategoryBrowse({ active: false, breadcrumb: [] });
-    browseOpacity.setValue(1);
-    browseTranslateX.setValue(0);
-  }, [values.type, browseOpacity, browseTranslateX]);
+  }, [values.type]);
 
-  // Animate a level change: the content is swapped immediately (keeping the
-  // interaction responsive and the state deterministic), then the new level
-  // slides in from the side and fades up. `direction` is 'forward' (drilling
-  // in / opening all → slide from the right) or 'back' (popping out → slide
-  // from the left). The container's HEIGHT change is smoothed separately by
-  // Reanimated's LinearTransition on the wrapper — Fabric-native and scoped to
-  // that view, unlike LayoutAnimation (a no-op under the New Architecture and
-  // global to the next layout commit).
-  const animateCategorySwap = useCallback((direction, applyChange) => {
-    const enterFrom = direction === 'forward' ? CATEGORY_SLIDE_DISTANCE : -CATEGORY_SLIDE_DISTANCE;
-    browseOpacity.setValue(0);
-    browseTranslateX.setValue(enterFrom);
-    applyChange();
-    Animated.parallel([
-      Animated.timing(browseOpacity, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(browseTranslateX, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]).start();
-  }, [browseOpacity, browseTranslateX]);
-
-  // Collapse the browser back to the suggestions grid (no animation — used when
-  // the parent is already resetting the form after an auto-add).
-  const collapseCategoryBrowse = useCallback(() => {
-    setCategoryBrowse({ active: false, breadcrumb: [] });
-    browseOpacity.setValue(1);
-    browseTranslateX.setValue(0);
-  }, [browseOpacity, browseTranslateX]);
+  // Change browser level. `dir` ('forward' | 'back' | 'none') selects the enter
+  // animation for the next level; the content is keyed per level so Reanimated
+  // plays a single UI-thread slide/fade as it mounts (no cross-system juggling
+  // or setValue/setState ordering, which is what caused stutter before). The
+  // wrapper's height change is smoothed by LinearTransition.
+  const changeBrowseLevel = useCallback((dir, updater) => {
+    browseDirRef.current = dir;
+    setCategoryBrowse(updater);
+  }, []);
 
   // Open the inline browser at the root level. No-op until categories exist, so
   // tapping during the initial load window doesn't open an empty browser.
   const enterCategoryBrowse = useCallback(() => {
     if (disabled || categories.length === 0) return;
-    animateCategorySwap('forward', () => setCategoryBrowse({ active: true, breadcrumb: [] }));
-  }, [disabled, categories.length, animateCategorySwap]);
+    changeBrowseLevel('forward', { active: true, breadcrumb: [] });
+  }, [disabled, categories.length, changeBrowseLevel]);
 
   // Drill into a folder.
   const handleBrowseIntoFolder = useCallback((folder) => {
     if (disabled) return;
     const name = folder.nameKey ? t(folder.nameKey) : folder.name;
-    animateCategorySwap('forward', () => setCategoryBrowse(prev => ({
+    changeBrowseLevel('forward', prev => ({
       active: true,
       breadcrumb: [...prev.breadcrumb, { id: folder.id, name }],
-    })));
-  }, [disabled, t, animateCategorySwap]);
+    }));
+  }, [disabled, t, changeBrowseLevel]);
 
   // Back chip: pop one folder level, or exit the browser when at root.
   const handleBrowseBack = useCallback(() => {
     if (disabled) return;
-    animateCategorySwap('back', () => setCategoryBrowse(prev => (
+    changeBrowseLevel('back', prev => (
       prev.breadcrumb.length === 0
         ? { active: false, breadcrumb: [] }
         : { active: true, breadcrumb: prev.breadcrumb.slice(0, -1) }
-    )));
-  }, [disabled, animateCategorySwap]);
+    ));
+  }, [disabled, changeBrowseLevel]);
 
   // Select a leaf category: auto-add when an amount is present, otherwise just
   // set the value. Shared by the suggestion chips and the inline browser; when
@@ -220,14 +198,13 @@ const OperationFormFields = memo(({
     const hasValidAmount = values.amount && values.amount.trim() !== '';
     if (hasValidAmount && onAutoAddWithCategory) {
       onAutoAddWithCategory(categoryId);
-      if (fromBrowse) collapseCategoryBrowse(); // form is reset by the parent
+      // Form is reset by the parent; collapse without an enter animation.
+      if (fromBrowse) changeBrowseLevel('none', { active: false, breadcrumb: [] });
     } else {
       setValues(v => ({ ...v, categoryId }));
-      if (fromBrowse) {
-        animateCategorySwap('back', () => setCategoryBrowse({ active: false, breadcrumb: [] }));
-      }
+      if (fromBrowse) changeBrowseLevel('back', { active: false, breadcrumb: [] });
     }
-  }, [disabled, values.amount, onAutoAddWithCategory, setValues, animateCategorySwap, collapseCategoryBrowse]);
+  }, [disabled, values.amount, onAutoAddWithCategory, setValues, changeBrowseLevel]);
 
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -422,13 +399,6 @@ const OperationFormFields = memo(({
     } else {
       openPicker('category', categories);
     }
-  };
-
-  // Animated wrapper style — both suggestion and browse content live inside the
-  // same Animated.View so swapping between them slides + fades as one element.
-  const categoryAnimStyle = {
-    opacity: browseOpacity,
-    transform: [{ translateX: browseTranslateX }],
   };
 
   // Shared category chip — used by both the suggestion shortcuts and the inline
@@ -676,25 +646,36 @@ const OperationFormFields = memo(({
     }
 
     let content;
+    let levelKey;
     if (categoryBrowse.active) {
       content = renderCategoryBrowseRows();
+      levelKey = `browse:${browseFolderId ?? 'root'}`;
     } else if (hasSuggestions) {
       content = renderCategorySuggestionRows();
+      levelKey = 'suggestions';
     } else {
       // QuickAdd: categories not yet loaded — show the blurred placeholder grid
       content = renderCategoryPlaceholderRows();
+      levelKey = 'placeholder';
     }
 
-    // Outer Reanimated.View smooths the wrapper's HEIGHT change between levels
-    // (Fabric-native, scoped); inner Animated.View carries the slide + fade.
+    const dir = browseDirRef.current;
+    const entering = dir === 'none'
+      ? undefined
+      : (dir === 'back' ? FadeInLeft : FadeInRight).duration(220);
+
+    // Single Reanimated system (UI thread): the wrapper smooths its HEIGHT
+    // change with LinearTransition, and the keyed inner view slides/fades in on
+    // each level change. Keying per level remounts the content so `entering`
+    // fires; `dir === 'none'` suppresses the animation on the initial render.
     return (
       <Reanimated.View
         layout={LinearTransition.duration(240)}
         style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}
       >
-        <Animated.View style={categoryAnimStyle}>
+        <Reanimated.View key={levelKey} entering={entering}>
           {content}
-        </Animated.View>
+        </Reanimated.View>
       </Reanimated.View>
     );
   };
@@ -975,7 +956,7 @@ const styles = StyleSheet.create({
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
-    gap: SPACING.xs,
+    gap: SPACING.sm,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -995,7 +976,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryRowsWrapper: {
-    gap: SPACING.xs,
+    gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
   categoryRowsWrapperCompact: {
