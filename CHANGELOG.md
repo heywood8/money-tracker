@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.140.0](https://github.com/heywood8/money-tracker/compare/penny-v0.139.2...penny-v0.140.0) (2026-06-19)
+
+
+### Features
+
+* redesign "All categories" in quick-add as an inline hierarchical browser ([#1013](https://github.com/heywood8/money-tracker/issues/1013)) ([dbbdaf2](https://github.com/heywood8/money-tracker/commit/dbbdaf20152a7af54de8d11b8d3e7c4d83901385))
+
 ## [0.139.2](https://github.com/heywood8/money-tracker/compare/penny-v0.139.1...penny-v0.139.2) (2026-06-19)
 
 
