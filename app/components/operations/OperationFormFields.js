@@ -673,7 +673,7 @@ const OperationFormFields = memo(({
         layout={LinearTransition.duration(240)}
         style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}
       >
-        <Reanimated.View key={levelKey} entering={entering}>
+        <Reanimated.View key={levelKey} entering={entering} style={styles.categoryRows}>
           {content}
         </Reanimated.View>
       </Reanimated.View>
@@ -956,7 +956,7 @@ const styles = StyleSheet.create({
   },
   categoryButtonsContainer: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   categoryPickerButton: {
     alignItems: 'center',
@@ -975,8 +975,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  categoryRowsWrapper: {
+  categoryRows: {
     gap: SPACING.sm,
+  },
+  categoryRowsWrapper: {
     marginBottom: SPACING.md,
   },
   categoryRowsWrapperCompact: {
