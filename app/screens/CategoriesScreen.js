@@ -13,6 +13,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { Text, TouchableRipple, TextInput as PaperTextInput } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { TOP_CONTENT_SPACING, SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -35,6 +36,7 @@ const DEFAULT_FORM_VALUES = {
 
 const CategoriesScreen = ({ onBackStateChange }) => {
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { paperInputTheme } = makeModalStyles(colors);
   const themed = useMemo(() => ({
     pickerItemText: { color: colors.text, fontSize: 18 },
@@ -442,7 +444,7 @@ const CategoriesScreen = ({ onBackStateChange }) => {
           </ScrollView>
 
           {/* Form footer */}
-          <View style={[styles.formPanelFooter, { borderTopColor: colors.border }]}>
+          <View style={[styles.formPanelFooter, { borderTopColor: colors.border, paddingBottom: insets.bottom + 80 }]}>
             <TouchableRipple
               onPress={closeForm}
               style={[styles.formFooterBtn, { borderColor: colors.border }]}
@@ -642,7 +644,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
   },
   formPanelHeader: {
     alignItems: 'center',
