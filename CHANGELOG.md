@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.141.1](https://github.com/heywood8/money-tracker/compare/penny-v0.141.0...penny-v0.141.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* restore quick-add category chip labels (height collapse) ([#1016](https://github.com/heywood8/money-tracker/issues/1016)) ([8aef562](https://github.com/heywood8/money-tracker/commit/8aef562338a4a7489183fdf7f17643f49cd26abd))
+
 ## [0.141.0](https://github.com/heywood8/money-tracker/compare/penny-v0.140.0...penny-v0.141.0) (2026-06-19)
 
 
