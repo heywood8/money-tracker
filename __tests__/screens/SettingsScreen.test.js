@@ -982,7 +982,7 @@ describe('SettingsScreen', () => {
 
         // Advancing past the poll interval triggers a silent re-check that updates the percent.
         await act(async () => {
-          jest.advanceTimersByTime(30000);
+          jest.advanceTimersByTime(5000);
         });
 
         await waitFor(() => {
@@ -1028,7 +1028,7 @@ describe('SettingsScreen', () => {
         });
 
         await act(async () => {
-          jest.advanceTimersByTime(30000);
+          jest.advanceTimersByTime(5000);
         });
 
         await waitFor(() => {
