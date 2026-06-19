@@ -61,11 +61,6 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
-// Left-edge region (px) from which a swipe can dismiss panels that embed their
-// own horizontal/drag gestures (Accounts, Categories), so a body drag isn't
-// hijacked by the dismiss gesture.
-const EDGE_SWIPE_WIDTH = 48;
-
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 30000;
 
@@ -220,15 +215,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
   }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
 
   // Telegram-style interactive swipe: drag the subpanel right and it follows the
-  // finger, sliding away to reveal the main settings list behind it. The Accounts
-  // and Categories panels embed a drag-to-reorder list, so their swipe is limited
-  // to a left-edge start (edgeWidth) to avoid stealing reorder/body drags.
-  const isEmbeddedScreenPanel = activeSubPanel === 'accounts' || activeSubPanel === 'categories';
+  // finger, sliding away to reveal the main settings list behind it. Every panel
+  // is swipeable from anywhere on its surface; inside the Accounts/Categories
+  // reorder lists, vertical drags/scroll yield to those gestures via failOffsetY,
+  // and the drag handle is long-press activated, so the swipe never steals a
+  // reorder.
   const { gesture: swipeGesture, animatedStyle: swipeStyle, open: openPanelAnim, dismiss: dismissPanel } =
     useSwipeDismiss({
       onDismiss: closeSubPanel,
       enabled: !isBackDisabled,
-      edgeWidth: isEmbeddedScreenPanel ? EDGE_SWIPE_WIDTH : 0,
     });
 
   const openSubPanel = useCallback((panel) => {
