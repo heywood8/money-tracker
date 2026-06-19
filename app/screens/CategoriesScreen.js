@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import {
   View,
   StyleSheet,
@@ -32,7 +33,7 @@ const DEFAULT_FORM_VALUES = {
   category_type: 'expense',
 };
 
-const CategoriesScreen = () => {
+const CategoriesScreen = ({ onBackStateChange }) => {
   const { colors } = useThemeColors();
   const { paperInputTheme } = makeModalStyles(colors);
   const themed = useMemo(() => ({
@@ -260,6 +261,25 @@ const CategoriesScreen = () => {
       </TouchableOpacity>
     );
   }, [colors, t, getChildren, handleGridCellPress, handleCategoryLongPress]);
+
+  // Report internal back capability to an embedding parent (the Settings subpanel)
+  // so a swipe / hardware-back pops one level here (picker → form → subcategory
+  // grid) before the parent closes the whole panel.
+  const internalCanGoBack =
+    iconPickerVisible || activePicker !== null || activePanel === 'form' || gridParentId !== null;
+
+  const internalGoBack = useCallback(() => {
+    if (iconPickerVisible) { setIconPickerVisible(false); return; }
+    if (activePicker !== null) { handleClosePicker(); return; }
+    if (activePanel === 'form') { closeForm(); return; }
+    if (gridParentId !== null) { setGridParentId(null); return; }
+  }, [iconPickerVisible, activePicker, activePanel, gridParentId, handleClosePicker, closeForm]);
+
+  useEffect(() => {
+    onBackStateChange?.(internalCanGoBack ? internalGoBack : null);
+  }, [internalCanGoBack, internalGoBack, onBackStateChange]);
+
+  useEffect(() => () => onBackStateChange?.(null), [onBackStateChange]);
 
   if (loading) {
     return <LoadingView message={t('loading_categories') || 'Loading categories...'} />;
@@ -717,5 +737,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
 });
+
+CategoriesScreen.propTypes = {
+  onBackStateChange: PropTypes.func,
+};
 
 export default CategoriesScreen;

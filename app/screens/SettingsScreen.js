@@ -214,18 +214,32 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return false;
   }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
 
-  // Multi-step panels (Import / Export) have parent steps; a swipe on a nested
-  // step should go one level up (like the back arrow), not close the whole panel.
+  // Embedded screens (Accounts/Categories) report whether they can navigate back
+  // one level internally (edit form open, subcategory drill, picker, …) so a swipe
+  // / hardware-back steps up there before closing the whole panel.
+  const embeddedBackRef = useRef(null);
+  const [embeddedCanGoBack, setEmbeddedCanGoBack] = useState(false);
+  const handleEmbeddedBackStateChange = useCallback((goBack) => {
+    embeddedBackRef.current = typeof goBack === 'function' ? goBack : null;
+    setEmbeddedCanGoBack(!!goBack);
+  }, []);
+
+  // Whether a completed swipe (or hardware-back) should step one level up rather
+  // than dismiss the whole panel: nested Import/Export steps, or an embedded
+  // Accounts/Categories screen that still has an internal level to pop.
   const canSwipeStepBack = useMemo(() => {
     if (activeSubPanel === 'import') return importStep !== 'source';
     if (activeSubPanel === 'export') return exportStep !== 'list';
+    if (activeSubPanel === 'accounts' || activeSubPanel === 'categories') return embeddedCanGoBack;
     return false;
-  }, [activeSubPanel, importStep, exportStep]);
+  }, [activeSubPanel, importStep, exportStep, embeddedCanGoBack]);
 
-  // The step-back handler is defined further down (it depends on dismissPanel,
-  // which this hook returns), so reach it through a ref kept current each render.
+  // Unified back navigation for the swipe, hardware-back, and the header arrow.
+  // The resolver is defined further down (it depends on dismissPanel, which this
+  // hook returns), so reach it through a ref kept current each render. It pops one
+  // level when possible (embedded screen / nested step) and otherwise closes.
   const subPanelBackRef = useRef(null);
-  const handleSwipeStepBack = useCallback(() => {
+  const navigateBack = useCallback(() => {
     subPanelBackRef.current?.();
   }, []);
 
@@ -238,7 +252,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { gesture: swipeGesture, animatedStyle: swipeStyle, open: openPanelAnim, dismiss: dismissPanel } =
     useSwipeDismiss({
       onDismiss: closeSubPanel,
-      onStepBack: handleSwipeStepBack,
+      onStepBack: navigateBack,
       canStepBack: canSwipeStepBack,
       enabled: !isBackDisabled,
     });
@@ -270,16 +284,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
 
-  // Android hardware back button closes subpanel
+  // Android hardware back: step one level up when possible (nested step / embedded
+  // screen), otherwise close the panel — mirroring the swipe and the back arrow.
   useEffect(() => {
     if (!activeSubPanel) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isBackDisabled) return true;
-      dismissPanel();
+      navigateBack();
       return true;
     });
     return () => subscription.remove();
-  }, [activeSubPanel, isBackDisabled, dismissPanel]);
+  }, [activeSubPanel, isBackDisabled, navigateBack]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
@@ -854,10 +869,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return dismissPanel;
   }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
 
-  // Keep the swipe's step-back ref pointing at the current back handler. The
-  // swipe only invokes this when canSwipeStepBack is true (a nested step), where
-  // handleImportBack/handleExportBack step up one level rather than dismiss.
-  subPanelBackRef.current = handleSubPanelBack;
+  // Resolver behind navigateBack (swipe / hardware-back / header arrow): if an
+  // embedded Accounts/Categories screen can still pop a level (form, picker,
+  // subcategory), defer to it; otherwise step up the Import/Export flow or close
+  // the panel (handleSubPanelBack).
+  subPanelBackRef.current = () => {
+    if ((activeSubPanel === 'accounts' || activeSubPanel === 'categories') && embeddedBackRef.current) {
+      embeddedBackRef.current();
+      return;
+    }
+    handleSubPanelBack();
+  };
 
 
   // ─── RENDER ───
@@ -872,7 +894,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         {/* Subpanel header */}
         <View style={styles.subPanelHeader}>
           <TouchableOpacity
-            onPress={handleSubPanelBack}
+            onPress={navigateBack}
             style={styles.backButton}
             testID="settings-subpanel-back"
             disabled={isBackDisabled}
@@ -899,8 +921,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
           (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
           !(activeSubPanel === 'accounts' || activeSubPanel === 'categories') && { paddingBottom: insets.bottom + 80 },
         ]}>
-          {activeSubPanel === 'accounts' && <AccountsScreen />}
-          {activeSubPanel === 'categories' && <CategoriesScreen />}
+          {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
+          {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
           {activeSubPanel === 'defaultAccount' && (
             <ScrollView
