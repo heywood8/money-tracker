@@ -34,6 +34,11 @@ const ACTIVE_OFFSET_X = 16;
  *
  * @param {object}   options
  * @param {Function} options.onDismiss  Called once the panel has slid fully away.
+ * @param {Function} [options.onStepBack]  Called instead of onDismiss when the panel
+ *   has a parent step (canStepBack). Navigates one level up; the surface springs
+ *   back to rest rather than sliding off, so the parent step's content takes over.
+ * @param {boolean}  [options.canStepBack=false]  When true, a completed swipe steps
+ *   one level up (onStepBack) instead of dismissing the whole panel.
  * @param {boolean}  [options.enabled=true]  Gates the gesture (e.g. mid-operation).
  *   Read from a shared value inside the worklets so toggling it never rebuilds
  *   the native recognizer (which would jitter an in-flight gesture).
@@ -45,7 +50,7 @@ const ACTIVE_OFFSET_X = 16;
  *   stolen by the dismiss gesture. 0 = the whole surface is swipeable.
  * @returns {{ gesture: object, animatedStyle: object, open: () => void, dismiss: () => void }}
  */
-export function useSwipeDismiss({ onDismiss, enabled = true, width: widthProp, edgeWidth = 0 } = {}) {
+export function useSwipeDismiss({ onDismiss, onStepBack, canStepBack = false, enabled = true, width: widthProp, edgeWidth = 0 } = {}) {
   const { width: windowWidth } = useWindowDimensions();
   const width = widthProp ?? windowWidth;
 
@@ -116,14 +121,20 @@ export function useSwipeDismiss({ onDismiss, enabled = true, width: widthProp, e
         'worklet';
         if (!valid.value) return;
         const dx = event.translationX - dragStart.value;
-        if (dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD) {
+        const past = dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD;
+        if (past && canStepBack) {
+          // Go one level up within the panel and spring the surface back to rest
+          // so the parent step's content takes its place (mirrors the back arrow).
+          if (onStepBack) runOnJS(onStepBack)();
+          translateX.value = withTiming(0, { duration: EXIT_DURATION, easing: ENTER_EASING });
+        } else if (past) {
           // Reuse dismiss() so the completion + re-entrancy guard live in one place.
           runOnJS(dismiss)();
         } else {
           translateX.value = withTiming(0, { duration: EXIT_DURATION, easing: ENTER_EASING });
         }
       });
-  }, [translateX, dragStart, valid, dismissing, enabledShared, width, edgeWidth, dismiss]);
+  }, [translateX, dragStart, valid, dismissing, enabledShared, width, edgeWidth, dismiss, canStepBack, onStepBack]);
 
   return { gesture, animatedStyle, open, dismiss };
 }

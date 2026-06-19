@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Keyboard, FlatList, TouchableOpacity, Pressable, Animated, Dimensions, ScrollView, Easing } from 'react-native';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
@@ -424,7 +424,7 @@ AccountRow.defaultProps = {
   isActive: false,
 };
 
-export default function AccountsScreen() {
+export default function AccountsScreen({ onBackStateChange }) {
 
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
@@ -776,6 +776,22 @@ export default function AccountsScreen() {
     <View style={[styles.divider, { backgroundColor: colors.border }]} />
   ), [colors.border]);
 
+  // Report internal back capability to an embedding parent (the Settings subpanel)
+  // so a swipe / hardware-back pops one level here (currency picker → edit form)
+  // before the parent closes the whole panel.
+  const internalCanGoBack = currencyPanelVisible || editingId !== null;
+
+  const internalGoBack = useCallback(() => {
+    if (currencyPanelVisible) { handleClosePicker(); return; }
+    if (editingId !== null) { closeFormPanel(); return; }
+  }, [currencyPanelVisible, editingId, handleClosePicker, closeFormPanel]);
+
+  useEffect(() => {
+    onBackStateChange?.(internalCanGoBack ? internalGoBack : null);
+  }, [internalCanGoBack, internalGoBack, onBackStateChange]);
+
+  useEffect(() => () => onBackStateChange?.(null), [onBackStateChange]);
+
   if (loading) {
     return <LoadingView message={t('loading_accounts') || 'Loading accounts...'} />;
   }
@@ -1069,7 +1085,9 @@ export default function AccountsScreen() {
   );
 }
 
-AccountsScreen.propTypes = {};
+AccountsScreen.propTypes = {
+  onBackStateChange: PropTypes.func,
+};
 
 AccountsScreen.defaultProps = {};
 

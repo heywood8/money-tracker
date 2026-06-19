@@ -275,16 +275,26 @@ jest.mock('../../app/components/UpdateContentPanel', () => {
   };
 });
 
+// Captures the embedded accounts screen's reported internal back handler so a
+// test can verify the parent drills into it before closing the panel.
+const mockAccountsBack = { goBack: null };
+
 // Mock AccountsScreen (embedded in the accounts subpanel) to avoid pulling in
 // its heavy dependency tree (draggable list, accounts/operations contexts, etc.)
 jest.mock('../../app/screens/AccountsScreen', () => {
   const React = require('react');
   const { View } = require('react-native');
   const PropTypes = require('prop-types');
-  function AccountsScreen({ embedded }) {
+  function AccountsScreen({ embedded, onBackStateChange }) {
+    // Simulate an internal level being open so the parent should step back here.
+    React.useEffect(() => {
+      mockAccountsBack.goBack = jest.fn();
+      onBackStateChange?.(mockAccountsBack.goBack);
+      return () => onBackStateChange?.(null);
+    }, [onBackStateChange]);
     return React.createElement(View, { testID: 'accounts-screen', accessibilityLabel: embedded ? 'embedded' : 'standalone' });
   }
-  AccountsScreen.propTypes = { embedded: PropTypes.bool };
+  AccountsScreen.propTypes = { embedded: PropTypes.bool, onBackStateChange: PropTypes.func };
   return AccountsScreen;
 });
 
@@ -349,6 +359,26 @@ describe('SettingsScreen', () => {
 
       expect(getByTestId('accounts-screen')).toBeTruthy();
       expect(mockSetSubPanelActive).toHaveBeenCalledWith(true);
+    });
+
+    it('back navigation drills into the embedded accounts screen before closing the panel', async () => {
+      const { getByTestId } = await render(
+        <SettingsScreen setSubPanelActive={mockSetSubPanelActive} />,
+      );
+
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-accounts-row'));
+      });
+
+      // The embedded screen reported an internal back handler (form/picker open);
+      // pressing back should step up there rather than close the whole panel.
+      await act(async () => {
+        await fireEvent.press(getByTestId('settings-subpanel-back'));
+      });
+
+      expect(mockAccountsBack.goBack).toHaveBeenCalled();
+      // Panel stays open — the embedded screen popped a level, not the panel.
+      expect(getByTestId('accounts-screen')).toBeTruthy();
     });
 
     it('renders categories row', async () => {

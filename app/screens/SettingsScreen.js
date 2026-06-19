@@ -61,11 +61,6 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
-// Left-edge region (px) from which a swipe can dismiss panels that embed their
-// own horizontal/drag gestures (Accounts, Categories), so a body drag isn't
-// hijacked by the dismiss gesture.
-const EDGE_SWIPE_WIDTH = 48;
-
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 30000;
 
@@ -219,16 +214,47 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return false;
   }, [activeSubPanel, exportStep, importStep, sheetsSteps, sheetsImportSteps]);
 
+  // Embedded screens (Accounts/Categories) report whether they can navigate back
+  // one level internally (edit form open, subcategory drill, picker, …) so a swipe
+  // / hardware-back steps up there before closing the whole panel.
+  const embeddedBackRef = useRef(null);
+  const [embeddedCanGoBack, setEmbeddedCanGoBack] = useState(false);
+  const handleEmbeddedBackStateChange = useCallback((goBack) => {
+    embeddedBackRef.current = typeof goBack === 'function' ? goBack : null;
+    setEmbeddedCanGoBack(!!goBack);
+  }, []);
+
+  // Whether a completed swipe (or hardware-back) should step one level up rather
+  // than dismiss the whole panel: nested Import/Export steps, or an embedded
+  // Accounts/Categories screen that still has an internal level to pop.
+  const canSwipeStepBack = useMemo(() => {
+    if (activeSubPanel === 'import') return importStep !== 'source';
+    if (activeSubPanel === 'export') return exportStep !== 'list';
+    if (activeSubPanel === 'accounts' || activeSubPanel === 'categories') return embeddedCanGoBack;
+    return false;
+  }, [activeSubPanel, importStep, exportStep, embeddedCanGoBack]);
+
+  // Unified back navigation for the swipe, hardware-back, and the header arrow.
+  // The resolver is defined further down (it depends on dismissPanel, which this
+  // hook returns), so reach it through a ref kept current each render. It pops one
+  // level when possible (embedded screen / nested step) and otherwise closes.
+  const subPanelBackRef = useRef(null);
+  const navigateBack = useCallback(() => {
+    subPanelBackRef.current?.();
+  }, []);
+
   // Telegram-style interactive swipe: drag the subpanel right and it follows the
-  // finger, sliding away to reveal the main settings list behind it. The Accounts
-  // and Categories panels embed a drag-to-reorder list, so their swipe is limited
-  // to a left-edge start (edgeWidth) to avoid stealing reorder/body drags.
-  const isEmbeddedScreenPanel = activeSubPanel === 'accounts' || activeSubPanel === 'categories';
+  // finger, sliding away to reveal the main settings list behind it. Every panel
+  // is swipeable from anywhere on its surface; inside the Accounts/Categories
+  // reorder lists, vertical drags/scroll yield to those gestures via failOffsetY,
+  // and the drag handle is long-press activated, so the swipe never steals a
+  // reorder.
   const { gesture: swipeGesture, animatedStyle: swipeStyle, open: openPanelAnim, dismiss: dismissPanel } =
     useSwipeDismiss({
       onDismiss: closeSubPanel,
+      onStepBack: navigateBack,
+      canStepBack: canSwipeStepBack,
       enabled: !isBackDisabled,
-      edgeWidth: isEmbeddedScreenPanel ? EDGE_SWIPE_WIDTH : 0,
     });
 
   const openSubPanel = useCallback((panel) => {
@@ -258,16 +284,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSubPanelActive(activeSubPanel !== null);
   }, [activeSubPanel, setSubPanelActive]);
 
-  // Android hardware back button closes subpanel
+  // Android hardware back: step one level up when possible (nested step / embedded
+  // screen), otherwise close the panel — mirroring the swipe and the back arrow.
   useEffect(() => {
     if (!activeSubPanel) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isBackDisabled) return true;
-      dismissPanel();
+      navigateBack();
       return true;
     });
     return () => subscription.remove();
-  }, [activeSubPanel, isBackDisabled, dismissPanel]);
+  }, [activeSubPanel, isBackDisabled, navigateBack]);
 
   const handleLanguageSelect = useCallback((lng) => {
     setLanguage(lng);
@@ -842,6 +869,18 @@ export default function SettingsScreen({ setSubPanelActive }) {
     return dismissPanel;
   }, [activeSubPanel, handleImportBack, handleExportBack, dismissPanel]);
 
+  // Resolver behind navigateBack (swipe / hardware-back / header arrow): if an
+  // embedded Accounts/Categories screen can still pop a level (form, picker,
+  // subcategory), defer to it; otherwise step up the Import/Export flow or close
+  // the panel (handleSubPanelBack).
+  subPanelBackRef.current = () => {
+    if ((activeSubPanel === 'accounts' || activeSubPanel === 'categories') && embeddedBackRef.current) {
+      embeddedBackRef.current();
+      return;
+    }
+    handleSubPanelBack();
+  };
+
 
   // ─── RENDER ───
   // The subpanel is an overlay that slides over the main settings list. Keeping
@@ -855,7 +894,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         {/* Subpanel header */}
         <View style={styles.subPanelHeader}>
           <TouchableOpacity
-            onPress={handleSubPanelBack}
+            onPress={navigateBack}
             style={styles.backButton}
             testID="settings-subpanel-back"
             disabled={isBackDisabled}
@@ -882,8 +921,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
           (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
           !(activeSubPanel === 'accounts' || activeSubPanel === 'categories') && { paddingBottom: insets.bottom + 80 },
         ]}>
-          {activeSubPanel === 'accounts' && <AccountsScreen />}
-          {activeSubPanel === 'categories' && <CategoriesScreen />}
+          {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
+          {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
           {activeSubPanel === 'defaultAccount' && (
             <ScrollView
