@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.139.2](https://github.com/heywood8/money-tracker/compare/penny-v0.139.1...penny-v0.139.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* stop revealing main settings on step-back swipe; align Categories form footer ([#1011](https://github.com/heywood8/money-tracker/issues/1011)) ([16bcb77](https://github.com/heywood8/money-tracker/commit/16bcb7712708e90ac0be0e6d84e1973f91b9a443))
+
 ## [0.139.1](https://github.com/heywood8/money-tracker/compare/penny-v0.139.0...penny-v0.139.1) (2026-06-19)
 
 
