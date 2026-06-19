@@ -115,6 +115,12 @@ export function useSwipeDismiss({ onDismiss, onStepBack, canStepBack = false, en
       .onUpdate((event) => {
         'worklet';
         if (!valid.value) return;
+        // For a step-back the parent lives INSIDE this panel (a nested step or an
+        // embedded screen level), so dragging the whole overlay would wrongly
+        // reveal the layer beneath it (the main settings list). Recognize the
+        // swipe but leave the overlay in place; the inner level plays its own
+        // transition when we trigger the step-back on release.
+        if (canStepBack) return;
         translateX.value = Math.max(0, event.translationX - dragStart.value);
       })
       .onEnd((event) => {
@@ -123,10 +129,9 @@ export function useSwipeDismiss({ onDismiss, onStepBack, canStepBack = false, en
         const dx = event.translationX - dragStart.value;
         const past = dx > DISTANCE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD;
         if (past && canStepBack) {
-          // Go one level up within the panel and spring the surface back to rest
-          // so the parent step's content takes its place (mirrors the back arrow).
+          // Go one level up within the panel; the overlay never moved, so there is
+          // nothing to spring back — the inner level animates itself.
           if (onStepBack) runOnJS(onStepBack)();
-          translateX.value = withTiming(0, { duration: EXIT_DURATION, easing: ENTER_EASING });
         } else if (past) {
           // Reuse dismiss() so the completion + re-entrancy guard live in one place.
           runOnJS(dismiss)();
