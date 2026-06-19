@@ -686,6 +686,39 @@ describe('OperationFormFields', () => {
       await waitFor(() => expect(setValues).toHaveBeenCalled());
       expect(props.onAutoAddWithCategory).not.toHaveBeenCalled();
     });
+
+    it('does not open an empty browser when tapped before categories load', async () => {
+      const props = browseProps({
+        categories: [], // still loading
+        topCategoriesForType: [],
+        values: { ...defaultProps.values, categoryId: '', amount: '' },
+      });
+      const { getByTestId, queryByTestId } = await render(<OperationFormFields {...props} />);
+
+      // Placeholder shows the All-categories button during load
+      fireEvent.press(getByTestId('all-categories-button'));
+
+      // Browser must not open over an empty category list
+      await waitFor(() => expect(queryByTestId('category-browse-back')).toBeNull());
+    });
+
+    it('falls back to the single picker when loaded but no leaf suggestions exist', async () => {
+      const openPicker = jest.fn();
+      const props = browseProps({
+        // Loaded categories but only an (empty) folder → no leaf chips
+        categories: [{ id: 'folder-empty', name: 'Empty', icon: 'folder', type: 'folder', categoryType: 'expense' }],
+        topCategoriesForType: [],
+        openPicker,
+        getCategoryName: () => 'select_category',
+        values: { ...defaultProps.values, categoryId: '', amount: '' },
+      });
+      const { getByText, queryByTestId } = await render(<OperationFormFields {...props} />);
+
+      // No blurred placeholder loop; a functional single picker is shown instead
+      expect(queryByTestId('all-categories-button')).toBeNull();
+      fireEvent.press(getByText('select_category'));
+      expect(openPicker).toHaveBeenCalledWith('category', props.categories);
+    });
   });
 
   describe('Category Error Flash Animation', () => {

@@ -1,6 +1,7 @@
 import React, { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { View, Text, StyleSheet, Pressable, Animated, Easing, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
@@ -11,16 +12,9 @@ import currencies from '../../../assets/currencies.json';
 
 const getCurrencySymbol = (code) => currencies[code]?.symbol || code;
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 import { hasOperation as checkHasOperation, evaluateExpression } from '../../utils/calculatorUtils';
 import { SPACING, BORDER_RADIUS } from '../../styles/layout';
 import { FONT_SIZE } from '../../styles/designTokens';
-
-// Enable LayoutAnimation on Android so the inline category browser can animate
-// its height changes smoothly when drilling between hierarchy levels.
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // Horizontal slide distance (px) for the category browser push/pop transition.
 const CATEGORY_SLIDE_DISTANCE = 28;
@@ -131,20 +125,39 @@ const OperationFormFields = memo(({
   // QuickAdd. We render the category hierarchy in-place using chips that look
   // identical to the suggested-category shortcuts, so the suggested → all
   // transition reads as a single morphing list rather than a modal swap.
+  // The current folder is derived from the breadcrumb (last entry) rather than
+  // stored separately, so the two can never disagree.
   const [categoryBrowse, setCategoryBrowse] = useState({
     active: false,
-    folderId: null, // null = root level
     breadcrumb: [], // [{ id, name }] of folders drilled into
   });
+  const browseFolderId = categoryBrowse.breadcrumb.length
+    ? categoryBrowse.breadcrumb[categoryBrowse.breadcrumb.length - 1].id
+    : null;
+
   // Animated values shared across suggestion/browse renders so the same wrapper
   // slides + fades as content swaps (native-thread driven).
   const browseOpacity = useRef(new Animated.Value(1)).current;
   const browseTranslateX = useRef(new Animated.Value(0)).current;
 
-  // Reset the browser whenever the operation type changes — a leftover folderId
+  // Categories at the current browser level (root = no parent). Memoized so the
+  // O(n) scan only re-runs when the data or level changes, not on every render.
+  const browseItems = useMemo(
+    () => categories.filter(c => (browseFolderId == null ? !c.parentId : c.parentId === browseFolderId)),
+    [categories, browseFolderId],
+  );
+
+  // Whether enough leaf categories exist to warrant the "All categories" entry.
+  const leafCategoryCount = useMemo(
+    () => categories.filter(c => c.type !== 'folder').length,
+    [categories],
+  );
+  const showAllCategoriesButton = leafCategoryCount > 8;
+
+  // Reset the browser whenever the operation type changes — a leftover folder
   // from a previous type would otherwise filter to nothing.
   useEffect(() => {
-    setCategoryBrowse({ active: false, folderId: null, breadcrumb: [] });
+    setCategoryBrowse({ active: false, breadcrumb: [] });
     browseOpacity.setValue(1);
     browseTranslateX.setValue(0);
   }, [values.type, browseOpacity, browseTranslateX]);
@@ -153,16 +166,12 @@ const OperationFormFields = memo(({
   // interaction responsive and the state deterministic), then the new level
   // slides in from the side and fades up. `direction` is 'forward' (drilling
   // in / opening all → slide from the right) or 'back' (popping out → slide
-  // from the left). The container's height change is smoothed with
-  // LayoutAnimation so the list below glides rather than jumping.
+  // from the left). The container's HEIGHT change is smoothed separately by
+  // Reanimated's LinearTransition on the wrapper — Fabric-native and scoped to
+  // that view, unlike LayoutAnimation (a no-op under the New Architecture and
+  // global to the next layout commit).
   const animateCategorySwap = useCallback((direction, applyChange) => {
     const enterFrom = direction === 'forward' ? CATEGORY_SLIDE_DISTANCE : -CATEGORY_SLIDE_DISTANCE;
-    LayoutAnimation.configureNext({
-      duration: 220,
-      update: { type: LayoutAnimation.Types.easeInEaseOut },
-      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-    });
     browseOpacity.setValue(0);
     browseTranslateX.setValue(enterFrom);
     applyChange();
@@ -172,11 +181,20 @@ const OperationFormFields = memo(({
     ]).start();
   }, [browseOpacity, browseTranslateX]);
 
-  // Open the inline browser at the root level.
+  // Collapse the browser back to the suggestions grid (no animation — used when
+  // the parent is already resetting the form after an auto-add).
+  const collapseCategoryBrowse = useCallback(() => {
+    setCategoryBrowse({ active: false, breadcrumb: [] });
+    browseOpacity.setValue(1);
+    browseTranslateX.setValue(0);
+  }, [browseOpacity, browseTranslateX]);
+
+  // Open the inline browser at the root level. No-op until categories exist, so
+  // tapping during the initial load window doesn't open an empty browser.
   const enterCategoryBrowse = useCallback(() => {
-    if (disabled) return;
-    animateCategorySwap('forward', () => setCategoryBrowse({ active: true, folderId: null, breadcrumb: [] }));
-  }, [disabled, animateCategorySwap]);
+    if (disabled || categories.length === 0) return;
+    animateCategorySwap('forward', () => setCategoryBrowse({ active: true, breadcrumb: [] }));
+  }, [disabled, categories.length, animateCategorySwap]);
 
   // Drill into a folder.
   const handleBrowseIntoFolder = useCallback((folder) => {
@@ -184,7 +202,6 @@ const OperationFormFields = memo(({
     const name = folder.nameKey ? t(folder.nameKey) : folder.name;
     animateCategorySwap('forward', () => setCategoryBrowse(prev => ({
       active: true,
-      folderId: folder.id,
       breadcrumb: [...prev.breadcrumb, { id: folder.id, name }],
     })));
   }, [disabled, t, animateCategorySwap]);
@@ -192,31 +209,29 @@ const OperationFormFields = memo(({
   // Back chip: pop one folder level, or exit the browser when at root.
   const handleBrowseBack = useCallback(() => {
     if (disabled) return;
-    if (categoryBrowse.breadcrumb.length === 0) {
-      animateCategorySwap('back', () => setCategoryBrowse({ active: false, folderId: null, breadcrumb: [] }));
-    } else {
-      const nb = categoryBrowse.breadcrumb.slice(0, -1);
-      const newFolderId = nb.length ? nb[nb.length - 1].id : null;
-      animateCategorySwap('back', () => setCategoryBrowse({ active: true, folderId: newFolderId, breadcrumb: nb }));
-    }
-  }, [disabled, categoryBrowse.breadcrumb, animateCategorySwap]);
+    animateCategorySwap('back', () => setCategoryBrowse(prev => (
+      prev.breadcrumb.length === 0
+        ? { active: false, breadcrumb: [] }
+        : { active: true, breadcrumb: prev.breadcrumb.slice(0, -1) }
+    )));
+  }, [disabled, animateCategorySwap]);
 
-  // Select a leaf category from within the browser. Mirrors the shortcut
-  // behaviour: auto-add when an amount is present, otherwise just set the value.
-  const handleBrowseSelectLeaf = useCallback((categoryId) => {
+  // Select a leaf category: auto-add when an amount is present, otherwise just
+  // set the value. Shared by the suggestion chips and the inline browser; when
+  // `fromBrowse` is set, the browser collapses back to the suggestions grid.
+  const selectLeafCategory = useCallback((categoryId, { fromBrowse = false } = {}) => {
     if (disabled) return;
     const hasValidAmount = values.amount && values.amount.trim() !== '';
     if (hasValidAmount && onAutoAddWithCategory) {
       onAutoAddWithCategory(categoryId);
-      // Form is being reset by the parent — collapse the browser instantly.
-      setCategoryBrowse({ active: false, folderId: null, breadcrumb: [] });
-      browseOpacity.setValue(1);
-      browseTranslateX.setValue(0);
+      if (fromBrowse) collapseCategoryBrowse(); // form is reset by the parent
     } else {
       setValues(v => ({ ...v, categoryId }));
-      animateCategorySwap('back', () => setCategoryBrowse({ active: false, folderId: null, breadcrumb: [] }));
+      if (fromBrowse) {
+        animateCategorySwap('back', () => setCategoryBrowse({ active: false, breadcrumb: [] }));
+      }
     }
-  }, [disabled, values.amount, onAutoAddWithCategory, setValues, animateCategorySwap, browseOpacity, browseTranslateX]);
+  }, [disabled, values.amount, onAutoAddWithCategory, setValues, animateCategorySwap, collapseCategoryBrowse]);
 
   // Memoize input styles
   const inputStyle = useMemo(() => ({
@@ -420,6 +435,71 @@ const OperationFormFields = memo(({
     transform: [{ translateX: browseTranslateX }],
   };
 
+  // Shared category chip — used by both the suggestion shortcuts and the inline
+  // browser so styling, selection colours, name resolution and the error-flash
+  // border stay in one place. A plain Pressable wraps an Animated.View: the
+  // Pressable keeps presses testable while the Animated.View carries the
+  // (non-native-driver) animated border for the error flash.
+  const renderCategoryChip = (item, { testID, numberOfLines = 1, onPress, isFolder = false }) => {
+    const info = getCategoryInfo
+      ? getCategoryInfo(item.id)
+      : { name: item.nameKey ? t(item.nameKey) : item.name, icon: item.icon };
+    const isSelected = !isFolder && values.categoryId === item.id;
+    const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
+
+    return (
+      <Pressable
+        key={item.id}
+        testID={testID}
+        style={styles.categoryChipPressable}
+        onPress={onPress}
+        disabled={disabled}
+      >
+        <Animated.View
+          style={[
+            styles.categoryShortcutButton,
+            compact && styles.categoryShortcutButtonCompact,
+            { backgroundColor: isSelected ? colors.primary : colors.inputBackground, borderColor: chipErrorBorderColor },
+            disabledStyle,
+          ]}
+        >
+          <Icon name={info.icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
+          <Text
+            style={[styles.categoryShortcutText, { color: textColor }]}
+            numberOfLines={numberOfLines}
+            ellipsizeMode="tail"
+          >
+            {info.name}
+          </Text>
+          {isFolder && (
+            <View style={styles.browseFolderBadge}>
+              <Icon name="folder-outline" size={11} color={isSelected ? 'rgba(255,255,255,0.85)' : colors.mutedText} />
+            </View>
+          )}
+        </Animated.View>
+      </Pressable>
+    );
+  };
+
+  // The "All categories" entry button (first slot of the suggestions grid).
+  const renderAllCategoriesButton = () => (
+    <Pressable
+      testID="all-categories-button"
+      style={styles.categoryPickerPressable}
+      onPress={handleAllCategoriesPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={t('all_categories')}
+    >
+      <Animated.View style={[styles.categoryPickerButton, inputStyle, { borderColor: chipErrorBorderColor }, disabledStyle]}>
+        <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
+        <Text style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]} numberOfLines={2}>
+          {t('all_categories')}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+
   // Placeholder rows shown during initial load in QuickAdd before categories are ready
   const renderCategoryPlaceholderRows = () => {
     const renderPlaceholderChip = (key) => (
@@ -444,6 +524,7 @@ const OperationFormFields = memo(({
       <>
         <View style={styles.categoryButtonsContainer}>
           <Pressable
+            testID="all-categories-button"
             style={[styles.categoryPickerButton, inputStyle, groupBorderStyle]}
             onPress={handleAllCategoriesPress}
             disabled={disabled}
@@ -469,79 +550,19 @@ const OperationFormFields = memo(({
 
   // Suggested-category shortcut rows (the default QuickAdd view)
   const renderCategorySuggestionRows = () => {
-    const handleCategoryPress = (categoryId) => {
-      if (disabled) return;
-      const hasValidAmount = values.amount && values.amount.trim() !== '';
-      if (hasValidAmount && onAutoAddWithCategory) {
-        onAutoAddWithCategory(categoryId);
-      } else {
-        setValues(v => ({ ...v, categoryId }));
-      }
-    };
-
-    // Count only leaf categories — folders inflate the length but never appear as chips
-    const showAllButton = categories.filter(c => c.type !== 'folder').length > 8;
-    const firstRowCats = showAllButton ? topCategoriesForType.slice(0, 3) : topCategoriesForType.slice(0, 4);
-    const secondRowCats = showAllButton ? topCategoriesForType.slice(3) : topCategoriesForType.slice(4);
-
-    const renderCategoryChip = (category, index, isSecondRow = false) => {
-      const categoryInfo = getCategoryInfo ? getCategoryInfo(category.id) : { name: category.name, icon: category.icon, parentName: null };
-      const isSelected = values.categoryId === category.id;
-      const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
-
-      return (
-        <AnimatedPressable
-          key={category.id}
-          testID={`category-shortcut-${isSecondRow ? 'r2-' : ''}${index}`}
-          style={[
-            styles.categoryShortcutButton,
-            compact && styles.categoryShortcutButtonCompact,
-            {
-              backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-              borderColor: chipErrorBorderColor,
-            },
-            disabledStyle,
-          ]}
-          onPress={() => handleCategoryPress(category.id)}
-          disabled={disabled}
-        >
-          <Icon name={categoryInfo.icon} size={18} color={textColor} />
-          <Text
-            style={[styles.categoryShortcutText, { color: textColor }]}
-            numberOfLines={isSecondRow ? 1 : 2}
-            ellipsizeMode="tail"
-          >
-            {categoryInfo.name}
-          </Text>
-        </AnimatedPressable>
-      );
-    };
+    const firstRowCats = showAllCategoriesButton ? topCategoriesForType.slice(0, 3) : topCategoriesForType.slice(0, 4);
+    const secondRowCats = showAllCategoriesButton ? topCategoriesForType.slice(3) : topCategoriesForType.slice(4);
 
     return (
       <>
         {/* Row 1: "All categories" button (if > 8 total) + first 3 or 4 shortcuts */}
         <View style={styles.categoryButtonsContainer}>
-          {showAllButton && (
-            <Pressable
-              testID="all-categories-button"
-              style={styles.categoryPickerPressable}
-              onPress={handleAllCategoriesPress}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('all_categories')}
-            >
-              <Animated.View style={[styles.categoryPickerButton, inputStyle, { borderColor: chipErrorBorderColor }, disabledStyle]}>
-                <Icon name="menu" size={16} color={disabled ? colors.mutedText : colors.text} />
-                <Text
-                  style={[styles.categoryPickerText, { color: disabled ? colors.mutedText : colors.text }]}
-                  numberOfLines={2}
-                >
-                  {t('all_categories')}
-                </Text>
-              </Animated.View>
-            </Pressable>
-          )}
-          {firstRowCats.map((category, index) => renderCategoryChip(category, index, false))}
+          {showAllCategoriesButton && renderAllCategoriesButton()}
+          {firstRowCats.map((category, index) => renderCategoryChip(category, {
+            testID: `category-shortcut-${index}`,
+            numberOfLines: 2,
+            onPress: () => selectLeafCategory(category.id),
+          }))}
         </View>
 
         {/* Row 2: always 4 flex-1 slots to match row 1 widths; invisible spacers for empty slots */}
@@ -560,7 +581,11 @@ const OperationFormFields = memo(({
                 />
               );
             }
-            return renderCategoryChip(category, i, true);
+            return renderCategoryChip(category, {
+              testID: `category-shortcut-r2-${i}`,
+              numberOfLines: 1,
+              onPress: () => selectLeafCategory(category.id),
+            });
           })}
         </View>
       </>
@@ -572,10 +597,6 @@ const OperationFormFields = memo(({
   // drill in; leaf entries select. Chips reuse the shortcut styling so the
   // suggested → all transition feels like one continuous list.
   const renderCategoryBrowseRows = () => {
-    const items = categories.filter(c =>
-      categoryBrowse.folderId == null ? !c.parentId : c.parentId === categoryBrowse.folderId,
-    );
-
     const renderBackChip = () => (
       <Pressable
         key="category-browse-back"
@@ -596,48 +617,9 @@ const OperationFormFields = memo(({
       </Pressable>
     );
 
-    const renderBrowseChip = (item, key) => {
-      const isFolder = item.type === 'folder';
-      const isSelected = !isFolder && values.categoryId === item.id;
-      const name = item.nameKey ? t(item.nameKey) : item.name;
-      const textColor = isSelected ? '#fff' : (disabled ? colors.mutedText : colors.text);
-
-      return (
-        <Pressable
-          key={key}
-          testID={`category-browse-${key}`}
-          style={[
-            styles.categoryShortcutButton,
-            compact && styles.categoryShortcutButtonCompact,
-            {
-              backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-              borderColor: colors.border,
-            },
-            disabledStyle,
-          ]}
-          onPress={() => (isFolder ? handleBrowseIntoFolder(item) : handleBrowseSelectLeaf(item.id))}
-          disabled={disabled}
-        >
-          <Icon name={item.icon || (isFolder ? 'folder' : 'help-circle')} size={18} color={textColor} />
-          <Text
-            style={[styles.categoryShortcutText, { color: textColor }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {name}
-          </Text>
-          {isFolder && (
-            <View style={styles.browseFolderBadge}>
-              <Icon name="folder-outline" size={11} color={isSelected ? 'rgba(255,255,255,0.85)' : colors.mutedText} />
-            </View>
-          )}
-        </Pressable>
-      );
-    };
-
     // Back chip occupies the first slot (where "All categories" was); the rest
     // are the current level's categories, chunked into rows of four.
-    const slots = [{ kind: 'back' }, ...items.map(item => ({ kind: 'item', item }))];
+    const slots = [{ kind: 'back' }, ...browseItems.map(item => ({ kind: 'item', item }))];
     const rows = [];
     for (let i = 0; i < slots.length; i += 4) rows.push(slots.slice(i, i + 4));
 
@@ -646,7 +628,7 @@ const OperationFormFields = memo(({
       while (padded.length < 4) padded.push({ kind: 'spacer', id: `sp-${ri}-${padded.length}` });
       return (
         <View key={`category-browse-row-${ri}`} style={styles.categoryButtonsContainer}>
-          {padded.map((slot, ci) => {
+          {padded.map((slot) => {
             if (slot.kind === 'back') return renderBackChip();
             if (slot.kind === 'spacer') {
               return (
@@ -660,7 +642,13 @@ const OperationFormFields = memo(({
                 />
               );
             }
-            return renderBrowseChip(slot.item, slot.item.id);
+            const isFolder = slot.item.type === 'folder';
+            return renderCategoryChip(slot.item, {
+              testID: `category-browse-${slot.item.id}`,
+              numberOfLines: 1,
+              isFolder,
+              onPress: () => (isFolder ? handleBrowseIntoFolder(slot.item) : selectLeafCategory(slot.item.id, { fromBrowse: true })),
+            });
           })}
         </View>
       );
@@ -673,9 +661,15 @@ const OperationFormFields = memo(({
     if (values.type === 'transfer') return null;
 
     const hasSuggestions = topCategoriesForType && topCategoriesForType.length > 0;
+    // QuickAdd only shows the blurred placeholder while categories are genuinely
+    // still loading (none present yet).
+    const stillLoading = categoryBrowseEnabled && categories.length === 0;
 
-    // OperationModal / non-shortcut context: single full-width picker (no inline browser)
-    if (!categoryBrowseEnabled && !hasSuggestions) {
+    // Single full-width picker fallback: the OperationModal / non-shortcut
+    // context, or QuickAdd where categories are loaded but yield no leaf chips
+    // (so neither suggestions nor a useful inline grid exist). Not used while
+    // browsing or while still loading.
+    if (!hasSuggestions && !categoryBrowse.active && !stillLoading) {
       return (
         <Pressable
           style={[styles.formInput, inputStyle, disabledStyle]}
@@ -702,16 +696,17 @@ const OperationFormFields = memo(({
       content = renderCategoryPlaceholderRows();
     }
 
+    // Outer Reanimated.View smooths the wrapper's HEIGHT change between levels
+    // (Fabric-native, scoped); inner Animated.View carries the slide + fade.
     return (
-      <Animated.View
-        style={[
-          styles.categoryRowsWrapper,
-          compact && styles.categoryRowsWrapperCompact,
-          categoryAnimStyle,
-        ]}
+      <Reanimated.View
+        layout={LinearTransition.duration(240)}
+        style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}
       >
-        {content}
-      </Animated.View>
+        <Animated.View style={categoryAnimStyle}>
+          {content}
+        </Animated.View>
+      </Reanimated.View>
     );
   };
 
@@ -992,6 +987,9 @@ const styles = StyleSheet.create({
   categoryButtonsContainer: {
     flexDirection: 'row',
     gap: SPACING.xs,
+  },
+  categoryChipPressable: {
+    flex: 1,
   },
   categoryPickerButton: {
     alignItems: 'center',

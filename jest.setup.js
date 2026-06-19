@@ -726,6 +726,7 @@ jest.mock('react-native-reanimated', () => {
     SlideInLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SlideOutLeft: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
     SlideOutRight: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); return o; })(),
+    LinearTransition: (() => { const o = {}; o.duration = jest.fn(() => o); o.easing = jest.fn(() => o); o.springify = jest.fn(() => o); return o; })(),
     SharedValue: class SharedValue {
       constructor(value) { this.value = value; }
     },
