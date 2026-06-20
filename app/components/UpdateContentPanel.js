@@ -65,6 +65,15 @@ const repoBaseFromReleasesUrl = (releasesUrl) => {
   return releasesUrl.replace(/\/releases\/?$/, '');
 };
 
+// Resolves the GitHub release page URL for a single release. Prefers the release's own
+// html_url from the API; when that is absent (older payloads) it reconstructs the tag URL
+// from the repository base, mirroring this repo's "penny-v<version>" tag convention.
+export const releaseUrlFor = (releaseUrl, repoBase, version) => {
+  if (releaseUrl) return releaseUrl;
+  if (repoBase && version) return `${repoBase}/releases/tag/penny-v${version}`;
+  return null;
+};
+
 // Renders release-note text, turning "#123" pull-request references into tappable links.
 const renderNotesWithLinks = (text, repoBase, linkColor) => {
   if (!text) return null;
@@ -103,13 +112,31 @@ const formatApkDate = (modificationTime) => {
   return new Date(modificationTime * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
+// Builds the "date · time" label shown beside a release version. GitHub's `published_at`
+// timestamp carries the time of day, so we prefer it and render both date and time. When it
+// is missing (older payloads, or the date was only lifted from the release-note heading) we
+// fall back to the bare date string, which has no time component.
+export const formatReleaseDateTime = (publishedAt, fallbackDate) => {
+  if (publishedAt) {
+    const parsed = new Date(publishedAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      const datePart = parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      const timePart = parsed.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return `${datePart} · ${timePart}`;
+    }
+  }
+  return fallbackDate || null;
+};
+
 // Green used for the "installed / up to date" status, matching the checkmark elsewhere in this panel.
 const INSTALLED_GREEN = '#4caf50';
 // Amber used to warn that a corrupt cached download was discarded and is being re-downloaded.
 const WARNING_AMBER = '#f0a500';
 
-function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
+function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
+  const dateLabel = formatReleaseDateTime(publishedAt, date);
+  const releasePageUrl = releaseUrlFor(releaseUrl, repoBase, version);
   const spinAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!buildProgress) return undefined;
@@ -137,9 +164,20 @@ function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBas
     >
       <View style={styles.releaseHeader}>
         <View style={styles.releaseHeaderLeft}>
-          <Text style={[styles.releaseVersion, { color: colors.text }]}>v{version}</Text>
-          {date ? (
-            <Text style={[styles.releaseDate, { color: colors.mutedText }]}>{date}</Text>
+          {releasePageUrl ? (
+            <Text
+              style={[styles.releaseVersion, { color: colors.text }]}
+              onPress={() => Linking.openURL(releasePageUrl)}
+              accessibilityRole="link"
+              accessibilityLabel={`View release ${version} on GitHub`}
+            >
+              v{version}
+            </Text>
+          ) : (
+            <Text style={[styles.releaseVersion, { color: colors.text }]}>v{version}</Text>
+          )}
+          {dateLabel ? (
+            <Text style={[styles.releaseDate, { color: colors.mutedText }]}>{dateLabel}</Text>
           ) : null}
           {badge ? (
             <Text style={[styles.releaseBadge, { color: colors.mutedText, borderColor: colors.border }]}>
@@ -221,6 +259,8 @@ function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBas
 ReleaseCard.propTypes = {
   version: PropTypes.string,
   notes: PropTypes.string,
+  publishedAt: PropTypes.string,
+  releaseUrl: PropTypes.string,
   badge: PropTypes.string,
   buildProgress: PropTypes.shape({
     percent: PropTypes.number,
@@ -364,6 +404,8 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         key={release.version}
         version={release.version}
         notes={release.notes}
+        publishedAt={release.publishedAt}
+        releaseUrl={release.releaseUrl}
         badge={release.badge}
         buildProgress={release.buildProgress}
         matchedApk={apkLookup.get(release.version)}
@@ -537,6 +579,8 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
           return {
             version: r.version,
             notes: r.notes,
+            publishedAt: r.publishedAt,
+            releaseUrl: r.releaseUrl,
             badge: !r.hasApk ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
             buildProgress,
           };
@@ -585,6 +629,8 @@ UpdateContentPanel.propTypes = {
     releaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
       notes: PropTypes.string,
+      publishedAt: PropTypes.string,
+      releaseUrl: PropTypes.string,
       hasApk: PropTypes.bool,
       buildProgress: PropTypes.shape({
         percent: PropTypes.number,
@@ -593,6 +639,8 @@ UpdateContentPanel.propTypes = {
     recentReleaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
       notes: PropTypes.string,
+      publishedAt: PropTypes.string,
+      releaseUrl: PropTypes.string,
     })),
     releasesUrl: PropTypes.string,
     alreadyDownloaded: PropTypes.bool,

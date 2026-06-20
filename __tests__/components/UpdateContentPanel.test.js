@@ -2,7 +2,7 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 // fireEvent is used for update button press tests
-import UpdateContentPanel, { parseReleaseNotes } from '../../app/components/UpdateContentPanel';
+import UpdateContentPanel, { parseReleaseNotes, formatReleaseDateTime, releaseUrlFor } from '../../app/components/UpdateContentPanel';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -41,6 +41,46 @@ describe('parseReleaseNotes', () => {
 
   it('handles empty notes gracefully', () => {
     expect(parseReleaseNotes('', '1.0.0')).toEqual({ date: null, body: '' });
+  });
+});
+
+describe('formatReleaseDateTime', () => {
+  it('renders both date and time from an ISO published_at timestamp', () => {
+    const label = formatReleaseDateTime('2026-06-17T14:30:00Z', '2026-06-17');
+    // Time component must be present (separated from the date by the middot).
+    expect(label).toContain(' · ');
+    // The numeric date and time pieces survive whatever the host locale produces.
+    expect(label).toMatch(/2026/);
+    expect(label).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it('falls back to the bare date string when no published_at is available', () => {
+    expect(formatReleaseDateTime(null, '2026-06-17')).toBe('2026-06-17');
+    expect(formatReleaseDateTime(undefined, '2026-06-17')).toBe('2026-06-17');
+  });
+
+  it('falls back to the date when published_at is unparseable', () => {
+    expect(formatReleaseDateTime('not-a-date', '2026-06-17')).toBe('2026-06-17');
+  });
+
+  it('returns null when neither a timestamp nor a fallback date exists', () => {
+    expect(formatReleaseDateTime(null, null)).toBeNull();
+  });
+});
+
+describe('releaseUrlFor', () => {
+  it('prefers the release html_url when present', () => {
+    expect(releaseUrlFor('https://github.com/o/r/releases/tag/penny-v1.2.0', 'https://github.com/o/r', '1.2.0'))
+      .toBe('https://github.com/o/r/releases/tag/penny-v1.2.0');
+  });
+
+  it('reconstructs the tag URL from the repo base when no html_url is given', () => {
+    expect(releaseUrlFor(null, 'https://github.com/o/r', '1.2.0'))
+      .toBe('https://github.com/o/r/releases/tag/penny-v1.2.0');
+  });
+
+  it('returns null when neither a url nor a repo base is available', () => {
+    expect(releaseUrlFor(null, null, '1.2.0')).toBeNull();
   });
 });
 
@@ -103,6 +143,76 @@ describe('UpdateContentPanel', () => {
         />,
       );
       expect(getByText('more_releases')).toBeTruthy();
+    });
+
+    it('shows the release date and time when published_at is present', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: '## 1.2.0 (2026-06-17)\n\nBug fix release', publishedAt: '2026-06-17T14:30:00Z' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      // The date label now carries a time component separated by a middot.
+      expect(getByText(/ · \d{1,2}:\d{2}/)).toBeTruthy();
+    });
+
+    it('opens the GitHub release page when the version is tapped', async () => {
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
+      const { getByLabelText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: 'Bug fix release', releaseUrl: 'https://github.com/o/r/releases/tag/penny-v1.2.0' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      const link = getByLabelText('View release 1.2.0 on GitHub');
+      fireEvent.press(link);
+      expect(openURL).toHaveBeenCalledWith('https://github.com/o/r/releases/tag/penny-v1.2.0');
+      openURL.mockRestore();
+    });
+
+    it('reconstructs the release URL from releasesUrl when the entry has no releaseUrl', async () => {
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
+      const { getByLabelText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [{ version: '1.2.0', notes: 'Bug fix release' }],
+            releasesUrl: 'https://github.com/heywood8/money-tracker/releases',
+          }}
+        />,
+      );
+      fireEvent.press(getByLabelText('View release 1.2.0 on GitHub'));
+      expect(openURL).toHaveBeenCalledWith('https://github.com/heywood8/money-tracker/releases/tag/penny-v1.2.0');
+      openURL.mockRestore();
+    });
+
+    it('falls back to the heading date when published_at is absent', async () => {
+      const { getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'up_to_date',
+            recentReleaseNotes: [
+              { version: '1.2.0', notes: '## 1.2.0 (2026-06-17)\n\nBug fix release' },
+            ],
+            releasesUrl: null,
+          }}
+        />,
+      );
+      expect(getByText('2026-06-17')).toBeTruthy();
     });
 
     it('shows an inline install button on the release matching a downloaded APK', async () => {
