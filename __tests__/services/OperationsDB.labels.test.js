@@ -60,12 +60,12 @@ describe('OperationsDB.getDistinctLabels', () => {
     expect(await getDistinctLabels(10)).toEqual([]);
   });
 
-  it('filters out system descriptions via parseLabels (they yield no labels)', async () => {
+  it('parses legacy [MoneyOK] descriptions into their delimited labels', async () => {
     queryAll.mockResolvedValue([
-      { description: '[MoneyOK] adjustment', category_id: 'c1', cnt: 5 },
+      { description: '[MoneyOK] | groceries', category_id: 'c1', cnt: 5 },
       { description: 'real', category_id: 'c1', cnt: 1 },
     ]);
     const labels = await getDistinctLabels(10);
-    expect(labels).toEqual(['real']);
+    expect(labels).toEqual(expect.arrayContaining(['[MoneyOK]', 'groceries', 'real']));
   });
 });

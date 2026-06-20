@@ -23,18 +23,6 @@ export const LABEL_JOIN = ' | ';
 export const MAX_LABELS = 30;
 export const MAX_LABEL_LENGTH = 60;
 
-// Descriptions that belong to internal/shadow operations (balance adjustments).
-// They are never treated as user labels.
-const SYSTEM_PREFIX = '[MoneyOK]';
-
-/**
- * Whether a description is an internal system marker rather than user labels.
- * @param {*} description
- * @returns {boolean}
- */
-export const isSystemDescription = (description) =>
-  typeof description === 'string' && description.startsWith(SYSTEM_PREFIX);
-
 /**
  * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
  * collapse internal whitespace, and trim. Returns '' for anything unusable.
@@ -66,13 +54,13 @@ export const sanitizeLabel = (label) => normalizeLabel(label).slice(0, MAX_LABEL
 /**
  * Parse a description string into an ordered, de-duplicated list of labels.
  * De-duplication is case-insensitive; the first occurrence's casing is kept.
- * System/shadow descriptions parse to an empty list.
+ * Every delimiter-separated segment becomes a label, including legacy markers
+ * such as "[MoneyOK]" from imported data.
  * @param {*} description
  * @returns {string[]}
  */
 export const parseLabels = (description) => {
   if (typeof description !== 'string' || description === '') return [];
-  if (isSystemDescription(description)) return [];
 
   const seen = new Set();
   const result = [];
