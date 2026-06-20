@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.144.2](https://github.com/heywood8/money-tracker/compare/penny-v0.144.1...penny-v0.144.2) (2026-06-20)
+
+
+### Bug Fixes
+
+* wrap operation labels to a second line instead of truncating the category name ([#1032](https://github.com/heywood8/money-tracker/issues/1032)) ([59736fe](https://github.com/heywood8/money-tracker/commit/59736fe4779d4a33fba28051db188bfe6ffa497d))
+
 ## [0.144.1](https://github.com/heywood8/money-tracker/compare/penny-v0.144.0...penny-v0.144.1) (2026-06-20)
 
 
