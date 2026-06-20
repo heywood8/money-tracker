@@ -346,7 +346,7 @@ const unmatchedApksFor = (downloadedApks, releases) => {
   return downloadedApks.filter((apk) => !apk.version || !shown.has(apk.version));
 };
 
-export default function UpdateContentPanel({ isChecking, updateResult, downloadedApks, onUpdate, onInstallApk, onRefresh }) {
+export default function UpdateContentPanel({ isChecking, updateResult, downloadedApks, onUpdate, onInstallApk, onRefresh, bottomInset }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -458,7 +458,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                 </Text>
               </View>
             ) : null}
-            <View style={styles.updateBottomRow}>
+            <View style={[styles.updateBottomRow, { paddingBottom: bottomInset }]}>
               {releaseNotes ? (
                 <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
               ) : (
@@ -504,6 +504,10 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
             // Only fall back to a standalone bottom status when that card is absent (the
             // installed version isn't among the listed releases).
             const latestShownOnCard = !!installedVersion && releases.some((r) => r.version === installedVersion);
+            // The release list is the bottom-most element only when no status row
+            // follows it; in that case it carries the bottom inset so its content
+            // can scroll clear of — and peek through — the floating tab bar.
+            const upToDateHasBottomRow = unmatched.length > 0 || !latestShownOnCard;
             return (
               <>
                 <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
@@ -512,6 +516,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                 <ScrollView
                   style={styles.changelogScroll}
                   showsVerticalScrollIndicator={false}
+                  contentContainerStyle={upToDateHasBottomRow ? undefined : { paddingBottom: bottomInset }}
                   refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
                 >
                   {renderReleaseCards(releases)}
@@ -519,10 +524,10 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
                     <MoreReleasesLink url={updateResult.releasesUrl} colors={colors} t={t} />
                   )}
                 </ScrollView>
-                {(unmatched.length > 0 || !latestShownOnCard) && (
+                {upToDateHasBottomRow && (
                   <>
                     <Divider style={styles.updateDivider} />
-                    <View style={styles.updateBottomRow}>
+                    <View style={[styles.updateBottomRow, { paddingBottom: bottomInset }]}>
                       <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
                       {!latestShownOnCard ? (
                         <View style={styles.upToDateBottomRight}>
@@ -594,6 +599,7 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
             <ScrollView
               style={styles.changelogScroll}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: bottomInset }}
               refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
             >
               {renderReleaseCards(noApkReleases)}
@@ -655,6 +661,7 @@ UpdateContentPanel.propTypes = {
   onUpdate: PropTypes.func,
   onInstallApk: PropTypes.func,
   onRefresh: PropTypes.func,
+  bottomInset: PropTypes.number,
 };
 
 UpdateContentPanel.defaultProps = {
@@ -664,6 +671,7 @@ UpdateContentPanel.defaultProps = {
   onUpdate: () => {},
   onInstallApk: () => {},
   onRefresh: null,
+  bottomInset: 0,
 };
 
 const styles = StyleSheet.create({
@@ -867,7 +875,10 @@ const styles = StyleSheet.create({
   resultContainer: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: SPACING.lg,
+    // Only top padding: the bottom inset is applied per-section (scroll
+    // contentContainerStyle / bottom action row) so list content can scroll
+    // behind the floating tab bar instead of stopping short above it.
+    paddingTop: SPACING.lg,
   },
   upToDateBottomRight: {
     alignItems: 'center',
