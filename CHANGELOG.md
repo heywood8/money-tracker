@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.147.0](https://github.com/heywood8/money-tracker/compare/penny-v0.146.0...penny-v0.147.0) (2026-06-20)
+
+
+### Features
+
+* refine operation label display (imported metadata, Note, balance adjustments) ([#1039](https://github.com/heywood8/money-tracker/issues/1039)) ([b5c0695](https://github.com/heywood8/money-tracker/commit/b5c06955e6a5bc45985e9482a8b47803ee84b978))
+
 ## [0.146.0](https://github.com/heywood8/money-tracker/compare/penny-v0.145.0...penny-v0.146.0) (2026-06-20)
 
 
