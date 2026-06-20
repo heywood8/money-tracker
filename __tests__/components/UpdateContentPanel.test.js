@@ -259,6 +259,27 @@ describe('UpdateContentPanel', () => {
       expect(queryByText('No APK')).toBeNull(); // sanity: still the no-APK branch
     });
 
+    it('shows a build progress chip on each no-APK release that is building', async () => {
+      const { getAllByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{
+            type: 'error',
+            errorCode: 'releases_without_apks',
+            releaseNotes: [
+              { version: '0.142.0', notes: 'Building newer', hasApk: false, buildProgress: { percent: 31, status: 'in_progress' } },
+              { version: '0.141.4', notes: 'Building older', hasApk: false, buildProgress: { percent: 70, status: 'in_progress' } },
+            ],
+            recentReleaseNotes: null,
+            releasesUrl: null,
+            buildProgress: { percent: 31, status: 'in_progress' },
+          }}
+        />,
+      );
+      // Both building releases surface their own chip (the mock t() collapses each to its key).
+      expect(getAllByText('build_in_progress')).toHaveLength(2);
+    });
+
     it('does not show a build progress chip when buildProgress is null', async () => {
       const { queryByText } = await render(
         <UpdateContentPanel
