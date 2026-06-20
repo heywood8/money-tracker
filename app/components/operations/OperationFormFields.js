@@ -1,7 +1,14 @@
 import React, { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Reanimated, { LinearTransition, FadeInRight, FadeInLeft } from 'react-native-reanimated';
+import Reanimated, {
+  FadeInRight,
+  FadeInLeft,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useDisplaySettings } from '../../contexts/DisplaySettingsContext';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import Calculator from '../Calculator';
@@ -132,6 +139,31 @@ const OperationFormFields = memo(({
   // 'none' on the initial render so the grid doesn't animate on mount.
   const browseDirRef = useRef('none');
 
+  // Animated height for the category grid so the operations list below glides
+  // up/down when the row count changes (e.g. 1 vs 2 rows), instead of jumping —
+  // same feel as the search open/close animation. The inner content is measured
+  // via onLayout (normal flow, clipped by the wrapper's overflow:hidden); the
+  // first measurement is applied instantly, later changes are tweened.
+  const categoryHeightSV = useSharedValue(0);
+  const categoryHeightInitialized = useRef(false);
+
+  const handleCategoryContentLayout = useCallback((e) => {
+    const h = e.nativeEvent.layout.height;
+    if (h <= 0) return;
+    if (!categoryHeightInitialized.current) {
+      categoryHeightSV.value = h;
+      categoryHeightInitialized.current = true;
+    } else {
+      categoryHeightSV.value = withTiming(h, { duration: 300, easing: Easing.out(Easing.cubic) });
+    }
+  }, [categoryHeightSV]);
+
+  const categoryHeightStyle = useAnimatedStyle(() => ({
+    // undefined (auto) until the first measurement so the grid is never a
+    // 0-height flash on mount.
+    height: categoryHeightSV.value === 0 ? undefined : categoryHeightSV.value,
+  }));
+
   // Categories at the current browser level (root = no parent). Memoized so the
   // O(n) scan only re-runs when the data or level changes, not on every render.
   const browseItems = useMemo(
@@ -157,7 +189,7 @@ const OperationFormFields = memo(({
   // animation for the next level; the content is keyed per level so Reanimated
   // plays a single UI-thread slide/fade as it mounts (no cross-system juggling
   // or setValue/setState ordering, which is what caused stutter before). The
-  // wrapper's height change is smoothed by LinearTransition.
+  // wrapper's height change is tweened separately (see categoryHeightStyle).
   const changeBrowseLevel = useCallback((dir, updater) => {
     browseDirRef.current = dir;
     setCategoryBrowse(updater);
@@ -664,16 +696,20 @@ const OperationFormFields = memo(({
       ? undefined
       : (dir === 'back' ? FadeInLeft : FadeInRight).duration(220);
 
-    // Single Reanimated system (UI thread): the wrapper smooths its HEIGHT
-    // change with LinearTransition, and the keyed inner view slides/fades in on
-    // each level change. Keying per level remounts the content so `entering`
-    // fires; `dir === 'none'` suppresses the animation on the initial render.
+    // The wrapper's height is animated (driven by the measured content height)
+    // so the operations list below glides when the row count changes. The keyed
+    // inner view slides/fades in on each level change; keying per level remounts
+    // it so `entering` fires, and `dir === 'none'` suppresses it on first render.
     return (
       <Reanimated.View
-        layout={LinearTransition.duration(240)}
-        style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}
+        style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact, categoryHeightStyle]}
       >
-        <Reanimated.View key={levelKey} entering={entering} style={styles.categoryRows}>
+        <Reanimated.View
+          key={levelKey}
+          entering={entering}
+          style={styles.categoryRows}
+          onLayout={handleCategoryContentLayout}
+        >
           {content}
         </Reanimated.View>
       </Reanimated.View>
@@ -980,6 +1016,7 @@ const styles = StyleSheet.create({
   },
   categoryRowsWrapper: {
     marginBottom: SPACING.md,
+    overflow: 'hidden',
   },
   categoryRowsWrapperCompact: {
     marginBottom: SPACING.xs,
