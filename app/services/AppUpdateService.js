@@ -291,14 +291,14 @@ export const checkForAppUpdate = async ({
 
       // Collect recent releases with APKs for changelog display regardless of version
       if (apkAsset && release.body && recentReleasesWithApk.length < MAX_CHANGELOG_ENTRIES) {
-        recentReleasesWithApk.push({ version: releaseVersion, notes: release.body });
+        recentReleasesWithApk.push({ version: releaseVersion, notes: release.body, publishedAt: release.published_at || null, releaseUrl: release.html_url || null });
       }
 
       if (compareVersions(releaseVersion, currentNormalized) <= 0) {
         continue; // not newer than current — skip
       }
 
-      newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset });
+      newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset, publishedAt: release.published_at || null, releaseUrl: release.html_url || null });
 
       if (apkAsset && (!bestRelease || compareVersions(releaseVersion, bestRelease.version) > 0)) {
         const checksumAsset = extractChecksumAsset(release.assets, apkAsset.name);
@@ -351,6 +351,8 @@ export const checkForAppUpdate = async ({
             version: r.version,
             notes: r.notes,
             hasApk: r.hasApk,
+            publishedAt: r.publishedAt || null,
+            releaseUrl: r.releaseUrl || null,
             buildProgress: !r.hasApk ? (progressByVersion[r.version] || null) : null,
           }));
         return {
@@ -374,7 +376,7 @@ export const checkForAppUpdate = async ({
 
     const releaseNotes = newerReleases
       .filter((r) => r.notes && r.hasApk)
-      .map((r) => ({ version: r.version, notes: r.notes }));
+      .map((r) => ({ version: r.version, notes: r.notes, publishedAt: r.publishedAt || null, releaseUrl: r.releaseUrl || null }));
 
     return {
       success: true,

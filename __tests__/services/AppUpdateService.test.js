@@ -340,6 +340,41 @@ describe('AppUpdateService', () => {
       expect(result.releasesUrl).toBe('https://github.com/heywood8/money-tracker/releases');
     });
 
+    it('propagates the release published_at timestamp into changelog entries', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v0.50.5',
+            assets: [{ name: 'penny-v0.50.5.apk', browser_download_url: 'https://example.com/penny-v0.50.5.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.5',
+            body: 'New features in 0.50.5',
+            published_at: '2026-06-17T14:30:00Z',
+          },
+          {
+            tag_name: 'v0.50.3',
+            assets: [{ name: 'penny-v0.50.3.apk', browser_download_url: 'https://example.com/penny-v0.50.3.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.3',
+            body: 'Fixes in 0.50.3',
+            published_at: '2026-06-10T09:15:00Z',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.50.3',
+        fetchImpl,
+      });
+
+      // The newer release surfaces its timestamp in both the update changelog and the recent list.
+      expect(result.releaseNotes[0].publishedAt).toBe('2026-06-17T14:30:00Z');
+      expect(result.recentReleaseNotes[0].publishedAt).toBe('2026-06-17T14:30:00Z');
+      expect(result.recentReleaseNotes[1].publishedAt).toBe('2026-06-10T09:15:00Z');
+      // The release page URL travels with the changelog entries so the version can deep-link to it.
+      expect(result.releaseNotes[0].releaseUrl).toBe('https://github.com/heywood8/money-tracker/releases/tag/v0.50.5');
+      expect(result.recentReleaseNotes[0].releaseUrl).toBe('https://github.com/heywood8/money-tracker/releases/tag/v0.50.5');
+    });
+
     it('handles GitHub rate limiting response gracefully', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: false,
