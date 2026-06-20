@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.146.0](https://github.com/heywood8/money-tracker/compare/penny-v0.145.0...penny-v0.146.0) (2026-06-20)
+
+
+### Features
+
+* hide imported metadata labels in operation list and protect MoneyOK operations ([#1036](https://github.com/heywood8/money-tracker/issues/1036)) ([7a1f443](https://github.com/heywood8/money-tracker/commit/7a1f443e4128416b915a8f2d380d7d5ed008c76b))
+
 ## [0.145.0](https://github.com/heywood8/money-tracker/compare/penny-v0.144.2...penny-v0.145.0) (2026-06-20)
 
 
