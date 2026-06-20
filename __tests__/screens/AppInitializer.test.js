@@ -23,6 +23,12 @@ jest.mock('../../app/contexts/UpdateDownloadContext', () => ({
   })),
 }));
 
+// The opened-file import handler is covered by its own unit tests; stub it here
+// so AppInitializer doesn't require the ImportProgress/Dialog providers.
+jest.mock('../../app/hooks/useSqliteFileImport', () => ({
+  useSqliteFileImport: jest.fn(),
+}));
+
 jest.mock('../../app/services/AppUpdateService', () => ({
   checkForAppUpdate: jest.fn(async () => ({
     success: true,

@@ -9,6 +9,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { checkForAppUpdate } from '../services/AppUpdateService';
 import { getPreference, setPreference, PREF_KEYS } from '../services/PreferencesDB';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { useSqliteFileImport } from '../hooks/useSqliteFileImport';
 import UpdateAvailableModal from '../modals/UpdateAvailableModal';
 
 const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -25,6 +26,11 @@ const AppInitializer = () => {
   const { startDownload } = useUpdateDownload();
   const [isInitializing, setIsInitializing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null);
+
+  // Handle SQLite/backup files opened with the app (Android ACTION_VIEW).
+  // Disabled during first launch so the import warning doesn't appear before
+  // the user has finished initial language setup.
+  useSqliteFileImport({ enabled: !isFirstLaunch });
 
   // Run once on every app open (after first launch is complete)
   useEffect(() => {
