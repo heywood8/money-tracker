@@ -116,32 +116,34 @@ const OperationListItem = ({
 
           {/* Text */}
           <View style={styles.textContainer}>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {title}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                {title}
+              </Text>
+              {visibleLabels.length > 0 && (
+                <View style={styles.labelRow}>
+                  {visibleLabels.map((label) => (
+                    <View
+                      key={label}
+                      style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+                      testID={`op-label-${label}`}
+                    >
+                      <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                  {overflowCount > 0 && (
+                    <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+                      <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
             <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
               {subtitle}
             </Text>
-            {visibleLabels.length > 0 && (
-              <View style={styles.labelRow}>
-                {visibleLabels.map((label) => (
-                  <View
-                    key={label}
-                    style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
-                    testID={`op-label-${label}`}
-                  >
-                    <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
-                      {label}
-                    </Text>
-                  </View>
-                ))}
-                {overflowCount > 0 && (
-                  <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-                    <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
-                  </View>
-                )}
-              </View>
-            )}
           </View>
 
           {/* Amount */}
@@ -254,10 +256,11 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   labelRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexShrink: 1,
     gap: SPACING.xs,
-    marginTop: 4,
+    marginLeft: SPACING.sm,
   },
   row: {
     alignItems: 'center',
@@ -281,9 +284,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   title: {
+    flexShrink: 1,
     fontSize: FONT_SIZE.md + 1,
     fontWeight: FONT_WEIGHT.medium,
     includeFontPadding: false,
+  },
+  titleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
 });
 
