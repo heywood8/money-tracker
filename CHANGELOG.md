@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.145.0](https://github.com/heywood8/money-tracker/compare/penny-v0.144.2...penny-v0.145.0) (2026-06-20)
+
+
+### Features
+
+* remove labels picker from search filters ([#1034](https://github.com/heywood8/money-tracker/issues/1034)) ([4ed95d3](https://github.com/heywood8/money-tracker/commit/4ed95d3509e25b34f4b377968c9608478fc09165))
+
 ## [0.144.2](https://github.com/heywood8/money-tracker/compare/penny-v0.144.1...penny-v0.144.2) (2026-06-20)
 
 
