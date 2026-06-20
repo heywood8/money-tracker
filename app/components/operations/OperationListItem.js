@@ -116,27 +116,23 @@ const OperationListItem = ({
           {/* Text */}
           <View style={styles.textContainer}>
             <View style={styles.titleRow}>
-              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.title, { color: colors.text }]}>
                 {title}
               </Text>
-              {visibleLabels.length > 0 && (
-                <View style={styles.labelRow}>
-                  {visibleLabels.map((label) => (
-                    <View
-                      key={label}
-                      style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
-                      testID={`op-label-${label}`}
-                    >
-                      <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
-                        {label}
-                      </Text>
-                    </View>
-                  ))}
-                  {overflowCount > 0 && (
-                    <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-                      <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
-                    </View>
-                  )}
+              {visibleLabels.map((label) => (
+                <View
+                  key={label}
+                  style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+                  testID={`op-label-${label}`}
+                >
+                  <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
+                    {label}
+                  </Text>
+                </View>
+              ))}
+              {overflowCount > 0 && (
+                <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+                  <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
                 </View>
               )}
             </View>
@@ -254,13 +250,6 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.medium,
     maxWidth: 140,
   },
-  labelRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexShrink: 1,
-    gap: SPACING.xs,
-    marginLeft: SPACING.sm,
-  },
   row: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -291,6 +280,8 @@ const styles = StyleSheet.create({
   titleRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
   },
 });
 
