@@ -252,10 +252,16 @@ describe('labelUtils', () => {
       expect(displayLabel('note:  paid in cash ')).toBe('paid in cash');
     });
 
+    it('strips the "Balance adjusted from" prefix, leaving the amount chain', () => {
+      expect(displayLabel('Balance adjusted from 62000.00 → 66000.00')).toBe('62000.00 → 66000.00');
+      expect(displayLabel('balance adjusted from 80.00 → 100.00 → 120.00')).toBe('80.00 → 100.00 → 120.00');
+    });
+
     it('returns ordinary labels unchanged', () => {
       expect(displayLabel('groceries')).toBe('groceries');
       expect(displayLabel('[MoneyOK]')).toBe('[MoneyOK]');
       expect(displayLabel('Notepad')).toBe('Notepad');
+      expect(displayLabel('62000.00 → 66000.00')).toBe('62000.00 → 66000.00');
     });
 
     it('returns empty string for unusable input', () => {

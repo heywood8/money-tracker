@@ -34,6 +34,15 @@ describe('LabelInput', () => {
     expect(getByText('food')).toBeTruthy();
   });
 
+  it('shows a balance-adjustment label without the "Balance adjusted from" prefix', async () => {
+    const { getByText, queryByText } = await renderInput({
+      value: 'Balance adjusted from 62000.00 → 66000.00',
+      editable: false,
+    });
+    expect(getByText('62000.00 → 66000.00')).toBeTruthy();
+    expect(queryByText('Balance adjusted from 62000.00 → 66000.00')).toBeNull();
+  });
+
   it('adds a label on submit and serialises with the delimiter', async () => {
     const onChangeText = jest.fn();
     const { getByTestId } = await renderInput({ value: 'work', onChangeText });

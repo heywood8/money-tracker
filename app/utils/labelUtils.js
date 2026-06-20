@@ -36,6 +36,15 @@ export const MONEYOK_LABEL = '[MoneyOK]';
 // the underlying label value is left untouched.
 export const NOTE_LABEL_PREFIX = 'Note:';
 
+// Balance-adjustment operations historically stored their label as
+// "Balance adjusted from <orig> → <target>". The prefix is noise — only the
+// amount chain matters — so it is stripped for display. (New adjustments no
+// longer write the prefix; this keeps older records tidy too.)
+export const BALANCE_ADJUST_PREFIX = 'Balance adjusted from';
+
+// Prefixes stripped from a label purely for display (value is left untouched).
+const DISPLAY_STRIP_PREFIXES = [NOTE_LABEL_PREFIX, BALANCE_ADJUST_PREFIX];
+
 /**
  * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
  * collapse internal whitespace, and trim. Returns '' for anything unusable.
@@ -90,16 +99,21 @@ export const parseLabels = (description) => {
 };
 
 /**
- * Map a label to its user-facing text. Imported "Note:" labels are shown as just
- * the free-text after the prefix (e.g. "Note: За очки" -> "За очки"); all other
- * labels are returned unchanged. Matching is case-insensitive. Never mutates state.
+ * Map a label to its user-facing text. Display-only prefixes are stripped:
+ * imported "Note:" labels show just the free-text after the prefix
+ * (e.g. "Note: За очки" -> "За очки"), and legacy "Balance adjusted from <a> → <b>"
+ * labels show just the amount chain ("<a> → <b>"). All other labels are returned
+ * unchanged. Matching is case-insensitive. Never mutates state.
  * @param {*} label
  * @returns {string}
  */
 export const displayLabel = (label) => {
   const clean = normalizeLabel(label);
-  if (clean.toLowerCase().startsWith(NOTE_LABEL_PREFIX.toLowerCase())) {
-    return clean.slice(NOTE_LABEL_PREFIX.length).trim();
+  const lower = clean.toLowerCase();
+  for (const prefix of DISPLAY_STRIP_PREFIXES) {
+    if (lower.startsWith(prefix.toLowerCase())) {
+      return clean.slice(prefix.length).trim();
+    }
   }
   return clean;
 };

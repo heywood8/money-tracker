@@ -11,7 +11,7 @@ import {
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../../styles/designTokens';
-import { parseLabels, serializeLabels, addLabel, removeLabel, hasLabel } from '../../utils/labelUtils';
+import { parseLabels, serializeLabels, addLabel, removeLabel, hasLabel, displayLabel } from '../../utils/labelUtils';
 
 const MAX_SUGGESTION_CHIPS = 8;
 
@@ -178,7 +178,7 @@ const LabelInput = forwardRef(({
             style={[styles.chip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
             testID={`label-chip-${label}`}
           >
-            <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>{label}</Text>
+            <Text style={[styles.chipText, { color: colors.text }]} numberOfLines={1}>{displayLabel(label)}</Text>
             {editable && (
               <TouchableOpacity
                 onPress={() => handleRemove(label)}
