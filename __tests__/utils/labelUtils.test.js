@@ -3,7 +3,6 @@ import {
   LABEL_JOIN,
   MAX_LABELS,
   MAX_LABEL_LENGTH,
-  isSystemDescription,
   normalizeLabel,
   sanitizeLabel,
   parseLabels,
@@ -83,17 +82,6 @@ describe('labelUtils', () => {
     });
   });
 
-  describe('isSystemDescription', () => {
-    it('detects the MoneyOK marker', () => {
-      expect(isSystemDescription('[MoneyOK] adjustment')).toBe(true);
-    });
-    it('is false for normal text and non-strings', () => {
-      expect(isSystemDescription('work')).toBe(false);
-      expect(isSystemDescription(null)).toBe(false);
-      expect(isSystemDescription(123)).toBe(false);
-    });
-  });
-
   describe('parseLabels', () => {
     it('splits on the delimiter and trims', () => {
       expect(parseLabels('work | food | lunch')).toEqual(['work', 'food', 'lunch']);
@@ -118,8 +106,8 @@ describe('labelUtils', () => {
       expect(parseLabels('Work | work | WORK | food')).toEqual(['Work', 'food']);
     });
 
-    it('returns [] for system/shadow descriptions', () => {
-      expect(parseLabels('[MoneyOK] balance adjustment')).toEqual([]);
+    it('treats legacy [MoneyOK] segments as ordinary labels', () => {
+      expect(parseLabels('[MoneyOK] | groceries | food')).toEqual(['[MoneyOK]', 'groceries', 'food']);
     });
 
     it('caps at MAX_LABELS', () => {
@@ -217,7 +205,10 @@ describe('labelUtils', () => {
     });
     it('does not match an operation with no labels against a non-empty filter', () => {
       expect(matchesAllLabels('', ['work'])).toBe(false);
-      expect(matchesAllLabels('[MoneyOK] adj', ['work'])).toBe(false);
+    });
+    it('matches a legacy [MoneyOK] segment as a filterable label', () => {
+      expect(matchesAllLabels('[MoneyOK] | groceries', ['[MoneyOK]'])).toBe(true);
+      expect(matchesAllLabels('[MoneyOK] | groceries', ['groceries'])).toBe(true);
     });
   });
 });

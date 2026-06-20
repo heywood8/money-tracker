@@ -1997,7 +1997,7 @@ export const getDistinctLabels = async (limit = 50, categoryId = null) => {
     const rows = await queryAll(
       `SELECT description, category_id, COUNT(*) AS cnt
        FROM operations
-       WHERE description IS NOT NULL AND description != '' AND description NOT LIKE '[MoneyOK]%'
+       WHERE description IS NOT NULL AND description != ''
        GROUP BY description, category_id
        ORDER BY cnt DESC
        LIMIT ${SCAN_GROUP_LIMIT}`,

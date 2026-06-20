@@ -4,7 +4,7 @@ import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
-import { parseLabels, isSystemDescription } from '../../utils/labelUtils';
+import { parseLabels } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
@@ -58,11 +58,10 @@ const OperationListItem = ({
   const accountName = getAccountName(operation.accountId);
 
   // The description column holds a delimited list of labels (see labelUtils).
-  // Shadow/system descriptions are not user labels and are never shown as chips.
-  // Memoised so the regex parse only re-runs when the description string changes,
+  // Memoised so the parse only re-runs when the description string changes,
   // not on every re-render of this memoised row (scroll, theme, selection, …).
   const labels = useMemo(
-    () => (isSystemDescription(operation.description) ? [] : parseLabels(operation.description)),
+    () => parseLabels(operation.description),
     [operation.description],
   );
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
@@ -116,32 +115,34 @@ const OperationListItem = ({
 
           {/* Text */}
           <View style={styles.textContainer}>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {title}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                {title}
+              </Text>
+              {visibleLabels.length > 0 && (
+                <View style={styles.labelRow}>
+                  {visibleLabels.map((label) => (
+                    <View
+                      key={label}
+                      style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+                      testID={`op-label-${label}`}
+                    >
+                      <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                  {overflowCount > 0 && (
+                    <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+                      <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
             <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
               {subtitle}
             </Text>
-            {visibleLabels.length > 0 && (
-              <View style={styles.labelRow}>
-                {visibleLabels.map((label) => (
-                  <View
-                    key={label}
-                    style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
-                    testID={`op-label-${label}`}
-                  >
-                    <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
-                      {label}
-                    </Text>
-                  </View>
-                ))}
-                {overflowCount > 0 && (
-                  <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
-                    <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
-                  </View>
-                )}
-              </View>
-            )}
           </View>
 
           {/* Amount */}
@@ -254,10 +255,11 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   labelRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexShrink: 1,
     gap: SPACING.xs,
-    marginTop: 4,
+    marginLeft: SPACING.sm,
   },
   row: {
     alignItems: 'center',
@@ -281,9 +283,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   title: {
+    flexShrink: 1,
     fontSize: FONT_SIZE.md + 1,
     fontWeight: FONT_WEIGHT.medium,
     includeFontPadding: false,
+  },
+  titleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
 });
 
