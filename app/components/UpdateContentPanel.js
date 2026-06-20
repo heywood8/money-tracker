@@ -110,6 +110,15 @@ const WARNING_AMBER = '#f0a500';
 
 function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!buildProgress) return undefined;
+    const loop = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => { loop.stop(); spinAnim.setValue(0); };
+  }, [buildProgress, spinAnim]);
   // We highlight a single card: the candidate for installation when an update is available,
   // otherwise the installed-and-latest card when we are already up to date. The candidate
   // takes the primary accent; the up-to-date installed card keeps the green "latest" accent.
@@ -143,7 +152,9 @@ function ReleaseCard({ version, notes, badge, buildProgress, matchedApk, repoBas
               accessibilityRole="text"
               accessibilityLabel={(t('build_in_progress') || 'Building {percent}%').replace('{percent}', String(buildProgress.percent))}
             >
-              <Ionicons name="sync-outline" size={13} color={colors.primary} />
+              <Animated.View style={{ transform: [{ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+                <Ionicons name="sync-outline" size={13} color={colors.primary} />
+              </Animated.View>
               <Text style={[styles.buildProgressText, { color: colors.primary }]}>
                 {(t('build_in_progress') || 'Building {percent}%').replace('{percent}', String(buildProgress.percent))}
               </Text>
