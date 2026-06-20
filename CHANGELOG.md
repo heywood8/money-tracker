@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.148.0](https://github.com/heywood8/money-tracker/compare/penny-v0.147.0...penny-v0.148.0) (2026-06-20)
+
+
+### Features
+
+* open SQLite backup files with the app to start import ([#1040](https://github.com/heywood8/money-tracker/issues/1040)) ([b76f818](https://github.com/heywood8/money-tracker/commit/b76f8189a1603df8fe98787a3081cdb83de91cce))
+
+
+### Bug Fixes
+
+* detect truncated cached APK without a checksum before offering install ([#1038](https://github.com/heywood8/money-tracker/issues/1038)) ([6f8dae4](https://github.com/heywood8/money-tracker/commit/6f8dae419f9aa87623029c3c87fe095e4dd30e47))
+* show bottom gradient fade over Settings subpanels ([#1042](https://github.com/heywood8/money-tracker/issues/1042)) ([204c24e](https://github.com/heywood8/money-tracker/commit/204c24ec0dc9895c87f61c2a0c5ed218981352bc))
+
 ## [0.147.0](https://github.com/heywood8/money-tracker/compare/penny-v0.146.0...penny-v0.147.0) (2026-06-20)
 
 
