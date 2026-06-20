@@ -7,6 +7,7 @@ import {
   cleanupOldApks,
   checkAlreadyDownloaded,
   verifyCachedApk,
+  verifyApkStructure,
   sanitizeFilename,
   fetchExpectedChecksum,
   computeSha256,
@@ -756,6 +757,15 @@ describe('AppUpdateService', () => {
     // 'aGVsbG8=' = base64("hello"); SHA-256("hello") is this known constant
     const HELLO_B64 = 'aGVsbG8=';
     const HELLO_SHA = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+    // Base64 of the ZIP signatures used by the structural integrity fallback.
+    const APK_HEAD_B64 = 'UEsDBA=='; // PK\x03\x04 — local file header
+    const APK_EOCD_B64 = 'UEsFBg=='; // PK\x05\x06 — End Of Central Directory record
+    // Make the structural check (head read, then tail read) see a complete archive.
+    const mockIntactApkStructure = () => {
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce(APK_EOCD_B64);
+    };
 
     it('reports exists:false when no cached APK is present', async () => {
       FileSystem.getInfoAsync.mockResolvedValue({ exists: false, size: 0 });
@@ -769,13 +779,32 @@ describe('AppUpdateService', () => {
       expect(result).toEqual({ exists: false });
     });
 
-    it('returns verified:false when no checksum URL is provided', async () => {
+    it('returns verified:false when no checksum URL is provided and the file is structurally intact', async () => {
       FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      mockIntactApkStructure();
 
       const result = await verifyCachedApk(URL, { cacheDir: 'file:///cache/' });
 
       expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: false });
-      expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    });
+
+    it('deletes the file and reports corrupted when no checksum and the file is structurally truncated', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.deleteAsync.mockResolvedValue();
+      // Valid header but the tail has no End Of Central Directory record (truncated download).
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce('AAAAAAAA'); // decodes to zero bytes — no EOCD signature
+
+      const result = await verifyCachedApk(URL, { cacheDir: 'file:///cache/' });
+
+      expect(result).toEqual({ exists: false, corrupted: true });
+      expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+        'file:///cache/penny-v1.0.0.apk',
+        { idempotent: true },
+      );
     });
 
     it('returns verified:true when the cached APK matches the checksum', async () => {
@@ -819,8 +848,9 @@ describe('AppUpdateService', () => {
       );
     });
 
-    it('keeps the file (verified:false) when the checksum file cannot be fetched', async () => {
+    it('falls back to the structural check (verified:false) when the checksum file cannot be fetched', async () => {
       FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      mockIntactApkStructure();
       const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
 
       const result = await verifyCachedApk(URL, {
@@ -831,6 +861,25 @@ describe('AppUpdateService', () => {
 
       expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: false });
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    });
+
+    it('deletes the file when the checksum is unfetchable AND the file is structurally truncated', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
+      FileSystem.deleteAsync.mockResolvedValue();
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce('AAAAAAAA'); // no EOCD
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false });
+
+      const result = await verifyCachedApk(URL, {
+        checksumUrl: 'https://example.com/penny-v1.0.0.apk.sha256',
+        cacheDir: 'file:///cache/',
+        fetchImpl,
+      });
+
+      expect(result).toEqual({ exists: false, corrupted: true });
+      expect(FileSystem.deleteAsync).toHaveBeenCalled();
     });
 
     it('keeps the file (verified:false) when hashing throws (OOM / read error)', async () => {
@@ -850,6 +899,73 @@ describe('AppUpdateService', () => {
 
       expect(result).toEqual({ exists: true, uri: 'file:///cache/penny-v1.0.0.apk', verified: false });
       expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('verifyApkStructure', () => {
+    const FILE = 'file:///cache/penny-v1.0.0.apk';
+    const APK_HEAD_B64 = 'UEsDBA=='; // PK\x03\x04
+    const APK_EOCD_B64 = 'UEsFBg=='; // PK\x05\x06
+
+    it('returns true for a complete archive (valid header + trailing EOCD)', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce(APK_EOCD_B64);
+
+      expect(await verifyApkStructure(FILE)).toBe(true);
+    });
+
+    it('reads only the head and tail, never the whole file', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce(APK_EOCD_B64);
+
+      await verifyApkStructure(FILE);
+
+      expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
+      // Head: first 4 bytes from position 0.
+      expect(FileSystem.readAsStringAsync).toHaveBeenNthCalledWith(1, FILE, {
+        encoding: 'base64', position: 0, length: 4,
+      });
+      // Tail: the last ≤64KB, never offset 0 on a large file.
+      const tailCall = FileSystem.readAsStringAsync.mock.calls[1][1];
+      expect(tailCall.length).toBe(65557);
+      expect(tailCall.position).toBe(40_000_000 - 65557);
+    });
+
+    it('returns false when the End Of Central Directory record is missing (truncated)', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.readAsStringAsync
+        .mockResolvedValueOnce(APK_HEAD_B64)
+        .mockResolvedValueOnce('AAAAAAAA'); // zero bytes, no signature
+
+      expect(await verifyApkStructure(FILE)).toBe(false);
+    });
+
+    it('returns false when the local file header magic is wrong', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.readAsStringAsync.mockResolvedValueOnce('AAAAAAAA'); // not PK\x03\x04
+
+      expect(await verifyApkStructure(FILE)).toBe(false);
+      // Bails out after the header read — never bothers reading the tail.
+      expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns false when the file is too small to be a valid archive', async () => {
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 10 });
+
+      expect(await verifyApkStructure(FILE)).toBe(false);
+      expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns true (cannot determine) when the file cannot be read', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 40_000_000 });
+      FileSystem.readAsStringAsync.mockRejectedValue(new Error('read failed'));
+
+      expect(await verifyApkStructure(FILE)).toBe(true);
     });
   });
 
