@@ -1,9 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
+import { parseLabels, isSystemDescription } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
@@ -12,6 +13,10 @@ const getForeignSymbol = (currencyCode) => {
   if (!currencyCode) return '';
   return currencies[currencyCode]?.symbol || currencyCode;
 };
+
+// Cap the chips shown per row so a heavily-labelled operation can't blow up the
+// row height; any remainder is summarised as a "+N" chip.
+const MAX_VISIBLE_LABELS = 6;
 
 const OperationListItem = ({
   operation,
@@ -52,20 +57,25 @@ const OperationListItem = ({
 
   const accountName = getAccountName(operation.accountId);
 
-  // Title: user's description if set, otherwise the category name
-  const title = (operation.description && operation.description.trim())
-    ? operation.description.trim()
-    : categoryName;
+  // The description column holds a delimited list of labels (see labelUtils).
+  // Shadow/system descriptions are not user labels and are never shown as chips.
+  // Memoised so the regex parse only re-runs when the description string changes,
+  // not on every re-render of this memoised row (scroll, theme, selection, …).
+  const labels = useMemo(
+    () => (isSystemDescription(operation.description) ? [] : parseLabels(operation.description)),
+    [operation.description],
+  );
+  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
+  const overflowCount = labels.length - visibleLabels.length;
 
-  // Subtitle: "Category · Account" when description is the title, else "ParentCat · Account"
+  // Title is always the category name (or "Transfer"); labels render as chips below.
+  const title = categoryName;
+
+  // Subtitle: account context. Labels carry the per-operation detail now.
   let subtitle;
   if (isTransfer) {
     const toAccountName = getAccountName(operation.toAccountId);
     subtitle = `${accountName} → ${toAccountName}`;
-  } else if (operation.description && operation.description.trim()) {
-    subtitle = parentName
-      ? `${parentName} / ${categoryName} · ${accountName}`
-      : `${categoryName} · ${accountName}`;
   } else if (parentName) {
     subtitle = `${parentName} · ${accountName}`;
   } else {
@@ -84,8 +94,8 @@ const OperationListItem = ({
   // Build accessibility label
   const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
   let accessibilityLabel = `${typeLabel}, ${title}, ${displayAmount}`;
-  if (operation.description) {
-    accessibilityLabel += `, note: ${operation.description}`;
+  if (labels.length > 0) {
+    accessibilityLabel += `, ${t('labels')}: ${labels.join(', ')}`;
   }
 
   return (
@@ -112,6 +122,26 @@ const OperationListItem = ({
             <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
               {subtitle}
             </Text>
+            {visibleLabels.length > 0 && (
+              <View style={styles.labelRow}>
+                {visibleLabels.map((label) => (
+                  <View
+                    key={label}
+                    style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}
+                    testID={`op-label-${label}`}
+                  >
+                    <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  </View>
+                ))}
+                {overflowCount > 0 && (
+                  <View style={[styles.labelChip, { backgroundColor: colors.altRow, borderColor: colors.border }]}>
+                    <Text style={[styles.labelChipText, { color: colors.mutedText }]}>{`+${overflowCount}`}</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Amount */}
@@ -211,6 +241,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SPACING.md,
     width: 32,
+  },
+  labelChip: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 1,
+  },
+  labelChipText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.medium,
+    maxWidth: 140,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginTop: 4,
   },
   row: {
     alignItems: 'center',

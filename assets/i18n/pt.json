@@ -432,5 +432,7 @@
   "loading_accounts": "Carregando contas...",
   "loading_categories": "Carregando categorias...",
   "none": "Nenhum",
-  "update_download_failed": "Não foi possível baixar a atualização. Tente novamente."
+  "update_download_failed": "Não foi possível baixar a atualização. Tente novamente.",
+  "labels": "Etiquetas",
+  "add_label_placeholder": "Adicionar etiqueta…"
 }

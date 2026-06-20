@@ -13,7 +13,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import { formatDate as toDateString } from '../services/BalanceHistoryDB';
-import { getDistinctDescriptions } from '../services/OperationsDB';
+import { getDistinctLabels } from '../services/OperationsDB';
+import { parseLabels, serializeLabels, addLabel, hasLabel } from '../utils/labelUtils';
 import OperationModal from '../modals/OperationModal';
 import Calculator from '../components/Calculator';
 import ListCard from '../components/ListCard';
@@ -69,6 +70,10 @@ const OperationsScreen = () => {
   const [pendingScroll, setPendingScroll] = useState(false);
   const [pendingSuggestionId, setPendingSuggestionId] = useState(null);
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  // Latest known description for the operation the suggestion row targets. Kept in
+  // a ref so applying a label does not depend on the freshly-created operation
+  // having already been re-loaded into `operations` (which is async).
+  const pendingOpDescRef = useRef('');
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
   const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(0);
   const [flashCategoryErrorCount, setFlashCategoryErrorCount] = useState(0);
@@ -533,18 +538,22 @@ const OperationsScreen = () => {
 
       Keyboard.dismiss();
 
-      // Check for matching description suggestions for this category
+      // Offer quick label tagging for the freshly-created operation. Suggestions are
+      // distinct labels (category-first), minus any already present on the operation.
       const effectiveCategoryId = operationData.categoryId;
-      if (effectiveCategoryId && createdOperation?.id) {
-        const suggestions = await getDistinctDescriptions(8, effectiveCategoryId);
-        if (suggestions.length > 0) {
+      if (createdOperation?.id) {
+        const suggestions = await getDistinctLabels(8, effectiveCategoryId || null);
+        const existing = parseLabels(createdOperation.description);
+        const filtered = suggestions.filter(label => !hasLabel(existing, label));
+        if (filtered.length > 0) {
+          pendingOpDescRef.current = createdOperation.description || '';
           setPendingSuggestionId(createdOperation.id);
-          setPendingSuggestions(suggestions);
+          setPendingSuggestions(filtered);
         }
       }
     } catch (error) {
       // Errors from addOperation are already shown via dialog.
-      // Errors from getDistinctDescriptions are non-critical — suggestion row simply won't appear.
+      // Errors from getDistinctLabels are non-critical — suggestion row simply won't appear.
     }
   }, [quickAddValues, validateOperation, addOperation, t, showDialog, accounts, resetForm]);
 
@@ -567,15 +576,32 @@ const OperationsScreen = () => {
     await handleQuickAdd(undefined, toAccountId);
   }, [resetForm, closePicker, handleQuickAdd]);
 
-  const handleApplySuggestion = useCallback(async (description) => {
+  // Apply a suggested label by APPENDING it to the operation's existing labels.
+  // The row stays open so the user can add several labels in a row; the applied
+  // chip is removed from the suggestion list, and the row auto-dismisses once no
+  // suggestions remain.
+  const handleApplySuggestion = useCallback(async (label) => {
     if (!pendingSuggestionId) return;
     const idToUpdate = pendingSuggestionId;
-    // Clear state optimistically before the await — if updateOperation fails,
-    // the dialog from OperationsActionsContext will show the error, but the
-    // suggestion row stays dismissed (intentional: avoids a broken retry loop).
-    setPendingSuggestionId(null);
-    setPendingSuggestions([]);
-    await updateOperation(idToUpdate, { description });
+
+    // Append against the latest known description from the ref rather than looking
+    // the operation up in `operations` — the freshly-created op may not have been
+    // re-loaded into that list yet, which previously made the first tap a no-op.
+    const merged = serializeLabels(addLabel(parseLabels(pendingOpDescRef.current), label));
+    pendingOpDescRef.current = merged;
+
+    // Remove the chip optimistically before the await. If updateOperation fails,
+    // its error surfaces via the dialog in OperationsActionsContext; the chip stays
+    // dismissed rather than re-appearing, which avoids a confusing retry loop.
+    setPendingSuggestions((prev) => {
+      const remaining = prev.filter(l => l.toLowerCase() !== label.toLowerCase());
+      if (remaining.length === 0) {
+        setPendingSuggestionId(null);
+      }
+      return remaining;
+    });
+
+    await updateOperation(idToUpdate, { description: merged });
   }, [pendingSuggestionId, updateOperation]);
 
   const handleDismissSuggestion = useCallback(() => {
@@ -583,14 +609,24 @@ const OperationsScreen = () => {
     setPendingSuggestions([]);
   }, []);
 
-  // Auto-dismiss suggestion if the pending operation gets a description (e.g. via edit modal)
+  // Keep the suggestion row in sync with the operation's current labels. When the
+  // op is (re)loaded, refresh the ref and drop any suggestions already applied —
+  // whether via this row or the edit modal — so the row reflects reality and
+  // auto-dismisses once nothing is left to add. We intentionally do NOT clear the
+  // row merely because the op is absent: right after creation it may not be in
+  // `operations` yet, and clearing then would hide the row before the user sees it.
   useEffect(() => {
     if (!pendingSuggestionId) return;
     const op = operations.find(o => o.id === pendingSuggestionId);
-    if (op?.description) {
-      setPendingSuggestionId(null);
-      setPendingSuggestions([]);
-    }
+    if (!op) return;
+    pendingOpDescRef.current = op.description || '';
+    const opLabels = parseLabels(op.description);
+    setPendingSuggestions((prev) => {
+      const remaining = prev.filter(s => !hasLabel(opLabels, s));
+      if (remaining.length === prev.length) return prev;
+      if (remaining.length === 0) setPendingSuggestionId(null);
+      return remaining;
+    });
   }, [operations, pendingSuggestionId]);
 
   const TYPES = useMemo(() => [
@@ -658,6 +694,7 @@ const OperationsScreen = () => {
       amountRange: { amountRange: { min: null, max: null } },
       accountIds: { accountIds: [] },
       categoryIds: { categoryIds: [] },
+      labels: { labels: [] },
     };
     updateSearchFilters(clearValues[groupKey]);
   }, [updateSearchFilters]);
@@ -668,6 +705,7 @@ const OperationsScreen = () => {
         (searchState?.types?.length > 0) ||
         (searchState?.accountIds?.length > 0) ||
         (searchState?.categoryIds?.length > 0) ||
+        (searchState?.labels?.length > 0) ||
         !!searchState?.dateRange?.startDate ||
         !!searchState?.dateRange?.endDate ||
         (searchState?.amountRange?.min !== null && searchState?.amountRange?.min !== undefined) ||

@@ -20,7 +20,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import OperationModal from '../../app/modals/OperationModal';
-import DescriptionAutocomplete from '../../app/components/DescriptionAutocomplete';
 
 // Mock dependencies
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
@@ -345,8 +344,8 @@ describe('OperationModal', () => {
     });
   });
 
-  describe('Description Field', () => {
-    it('shows description field only in edit mode', async () => {
+  describe('Labels Field', () => {
+    it('renders existing labels as chips when editing', async () => {
       const useOperationForm = require('../../app/hooks/useOperationForm');
       useOperationForm.mockReturnValue({
         ...useOperationForm(),
@@ -356,7 +355,7 @@ describe('OperationModal', () => {
           accountId: 'acc1',
           categoryId: 'cat2',
           date: '2024-01-15',
-          description: 'Test description',
+          description: 'work | food',
         },
       });
 
@@ -367,10 +366,10 @@ describe('OperationModal', () => {
         accountId: 'acc1',
         categoryId: 'cat2',
         date: '2024-01-15',
-        description: 'Test description',
+        description: 'work | food',
       };
 
-      const { getByDisplayValue } = await render(
+      const { getByText } = await render(
         <OperationModal
           visible={true}
           onClose={mockOnClose}
@@ -379,16 +378,18 @@ describe('OperationModal', () => {
         />,
       );
 
-      expect(getByDisplayValue('Test description')).toBeTruthy();
+      // Labels render as removable chips inside the LabelInput
+      expect(getByText('work')).toBeTruthy();
+      expect(getByText('food')).toBeTruthy();
     });
 
-    it('shows description field for new operations', async () => {
+    it('shows the label editor for new operations', async () => {
       const { queryByPlaceholderText } = await render(
         <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
       );
 
-      // Description autocomplete is shown for both new and existing operations
-      expect(queryByPlaceholderText('description')).toBeTruthy();
+      // The label editor is shown for both new and existing operations
+      expect(queryByPlaceholderText('add_label_placeholder')).toBeTruthy();
     });
   });
 
@@ -1580,8 +1581,8 @@ describe('OperationModal', () => {
     });
   });
 
-  describe('Description field keyboard integration', () => {
-    it('passes an onFocus function prop to DescriptionAutocomplete when editing', async () => {
+  describe('Label editor keyboard integration', () => {
+    it('passes an onFocus function prop to the label editor when editing', async () => {
       const { getByTestId } = await render(
         <OperationModal
           visible={true}
@@ -1598,10 +1599,10 @@ describe('OperationModal', () => {
           }}
         />,
       );
-      // DescriptionAutocomplete renders a TextInput with testID="description-input";
+      // LabelInput renders a TextInput with testID="label-input-field";
       // verify it has an onFocus handler (forwarded from OperationModal's handleDescriptionFocus)
-      const descInput = getByTestId('description-input');
-      expect(typeof descInput.props.onFocus).toBe('function');
+      const labelInput = getByTestId('label-input-field');
+      expect(typeof labelInput.props.onFocus).toBe('function');
     });
   });
 });

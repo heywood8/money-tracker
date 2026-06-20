@@ -432,5 +432,7 @@
   "loading_accounts": "Caricamento conti...",
   "loading_categories": "Caricamento categorie...",
   "none": "Nessuno",
-  "update_download_failed": "Impossibile scaricare l'aggiornamento. Riprova."
+  "update_download_failed": "Impossibile scaricare l'aggiornamento. Riprova.",
+  "labels": "Etichette",
+  "add_label_placeholder": "Aggiungi etichetta…"
 }

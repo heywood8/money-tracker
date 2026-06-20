@@ -355,8 +355,10 @@ const useOperationForm = ({
   }, [values, accounts, t]);
 
   // Prepare operation data with currency information for saving
-  const prepareOperationData = useCallback((customAmount = null) => {
-    const data = { ...values };
+  const prepareOperationData = useCallback((customAmount = null, overrides = {}) => {
+    // `overrides` carries values committed synchronously at save time that may not
+    // yet be reflected in `values` (e.g. a half-typed label flushed from LabelInput).
+    const data = { ...values, ...overrides };
 
     // Override amount if provided (used when evaluating expressions)
     if (customAmount !== null) {
@@ -453,7 +455,10 @@ const useOperationForm = ({
   }, [values, isMultiCurrencyTransfer, isForeignCurrencyOp, sourceAccount, destinationAccount, isNew, operation, lastEditedField]);
 
   // Save operation (add or update)
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (overrides = {}) => {
+    // `overrides` lets the caller inject values committed synchronously at save
+    // time (e.g. a half-typed label flushed from LabelInput) that the async
+    // setValues from onChangeText would not yet have applied to `values`.
     // Automatically evaluate any pending math operation before saving
     let finalAmount = values.amount;
     if (hasOperation(values.amount)) {
@@ -464,7 +469,7 @@ const useOperationForm = ({
     }
 
     // Create updated values with evaluated amount for validation
-    const valuesToValidate = { ...values, amount: finalAmount };
+    const valuesToValidate = { ...values, amount: finalAmount, ...overrides };
 
     if (!validateFields(valuesToValidate)) {
       // Show a dialog with the validation error
@@ -479,7 +484,7 @@ const useOperationForm = ({
     setValues(v => ({ ...v, amount: finalAmount }));
 
     // Pass the evaluated amount to prepareOperationData
-    const operationData = prepareOperationData(finalAmount);
+    const operationData = prepareOperationData(finalAmount, overrides);
 
     if (isNew) {
       await addOperation(operationData);

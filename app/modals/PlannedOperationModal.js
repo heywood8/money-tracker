@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import useOperationPicker from '../hooks/useOperationPicker';
 import PickerModal from '../components/operations/PickerModal';
+import LabelInput from '../components/operations/LabelInput';
+import { getDistinctLabels } from '../services/OperationsDB';
 import ModalShell from '../components/ModalShell';
 import { makeModalStyles, modalSharedStyles } from '../styles/modalStyles';
 import { SPACING, BORDER_RADIUS, FONT_SIZE } from '../styles/designTokens';
@@ -53,6 +55,18 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
   const [errors, setErrors] = useState({});
   const [accountPickerVisible, setAccountPickerVisible] = useState(false);
   const [toAccountPickerVisible, setToAccountPickerVisible] = useState(false);
+  const [labelSuggestions, setLabelSuggestions] = useState([]);
+  const labelInputRef = useRef(null);
+
+  // Distinct labels for autocomplete in the label editor (category-first).
+  useEffect(() => {
+    if (!visible) return undefined;
+    let cancelled = false;
+    getDistinctLabels(50, values.categoryId || null)
+      .then(labels => { if (!cancelled) setLabelSuggestions(labels); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible, values.categoryId]);
 
   // Hierarchical category picker via useOperationPicker
   const {
@@ -140,6 +154,10 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
     Keyboard.dismiss();
     if (!validateForm()) return;
 
+    // Flush any half-typed label so it isn't lost when saving without committing it.
+    const flushedDescription = labelInputRef.current?.flush();
+    const description = flushedDescription != null ? flushedDescription : values.description;
+
     try {
       const data = {
         name: values.name.trim(),
@@ -148,7 +166,7 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
         accountId: values.accountId,
         categoryId: values.type === 'transfer' ? null : values.categoryId,
         toAccountId: values.type === 'transfer' ? values.toAccountId : null,
-        description: values.description.trim() || null,
+        description: description.trim() || null,
         isRecurring: values.isRecurring,
       };
 
@@ -383,19 +401,18 @@ export default function PlannedOperationModal({ visible, onClose, plannedOperati
           />
         </View>
 
-        {/* Description */}
+        {/* Labels (stored in the description field) */}
         <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
-          {(t('description') || 'Description').toUpperCase()}
+          {(t('labels') || 'Labels').toUpperCase()}
         </Text>
-        <PaperTextInput
-          mode="outlined"
-          multiline
-          numberOfLines={2}
+        <LabelInput
+          ref={labelInputRef}
           value={values.description}
           onChangeText={text => setValues(v => ({ ...v, description: text }))}
-          placeholder={t('description')}
-          theme={paperInputTheme}
-          style={modalSharedStyles.textInput}
+          suggestions={labelSuggestions}
+          placeholder={t('add_label_placeholder')}
+          colors={colors}
+          t={t}
         />
       </ModalShell>
 

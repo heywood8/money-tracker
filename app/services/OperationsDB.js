@@ -1,5 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from './db';
 import { normalizeSearchText } from './searchNormalize';
+import { parseLabels } from '../utils/labelUtils';
 
 // Returns 'SEARCH_NORM' when the custom function was registered successfully (full
 // Cyrillic case-folding + ё/е equivalence), otherwise falls back to SQLite's built-in
@@ -1971,6 +1972,67 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
     return (results || []).map(row => row.description);
   } catch (error) {
     console.error('Failed to get distinct descriptions:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get distinct labels across all operations, ordered by usage frequency.
+ * Labels are parsed out of the description column (see labelUtils). When a
+ * categoryId is provided, labels that have been used in that category are
+ * surfaced first, mirroring getDistinctDescriptions' category-aware ordering.
+ * Used for label autocomplete in the operation form and for the label filter UI.
+ * @param {number} limit - Maximum number of labels to return
+ * @param {string|null} categoryId - If provided, labels used in this category appear first
+ * @returns {Promise<string[]>} Array of label strings
+ */
+export const getDistinctLabels = async (limit = 50, categoryId = null) => {
+  try {
+    // Bound the work: take the most-used distinct (description, category) groups
+    // rather than scanning and parsing the entire history in JS on every modal/
+    // overlay open. The cap is well above any realistic distinct-description count
+    // for personal use, and ordering by frequency keeps the labels users actually
+    // care about (the most common ones) within the window.
+    const SCAN_GROUP_LIMIT = 2000;
+    const rows = await queryAll(
+      `SELECT description, category_id, COUNT(*) AS cnt
+       FROM operations
+       WHERE description IS NOT NULL AND description != '' AND description NOT LIKE '[MoneyOK]%'
+       GROUP BY description, category_id
+       ORDER BY cnt DESC
+       LIMIT ${SCAN_GROUP_LIMIT}`,
+    );
+
+    // Aggregate per-label frequency (summed across descriptions) and whether the
+    // label has ever been used in the requested category.
+    const byLabel = new Map(); // lowercased label -> { label, count, inCategory }
+    for (const row of (rows || [])) {
+      const labels = parseLabels(row.description);
+      for (const label of labels) {
+        const key = label.toLowerCase();
+        let entry = byLabel.get(key);
+        if (!entry) {
+          entry = { label, count: 0, inCategory: false };
+          byLabel.set(key, entry);
+        }
+        entry.count += Number(row.cnt) || 0;
+        if (categoryId != null && String(row.category_id) === String(categoryId)) {
+          entry.inCategory = true;
+        }
+      }
+    }
+
+    const sorted = Array.from(byLabel.values()).sort((a, b) => {
+      if (categoryId != null && a.inCategory !== b.inCategory) {
+        return a.inCategory ? -1 : 1;
+      }
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+
+    return sorted.slice(0, limit).map(entry => entry.label);
+  } catch (error) {
+    console.error('Failed to get distinct labels:', error);
     throw error;
   }
 };

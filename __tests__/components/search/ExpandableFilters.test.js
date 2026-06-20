@@ -99,8 +99,39 @@ describe('ExpandableFilters', () => {
       types: [],
       accountIds: [],
       categoryIds: [],
+      labels: [],
       dateRange: { startDate: null, endDate: null },
       amountRange: { min: null, max: null },
+    });
+  });
+
+  describe('Labels filter', () => {
+    it('renders a chip for a selected label even when it is absent from availableLabels', async () => {
+      // e.g. the only operation carrying "Coffee" was deleted, so getDistinctLabels
+      // no longer returns it — the chip must still appear so it can be toggled off.
+      const { getByTestId } = await render(
+        <ExpandableFilters
+          {...defaultProps}
+          availableLabels={['Food']}
+          filters={{ ...defaultFilters, labels: ['Coffee'] }}
+        />,
+      );
+      expect(getByTestId('filter-label-Coffee')).toBeTruthy();
+      expect(getByTestId('filter-label-Food')).toBeTruthy();
+    });
+
+    it('toggles a selected label off case-insensitively', async () => {
+      const { getByTestId } = await render(
+        <ExpandableFilters
+          {...defaultProps}
+          availableLabels={['coffee']}
+          filters={{ ...defaultFilters, labels: ['Coffee'] }}
+        />,
+      );
+      // The shown chip keeps the selected casing ("Coffee"); pressing it should
+      // DESELECT the already-selected label case-insensitively, not add a duplicate.
+      await fireEvent.press(getByTestId('filter-label-Coffee'));
+      expect(defaultProps.onFilterChange).toHaveBeenCalledWith({ labels: [] });
     });
   });
 

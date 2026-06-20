@@ -16,6 +16,7 @@ const mockColors = {
   border: '#333',
   primary: '#4C9EFF',
   surface: '#1e1e1e',
+  altRow: '#222',
   expense: '#ff6b6b',
   income: '#4caf50',
   transfer: '#aaa',
@@ -132,7 +133,7 @@ describe('OperationListItem', () => {
   });
 
   describe('List Item Rendering', () => {
-    it('renders operation title and subtitle', async () => {
+    it('renders category as title, account as subtitle, and the note as a label chip', async () => {
       const { getByText } = await render(
         <OperationListItem
           {...baseProps}
@@ -142,8 +143,39 @@ describe('OperationListItem', () => {
           }}
         />,
       );
+      // Title is the category; the description value renders as a label chip.
+      expect(getByText('Transport')).toBeTruthy();
       expect(getByText('Bus ticket')).toBeTruthy();
-      expect(getByText(/Transport · Checking/)).toBeTruthy();
+      expect(getByText('Checking')).toBeTruthy();
+    });
+
+    it('renders multiple labels parsed from the delimited description', async () => {
+      const { getByText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            description: 'work | food | lunch',
+          }}
+        />,
+      );
+      expect(getByText('work')).toBeTruthy();
+      expect(getByText('food')).toBeTruthy();
+      expect(getByText('lunch')).toBeTruthy();
+    });
+
+    it('summarises overflow labels as +N', async () => {
+      const { getByText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            description: 'a | b | c | d | e | f | g | h',
+          }}
+        />,
+      );
+      // MAX_VISIBLE_LABELS = 6, so 8 labels -> "+2"
+      expect(getByText('+2')).toBeTruthy();
     });
 
     it('renders amount with correct color for expense', async () => {
@@ -200,8 +232,9 @@ describe('OperationListItem', () => {
           }}
         />,
       );
-      // Exact format depends on translation keys, but should contain key info
-      expect(getByLabelText(/Coffee.*12\.00/)).toBeTruthy();
+      // Exact format depends on translation keys, but should contain key info.
+      // Labels are appended after the amount in the a11y label.
+      expect(getByLabelText(/12\.00.*Coffee/)).toBeTruthy();
     });
 
     it('has accessibility hint', async () => {
@@ -392,7 +425,7 @@ describe('OperationListItem', () => {
       expect(getByText(/Food · Checking/)).toBeTruthy();
     });
 
-    it('shows parentName / categoryName · accountName subtitle when description set and category has parent', async () => {
+    it('shows parentName · accountName subtitle and the note as a label when category has parent', async () => {
       const categoriesWithParent = [
         { id: 'parent1', name: 'Food', icon: 'food', parentId: null },
         { id: 'cat2', name: 'Groceries', icon: 'cart', parentId: 'parent1' },
@@ -405,8 +438,10 @@ describe('OperationListItem', () => {
           getCategoryInfo={() => ({ name: 'Groceries', icon: 'cart' })}
         />,
       );
-      // title = description, subtitle = "Food / Groceries · Checking"
-      expect(getByText(/Food \/ Groceries · Checking/)).toBeTruthy();
+      // title = "Groceries" (category), subtitle = "Food · Checking", label chip = "Weekly shop"
+      expect(getByText('Groceries')).toBeTruthy();
+      expect(getByText(/Food · Checking/)).toBeTruthy();
+      expect(getByText('Weekly shop')).toBeTruthy();
     });
   });
 });

@@ -121,6 +121,7 @@ describe('Operations Filtering Integration', () => {
           types: [],
           accountIds: [],
           categoryIds: [],
+          labels: [],
           searchText: '',
           dateRange: { startDate: null, endDate: null },
           amountRange: { min: null, max: null },
@@ -134,6 +135,7 @@ describe('Operations Filtering Integration', () => {
         types: ['expense'],
         accountIds: ['acc1'],
         categoryIds: [],
+        labels: [],
         searchText: '',
         dateRange: { startDate: null, endDate: null },
         amountRange: { min: null, max: null },
@@ -255,6 +257,38 @@ describe('Operations Filtering Integration', () => {
       await waitFor(() => {
         expect(OperationsDB.getFilteredOperationsAllDates).toHaveBeenCalled();
         expect(result.current.operations).toEqual(filteredOps);
+      });
+    });
+
+    it('narrows operations by label filter (in-memory, AND semantics)', async () => {
+      const { result } = await renderHook(() => useOperations(), {
+        wrapper: OperationsProvider,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // A label filter is "active", so the all-dates query runs; the in-memory
+      // label filter then narrows the loaded set down to matching operations.
+      OperationsDB.getFilteredOperationsAllDates.mockResolvedValue(mockOperations);
+
+      await act(async () => {
+        await result.current.updateFilters({
+          types: [],
+          accountIds: [],
+          categoryIds: [],
+          labels: ['groceries'],
+          searchText: '',
+          dateRange: { startDate: null, endDate: null },
+          amountRange: { min: null, max: null },
+        });
+      });
+
+      await waitFor(() => {
+        // Only op1 ("Groceries") carries the label; case-insensitive match.
+        expect(result.current.operations).toHaveLength(1);
+        expect(result.current.operations[0].id).toBe('op1');
       });
     });
 
@@ -426,6 +460,7 @@ describe('Operations Filtering Integration', () => {
         types: ['expense'],
         accountIds: ['acc1'],
         categoryIds: [],
+        labels: [],
         searchText: 'test',
         dateRange: { startDate: null, endDate: null },
         amountRange: { min: null, max: null },

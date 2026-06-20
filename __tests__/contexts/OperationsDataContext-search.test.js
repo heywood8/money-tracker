@@ -166,6 +166,7 @@ describe('OperationsDataContext - Search API', () => {
         types: [],
         accountIds: [],
         categoryIds: [],
+        labels: [],
         dateRange: { startDate: null, endDate: null },
         amountRange: { min: null, max: null },
       });
@@ -245,6 +246,7 @@ describe('OperationsDataContext - Search API', () => {
         types: [],
         accountIds: [],
         categoryIds: [],
+        labels: [],
         dateRange: { startDate: null, endDate: null },
         amountRange: { min: null, max: null },
       });
