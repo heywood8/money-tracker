@@ -26,10 +26,15 @@ export const MAX_LABEL_LENGTH = 60;
 // Prefixes that mark a label as imported metadata (e.g. from a MoneyOK export).
 // These clutter the operation list, so they are hidden there while still shown
 // when the operation is opened for editing. Matching is case-insensitive.
-export const SYSTEM_LABEL_PREFIXES = ['Account:', 'Category:', 'Category group:'];
+export const SYSTEM_LABEL_PREFIXES = ['Account:', 'Category:', 'Category group:', 'Date:', 'Amount:'];
 
 // Marker tag identifying an operation imported from MoneyOK.
 export const MONEYOK_LABEL = '[MoneyOK]';
+
+// Imported "Note:" labels carry free-text the user wrote in the source app. The
+// "Note:" prefix is just an import artefact, so it is stripped for display while
+// the underlying label value is left untouched.
+export const NOTE_LABEL_PREFIX = 'Note:';
 
 /**
  * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
@@ -82,6 +87,21 @@ export const parseLabels = (description) => {
     if (result.length >= MAX_LABELS) break;
   }
   return result;
+};
+
+/**
+ * Map a label to its user-facing text. Imported "Note:" labels are shown as just
+ * the free-text after the prefix (e.g. "Note: За очки" -> "За очки"); all other
+ * labels are returned unchanged. Matching is case-insensitive. Never mutates state.
+ * @param {*} label
+ * @returns {string}
+ */
+export const displayLabel = (label) => {
+  const clean = normalizeLabel(label);
+  if (clean.toLowerCase().startsWith(NOTE_LABEL_PREFIX.toLowerCase())) {
+    return clean.slice(NOTE_LABEL_PREFIX.length).trim();
+  }
+  return clean;
 };
 
 /**

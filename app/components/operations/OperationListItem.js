@@ -4,7 +4,7 @@ import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
-import { parseLabels, visibleListLabels } from '../../utils/labelUtils';
+import { parseLabels, visibleListLabels, displayLabel } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
@@ -96,7 +96,7 @@ const OperationListItem = ({
   const typeLabel = isExpense ? t('expense_label') : isIncome ? t('income_label') : t('transfer_label');
   let accessibilityLabel = `${typeLabel}, ${title}, ${displayAmount}`;
   if (labels.length > 0) {
-    accessibilityLabel += `, ${t('labels')}: ${labels.join(', ')}`;
+    accessibilityLabel += `, ${t('labels')}: ${labels.map(displayLabel).join(', ')}`;
   }
 
   return (
@@ -128,7 +128,7 @@ const OperationListItem = ({
                   testID={`op-label-${label}`}
                 >
                   <Text style={[styles.labelChipText, { color: colors.mutedText }]} numberOfLines={1}>
-                    {label}
+                    {displayLabel(label)}
                   </Text>
                 </View>
               ))}

@@ -15,6 +15,7 @@ import {
   isHiddenLabel,
   visibleListLabels,
   isProtectedOperation,
+  displayLabel,
 } from '../../app/utils/labelUtils';
 
 describe('labelUtils', () => {
@@ -217,11 +218,14 @@ describe('labelUtils', () => {
   });
 
   describe('isSystemLabel', () => {
-    it('flags Account:/Category:/Category group: labels (case-insensitive)', () => {
+    it('flags Account:/Category:/Category group:/Date:/Amount: labels (case-insensitive)', () => {
       expect(isSystemLabel('Account: Cash')).toBe(true);
       expect(isSystemLabel('Category: Food')).toBe(true);
       expect(isSystemLabel('Category group: Expenses')).toBe(true);
+      expect(isSystemLabel('Date: 2025.11.03')).toBe(true);
+      expect(isSystemLabel('Amount: 1172300 AMD')).toBe(true);
       expect(isSystemLabel('account: cash')).toBe(true);
+      expect(isSystemLabel('  date:  2025.11.03 ')).toBe(true);
       expect(isSystemLabel('  Category group:  Income ')).toBe(true);
     });
 
@@ -230,6 +234,7 @@ describe('labelUtils', () => {
       expect(isSystemLabel('[MoneyOK]')).toBe(false);
       expect(isSystemLabel('Accountant')).toBe(false);
       expect(isSystemLabel('My Category')).toBe(false);
+      expect(isSystemLabel('Note: paid in cash')).toBe(false);
     });
 
     it('returns false for empty or non-string input', () => {
@@ -237,6 +242,26 @@ describe('labelUtils', () => {
       expect(isSystemLabel(null)).toBe(false);
       expect(isSystemLabel(undefined)).toBe(false);
       expect(isSystemLabel(42)).toBe(false);
+    });
+  });
+
+  describe('displayLabel', () => {
+    it('strips the Note: prefix and shows the free-text after it', () => {
+      expect(displayLabel('Note: Отпускные (октябрь)')).toBe('Отпускные (октябрь)');
+      expect(displayLabel('Note: За очки')).toBe('За очки');
+      expect(displayLabel('note:  paid in cash ')).toBe('paid in cash');
+    });
+
+    it('returns ordinary labels unchanged', () => {
+      expect(displayLabel('groceries')).toBe('groceries');
+      expect(displayLabel('[MoneyOK]')).toBe('[MoneyOK]');
+      expect(displayLabel('Notepad')).toBe('Notepad');
+    });
+
+    it('returns empty string for unusable input', () => {
+      expect(displayLabel('')).toBe('');
+      expect(displayLabel(null)).toBe('');
+      expect(displayLabel(undefined)).toBe('');
     });
   });
 
@@ -259,7 +284,7 @@ describe('labelUtils', () => {
 
   describe('visibleListLabels', () => {
     it('drops system labels but keeps ordinary ones and [MoneyOK]', () => {
-      const labels = parseLabels('[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses');
+      const labels = parseLabels('[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses | Date: 2025.11.03 | Amount: 1172300 AMD');
       expect(visibleListLabels(labels)).toEqual(['[MoneyOK]', 'groceries']);
     });
 
@@ -285,6 +310,8 @@ describe('labelUtils', () => {
       expect(isProtectedOperation('Account: Cash | groceries')).toBe(true);
       expect(isProtectedOperation('Category: Food')).toBe(true);
       expect(isProtectedOperation('Category group: Expenses | rent')).toBe(true);
+      expect(isProtectedOperation('Date: 2025.11.03 | salary')).toBe(true);
+      expect(isProtectedOperation('Amount: 1172300 AMD | salary')).toBe(true);
     });
 
     it('protects operations carrying the [MoneyOK] marker', () => {

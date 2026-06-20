@@ -72,7 +72,7 @@ describe('OperationsDB.getDistinctLabels', () => {
 
   it('excludes imported metadata labels and the [MoneyOK] marker from suggestions', async () => {
     queryAll.mockResolvedValue([
-      { description: '[MoneyOK] | Account: Cash | Category: Food | Category group: Expenses | groceries', category_id: 'c1', cnt: 5 },
+      { description: '[MoneyOK] | Account: Cash | Category: Food | Category group: Expenses | Date: 2025.11.03 | Amount: 1172300 AMD | groceries', category_id: 'c1', cnt: 5 },
     ]);
     const labels = await getDistinctLabels(10);
     expect(labels).toEqual(['groceries']);
