@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.144.1](https://github.com/heywood8/money-tracker/compare/penny-v0.144.0...penny-v0.144.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* place operation labels next to category name ([#1030](https://github.com/heywood8/money-tracker/issues/1030)) ([ddd9f68](https://github.com/heywood8/money-tracker/commit/ddd9f68cf78d1202c8e2868b211d7126ac8dbfe0))
+
 ## [0.144.0](https://github.com/heywood8/money-tracker/compare/penny-v0.143.0...penny-v0.144.0) (2026-06-20)
 
 
