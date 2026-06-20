@@ -108,20 +108,55 @@ const BUILD_WORKFLOW_FILE = 'build-release-apk.yml';
 // A full APK build takes ~17 minutes on the GitHub Actions runner; we treat that as 100%.
 const BUILD_DURATION_MINUTES = 17;
 
-// Queries the GitHub Actions API for the most recent in-progress run of the APK build workflow
-// and derives a rough completion percentage from how long it has been running. Used to show the
-// user that a release's APK is on its way when the tag exists but the asset is not uploaded yet.
-//
-// Returns null when there is no active run, when the API is unreachable, or when the timing data
-// is unusable — callers should treat null as "no progress information available".
-export const fetchBuildProgress = async ({
+// Tag pushes (penny-v*) drive the build workflow, so a run's head_branch is the tag that
+// triggered it. We use that — falling back to the run's display title — to tie a build run to
+// the release version whose APK it is producing.
+const versionFromRun = (run) =>
+  normalizeVersion(run?.head_branch) || normalizeVersion(run?.display_title) || null;
+
+// Derives a rough completion percentage for a single active workflow run from how long it has
+// been running. Returns null when the run has no usable start time.
+const computeRunProgress = (run, now, expectedDurationMinutes) => {
+  if (!run) {
+    return null;
+  }
+
+  const startMs = new Date(run.run_started_at || run.created_at || 0).getTime();
+  if (!Number.isFinite(startMs) || startMs <= 0) {
+    return null;
+  }
+
+  const elapsedMinutes = (now - startMs) / 60000;
+  if (elapsedMinutes < 0) {
+    return null;
+  }
+
+  // Cap below 100%: the build is by definition not finished (no APK yet), so never show 100%.
+  const rawPercent = Math.round((elapsedMinutes / expectedDurationMinutes) * 100);
+  const percent = Math.min(99, Math.max(0, rawPercent));
+
+  return {
+    percent,
+    elapsedMinutes: Math.floor(elapsedMinutes),
+    status: run.status,
+    startedAt: run.run_started_at || run.created_at || null,
+    htmlUrl: run.html_url || null,
+    version: versionFromRun(run),
+  };
+};
+
+// Queries the GitHub Actions API for all currently active (not yet completed) runs of the APK
+// build workflow and maps each to a rough completion percentage. Returned newest-first so the
+// most recently started run is first. Returns an empty array when the API is unreachable, when
+// there are no active runs, or when timing data is unusable.
+export const fetchActiveBuildRuns = async ({
   owner = DEFAULT_GITHUB_OWNER,
   repo = DEFAULT_GITHUB_REPO,
   fetchImpl = fetch,
   now = Date.now(),
   expectedDurationMinutes = BUILD_DURATION_MINUTES,
 } = {}) => {
-  const endpoint = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${BUILD_WORKFLOW_FILE}/runs?per_page=10`;
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${BUILD_WORKFLOW_FILE}/runs?per_page=20`;
 
   try {
     const response = await fetchWithTimeout(
@@ -138,7 +173,7 @@ export const fetchBuildProgress = async ({
     );
 
     if (!response.ok) {
-      return null;
+      return [];
     }
 
     const data = await response.json();
@@ -147,37 +182,44 @@ export const fetchBuildProgress = async ({
     // A run is "active" until GitHub marks it completed (queued / in_progress / waiting / etc.).
     const activeRuns = runs.filter((run) => run && run.status && run.status !== 'completed');
     if (activeRuns.length === 0) {
-      return null;
+      return [];
     }
 
     const startedMs = (run) => new Date(run.run_started_at || run.created_at || 0).getTime();
     activeRuns.sort((a, b) => startedMs(b) - startedMs(a));
-    const run = activeRuns[0];
 
-    const startMs = startedMs(run);
-    if (!Number.isFinite(startMs) || startMs <= 0) {
-      return null;
-    }
-
-    const elapsedMinutes = (now - startMs) / 60000;
-    if (elapsedMinutes < 0) {
-      return null;
-    }
-
-    // Cap below 100%: the build is by definition not finished (no APK yet), so never show 100%.
-    const rawPercent = Math.round((elapsedMinutes / expectedDurationMinutes) * 100);
-    const percent = Math.min(99, Math.max(0, rawPercent));
-
-    return {
-      percent,
-      elapsedMinutes: Math.floor(elapsedMinutes),
-      status: run.status,
-      startedAt: run.run_started_at || run.created_at || null,
-      htmlUrl: run.html_url || null,
-    };
+    return activeRuns
+      .map((run) => computeRunProgress(run, now, expectedDurationMinutes))
+      .filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
+};
+
+// Returns a rough completion percentage for the most recently started active APK build run.
+// Used to show the user that a release's APK is on its way when the tag exists but the asset is
+// not uploaded yet.
+//
+// Returns null when there is no active run, when the API is unreachable, or when the timing data
+// is unusable — callers should treat null as "no progress information available".
+export const fetchBuildProgress = async (options = {}) => {
+  const runs = await fetchActiveBuildRuns(options);
+  return runs.length > 0 ? runs[0] : null;
+};
+
+// Like fetchBuildProgress, but returns a map of release version → build progress so that each
+// release still awaiting its APK can surface its own CI build status. When more than one active
+// run maps to the same version, the most recently started one wins (runs are pre-sorted
+// newest-first). Versions that cannot be derived from a run are skipped.
+export const fetchBuildProgressByVersion = async (options = {}) => {
+  const runs = await fetchActiveBuildRuns(options);
+  const byVersion = {};
+  for (const progress of runs) {
+    if (progress.version && !(progress.version in byVersion)) {
+      byVersion[progress.version] = progress;
+    }
+  }
+  return byVersion;
 };
 
 export const checkForAppUpdate = async ({
@@ -289,12 +331,28 @@ export const checkForAppUpdate = async ({
 
     if (!bestRelease) {
       if (foundReleasesWithoutApk) {
+        // The newer release(s) have no APK yet — a CI build is likely still running for each.
+        // Fetch every active build run once and tie each one to its release version, so when
+        // several releases are awaiting APKs we can show how far along each individual build is
+        // (not just the newest). The most recently started run is also surfaced top-level as
+        // `buildProgress` for the build-progress poller and legacy single-progress consumers.
+        const activeRuns = await fetchActiveBuildRuns({ owner, repo, fetchImpl });
+        const progressByVersion = {};
+        for (const progress of activeRuns) {
+          if (progress.version && !(progress.version in progressByVersion)) {
+            progressByVersion[progress.version] = progress;
+          }
+        }
+        const buildProgress = activeRuns.length > 0 ? activeRuns[0] : null;
+
         const releaseNotes = newerReleases
           .filter((r) => r.notes)
-          .map((r) => ({ version: r.version, notes: r.notes, hasApk: r.hasApk }));
-        // The newer release(s) have no APK yet — the CI build is likely still running. Surface
-        // how far along that build is so the user knows the APK is on its way.
-        const buildProgress = await fetchBuildProgress({ owner, repo, fetchImpl });
+          .map((r) => ({
+            version: r.version,
+            notes: r.notes,
+            hasApk: r.hasApk,
+            buildProgress: !r.hasApk ? (progressByVersion[r.version] || null) : null,
+          }));
         return {
           success: false,
           isUpdateAvailable: false,

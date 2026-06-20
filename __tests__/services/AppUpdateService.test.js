@@ -12,6 +12,8 @@ import {
   computeSha256,
   downloadAndInstallApk,
   fetchBuildProgress,
+  fetchBuildProgressByVersion,
+  fetchActiveBuildRuns,
 } from '../../app/services/AppUpdateService';
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -404,6 +406,46 @@ describe('AppUpdateService', () => {
       expect(result.recentReleaseNotes.length).toBe(2);
       expect(result.recentReleaseNotes[0].version).toBe('0.50.0');
       expect(result.recentReleaseNotes[1].version).toBe('0.49.9');
+    });
+
+    it('attaches a CI build progress to each no-APK release that is still building', async () => {
+      const MINUTE = 60000;
+      const now = Date.now();
+      // Route releases vs. workflow-runs requests to different payloads so each no-APK release
+      // can be matched to its own active build run by tag.
+      const fetchImpl = jest.fn(async (url) => {
+        if (url.includes('/actions/workflows/')) {
+          return {
+            ok: true,
+            json: async () => ({
+              workflow_runs: [
+                { status: 'in_progress', head_branch: 'penny-v0.50.5', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+                { status: 'in_progress', head_branch: 'penny-v0.50.4', run_started_at: new Date(now - 8.5 * MINUTE).toISOString() },
+              ],
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ([
+            { tag_name: 'v0.50.5', assets: [], body: 'Notes for 0.50.5' },
+            { tag_name: 'v0.50.4', assets: [], body: 'Notes for 0.50.4' },
+            { tag_name: 'v0.50.0', assets: [{ name: 'penny-0.50.0.apk', browser_download_url: 'https://example.com/penny-0.50.0.apk' }], body: 'Notes for 0.50.0' },
+          ]),
+        };
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: '0.50.0',
+        fetchImpl,
+      });
+
+      expect(result.errorCode).toBe('releases_without_apks');
+      const byVersion = Object.fromEntries(result.releaseNotes.map((r) => [r.version, r]));
+      expect(byVersion['0.50.5'].buildProgress.percent).toBe(10);
+      expect(byVersion['0.50.4'].buildProgress.percent).toBe(50);
+      // The newest active run is still surfaced top-level for the poller / legacy consumers.
+      expect(result.buildProgress.version).toBe('0.50.5');
     });
 
     it('returns invalid_release_data when releases list is empty', async () => {
@@ -1000,6 +1042,107 @@ describe('AppUpdateService', () => {
       const result = await fetchBuildProgress({ fetchImpl, now });
 
       expect(result).toBeNull();
+    });
+
+    it('derives the release version from the run head_branch (tag)', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        {
+          status: 'in_progress',
+          head_branch: 'penny-v0.142.0',
+          run_started_at: new Date(now - 8.5 * MINUTE).toISOString(),
+        },
+      ]));
+
+      const result = await fetchBuildProgress({ fetchImpl, now });
+
+      expect(result.version).toBe('0.142.0');
+    });
+  });
+
+  describe('fetchActiveBuildRuns', () => {
+    const MINUTE = 60000;
+    const now = new Date('2026-06-18T12:00:00Z').getTime();
+
+    const runsResponse = (runs) => ({
+      ok: true,
+      json: async () => ({ workflow_runs: runs }),
+    });
+
+    it('returns every active run with progress, newest first', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', head_branch: 'penny-v0.141.4', run_started_at: new Date(now - 8.5 * MINUTE).toISOString() },
+        { status: 'queued', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+        { status: 'completed', head_branch: 'penny-v0.140.0', run_started_at: new Date(now - 30 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchActiveBuildRuns({ fetchImpl, now });
+
+      expect(result).toHaveLength(2);
+      // Newest first: 0.142.0 (1.7 min ago) then 0.141.4 (8.5 min ago).
+      expect(result[0].version).toBe('0.142.0');
+      expect(result[0].percent).toBe(10);
+      expect(result[1].version).toBe('0.141.4');
+      expect(result[1].percent).toBe(50);
+    });
+
+    it('returns an empty array on API error', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false, status: 500 });
+
+      const result = await fetchActiveBuildRuns({ fetchImpl, now });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('fetchBuildProgressByVersion', () => {
+    const MINUTE = 60000;
+    const now = new Date('2026-06-18T12:00:00Z').getTime();
+
+    const runsResponse = (runs) => ({
+      ok: true,
+      json: async () => ({ workflow_runs: runs }),
+    });
+
+    it('maps each release version to its own build progress', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', head_branch: 'penny-v0.141.4', run_started_at: new Date(now - 8.5 * MINUTE).toISOString() },
+        { status: 'queued', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgressByVersion({ fetchImpl, now });
+
+      expect(result['0.142.0'].percent).toBe(10);
+      expect(result['0.141.4'].percent).toBe(50);
+    });
+
+    it('keeps the most recent run when multiple runs map to the same version', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 1.7 * MINUTE).toISOString() },
+        { status: 'in_progress', head_branch: 'penny-v0.142.0', run_started_at: new Date(now - 15 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgressByVersion({ fetchImpl, now });
+
+      expect(Object.keys(result)).toEqual(['0.142.0']);
+      expect(result['0.142.0'].percent).toBe(10);
+    });
+
+    it('skips runs whose version cannot be derived', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue(runsResponse([
+        { status: 'in_progress', head_branch: 'main', run_started_at: new Date(now - 5 * MINUTE).toISOString() },
+      ]));
+
+      const result = await fetchBuildProgressByVersion({ fetchImpl, now });
+
+      expect(result).toEqual({});
+    });
+
+    it('returns an empty map on API error', async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: false, status: 404 });
+
+      const result = await fetchBuildProgressByVersion({ fetchImpl, now });
+
+      expect(result).toEqual({});
     });
   });
 });

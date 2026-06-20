@@ -517,17 +517,28 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
       )}
 
       {updateResult.type === 'error' && updateResult.errorCode === 'releases_without_apks' && (updateResult.releaseNotes || updateResult.recentReleaseNotes) ? (() => {
-        // Surface CI build progress on the newest release awaiting its APK — that is the build
-        // currently running. Older no-APK releases (if any) get no progress chip.
-        let buildProgressShown = false;
-        const noApkReleases = (updateResult.releaseNotes || []).map((r) => {
-          const showProgress = !r.hasApk && !buildProgressShown && !!updateResult.buildProgress;
-          if (showProgress) buildProgressShown = true;
+        // Surface CI build progress per release awaiting its APK. The service resolves each
+        // no-APK release's own build run, so when several releases are building at once each
+        // gets its own "Building N%" chip. Older payloads carry only a single top-level
+        // buildProgress; fall back to showing that on the newest no-APK release alone.
+        const releaseNotesList = updateResult.releaseNotes || [];
+        const hasPerReleaseProgress = releaseNotesList.some((r) => r.buildProgress);
+        let legacyProgressShown = false;
+        const noApkReleases = releaseNotesList.map((r) => {
+          let buildProgress = null;
+          if (!r.hasApk) {
+            if (hasPerReleaseProgress) {
+              buildProgress = r.buildProgress || null;
+            } else if (!legacyProgressShown && updateResult.buildProgress) {
+              buildProgress = updateResult.buildProgress;
+              legacyProgressShown = true;
+            }
+          }
           return {
             version: r.version,
             notes: r.notes,
             badge: !r.hasApk ? (t('no_apk_attached') || 'NO_APK_ATTACHED') : undefined,
-            buildProgress: showProgress ? updateResult.buildProgress : null,
+            buildProgress,
           };
         });
         const recentReleases = updateResult.recentReleaseNotes || [];
@@ -575,6 +586,9 @@ UpdateContentPanel.propTypes = {
       version: PropTypes.string,
       notes: PropTypes.string,
       hasApk: PropTypes.bool,
+      buildProgress: PropTypes.shape({
+        percent: PropTypes.number,
+      }),
     })),
     recentReleaseNotes: PropTypes.arrayOf(PropTypes.shape({
       version: PropTypes.string,
