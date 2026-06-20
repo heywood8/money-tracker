@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.141.4](https://github.com/heywood8/money-tracker/compare/penny-v0.141.3...penny-v0.141.4) (2026-06-20)
+
+
+### Bug Fixes
+
+* animate operations-list shift when category row count changes ([#1024](https://github.com/heywood8/money-tracker/issues/1024)) ([bf35292](https://github.com/heywood8/money-tracker/commit/bf35292fcf624132c937397168d799df5b1a65e1))
+
 ## [0.141.3](https://github.com/heywood8/money-tracker/compare/penny-v0.141.2...penny-v0.141.3) (2026-06-19)
 
 
