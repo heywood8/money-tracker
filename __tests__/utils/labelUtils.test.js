@@ -11,6 +11,9 @@ import {
   addLabel,
   removeLabel,
   matchesAllLabels,
+  isSystemLabel,
+  visibleListLabels,
+  isProtectedOperation,
 } from '../../app/utils/labelUtils';
 
 describe('labelUtils', () => {
@@ -209,6 +212,77 @@ describe('labelUtils', () => {
     it('matches a legacy [MoneyOK] segment as a filterable label', () => {
       expect(matchesAllLabels('[MoneyOK] | groceries', ['[MoneyOK]'])).toBe(true);
       expect(matchesAllLabels('[MoneyOK] | groceries', ['groceries'])).toBe(true);
+    });
+  });
+
+  describe('isSystemLabel', () => {
+    it('flags Account:/Category:/Category group: labels (case-insensitive)', () => {
+      expect(isSystemLabel('Account: Cash')).toBe(true);
+      expect(isSystemLabel('Category: Food')).toBe(true);
+      expect(isSystemLabel('Category group: Expenses')).toBe(true);
+      expect(isSystemLabel('account: cash')).toBe(true);
+      expect(isSystemLabel('  Category group:  Income ')).toBe(true);
+    });
+
+    it('does not flag ordinary labels or the [MoneyOK] marker', () => {
+      expect(isSystemLabel('groceries')).toBe(false);
+      expect(isSystemLabel('[MoneyOK]')).toBe(false);
+      expect(isSystemLabel('Accountant')).toBe(false);
+      expect(isSystemLabel('My Category')).toBe(false);
+    });
+
+    it('returns false for empty or non-string input', () => {
+      expect(isSystemLabel('')).toBe(false);
+      expect(isSystemLabel(null)).toBe(false);
+      expect(isSystemLabel(undefined)).toBe(false);
+      expect(isSystemLabel(42)).toBe(false);
+    });
+  });
+
+  describe('visibleListLabels', () => {
+    it('drops system labels but keeps ordinary ones and [MoneyOK]', () => {
+      const labels = parseLabels('[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses');
+      expect(visibleListLabels(labels)).toEqual(['[MoneyOK]', 'groceries']);
+    });
+
+    it('returns all labels when none are system labels', () => {
+      expect(visibleListLabels(['work', 'food'])).toEqual(['work', 'food']);
+    });
+
+    it('returns [] for non-arrays', () => {
+      expect(visibleListLabels(null)).toEqual([]);
+      expect(visibleListLabels(undefined)).toEqual([]);
+    });
+
+    it('does not mutate the input array', () => {
+      const input = ['Account: Cash', 'food'];
+      const result = visibleListLabels(input);
+      expect(input).toEqual(['Account: Cash', 'food']);
+      expect(result).toEqual(['food']);
+    });
+  });
+
+  describe('isProtectedOperation', () => {
+    it('protects operations carrying a system metadata label', () => {
+      expect(isProtectedOperation('Account: Cash | groceries')).toBe(true);
+      expect(isProtectedOperation('Category: Food')).toBe(true);
+      expect(isProtectedOperation('Category group: Expenses | rent')).toBe(true);
+    });
+
+    it('protects operations carrying the [MoneyOK] marker', () => {
+      expect(isProtectedOperation('[MoneyOK] | groceries')).toBe(true);
+      expect(isProtectedOperation('[moneyok]')).toBe(true);
+    });
+
+    it('does not protect ordinary operations', () => {
+      expect(isProtectedOperation('groceries | food')).toBe(false);
+      expect(isProtectedOperation('Coffee at the airport')).toBe(false);
+    });
+
+    it('returns false for empty or non-string input', () => {
+      expect(isProtectedOperation('')).toBe(false);
+      expect(isProtectedOperation(null)).toBe(false);
+      expect(isProtectedOperation(undefined)).toBe(false);
     });
   });
 });

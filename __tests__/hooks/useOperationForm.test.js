@@ -214,6 +214,64 @@ describe('useOperationForm', () => {
     });
   });
 
+  describe('Protected MoneyOK Operations', () => {
+    it('should not allow deletion of operations with system metadata labels', async () => {
+      const importedOperation = {
+        id: 'op-1',
+        categoryId: 'cat-1',
+        date: new Date().toISOString().split('T')[0],
+        description: 'Account: Cash | groceries',
+      };
+
+      const props = { ...defaultProps, operation: importedOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      expect(result.current.canDeleteShadowOperation).toBe(false);
+    });
+
+    it('should not allow deletion of operations with the [MoneyOK] marker', async () => {
+      const importedOperation = {
+        id: 'op-1',
+        categoryId: 'cat-1',
+        date: new Date().toISOString().split('T')[0],
+        description: '[MoneyOK] | groceries',
+      };
+
+      const props = { ...defaultProps, operation: importedOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      expect(result.current.canDeleteShadowOperation).toBe(false);
+    });
+
+    it('should not allow deletion of operations with a Category group: label', async () => {
+      const importedOperation = {
+        id: 'op-1',
+        categoryId: 'cat-1',
+        date: new Date().toISOString().split('T')[0],
+        description: 'Category group: Expenses | rent',
+      };
+
+      const props = { ...defaultProps, operation: importedOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      expect(result.current.canDeleteShadowOperation).toBe(false);
+    });
+
+    it('should still allow deletion of operations without protected labels', async () => {
+      const regularOperation = {
+        id: 'op-1',
+        categoryId: 'cat-1',
+        date: new Date().toISOString().split('T')[0],
+        description: 'groceries | food',
+      };
+
+      const props = { ...defaultProps, operation: regularOperation, isNew: false };
+      const { result } = await renderHook(() => useOperationForm(props));
+
+      expect(result.current.canDeleteShadowOperation).toBe(true);
+    });
+  });
+
   describe('Multi-Currency Transfers', () => {
     it('should detect multi-currency transfers', async () => {
       const { result } = await renderHook(() => useOperationForm(defaultProps));

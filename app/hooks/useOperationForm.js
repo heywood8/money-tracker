@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { getLastAccessedAccount, setLastAccessedAccount } from '../services/LastAccount';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
+import { isProtectedOperation } from '../utils/labelUtils';
 import { hasOperation, evaluateExpression } from '../utils/calculatorUtils';
 import * as Currency from '../services/currency';
 import currencies from '../../assets/currencies.json';
@@ -76,10 +77,19 @@ const useOperationForm = ({
     return operation.date === today;
   }, [operation]);
 
-  // Shadow operations can only be deleted if they were made today
+  // Imported MoneyOK operations carry protected metadata labels (Account:/Category:/
+  // Category group:/[MoneyOK]) and must never be deletable.
+  const isProtectedImport = useMemo(() => {
+    if (!operation) return false;
+    return isProtectedOperation(operation.description);
+  }, [operation]);
+
+  // Delete is allowed unless the operation is a protected import, or a shadow
+  // operation that was not created today.
   const canDeleteShadowOperation = useMemo(() => {
+    if (isProtectedImport) return false;
     return !isShadowOperation || isOperationToday;
-  }, [isShadowOperation, isOperationToday]);
+  }, [isShadowOperation, isOperationToday, isProtectedImport]);
 
   // Multi-currency transfer logic
   const sourceAccount = useMemo(() => {

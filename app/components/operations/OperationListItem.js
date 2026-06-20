@@ -4,7 +4,7 @@ import { TouchableRipple } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
 import { getCategoryNames } from '../../utils/categoryUtils';
-import { parseLabels } from '../../utils/labelUtils';
+import { parseLabels, visibleListLabels } from '../../utils/labelUtils';
 import DescriptionSuggestionRow from './DescriptionSuggestionRow';
 import { SPACING, FONT_SIZE, FONT_WEIGHT, ICON_SIZE, HEIGHTS } from '../../styles/designTokens';
 import currencies from '../../../assets/currencies.json';
@@ -60,8 +60,10 @@ const OperationListItem = ({
   // The description column holds a delimited list of labels (see labelUtils).
   // Memoised so the parse only re-runs when the description string changes,
   // not on every re-render of this memoised row (scroll, theme, selection, …).
+  // Imported metadata labels (Account:/Category:/Category group:) are hidden in
+  // the list; they remain visible when the operation is opened.
   const labels = useMemo(
-    () => parseLabels(operation.description),
+    () => visibleListLabels(parseLabels(operation.description)),
     [operation.description],
   );
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
