@@ -23,6 +23,14 @@ export const LABEL_JOIN = ' | ';
 export const MAX_LABELS = 30;
 export const MAX_LABEL_LENGTH = 60;
 
+// Prefixes that mark a label as imported metadata (e.g. from a MoneyOK export).
+// These clutter the operation list, so they are hidden there while still shown
+// when the operation is opened for editing. Matching is case-insensitive.
+export const SYSTEM_LABEL_PREFIXES = ['Account:', 'Category:', 'Category group:'];
+
+// Marker tag identifying an operation imported from MoneyOK.
+export const MONEYOK_LABEL = '[MoneyOK]';
+
 /**
  * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
  * collapse internal whitespace, and trim. Returns '' for anything unusable.
@@ -139,6 +147,44 @@ export const removeLabel = (labels, target) => {
   const clean = normalizeLabel(target).toLowerCase();
   if (!clean) return labels.slice();
   return labels.filter((l) => normalizeLabel(l).toLowerCase() !== clean);
+};
+
+/**
+ * Whether a single label is a hidden "system" label — imported metadata such as
+ * "Account: Cash" or "Category group: Expenses". Matching is case-insensitive and
+ * tolerant of surrounding whitespace.
+ * @param {*} label
+ * @returns {boolean}
+ */
+export const isSystemLabel = (label) => {
+  const clean = normalizeLabel(label).toLowerCase();
+  if (!clean) return false;
+  return SYSTEM_LABEL_PREFIXES.some((prefix) => clean.startsWith(prefix.toLowerCase()));
+};
+
+/**
+ * Return only the labels meant for the operation list, dropping hidden system
+ * labels. Never mutates the input.
+ * @param {string[]} labels
+ * @returns {string[]}
+ */
+export const visibleListLabels = (labels) => {
+  if (!Array.isArray(labels)) return [];
+  return labels.filter((l) => !isSystemLabel(l));
+};
+
+/**
+ * Whether an operation's description marks it as a protected import — it carries
+ * either a system label (Account:/Category:/Category group:) or the [MoneyOK]
+ * marker. Protected operations are non-deletable.
+ * @param {*} description
+ * @returns {boolean}
+ */
+export const isProtectedOperation = (description) => {
+  const labels = parseLabels(description);
+  if (labels.length === 0) return false;
+  const moneyOk = MONEYOK_LABEL.toLowerCase();
+  return labels.some((l) => isSystemLabel(l) || normalizeLabel(l).toLowerCase() === moneyOk);
 };
 
 /**

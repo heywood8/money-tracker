@@ -164,6 +164,25 @@ describe('OperationListItem', () => {
       expect(getByText('lunch')).toBeTruthy();
     });
 
+    it('hides imported system metadata labels in the list', async () => {
+      const { getByText, queryByText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            description: '[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses',
+          }}
+        />,
+      );
+      // Ordinary labels and the [MoneyOK] marker remain visible...
+      expect(getByText('groceries')).toBeTruthy();
+      expect(getByText('[MoneyOK]')).toBeTruthy();
+      // ...but the Account:/Category:/Category group: metadata labels are hidden.
+      expect(queryByText('Account: Cash')).toBeNull();
+      expect(queryByText('Category: Food')).toBeNull();
+      expect(queryByText('Category group: Expenses')).toBeNull();
+    });
+
     it('summarises overflow labels as +N', async () => {
       const { getByText } = await render(
         <OperationListItem
