@@ -28,6 +28,35 @@ module.exports = {
       edgeToEdgeEnabled: true,
       package: 'com.heywood8.monkeep',
       permissions: ['android.permission.REQUEST_INSTALL_PACKAGES'],
+      // Register Penny as a handler for opening SQLite database backup files.
+      // When the user opens a .db/.sqlite file from a file manager, email
+      // attachment, etc., Android offers Penny as one of the apps, and the
+      // launching ACTION_VIEW intent's content/file URI is delivered to JS via
+      // expo/react-native Linking (see app/hooks/useSqliteFileImport.js).
+      //
+      // SQLite files on disk are usually typed as application/octet-stream by
+      // Android (there is no standard registered MIME type for the .db
+      // extension), so we match that alongside the SQLite-specific MIME types
+      // and an extension-based pathPattern fallback for the file:// scheme.
+      // Files that turn out not to be valid backups are rejected gracefully by
+      // the import flow after the confirmation warning.
+      intentFilters: [
+        {
+          action: 'VIEW',
+          category: ['DEFAULT', 'BROWSABLE'],
+          data: [
+            { scheme: 'content', mimeType: 'application/x-sqlite3' },
+            { scheme: 'content', mimeType: 'application/vnd.sqlite3' },
+            { scheme: 'content', mimeType: 'application/octet-stream' },
+            { scheme: 'file', mimeType: 'application/x-sqlite3' },
+            { scheme: 'file', mimeType: 'application/vnd.sqlite3' },
+            { scheme: 'file', mimeType: 'application/octet-stream' },
+            { scheme: 'file', mimeType: '*/*', pathPattern: '.*\\.db' },
+            { scheme: 'file', mimeType: '*/*', pathPattern: '.*\\.sqlite' },
+            { scheme: 'file', mimeType: '*/*', pathPattern: '.*\\.sqlite3' },
+          ],
+        },
+      ],
     },
     extra: {
       eas: {
