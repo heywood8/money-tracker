@@ -12,6 +12,7 @@ import {
   removeLabel,
   matchesAllLabels,
   isSystemLabel,
+  isHiddenLabel,
   visibleListLabels,
   isProtectedOperation,
 } from '../../app/utils/labelUtils';
@@ -236,6 +237,23 @@ describe('labelUtils', () => {
       expect(isSystemLabel(null)).toBe(false);
       expect(isSystemLabel(undefined)).toBe(false);
       expect(isSystemLabel(42)).toBe(false);
+    });
+  });
+
+  describe('isHiddenLabel', () => {
+    it('hides system labels and the [MoneyOK] marker (case-insensitive)', () => {
+      expect(isHiddenLabel('Account: Cash')).toBe(true);
+      expect(isHiddenLabel('Category: Food')).toBe(true);
+      expect(isHiddenLabel('Category group: Expenses')).toBe(true);
+      expect(isHiddenLabel('[MoneyOK]')).toBe(true);
+      expect(isHiddenLabel('[moneyok]')).toBe(true);
+    });
+
+    it('does not hide ordinary labels', () => {
+      expect(isHiddenLabel('groceries')).toBe(false);
+      expect(isHiddenLabel('Ваган')).toBe(false);
+      expect(isHiddenLabel('')).toBe(false);
+      expect(isHiddenLabel(null)).toBe(false);
     });
   });
 

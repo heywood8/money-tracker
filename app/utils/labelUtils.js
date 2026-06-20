@@ -174,6 +174,19 @@ export const visibleListLabels = (labels) => {
 };
 
 /**
+ * Whether a single label should be kept out of autocomplete suggestions: imported
+ * metadata (a system label) or the [MoneyOK] import marker. Offering these as
+ * suggestions would let the user re-introduce the clutter / mark an operation as a
+ * protected import. Matching is case-insensitive.
+ * @param {*} label
+ * @returns {boolean}
+ */
+export const isHiddenLabel = (label) => {
+  if (isSystemLabel(label)) return true;
+  return normalizeLabel(label).toLowerCase() === MONEYOK_LABEL.toLowerCase();
+};
+
+/**
  * Whether an operation's description marks it as a protected import — it carries
  * either a system label (Account:/Category:/Category group:) or the [MoneyOK]
  * marker. Protected operations are non-deletable.
