@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.149.1](https://github.com/heywood8/money-tracker/compare/penny-v0.149.0...penny-v0.149.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* let Settings subpanel content scroll behind the tab bar ([#1046](https://github.com/heywood8/money-tracker/issues/1046)) ([cb315ff](https://github.com/heywood8/money-tracker/commit/cb315ffc2e37d5e864afb65999383499ba005a58))
+
 ## [0.149.0](https://github.com/heywood8/money-tracker/compare/penny-v0.148.0...penny-v0.149.0) (2026-06-20)
 
 
