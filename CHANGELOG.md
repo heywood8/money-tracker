@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.149.0](https://github.com/heywood8/money-tracker/compare/penny-v0.148.0...penny-v0.149.0) (2026-06-20)
+
+
+### Features
+
+* **updates:** show release time and link version to GitHub release ([#1044](https://github.com/heywood8/money-tracker/issues/1044)) ([817fa45](https://github.com/heywood8/money-tracker/commit/817fa450b839aea1840dec06b7442902213dfad0))
+
 ## [0.148.0](https://github.com/heywood8/money-tracker/compare/penny-v0.147.0...penny-v0.148.0) (2026-06-20)
 
 
