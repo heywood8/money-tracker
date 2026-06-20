@@ -10,7 +10,6 @@ const ExpandableFilters = ({
   filters,
   onFilterChange,
   accounts,
-  availableLabels = [],
   colors,
   t,
   isExpanded,
@@ -70,36 +69,6 @@ const ExpandableFilters = ({
       : [...filters.accountIds, accountId];
     onFilterChange({ accountIds: newAccountIds });
   };
-
-  // Case-insensitive toggle — labels are matched case-insensitively everywhere
-  // else (matchesAllLabels, getDistinctLabels de-dup), so the filter UI must be
-  // consistent or a label can end up both "selected" and re-addable.
-  const toggleLabel = (label) => {
-    const current = filters.labels || [];
-    const key = label.toLowerCase();
-    const exists = current.some(l => l.toLowerCase() === key);
-    const newLabels = exists
-      ? current.filter(l => l.toLowerCase() !== key)
-      : [...current, label];
-    onFilterChange({ labels: newLabels });
-  };
-
-  // Show every available label plus any currently-selected label that is no longer
-  // in availableLabels (e.g. the only operation carrying it was deleted, or casing
-  // drifted). Without this a stale selected label keeps filtering to zero results
-  // with no chip to toggle it off. De-duplicated case-insensitively, selected first.
-  const selectedLabels = filters.labels || [];
-  const labelsToShow = (() => {
-    const seen = new Set();
-    const out = [];
-    for (const l of [...selectedLabels, ...availableLabels]) {
-      const key = l.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(l);
-    }
-    return out;
-  })();
 
   const handleStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
@@ -270,36 +239,6 @@ const ExpandableFilters = ({
           </View>
         </View>
 
-        {/* Labels Section */}
-        {labelsToShow.length > 0 && (
-          <View style={[styles.section, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>
-              {t('labels')}
-            </Text>
-            <View style={styles.chipContainer}>
-              {labelsToShow.map(label => {
-                const isSelected = selectedLabels.some(l => l.toLowerCase() === label.toLowerCase());
-                const chipTextColor = isSelected ? '#fff' : colors.text;
-                return (
-                  <TouchableOpacity
-                    key={label}
-                    testID={`filter-label-${label}`}
-                    style={[styles.chip, {
-                      backgroundColor: isSelected ? colors.primary : colors.inputBackground,
-                      borderColor: colors.border,
-                    }]}
-                    onPress={() => toggleLabel(label)}
-                  >
-                    <Text style={[styles.chipText, { color: chipTextColor }]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
         <TouchableOpacity
           testID="clear-all-button"
           style={styles.clearAllButton}
@@ -354,7 +293,6 @@ ExpandableFilters.propTypes = {
     id: PropTypes.string,
     name: PropTypes.string,
   })).isRequired,
-  availableLabels: PropTypes.arrayOf(PropTypes.string),
   colors: PropTypes.shape({
     background: PropTypes.string,
     text: PropTypes.string,
