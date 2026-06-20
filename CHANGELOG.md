@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.144.0](https://github.com/heywood8/money-tracker/compare/penny-v0.143.0...penny-v0.144.0) (2026-06-20)
+
+
+### Features
+
+* add labels to operations via delimited description field ([#985](https://github.com/heywood8/money-tracker/issues/985)) ([995d50a](https://github.com/heywood8/money-tracker/commit/995d50ac546ffa569519f4f6373093d77fdbd858))
+
 ## [0.143.0](https://github.com/heywood8/money-tracker/compare/penny-v0.142.0...penny-v0.143.0) (2026-06-20)
 
 
