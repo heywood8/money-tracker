@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Dimensions,
@@ -10,7 +10,6 @@ import { useOperationsData } from '../../contexts/OperationsDataContext';
 import { useOperationsActions } from '../../contexts/OperationsActionsContext';
 import { useAccountsData } from '../../contexts/AccountsDataContext';
 import { useSearch } from '../../contexts/SearchContext';
-import { getDistinctLabels } from '../../services/OperationsDB';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -19,17 +18,6 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange, topOffset }) => {
   const { filtersExpanded } = useSearch();
   const { updateSearchFilters } = useOperationsActions();
   const { visibleAccounts } = useAccountsData();
-
-  // Available labels for the label filter chips — refreshed each time the overlay opens.
-  const [availableLabels, setAvailableLabels] = useState([]);
-  useEffect(() => {
-    if (!visible) return undefined;
-    let cancelled = false;
-    getDistinctLabels(50)
-      .then(labels => { if (!cancelled) setAvailableLabels(labels); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [visible]);
 
   const translateY = useSharedValue(-SCREEN_HEIGHT);
 
@@ -73,7 +61,6 @@ const SearchOverlay = ({ colors, t, visible, onHeightChange, topOffset }) => {
         filters={searchState}
         onFilterChange={handleFilterChange}
         accounts={visibleAccounts}
-        availableLabels={availableLabels}
         colors={colors}
         t={t}
         isExpanded={filtersExpanded}
