@@ -60,12 +60,21 @@ describe('OperationsDB.getDistinctLabels', () => {
     expect(await getDistinctLabels(10)).toEqual([]);
   });
 
-  it('parses legacy [MoneyOK] descriptions into their delimited labels', async () => {
+  it('parses real labels out of legacy [MoneyOK] descriptions but hides the marker', async () => {
     queryAll.mockResolvedValue([
       { description: '[MoneyOK] | groceries', category_id: 'c1', cnt: 5 },
       { description: 'real', category_id: 'c1', cnt: 1 },
     ]);
     const labels = await getDistinctLabels(10);
-    expect(labels).toEqual(expect.arrayContaining(['[MoneyOK]', 'groceries', 'real']));
+    expect(labels).toEqual(expect.arrayContaining(['groceries', 'real']));
+    expect(labels).not.toContain('[MoneyOK]');
+  });
+
+  it('excludes imported metadata labels and the [MoneyOK] marker from suggestions', async () => {
+    queryAll.mockResolvedValue([
+      { description: '[MoneyOK] | Account: Cash | Category: Food | Category group: Expenses | Date: 2025.11.03 | Amount: 1172300 AMD | groceries', category_id: 'c1', cnt: 5 },
+    ]);
+    const labels = await getDistinctLabels(10);
+    expect(labels).toEqual(['groceries']);
   });
 });

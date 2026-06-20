@@ -532,9 +532,12 @@ export const adjustAccountBalance = async (accountId, newBalance, description = 
       // Build description with adjustment history
       const historyString = adjustmentHistory.join(' → ');
       const originalFormatted = Currency.formatAmount(originalBalanceStr);
+      // Description carries only the balance chain (original → … → target). The
+      // original balance is also stored in its own column and the chain is parsed
+      // back from the "→" separators, so no prefix text is needed.
       const fullDescription = description
-        ? `${description}\nBalance adjusted from ${originalFormatted} → ${historyString}`
-        : `Balance adjusted from ${originalFormatted} → ${historyString}`;
+        ? `${description}\n${originalFormatted} → ${historyString}`
+        : `${originalFormatted} → ${historyString}`;
 
       if (existingOperation) {
         // Check if total delta is 0 - if so, delete the operation

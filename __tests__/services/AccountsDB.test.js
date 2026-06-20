@@ -828,6 +828,15 @@ describe('AccountsDB', () => {
         expect.stringContaining('INSERT INTO operations'),
         expect.arrayContaining(['income', '50.00', 'acc-1', 'shadow-income']),
       );
+
+      // Description carries the amount chain only — no "Balance adjusted from" prefix.
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        c => String(c[0]).includes('INSERT INTO operations'),
+      );
+      const insertedDescription = insertCall[1][7];
+      expect(insertedDescription).not.toContain('Balance adjusted from');
+      expect(insertedDescription).toContain('100.00 → 150.00');
+      expect(insertedDescription).toContain('Test adjustment');
     });
 
     it('creates new adjustment operation when decreasing balance', async () => {

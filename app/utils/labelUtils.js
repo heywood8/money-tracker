@@ -26,10 +26,24 @@ export const MAX_LABEL_LENGTH = 60;
 // Prefixes that mark a label as imported metadata (e.g. from a MoneyOK export).
 // These clutter the operation list, so they are hidden there while still shown
 // when the operation is opened for editing. Matching is case-insensitive.
-export const SYSTEM_LABEL_PREFIXES = ['Account:', 'Category:', 'Category group:'];
+export const SYSTEM_LABEL_PREFIXES = ['Account:', 'Category:', 'Category group:', 'Date:', 'Amount:'];
 
 // Marker tag identifying an operation imported from MoneyOK.
 export const MONEYOK_LABEL = '[MoneyOK]';
+
+// Imported "Note:" labels carry free-text the user wrote in the source app. The
+// "Note:" prefix is just an import artefact, so it is stripped for display while
+// the underlying label value is left untouched.
+export const NOTE_LABEL_PREFIX = 'Note:';
+
+// Balance-adjustment operations historically stored their label as
+// "Balance adjusted from <orig> → <target>". The prefix is noise — only the
+// amount chain matters — so it is stripped for display. (New adjustments no
+// longer write the prefix; this keeps older records tidy too.)
+export const BALANCE_ADJUST_PREFIX = 'Balance adjusted from';
+
+// Prefixes stripped from a label purely for display (value is left untouched).
+const DISPLAY_STRIP_PREFIXES = [NOTE_LABEL_PREFIX, BALANCE_ADJUST_PREFIX];
 
 /**
  * Normalise a single label WITHOUT enforcing the length cap: drop the delimiter,
@@ -82,6 +96,26 @@ export const parseLabels = (description) => {
     if (result.length >= MAX_LABELS) break;
   }
   return result;
+};
+
+/**
+ * Map a label to its user-facing text. Display-only prefixes are stripped:
+ * imported "Note:" labels show just the free-text after the prefix
+ * (e.g. "Note: За очки" -> "За очки"), and legacy "Balance adjusted from <a> → <b>"
+ * labels show just the amount chain ("<a> → <b>"). All other labels are returned
+ * unchanged. Matching is case-insensitive. Never mutates state.
+ * @param {*} label
+ * @returns {string}
+ */
+export const displayLabel = (label) => {
+  const clean = normalizeLabel(label);
+  const lower = clean.toLowerCase();
+  for (const prefix of DISPLAY_STRIP_PREFIXES) {
+    if (lower.startsWith(prefix.toLowerCase())) {
+      return clean.slice(prefix.length).trim();
+    }
+  }
+  return clean;
 };
 
 /**
@@ -171,6 +205,19 @@ export const isSystemLabel = (label) => {
 export const visibleListLabels = (labels) => {
   if (!Array.isArray(labels)) return [];
   return labels.filter((l) => !isSystemLabel(l));
+};
+
+/**
+ * Whether a single label should be kept out of autocomplete suggestions: imported
+ * metadata (a system label) or the [MoneyOK] import marker. Offering these as
+ * suggestions would let the user re-introduce the clutter / mark an operation as a
+ * protected import. Matching is case-insensitive.
+ * @param {*} label
+ * @returns {boolean}
+ */
+export const isHiddenLabel = (label) => {
+  if (isSystemLabel(label)) return true;
+  return normalizeLabel(label).toLowerCase() === MONEYOK_LABEL.toLowerCase();
 };
 
 /**

@@ -170,17 +170,34 @@ describe('OperationListItem', () => {
           {...baseProps}
           operation={{
             ...baseOperation,
-            description: '[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses',
+            description: '[MoneyOK] | Account: Cash | groceries | Category: Food | Category group: Expenses | Date: 2025.11.03 | Amount: 1172300 AMD',
           }}
         />,
       );
       // Ordinary labels and the [MoneyOK] marker remain visible...
       expect(getByText('groceries')).toBeTruthy();
       expect(getByText('[MoneyOK]')).toBeTruthy();
-      // ...but the Account:/Category:/Category group: metadata labels are hidden.
+      // ...but the imported metadata labels are hidden.
       expect(queryByText('Account: Cash')).toBeNull();
       expect(queryByText('Category: Food')).toBeNull();
       expect(queryByText('Category group: Expenses')).toBeNull();
+      expect(queryByText('Date: 2025.11.03')).toBeNull();
+      expect(queryByText('Amount: 1172300 AMD')).toBeNull();
+    });
+
+    it('shows Note: labels with the prefix stripped', async () => {
+      const { getByText, queryByText } = await render(
+        <OperationListItem
+          {...baseProps}
+          operation={{
+            ...baseOperation,
+            description: 'Note: За очки | groceries',
+          }}
+        />,
+      );
+      expect(getByText('За очки')).toBeTruthy();
+      expect(queryByText('Note: За очки')).toBeNull();
+      expect(getByText('groceries')).toBeTruthy();
     });
 
     it('summarises overflow labels as +N', async () => {

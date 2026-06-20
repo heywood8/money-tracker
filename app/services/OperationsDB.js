@@ -1,6 +1,6 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from './db';
 import { normalizeSearchText } from './searchNormalize';
-import { parseLabels } from '../utils/labelUtils';
+import { parseLabels, isHiddenLabel } from '../utils/labelUtils';
 
 // Returns 'SEARCH_NORM' when the custom function was registered successfully (full
 // Cyrillic case-folding + ё/е equivalence), otherwise falls back to SQLite's built-in
@@ -2009,6 +2009,9 @@ export const getDistinctLabels = async (limit = 50, categoryId = null) => {
     for (const row of (rows || [])) {
       const labels = parseLabels(row.description);
       for (const label of labels) {
+        // Imported metadata (Account:/Category:/Category group:) and the [MoneyOK]
+        // marker are never offered as suggestions.
+        if (isHiddenLabel(label)) continue;
         const key = label.toLowerCase();
         let entry = byLabel.get(key);
         if (!entry) {
