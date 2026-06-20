@@ -597,6 +597,13 @@ const styles = StyleSheet.create({
   },
   tabGradientOverlay: {
     bottom: 0,
+    // Match the elevation of the floating bar and the Settings subpanel overlay
+    // so the gradient fade renders above an elevated subpanel (e.g. the Settings
+    // sub-screens) the same way it does over the operations list. With equal
+    // elevation, draw order falls back to document order: screen content <
+    // gradient < floating bar. The overlay has no backgroundColor, so this does
+    // not cast a shadow on Android — it only affects z-ordering.
+    elevation: 8,
     height: TAB_OVERLAY_HEIGHT,
     left: 0,
     position: 'absolute',
