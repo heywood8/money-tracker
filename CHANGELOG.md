@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.142.0](https://github.com/heywood8/money-tracker/compare/penny-v0.141.4...penny-v0.142.0) (2026-06-20)
+
+
+### Features
+
+* reduce CI build progress poll to 5s and animate sync icon ([#1015](https://github.com/heywood8/money-tracker/issues/1015)) ([2fa8b70](https://github.com/heywood8/money-tracker/commit/2fa8b70ee3340a8b005981ef217a46d344423be5))
+
 ## [0.141.4](https://github.com/heywood8/money-tracker/compare/penny-v0.141.3...penny-v0.141.4) (2026-06-20)
 
 
