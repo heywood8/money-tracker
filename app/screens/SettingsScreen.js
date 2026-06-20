@@ -67,6 +67,11 @@ const BUILD_PROGRESS_POLL_MS = 5000;
 
 export default function SettingsScreen({ setSubPanelActive }) {
   const insets = useSafeAreaInsets();
+  // Bottom padding applied to each subpanel's scrollable content so the last
+  // items clear the floating tab bar while the scroll viewport itself still
+  // extends to the screen bottom — letting content scroll behind the
+  // translucent bar exactly like the operations list does.
+  const scrollBottomInset = insets.bottom + 80;
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
@@ -919,11 +924,13 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
         <Divider />
 
-        {/* Subpanel body */}
+        {/* Subpanel body — fills to the screen bottom so list content can scroll
+            behind the translucent floating tab bar. The bottom padding that keeps
+            the last items reachable lives on each scrollable's contentContainerStyle
+            instead, mirroring the operations list. */}
         <View style={[
           styles.subPanelBody,
           (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
-          !(activeSubPanel === 'accounts' || activeSubPanel === 'categories') && { paddingBottom: insets.bottom + 80 },
         ]}>
           {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
           {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
@@ -931,6 +938,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           {activeSubPanel === 'defaultAccount' && (
             <ScrollView
               style={styles.listContainer}
+              contentContainerStyle={{ paddingBottom: scrollBottomInset }}
               testID="settings-default-account-panel"
             >
               <TouchableRipple
@@ -964,7 +972,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
 
           {activeSubPanel === 'language' && (
-            <ScrollView style={styles.listContainer}>
+            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
               {availableLanguages.map(lng => (
                 <TouchableRipple
                   key={lng}
@@ -985,7 +993,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
 
           {activeSubPanel === 'export' && exportStep === 'list' && (
-            <ScrollView style={styles.listContainer}>
+            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
               <TouchableRipple
                 onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
                 style={styles.listItem}
@@ -1179,7 +1187,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
           )}
 
           {activeSubPanel === 'import' && importStep === 'source' && (
-            <ScrollView style={styles.listContainer}>
+            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
               <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.listItem}>
                 <View style={styles.listItemContent}>
                   <View style={styles.formatItemRow}>
@@ -1253,7 +1261,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 keyExtractor={(item) => item.uri}
                 renderItem={renderBackupItem}
                 style={styles.flexList}
-                contentContainerStyle={storedBackups.length === 0 && styles.emptyContainer}
+                contentContainerStyle={[
+                  storedBackups.length === 0 && styles.emptyContainer,
+                  { paddingBottom: scrollBottomInset },
+                ]}
                 ListEmptyComponent={
                   <Text style={[styles.emptyText, { color: colors.mutedText }]}>
                     {t('local_backups_empty') || 'No local backups yet'}
@@ -1361,7 +1372,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
               <Divider />
 
-              <View style={styles.logsActionBar}>
+              <View style={[styles.logsActionBar, { paddingBottom: scrollBottomInset }]}>
                 <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
                   <Ionicons name="share-outline" size={20} color={colors.primary} />
                   <Text style={[styles.logsActionText, { color: colors.primary }]}>
@@ -1387,6 +1398,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 onUpdate={handleUpdateFromSettings}
                 onInstallApk={handleInstallApk}
                 onRefresh={runUpdateCheck}
+                bottomInset={scrollBottomInset}
               />
             </View>
           )}
