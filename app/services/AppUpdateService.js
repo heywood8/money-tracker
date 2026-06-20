@@ -468,16 +468,21 @@ export const checkAlreadyDownloaded = async (downloadUrl, cacheDir = FileSystem.
 };
 
 // Verifies the integrity of an APK already sitting in the cache for the given download URL.
-// A previous download can be left truncated or corrupt (interrupted transfer, full disk), in
-// which case offering "Install now" would launch a broken installer. When a checksum is
-// available we hash the cached file and, on mismatch, delete it so callers re-download cleanly.
+// A previous download can be left truncated or corrupt (interrupted transfer, app killed
+// mid-download, full disk), in which case offering "Install now" launches a broken installer
+// that Android rejects with "There's a problem with the app file".
+//
+// Two layers of defence:
+//   1. Checksum — when the release ships a .sha256 we hash the file and compare (strongest signal).
+//   2. Structure — when no checksum is usable (asset missing, unfetchable, or hashing OOMed) we
+//      fall back to a lightweight ZIP-structure check that still catches truncated downloads.
+// A file that fails either layer is deleted so callers re-download cleanly.
 //
 // Returns one of:
 //   { exists: false }                          — no usable cached file (absent or zero-size)
-//   { exists: false, corrupted: true }         — cached file failed the checksum and was deleted
+//   { exists: false, corrupted: true }         — cached file failed verification and was deleted
 //   { exists: true, uri, verified: true }      — checksum matched
-//   { exists: true, uri, verified: false }     — present but integrity could not be confirmed
-//                                                 (no checksum, unfetchable checksum, or hash error)
+//   { exists: true, uri, verified: false }     — checksum unavailable but the file is structurally intact
 export const verifyCachedApk = async (
   downloadUrl,
   { checksumUrl = null, cacheDir = FileSystem.cacheDirectory, fetchImpl = fetch } = {},
@@ -487,36 +492,38 @@ export const verifyCachedApk = async (
     return { exists: false };
   }
 
-  // Without a checksum we can confirm the file is present and non-empty, but not prove
-  // integrity — treat it as usable but unverified.
-  if (!checksumUrl) {
-    return { exists: true, uri: localUri, verified: false };
+  // Layer 1: checksum verification when a checksum is available — the strongest proof.
+  if (checksumUrl) {
+    const filename = localUri.split('/').pop();
+    const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
+    if (expectedHash) {
+      try {
+        const actualHash = await computeSha256(localUri);
+        if (actualHash !== expectedHash) {
+          await FileSystem.deleteAsync(localUri, { idempotent: true });
+          console.warn('[AppUpdate] cached APK failed checksum; deleted corrupt file', localUri);
+          return { exists: false, corrupted: true };
+        }
+        return { exists: true, uri: localUri, verified: true };
+      } catch (e) {
+        // Hashing can OOM on large APKs (reads the whole file into the JS heap). Fall through to
+        // the structural check rather than trusting the file outright.
+        console.warn('[AppUpdate] cached APK checksum computation failed; falling back to structure check', e.message);
+      }
+    }
+    // expectedHash null → checksum asset missing/unfetchable/unparseable; fall through to structure.
   }
 
-  const filename = localUri.split('/').pop();
-  const expectedHash = await fetchExpectedChecksum(checksumUrl, filename, fetchImpl);
-  if (!expectedHash) {
-    // Checksum file unavailable or unparseable — cannot verify, keep the file.
-    return { exists: true, uri: localUri, verified: false };
-  }
-
-  let actualHash;
-  try {
-    actualHash = await computeSha256(localUri);
-  } catch (e) {
-    // Hashing can OOM on large APKs (reads the whole file into the JS heap). A failure here
-    // means "unable to verify", not "corrupt" — keep the file rather than discarding a good one.
-    console.warn('[AppUpdate] cached APK checksum computation failed; skipping verification', e.message);
-    return { exists: true, uri: localUri, verified: false };
-  }
-
-  if (actualHash !== expectedHash) {
+  // Layer 2: no usable checksum — verify the file is a structurally complete ZIP/APK so we still
+  // catch truncated or partially-written downloads.
+  const intact = await verifyApkStructure(localUri);
+  if (!intact) {
     await FileSystem.deleteAsync(localUri, { idempotent: true });
-    console.warn('[AppUpdate] cached APK failed checksum; deleted corrupt file', localUri);
+    console.warn('[AppUpdate] cached APK is structurally invalid; deleted corrupt file', localUri);
     return { exists: false, corrupted: true };
   }
 
-  return { exists: true, uri: localUri, verified: true };
+  return { exists: true, uri: localUri, verified: false };
 };
 
 // Pre-built lookup table for base64 → 6-bit value. Avoids atob() + charCodeAt loop.
@@ -544,6 +551,61 @@ const base64ToBytes = (b64) => {
     if (j < byteLen) out[j++] = v & 0xff;
   }
   return out;
+};
+
+// ZIP signatures, little-endian, in the byte order they appear on disk.
+const ZIP_LOCAL_HEADER = [0x50, 0x4b, 0x03, 0x04]; // "PK\x03\x04" — first local file header
+const ZIP_EOCD = [0x50, 0x4b, 0x05, 0x06];         // "PK\x05\x06" — End Of Central Directory record
+// The EOCD is 22 bytes plus an optional comment of up to 0xFFFF bytes, so it lives within the
+// last ~64KB of a valid archive. We never need to read more than this to find it.
+const MAX_EOCD_SCAN = 22 + 0xffff; // 65557
+const EOCD_MIN_SIZE = 22; // a ZIP with no entries is still at least one 22-byte EOCD record
+
+// Checksum-independent integrity check for a cached APK. An APK is a ZIP archive: it must begin
+// with a local file header (PK\x03\x04) and end with an End Of Central Directory record
+// (PK\x05\x06) within the last ~64KB. A truncated or partially-written download — the usual cause
+// of Android's "There's a problem with the app file" — is missing the trailing EOCD, so this
+// catches exactly the corruption the OS installer would reject.
+//
+// Reads only the head (4 bytes) and tail (≤64KB), never the whole 30-50MB file, so it is cheap
+// and OOM-safe. Returns true when the file looks intact OR when it cannot be inspected (a read
+// error must not cause us to delete a possibly-good file — let other signals decide).
+export const verifyApkStructure = async (fileUri) => {
+  try {
+    const info = await FileSystem.getInfoAsync(fileUri);
+    const size = info?.size;
+    if (!Number.isFinite(size) || size < EOCD_MIN_SIZE) {
+      return false; // too small to be a valid APK/ZIP
+    }
+
+    const headB64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+      position: 0,
+      length: 4,
+    });
+    const head = base64ToBytes(headB64);
+    if (head.length < 4 || !ZIP_LOCAL_HEADER.every((b, i) => head[i] === b)) {
+      return false;
+    }
+
+    const tailLen = Math.min(size, MAX_EOCD_SCAN);
+    const tailB64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+      position: size - tailLen,
+      length: tailLen,
+    });
+    const tail = base64ToBytes(tailB64);
+    for (let i = tail.length - 4; i >= 0; i -= 1) {
+      if (tail[i] === ZIP_EOCD[0] && tail[i + 1] === ZIP_EOCD[1]
+        && tail[i + 2] === ZIP_EOCD[2] && tail[i + 3] === ZIP_EOCD[3]) {
+        return true; // found the End Of Central Directory record — archive is complete
+      }
+    }
+    return false; // no EOCD in the tail → truncated/corrupt
+  } catch (e) {
+    console.warn('[AppUpdate] APK structure check could not read file; skipping', e.message);
+    return true; // unable to determine → do not treat as corrupt
+  }
 };
 
 // Uses the native Web Crypto API (crypto.subtle) available in Hermes (RN 0.71+).
