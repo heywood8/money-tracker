@@ -110,6 +110,18 @@ describe('LabelInput', () => {
     expect(onChangeText).toHaveBeenCalledWith('food');
   });
 
+  it('shows Note: suggestion chips with the prefix stripped', async () => {
+    const { getByTestId, getByText, queryByText } = await renderInput({
+      value: '',
+      suggestions: ['Note: Mak'],
+    });
+    await fireEvent(getByTestId('label-input-field'), 'focus');
+    await waitFor(() => expect(getByTestId('label-suggestion-Note: Mak')).toBeTruthy());
+    // The chip text is the display form, not the raw "Note: Mak" label.
+    expect(getByText('Mak')).toBeTruthy();
+    expect(queryByText('Note: Mak')).toBeNull();
+  });
+
   it('hides the input and remove buttons when not editable', async () => {
     const { queryByTestId, getByText } = await renderInput({ value: 'work', editable: false });
     expect(queryByTestId('label-input-field')).toBeNull();
