@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.1](https://github.com/heywood8/money-tracker/compare/penny-v0.150.0...penny-v0.150.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* prioritize label-chip scroll over screen swipes ([#1053](https://github.com/heywood8/money-tracker/issues/1053)) ([f1ff9d3](https://github.com/heywood8/money-tracker/commit/f1ff9d3cc6ed4b09fffe58e20cecd01931d2b09e))
+
 ## [0.150.0](https://github.com/heywood8/money-tracker/compare/penny-v0.149.1...penny-v0.150.0) (2026-06-21)
 
 
