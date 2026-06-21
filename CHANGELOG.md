@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.0](https://github.com/heywood8/money-tracker/compare/penny-v0.149.1...penny-v0.150.0) (2026-06-21)
+
+
+### Features
+
+* strip Note:/metadata prefixes from label suggestion chips ([#1051](https://github.com/heywood8/money-tracker/issues/1051)) ([97d9249](https://github.com/heywood8/money-tracker/commit/97d92492d17984c731142dc5ff3797fe11c307f1))
+
 ## [0.149.1](https://github.com/heywood8/money-tracker/compare/penny-v0.149.0...penny-v0.149.1) (2026-06-20)
 
 
