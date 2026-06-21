@@ -56,7 +56,7 @@ jobs:
             core.setOutput('pr_number', String(pr.data.number));
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'issue_comment' && steps.pr-info.outputs.head_sha || github.sha }}
 
