@@ -230,11 +230,11 @@ const LabelInput = forwardRef(({
                 onPress={() => handleSuggestionPress(label)}
                 activeOpacity={0.65}
                 accessibilityRole="button"
-                accessibilityLabel={`label: ${label}`}
+                accessibilityLabel={`label: ${displayLabel(label)}`}
                 testID={`label-suggestion-${label}`}
               >
                 <Icon name="plus" size={12} color={colors.primary} />
-                <Text style={[styles.suggestionText, { color: colors.primary }]} numberOfLines={1}>{label}</Text>
+                <Text style={[styles.suggestionText, { color: colors.primary }]} numberOfLines={1}>{displayLabel(label)}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
