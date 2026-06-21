@@ -24,6 +24,7 @@ import PlannedOperationsScreen from '../screens/PlannedOperationsScreen';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
+import { SwipeNavigationGestureProvider } from '../contexts/SwipeNavigationContext';
 import Header from '../components/Header';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -482,7 +483,12 @@ export default function SimpleTabs() {
       <View style={styles.content}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.screensContainer, animatedStyle]}>
-            {renderScreens()}
+            {/* Expose the swipe Pan gesture so nested horizontal scrollables
+                (e.g. label-suggestion chips) can take priority over screen
+                swipes via blocksExternalGesture. */}
+            <SwipeNavigationGestureProvider value={panGesture}>
+              {renderScreens()}
+            </SwipeNavigationGestureProvider>
           </Animated.View>
         </GestureDetector>
       </View>

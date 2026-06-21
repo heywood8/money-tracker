@@ -1,7 +1,9 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
+import { Gesture } from 'react-native-gesture-handler';
 import { render, fireEvent } from '@testing-library/react-native';
 import DescriptionSuggestionRow from '../../../app/components/operations/DescriptionSuggestionRow';
+import { SwipeNavigationGestureProvider } from '../../../app/contexts/SwipeNavigationContext';
 
 const mockColors = {
   border: '#333',
@@ -69,5 +71,30 @@ describe('DescriptionSuggestionRow', () => {
     for (const chip of baseProps.chips) {
       expect(getByText(chip)).toBeTruthy();
     }
+  });
+
+  describe('Swipe priority', () => {
+    it('gives the chip scroll priority over the screen-swipe gesture', async () => {
+      const swipeGesture = { __id: 'swipe' };
+      Gesture.Native.mockClear();
+
+      await render(
+        <SwipeNavigationGestureProvider value={swipeGesture}>
+          <DescriptionSuggestionRow {...baseProps} />
+        </SwipeNavigationGestureProvider>,
+      );
+
+      // The chip's native scroll gesture must block the screen-swipe Pan so a
+      // horizontal drag scrolls the chips instead of switching screens.
+      expect(Gesture.Native).toHaveBeenCalled();
+      const nativeInstance = Gesture.Native.mock.results[0].value;
+      expect(nativeInstance.blocksExternalGesture).toHaveBeenCalledWith(swipeGesture);
+    });
+
+    it('renders without a swipe gesture provider (no blocking relation)', async () => {
+      const { getByText } = await render(<DescriptionSuggestionRow {...baseProps} />);
+      // Still renders normally when there is no swipe navigation in the tree.
+      expect(getByText('Monthly pass')).toBeTruthy();
+    });
   });
 });
