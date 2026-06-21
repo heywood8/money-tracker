@@ -1,10 +1,21 @@
-import React, { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, ScrollView, StyleSheet } from 'react-native';
 import PropTypes from 'prop-types';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/designTokens';
+import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Give horizontal scrolling over the chips priority over the screen-swipe
+  // gesture: the native scroll blocks the external Pan until it fails, so a
+  // sideways drag on the chips scrolls the strip instead of switching screens.
+  const swipeGesture = useSwipeNavigationGesture();
+  const scrollGesture = useMemo(() => {
+    const native = Gesture.Native();
+    return swipeGesture ? native.blocksExternalGesture(swipeGesture) : native;
+  }, [swipeGesture]);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -29,25 +40,27 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
             <Text style={[styles.chipText, { color: colors.mutedText }]}>✕</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
-          contentContainerStyle={styles.chipRow}
-          style={styles.chipScroll}
-        >
-          {chips.map((chip) => (
-            <TouchableOpacity
-              key={chip}
-              onPress={() => onApply(chip)}
-              style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
-              accessibilityRole="button"
-              accessibilityLabel={`label: ${chip}`}
-            >
-              <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{chip}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <GestureDetector gesture={scrollGesture}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.chipRow}
+            style={styles.chipScroll}
+          >
+            {chips.map((chip) => (
+              <TouchableOpacity
+                key={chip}
+                onPress={() => onApply(chip)}
+                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                accessibilityRole="button"
+                accessibilityLabel={`label: ${chip}`}
+              >
+                <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{chip}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </GestureDetector>
       </View>
     </Animated.View>
   );

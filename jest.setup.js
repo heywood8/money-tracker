@@ -455,10 +455,11 @@ jest.mock('react-native-gesture-handler', () => {
 
   const PropTypes = require('prop-types');
 
-  const GestureDetector = ({ children }) => React.createElement(View, {}, children);
+  const { View: RNView } = require('react-native');
+
+  const GestureDetector = ({ children }) => React.createElement(RNView, {}, children);
   GestureDetector.propTypes = { children: PropTypes.node };
 
-  const { View: RNView } = require('react-native');
   const SwipeableMock = ({ children, renderRightActions }) => {
     const rightActions = renderRightActions ? renderRightActions() : null;
     return React.createElement(RNView, {}, children, rightActions);
@@ -480,6 +481,9 @@ jest.mock('react-native-gesture-handler', () => {
       minDistance: jest.fn().mockReturnThis(),
       minPointers: jest.fn().mockReturnThis(),
       maxPointers: jest.fn().mockReturnThis(),
+      blocksExternalGesture: jest.fn().mockReturnThis(),
+      simultaneousWithExternalGesture: jest.fn().mockReturnThis(),
+      requireExternalGestureToFail: jest.fn().mockReturnThis(),
     })),
     Tap: jest.fn(() => ({
       onStart: jest.fn().mockReturnThis(),
@@ -495,6 +499,12 @@ jest.mock('react-native-gesture-handler', () => {
       onFinalize: jest.fn().mockReturnThis(),
       enabled: jest.fn().mockReturnThis(),
       minDuration: jest.fn().mockReturnThis(),
+    })),
+    Native: jest.fn(() => ({
+      enabled: jest.fn().mockReturnThis(),
+      blocksExternalGesture: jest.fn().mockReturnThis(),
+      simultaneousWithExternalGesture: jest.fn().mockReturnThis(),
+      requireExternalGestureToFail: jest.fn().mockReturnThis(),
     })),
   };
 
