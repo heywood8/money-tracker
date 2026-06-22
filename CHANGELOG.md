@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.3](https://github.com/heywood8/money-tracker/compare/penny-v0.150.2...penny-v0.150.3) (2026-06-22)
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump jest from 29.7.0 to 30.4.2 ([#1049](https://github.com/heywood8/money-tracker/issues/1049)) ([65b0afc](https://github.com/heywood8/money-tracker/commit/65b0afc1392bccdd19395c97cc00b2e6db4bbc41))
+
 ## [0.150.2](https://github.com/heywood8/money-tracker/compare/penny-v0.150.1...penny-v0.150.2) (2026-06-22)
 
 
