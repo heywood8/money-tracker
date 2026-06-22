@@ -39,6 +39,7 @@ const LocalizationContext = createContext({
   setLanguage: () => {},
   availableLanguages: Object.keys(i18nData),
   isFirstLaunch: false,
+  isLoading: true,
   setFirstLaunchComplete: () => {},
 });
 
@@ -128,8 +129,9 @@ export function LocalizationProvider({ children }) {
     setLanguage,
     availableLanguages: Object.keys(i18nData),
     isFirstLaunch,
+    isLoading,
     setFirstLaunchComplete,
-  }), [t, language, setLanguage, isFirstLaunch, setFirstLaunchComplete]);
+  }), [t, language, setLanguage, isFirstLaunch, isLoading, setFirstLaunchComplete]);
 
   return (
     <LocalizationContext.Provider value={value}>
