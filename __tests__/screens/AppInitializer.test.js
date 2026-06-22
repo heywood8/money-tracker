@@ -85,6 +85,7 @@ jest.mock('../../app/navigation/SimpleTabs', () => {
 // Create a mock LocalizationContext for controlled testing
 const mockLocalizationContext = {
   isFirstLaunch: false,
+  isLoading: false,
   setFirstLaunchComplete: jest.fn(),
   language: 'en',
 };
@@ -120,6 +121,7 @@ describe('AppInitializer', () => {
     jest.clearAllMocks();
     // Reset to default state
     mockLocalizationContext.isFirstLaunch = false;
+    mockLocalizationContext.isLoading = false;
     mockLocalizationContext.language = 'en';
     mockLocalizationContext.setFirstLaunchComplete = jest.fn();
   });
@@ -262,6 +264,30 @@ describe('AppInitializer', () => {
   });
 
   describe('Regression Tests', () => {
+    it('renders nothing while the language preference is still loading', async () => {
+      // Guards against briefly flashing the welcome/language screen on app open:
+      // isFirstLaunch defaults to true until the stored preference is read, so
+      // AppInitializer must render nothing (keeping the splash up) while loading.
+      mockLocalizationContext.isLoading = true;
+      mockLocalizationContext.isFirstLaunch = true;
+
+      const { queryByTestId, toJSON } = await render(<AppInitializer />);
+
+      expect(queryByTestId('language-selection-screen')).toBeNull();
+      expect(queryByTestId('simple-tabs')).toBeNull();
+      expect(toJSON()).toBeNull();
+    });
+
+    it('shows main app once loading completes for an initialized app', async () => {
+      mockLocalizationContext.isLoading = false;
+      mockLocalizationContext.isFirstLaunch = false;
+
+      const { getByTestId, queryByTestId } = await render(<AppInitializer />);
+
+      expect(getByTestId('simple-tabs')).toBeTruthy();
+      expect(queryByTestId('language-selection-screen')).toBeNull();
+    });
+
     it('does not show loading indicator when not initializing', async () => {
       mockLocalizationContext.isFirstLaunch = false;
 

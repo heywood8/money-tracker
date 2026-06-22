@@ -20,7 +20,7 @@ const UPDATE_REMINDER_DELAY_DAYS = 3;
  * Shows language selection screen on first launch, then initializes categories
  */
 const AppInitializer = () => {
-  const { isFirstLaunch, setFirstLaunchComplete, t } = useLocalization();
+  const { isFirstLaunch, isLoading, setFirstLaunchComplete, t } = useLocalization();
   const { colors } = useThemeColors();
   const { showDialog } = useDialog();
   const { startDownload } = useUpdateDownload();
@@ -120,6 +120,14 @@ const AppInitializer = () => {
       setIsInitializing(false);
     }
   };
+
+  // While the stored language preference is still loading, render nothing so the
+  // native splash screen stays up. This avoids briefly flashing the language
+  // selection (welcome) screen before we know whether this is truly a first
+  // launch — isFirstLaunch defaults to true until the preference is read.
+  if (isLoading) {
+    return null;
+  }
 
   // If showing language selection or initializing, don't show main app yet
   if (isFirstLaunch) {
