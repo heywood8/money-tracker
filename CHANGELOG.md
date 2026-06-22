@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.4](https://github.com/heywood8/money-tracker/compare/penny-v0.150.3...penny-v0.150.4) (2026-06-22)
+
+
+### Bug Fixes
+
+* prevent welcome screen flash on app open ([#1057](https://github.com/heywood8/money-tracker/issues/1057)) ([0022687](https://github.com/heywood8/money-tracker/commit/0022687633b50310297b8937957e0d7b52decb19))
+
 ## [0.150.3](https://github.com/heywood8/money-tracker/compare/penny-v0.150.2...penny-v0.150.3) (2026-06-22)
 
 
