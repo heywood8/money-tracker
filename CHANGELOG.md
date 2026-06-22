@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.2](https://github.com/heywood8/money-tracker/compare/penny-v0.150.1...penny-v0.150.2) (2026-06-22)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump actions/checkout from 6 to 7 ([#1048](https://github.com/heywood8/money-tracker/issues/1048)) ([af5a03f](https://github.com/heywood8/money-tracker/commit/af5a03f0f37e37494c84207a3a12921861d8bb23))
+
 ## [0.150.1](https://github.com/heywood8/money-tracker/compare/penny-v0.150.0...penny-v0.150.1) (2026-06-21)
 
 
