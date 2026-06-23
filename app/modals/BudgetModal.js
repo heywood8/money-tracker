@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
   Platform,
   Keyboard,
   Switch,
+  Animated,
+  Easing,
+  Dimensions,
 } from 'react-native';
 import PropTypes from 'prop-types';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -56,8 +59,13 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
   const [errors, setErrors] = useState({});
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
-  const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
+
+  // Sub-panel navigation (subpanel pattern — see CLAUDE.md). Secondary views
+  // (currency / period pickers) slide in over the form inside the same modal
+  // instead of opening a second, nested native Modal.
+  const [activeSubPanel, setActiveSubPanel] = useState(null); // null | 'currency' | 'period'
+  const mainAnim = useRef(new Animated.Value(0)).current; // 0 = form visible, 1 = form shifted/dimmed
+  const subPanelAnim = useRef(new Animated.Value(0)).current; // 0 = subpanel hidden, 1 = visible
 
   const PERIOD_TYPES = [
     { key: 'weekly', label: t('weekly') },
@@ -95,6 +103,55 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     }
     setErrors({});
   }, [budget, isNew, visible, availableCurrencies]);
+
+  // Reset any open subpanel (and its animation values) whenever the modal is
+  // hidden, so reopening always starts on the form.
+  useEffect(() => {
+    if (!visible) {
+      setActiveSubPanel(null);
+      mainAnim.setValue(0);
+      subPanelAnim.setValue(0);
+    }
+  }, [visible, mainAnim, subPanelAnim]);
+
+  // Slide a secondary view in over the form. Asymmetric durations inside a
+  // single Animated.parallel produce the staggered feel without an
+  // Animated.delay node (which would break the native driver).
+  const openSubPanel = useCallback((panel) => {
+    Keyboard.dismiss();
+    setActiveSubPanel(panel);
+    Animated.parallel([
+      Animated.timing(mainAnim, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(subPanelAnim, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [mainAnim, subPanelAnim]);
+
+  const closeSubPanel = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(subPanelAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(mainAnim, {
+        toValue: 0,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => setActiveSubPanel(null));
+  }, [subPanelAnim, mainAnim]);
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -178,6 +235,16 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     onClose();
   }, [onClose]);
 
+  // Android hardware back (and the outer Modal's onRequestClose): step out of an
+  // open subpanel first, otherwise close the whole modal.
+  const handleRequestClose = useCallback(() => {
+    if (activeSubPanel) {
+      closeSubPanel();
+    } else {
+      handleClose();
+    }
+  }, [activeSubPanel, closeSubPanel, handleClose]);
+
   const handleDelete = useCallback(() => {
     showDialog(
       t('delete_budget'),
@@ -220,6 +287,71 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
     return date.toLocaleDateString();
   }, [t]);
 
+  const handleSelectCurrency = useCallback((code) => {
+    setValues(v => ({ ...v, currency: code }));
+    closeSubPanel();
+  }, [closeSubPanel]);
+
+  const handleSelectPeriod = useCallback((key) => {
+    setValues(v => ({ ...v, periodType: key }));
+    closeSubPanel();
+  }, [closeSubPanel]);
+
+  // Subpanel slides in from the right edge of the card; the form shifts slightly
+  // left and fades as it goes. Transforms/opacity only — no layout impact.
+  const panelWidth = Dimensions.get('window').width;
+  const subPanelTranslateX = subPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [panelWidth, 0],
+  });
+  const mainTranslateX = mainAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -40],
+  });
+  const mainOpacity = mainAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const renderCurrencyItem = useCallback(({ item }) => (
+    <Pressable
+      onPress={() => handleSelectCurrency(item.code)}
+      style={({ pressed }) => [
+        styles.pickerOption,
+        { borderColor: colors.border },
+        pressed && { backgroundColor: colors.selected },
+        values.currency === item.code && { backgroundColor: colors.selected },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.code} ${item.name}`}
+    >
+      <View style={styles.currencyOption}>
+        <Text style={[styles.text18bold, { color: colors.text }]}>
+          {item.code}
+        </Text>
+        <Text style={[styles.text14muted, { color: colors.mutedText }]}>
+          {item.symbol} - {item.name}
+        </Text>
+      </View>
+    </Pressable>
+  ), [colors, values.currency, handleSelectCurrency]);
+
+  const renderPeriodItem = useCallback(({ item }) => (
+    <Pressable
+      onPress={() => handleSelectPeriod(item.key)}
+      style={({ pressed }) => [
+        styles.pickerOption,
+        { borderColor: colors.border },
+        pressed && { backgroundColor: colors.selected },
+        values.periodType === item.key && { backgroundColor: colors.selected },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+    >
+      <Text style={[styles.text18, { color: colors.text }]}>{item.label}</Text>
+    </Pressable>
+  ), [colors, values.periodType, handleSelectPeriod]);
+
   return (
     <>
       {visible && <ModalBlurOverlay />}
@@ -227,7 +359,8 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
         visible={visible}
         animationType="slide"
         transparent={true}
-        onRequestClose={handleClose}
+        onRequestClose={handleRequestClose}
+        testID="budget-modal"
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -235,212 +368,271 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
         >
           <Pressable style={styles.modalOverlay} onPress={handleClose}>
             <Pressable style={[styles.modalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
+              <Animated.View
+                style={[
+                  styles.mainContent,
+                  { opacity: mainOpacity, transform: [{ translateX: mainTranslateX }] },
+                ]}
               >
-                <ModalHeader title={isNew ? t('set_budget') : t('edit_budget')} />
+                <ScrollView
+                  style={styles.scrollView}
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <ModalHeader title={isNew ? t('set_budget') : t('edit_budget')} />
 
-                <Text style={[styles.categoryLabel, { color: colors.mutedText }]}>
-                  {t('budget_for_category')}: {categoryName}
-                </Text>
-
-                {/* Amount Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                    {t('budget_amount')}
+                  <Text style={[styles.categoryLabel, { color: colors.mutedText }]}>
+                    {t('budget_for_category')}: {categoryName}
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.text,
-                        backgroundColor: colors.inputBackground,
-                        borderColor: errors.amount ? colors.error : colors.inputBorder,
-                      },
-                    ]}
-                    value={values.amount}
-                    onChangeText={text => setValues(v => ({ ...v, amount: text }))}
-                    placeholder="0.00"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                  />
-                  {errors.amount && (
-                    <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>
-                  )}
-                </View>
 
-                {/* Currency Picker */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                    {t('currency')}
-                  </Text>
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                    ]}
-                    onPress={() => setCurrencyPickerVisible(true)}
-                  >
-                    <View style={styles.pickerValue}>
-                      <Text style={[styles.text16, { color: colors.text }]}> 
-                        {values.currency} {currencies[values.currency]?.symbol || ''}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={colors.text} />
-                    </View>
-                  </Pressable>
-                </View>
+                  {/* Amount Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                      {t('budget_amount')}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.text,
+                          backgroundColor: colors.inputBackground,
+                          borderColor: errors.amount ? colors.error : colors.inputBorder,
+                        },
+                      ]}
+                      value={values.amount}
+                      onChangeText={text => setValues(v => ({ ...v, amount: text }))}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.mutedText}
+                      keyboardType="decimal-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                    />
+                    {errors.amount && (
+                      <Text style={[styles.error, { color: colors.error }]}>{errors.amount}</Text>
+                    )}
+                  </View>
 
-                {/* Period Type Picker */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                    {t('period_type')}
-                  </Text>
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                    ]}
-                    onPress={() => setPeriodPickerVisible(true)}
-                  >
-                    <View style={styles.pickerValue}>
-                      <Text style={[styles.text16, { color: colors.text }]}> 
-                        {PERIOD_TYPES.find(p => p.key === values.periodType)?.label}
-                      </Text>
-                      <Icon name="chevron-down" size={20} color={colors.text} />
-                    </View>
-                  </Pressable>
-                </View>
-
-                {/* Start Date Picker */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                    {t('start_date')}
-                  </Text>
-                  <Pressable
-                    style={[
-                      styles.pickerButton,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-                    ]}
-                    onPress={() => setShowStartDatePicker(true)}
-                  >
-                    <View style={styles.pickerValue}>
-                      <Text style={[styles.text16, { color: colors.text }]}> 
-                        {formatDate(values.startDate)}
-                      </Text>
-                      <Icon name="calendar" size={20} color={colors.text} />
-                    </View>
-                  </Pressable>
-                </View>
-
-                {/* End Date Picker */}
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
-                    {t('end_date')}
-                  </Text>
-                  <View style={styles.dateRow}>
+                  {/* Currency Picker */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                      {t('currency')}
+                    </Text>
                     <Pressable
                       style={[
                         styles.pickerButton,
-                        styles.flex1,
-                        {
-                          backgroundColor: colors.inputBackground,
-                          borderColor: colors.inputBorder,
-                        },
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
                       ]}
-                      onPress={() => setShowEndDatePicker(true)}
+                      onPress={() => openSubPanel('currency')}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('currency')}
                     >
                       <View style={styles.pickerValue}>
-                        <Text style={[styles.text16, { color: colors.text }]}> 
-                          {formatDate(values.endDate)}
+                        <Text style={[styles.text16, { color: colors.text }]}>
+                          {values.currency} {currencies[values.currency]?.symbol || ''}
+                        </Text>
+                        <Icon name="chevron-down" size={20} color={colors.text} />
+                      </View>
+                    </Pressable>
+                  </View>
+
+                  {/* Period Type Picker */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                      {t('period_type')}
+                    </Text>
+                    <Pressable
+                      style={[
+                        styles.pickerButton,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      ]}
+                      onPress={() => openSubPanel('period')}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('period_type')}
+                    >
+                      <View style={styles.pickerValue}>
+                        <Text style={[styles.text16, { color: colors.text }]}>
+                          {PERIOD_TYPES.find(p => p.key === values.periodType)?.label}
+                        </Text>
+                        <Icon name="chevron-down" size={20} color={colors.text} />
+                      </View>
+                    </Pressable>
+                  </View>
+
+                  {/* Start Date Picker */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                      {t('start_date')}
+                    </Text>
+                    <Pressable
+                      style={[
+                        styles.pickerButton,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                      ]}
+                      onPress={() => setShowStartDatePicker(true)}
+                    >
+                      <View style={styles.pickerValue}>
+                        <Text style={[styles.text16, { color: colors.text }]}>
+                          {formatDate(values.startDate)}
                         </Text>
                         <Icon name="calendar" size={20} color={colors.text} />
                       </View>
                     </Pressable>
-                    {values.endDate && (
+                  </View>
+
+                  {/* End Date Picker */}
+                  <View style={styles.inputContainer}>
+                    <Text style={[styles.inputLabel, { color: colors.mutedText }]}>
+                      {t('end_date')}
+                    </Text>
+                    <View style={styles.dateRow}>
                       <Pressable
-                        style={[styles.clearButton, { backgroundColor: colors.secondary }]}
-                        onPress={() => setValues(v => ({ ...v, endDate: null }))}
+                        style={[
+                          styles.pickerButton,
+                          styles.flex1,
+                          {
+                            backgroundColor: colors.inputBackground,
+                            borderColor: colors.inputBorder,
+                          },
+                        ]}
+                        onPress={() => setShowEndDatePicker(true)}
                       >
-                        <Icon name="close" size={20} color={colors.text} />
+                        <View style={styles.pickerValue}>
+                          <Text style={[styles.text16, { color: colors.text }]}>
+                            {formatDate(values.endDate)}
+                          </Text>
+                          <Icon name="calendar" size={20} color={colors.text} />
+                        </View>
                       </Pressable>
-                    )}
-                  </View>
-                </View>
-
-                {/* Recurring Switch */}
-                <View style={styles.switchContainer}>
-                  <View style={styles.switchLabel}>
-                    <Icon name="sync" size={20} color={colors.text} style={styles.iconMarginRight} />
-                    <Text style={[styles.text16, { color: colors.text }]}>{t('recurring')}</Text>
-                  </View>
-                  <Switch
-                    value={values.isRecurring}
-                    onValueChange={(value) => setValues(v => ({ ...v, isRecurring: value }))}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={colors.card}
-                  />
-                </View>
-
-                {/* Rollover Switch */}
-                <View style={styles.switchContainer}>
-                  <View style={styles.switchLabel}>
-                    <Icon name="arrow-right-thick" size={20} color={colors.text} style={styles.iconMarginRight} />
-                    <View style={styles.flex1}>
-                      <Text style={[styles.text16, { color: colors.text }]}>{t('rollover')}</Text>
-                      <Text style={[styles.text12, styles.smallTop, { color: colors.mutedText }]}> 
-                      Carry unused amount to next period
-                      </Text>
+                      {values.endDate && (
+                        <Pressable
+                          style={[styles.clearButton, { backgroundColor: colors.secondary }]}
+                          onPress={() => setValues(v => ({ ...v, endDate: null }))}
+                        >
+                          <Icon name="close" size={20} color={colors.text} />
+                        </Pressable>
+                      )}
                     </View>
                   </View>
-                  <Switch
-                    value={values.rolloverEnabled}
-                    onValueChange={(value) => setValues(v => ({ ...v, rolloverEnabled: value }))}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={colors.card}
-                  />
-                </View>
 
-                {errors.general && (
-                  <Text style={[styles.error, { color: colors.error }]}>{errors.general}</Text>
-                )}
+                  {/* Recurring Switch */}
+                  <View style={styles.switchContainer}>
+                    <View style={styles.switchLabel}>
+                      <Icon name="sync" size={20} color={colors.text} style={styles.iconMarginRight} />
+                      <Text style={[styles.text16, { color: colors.text }]}>{t('recurring')}</Text>
+                    </View>
+                    <Switch
+                      value={values.isRecurring}
+                      onValueChange={(value) => setValues(v => ({ ...v, isRecurring: value }))}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor={colors.card}
+                    />
+                  </View>
 
-                {/* Delete Button (only for existing budgets) */}
-                {!isNew && (
+                  {/* Rollover Switch */}
+                  <View style={styles.switchContainer}>
+                    <View style={styles.switchLabel}>
+                      <Icon name="arrow-right-thick" size={20} color={colors.text} style={styles.iconMarginRight} />
+                      <View style={styles.flex1}>
+                        <Text style={[styles.text16, { color: colors.text }]}>{t('rollover')}</Text>
+                        <Text style={[styles.text12, styles.smallTop, { color: colors.mutedText }]}>
+                        Carry unused amount to next period
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={values.rolloverEnabled}
+                      onValueChange={(value) => setValues(v => ({ ...v, rolloverEnabled: value }))}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor={colors.card}
+                    />
+                  </View>
+
+                  {errors.general && (
+                    <Text style={[styles.error, { color: colors.error }]}>{errors.general}</Text>
+                  )}
+
+                  {/* Delete Button (only for existing budgets) */}
+                  {!isNew && (
+                    <Pressable
+                      style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
+                      onPress={handleDelete}
+                    >
+                      <Icon name="delete-outline" size={20} color={colors.delete} />
+                      <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
+                        {t('delete_budget')}
+                      </Text>
+                    </Pressable>
+                  )}
+                </ScrollView>
+
+                {/* Action Buttons */}
+                <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
                   <Pressable
-                    style={[styles.deleteButtonContainer, { borderTopColor: colors.border }]}
-                    onPress={handleDelete}
+                    style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                    onPress={handleClose}
                   >
-                    <Icon name="delete-outline" size={20} color={colors.delete} />
-                    <Text style={[styles.deleteButtonText, { color: colors.delete }]}>
-                      {t('delete_budget')}
+                    <Text style={[styles.buttonText, { color: colors.text }]}>
+                      {t('cancel')}
                     </Text>
                   </Pressable>
-                )}
-              </ScrollView>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                    onPress={handleSave}
+                  >
+                    <Text style={[styles.buttonText, { color: colors.text }]}>
+                      {t('save')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </Animated.View>
 
-              {/* Action Buttons */}
-              <View style={[styles.modalButtonRow, { backgroundColor: colors.card }]}>
-                <Pressable
-                  style={[styles.modalButton, { backgroundColor: colors.secondary }]}
-                  onPress={handleClose}
+              {/* Secondary view (currency / period picker) — slides in over the
+                  form within the same modal. Mounted only while open so the
+                  entry animation always plays from the hidden state. */}
+              {activeSubPanel && (
+                <Animated.View
+                  testID="budget-subpanel"
+                  style={[
+                    styles.subPanel,
+                    { backgroundColor: colors.card },
+                    { opacity: subPanelAnim, transform: [{ translateX: subPanelTranslateX }] },
+                  ]}
                 >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>
-                    {t('cancel')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                  onPress={handleSave}
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>
-                    {t('save')}
-                  </Text>
-                </Pressable>
-              </View>
+                  <View style={styles.subPanelHeader}>
+                    <Pressable
+                      onPress={closeSubPanel}
+                      style={styles.subPanelBack}
+                      hitSlop={8}
+                      testID="budget-subpanel-back"
+                      accessibilityRole="button"
+                      accessibilityLabel={t('back')}
+                    >
+                      <Icon name="arrow-left" size={24} color={colors.text} />
+                    </Pressable>
+                    <Text style={[styles.subPanelTitle, { color: colors.text }]}>
+                      {activeSubPanel === 'currency' ? t('select_currency') : t('period_type')}
+                    </Text>
+                  </View>
+
+                  {activeSubPanel === 'currency' && (
+                    <FlatList
+                      data={availableCurrencies}
+                      keyExtractor={item => item.code}
+                      renderItem={renderCurrencyItem}
+                      keyboardShouldPersistTaps="handled"
+                    />
+                  )}
+
+                  {activeSubPanel === 'period' && (
+                    <FlatList
+                      data={PERIOD_TYPES}
+                      keyExtractor={item => item.key}
+                      renderItem={renderPeriodItem}
+                      keyboardShouldPersistTaps="handled"
+                    />
+                  )}
+                </Animated.View>
+              )}
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -465,87 +657,6 @@ export default function BudgetModal({ visible, onClose, budget, categoryId, cate
             minimumDate={values.startDate ? new Date(values.startDate + 'T00:00:00') : undefined}
           />
         )}
-
-        {/* Currency Picker Modal */}
-        <Modal
-          visible={currencyPickerVisible}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setCurrencyPickerVisible(false)}
-        >
-          <Pressable style={styles.modalOverlay} onPress={() => setCurrencyPickerVisible(false)}>
-            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('select_currency')}</Text>
-              <FlatList
-                data={availableCurrencies}
-                keyExtractor={item => item.code}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => {
-                      setValues(v => ({ ...v, currency: item.code }));
-                      setCurrencyPickerVisible(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.pickerOption,
-                      { borderColor: colors.border },
-                      pressed && { backgroundColor: colors.selected },
-                      values.currency === item.code && { backgroundColor: colors.selected },
-                    ]}
-                  >
-                    <View style={styles.currencyOption}>
-                      <Text style={[styles.text18bold, { color: colors.text }]}> 
-                        {item.code}
-                      </Text>
-                      <Text style={[styles.text14muted, { color: colors.mutedText }]}> 
-                        {item.symbol} - {item.name}
-                      </Text>
-                    </View>
-                  </Pressable>
-                )}
-              />
-              <Pressable style={styles.closeButton} onPress={() => setCurrencyPickerVisible(false)}>
-                <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
-              </Pressable>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        {/* Period Type Picker Modal */}
-        <Modal
-          visible={periodPickerVisible}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setPeriodPickerVisible(false)}
-        >
-          <Pressable style={styles.modalOverlay} onPress={() => setPeriodPickerVisible(false)}>
-            <Pressable style={[styles.pickerModalContent, { backgroundColor: colors.card }]} onPress={() => {}}>
-              <Text style={[styles.pickerTitle, { color: colors.text }]}>{t('period_type')}</Text>
-              <FlatList
-                data={PERIOD_TYPES}
-                keyExtractor={item => item.key}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => {
-                      setValues(v => ({ ...v, periodType: item.key }));
-                      setPeriodPickerVisible(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.pickerOption,
-                      { borderColor: colors.border },
-                      pressed && { backgroundColor: colors.selected },
-                      values.periodType === item.key && { backgroundColor: colors.selected },
-                    ]}
-                  >
-                    <Text style={[styles.text18, { color: colors.text }]}>{item.label}</Text>
-                  </Pressable>
-                )}
-              />
-              <Pressable style={styles.closeButton} onPress={() => setPeriodPickerVisible(false)}>
-                <Text style={[styles.textPrimary, { color: colors.primary }]}>{t('close')}</Text>
-              </Pressable>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </Modal>
     </>
   );
@@ -593,11 +704,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     padding: 12,
   },
-  closeButton: {
-    alignSelf: 'center',
-    marginTop: 8,
-    padding: 10,
-  },
   currencyOption: {
     alignItems: 'baseline',
     flexDirection: 'row',
@@ -642,6 +748,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 6,
   },
+  mainContent: {
+    flexShrink: 1,
+    padding: 20,
+  },
   modalButton: {
     alignItems: 'center',
     borderRadius: 6,
@@ -660,7 +770,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     maxHeight: '85%',
     minHeight: '60%',
-    padding: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -677,22 +787,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
   },
-  pickerModalContent: {
-    borderRadius: 12,
-    maxHeight: '60%',
-    padding: 12,
-    width: '90%',
-  },
   pickerOption: {
     borderBottomWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 12,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
   },
   pickerValue: {
     alignItems: 'center',
@@ -708,6 +806,23 @@ const styles = StyleSheet.create({
   },
   smallTop: {
     marginTop: 2,
+  },
+  subPanel: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 20,
+  },
+  subPanelBack: {
+    marginRight: 8,
+    padding: 4,
+  },
+  subPanelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  subPanelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   switchContainer: {
     alignItems: 'center',
@@ -738,8 +853,5 @@ const styles = StyleSheet.create({
   text18bold: {
     fontSize: 18,
     fontWeight: '500',
-  },
-  textPrimary: {
-    fontSize: 16,
   },
 });

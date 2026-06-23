@@ -517,50 +517,47 @@ describe('BudgetModal', () => {
     });
   });
 
-  it('closes currency picker via close button (lines 504-506)', async () => {
-    const { getByText, queryByText } = await render(
+  it('closes currency picker via back arrow', async () => {
+    const { getByText, getByTestId, queryByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
-    // Open currency picker
+    // Open currency subpanel
     const currencyBtn = getByText(/USD/);
     await fireEvent.press(currencyBtn);
 
-    // Modal should open
+    // Subpanel should slide in
     expect(getByText('select_currency')).toBeTruthy();
 
-    // Find and press close button
-    const closeBtn = getByText('close');
-    await fireEvent.press(closeBtn);
+    // Press the back arrow to close the subpanel
+    await fireEvent.press(getByTestId('budget-subpanel-back'));
 
     await waitFor(() => {
       expect(queryByText('select_currency')).toBeFalsy();
     });
   });
 
-  it('closes period picker via close button (lines 541)', async () => {
-    const { getByText, queryByText, getAllByText } = await render(
+  it('closes period picker via back arrow', async () => {
+    const { getByText, getByTestId, getAllByText } = await render(
       <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
     );
 
-    // Open period picker
+    // Open period subpanel
     const periodBtn = getByText('monthly');
     await fireEvent.press(periodBtn);
 
-    // Modal should open with period_type title
+    // Subpanel should slide in with period_type title
     await waitFor(() => {
       const periodTitles = getAllByText('period_type');
-      expect(periodTitles.length).toBeGreaterThan(1); // One in main form, one in picker title
+      expect(periodTitles.length).toBeGreaterThan(1); // One in main form label, one as subpanel title
     });
 
-    // Find and press close button in the period picker
-    const closeBtns = getAllByText('close');
-    await fireEvent.press(closeBtns[closeBtns.length - 1]);
+    // Press the back arrow to close the subpanel
+    await fireEvent.press(getByTestId('budget-subpanel-back'));
 
-    // Picker should close - period picker has period_type as title
+    // After closing, only the form's period_type label remains
     await waitFor(() => {
-      // After closing, there should be only one period_type text (the label)
-      expect(getByText('period_type')).toBeTruthy();
+      expect(getAllByText('period_type').length).toBe(1);
     });
   });
 
@@ -951,52 +948,111 @@ describe('BudgetModal', () => {
       expect(getByText('save')).toBeTruthy();
     });
 
-    it('opens currency picker modal successfully', async () => {
-      const { getByText, queryByText } = await render(
+    it('opens currency picker subpanel successfully', async () => {
+      const { getByText, getByTestId, queryByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
-      // Open currency picker
+      // Open currency subpanel
       const currencyBtn = getByText(/USD/);
       await fireEvent.press(currencyBtn);
 
-      // Modal should open with title
+      // Subpanel should slide in with title
       expect(getByText('select_currency')).toBeTruthy();
 
-      // Close via close button
-      const closeBtn = getByText('close');
-      await fireEvent.press(closeBtn);
+      // Close via back arrow
+      await fireEvent.press(getByTestId('budget-subpanel-back'));
 
       await waitFor(() => {
         expect(queryByText('select_currency')).toBeFalsy();
       });
     });
 
-    it('opens period picker modal successfully', async () => {
-      const { getByText, getAllByText, queryAllByText, getByPlaceholderText } = await render(
+    it('opens period picker subpanel successfully', async () => {
+      const { getByText, getByTestId, getAllByText, queryAllByText } = await render(
         <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
       );
 
-      // Open period picker
+      // Open period subpanel
       const periodBtn = getByText('monthly');
       await fireEvent.press(periodBtn);
 
-      // Modal should open with title - now there should be 2 period_type elements
+      // Subpanel should slide in - now there should be 2 period_type elements
       await waitFor(() => {
         const periodLabels = getAllByText('period_type');
         expect(periodLabels.length).toBeGreaterThan(1);
       });
 
-      // Close via close button (last close button)
-      const closeBtns = getAllByText('close');
-      await fireEvent.press(closeBtns[closeBtns.length - 1]);
+      // Close via back arrow
+      await fireEvent.press(getByTestId('budget-subpanel-back'));
 
-      // Modal should close
+      // Subpanel should close
       await waitFor(() => {
-        // After closing, modal title should be gone (only the label remains)
+        // After closing, subpanel title should be gone (only the label remains)
         const remaining = queryAllByText('period_type');
         expect(remaining.length).toBe(1);
       });
+    });
+  });
+
+  describe('Subpanel pattern (no nested Modal)', () => {
+    it('renders the picker as a subpanel within the same modal (no nested Modal)', async () => {
+      const { getByText, getByTestId, getAllByTestId, queryByTestId } = await render(
+        <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
+      );
+
+      // No subpanel up front
+      expect(queryByTestId('budget-subpanel')).toBeFalsy();
+
+      // Opening the currency picker mounts the subpanel inside the existing modal
+      await fireEvent.press(getByText(/USD/));
+      expect(getByTestId('budget-subpanel')).toBeTruthy();
+      expect(getByText('select_currency')).toBeTruthy();
+
+      // Still exactly one modal, and the main form header is still mounted behind it
+      expect(getAllByTestId('budget-modal').length).toBe(1);
+      expect(getByText('set_budget')).toBeTruthy();
+    });
+
+    it('hardware back closes the subpanel first, then the modal', async () => {
+      const { getByText, getByTestId, queryByText } = await render(
+        <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
+      );
+
+      // Open the currency subpanel
+      await fireEvent.press(getByText(/USD/));
+      expect(getByText('select_currency')).toBeTruthy();
+
+      // First hardware-back (onRequestClose): closes the subpanel, not the modal
+      await fireEvent(getByTestId('budget-modal'), 'requestClose');
+      await waitFor(() => {
+        expect(queryByText('select_currency')).toBeFalsy();
+      });
+      expect(mockOnClose).not.toHaveBeenCalled();
+
+      // Second hardware-back: now closes the whole modal
+      await fireEvent(getByTestId('budget-modal'), 'requestClose');
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled();
+      });
+    });
+
+    it('back arrow on the subpanel does not close the modal', async () => {
+      const { getByText, getByTestId, queryByText } = await render(
+        <BudgetModal visible={true} onClose={mockOnClose} isNew={true} categoryId="c1" categoryName="Food" />,
+      );
+
+      await fireEvent.press(getByText('monthly'));
+      await waitFor(() => expect(getByText('weekly')).toBeTruthy());
+
+      await fireEvent.press(getByTestId('budget-subpanel-back'));
+
+      await waitFor(() => {
+        // weekly option gone (subpanel unmounted) but modal still open
+        expect(queryByText('weekly')).toBeFalsy();
+      });
+      expect(getByText('set_budget')).toBeTruthy();
+      expect(mockOnClose).not.toHaveBeenCalled();
     });
   });
 });
