@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.5](https://github.com/heywood8/money-tracker/compare/penny-v0.150.4...penny-v0.150.5) (2026-06-24)
+
+
+### Styles
+
+* adjust suggestion row spacing in quick-add form ([#1060](https://github.com/heywood8/money-tracker/issues/1060)) ([08539f8](https://github.com/heywood8/money-tracker/commit/08539f8c09ab773b937b6576cc7416c574d7f1b9))
+
 ## [0.150.4](https://github.com/heywood8/money-tracker/compare/penny-v0.150.3...penny-v0.150.4) (2026-06-22)
 
 
