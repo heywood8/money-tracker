@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, DURATION } from '../../styles/designTokens';
 import { useSwipeNavigationGesture } from '../../contexts/SwipeNavigationContext';
+import { displayLabel } from '../../utils/labelUtils';
 
 const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -54,9 +55,9 @@ const DescriptionSuggestionRow = ({ chips, colors, onApply, onDismiss }) => {
                 onPress={() => onApply(chip)}
                 style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
                 accessibilityRole="button"
-                accessibilityLabel={`label: ${chip}`}
+                accessibilityLabel={`label: ${displayLabel(chip)}`}
               >
-                <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{chip}</Text>
+                <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>{displayLabel(chip)}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
