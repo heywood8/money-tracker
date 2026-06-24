@@ -781,7 +781,7 @@ const OperationFormFields = memo(({
       };
 
       return (
-        <View style={[styles.categoryRowsWrapper, compact && styles.categoryRowsWrapperCompact]}>
+        <View style={[styles.categoryRowsWrapper, styles.accountRows, compact && styles.categoryRowsWrapperCompact]}>
           {/* Row 1: "All accounts" button (if > 8 total) + first 3 or 4 shortcuts */}
           <View style={styles.categoryButtonsContainer}>
             {showAllAccountsButton && (
@@ -961,6 +961,9 @@ const styles = StyleSheet.create({
   accountBalanceText: {
     fontSize: 12,
   },
+  accountRows: {
+    gap: SPACING.sm,
+  },
   accountShortcutBalance: {
     fontSize: 10,
     textAlign: 'center',
@@ -1012,7 +1015,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryRows: {
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   categoryRowsWrapper: {
     marginBottom: SPACING.md,
