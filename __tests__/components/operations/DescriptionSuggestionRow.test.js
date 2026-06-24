@@ -73,6 +73,27 @@ describe('DescriptionSuggestionRow', () => {
     }
   });
 
+  it('strips the "Note:" prefix from chip text while applying the raw label', async () => {
+    const onApply = jest.fn();
+    const { getByText, queryByText } = await render(
+      <DescriptionSuggestionRow
+        {...baseProps}
+        chips={['Note: Денису', 'Groceries']}
+        onApply={onApply}
+      />,
+    );
+
+    // The prefix is stripped for display...
+    expect(getByText('Денису')).toBeTruthy();
+    expect(queryByText('Note: Денису')).toBeNull();
+    // ...but plain labels are untouched.
+    expect(getByText('Groceries')).toBeTruthy();
+
+    // Pressing the chip still applies the raw underlying label.
+    await fireEvent.press(getByText('Денису'));
+    expect(onApply).toHaveBeenCalledWith('Note: Денису');
+  });
+
   describe('Swipe priority', () => {
     it('gives the chip scroll priority over the screen-swipe gesture', async () => {
       const swipeGesture = { __id: 'swipe' };
