@@ -6,7 +6,7 @@ import DateSeparator from './DateSeparator';
 import OperationListItem from './OperationListItem';
 import OperationsListPlaceholder from './OperationsListPlaceholder';
 import currencies from '../../../assets/currencies.json';
-import { SPACING, BORDER_RADIUS } from '../../styles/designTokens';
+import { SPACING, BORDER_RADIUS, HEIGHTS } from '../../styles/designTokens';
 
 /**
  * Get currency symbol from currency code
@@ -16,6 +16,31 @@ const getCurrencySymbol = (currencyCode) => {
   const currency = currencies[currencyCode];
   return currency ? currency.symbol : currencyCode;
 };
+
+// ── getItemLayout constants ────────────────────────────────────────────────
+// The SectionList flattens to [sectionHeader, ...rows, sectionFooter] per
+// section. getItemLayout lets scrollToLocation compute a target offset directly
+// instead of measuring every cell on the way (which is slow and trips the
+// onScrollToIndexFailed fallback). These cover the fixed-height pieces:
+//
+//   • Row height: OperationListItem's row uses minHeight HEIGHTS.listItem and
+//     single-line content, so a row is exactly this tall in the common case.
+//   • Separator: the 1px divider rendered INSIDE OperationListItem for every
+//     row except the last in a section (see styles.separator there).
+//   • Section footer: the cardBottom cap (height BORDER_RADIUS.md) plus its
+//     marginBottom (SPACING.xs); the margin is folded in so the following
+//     section header lands at the correct offset.
+//
+// The section header (DateSeparator + cardTop) contains text whose exact line
+// height is font/platform dependent, and the list header (the QuickAdd form) is
+// dynamic, so both are measured at runtime via onLayout rather than hardcoded.
+const ITEM_ROW_HEIGHT = HEIGHTS.listItem;
+const ITEM_SEPARATOR_HEIGHT = 1;
+const SECTION_FOOTER_HEIGHT = BORDER_RADIUS.md + SPACING.xs;
+// Used only until the first DateSeparator card reports its real height:
+// paddingTop (SPACING.sm) + ~17px text line + paddingBottom (SPACING.xs) for the
+// DateSeparator, plus the cardTop cap (BORDER_RADIUS.md).
+const SECTION_HEADER_HEIGHT_FALLBACK = SPACING.sm + 17 + SPACING.xs + BORDER_RADIUS.md;
 
 /**
  * OperationsList Component
@@ -142,6 +167,31 @@ const OperationsList = forwardRef(({
     );
   }, [loadingMore, colors, t]);
 
+  // ── Runtime-measured heights for getItemLayout ────────────────────────────
+  // Read lazily inside getItemLayout (which RN calls fresh each time), so these
+  // are plain refs — updating them needs no re-render and never churns mid-scroll.
+  const listHeaderHeightRef = useRef(0);
+  const sectionHeaderHeightRef = useRef(SECTION_HEADER_HEIGHT_FALLBACK);
+  const sectionHeaderMeasuredRef = useRef(false);
+
+  // The QuickAdd form (list header) grows/shrinks, so always track its latest height.
+  const handleListHeaderLayout = useCallback((e) => {
+    listHeaderHeightRef.current = e.nativeEvent.layout.height;
+  }, []);
+
+  // Section headers are uniform; capture the first real measurement, then keep the
+  // tallest seen (expense days show a spending total, income-only days do not).
+  const handleSectionHeaderLayout = useCallback((e) => {
+    const h = e.nativeEvent.layout.height;
+    if (h <= 0) return;
+    if (!sectionHeaderMeasuredRef.current) {
+      sectionHeaderHeightRef.current = h;
+      sectionHeaderMeasuredRef.current = true;
+    } else if (h > sectionHeaderHeightRef.current) {
+      sectionHeaderHeightRef.current = h;
+    }
+  }, []);
+
   // Convert groupedOperations array into SectionList sections
   const sections = useMemo(() => groupedOperations.map(group => ({
     title: group.date,
@@ -149,9 +199,73 @@ const OperationsList = forwardRef(({
     data: group.operations,
   })), [groupedOperations]);
 
+  // Cumulative geometry per section, recomputed only when the sections change.
+  // Keeps getItemLayout to an O(log n) binary search instead of an O(items) walk.
+  // Stores the parts that don't depend on the measured header heights; those are
+  // added at lookup time so a header-height change never invalidates this cache.
+  const layoutCache = useMemo(() => {
+    const flatStarts = new Array(sections.length); // flattened index where each section starts
+    const dataBefore = new Array(sections.length); // Σ(rows + footer) of all earlier sections
+    const counts = new Array(sections.length);     // rows in each section
+    const itemsHeights = new Array(sections.length); // total row height of each section
+    let flat = 0;
+    let data = 0;
+    for (let s = 0; s < sections.length; s++) {
+      const n = sections[s].data.length;
+      flatStarts[s] = flat;
+      dataBefore[s] = data;
+      counts[s] = n;
+      const itemsH = n > 0
+        ? n * ITEM_ROW_HEIGHT + (n - 1) * ITEM_SEPARATOR_HEIGHT
+        : 0;
+      itemsHeights[s] = itemsH;
+      flat += n + 2; // section header + rows + section footer
+      data += itemsH + SECTION_FOOTER_HEIGHT;
+    }
+    return { flatStarts, dataBefore, counts, itemsHeights, totalCount: flat };
+  }, [sections]);
+
+  // Exact offsets for the SectionList's flattened cells. Section header and list
+  // header heights come from the measured refs; rows/separators/footers are fixed.
+  const getItemLayout = useCallback((_data, index) => {
+    const { flatStarts, dataBefore, counts, itemsHeights, totalCount } = layoutCache;
+    const headerH = sectionHeaderHeightRef.current;
+    const listHeaderH = listHeaderHeightRef.current;
+
+    if (totalCount === 0 || index < 0 || index >= totalCount) {
+      return { length: 0, offset: listHeaderH, index };
+    }
+
+    // Largest section s whose flattened start is <= index.
+    let lo = 0;
+    let hi = flatStarts.length - 1;
+    let s = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (flatStarts[mid] <= index) { s = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+
+    // Offset of section s's header: list header + earlier rows/footers + earlier headers.
+    const base = listHeaderH + dataBefore[s] + s * headerH;
+    const local = index - flatStarts[s];
+    const n = counts[s];
+
+    if (local === 0) {
+      return { length: headerH, offset: base, index }; // section header
+    }
+    if (local <= n) {
+      const j = local - 1; // row index within the section
+      const offset = base + headerH + j * (ITEM_ROW_HEIGHT + ITEM_SEPARATOR_HEIGHT);
+      const isLast = j === n - 1; // last row has no trailing separator
+      return { length: ITEM_ROW_HEIGHT + (isLast ? 0 : ITEM_SEPARATOR_HEIGHT), offset, index };
+    }
+    // section footer
+    return { length: SECTION_FOOTER_HEIGHT, offset: base + headerH + itemsHeights[s], index };
+  }, [layoutCache]);
+
   // Render the date separator as a section header
   const renderSectionHeader = useCallback(({ section }) => (
-    <View style={styles.groupContainer}>
+    <View style={styles.groupContainer} onLayout={handleSectionHeaderLayout}>
       <DateSeparator
         date={section.title}
         spendingSums={section.spendingSums}
@@ -170,7 +284,7 @@ const OperationsList = forwardRef(({
         ]}
       />
     </View>
-  ), [formatDate, colors, onDateSeparatorPress]);
+  ), [formatDate, colors, onDateSeparatorPress, handleSectionHeaderLayout]);
 
   // Render a closing cap at the bottom of each section's card
   const renderSectionFooter = useCallback(({ section }) => (
@@ -249,7 +363,12 @@ const OperationsList = forwardRef(({
       renderSectionFooter={renderSectionFooter}
       keyExtractor={keyExtractor}
       extraData={[accounts, categories, pendingSuggestionId]}
-      ListHeaderComponent={headerComponent}
+      getItemLayout={getItemLayout}
+      ListHeaderComponent={
+        headerComponent
+          ? <View onLayout={handleListHeaderLayout}>{headerComponent}</View>
+          : null
+      }
       ListFooterComponent={renderFooter}
       ListEmptyComponent={
         initialLoading ? (
