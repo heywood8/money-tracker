@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.6](https://github.com/heywood8/money-tracker/compare/penny-v0.150.5...penny-v0.150.6) (2026-06-24)
+
+
+### Bug Fixes
+
+* strip "Note:" prefix from quick-add suggestion chips ([#1062](https://github.com/heywood8/money-tracker/issues/1062)) ([80f4f9c](https://github.com/heywood8/money-tracker/commit/80f4f9cd2549575191ba9fbc15bbe6286d0502b5))
+
 ## [0.150.5](https://github.com/heywood8/money-tracker/compare/penny-v0.150.4...penny-v0.150.5) (2026-06-24)
 
 
