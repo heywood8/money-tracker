@@ -501,5 +501,72 @@ describe('OperationsList', () => {
       const { sp } = await getSectionListProps({ groupedOperations: [] });
       expect(sp.getItemLayout([], 0)).toEqual({ length: 0, offset: 0, index: 0 });
     });
+
+    // ── runtime height measurement feeding getItemLayout ─────────────────────
+    // onLayout never fires in the test renderer, so we drive the captured
+    // handlers directly and confirm getItemLayout picks up the measured heights.
+    describe('runtime height measurement', () => {
+      const fireLayout = (element, height) => {
+        element.props.onLayout({ nativeEvent: { layout: { height } } });
+      };
+
+      it('uses a measured section-header height for every section offset', async () => {
+        const groups = [makeGroup(TODAY, makeOps('a', 1)), makeGroup(OLD_DATE, makeOps('b', 1))];
+        const { sp } = await getSectionListProps({ groupedOperations: groups });
+        const section = toSection(groups[0]);
+        const aData = 1 * ROW + FOOTER; // section A's rows + footer = dataBefore[B]
+
+        // Fallback height until the DateSeparator card reports a real one.
+        expect(sp.getItemLayout(sp.sections, 0).length).toBe(HEADER);
+        expect(sp.getItemLayout(sp.sections, 3).offset).toBe(aData + HEADER); // section B header
+
+        // The section-header card reports its real height.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 44); });
+
+        // Both the header length and every later section's offset reflect it.
+        expect(sp.getItemLayout(sp.sections, 0).length).toBe(44);
+        expect(sp.getItemLayout(sp.sections, 3)).toEqual({ length: 44, offset: aData + 44, index: 3 });
+      });
+
+      it('keeps the first measurement, then the tallest, and ignores non-positive heights', async () => {
+        const groups = [makeGroup(TODAY, makeOps('a', 1))];
+        const { sp } = await getSectionListProps({ groupedOperations: groups });
+        const section = toSection(groups[0]);
+        const headerLength = () => sp.getItemLayout(sp.sections, 0).length;
+
+        // First real measurement replaces the fallback even when it is shorter.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 30); });
+        expect(headerLength()).toBe(30);
+
+        // A shorter later measurement is ignored (keep the tallest seen)...
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 25); });
+        expect(headerLength()).toBe(30);
+
+        // ...a taller one wins...
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 50); });
+        expect(headerLength()).toBe(50);
+
+        // ...and a zero/garbage layout never regresses it.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 0); });
+        expect(headerLength()).toBe(50);
+      });
+
+      it('shifts all offsets down by the measured list-header (QuickAdd form) height', async () => {
+        const React = require('react');
+        const headerComponent = React.createElement('View', { testID: 'qa-form' });
+        const { sp } = await getSectionListProps({
+          groupedOperations: [makeGroup(TODAY, makeOps('a', 1))],
+          headerComponent,
+        });
+
+        // List header starts at 0 until its wrapper reports a height.
+        expect(sp.getItemLayout(sp.sections, 0).offset).toBe(0);
+
+        await act(async () => { fireLayout(sp.ListHeaderComponent, 120); });
+
+        // First section header now begins right after the measured list header.
+        expect(sp.getItemLayout(sp.sections, 0)).toEqual({ length: HEADER, offset: 120, index: 0 });
+      });
+    });
   });
 });
