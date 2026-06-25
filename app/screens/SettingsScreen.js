@@ -1902,9 +1902,15 @@ const styles = StyleSheet.create({
   },
   subPanelOverlay: {
     // Covers the settings list while open; the swipe slides it off to the right
-    // to reveal the list behind. Elevation lifts it above the base layer.
+    // to reveal the list behind. Both elevation and zIndex lift it above the
+    // base ScrollView: under the New Architecture (Fabric, RN 0.85+) Android
+    // stacking follows the CSS model, where paint order among positioned
+    // siblings is governed by zIndex while elevation only drives the native
+    // shadow. Without zIndex the absolutely-positioned overlay paints behind the
+    // ScrollView and renders below the main settings list instead of over it.
     ...StyleSheet.absoluteFillObject,
     elevation: 8,
+    zIndex: 10,
   },
   subPanelTitle: {
     fontWeight: '600',
