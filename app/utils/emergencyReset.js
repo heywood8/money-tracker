@@ -7,7 +7,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const DB_NAME = 'penny.db';
 
