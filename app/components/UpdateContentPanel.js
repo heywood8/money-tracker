@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Linking, RefreshControl } from 'react-native';
-import { Text, Divider, TouchableRipple } from 'react-native-paper';
+import { Text, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -133,7 +133,7 @@ const INSTALLED_GREEN = '#4caf50';
 // Amber used to warn that a corrupt cached download was discarded and is being re-downloaded.
 const WARNING_AMBER = '#f0a500';
 
-function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, matchedApk, repoBase, onInstallApk, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
+function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProgress, matchedApk, downloadUrl, checksumUrl, repoBase, onInstallApk, onUpdate, colors, t, isInstalled, isLatestInstalled, isUpdateCandidate }) {
   const { date, body } = parseReleaseNotes(notes, version);
   const dateLabel = formatReleaseDateTime(publishedAt, date);
   const releasePageUrl = releaseUrlFor(releaseUrl, repoBase, version);
@@ -154,6 +154,20 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
   // Once an update is available the installed card is no longer the highlighted one, so its
   // "Installed" chip recedes to a muted, purely informational treatment.
   const installedChipColor = isLatestInstalled ? accent : colors.mutedText;
+  // Per-release install action. A version already sitting in the cache installs immediately;
+  // otherwise we download it first. The currently installed version offers no action — there is
+  // nothing to install over what is already running.
+  const isCached = !!matchedApk;
+  const canAct = !isInstalled && (isCached || !!downloadUrl);
+  const actionFilled = isUpdateCandidate; // the recommended update gets the prominent filled button
+  const actionColor = actionFilled ? '#fff' : colors.primary;
+  const handleActionPress = () => {
+    if (isCached) {
+      onInstallApk(matchedApk.uri);
+    } else if (downloadUrl) {
+      onUpdate(downloadUrl, checksumUrl, version);
+    }
+  };
   return (
     <View
       style={[
@@ -227,15 +241,22 @@ function ReleaseCard({ version, notes, publishedAt, releaseUrl, badge, buildProg
             </View>
           ) : null}
         </View>
-        {matchedApk ? (
+        {canAct ? (
           <TouchableOpacity
-            onPress={() => onInstallApk(matchedApk.uri)}
-            style={styles.releaseApkButton}
+            onPress={handleActionPress}
+            style={[
+              styles.releaseActionButton,
+              actionFilled
+                ? { backgroundColor: colors.primary }
+                : { borderColor: colors.primary, borderWidth: StyleSheet.hairlineWidth },
+            ]}
             accessibilityRole="button"
-            accessibilityLabel={`Install version ${version}`}
+            accessibilityLabel={isCached ? `Install version ${version}` : `Download version ${version}`}
           >
-            <Ionicons name="archive-outline" size={18} color={colors.primary} />
-            <Ionicons name="download-outline" size={14} color={colors.primary} />
+            <Ionicons name={isCached ? 'archive-outline' : 'cloud-download-outline'} size={15} color={actionColor} />
+            <Text style={[styles.releaseActionText, { color: actionColor }]}>
+              {isCached ? (t('install') || 'Install') : (t('download') || 'Download')}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -266,8 +287,11 @@ ReleaseCard.propTypes = {
     percent: PropTypes.number,
   }),
   matchedApk: PropTypes.object,
+  downloadUrl: PropTypes.string,
+  checksumUrl: PropTypes.string,
   repoBase: PropTypes.string,
   onInstallApk: PropTypes.func,
+  onUpdate: PropTypes.func,
   colors: PropTypes.object,
   t: PropTypes.func,
   isInstalled: PropTypes.bool,
@@ -409,8 +433,11 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
         badge={release.badge}
         buildProgress={release.buildProgress}
         matchedApk={apkLookup.get(release.version)}
+        downloadUrl={release.downloadUrl}
+        checksumUrl={release.checksumUrl}
         repoBase={repoBase}
         onInstallApk={onInstallApk}
+        onUpdate={onUpdate}
         colors={colors}
         t={t}
         isInstalled={isInstalled}
@@ -423,73 +450,63 @@ export default function UpdateContentPanel({ isChecking, updateResult, downloade
   return (
     <Animated.View style={[styles.resultContainer, { opacity: contentAnim }]}>
       {updateResult.type === 'available' && (() => {
-        const releaseNotes = updateResult.recentReleaseNotes || updateResult.releaseNotes;
-        const releases = releaseNotes || [];
+        const notesList = updateResult.recentReleaseNotes || updateResult.releaseNotes || [];
+        // The install action now lives on each release card, so the newest version must always be
+        // present as a card even when that release shipped without notes — synthesize it from the
+        // top-level candidate fields so its download button is reachable.
+        let releases = notesList;
+        if (updateResult.latestVersion && !releases.some((r) => r.version === updateResult.latestVersion)) {
+          releases = [
+            {
+              version: updateResult.latestVersion,
+              notes: null,
+              downloadUrl: updateResult.downloadUrl,
+              checksumUrl: updateResult.checksumUrl,
+            },
+            ...releases,
+          ];
+        }
         const unmatched = unmatchedApksFor(downloadedApks, releases);
+        const hasBottomRow = unmatched.length > 0 || updateResult.previousDownloadCorrupted;
         return (
           <>
-            {releaseNotes ? (
-              <>
-                <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
-                  {t('whats_new') || "What's new"}
+            <Text style={[styles.changelogTitle, { color: colors.mutedText }]}>
+              {t('whats_new') || "What's new"}
+            </Text>
+            <ScrollView
+              style={styles.changelogScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={hasBottomRow ? undefined : { paddingBottom: bottomInset }}
+              refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
+            >
+              {renderReleaseCards(releases)}
+              {notesList.length === 0 ? (
+                <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
+                  {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
                 </Text>
-                <ScrollView
-                  style={styles.changelogScroll}
-                  showsVerticalScrollIndicator={false}
-                  refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined}
-                >
-                  {renderReleaseCards(releases)}
-                  {updateResult.releasesUrl && (
-                    <MoreReleasesLink url={updateResult.releasesUrl} colors={colors} t={t} />
-                  )}
-                </ScrollView>
-              </>
-            ) : (
-              <Text style={[styles.updateVersionText, { color: colors.mutedText }]}>
-                {t('update_install_hint') || 'If installation is blocked, allow "Install unknown apps" for your browser or file manager in Android settings.'}
-              </Text>
-            )}
-            <Divider style={styles.updateDivider} />
-            {updateResult.previousDownloadCorrupted ? (
-              <View style={styles.corruptNoteRow} accessibilityRole="text">
-                <Ionicons name="alert-circle-outline" size={14} color={WARNING_AMBER} />
-                <Text style={[styles.corruptNoteText, { color: WARNING_AMBER }]}>
-                  {t('apk_corrupt_redownload') || 'The previous download was damaged and was removed. Tap Update now to download it again.'}
-                </Text>
-              </View>
-            ) : null}
-            <View style={[styles.updateBottomRow, { paddingBottom: bottomInset }]}>
-              {releaseNotes ? (
-                <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
-              ) : (
-                <UnmatchedApks apks={downloadedApks} onInstallApk={onInstallApk} colors={colors} t={t} compact />
+              ) : null}
+              {updateResult.releasesUrl && (
+                <MoreReleasesLink url={updateResult.releasesUrl} colors={colors} t={t} />
               )}
-              <View style={styles.updateActionColumn}>
-                <Text style={[styles.updateButtonVersion, { color: colors.text }]}>
-                  v{updateResult.latestVersion}
-                </Text>
-                <Text style={[styles.updateButtonCurrentVersion, { color: colors.mutedText }]}>
-                  {(t('update_from_version') || 'installed: v{currentVersion}')
-                    .replace('{currentVersion}', updateResult.currentVersion)}
-                </Text>
-                <TouchableRipple
-                  onPress={() => {
-                    if (updateResult.alreadyDownloaded) {
-                      onInstallApk(updateResult.localUri);
-                    } else {
-                      onUpdate(updateResult.downloadUrl, updateResult.checksumUrl);
-                    }
-                  }}
-                  style={[styles.updateButtonCompact, { backgroundColor: colors.primary }]}
-                >
-                  <Text style={styles.updateButtonText}>
-                    {updateResult.alreadyDownloaded
-                      ? (t('update_install_now') || 'Install now')
-                      : (t('update_now') || 'Update now')}
-                  </Text>
-                </TouchableRipple>
-              </View>
-            </View>
+            </ScrollView>
+            {hasBottomRow ? (
+              <>
+                <Divider style={styles.updateDivider} />
+                {updateResult.previousDownloadCorrupted ? (
+                  <View style={styles.corruptNoteRow} accessibilityRole="text">
+                    <Ionicons name="alert-circle-outline" size={14} color={WARNING_AMBER} />
+                    <Text style={[styles.corruptNoteText, { color: WARNING_AMBER }]}>
+                      {t('apk_corrupt_redownload') || 'The previous download was damaged and was removed. Download it again from the release above.'}
+                    </Text>
+                  </View>
+                ) : null}
+                {unmatched.length > 0 ? (
+                  <View style={[styles.updateBottomRow, { paddingBottom: bottomInset }]}>
+                    <UnmatchedApks apks={unmatched} onInstallApk={onInstallApk} colors={colors} t={t} compact />
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </>
         );
       })()}
@@ -637,6 +654,8 @@ UpdateContentPanel.propTypes = {
       notes: PropTypes.string,
       publishedAt: PropTypes.string,
       releaseUrl: PropTypes.string,
+      downloadUrl: PropTypes.string,
+      checksumUrl: PropTypes.string,
       hasApk: PropTypes.bool,
       buildProgress: PropTypes.shape({
         percent: PropTypes.number,
@@ -647,6 +666,8 @@ UpdateContentPanel.propTypes = {
       notes: PropTypes.string,
       publishedAt: PropTypes.string,
       releaseUrl: PropTypes.string,
+      downloadUrl: PropTypes.string,
+      checksumUrl: PropTypes.string,
     })),
     releasesUrl: PropTypes.string,
     alreadyDownloaded: PropTypes.bool,
@@ -817,12 +838,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
-  releaseApkButton: {
+  releaseActionButton: {
     alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
     flexDirection: 'row',
-    gap: 1,
+    gap: SPACING.xs,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
+  },
+  releaseActionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   releaseBadge: {
     borderRadius: BORDER_RADIUS.sm,
@@ -905,38 +931,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  updateActionColumn: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
   updateBottomRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
     paddingTop: SPACING.sm,
-  },
-  updateButtonCompact: {
-    alignSelf: 'stretch',
-    borderRadius: BORDER_RADIUS.md,
-    marginTop: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  updateButtonCurrentVersion: {
-    fontSize: 11,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  updateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  updateButtonVersion: {
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   updateDivider: {
     marginTop: SPACING.sm,

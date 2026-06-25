@@ -388,6 +388,8 @@
   "update_phase_verifying": "APK-ի ստուգում…",
   "update_phase_backing_up": "Կրկնօրինակ ստեղծում…",
   "update_install_now": "Տեղադրել հիմա",
+  "install": "Տեղադրել",
+  "download": "Ներբեռնել",
   "apk_corrupt_redownload": "Նախորդ ներբեռնումը վնասված էր և հեռացվեց։ Սեղմեք «Թարմացնել հիմա»՝ կրկին ներբեռնելու համար։",
   "downloaded_apks": "Ներբեռնված APK-ներ",
   "installed": "Տեղադրված է",

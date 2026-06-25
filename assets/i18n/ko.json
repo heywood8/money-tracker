@@ -392,6 +392,8 @@
   "update_phase_verifying": "APK 검증 중…",
   "update_phase_backing_up": "백업 생성 중…",
   "update_install_now": "지금 설치",
+  "install": "설치",
+  "download": "다운로드",
   "apk_corrupt_redownload": "이전 다운로드가 손상되어 제거되었습니다. 지금 업데이트를 눌러 다시 다운로드하세요.",
   "downloaded_apks": "다운로드된 APK",
   "installed": "설치됨",

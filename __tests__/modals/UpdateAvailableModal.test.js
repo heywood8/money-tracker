@@ -69,13 +69,14 @@ describe('UpdateAvailableModal', () => {
       expect(onDismiss).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onUpdate with downloadUrl and checksumUrl when update button pressed', async () => {
+    it('calls onUpdate with downloadUrl, checksum and version when a release download button is pressed', async () => {
       const onUpdate = jest.fn();
-      const { getByText } = await render(
+      const { getByLabelText } = await render(
         <UpdateAvailableModal {...baseProps} onUpdate={onUpdate} updateData={baseUpdateData} />,
       );
-      await fireEvent.press(getByText('update_now'));
-      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk', undefined);
+      // The newest version is synthesized into a card so its per-release download button is reachable.
+      await fireEvent.press(getByLabelText('Download version 2.0.0'));
+      expect(onUpdate).toHaveBeenCalledWith('https://example.com/app.apk', undefined, '2.0.0');
     });
   });
 
@@ -128,20 +129,20 @@ describe('UpdateAvailableModal', () => {
       expect(getByText('Bold and italic text')).toBeTruthy();
     });
 
-    it('always shows version label in changelog entries', async () => {
+    it('shows the release version label on each changelog entry', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [{ version: '2.0.0', notes: 'Single release' }],
       };
-      const { getAllByText } = await render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // v2.0.0 appears in both the version header row and the changelog entry
-      const v200elements = getAllByText('v2.0.0');
-      expect(v200elements.length).toBeGreaterThanOrEqual(2);
+      // The version now lives only on its release card (the single bottom header is gone).
+      expect(getByText('v2.0.0')).toBeTruthy();
+      expect(getByText('Single release')).toBeTruthy();
     });
 
-    it('shows version header when there are multiple release notes', async () => {
+    it('shows every release version when there are multiple release notes', async () => {
       const updateData = {
         ...baseUpdateData,
         releaseNotes: [
@@ -149,12 +150,13 @@ describe('UpdateAvailableModal', () => {
           { version: '1.9.0', notes: 'Bug fix' },
         ],
       };
-      const { getAllByText } = await render(
+      const { getByText } = await render(
         <UpdateAvailableModal {...baseProps} updateData={updateData} />,
       );
-      // v2.0.0 should appear twice: once in header, once as changelog version
-      const v200 = getAllByText('v2.0.0');
-      expect(v200.length).toBeGreaterThanOrEqual(2);
+      // Each release is its own card with its own version label.
+      expect(getByText('v2.0.0')).toBeTruthy();
+      expect(getByText('v1.9.0')).toBeTruthy();
+      expect(getByText('New feature')).toBeTruthy();
     });
 
     it('shows changelog section instead of install hint when releaseNotes is provided', async () => {

@@ -388,6 +388,8 @@
   "update_phase_verifying": "APK wird geprüft…",
   "update_phase_backing_up": "Sicherung wird erstellt…",
   "update_install_now": "Jetzt installieren",
+  "install": "Installieren",
+  "download": "Herunterladen",
   "apk_corrupt_redownload": "Der vorherige Download war beschädigt und wurde entfernt. Tippe auf „Jetzt aktualisieren“, um ihn erneut herunterzuladen.",
   "downloaded_apks": "Heruntergeladene APKs",
   "installed": "Installiert",
