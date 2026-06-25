@@ -682,6 +682,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
         // deleted here so we offer a fresh "Update now" (re-download) instead of an "Install now"
         // that would launch a broken installer.
         const cached = await verifyCachedApk(result.downloadUrl, { checksumUrl: result.checksumUrl });
+        // Re-scan the cache so the per-release install buttons reflect reality: a corrupt file just
+        // deleted by verifyCachedApk drops out, and a freshly verified one shows as installable.
+        await loadDownloadedApks();
         setUpdateResult({
           type: 'available',
           latestVersion: result.latestVersion,
@@ -722,9 +725,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
     runUpdateCheck();
   }, [openSubPanel, runUpdateCheck]);
 
-  const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl) => {
-    if (updateResult) {
-      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, updateResult.latestVersion);
+  const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
+    // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
+    // per-release buttons pass their own version; fall back to the highlighted candidate.
+    const promptedVersion = version || updateResult?.latestVersion;
+    if (promptedVersion) {
+      await setPreference(PREF_KEYS.UPDATE_LAST_PROMPTED_VERSION, promptedVersion);
     }
     closeSubPanel();
     startDownload(downloadUrl, {

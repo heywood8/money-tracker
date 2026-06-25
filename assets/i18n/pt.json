@@ -392,6 +392,8 @@
   "update_phase_verifying": "Verificando APK…",
   "update_phase_backing_up": "Criando backup…",
   "update_install_now": "Instalar agora",
+  "install": "Instalar",
+  "download": "Baixar",
   "apk_corrupt_redownload": "O download anterior estava corrompido e foi removido. Toque em Atualizar agora para baixá-lo novamente.",
   "downloaded_apks": "APKs baixados",
   "installed": "Instalada",

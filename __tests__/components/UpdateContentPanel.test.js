@@ -454,42 +454,63 @@ describe('UpdateContentPanel', () => {
       currentVersion: '1.0.0',
       downloadUrl: 'https://example.com/penny-2.0.0.apk',
       checksumUrl: null,
-      releaseNotes: [{ version: '2.0.0', notes: 'Major update', hasApk: true }],
+      releaseNotes: [{ version: '2.0.0', notes: 'Major update', hasApk: true, downloadUrl: 'https://example.com/penny-2.0.0.apk', checksumUrl: null }],
       recentReleaseNotes: null,
       releasesUrl: 'https://github.com/example/releases',
       alreadyDownloaded: false,
       localUri: null,
     };
 
-    it('shows update button and release notes', async () => {
-      const { getByText } = await render(
+    it('shows a per-release download button and release notes (no bottom Update now button)', async () => {
+      const { getByLabelText, getByText, queryByText } = await render(
         <UpdateContentPanel {...baseProps} updateResult={availableResult} />,
       );
-      expect(getByText('update_now')).toBeTruthy();
+      // The action now lives on the release card itself, not as a single bottom button.
+      expect(getByLabelText('Download version 2.0.0')).toBeTruthy();
       expect(getByText('Major update')).toBeTruthy();
+      expect(queryByText('update_now')).toBeNull();
     });
 
-    it('calls onUpdate when update button pressed', async () => {
+    it('calls onUpdate with the release download url, checksum and version when its button is pressed', async () => {
       const onUpdate = jest.fn();
-      const { getByText } = await render(
+      const { getByLabelText } = await render(
         <UpdateContentPanel {...baseProps} updateResult={availableResult} onUpdate={onUpdate} />,
       );
-      fireEvent.press(getByText('update_now'));
-      expect(onUpdate).toHaveBeenCalledWith('https://example.com/penny-2.0.0.apk', null);
+      fireEvent.press(getByLabelText('Download version 2.0.0'));
+      expect(onUpdate).toHaveBeenCalledWith('https://example.com/penny-2.0.0.apk', null, '2.0.0');
     });
 
-    it('shows install button when already downloaded', async () => {
-      const { getByText } = await render(
+    it('shows an install button on the candidate when its APK is already downloaded', async () => {
+      const onInstallApk = jest.fn();
+      const { getByLabelText, queryByLabelText } = await render(
         <UpdateContentPanel
           {...baseProps}
-          updateResult={{ ...availableResult, alreadyDownloaded: true, localUri: 'file:///cache/penny-2.0.0.apk' }}
+          onInstallApk={onInstallApk}
+          updateResult={availableResult}
+          downloadedApks={[{ uri: 'file:///cache/penny-2.0.0.apk', version: '2.0.0', filename: 'penny-2.0.0.apk', modificationTime: 1700000000 }]}
         />,
       );
-      expect(getByText('update_install_now')).toBeTruthy();
+      // A cached candidate installs directly — no re-download needed.
+      expect(getByLabelText('Install version 2.0.0')).toBeTruthy();
+      expect(queryByLabelText('Download version 2.0.0')).toBeNull();
+      fireEvent.press(getByLabelText('Install version 2.0.0'));
+      expect(onInstallApk).toHaveBeenCalledWith('file:///cache/penny-2.0.0.apk');
     });
 
-    it('shows the corrupt-redownload note and an Update now button when the cached APK was damaged', async () => {
-      const { getByText, queryByText } = await render(
+    it('synthesizes a candidate card with a download button when the update has no release notes', async () => {
+      const { getByLabelText, getByText } = await render(
+        <UpdateContentPanel
+          {...baseProps}
+          updateResult={{ ...availableResult, releaseNotes: null, recentReleaseNotes: null }}
+        />,
+      );
+      // Even without notes the newest version is reachable via its own download button.
+      expect(getByLabelText('Download version 2.0.0')).toBeTruthy();
+      expect(getByText('update_install_hint')).toBeTruthy();
+    });
+
+    it('shows the corrupt-redownload note and a download button when the cached APK was damaged', async () => {
+      const { getByText, getByLabelText, queryByLabelText } = await render(
         <UpdateContentPanel
           {...baseProps}
           updateResult={{ ...availableResult, alreadyDownloaded: false, localUri: null, previousDownloadCorrupted: true }}
@@ -497,16 +518,13 @@ describe('UpdateContentPanel', () => {
       );
       expect(getByText('apk_corrupt_redownload')).toBeTruthy();
       // The damaged file was discarded, so we offer a fresh re-download, not an install.
-      expect(getByText('update_now')).toBeTruthy();
-      expect(queryByText('update_install_now')).toBeNull();
+      expect(getByLabelText('Download version 2.0.0')).toBeTruthy();
+      expect(queryByLabelText('Install version 2.0.0')).toBeNull();
     });
 
-    it('does not show the corrupt-redownload note when the cached APK is valid', async () => {
+    it('does not show the corrupt-redownload note when nothing was corrupted', async () => {
       const { queryByText } = await render(
-        <UpdateContentPanel
-          {...baseProps}
-          updateResult={{ ...availableResult, alreadyDownloaded: true, localUri: 'file:///cache/penny-2.0.0.apk' }}
-        />,
+        <UpdateContentPanel {...baseProps} updateResult={availableResult} />,
       );
       expect(queryByText('apk_corrupt_redownload')).toBeNull();
     });

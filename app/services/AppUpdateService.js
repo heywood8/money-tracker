@@ -288,24 +288,28 @@ export const checkForAppUpdate = async ({
       }
 
       const apkAsset = extractApkAsset(release.assets);
+      // Resolve each release's own APK + checksum URLs so the UI can offer a per-release
+      // install/download button, not just one action for the newest release.
+      const checksumAsset = apkAsset ? extractChecksumAsset(release.assets, apkAsset.name) : null;
+      const apkDownloadUrl = apkAsset ? apkAsset.browser_download_url : null;
+      const apkChecksumUrl = checksumAsset ? checksumAsset.browser_download_url : null;
 
       // Collect recent releases with APKs for changelog display regardless of version
       if (apkAsset && release.body && recentReleasesWithApk.length < MAX_CHANGELOG_ENTRIES) {
-        recentReleasesWithApk.push({ version: releaseVersion, notes: release.body, publishedAt: release.published_at || null, releaseUrl: release.html_url || null });
+        recentReleasesWithApk.push({ version: releaseVersion, notes: release.body, publishedAt: release.published_at || null, releaseUrl: release.html_url || null, downloadUrl: apkDownloadUrl, checksumUrl: apkChecksumUrl });
       }
 
       if (compareVersions(releaseVersion, currentNormalized) <= 0) {
         continue; // not newer than current — skip
       }
 
-      newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset, publishedAt: release.published_at || null, releaseUrl: release.html_url || null });
+      newerReleases.push({ version: releaseVersion, notes: release.body || null, hasApk: !!apkAsset, publishedAt: release.published_at || null, releaseUrl: release.html_url || null, downloadUrl: apkDownloadUrl, checksumUrl: apkChecksumUrl });
 
       if (apkAsset && (!bestRelease || compareVersions(releaseVersion, bestRelease.version) > 0)) {
-        const checksumAsset = extractChecksumAsset(release.assets, apkAsset.name);
         bestRelease = {
           version: releaseVersion,
-          downloadUrl: apkAsset.browser_download_url,
-          checksumUrl: checksumAsset ? checksumAsset.browser_download_url : null,
+          downloadUrl: apkDownloadUrl,
+          checksumUrl: apkChecksumUrl,
           releaseUrl: release.html_url || apkAsset.browser_download_url,
           publishedAt: release.published_at || null,
           releaseName: release.name || release.tag_name || null,
@@ -353,6 +357,8 @@ export const checkForAppUpdate = async ({
             hasApk: r.hasApk,
             publishedAt: r.publishedAt || null,
             releaseUrl: r.releaseUrl || null,
+            downloadUrl: r.downloadUrl || null,
+            checksumUrl: r.checksumUrl || null,
             buildProgress: !r.hasApk ? (progressByVersion[r.version] || null) : null,
           }));
         return {
@@ -376,7 +382,7 @@ export const checkForAppUpdate = async ({
 
     const releaseNotes = newerReleases
       .filter((r) => r.notes && r.hasApk)
-      .map((r) => ({ version: r.version, notes: r.notes, publishedAt: r.publishedAt || null, releaseUrl: r.releaseUrl || null }));
+      .map((r) => ({ version: r.version, notes: r.notes, publishedAt: r.publishedAt || null, releaseUrl: r.releaseUrl || null, downloadUrl: r.downloadUrl || null, checksumUrl: r.checksumUrl || null }));
 
     return {
       success: true,

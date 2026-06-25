@@ -375,6 +375,43 @@ describe('AppUpdateService', () => {
       expect(result.recentReleaseNotes[0].releaseUrl).toBe('https://github.com/heywood8/money-tracker/releases/tag/v0.50.5');
     });
 
+    it("carries each release's own downloadUrl and checksumUrl so every release is individually installable", async () => {
+      const fetchImpl = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ([
+          {
+            tag_name: 'v0.50.5',
+            assets: [
+              { name: 'penny-v0.50.5.apk', browser_download_url: 'https://example.com/penny-v0.50.5.apk' },
+              { name: 'penny-v0.50.5.apk.sha256', browser_download_url: 'https://example.com/penny-v0.50.5.apk.sha256' },
+            ],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.5',
+            body: 'New features in 0.50.5',
+          },
+          {
+            tag_name: 'v0.50.3',
+            assets: [{ name: 'penny-v0.50.3.apk', browser_download_url: 'https://example.com/penny-v0.50.3.apk' }],
+            html_url: 'https://github.com/heywood8/money-tracker/releases/tag/v0.50.3',
+            body: 'Fixes in 0.50.3',
+          },
+        ]),
+      });
+
+      const result = await checkForAppUpdate({ currentVersion: '0.50.3', fetchImpl });
+
+      // The candidate exposes its APK + checksum so the panel offers a per-release download button.
+      expect(result.releaseNotes[0].version).toBe('0.50.5');
+      expect(result.releaseNotes[0].downloadUrl).toBe('https://example.com/penny-v0.50.5.apk');
+      expect(result.releaseNotes[0].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.sha256');
+
+      // Older releases in the recent list carry their own URLs too (checksum null when not attached).
+      const recent = Object.fromEntries(result.recentReleaseNotes.map((r) => [r.version, r]));
+      expect(recent['0.50.5'].downloadUrl).toBe('https://example.com/penny-v0.50.5.apk');
+      expect(recent['0.50.5'].checksumUrl).toBe('https://example.com/penny-v0.50.5.apk.sha256');
+      expect(recent['0.50.3'].downloadUrl).toBe('https://example.com/penny-v0.50.3.apk');
+      expect(recent['0.50.3'].checksumUrl).toBeNull();
+    });
+
     it('handles GitHub rate limiting response gracefully', async () => {
       const fetchImpl = jest.fn().mockResolvedValue({
         ok: false,
