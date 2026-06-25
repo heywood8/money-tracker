@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.2](https://github.com/heywood8/money-tracker/compare/penny-v0.151.1...penny-v0.151.2) (2026-06-25)
+
+
+### Bug Fixes
+
+* **operations:** make scroll-to-top button visible on dark theme ([#1070](https://github.com/heywood8/money-tracker/issues/1070)) ([7f21f9f](https://github.com/heywood8/money-tracker/commit/7f21f9f54e0376ef6078096b9a363ec2d491f881))
+
 ## [0.151.1](https://github.com/heywood8/money-tracker/compare/penny-v0.151.0...penny-v0.151.1) (2026-06-25)
 
 
