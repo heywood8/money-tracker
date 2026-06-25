@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.150.7](https://github.com/heywood8/money-tracker/compare/penny-v0.150.6...penny-v0.150.7) (2026-06-25)
+
+
+### Performance Improvements
+
+* **operations:** add getItemLayout to OperationsList for instant date jumps ([#1066](https://github.com/heywood8/money-tracker/issues/1066)) ([58f96f8](https://github.com/heywood8/money-tracker/commit/58f96f8292b81865758f26c58143c2497afe0487))
+
 ## [0.150.6](https://github.com/heywood8/money-tracker/compare/penny-v0.150.5...penny-v0.150.6) (2026-06-24)
 
 
