@@ -78,9 +78,12 @@ jobs:
           echo "Found APK: $APK_PATH"
           ls -lh "$APK_PATH"
 
-          # Use git tag for filename
+          # Use git ref for filename. Sanitize "/" (present in branch names such
+          # as those used for workflow_dispatch runs) so cp does not try to write
+          # into a non-existent directory. Tag names like "penny-v*" are unaffected.
           TAG_NAME="${{ github.ref_name }}"
-          NEW_NAME="${TAG_NAME}.apk"
+          SAFE_NAME="${TAG_NAME//\//-}"
+          NEW_NAME="${SAFE_NAME}.apk"
           cp "$APK_PATH" "$NEW_NAME"
           echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
           echo "Renamed to: $NEW_NAME"

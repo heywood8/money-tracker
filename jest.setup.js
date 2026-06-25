@@ -1,22 +1,38 @@
-// Mock Expo's internal module registry and utilities to prevent "outside scope" errors
-global.__ExpoImportMetaRegistry = {};
+// --- Expo SDK 56 "winter" runtime compatibility (Jest 30) ---
+// jest-expo's preset eagerly loads `expo/src/winter`, which installs WinterCG
+// globals (URL, URLSearchParams, TextDecoder, structuredClone, DOMException, ...)
+// as *lazy* getters that `require()` their implementation only on first access.
+// Jest 30's stricter `throwIfBetweenTests` guard throws when such a `require()`
+// fires asynchronously after a test's scope has closed, which otherwise crashes
+// nearly every suite at import time ("trying to require a file outside of the
+// scope of the test code"). Force each lazy winter global to resolve now, during
+// setup (a valid require scope), so later accesses read a concrete value instead
+// of triggering a between-tests `require()`.
+for (const name of [
+  'TextDecoder',
+  'TextDecoderStream',
+  'TextEncoderStream',
+  'URL',
+  'URLSearchParams',
+  'DOMException',
+  'structuredClone',
+  '__ExpoImportMetaRegistry',
+  'fetch',
+]) {
+  try {
+    // Reading the property triggers the lazy getter -> require() within scope.
+    // If it throws, the global is permanently set to `undefined` with no getter,
+    // which is also fine: no between-tests require can fire afterwards.
+    void global[name];
+  } catch {
+    // intentionally ignored
+  }
+}
 
-// Mock structuredClone which is causing scope issues
+// Provide a deterministic structuredClone fallback when the runtime lacks one.
 if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 }
-
-// Mock Expo's winter module to bypass scope checks
-jest.mock('expo/src/winter/runtime.native.ts', () => ({
-  require: jest.fn((module) => require(module)),
-}), { virtual: true });
-
-jest.mock('expo/src/winter/installGlobal.ts', () => ({
-  getValue: jest.fn((key) => {
-    if (key === 'structuredClone') return global.structuredClone;
-    return undefined;
-  }),
-}), { virtual: true });
 
 // Mock expo-clipboard
 jest.mock('expo-clipboard', () => ({

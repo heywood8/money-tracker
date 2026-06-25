@@ -1,8 +1,8 @@
 import { forceDeleteDatabase, getDatabaseFileInfo } from '../../app/utils/emergencyReset';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
-// Mock expo-file-system
-jest.mock('expo-file-system', () => ({
+// Mock expo-file-system/legacy
+jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///mock/path/',
   getInfoAsync: jest.fn(),
   deleteAsync: jest.fn(),
