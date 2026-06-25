@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.0](https://github.com/heywood8/money-tracker/compare/penny-v0.150.7...penny-v0.151.0) (2026-06-25)
+
+
+### Features
+
+* **updates:** install any release version from its own card button ([#1068](https://github.com/heywood8/money-tracker/issues/1068)) ([99c99d1](https://github.com/heywood8/money-tracker/commit/99c99d17ace8425cff448d84f98cc0f07c322797))
+
 ## [0.150.7](https://github.com/heywood8/money-tracker/compare/penny-v0.150.6...penny-v0.150.7) (2026-06-25)
 
 
