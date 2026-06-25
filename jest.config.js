@@ -13,6 +13,10 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
+    // scripts/e2e-agent is a standalone ESM sub-project with its own package.json,
+    // dependencies, and jest runner (node --experimental-vm-modules). It must not be
+    // run by the React Native jest-expo preset, which lacks its deps and ESM setup.
+    '/scripts/e2e-agent/',
   ],
   moduleNameMapper: {
     '^expo$': '<rootDir>/node_modules/expo',

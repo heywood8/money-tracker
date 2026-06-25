@@ -12,10 +12,10 @@ async function executeAction(device, action) {
   const cx = action.bounds ? Math.round((action.bounds[0] + action.bounds[2]) / 2) : 0;
   const cy = action.bounds ? Math.round((action.bounds[1] + action.bounds[3]) / 2) : 0;
   switch (action.action) {
-    case 'tap':   tap(device, cx, cy); break;
-    case 'type':  typeText(device, action.text || ''); break;
-    case 'swipe': swipe(device, action.from[0], action.from[1], action.to[0], action.to[1]); break;
-    case 'back':  pressBack(device); break;
+  case 'tap':   tap(device, cx, cy); break;
+  case 'type':  typeText(device, action.text || ''); break;
+  case 'swipe': swipe(device, action.from[0], action.from[1], action.to[0], action.to[1]); break;
+  case 'back':  pressBack(device); break;
   }
 }
 
