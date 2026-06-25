@@ -902,515 +902,523 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // the list mounted behind it lets a rightward swipe (or the back arrow) reveal
   // it Telegram-style as the panel follows the finger off the right edge.
   const subPanelOverlay = activeSubPanel !== null ? (
-    <GestureDetector gesture={swipeGesture}>
-      <Animated.View
-        style={[styles.subPanelOverlay, { backgroundColor: colors.background }, swipeStyle]}
-      >
-        {/* Subpanel header */}
-        <View style={styles.subPanelHeader}>
-          <TouchableOpacity
-            onPress={navigateBack}
-            style={styles.backButton}
-            testID="settings-subpanel-back"
-            disabled={isBackDisabled}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text variant="titleLarge" style={[styles.subPanelTitle, { color: colors.text }]}>
-            {subPanelTitle}
-          </Text>
-          {activeSubPanel === 'import' && importStep === 'local-list' ? (
-            <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
-              <Ionicons name="refresh-outline" size={22} color={colors.text} />
+    // Positioning/stacking live on a plain View (absolute fill + zIndex): under
+    // Reanimated 4 / RN 0.85's Yoga, an `absoluteFillObject` stretch (top+bottom)
+    // applied directly to the gesture-driven, transform-animated Animated.View is
+    // dropped — the panel collapses to its header height and falls into normal
+    // flow below the list. The inner Animated.View instead fills this concretely
+    // sized parent with flex:1 and carries only the swipe transform + background.
+    <View style={styles.subPanelOverlay}>
+      <GestureDetector gesture={swipeGesture}>
+        <Animated.View
+          style={[styles.subPanelFill, { backgroundColor: colors.background }, swipeStyle]}
+        >
+          {/* Subpanel header */}
+          <View style={styles.subPanelHeader}>
+            <TouchableOpacity
+              onPress={navigateBack}
+              style={styles.backButton}
+              testID="settings-subpanel-back"
+              disabled={isBackDisabled}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-          ) : (
-            <View style={styles.backButton} />
-          )}
-        </View>
+            <Text variant="titleLarge" style={[styles.subPanelTitle, { color: colors.text }]}>
+              {subPanelTitle}
+            </Text>
+            {activeSubPanel === 'import' && importStep === 'local-list' ? (
+              <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+                <Ionicons name="refresh-outline" size={22} color={colors.text} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.backButton} />
+            )}
+          </View>
 
-        <Divider />
+          <Divider />
 
-        {/* Subpanel body — fills to the screen bottom so list content can scroll
+          {/* Subpanel body — fills to the screen bottom so list content can scroll
             behind the translucent floating tab bar. The bottom padding that keeps
             the last items reachable lives on each scrollable's contentContainerStyle
             instead, mirroring the operations list. */}
-        <View style={[
-          styles.subPanelBody,
-          (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
-        ]}>
-          {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
-          {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
+          <View style={[
+            styles.subPanelBody,
+            (activeSubPanel === 'accounts' || activeSubPanel === 'categories') && styles.subPanelBodyFlush,
+          ]}>
+            {activeSubPanel === 'accounts' && <AccountsScreen onBackStateChange={handleEmbeddedBackStateChange} />}
+            {activeSubPanel === 'categories' && <CategoriesScreen onBackStateChange={handleEmbeddedBackStateChange} />}
 
-          {activeSubPanel === 'defaultAccount' && (
-            <ScrollView
-              style={styles.listContainer}
-              contentContainerStyle={{ paddingBottom: scrollBottomInset }}
-              testID="settings-default-account-panel"
-            >
-              <TouchableRipple
-                onPress={() => handleDefaultAccountSelect(null)}
-                style={styles.listItem}
-                testID="default-account-option-null"
+            {activeSubPanel === 'defaultAccount' && (
+              <ScrollView
+                style={styles.listContainer}
+                contentContainerStyle={{ paddingBottom: scrollBottomInset }}
+                testID="settings-default-account-panel"
               >
-                <View style={styles.listItemContent}>
-                  <Text style={[styles.listItemText, { color: colors.text }]}>{t('latest_used')}</Text>
-                  {pinnedAccountId === null && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                  )}
-                </View>
-              </TouchableRipple>
-              {visibleAccounts.map(acc => (
                 <TouchableRipple
-                  key={acc.id}
-                  onPress={() => handleDefaultAccountSelect(acc.id)}
+                  onPress={() => handleDefaultAccountSelect(null)}
                   style={styles.listItem}
-                  testID={`default-account-option-${acc.id}`}
+                  testID="default-account-option-null"
                 >
                   <View style={styles.listItemContent}>
-                    <Text style={[styles.listItemText, { color: colors.text }]}>{acc.name}</Text>
-                    {pinnedAccountId === acc.id && (
+                    <Text style={[styles.listItemText, { color: colors.text }]}>{t('latest_used')}</Text>
+                    {pinnedAccountId === null && (
                       <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                     )}
                   </View>
                 </TouchableRipple>
-              ))}
-            </ScrollView>
-          )}
+                {visibleAccounts.map(acc => (
+                  <TouchableRipple
+                    key={acc.id}
+                    onPress={() => handleDefaultAccountSelect(acc.id)}
+                    style={styles.listItem}
+                    testID={`default-account-option-${acc.id}`}
+                  >
+                    <View style={styles.listItemContent}>
+                      <Text style={[styles.listItemText, { color: colors.text }]}>{acc.name}</Text>
+                      {pinnedAccountId === acc.id && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      )}
+                    </View>
+                  </TouchableRipple>
+                ))}
+              </ScrollView>
+            )}
 
-          {activeSubPanel === 'language' && (
-            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-              {availableLanguages.map(lng => (
+            {activeSubPanel === 'language' && (
+              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
+                {availableLanguages.map(lng => (
+                  <TouchableRipple
+                    key={lng}
+                    onPress={() => handleLanguageSelect(lng)}
+                    style={styles.listItem}
+                  >
+                    <View style={styles.listItemContent}>
+                      <Text style={[styles.listItemText, { color: colors.text }]}>
+                        {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
+                      </Text>
+                      {language === lng && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      )}
+                    </View>
+                  </TouchableRipple>
+                ))}
+              </ScrollView>
+            )}
+
+            {activeSubPanel === 'export' && exportStep === 'list' && (
+              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
                 <TouchableRipple
-                  key={lng}
-                  onPress={() => handleLanguageSelect(lng)}
+                  onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
                   style={styles.listItem}
+                  disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
+                  testID="settings-export-save-local-backup"
                 >
                   <View style={styles.listItemContent}>
-                    <Text style={[styles.listItemText, { color: colors.text }]}>
-                      {languageFlags[lng] ? `${languageFlags[lng]}  ${nativeLanguageNames[lng] || lng}` : (nativeLanguageNames[lng] || lng)}
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="archive-outline" size={24} color={saveLocalBackupColor} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: saveLocalBackupColor }]}>
+                          {t('save_local_backup') || 'Save local backup'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {saveLocalBackupLoading
+                            ? (t('save_local_backup_saving') || 'Saving…')
+                            : saveLocalBackupSuccess
+                              ? (t('save_local_backup_success') || 'Backup saved')
+                              : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
+                        </Text>
+                      </View>
+                    </View>
+                    {saveLocalBackupLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : saveLocalBackupSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple
+                  onPress={handleGoogleSheetsExport}
+                  style={styles.listItem}
+                  testID="settings-export-google-sheets"
+                >
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={sheetsColor} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: sheetsColor }]}>Google Sheets</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {sheetsExportSuccess
+                            ? (t('export_success') || 'Export complete')
+                            : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
+                        </Text>
+                      </View>
+                    </View>
+                    {sheetsExportSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple
+                  onPress={sqliteExportLoading ? null : () => handleExportFormatSelect('sqlite')}
+                  style={styles.listItem}
+                  disabled={sqliteExportLoading}
+                >
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="server-outline" size={24} color={sqliteColor} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: sqliteColor }]}>Save externally to SQLite</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {sqliteExportLoading
+                            ? (t('exporting') || 'Exporting…')
+                            : sqliteExportSuccess
+                              ? (t('export_success') || 'Export complete')
+                              : (t('sqlite_description') || 'Raw database file, complete backup')}
+                        </Text>
+                      </View>
+                    </View>
+                    {sqliteExportLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : sqliteExportSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple
+                  onPress={csvExportLoading ? null : () => handleExportFormatSelect('csv')}
+                  style={styles.listItem}
+                  disabled={csvExportLoading}
+                >
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="document-text-outline" size={24} color={csvColor} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: csvColor }]}>Save externally to CSV</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {csvExportLoading
+                            ? (t('exporting') || 'Exporting…')
+                            : csvExportSuccess
+                              ? (t('export_success') || 'Export complete')
+                              : (t('csv_description') || 'Plain text format, easy to edit')}
+                        </Text>
+                      </View>
+                    </View>
+                    {csvExportLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : csvExportSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+
+                <TouchableRipple
+                  onPress={jsonExportLoading ? null : () => handleExportFormatSelect('json')}
+                  style={styles.listItem}
+                  disabled={jsonExportLoading}
+                >
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="code-outline" size={24} color={jsonColor} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: jsonColor }]}>Save externally to JSON</Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {jsonExportLoading
+                            ? (t('exporting') || 'Exporting…')
+                            : jsonExportSuccess
+                              ? (t('export_success') || 'Export complete')
+                              : (t('json_description') || 'Standard format, compatible with all versions')}
+                        </Text>
+                      </View>
+                    </View>
+                    {jsonExportLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : jsonExportSuccess ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                    )}
+                  </View>
+                </TouchableRipple>
+              </ScrollView>
+            )}
+
+            {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
+              <View style={styles.sheetsProgressContent}>
+                {sheetsSteps.map(step => (
+                  <View key={step.id} style={styles.sheetsProgressStep}>
+                    <View style={styles.sheetsProgressStepIcon}>
+                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
+                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
+                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
+                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
+                    </View>
+                    <Text style={[
+                      styles.sheetsProgressStepLabel,
+                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                    ]}>
+                      {step.label}
                     </Text>
-                    {language === lng && (
-                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                    )}
+                  </View>
+                ))}
+                {sheetsError && <Text style={styles.sheetsErrorText}>{sheetsError}</Text>}
+                {sheetsSuccessUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(sheetsSuccessUrl)}
+                    style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Ionicons name="open-outline" size={16} color="#fff" />
+                    <Text style={styles.sheetsOpenButtonText}>
+                      {t('google_sheets_open') || 'Open in Google Sheets'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {activeSubPanel === 'reset' && (
+              <View style={styles.confirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                <Text style={[styles.confirmText, { color: colors.text }]}>
+                  {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
+                </Text>
+                <TouchableRipple onPress={confirmResetDatabase} style={styles.confirmButtonDestructive}>
+                  <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
+                </TouchableRipple>
+              </View>
+            )}
+
+            {activeSubPanel === 'import' && importStep === 'source' && (
+              <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
+                <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.listItem}>
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: colors.text }]}>
+                          {t('import_from_file') || 'From Google Drive'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
                   </View>
                 </TouchableRipple>
-              ))}
-            </ScrollView>
-          )}
 
-          {activeSubPanel === 'export' && exportStep === 'list' && (
-            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-              <TouchableRipple
-                onPress={saveLocalBackupSuccess ? null : handleSaveLocalBackup}
-                style={styles.listItem}
-                disabled={saveLocalBackupLoading || saveLocalBackupSuccess}
-                testID="settings-export-save-local-backup"
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="archive-outline" size={24} color={saveLocalBackupColor} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: saveLocalBackupColor }]}>
-                        {t('save_local_backup') || 'Save local backup'}
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {saveLocalBackupLoading
-                          ? (t('save_local_backup_saving') || 'Saving…')
-                          : saveLocalBackupSuccess
-                            ? (t('save_local_backup_success') || 'Backup saved')
-                            : (t('save_local_backup_description') || 'Save a backup to device storage and share')}
-                      </Text>
+                <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.listItem}>
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="archive-outline" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: colors.text }]}>
+                          {t('import_from_local') || 'From local backup'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {saveLocalBackupLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : saveLocalBackupSuccess ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                  ) : (
                     <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  )}
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={handleGoogleSheetsExport}
-                style={styles.listItem}
-                testID="settings-export-google-sheets"
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="logo-google" size={24} color={sheetsColor} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: sheetsColor }]}>Google Sheets</Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {sheetsExportSuccess
-                          ? (t('export_success') || 'Export complete')
-                          : (t('google_sheets_description') || 'Export to a Google Sheets spreadsheet')}
-                      </Text>
-                    </View>
                   </View>
-                  {sheetsExportSuccess ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  )}
-                </View>
-              </TouchableRipple>
+                </TouchableRipple>
 
-              <TouchableRipple
-                onPress={sqliteExportLoading ? null : () => handleExportFormatSelect('sqlite')}
-                style={styles.listItem}
-                disabled={sqliteExportLoading}
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="server-outline" size={24} color={sqliteColor} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: sqliteColor }]}>Save externally to SQLite</Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {sqliteExportLoading
-                          ? (t('exporting') || 'Exporting…')
-                          : sqliteExportSuccess
-                            ? (t('export_success') || 'Export complete')
-                            : (t('sqlite_description') || 'Raw database file, complete backup')}
-                      </Text>
-                    </View>
-                  </View>
-                  {sqliteExportLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : sqliteExportSuccess ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  )}
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={csvExportLoading ? null : () => handleExportFormatSelect('csv')}
-                style={styles.listItem}
-                disabled={csvExportLoading}
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="document-text-outline" size={24} color={csvColor} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: csvColor }]}>Save externally to CSV</Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {csvExportLoading
-                          ? (t('exporting') || 'Exporting…')
-                          : csvExportSuccess
-                            ? (t('export_success') || 'Export complete')
-                            : (t('csv_description') || 'Plain text format, easy to edit')}
-                      </Text>
-                    </View>
-                  </View>
-                  {csvExportLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : csvExportSuccess ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  )}
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={jsonExportLoading ? null : () => handleExportFormatSelect('json')}
-                style={styles.listItem}
-                disabled={jsonExportLoading}
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="code-outline" size={24} color={jsonColor} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: jsonColor }]}>Save externally to JSON</Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {jsonExportLoading
-                          ? (t('exporting') || 'Exporting…')
-                          : jsonExportSuccess
-                            ? (t('export_success') || 'Export complete')
-                            : (t('json_description') || 'Standard format, compatible with all versions')}
-                      </Text>
-                    </View>
-                  </View>
-                  {jsonExportLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : jsonExportSuccess ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#4caf50" />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                  )}
-                </View>
-              </TouchableRipple>
-            </ScrollView>
-          )}
-
-          {activeSubPanel === 'export' && exportStep === 'sheets-progress' && (
-            <View style={styles.sheetsProgressContent}>
-              {sheetsSteps.map(step => (
-                <View key={step.id} style={styles.sheetsProgressStep}>
-                  <View style={styles.sheetsProgressStepIcon}>
-                    {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                    {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                    {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                    {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
-                  </View>
-                  <Text style={[
-                    styles.sheetsProgressStepLabel,
-                    step.status === 'error' ? styles.sheetsProgressStepLabelError :
-                      { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                  ]}>
-                    {step.label}
-                  </Text>
-                </View>
-              ))}
-              {sheetsError && <Text style={styles.sheetsErrorText}>{sheetsError}</Text>}
-              {sheetsSuccessUrl && (
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(sheetsSuccessUrl)}
-                  style={[styles.sheetsOpenButton, { backgroundColor: colors.primary }]}
+                <TouchableRipple
+                  onPress={handleGoogleSheetsImport}
+                  style={styles.listItem}
+                  testID="settings-import-google-sheets"
                 >
-                  <Ionicons name="open-outline" size={16} color="#fff" />
-                  <Text style={styles.sheetsOpenButtonText}>
-                    {t('google_sheets_open') || 'Open in Google Sheets'}
+                  <View style={styles.listItemContent}>
+                    <View style={styles.formatItemRow}>
+                      <Ionicons name="logo-google" size={24} color={colors.text} />
+                      <View style={styles.formatTextContainer}>
+                        <Text style={[styles.listItemText, { color: colors.text }]}>
+                          {t('import_from_google_sheets') || 'From Google Sheets'}
+                        </Text>
+                        <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
+                          {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+                  </View>
+                </TouchableRipple>
+                {sheetsImportError && importStep === 'source' && (
+                  <Text testID="settings-import-no-spreadsheet" style={styles.sheetsImportErrorInline}>
+                    {sheetsImportError}
                   </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                )}
+              </ScrollView>
+            )}
 
-          {activeSubPanel === 'reset' && (
-            <View style={styles.confirmContent}>
-              <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
-              <Text style={[styles.confirmText, { color: colors.text }]}>
-                {t('reset_database_confirm') || 'Are you sure you want to reset the database? This will delete all data and create default accounts.'}
-              </Text>
-              <TouchableRipple onPress={confirmResetDatabase} style={styles.confirmButtonDestructive}>
-                <Text style={styles.confirmButtonText}>{t('reset') || 'Reset'}</Text>
-              </TouchableRipple>
-            </View>
-          )}
-
-          {activeSubPanel === 'import' && importStep === 'source' && (
-            <ScrollView style={styles.listContainer} contentContainerStyle={{ paddingBottom: scrollBottomInset }}>
-              <TouchableRipple onPress={() => handleImportSourceSelect('file')} style={styles.listItem}>
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="logo-google" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>
-                        {t('import_from_file') || 'From Google Drive'}
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('import_from_file_description') || 'Pick a backup file from Google Drive'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            {activeSubPanel === 'import' && importStep === 'local-list' && (
+              backupsLoading ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
                 </View>
-              </TouchableRipple>
+              ) : (
+                <FlatList
+                  data={storedBackups}
+                  keyExtractor={(item) => item.uri}
+                  renderItem={renderBackupItem}
+                  style={styles.flexList}
+                  contentContainerStyle={[
+                    storedBackups.length === 0 && styles.emptyContainer,
+                    { paddingBottom: scrollBottomInset },
+                  ]}
+                  ListEmptyComponent={
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                      {t('local_backups_empty') || 'No local backups yet'}
+                    </Text>
+                  }
+                />
+              )
+            )}
 
-              <TouchableRipple onPress={() => handleImportSourceSelect('local')} style={styles.listItem}>
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="archive-outline" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>
-                        {t('import_from_local') || 'From local backup'}
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('import_from_local_description') || 'Restore from a daily or weekly automatic backup'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-
-              <TouchableRipple
-                onPress={handleGoogleSheetsImport}
-                style={styles.listItem}
-                testID="settings-import-google-sheets"
-              >
-                <View style={styles.listItemContent}>
-                  <View style={styles.formatItemRow}>
-                    <Ionicons name="logo-google" size={24} color={colors.text} />
-                    <View style={styles.formatTextContainer}>
-                      <Text style={[styles.listItemText, { color: colors.text }]}>
-                        {t('import_from_google_sheets') || 'From Google Sheets'}
-                      </Text>
-                      <Text style={[styles.formatDescription, { color: colors.mutedText }]}>
-                        {t('import_from_google_sheets_description') || 'Import from your Penny spreadsheet'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-                </View>
-              </TouchableRipple>
-              {sheetsImportError && importStep === 'source' && (
-                <Text testID="settings-import-no-spreadsheet" style={styles.sheetsImportErrorInline}>
-                  {sheetsImportError}
+            {activeSubPanel === 'import' && importStep === 'confirm-file' && (
+              <View style={styles.confirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                <Text style={[styles.confirmText, { color: colors.text }]}>
+                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                 </Text>
-              )}
-            </ScrollView>
-          )}
-
-          {activeSubPanel === 'import' && importStep === 'local-list' && (
-            backupsLoading ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.mutedText }]}>{'Loading...'}</Text>
+                <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.confirmButtonDestructive}>
+                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
+                </TouchableRipple>
               </View>
-            ) : (
-              <FlatList
-                data={storedBackups}
-                keyExtractor={(item) => item.uri}
-                renderItem={renderBackupItem}
-                style={styles.flexList}
-                contentContainerStyle={[
-                  storedBackups.length === 0 && styles.emptyContainer,
-                  { paddingBottom: scrollBottomInset },
-                ]}
-                ListEmptyComponent={
-                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                    {t('local_backups_empty') || 'No local backups yet'}
+            )}
+
+            {activeSubPanel === 'import' && importStep === 'confirm-local' && (
+              <View style={styles.confirmContent}>
+                <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
+                {importSelectedBackup && (
+                  <Text style={[styles.confirmText, { color: colors.mutedText }]}>
+                    {formatBackupLabel(importSelectedBackup.filename)}
                   </Text>
-                }
-              />
-            )
-          )}
-
-          {activeSubPanel === 'import' && importStep === 'confirm-file' && (
-            <View style={styles.confirmContent}>
-              <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
-              <Text style={[styles.confirmText, { color: colors.text }]}>
-                {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-              </Text>
-              <TouchableRipple testID="confirm-import-file-btn" onPress={confirmImportBackup} style={styles.confirmButtonDestructive}>
-                <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-              </TouchableRipple>
-            </View>
-          )}
-
-          {activeSubPanel === 'import' && importStep === 'confirm-local' && (
-            <View style={styles.confirmContent}>
-              <Ionicons name="warning-outline" size={48} color="#c44" style={styles.confirmWarningIcon} />
-              {importSelectedBackup && (
-                <Text style={[styles.confirmText, { color: colors.mutedText }]}>
-                  {formatBackupLabel(importSelectedBackup.filename)}
+                )}
+                <Text style={[styles.confirmText, { color: colors.text }]}>
+                  {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
                 </Text>
-              )}
-              <Text style={[styles.confirmText, { color: colors.text }]}>
-                {t('restore_confirm') || 'Are you sure you want to restore from backup? This will replace all current data.'}
-              </Text>
-              <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.confirmButtonDestructive}>
-                <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
-              </TouchableRipple>
-            </View>
-          )}
+                <TouchableRipple onPress={confirmRestoreLocalBackup} style={styles.confirmButtonDestructive}>
+                  <Text style={styles.confirmButtonText}>{t('restore_database') || 'Restore'}</Text>
+                </TouchableRipple>
+              </View>
+            )}
 
-          {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
-            <View style={styles.sheetsProgressContent}>
-              {sheetsImportSteps.map(step => (
-                <View key={step.id} style={styles.sheetsProgressStep}>
-                  <View style={styles.sheetsProgressStepIcon}>
-                    {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
-                    {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
-                    {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
-                    {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
+            {activeSubPanel === 'import' && importStep === 'sheets-progress' && (
+              <View style={styles.sheetsProgressContent}>
+                {sheetsImportSteps.map(step => (
+                  <View key={step.id} style={styles.sheetsProgressStep}>
+                    <View style={styles.sheetsProgressStepIcon}>
+                      {step.status === 'pending' && <Ionicons name="ellipse-outline" size={22} color={colors.mutedText} />}
+                      {step.status === 'in_progress' && <ActivityIndicator size="small" color={colors.primary} />}
+                      {step.status === 'completed' && <Ionicons name="checkmark-circle" size={22} color="#4caf50" />}
+                      {step.status === 'error' && <Ionicons name="close-circle" size={22} color="#c44" />}
+                    </View>
+                    <Text style={[
+                      styles.sheetsProgressStepLabel,
+                      step.status === 'error' ? styles.sheetsProgressStepLabelError :
+                        { color: step.status === 'pending' ? colors.mutedText : colors.text },
+                    ]}>
+                      {step.label}
+                    </Text>
                   </View>
-                  <Text style={[
-                    styles.sheetsProgressStepLabel,
-                    step.status === 'error' ? styles.sheetsProgressStepLabelError :
-                      { color: step.status === 'pending' ? colors.mutedText : colors.text },
-                  ]}>
-                    {step.label}
-                  </Text>
+                ))}
+                {sheetsImportError && <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>}
+              </View>
+            )}
+
+            {activeSubPanel === 'logs' && (
+              <>
+                <View style={styles.filterRow}>
+                  {LOG_FILTERS.map(f => {
+                    const isSelected = f === logFilter;
+                    const filterLabelKey = `log_level_${f}`;
+                    return (
+                      <TouchableOpacity
+                        key={f}
+                        onPress={() => setLogFilter(f)}
+                        style={[
+                          styles.filterChip,
+                          { borderColor: colors.border },
+                          isSelected && { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterChipText,
+                          isSelected ? styles.filterChipTextSelected : { color: colors.text },
+                        ]}>
+                          {t(filterLabelKey) || f}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              ))}
-              {sheetsImportError && <Text style={styles.sheetsErrorText}>{sheetsImportError}</Text>}
-            </View>
-          )}
 
-          {activeSubPanel === 'logs' && (
-            <>
-              <View style={styles.filterRow}>
-                {LOG_FILTERS.map(f => {
-                  const isSelected = f === logFilter;
-                  const filterLabelKey = `log_level_${f}`;
-                  return (
-                    <TouchableOpacity
-                      key={f}
-                      onPress={() => setLogFilter(f)}
-                      style={[
-                        styles.filterChip,
-                        { borderColor: colors.border },
-                        isSelected && { backgroundColor: colors.primary },
-                      ]}
-                    >
-                      <Text style={[
-                        styles.filterChipText,
-                        isSelected ? styles.filterChipTextSelected : { color: colors.text },
-                      ]}>
-                        {t(filterLabelKey) || f}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                <FlatList
+                  data={entries.slice().reverse()}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderLogEntry}
+                  style={styles.flexList}
+                  inverted
+                  initialNumToRender={20}
+                  maxToRenderPerBatch={20}
+                  windowSize={5}
+                  contentContainerStyle={entries.length === 0 && styles.emptyContainer}
+                  ListEmptyComponent={
+                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+                      {t('no_logs') || 'No logs yet'}
+                    </Text>
+                  }
+                />
+
+                <Divider />
+
+                <View style={[styles.logsActionBar, { paddingBottom: scrollBottomInset }]}>
+                  <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
+                    <Ionicons name="share-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.logsActionText, { color: colors.primary }]}>
+                      {t('share_logs') || 'Share Logs'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
+                    <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
+                    <Text style={[styles.logsActionText, styles.clearLogsText]}>
+                      {t('clear_logs') || 'Clear Logs'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {activeSubPanel === 'update' && (
+              <View style={styles.updatePanelWrapper}>
+                <UpdateContentPanel
+                  isChecking={isCheckingUpdate}
+                  updateResult={updateResult}
+                  downloadedApks={downloadedApks}
+                  onUpdate={handleUpdateFromSettings}
+                  onInstallApk={handleInstallApk}
+                  onRefresh={runUpdateCheck}
+                  bottomInset={scrollBottomInset}
+                />
               </View>
-
-              <FlatList
-                data={entries.slice().reverse()}
-                keyExtractor={(item) => item.id}
-                renderItem={renderLogEntry}
-                style={styles.flexList}
-                inverted
-                initialNumToRender={20}
-                maxToRenderPerBatch={20}
-                windowSize={5}
-                contentContainerStyle={entries.length === 0 && styles.emptyContainer}
-                ListEmptyComponent={
-                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-                    {t('no_logs') || 'No logs yet'}
-                  </Text>
-                }
-              />
-
-              <Divider />
-
-              <View style={[styles.logsActionBar, { paddingBottom: scrollBottomInset }]}>
-                <TouchableOpacity onPress={handleShareLogs} style={styles.logsActionButton}>
-                  <Ionicons name="share-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.logsActionText, { color: colors.primary }]}>
-                    {t('share_logs') || 'Share Logs'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleClearLogs} style={styles.logsActionButton}>
-                  <Ionicons name="trash-outline" size={20} color={LOG_LEVEL_COLORS.error} />
-                  <Text style={[styles.logsActionText, styles.clearLogsText]}>
-                    {t('clear_logs') || 'Clear Logs'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {activeSubPanel === 'update' && (
-            <View style={styles.updatePanelWrapper}>
-              <UpdateContentPanel
-                isChecking={isCheckingUpdate}
-                updateResult={updateResult}
-                downloadedApks={downloadedApks}
-                onUpdate={handleUpdateFromSettings}
-                onInstallApk={handleInstallApk}
-                onRefresh={runUpdateCheck}
-                bottomInset={scrollBottomInset}
-              />
-            </View>
-          )}
-        </View>
-      </Animated.View>
-    </GestureDetector>
+            )}
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   ) : null;
 
   // ─── Main settings list (base layer) + subpanel overlay ───
@@ -1893,6 +1901,12 @@ const styles = StyleSheet.create({
   subPanelBodyFlush: {
     paddingBottom: 0,
   },
+  subPanelFill: {
+    // Fills the absolutely-positioned overlay above. Carries the swipe transform
+    // and the opaque background so a rightward swipe slides this layer off to
+    // reveal the (transparent overlay →) settings list behind it.
+    flex: 1,
+  },
   subPanelHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1901,13 +1915,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
   },
   subPanelOverlay: {
-    // Covers the settings list while open; the swipe slides it off to the right
-    // to reveal the list behind. Both elevation and zIndex lift it above the
-    // base ScrollView: under the New Architecture (Fabric, RN 0.85+) Android
-    // stacking follows the CSS model, where paint order among positioned
-    // siblings is governed by zIndex while elevation only drives the native
-    // shadow. Without zIndex the absolutely-positioned overlay paints behind the
-    // ScrollView and renders below the main settings list instead of over it.
+    // Plain, transparent positioning + stacking layer covering the settings list
+    // while a subpanel is open. Both elevation and zIndex lift it above the base
+    // ScrollView: under the New Architecture (Fabric, RN 0.85+) Android stacking
+    // follows the CSS model, where paint order among positioned siblings is
+    // governed by zIndex while elevation only drives the native shadow. Without
+    // zIndex the overlay paints behind the ScrollView and renders below the main
+    // settings list instead of over it.
     ...StyleSheet.absoluteFillObject,
     elevation: 8,
     zIndex: 10,
