@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.3](https://github.com/heywood8/money-tracker/compare/penny-v0.151.2...penny-v0.151.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* **settings:** render subpanels over main list on New Architecture ([#1073](https://github.com/heywood8/money-tracker/issues/1073)) ([663f215](https://github.com/heywood8/money-tracker/commit/663f2154bb0cf5641c07f5c41f42c530d3817cbe))
+
 ## [0.151.2](https://github.com/heywood8/money-tracker/compare/penny-v0.151.1...penny-v0.151.2) (2026-06-25)
 
 
