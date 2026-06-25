@@ -899,7 +899,14 @@ const OperationsScreen = () => {
       {/* Scroll to Top Button - only show when scrolled down */}
       {showScrollToTop && !operationsLoading && (
         <TouchableOpacity
-          style={[styles.scrollToTopButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={[
+            styles.scrollToTopButton,
+            {
+              top: searchBarAreaHeight + SPACING.sm,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
           onPress={scrollToTop}
           accessibilityRole="button"
           accessibilityLabel="Scroll to top"
@@ -956,8 +963,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    top: 16,
     width: 40,
+    zIndex: 10,
   },
 });
 
