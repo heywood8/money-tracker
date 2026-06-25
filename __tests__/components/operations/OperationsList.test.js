@@ -10,6 +10,7 @@ import React from 'react';
 import { render, act } from '@testing-library/react-native';
 import { ActivityIndicator } from 'react-native';
 import OperationsList from '../../../app/components/operations/OperationsList';
+import { HEIGHTS, BORDER_RADIUS, SPACING } from '../../../app/styles/designTokens';
 
 // Intercept SectionList to capture its props for direct callback testing.
 // RNTL v14 no longer exposes composite elements, so we capture props this way.
@@ -426,6 +427,146 @@ describe('OperationsList', () => {
       // should not throw for either index
       await render(sp.renderItem({ item: section.data[0], index: 0, section }));
       await render(sp.renderItem({ item: section.data[1], index: 1, section }));
+    });
+  });
+
+  // ── getItemLayout — exact offsets for instant date jumps ───────────────────
+  // No onLayout fires in the test renderer, so the measured-height refs keep
+  // their defaults: list header = 0, section header = SPACING.sm + 17 +
+  // SPACING.xs + BORDER_RADIUS.md = 37. Rows are HEIGHTS.listItem (48) with a
+  // 1px separator on every row except the last in a section; the section footer
+  // is BORDER_RADIUS.md + SPACING.xs = 12.
+  describe('getItemLayout', () => {
+    const ROW = HEIGHTS.listItem;                       // 48
+    const SEP = 1;
+    const FOOTER = BORDER_RADIUS.md + SPACING.xs;        // 12
+    const HEADER = SPACING.sm + 17 + SPACING.xs + BORDER_RADIUS.md; // 37
+
+    const makeOps = (prefix, count) =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `${prefix}-${i}`, type: 'expense', amount: '1.00', accountId: 'acc-usd', categoryId: 'cat-1',
+      }));
+
+    it('is provided to the SectionList', async () => {
+      const { sp } = await getSectionListProps({ groupedOperations: [makeGroup(TODAY, makeOps('a', 1))] });
+      expect(typeof sp.getItemLayout).toBe('function');
+    });
+
+    it('computes exact header / row / footer offsets across sections', async () => {
+      // Section A: 2 rows, Section B: 1 row.
+      const groups = [makeGroup(TODAY, makeOps('a', 2)), makeGroup(OLD_DATE, makeOps('b', 1))];
+      const { sp } = await getSectionListProps({ groupedOperations: groups });
+      const layout = (i) => sp.getItemLayout(sp.sections, i);
+
+      // Section A — flattened [header, rowA0, rowA1, footerA]
+      expect(layout(0)).toEqual({ length: HEADER, offset: 0, index: 0 });            // header A
+      expect(layout(1)).toEqual({ length: ROW + SEP, offset: HEADER, index: 1 });    // row 0 (not last)
+      expect(layout(2)).toEqual({ length: ROW, offset: HEADER + ROW + SEP, index: 2 }); // row 1 (last, no sep)
+      const aItemsHeight = 2 * ROW + 1 * SEP; // 97
+      expect(layout(3)).toEqual({ length: FOOTER, offset: HEADER + aItemsHeight, index: 3 }); // footer A
+
+      // Section B starts after A's full height (header + rows + footer).
+      const sectionAHeight = HEADER + aItemsHeight + FOOTER;
+      expect(layout(4)).toEqual({ length: HEADER, offset: sectionAHeight, index: 4 }); // header B
+      expect(layout(5)).toEqual({ length: ROW, offset: sectionAHeight + HEADER, index: 5 }); // row 0 (last)
+      expect(layout(6)).toEqual({ length: FOOTER, offset: sectionAHeight + HEADER + ROW, index: 6 }); // footer B
+    });
+
+    it('produces contiguous offsets (offset[i+1] === offset[i] + length[i])', async () => {
+      const groups = [
+        makeGroup(TODAY, makeOps('a', 3)),
+        makeGroup(YESTERDAY, makeOps('b', 1)),
+        makeGroup(OLD_DATE, makeOps('c', 2)),
+      ];
+      const { sp } = await getSectionListProps({ groupedOperations: groups });
+      const totalCells = groups.reduce((sum, g) => sum + g.operations.length + 2, 0);
+      let expectedOffset = 0;
+      for (let i = 0; i < totalCells; i++) {
+        const frame = sp.getItemLayout(sp.sections, i);
+        expect(frame.index).toBe(i);
+        expect(frame.offset).toBe(expectedOffset);
+        expect(frame.length).toBeGreaterThan(0);
+        expectedOffset += frame.length;
+      }
+    });
+
+    it('returns a zero-length frame for out-of-range indices', async () => {
+      const { sp } = await getSectionListProps({ groupedOperations: [makeGroup(TODAY, makeOps('a', 1))] });
+      // Section has 1 row → flattened cells 0..2; index 3 is past the end.
+      expect(sp.getItemLayout(sp.sections, 3)).toEqual({ length: 0, offset: 0, index: 3 });
+      expect(sp.getItemLayout(sp.sections, -1)).toEqual({ length: 0, offset: 0, index: -1 });
+    });
+
+    it('handles an empty list without throwing', async () => {
+      const { sp } = await getSectionListProps({ groupedOperations: [] });
+      expect(sp.getItemLayout([], 0)).toEqual({ length: 0, offset: 0, index: 0 });
+    });
+
+    // ── runtime height measurement feeding getItemLayout ─────────────────────
+    // onLayout never fires in the test renderer, so we drive the captured
+    // handlers directly and confirm getItemLayout picks up the measured heights.
+    describe('runtime height measurement', () => {
+      const fireLayout = (element, height) => {
+        element.props.onLayout({ nativeEvent: { layout: { height } } });
+      };
+
+      it('uses a measured section-header height for every section offset', async () => {
+        const groups = [makeGroup(TODAY, makeOps('a', 1)), makeGroup(OLD_DATE, makeOps('b', 1))];
+        const { sp } = await getSectionListProps({ groupedOperations: groups });
+        const section = toSection(groups[0]);
+        const aData = 1 * ROW + FOOTER; // section A's rows + footer = dataBefore[B]
+
+        // Fallback height until the DateSeparator card reports a real one.
+        expect(sp.getItemLayout(sp.sections, 0).length).toBe(HEADER);
+        expect(sp.getItemLayout(sp.sections, 3).offset).toBe(aData + HEADER); // section B header
+
+        // The section-header card reports its real height.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 44); });
+
+        // Both the header length and every later section's offset reflect it.
+        expect(sp.getItemLayout(sp.sections, 0).length).toBe(44);
+        expect(sp.getItemLayout(sp.sections, 3)).toEqual({ length: 44, offset: aData + 44, index: 3 });
+      });
+
+      it('keeps the first measurement, then the tallest, and ignores non-positive heights', async () => {
+        const groups = [makeGroup(TODAY, makeOps('a', 1))];
+        const { sp } = await getSectionListProps({ groupedOperations: groups });
+        const section = toSection(groups[0]);
+        const headerLength = () => sp.getItemLayout(sp.sections, 0).length;
+
+        // First real measurement replaces the fallback even when it is shorter.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 30); });
+        expect(headerLength()).toBe(30);
+
+        // A shorter later measurement is ignored (keep the tallest seen)...
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 25); });
+        expect(headerLength()).toBe(30);
+
+        // ...a taller one wins...
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 50); });
+        expect(headerLength()).toBe(50);
+
+        // ...and a zero/garbage layout never regresses it.
+        await act(async () => { fireLayout(sp.renderSectionHeader({ section }), 0); });
+        expect(headerLength()).toBe(50);
+      });
+
+      it('shifts all offsets down by the measured list-header (QuickAdd form) height', async () => {
+        const React = require('react');
+        const headerComponent = React.createElement('View', { testID: 'qa-form' });
+        const { sp } = await getSectionListProps({
+          groupedOperations: [makeGroup(TODAY, makeOps('a', 1))],
+          headerComponent,
+        });
+
+        // List header starts at 0 until its wrapper reports a height.
+        expect(sp.getItemLayout(sp.sections, 0).offset).toBe(0);
+
+        await act(async () => { fireLayout(sp.ListHeaderComponent, 120); });
+
+        // First section header now begins right after the measured list header.
+        expect(sp.getItemLayout(sp.sections, 0)).toEqual({ length: HEADER, offset: 120, index: 0 });
+      });
     });
   });
 });

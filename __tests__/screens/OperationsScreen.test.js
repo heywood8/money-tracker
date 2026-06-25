@@ -1196,13 +1196,15 @@ describe('OperationsScreen', () => {
       expect(scrollToTopButton).toBeNull();
     });
 
-    it('handleScrollToIndexFailed handles scroll index errors gracefully', async () => {
+    it('handleScrollToIndexFailed falls back gracefully without warnings or retries', async () => {
       const OperationsScreen = require('../../app/screens/OperationsScreen').default;
       const { useOperationsData } = require('../../app/contexts/OperationsDataContext');
       const { useOperationsActions } = require('../../app/contexts/OperationsActionsContext');
 
-      // Spy on console.warn to verify the handler is called
+      // The list now ships getItemLayout, so the failure path is a quiet safety
+      // net: no console.warn, no 100ms setTimeout retry dance.
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const timeoutSpy = jest.spyOn(global, 'setTimeout');
 
       useOperationsData.mockReturnValue({
         operations: [],
@@ -1227,19 +1229,19 @@ describe('OperationsScreen', () => {
       const { getByTestId } = await render(<OperationsScreen />);
       const operationsList = getByTestId('operations-list');
 
-      // Invoke onScrollToIndexFailed
+      // Ignore any timers scheduled during render; only watch the handler itself.
+      timeoutSpy.mockClear();
+
+      // Invoke onScrollToIndexFailed — must not throw and must stay quiet
       await act(async () => {
-        operationsList.props.onScrollToIndexFailed({ index: 10 });
+        operationsList.props.onScrollToIndexFailed({ index: 10, averageItemLength: 56 });
       });
 
-      // Should log the error
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'scrollToIndex failed for index:',
-        10,
-        'Using offset fallback',
-      );
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(timeoutSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+      timeoutSpy.mockRestore();
     });
 
     it('handleContentSizeChange is passed to OperationsList', async () => {

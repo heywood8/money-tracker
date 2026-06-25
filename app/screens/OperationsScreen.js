@@ -4,7 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from '
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
-import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
+import { TOP_CONTENT_SPACING, HORIZONTAL_PADDING, SPACING, BORDER_RADIUS, HEIGHTS } from '../styles/layout';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
@@ -815,31 +815,16 @@ const OperationsScreen = () => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
-  // Handle scroll to index failures (when item is not rendered yet)
+  // Safety net for scrollToIndex failures. The list now provides getItemLayout,
+  // so scrollToLocation resolves offsets directly and this should not fire in
+  // practice. If it ever does, jump straight to an estimated offset — no retry,
+  // no timeout dance (RN supplies averageItemLength from its measured cells).
   const handleScrollToIndexFailed = useCallback((info) => {
-    console.warn('scrollToIndex failed for index:', info.index, 'Using offset fallback');
-
-    // Scroll to approximate position using offset
-    const estimatedItemHeight = 75;
-    const estimatedOffset = info.index * estimatedItemHeight;
-
+    const averageItemHeight = info?.averageItemLength || HEIGHTS.listItem;
     flatListRef.current?.scrollToOffset({
-      offset: estimatedOffset,
+      offset: averageItemHeight * (info?.index || 0),
       animated: false,
     });
-
-    // Try scrollToIndex again after a delay for precise positioning
-    setTimeout(() => {
-      try {
-        flatListRef.current?.scrollToIndex({
-          index: info.index,
-          animated: false,
-          viewPosition: 0,
-        });
-      } catch (error) {
-        console.warn('Second scrollToIndex attempt failed');
-      }
-    }, 100);
   }, []);
 
   const handleSearchBarAreaLayout = useCallback((event) => {
