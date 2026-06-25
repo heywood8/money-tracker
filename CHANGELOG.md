@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.1](https://github.com/heywood8/money-tracker/compare/penny-v0.151.0...penny-v0.151.1) (2026-06-25)
+
+
+### Build System
+
+* **deps:** upgrade Expo SDK 54 → 56 (RN 0.85, Reanimated 4.3, Worklets 0.8) ([#1065](https://github.com/heywood8/money-tracker/issues/1065)) ([21ce908](https://github.com/heywood8/money-tracker/commit/21ce908080c21c339fa1eb5a7269f4ca88f3a0af))
+
 ## [0.151.0](https://github.com/heywood8/money-tracker/compare/penny-v0.150.7...penny-v0.151.0) (2026-06-25)
 
 
