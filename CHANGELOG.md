@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.6](https://github.com/heywood8/money-tracker/compare/penny-v0.151.5...penny-v0.151.6) (2026-06-26)
+
+
+### Styles
+
+* **search:** make collapsed search bar a floating pill like the bottom menu ([#1080](https://github.com/heywood8/money-tracker/issues/1080)) ([8aff8b5](https://github.com/heywood8/money-tracker/commit/8aff8b55034f1ae49b8054a445206fbb06265948))
+
 ## [0.151.5](https://github.com/heywood8/money-tracker/compare/penny-v0.151.4...penny-v0.151.5) (2026-06-26)
 
 
