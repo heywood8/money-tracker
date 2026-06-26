@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.154.0](https://github.com/heywood8/money-tracker/compare/penny-v0.153.2...penny-v0.154.0) (2026-06-26)
+
+
+### Features
+
+* request permission to read notifications in background ([#1097](https://github.com/heywood8/money-tracker/issues/1097)) ([4270748](https://github.com/heywood8/money-tracker/commit/4270748fc763b5ad1dcf729603ff8fbaa0ffbf81))
+
 ## [0.153.2](https://github.com/heywood8/money-tracker/compare/penny-v0.153.1...penny-v0.153.2) (2026-06-26)
 
 
