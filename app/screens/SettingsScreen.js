@@ -31,8 +31,9 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
-import { openNotificationAccessSettings } from '../services/NotificationAccess';
+import { openNotificationAccessSettings, isNotificationAccessEnabled, getRecentNotifications } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
+import NotificationsContentPanel from '../components/NotificationsContentPanel';
 import AccountsScreen from './AccountsScreen';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import CategoriesScreen from './CategoriesScreen';
@@ -102,6 +103,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
+  const [recentNotifications, setRecentNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [importStep, setImportStep] = useState('source');
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
@@ -211,6 +214,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsImportError(null);
     setDownloadedApks([]);
+    setRecentNotifications([]);
+    setNotificationsLoading(false);
   }, []);
 
   // Back navigation is locked while a long async step (Sheets export/import) runs,
@@ -739,7 +744,28 @@ export default function SettingsScreen({ setSubPanelActive }) {
     runUpdateCheck();
   }, [openSubPanel, runUpdateCheck]);
 
+  const loadRecentNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
+    try {
+      const items = await getRecentNotifications();
+      setRecentNotifications(items);
+    } catch (error) {
+      setRecentNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
   const handleOpenNotificationAccess = useCallback(async () => {
+    // When access is already granted, drill into the subpanel that lists the
+    // most recent notifications. Otherwise send the user to the system screen
+    // where they can grant the permission.
+    const enabled = await isNotificationAccessEnabled();
+    if (enabled) {
+      openSubPanel('notifications');
+      loadRecentNotifications();
+      return;
+    }
     try {
       await openNotificationAccessSettings();
     } catch (error) {
@@ -750,7 +776,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
         [{ text: 'OK' }],
       );
     }
-  }, [showDialog, t]);
+  }, [openSubPanel, loadRecentNotifications, showDialog, t]);
 
   const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
     // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
@@ -901,6 +927,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       if (updateResult?.type === 'available') return t('update_available_title') || 'Update available';
       return t('check_updates') || 'Check for updates';
     }
+    if (activeSubPanel === 'notifications') return t('notification_access') || 'Notification access';
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
   }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, t]);
@@ -1441,6 +1468,17 @@ export default function SettingsScreen({ setSubPanelActive }) {
                   onUpdate={handleUpdateFromSettings}
                   onInstallApk={handleInstallApk}
                   onRefresh={runUpdateCheck}
+                  bottomInset={scrollBottomInset}
+                />
+              </View>
+            )}
+
+            {activeSubPanel === 'notifications' && (
+              <View style={styles.updatePanelWrapper}>
+                <NotificationsContentPanel
+                  isLoading={notificationsLoading}
+                  notifications={recentNotifications}
+                  onRefresh={loadRecentNotifications}
                   bottomInset={scrollBottomInset}
                 />
               </View>

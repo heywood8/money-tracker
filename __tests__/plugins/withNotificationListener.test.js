@@ -1,5 +1,6 @@
 let manifestCb;
 let dangerousCb;
+let mainAppCb;
 
 jest.mock('@expo/config-plugins', () => ({
   withAndroidManifest: (config, cb) => {
@@ -10,6 +11,10 @@ jest.mock('@expo/config-plugins', () => ({
     dangerousCb = cb;
     return config;
   },
+  withMainApplication: (config, cb) => {
+    mainAppCb = cb;
+    return config;
+  },
 }));
 
 const withNotificationListener = require('../../plugins/withNotificationListener');
@@ -18,6 +23,7 @@ describe('withNotificationListener', () => {
   beforeEach(() => {
     manifestCb = undefined;
     dangerousCb = undefined;
+    mainAppCb = undefined;
   });
 
   it('adds a notification listener service to the manifest', () => {
@@ -50,5 +56,49 @@ describe('withNotificationListener', () => {
     withNotificationListener({});
     const config = { modResults: { manifest: {} } };
     expect(() => manifestCb(config)).toThrow(/application/);
+  });
+
+  it('registers the native package in MainApplication', () => {
+    withNotificationListener({});
+    const config = {
+      modResults: {
+        language: 'kt',
+        contents: [
+          'override fun getPackages(): List<ReactPackage> {',
+          '    val packages = PackageList(this).packages',
+          '    return packages',
+          '}',
+        ].join('\n'),
+      },
+    };
+    const out = mainAppCb(config);
+    expect(out.modResults.contents).toContain(
+      'packages.add(PennyNotificationsPackage())',
+    );
+  });
+
+  it('does not register the native package twice', () => {
+    withNotificationListener({});
+    const config = {
+      modResults: {
+        language: 'kt',
+        contents: [
+          '    val packages = PackageList(this).packages',
+          '    packages.add(PennyNotificationsPackage())',
+          '    return packages',
+        ].join('\n'),
+      },
+    };
+    const out = mainAppCb(config);
+    const occurrences = out.modResults.contents.split(
+      'packages.add(PennyNotificationsPackage())',
+    ).length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  it('throws if the package list anchor is missing in MainApplication', () => {
+    withNotificationListener({});
+    const config = { modResults: { language: 'kt', contents: 'class MainApplication' } };
+    expect(() => mainAppCb(config)).toThrow(/package list/);
   });
 });
