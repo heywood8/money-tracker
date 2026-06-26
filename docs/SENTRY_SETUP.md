@@ -16,32 +16,34 @@ When no DSN is configured the entire integration is a **no-op**, so development 
 
 ## Required configuration
 
-The only secret is the **auth token** (used to upload source maps). The DSN, org, and project slugs are **not secret** — the DSN is embedded in every distributed build by design.
+The org/project slugs, region URL, and DSN are **baked into `app.config.js`** — none of them are secret (the DSN ships inside every release APK regardless). The committed values point at this project's Sentry:
 
-Set these as **GitHub Actions secrets** (used by `.github/workflows/build-release-apk.yml` and `eas-build-android.yml`):
+| Setting | Value | Where |
+| --- | --- | --- |
+| Organization | `heywood8` | plugin `organization` |
+| Project | `penny` | plugin `project` |
+| Region URL | `https://de.sentry.io/` (EU/DE) | plugin `url` |
+| DSN | `…@o4510430127980544.ingest.de.sentry.io/4510430145740880` | `extra.sentry.dsn` |
 
-| Name | Secret? | Example | Used for |
-| --- | --- | --- | --- |
-| `SENTRY_AUTH_TOKEN` | **Yes** | `sntrys_…` | Uploading source maps (already configured) |
-| `SENTRY_ORG` | No | `my-org` | Source-map upload target |
-| `SENTRY_PROJECT` | No | `penny` | Source-map upload target |
-| `SENTRY_DSN` | No | `https://abc123@o0.ingest.sentry.io/0` | Where the app sends events |
+So the **only secret you must provide is the auth token**, which is already configured:
 
-> Prefer not to manage env vars for the non-secret values? You can hardcode them
-> directly instead: put the `dsn` string in `app.config.js` (`extra.sentry.dsn`)
-> and the `organization` / `project` in the `@sentry/react-native/expo` plugin
-> options. They are safe to commit.
+| Name | Secret? | Used for |
+| --- | --- | --- |
+| `SENTRY_AUTH_TOKEN` | **Yes** | Uploading source maps (already configured) |
+
+Each baked-in value can be overridden at build time via the matching env var (`SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_URL`, `SENTRY_DSN`) — all are already passed through in both build workflows.
+
+> **EU/DE region note:** because the org is in Sentry's EU data region, source-map
+> uploads must target `https://de.sentry.io/` (set via the plugin `url`). The
+> default `https://sentry.io/` would fail with authentication errors.
 
 ### EAS Cloud builds
 
-`build-release-apk.yml` runs `eas build --local` on the GitHub runner, so the workflow `env:` block above is sufficient.
+`build-release-apk.yml` runs `eas build --local` on the GitHub runner, so its workflow `env:` block (which passes `SENTRY_AUTH_TOKEN`) is sufficient.
 
-For **cloud** EAS builds (`eas-build-android.yml`, plain `eas build`), the variables must also exist on the EAS build servers. Add them as EAS environment variables:
+For **cloud** EAS builds (`eas-build-android.yml`, plain `eas build`), the auth token must also exist on the EAS build servers. Since the org/project/DSN/region are baked into `app.config.js`, only the token is needed:
 
 ```bash
-eas env:create --name SENTRY_DSN --value "https://…" --environment production --visibility plaintext
-eas env:create --name SENTRY_ORG --value "my-org" --environment production --visibility plaintext
-eas env:create --name SENTRY_PROJECT --value "penny" --environment production --visibility plaintext
 eas env:create --name SENTRY_AUTH_TOKEN --value "sntrys_…" --environment production --visibility secret
 ```
 
@@ -62,4 +64,4 @@ eas env:create --name SENTRY_AUTH_TOKEN --value "sntrys_…" --environment produ
 
 ## Disabling
 
-Remove (or blank) `SENTRY_DSN`. With no DSN, `Sentry.init` is skipped and nothing is reported.
+Blank the `dsn` fallback in `app.config.js` (`extra.sentry.dsn`), or set the `SENTRY_DSN` env var to an empty string at build time. With no DSN, `Sentry.init` is skipped and nothing is reported.

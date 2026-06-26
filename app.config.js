@@ -34,12 +34,12 @@ module.exports = {
         projectId: '89372eb2-93f5-475a-a630-9caa827d8406',
       },
       // Sentry runtime config, read by app/services/sentry.js via expo-constants.
-      // The DSN is a public client key (safe to embed in the app). It is sourced
-      // from the SENTRY_DSN build-time env var; replace the fallback below with
-      // your DSN string if you prefer to hardcode it. When empty, Sentry is a
-      // complete no-op.
+      // The DSN is a public client key — it ships inside every release APK
+      // regardless, so it is safe to commit. An env var can override it.
       sentry: {
-        dsn: process.env.SENTRY_DSN || '',
+        dsn:
+          process.env.SENTRY_DSN ||
+          'https://f06a0b39f8c767ce0baa256f79dabe5b@o4510430127980544.ingest.de.sentry.io/4510430145740880',
         environment: process.env.APP_VARIANT || undefined,
       },
     },
@@ -61,13 +61,16 @@ module.exports = {
       ],
       [
         // Sets up native Sentry and uploads source maps + ProGuard mappings at
-        // build time. Authentication uses the SENTRY_AUTH_TOKEN env var; the
-        // organization/project slugs are not secret and may be provided as env
-        // vars or hardcoded here.
+        // build time. Authentication uses the SENTRY_AUTH_TOKEN env var. The
+        // org/project slugs and region URL are not secret; they default to this
+        // project's values and can be overridden by env vars.
         '@sentry/react-native/expo',
         {
-          organization: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
+          organization: process.env.SENTRY_ORG || 'heywood8',
+          project: process.env.SENTRY_PROJECT || 'penny',
+          // This org lives in Sentry's EU/DE data region, so source-map uploads
+          // must target de.sentry.io rather than the default https://sentry.io/.
+          url: process.env.SENTRY_URL || 'https://de.sentry.io/',
         },
       ],
       './plugins/withR8Config.js',
