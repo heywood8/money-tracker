@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.153.0](https://github.com/heywood8/money-tracker/compare/penny-v0.152.2...penny-v0.153.0) (2026-06-26)
+
+
+### Features
+
+* forward app logs to Sentry as redacted structured logs ([#1089](https://github.com/heywood8/money-tracker/issues/1089)) ([409da2c](https://github.com/heywood8/money-tracker/commit/409da2ceb25cd3a74a70f1c08e0eab8a7abd67e2))
+
 ## [0.152.2](https://github.com/heywood8/money-tracker/compare/penny-v0.152.1...penny-v0.152.2) (2026-06-26)
 
 
