@@ -82,6 +82,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const { visibleAccounts } = useAccountsData();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
+  // Measured size of the settings container. The subpanel overlay is sized in
+  // explicit pixels from this rather than relying on `absoluteFillObject`'s
+  // top+bottom inset stretch, which collapses to zero height under Reanimated 4 /
+  // RN 0.85's Yoga (leaving the panel invisible / seemingly not opening).
+  const [containerSize, setContainerSize] = useState(null);
   const [pinnedAccountId, setPinnedAccountId] = useState(null);
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
@@ -227,6 +232,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const handleEmbeddedBackStateChange = useCallback((goBack) => {
     embeddedBackRef.current = typeof goBack === 'function' ? goBack : null;
     setEmbeddedCanGoBack(!!goBack);
+  }, []);
+
+  // Capture the container's pixel size so the subpanel overlay can be sized
+  // explicitly (see containerSize above). Only update on real changes to avoid
+  // an extra render loop.
+  const handleContainerLayout = useCallback((event) => {
+    const { width, height } = event.nativeEvent.layout;
+    setContainerSize(prev => (prev && prev.width === width && prev.height === height ? prev : { width, height }));
   }, []);
 
   // Whether a completed swipe (or hardware-back) should step one level up rather
@@ -908,7 +921,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     // dropped — the panel collapses to its header height and falls into normal
     // flow below the list. The inner Animated.View instead fills this concretely
     // sized parent with flex:1 and carries only the swipe transform + background.
-    <View style={styles.subPanelOverlay}>
+    <View style={[
+      styles.subPanelOverlay,
+      containerSize && { width: containerSize.width, height: containerSize.height },
+    ]}>
       <GestureDetector gesture={swipeGesture}>
         <Animated.View
           style={[styles.subPanelFill, { backgroundColor: colors.background }, swipeStyle]}
@@ -1425,6 +1441,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   return (
     <View
       style={[styles.container, { backgroundColor: colors.background }]}
+      onLayout={handleContainerLayout}
     >
       <ScrollView contentContainerStyle={styles.settingsContent}>
         <TouchableRipple onPress={() => openSubPanel('language')} style={styles.settingsRow} testID="settings-language-row">
@@ -1916,14 +1933,18 @@ const styles = StyleSheet.create({
   },
   subPanelOverlay: {
     // Plain, transparent positioning + stacking layer covering the settings list
-    // while a subpanel is open. Both elevation and zIndex lift it above the base
-    // ScrollView: under the New Architecture (Fabric, RN 0.85+) Android stacking
-    // follows the CSS model, where paint order among positioned siblings is
-    // governed by zIndex while elevation only drives the native shadow. Without
-    // zIndex the overlay paints behind the ScrollView and renders below the main
-    // settings list instead of over it.
-    ...StyleSheet.absoluteFillObject,
+    // while a subpanel is open. Anchored top-left and sized in explicit pixels
+    // (from the measured container) rather than `absoluteFillObject`'s top+bottom
+    // inset stretch, which collapses to zero size under Reanimated 4 / RN 0.85's
+    // Yoga — that left the panel invisible / seemingly not opening. Both elevation
+    // and zIndex lift it above the base ScrollView: under the New Architecture
+    // (Fabric) Android stacking follows the CSS model, where paint order among
+    // positioned siblings is governed by zIndex while elevation only drives the
+    // native shadow.
     elevation: 8,
+    left: 0,
+    position: 'absolute',
+    top: 0,
     zIndex: 10,
   },
   subPanelTitle: {
