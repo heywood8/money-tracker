@@ -51,7 +51,10 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
         if (title.isBlank() && text.isBlank()) return
-        record(applicationContext, title, text, sbn.packageName ?: "", sbn.postTime)
+        // sbn.key is stable across updates of the same notification (e.g. a chat
+        // thread that re-posts as new messages arrive), so it lets us collapse
+        // repeats instead of stacking identical cards.
+        record(applicationContext, title, text, sbn.packageName ?: "", sbn.postTime, sbn.key ?: "")
     }
 
     companion object {
@@ -66,6 +69,7 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
             text: String,
             packageName: String,
             postTime: Long,
+            key: String,
         ) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val current = try {
@@ -78,13 +82,23 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
                 put("text", text)
                 put("packageName", packageName)
                 put("postTime", postTime)
+                put("key", key)
             }
-            // Newest first, capped at MAX_STORED.
+            // Newest first, capped at MAX_STORED. Drop any earlier entry that is
+            // the same notification — matched by its stable key, or by identical
+            // package+title+text — so re-posts/updates don't appear as duplicates.
             val updated = JSONArray()
             updated.put(entry)
             var i = 0
             while (i < current.length() && updated.length() < MAX_STORED) {
-                updated.put(current.get(i))
+                val existing = current.getJSONObject(i)
+                val sameKey = key.isNotEmpty() && existing.optString("key") == key
+                val sameContent = existing.optString("packageName") == packageName &&
+                    existing.optString("title") == title &&
+                    existing.optString("text") == text
+                if (!sameKey && !sameContent) {
+                    updated.put(existing)
+                }
                 i++
             }
             prefs.edit().putString(KEY_RECENT, updated.toString()).apply()
