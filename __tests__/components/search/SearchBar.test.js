@@ -160,26 +160,31 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar button sizing', () => {
-    it('filter button has proper 44x44px touch target', async () => {
+    // The buttons sit inside the compact pill (38px tall), so they are 44x36 and
+    // rely on hitSlop to keep a >=44px touch target.
+    it('filter button is centered and keeps a generous touch target', async () => {
       const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const button = getByTestId('filters-toggle-button');
 
       const buttonStyle = StyleSheet.flatten(button.props.style);
       expect(buttonStyle.width).toBe(44);
-      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.height).toBe(36);
       expect(buttonStyle.alignItems).toBe('center');
       expect(buttonStyle.justifyContent).toBe('center');
+      // hitSlop extends the effective touch target past the visible button.
+      expect(button.props.hitSlop).toEqual({ top: 10, bottom: 10, left: 10, right: 10 });
     });
 
-    it('close button has proper 44x44px touch target', async () => {
+    it('close button is centered and keeps a generous touch target', async () => {
       const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const button = getByTestId('close-search-button');
 
       const buttonStyle = StyleSheet.flatten(button.props.style);
       expect(buttonStyle.width).toBe(44);
-      expect(buttonStyle.height).toBe(44);
+      expect(buttonStyle.height).toBe(36);
       expect(buttonStyle.alignItems).toBe('center');
       expect(buttonStyle.justifyContent).toBe('center');
+      expect(button.props.hitSlop).toEqual({ top: 10, bottom: 10, left: 10, right: 10 });
     });
   });
 
@@ -192,7 +197,8 @@ describe('SearchBar', () => {
       const pill = getByTestId('search-pill');
 
       const pillStyle = StyleSheet.flatten(pill.props.style);
-      expect(pillStyle.borderRadius).toBe(24);
+      // Fully-rounded pill: radius is half the fixed 38px height.
+      expect(pillStyle.borderRadius).toBe(19);
       expect(pillStyle.borderWidth).toBe(1);
     });
 
