@@ -1,31 +1,37 @@
-import { buildMessages, parseAction, SYSTEM_PROMPT } from '../src/agent/prompts.js';
+import { buildPrompt, parseAction, SYSTEM_PROMPT } from '../src/agent/prompts.js';
 
-describe('buildMessages', () => {
-  it('returns array ending with user message', () => {
-    const msgs = buildMessages({ name: 'Test', description: 'desc' }, [], [], 'img');
-    expect(msgs[msgs.length - 1].role).toBe('user');
+describe('buildPrompt', () => {
+  it('returns a string', () => {
+    const prompt = buildPrompt({ name: 'Test', description: 'desc' }, [], [], '/tmp/frame.png');
+    expect(typeof prompt).toBe('string');
   });
 
-  it('includes image block with provided base64', () => {
-    const msgs = buildMessages({ name: 'T', description: 'd' }, [], [], 'abc123');
-    const img = msgs[msgs.length - 1].content.find(b => b.type === 'image');
-    expect(img.source.data).toBe('abc123');
-    expect(img.source.media_type).toBe('image/png');
+  it('references the screenshot path for the Read tool', () => {
+    const prompt = buildPrompt({ name: 'T', description: 'd' }, [], [], '/abs/path/frame.png');
+    expect(prompt).toContain('/abs/path/frame.png');
+    expect(prompt).toContain('Read tool');
   });
 
-  it('includes scenario name in text block', () => {
-    const msgs = buildMessages({ name: 'Add expense', description: 'test' }, [], [], 'img');
-    const text = msgs[msgs.length - 1].content.find(b => b.type === 'text');
-    expect(text.text).toContain('Add expense');
+  it('includes scenario name and goal', () => {
+    const prompt = buildPrompt({ name: 'Add expense', description: 'tap the FAB' }, [], [], '/tmp/f.png');
+    expect(prompt).toContain('Add expense');
+    expect(prompt).toContain('tap the FAB');
   });
 
-  it('prepends conversation history', () => {
-    const history = [
-      { role: 'user', content: [{ type: 'text', text: 'prev' }] },
-      { role: 'assistant', content: '{"action":"back"}' },
-    ];
-    const msgs = buildMessages({ name: 'T', description: 'd' }, history, [], 'img');
-    expect(msgs).toHaveLength(3);
+  it('serializes the UI elements', () => {
+    const prompt = buildPrompt({ name: 'T', description: 'd' }, [], [{ text: 'Save', bounds: [1, 2, 3, 4] }], '/tmp/f.png');
+    expect(prompt).toContain('Save');
+  });
+
+  it('inlines recent action history when present', () => {
+    const prompt = buildPrompt({ name: 'T', description: 'd' }, ['tap — opened Accounts', 'back'], [], '/tmp/f.png');
+    expect(prompt).toContain('RECENT ACTIONS');
+    expect(prompt).toContain('opened Accounts');
+  });
+
+  it('omits the history section when there is none', () => {
+    const prompt = buildPrompt({ name: 'T', description: 'd' }, [], [], '/tmp/f.png');
+    expect(prompt).not.toContain('RECENT ACTIONS');
   });
 });
 

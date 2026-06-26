@@ -1,5 +1,6 @@
 // scripts/e2e-agent/index.js
 import { program } from 'commander';
+import { ensureClaudeCli } from './src/agent/claude-cli.js';
 
 program
   .name('e2e-agent')
@@ -17,8 +18,12 @@ if (opts.mode === 'pr' && !opts.pr) {
   process.exit(1);
 }
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('ANTHROPIC_API_KEY environment variable is required');
+// Drives Claude through the local Claude Code CLI using your subscription —
+// no ANTHROPIC_API_KEY needed. Fail fast if the CLI isn't available.
+try {
+  ensureClaudeCli();
+} catch (e) {
+  console.error(e.message);
   process.exit(1);
 }
 

@@ -7,7 +7,7 @@ APP DETAILS:
 - 5 tabs: Operations (transaction list + FAB + quick-add bar), Accounts (account list + balances), Categories (category grid), Graphs (charts), Planned (recurring transactions)
 - Seed data: 3 accounts (Checking, Savings, Cash), 10 categories, ~60 operations over last 2 months, 2 monthly budgets
 
-YOUR JOB: Execute test scenarios by interacting with the UI. Each turn you receive a screenshot and a JSON list of UI elements with their pixel bounds.
+YOUR JOB: Execute test scenarios by interacting with the UI. Each turn you are given the file path to a screenshot of the current screen (view it with the Read tool) and a JSON list of UI elements with their pixel bounds.
 
 RESPOND WITH EXACTLY ONE JSON object (no prose before or after):
 {
@@ -27,21 +27,25 @@ RULES:
 - Stuck on same screen 3+ steps → try pressing back or tapping the Operations tab
 - Always include the "observation" field`;
 
-export function buildMessages(scenario, history, uiElements, imageBase64) {
-  const newMessage = {
-    role: 'user',
-    content: [
-      {
-        type: 'text',
-        text: `SCENARIO: ${scenario.name}\nGOAL: ${scenario.description}\n\nUI ELEMENTS:\n${JSON.stringify(uiElements, null, 2)}`,
-      },
-      {
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/png', data: imageBase64 },
-      },
-    ],
-  };
-  return [...history, newMessage];
+// Builds the per-step user prompt sent to `claude -p` on stdin. Returns a
+// single string (not Anthropic message objects): the screenshot is referenced
+// by file path for the Read tool, and prior actions are inlined as text since
+// each CLI invocation is stateless.
+export function buildPrompt(scenario, history, uiElements, screenshotPath) {
+  const historyBlock = history.length
+    ? `RECENT ACTIONS (oldest first):\n${history.map((h) => `- ${h}`).join('\n')}\n\n`
+    : '';
+  return `SCENARIO: ${scenario.name}
+GOAL: ${scenario.description}
+
+${historyBlock}A screenshot of the current screen is saved at this path:
+${screenshotPath}
+Use the Read tool to view it before deciding your next action.
+
+UI ELEMENTS:
+${JSON.stringify(uiElements, null, 2)}
+
+Respond with exactly one JSON action object as described in the system prompt.`;
 }
 
 export function parseAction(responseText) {
