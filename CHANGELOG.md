@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.155.1](https://github.com/heywood8/money-tracker/compare/penny-v0.155.0...penny-v0.155.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **android:** match the apply-block package list in MainApplication ([#1103](https://github.com/heywood8/money-tracker/issues/1103)) ([8aff02a](https://github.com/heywood8/money-tracker/commit/8aff02aea7516c55af7942957ba7f6b59bbc998c))
+
 ## [0.155.0](https://github.com/heywood8/money-tracker/compare/penny-v0.154.1...penny-v0.155.0) (2026-06-26)
 
 
