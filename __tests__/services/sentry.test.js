@@ -62,6 +62,17 @@ describe('services/sentry', () => {
       expect(options.sendDefaultPii).toBe(false);
     });
 
+    it('enables structured logs but never auto-captures the console', () => {
+      const { mod, Sentry } = loadWith({ dsn: DSN });
+      mod.initSentry();
+      const options = Sentry.init.mock.calls[0][0];
+      expect(options.enableLogs).toBe(true);
+      expect(options._experiments).toEqual({ enableLogs: true });
+      // Auto console capture would bypass our redaction; it must be off.
+      expect(options.enableAutoConsoleLogs).toBe(false);
+      expect(typeof options.beforeSendLog).toBe('function');
+    });
+
     it('initSentry is idempotent', () => {
       const { mod, Sentry } = loadWith({ dsn: DSN });
       expect(mod.initSentry()).toBe(true);
@@ -100,6 +111,100 @@ describe('services/sentry', () => {
         throw new Error('sentry down');
       });
       expect(() => mod.captureException(new Error('boom'))).not.toThrow();
+    });
+
+    it('captureLog forwards each level to the matching Sentry.logger method', () => {
+      const { mod, Sentry } = loadWith({ dsn: DSN });
+      mod.captureLog('info', 'hello');
+      mod.captureLog('warn', 'careful');
+      mod.captureLog('error', 'oops');
+      mod.captureLog('debug', 'details');
+      expect(Sentry.logger.info).toHaveBeenCalledWith('hello');
+      expect(Sentry.logger.warn).toHaveBeenCalledWith('careful');
+      expect(Sentry.logger.error).toHaveBeenCalledWith('oops');
+      expect(Sentry.logger.debug).toHaveBeenCalledWith('details');
+    });
+
+    it('captureLog falls back to info for unknown levels', () => {
+      const { mod, Sentry } = loadWith({ dsn: DSN });
+      mod.captureLog('verbose', 'mystery');
+      expect(Sentry.logger.info).toHaveBeenCalledWith('mystery');
+    });
+
+    it('captureLog never throws even if the logger throws', () => {
+      const { mod, Sentry } = loadWith({ dsn: DSN });
+      Sentry.logger.info.mockImplementation(() => {
+        throw new Error('logger down');
+      });
+      expect(() => mod.captureLog('info', 'boom')).not.toThrow();
+    });
+  });
+
+  describe('when no DSN is configured (logging)', () => {
+    it('captureLog is a no-op', () => {
+      const { mod, Sentry } = loadWith(null);
+      mod.captureLog('error', 'should not send');
+      expect(Sentry.logger.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('redactText', () => {
+    it('scrubs monetary amounts', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      expect(mod.redactText('Balance is 1,234.56 after sync')).toBe(
+        'Balance is [redacted] after sync',
+      );
+      expect(mod.redactText('delta -12.5')).toBe('delta [redacted]');
+    });
+
+    it('scrubs long digit runs (balances stored as cents / ids)', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      expect(mod.redactText('cents=123456')).toBe('cents=[redacted]');
+    });
+
+    it('scrubs email / PII addresses', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      expect(mod.redactText('user jane.doe@example.com failed')).toBe(
+        'user [redacted] failed',
+      );
+    });
+
+    it('leaves short numbers and plain text intact', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      expect(mod.redactText('Failed to delete account: 3 ops')).toBe(
+        'Failed to delete account: 3 ops',
+      );
+    });
+
+    it('returns non-string input unchanged', () => {
+      const { mod } = loadWith({ dsn: DSN });
+      expect(mod.redactText(undefined)).toBeUndefined();
+      expect(mod.redactText(42)).toBe(42);
+    });
+  });
+
+  describe('beforeSendLog redaction hook', () => {
+    function getHook() {
+      const { mod, Sentry } = loadWith({ dsn: DSN });
+      mod.initSentry();
+      return Sentry.init.mock.calls[0][0].beforeSendLog;
+    }
+
+    it('redacts the log message before sending', () => {
+      const beforeSendLog = getHook();
+      const out = beforeSendLog({ level: 'info', message: 'paid 99.99 to acct 555000' });
+      expect(out.message).toBe('paid [redacted] to acct [redacted]');
+    });
+
+    it('redacts string attribute values', () => {
+      const beforeSendLog = getHook();
+      const out = beforeSendLog({
+        level: 'info',
+        message: 'x',
+        attributes: { note: 'amount 50.00', wrapped: { value: 'id 778899', type: 'string' } },
+      });
+      expect(out.attributes.note).toBe('amount [redacted]');
+      expect(out.attributes.wrapped.value).toBe('id [redacted]');
     });
   });
 });

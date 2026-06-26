@@ -163,6 +163,14 @@ jest.mock('@sentry/react-native', () => ({
   setUser: jest.fn(),
   setExtra: jest.fn(),
   setContext: jest.fn(),
+  logger: {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+  },
 }));
 
 // Mock expo-constants with no Sentry config by default, so Sentry is a no-op in

@@ -1,4 +1,5 @@
 import { writeTodayLogs, readAllLogs, pruneOldFiles, clearAllLogs } from './LogsFile';
+import { captureLog } from './sentry';
 
 const MAX_ENTRIES = 500;
 
@@ -110,6 +111,9 @@ class LogService {
 
     this._notify();
     this._scheduledFlush();
+    // Mirror the line to Sentry's structured logs (no-op unless a DSN is
+    // configured). Redaction happens centrally in sentry.js `beforeSendLog`.
+    captureLog(level, entry.message);
   }
 
   getEntries(filter) {
