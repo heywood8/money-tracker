@@ -10,6 +10,7 @@ Penny uses [`@sentry/react-native`](https://docs.sentry.io/platforms/react-nativ
 | Metro | `metro.config.js` (`getSentryExpoConfig`) | Injects Debug IDs so uploaded source maps match captured events |
 | Init + wrap | `App.js` → `app/services/sentry.js` | `Sentry.init(...)` on startup, `Sentry.wrap(App)` as the root |
 | Error reporting | `app/components/ErrorBoundary.js` | Reports caught render errors via `captureException` |
+| Log forwarding | `app/services/LogService.js` → `captureLog` | Mirrors each captured log line to Sentry structured logs (redacted) |
 | Runtime config | `app.config.js` `extra.sentry` | DSN + environment, read at runtime via `expo-constants` |
 
 When no DSN is configured the entire integration is a **no-op**, so development and tests are unaffected.
@@ -53,8 +54,29 @@ eas env:create --name SENTRY_AUTH_TOKEN --value "sntrys_…" --environment produ
 
 - `enabled: !__DEV__` — events are sent **only from release builds**, never dev / Expo Go.
 - `sendDefaultPii: false` — no IP addresses, cookies, or user identifiers.
-- `beforeBreadcrumb` drops **console breadcrumbs** — the app patches `console` via `LogService` and may log transaction/account details; those are never shipped to Sentry.
+- `beforeBreadcrumb` drops **console breadcrumbs** — the app patches `console` via `LogService` and may log transaction/account details; those are never shipped to Sentry as breadcrumbs.
 - `tracesSampleRate: 0.2` — only a sample of performance traces is collected.
+
+## Log forwarding (structured logs)
+
+The app's own log lines (everything that flows through `console.*`, captured by
+`LogService`) are mirrored to Sentry's **structured logs** so they're viewable
+alongside crashes. This is done **without** weakening the privacy posture:
+
+- `enableLogs: true` (also under `_experiments` for cross-version compatibility)
+  turns on structured logs. The `Sentry.logger.*` API is used to forward entries.
+- `enableAutoConsoleLogs: false` — the SDK's *automatic* `console.*` capture is
+  **disabled**. Logs only reach Sentry through our explicit, redacted forwarding
+  path (`LogService._addEntry` → `captureLog`), never raw.
+- `beforeSendLog` runs `redactText` on every log body and string attribute,
+  scrubbing money amounts, long digit runs (balances are stored as integer
+  cents), and email/PII addresses. It is **fail-closed**: if redaction throws,
+  the log is dropped rather than sent.
+- Forwarding is release-only and DSN-gated — with no DSN, or in dev / Expo Go,
+  `captureLog` is a complete no-op (same as the rest of the integration).
+
+Redaction is intentionally aggressive (over-redaction is preferred to leaking),
+so some non-sensitive numbers in log lines may also appear as `[redacted]`.
 
 ## Verifying it works
 
