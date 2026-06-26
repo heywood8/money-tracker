@@ -1,14 +1,17 @@
 import { executeQuery, queryAll, queryFirst, executeTransaction, isSearchNormAvailable } from './db';
-import { normalizeSearchText } from './searchNormalize';
+import { normalizeSearchText, buildSearchNormSql } from './searchNormalize';
 import { parseLabels, isHiddenLabel } from '../utils/labelUtils';
 
-// Returns 'SEARCH_NORM' when the custom function was registered successfully (full
-// Cyrillic case-folding + ё/е equivalence), otherwise falls back to SQLite's built-in
-// LOWER() (ASCII-only but safe). The JS-side query passed in is normalized with the
-// matching function so both halves of the LIKE comparison use the same alphabet.
-const searchFn = () => (isSearchNormAvailable() ? 'SEARCH_NORM' : 'LOWER');
-const normalizeSearchQuery = (text) =>
-  isSearchNormAvailable() ? normalizeSearchText(text) : String(text).toLowerCase();
+// Build the SQL expression that normalizes a searchable column. When the
+// SEARCH_NORM custom function registered (full Cyrillic case-folding + ё/е
+// equivalence) use it; otherwise fall back to an inline LOWER()+REPLACE()
+// expression that still folds the Russian Cyrillic alphabet and ё/е. (expo-sqlite
+// exposes no custom-function API today, so the fallback is what runs on device —
+// see db.js.) Both halves of the LIKE comparison must use the same alphabet, so
+// the query side is always normalized with normalizeSearchText().
+const searchNormExpr = (columnExpr) =>
+  isSearchNormAvailable() ? `SEARCH_NORM(${columnExpr})` : buildSearchNormSql(columnExpr);
+const normalizeSearchQuery = (text) => normalizeSearchText(text);
 import * as Currency from './currency';
 import { formatDate, updateTodayBalance } from './BalanceHistoryDB';
 import * as AccountsDB from './AccountsDB';
@@ -263,15 +266,14 @@ export const getFilteredOperationsByDateRange = async (startDate, endDate, filte
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -352,15 +354,14 @@ export const getFilteredOperationsAllDates = async (filters = {}) => {
     }
 
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1320,15 +1321,14 @@ export const getFilteredOperationsByWeekFromDate = async (endDate, filters = {})
 
     // Apply search text filter (searches across multiple fields)
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1416,15 +1416,14 @@ export const getNextOldestFilteredOperation = async (beforeDate, filters = {}) =
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1581,15 +1580,14 @@ export const getNextNewestFilteredOperation = async (afterDate, filters = {}) =>
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }
@@ -1689,15 +1687,14 @@ export const getFilteredOperationsByWeekToDate = async (startDate, filters = {})
 
     // Apply search text filter
     if (filters.searchText && filters.searchText.trim()) {
-      const norm = searchFn();
       const searchLower = `%${normalizeSearchQuery(filters.searchText.trim())}%`;
       sql += ` AND (
-        ${norm}(o.description) LIKE ?
+        ${searchNormExpr('o.description')} LIKE ?
         OR o.amount LIKE ?
-        OR ${norm}(a.name) LIKE ?
-        OR ${norm}(to_a.name) LIKE ?
-        OR ${norm}(c.name) LIKE ?
-        OR ${norm}(pc.name) LIKE ?
+        OR ${searchNormExpr('a.name')} LIKE ?
+        OR ${searchNormExpr('to_a.name')} LIKE ?
+        OR ${searchNormExpr('c.name')} LIKE ?
+        OR ${searchNormExpr('pc.name')} LIKE ?
       )`;
       params.push(searchLower, searchLower, searchLower, searchLower, searchLower, searchLower);
     }

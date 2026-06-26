@@ -7,7 +7,7 @@
  * as "Самолёт" — both spellings have to normalize to the same string.
  */
 
-import { normalizeSearchText } from '../../app/services/searchNormalize';
+import { normalizeSearchText, buildSearchNormSql } from '../../app/services/searchNormalize';
 
 describe('normalizeSearchText', () => {
   describe('null/undefined handling', () => {
@@ -90,5 +90,63 @@ describe('normalizeSearchText', () => {
     it('coerces booleans to strings', async () => {
       expect(normalizeSearchText(true)).toBe('true');
     });
+  });
+});
+
+describe('buildSearchNormSql (SQL fallback for missing custom function)', () => {
+  it('wraps the column in LOWER() for ASCII folding', () => {
+    const sql = buildSearchNormSql('o.description');
+    expect(sql).toContain('LOWER(o.description)');
+  });
+
+  it('produces a single SQL expression with no surrounding whitespace', () => {
+    const sql = buildSearchNormSql('a.name');
+    expect(sql).toBe(sql.trim());
+    expect(sql.startsWith('REPLACE(')).toBe(true);
+  });
+
+  it('emits REPLACE() pairs that lower-case the Russian Cyrillic alphabet', () => {
+    const sql = buildSearchNormSql('o.description');
+    // A representative sample of uppercase → lowercase folds.
+    expect(sql).toContain("REPLACE(LOWER(o.description), 'А', 'а')");
+    expect(sql).toContain("'С', 'с'");
+    expect(sql).toContain("'Т', 'т'");
+    expect(sql).toContain("'Я', 'я'");
+  });
+
+  it('folds both ё and Ё straight to е', () => {
+    const sql = buildSearchNormSql('o.description');
+    expect(sql).toContain("'Ё', 'е'");
+    expect(sql).toContain("'ё', 'е'");
+    // It must never fold Ё to ё (which would defeat ё/е equivalence).
+    expect(sql).not.toContain("'Ё', 'ё'");
+  });
+
+  it('embeds the column reference verbatim so callers control the alias', () => {
+    expect(buildSearchNormSql('to_a.name')).toContain('LOWER(to_a.name)');
+    expect(buildSearchNormSql('pc.name')).toContain('LOWER(pc.name)');
+  });
+
+  it('mirrors normalizeSearchText for the Cyrillic case via a JS REPLACE simulation', () => {
+    // Apply the same LOWER()+REPLACE() chain that the SQL would, and confirm the
+    // result matches the JS normalizer for Cyrillic input (the case that LOWER()
+    // alone could not handle).
+    const pairs = [
+      ['А', 'а'], ['Б', 'б'], ['В', 'в'], ['Г', 'г'], ['Д', 'д'], ['Е', 'е'],
+      ['Ж', 'ж'], ['З', 'з'], ['И', 'и'], ['Й', 'й'], ['К', 'к'], ['Л', 'л'],
+      ['М', 'м'], ['Н', 'н'], ['О', 'о'], ['П', 'п'], ['Р', 'р'], ['С', 'с'],
+      ['Т', 'т'], ['У', 'у'], ['Ф', 'ф'], ['Х', 'х'], ['Ц', 'ц'], ['Ч', 'ч'],
+      ['Ш', 'ш'], ['Щ', 'щ'], ['Ъ', 'ъ'], ['Ы', 'ы'], ['Ь', 'ь'], ['Э', 'э'],
+      ['Ю', 'ю'], ['Я', 'я'], ['Ё', 'е'], ['ё', 'е'],
+    ];
+    const sqlSimulate = (value) => {
+      // LOWER() in SQLite only folds ASCII; emulate that, then apply the pairs.
+      let out = value.replace(/[A-Z]/g, (c) => c.toLowerCase());
+      for (const [u, l] of pairs) out = out.split(u).join(l);
+      return out;
+    };
+    for (const input of ['Самолёт', 'САМОЛЕТ', 'Транспорт', 'Ёлка', 'еда']) {
+      expect(sqlSimulate(input)).toBe(normalizeSearchText(input));
+    }
   });
 });

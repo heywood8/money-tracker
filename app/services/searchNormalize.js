@@ -26,3 +26,49 @@ export const normalizeSearchText = (value) => {
   if (value == null) return null;
   return String(value).normalize('NFC').toLowerCase().replace(/ё/g, 'е');
 };
+
+/**
+ * Russian Cyrillic uppercase → lowercase pairs, plus ё/Ё → е folding. Used to
+ * build a SQL expression that mirrors normalizeSearchText() for the Cyrillic
+ * alphabet (see buildSearchNormSql).
+ */
+const CYRILLIC_FOLD_PAIRS = [
+  ['А', 'а'], ['Б', 'б'], ['В', 'в'], ['Г', 'г'], ['Д', 'д'], ['Е', 'е'],
+  ['Ж', 'ж'], ['З', 'з'], ['И', 'и'], ['Й', 'й'], ['К', 'к'], ['Л', 'л'],
+  ['М', 'м'], ['Н', 'н'], ['О', 'о'], ['П', 'п'], ['Р', 'р'], ['С', 'с'],
+  ['Т', 'т'], ['У', 'у'], ['Ф', 'ф'], ['Х', 'х'], ['Ц', 'ц'], ['Ч', 'ч'],
+  ['Ш', 'ш'], ['Щ', 'щ'], ['Ъ', 'ъ'], ['Ы', 'ы'], ['Ь', 'ь'], ['Э', 'э'],
+  ['Ю', 'ю'], ['Я', 'я'],
+  // ё/Ё fold straight to е (not ё) so search treats them as equivalent.
+  ['Ё', 'е'], ['ё', 'е'],
+];
+
+/**
+ * Build a SQLite expression that normalizes `columnExpr` the way
+ * normalizeSearchText() does in JS — as closely as plain SQL allows.
+ *
+ * Why this exists: expo-sqlite exposes no API to register a custom SQL
+ * function, so the SEARCH_NORM custom function never registers on a real
+ * device (see db.js). SQLite's built-in LOWER() only case-folds ASCII, so a
+ * Cyrillic query like "самолёт" would never match a stored "Самолёт". This
+ * builder wraps the column in LOWER() (ASCII folding) plus a chain of
+ * REPLACE() calls that lower-case the Russian Cyrillic alphabet and fold
+ * ё/Ё → е.
+ *
+ * Coverage is the Russian alphabet only; other non-ASCII scripts (accented
+ * Latin, Greek, Armenian, …) still fold only their ASCII portion and match
+ * case-sensitively — the same limitation the LOWER()-only fallback always
+ * had, but now without breaking Cyrillic search. Callers must normalize the
+ * query side with normalizeSearchText() so both halves of the LIKE comparison
+ * use the same alphabet.
+ *
+ * @param {string} columnExpr - A SQL column reference, e.g. 'o.description'.
+ * @returns {string} A SQL expression string (no surrounding whitespace).
+ */
+export const buildSearchNormSql = (columnExpr) => {
+  let expr = `LOWER(${columnExpr})`;
+  for (const [upper, lower] of CYRILLIC_FOLD_PAIRS) {
+    expr = `REPLACE(${expr}, '${upper}', '${lower}')`;
+  }
+  return expr;
+};

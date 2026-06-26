@@ -1314,6 +1314,28 @@ describe('OperationsDB Service', () => {
       expect(sqlCall).toContain('SEARCH_NORM(pc.name) LIKE ?');
     });
 
+    it('falls back to an inline LOWER()+REPLACE() Cyrillic-folding expression when SEARCH_NORM is unavailable', async () => {
+      // On a real device expo-sqlite has no custom-function API, so isSearchNormAvailable()
+      // is false. The SQL must still fold Cyrillic case + ё/е instead of bare SEARCH_NORM/LOWER.
+      isSearchNormAvailable.mockReturnValue(false);
+      queryAll.mockResolvedValue([]);
+
+      const filters = { searchText: 'Самолёт' };
+      await OperationsDB.getFilteredOperationsByDateRange('2025-01-01', '2025-12-31', filters);
+
+      const sqlCall = queryAll.mock.calls[0][0];
+      const params = queryAll.mock.calls[0][1];
+      // No custom function is referenced...
+      expect(sqlCall).not.toContain('SEARCH_NORM(');
+      // ...and the inline expression wraps each searchable column in LOWER()+REPLACE().
+      expect(sqlCall).toContain('LOWER(o.description)');
+      expect(sqlCall).toContain('LOWER(c.name)');
+      expect(sqlCall).toContain("REPLACE(");
+      expect(sqlCall).toContain("'Ё', 'е'");
+      // The query term is still normalized (ё → е) so both halves use the same alphabet.
+      expect(params).toContain('%самолет%');
+    });
+
     it('trims search text before searching', async () => {
       queryAll.mockResolvedValue([]);
 

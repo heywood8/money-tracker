@@ -39,11 +39,18 @@ export const getDatabase = async () => {
         throw new Error('Database instance is null after opening');
       }
 
-      // Register search-normalization function — SQLite's built-in LOWER() is ASCII-only,
+      // Register a search-normalization function — SQLite's built-in LOWER() is ASCII-only,
       // so Cyrillic case-folding (and Russian ё/е equivalence) has to be done in JS. The
       // callback delegates to normalizeSearchText() which is the same normalizer applied
       // to the query on the JS side, so SQL-side and in-memory results stay consistent.
-      // expo-sqlite 16.x uses createCustomFunctionAsync(name, callback, options).
+      // expo-sqlite 16.x would use createCustomFunctionAsync(name, callback, options).
+      //
+      // Current expo-sqlite (SDK 56) exposes no custom-function API, so this feature-detect
+      // falls through on a real device. That is expected and not an error: OperationsDB
+      // falls back to an inline LOWER()+REPLACE() expression (buildSearchNormSql) that still
+      // folds the Cyrillic alphabet and ё/е, so search keeps working. The detection is kept
+      // so a future expo-sqlite that adds the API is used automatically for full Unicode
+      // folding. Nothing is logged on the not-available path to avoid noise.
       try {
         if (typeof dbInstance.createCustomFunctionAsync === 'function') {
           await dbInstance.createCustomFunctionAsync('SEARCH_NORM', normalizeSearchText, { deterministic: true });
@@ -51,11 +58,10 @@ export const getDatabase = async () => {
         } else if (typeof dbInstance.createFunctionAsync === 'function') {
           await dbInstance.createFunctionAsync('SEARCH_NORM', normalizeSearchText, { deterministic: true });
           searchNormAvailable = true;
-        } else {
-          console.warn('SEARCH_NORM: no custom function API found, Cyrillic/yo search will use LOWER()');
         }
       } catch (fnError) {
-        console.warn('SEARCH_NORM registration failed, Cyrillic/yo search will use LOWER():', fnError.message);
+        // Registration unexpectedly threw — the inline fallback still handles Cyrillic search.
+        console.warn('SEARCH_NORM registration failed, using inline Cyrillic-folding fallback:', fnError.message);
       }
 
       drizzleInstance = drizzle(dbInstance, { schema });
