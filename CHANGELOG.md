@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.154.1](https://github.com/heywood8/money-tracker/compare/penny-v0.154.0...penny-v0.154.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **search:** animate the search bar closing, symmetric with opening ([#1098](https://github.com/heywood8/money-tracker/issues/1098)) ([d7bad8b](https://github.com/heywood8/money-tracker/commit/d7bad8b294f34a140bdb7f2ebc432faa3cfb17c9))
+* **search:** fold Cyrillic + ё/е in SQL search fallback ([#1094](https://github.com/heywood8/money-tracker/issues/1094)) ([12f589b](https://github.com/heywood8/money-tracker/commit/12f589bc993a7efa2be6a16e5743210aba056dc5))
+
 ## [0.154.0](https://github.com/heywood8/money-tracker/compare/penny-v0.153.2...penny-v0.154.0) (2026-06-26)
 
 
