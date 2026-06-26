@@ -66,6 +66,7 @@ const OperationsList = forwardRef(({
   onScrollToIndexFailed,
   onContentSizeChange,
   headerComponent,
+  topInset,
   pendingSuggestionId,
   pendingSuggestions,
   onApplySuggestion,
@@ -365,8 +366,16 @@ const OperationsList = forwardRef(({
       extraData={[accounts, categories, pendingSuggestionId]}
       getItemLayout={getItemLayout}
       ListHeaderComponent={
-        headerComponent
-          ? <View onLayout={handleListHeaderLayout}>{headerComponent}</View>
+        (topInset > 0 || headerComponent)
+          ? (
+            <View onLayout={handleListHeaderLayout}>
+              {/* Spacer so the first content sits below the floating search bar
+                  and scrolls up behind it. Measured as part of the header, so
+                  getItemLayout offsets stay correct. */}
+              {topInset > 0 ? <View style={{ height: topInset }} /> : null}
+              {headerComponent}
+            </View>
+          )
           : null
       }
       ListFooterComponent={renderFooter}
@@ -423,6 +432,7 @@ OperationsList.propTypes = {
   onScrollToIndexFailed: PropTypes.func,
   onContentSizeChange: PropTypes.func,
   headerComponent: PropTypes.element,
+  topInset: PropTypes.number,
   pendingSuggestionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   pendingSuggestions: PropTypes.arrayOf(PropTypes.string),
   onApplySuggestion: PropTypes.func,
@@ -437,6 +447,7 @@ OperationsList.defaultProps = {
   onScrollToIndexFailed: () => {},
   onContentSizeChange: () => {},
   headerComponent: null,
+  topInset: 0,
   pendingSuggestionId: null,
   pendingSuggestions: [],
   onApplySuggestion: () => {},

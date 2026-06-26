@@ -75,7 +75,9 @@ const OperationsScreen = () => {
   // having already been re-loaded into `operations` (which is async).
   const pendingOpDescRef = useRef('');
   const [filterPanelHeight, setFilterPanelHeight] = useState(0);
-  const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(0);
+  // Seeded with an estimate of the collapsed search-pill area so the list's top
+  // inset is roughly right on first paint; the real value arrives via onLayout.
+  const [searchBarAreaHeight, setSearchBarAreaHeight] = useState(48);
   const [flashCategoryErrorCount, setFlashCategoryErrorCount] = useState(0);
 
   const { searchMode, filtersExpanded, openSearch, closeSearch, reopenSearch, toggleFilters } = useSearch();
@@ -834,29 +836,9 @@ const OperationsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View onLayout={handleSearchBarAreaLayout}>
-        <SearchBar
-          searchText={searchState?.text || ''}
-          onSearchTextChange={setSearchText}
-          onToggleFilters={handleToggleFilters}
-          onClose={handleCloseSearch}
-          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
-          colors={colors}
-          t={t}
-          collapsed={!isSearchOpen}
-          onCollapsedPress={handleCollapsedPress}
-        />
-        {isSearchOpen && hasActiveSearch && (
-          <FilterChipStrip
-            searchState={searchState}
-            onClearGroup={handleClearFilterGroup}
-            colors={colors}
-            t={t}
-          />
-        )}
-      </View>
       <OperationsList
         ref={flatListRef}
+        topInset={searchBarAreaHeight}
         groupedOperations={groupedOperations}
         accounts={accounts}
         categories={categories}
@@ -877,6 +859,35 @@ const OperationsScreen = () => {
         onApplySuggestion={handleApplySuggestion}
         onDismissSuggestion={handleDismissSuggestion}
       />
+
+      {/* Floating search area — overlays the list so its content scrolls behind
+          it instead of being clipped by an opaque band. The matching topInset on
+          the list above keeps content from starting underneath the pill. */}
+      <View
+        style={styles.floatingSearchArea}
+        onLayout={handleSearchBarAreaLayout}
+        pointerEvents="box-none"
+      >
+        <SearchBar
+          searchText={searchState?.text || ''}
+          onSearchTextChange={setSearchText}
+          onToggleFilters={handleToggleFilters}
+          onClose={handleCloseSearch}
+          filterCount={getSearchFilterCount ? getSearchFilterCount() : 0}
+          colors={colors}
+          t={t}
+          collapsed={!isSearchOpen}
+          onCollapsedPress={handleCollapsedPress}
+        />
+        {isSearchOpen && hasActiveSearch && (
+          <FilterChipStrip
+            searchState={searchState}
+            onClearGroup={handleClearFilterGroup}
+            colors={colors}
+            t={t}
+          />
+        )}
+      </View>
 
       {/* Picker Modal for Account/Category selection */}
       <PickerModal
@@ -950,6 +961,13 @@ const OperationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  floatingSearchArea: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 100,
   },
   scrollToTopButton: {
     alignItems: 'center',
