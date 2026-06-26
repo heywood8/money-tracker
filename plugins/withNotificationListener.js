@@ -1,10 +1,15 @@
-const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
+const {
+  withAndroidManifest,
+  withDangerousMod,
+  withMainApplication,
+} = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
 /**
- * Expo Config Plugin: declare a NotificationListenerService so the app can ask
- * the user for permission to read notifications in the background.
+ * Expo Config Plugin: wire up a NotificationListenerService plus a small native
+ * module so the app can (1) ask the user for permission to read notifications
+ * and (2) show the text of the most recent notifications in-app.
  *
  * On Android, reading other apps' notifications requires a service that extends
  * NotificationListenerService and is guarded by
@@ -12,27 +17,168 @@ const path = require('path');
  * the app appear in the system "Notification access" screen, where the user
  * grants the special-access permission.
  *
- * This plugin only wires up the permission request. The service it registers is
- * a deliberate no-op: it does not read, store, or process any notifications.
+ * The service records only a tiny rolling window (the latest few notifications)
+ * to private SharedPreferences so the "Notification access" settings subpanel
+ * can display them. Nothing is uploaded or shared off the device. The companion
+ * native module (PennyNotifications) exposes that window — and the current
+ * permission state — to JavaScript.
  */
 
 const ANDROID_PACKAGE = 'com.heywood8.monkeep';
 const SERVICE_CLASS = 'PennyNotificationListenerService';
+const MODULE_CLASS = 'PennyNotificationsModule';
+const PACKAGE_CLASS = 'PennyNotificationsPackage';
 
 const SERVICE_SOURCE = `package ${ANDROID_PACKAGE}
 
+import android.app.Notification
+import android.content.Context
 import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
- * No-op notification listener.
+ * Records the text of the most recent notifications so Penny can show them in
+ * the in-app "Notification access" subpanel.
  *
- * This service exists solely so that Penny appears in Android's
- * "Notification access" settings screen, allowing the user to grant the
- * BIND_NOTIFICATION_LISTENER_SERVICE permission. It intentionally does NOT
- * read, store, or process any notifications — no functionality beyond enabling
- * the permission request is implemented here.
+ * Only the latest [MAX_STORED] notifications are kept, persisted to private
+ * SharedPreferences. Nothing ever leaves the device.
  */
-class ${SERVICE_CLASS} : NotificationListenerService()
+class ${SERVICE_CLASS} : NotificationListenerService() {
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        val extras = sbn?.notification?.extras ?: return
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+        if (title.isBlank() && text.isBlank()) return
+        record(applicationContext, title, text, sbn.packageName ?: "", sbn.postTime)
+    }
+
+    companion object {
+        const val PREFS_NAME = "penny_notification_access"
+        const val KEY_RECENT = "recent_notifications"
+        const val MAX_STORED = 5
+
+        @Synchronized
+        fun record(
+            context: Context,
+            title: String,
+            text: String,
+            packageName: String,
+            postTime: Long,
+        ) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val current = try {
+                JSONArray(prefs.getString(KEY_RECENT, "[]"))
+            } catch (e: Exception) {
+                JSONArray()
+            }
+            val entry = JSONObject().apply {
+                put("title", title)
+                put("text", text)
+                put("packageName", packageName)
+                put("postTime", postTime)
+            }
+            // Newest first, capped at MAX_STORED.
+            val updated = JSONArray()
+            updated.put(entry)
+            var i = 0
+            while (i < current.length() && updated.length() < MAX_STORED) {
+                updated.put(current.get(i))
+                i++
+            }
+            prefs.edit().putString(KEY_RECENT, updated.toString()).apply()
+        }
+    }
+}
+`;
+
+const MODULE_SOURCE = `package ${ANDROID_PACKAGE}
+
+import android.content.Context
+import android.provider.Settings
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.WritableArray
+import org.json.JSONArray
+
+/**
+ * Bridges the recorded notifications — and the listener-permission state — to JS.
+ */
+class ${MODULE_CLASS}(reactContext: ReactApplicationContext) :
+    ReactContextBaseJavaModule(reactContext) {
+
+    override fun getName(): String = NAME
+
+    /** Whether the user has granted Penny notification-access in system settings. */
+    @ReactMethod
+    fun isNotificationAccessEnabled(promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val flat = Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners",
+            ).orEmpty()
+            val pkg = context.packageName
+            val enabled = flat.split(":").any { it.startsWith("$pkg/") }
+            promise.resolve(enabled)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    /** The latest recorded notifications, newest first. */
+    @ReactMethod
+    fun getRecentNotifications(promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val prefs = context.getSharedPreferences(
+                ${SERVICE_CLASS}.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            )
+            val stored = prefs.getString(${SERVICE_CLASS}.KEY_RECENT, "[]")
+            val array = JSONArray(stored)
+            val result: WritableArray = Arguments.createArray()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val map = Arguments.createMap()
+                map.putString("title", obj.optString("title"))
+                map.putString("text", obj.optString("text"))
+                map.putString("packageName", obj.optString("packageName"))
+                map.putDouble("postTime", obj.optLong("postTime", 0L).toDouble())
+                result.pushMap(map)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.resolve(Arguments.createArray())
+        }
+    }
+
+    companion object {
+        const val NAME = "PennyNotifications"
+    }
+}
+`;
+
+const PACKAGE_SOURCE = `package ${ANDROID_PACKAGE}
+
+import com.facebook.react.ReactPackage
+import com.facebook.react.bridge.NativeModule
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.uimanager.ViewManager
+
+class ${PACKAGE_CLASS} : ReactPackage {
+    override fun createNativeModules(
+        reactContext: ReactApplicationContext,
+    ): List<NativeModule> = listOf(${MODULE_CLASS}(reactContext))
+
+    override fun createViewManagers(
+        reactContext: ReactApplicationContext,
+    ): List<ViewManager<*, *>> = emptyList()
+}
 `;
 
 /**
@@ -84,10 +230,11 @@ const addServiceToManifest = (config) =>
   });
 
 /**
- * Writes the no-op native service class. The android/ folder is managed by Expo
- * (gitignored), so the source must be generated at prebuild time.
+ * Writes the native Kotlin sources (listener service, bridge module, and its
+ * ReactPackage). The android/ folder is managed by Expo (gitignored), so the
+ * sources must be generated at prebuild time.
  */
-const addServiceSourceFile = (config) =>
+const addNativeSources = (config) =>
   withDangerousMod(config, [
     'android',
     async (config) => {
@@ -102,21 +249,56 @@ const addServiceSourceFile = (config) =>
         'java',
         packagePath,
       );
-      const targetFile = path.join(targetDir, `${SERVICE_CLASS}.kt`);
 
       fs.mkdirSync(targetDir, { recursive: true });
-      fs.writeFileSync(targetFile, SERVICE_SOURCE);
+
+      const files = [
+        [`${SERVICE_CLASS}.kt`, SERVICE_SOURCE],
+        [`${MODULE_CLASS}.kt`, MODULE_SOURCE],
+        [`${PACKAGE_CLASS}.kt`, PACKAGE_SOURCE],
+      ];
+      files.forEach(([filename, source]) => {
+        fs.writeFileSync(path.join(targetDir, filename), source);
+      });
       console.log(
-        `✅ Wrote no-op ${SERVICE_CLASS}.kt for notification access permission`,
+        '✅ Wrote notification-access native sources (service, module, package)',
       );
 
       return config;
     },
   ]);
 
+/**
+ * Registers the ReactPackage in MainApplication so the native module is reachable
+ * from JS. Idempotent: re-running prebuild won't duplicate the registration.
+ */
+const addPackageRegistration = (config) =>
+  withMainApplication(config, (config) => {
+    let contents = config.modResults.contents;
+    if (contents.includes(`${PACKAGE_CLASS}()`)) {
+      return config;
+    }
+
+    const anchor = 'val packages = PackageList(this).packages';
+    if (contents.includes(anchor)) {
+      contents = contents.replace(
+        anchor,
+        `${anchor}\n            packages.add(${PACKAGE_CLASS}())`,
+      );
+    } else {
+      throw new Error(
+        'withNotificationListener: could not find the package list in MainApplication',
+      );
+    }
+
+    config.modResults.contents = contents;
+    return config;
+  });
+
 const withNotificationListener = (config) => {
   config = addServiceToManifest(config);
-  config = addServiceSourceFile(config);
+  config = addNativeSources(config);
+  config = addPackageRegistration(config);
   return config;
 };
 
