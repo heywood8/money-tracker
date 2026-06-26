@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.152.1](https://github.com/heywood8/money-tracker/compare/penny-v0.152.0...penny-v0.152.1) (2026-06-26)
+
+
+### Code Refactoring
+
+* replace deprecated InteractionManager with requestIdleCallback ([#1085](https://github.com/heywood8/money-tracker/issues/1085)) ([6aee1e6](https://github.com/heywood8/money-tracker/commit/6aee1e68fbb78ed4ab754bc430fe8f14635b4fe3))
+
 ## [0.152.0](https://github.com/heywood8/money-tracker/compare/penny-v0.151.6...penny-v0.152.0) (2026-06-26)
 
 
