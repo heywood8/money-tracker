@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.155.0](https://github.com/heywood8/money-tracker/compare/penny-v0.154.1...penny-v0.155.0) (2026-06-26)
+
+
+### Features
+
+* **settings:** show recent notifications in a subpanel when access is granted ([#1101](https://github.com/heywood8/money-tracker/issues/1101)) ([f668df2](https://github.com/heywood8/money-tracker/commit/f668df2a33229d671730119d95625078fdaf3901))
+
 ## [0.154.1](https://github.com/heywood8/money-tracker/compare/penny-v0.154.0...penny-v0.154.1) (2026-06-26)
 
 
