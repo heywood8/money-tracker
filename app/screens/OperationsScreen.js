@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, InteractionManager, BackHandler } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable, Modal, Keyboard, BackHandler } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -213,7 +213,7 @@ const OperationsScreen = () => {
   const handleContentSizeChange = useCallback((width, height) => {
     // scrollScheduledRef gates re-entrant calls: between the first scheduling and the
     // next React re-render (where pendingScroll becomes false), this callback can fire
-    // many times. Without the ref, each firing would queue another InteractionManager
+    // many times. Without the ref, each firing would queue another idle-callback
     // scroll and cause snap-back whenever the user tries to scroll away.
     if (scrollScheduledRef.current) return;
 
@@ -226,8 +226,9 @@ const OperationsScreen = () => {
         // Synchronously mark as handled before the async scroll so subsequent firings bail out
         scrollScheduledRef.current = true;
 
-        // Defer scroll until after interactions/layout have settled
-        InteractionManager.runAfterInteractions(() => {
+        // Defer scroll until the JS thread is idle (after interactions/layout
+        // have settled). The timeout guarantees it still fires under load.
+        requestIdleCallback(() => {
           try {
             // Use animated: false for instant, graceful jump to distant dates
             flatListRef.current?.scrollToIndex({
@@ -247,7 +248,7 @@ const OperationsScreen = () => {
             setScrollToDateString(null);
             setPendingScroll(false);
           }
-        });
+        }, { timeout: 500 });
       } else {
         setScrollToDateString(null);
         setPendingScroll(false);
@@ -778,16 +779,16 @@ const OperationsScreen = () => {
 
     if (wasExpanded && !filtersExpanded) {
       if (scrollOffsetRef.current <= filterPanelHeight) {
-        InteractionManager.runAfterInteractions(() => {
+        requestIdleCallback(() => {
           flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-        });
+        }, { timeout: 500 });
       }
     }
   }, [filtersExpanded, filterPanelHeight]);
 
   // Auto-scroll to top when search closes (open → closed/collapsed).
   // The user is returning to the normal view and should land on the QuickAdd form.
-  // Deferred via InteractionManager so the scroll runs after the close animation settles.
+  // Deferred via requestAnimationFrame so the scroll runs after the close animation settles.
   useEffect(() => {
     const wasOpen = prevSearchModeRef.current === 'open';
     prevSearchModeRef.current = searchMode;
