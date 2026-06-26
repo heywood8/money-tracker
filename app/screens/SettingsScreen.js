@@ -31,6 +31,7 @@ import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
+import { openNotificationAccessSettings } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import AccountsScreen from './AccountsScreen';
 import { useAccountsData } from '../contexts/AccountsDataContext';
@@ -737,6 +738,19 @@ export default function SettingsScreen({ setSubPanelActive }) {
     openSubPanel('update');
     runUpdateCheck();
   }, [openSubPanel, runUpdateCheck]);
+
+  const handleOpenNotificationAccess = useCallback(async () => {
+    try {
+      await openNotificationAccessSettings();
+    } catch (error) {
+      showDialog(
+        t('error') || 'Error',
+        t('notification_access_error') ||
+          'Could not open the notification access settings.',
+        [{ text: 'OK' }],
+      );
+    }
+  }, [showDialog, t]);
 
   const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
     // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
@@ -1535,6 +1549,28 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('categories') || 'Categories'}</Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
                   {t('categories_hint') || 'Manage your expense and income categories'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
+
+        <TouchableRipple
+          onPress={handleOpenNotificationAccess}
+          style={styles.settingsRow}
+          testID="settings-notification-access-row"
+        >
+          <View style={styles.settingsRowContent}>
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="notifications-outline" size={22} color={colors.text} />
+              <View style={styles.settingsRowText}>
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                  {t('notification_access') || 'Notification access'}
+                </Text>
+                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                  {t('notification_access_hint') ||
+                    'Allow Penny to read notifications in the background'}
                 </Text>
               </View>
             </View>

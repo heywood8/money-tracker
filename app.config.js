@@ -74,6 +74,10 @@ module.exports = {
         },
       ],
       './plugins/withR8Config.js',
+      // Declares a no-op NotificationListenerService so the app can request the
+      // "Notification access" special permission (read notifications in the
+      // background). No notifications are read or processed.
+      './plugins/withNotificationListener.js',
     ],
     updates: {
       'url': 'https://u.expo.dev/89372eb2-93f5-475a-a630-9caa827d8406',
