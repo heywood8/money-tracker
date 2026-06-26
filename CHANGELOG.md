@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.5](https://github.com/heywood8/money-tracker/compare/penny-v0.151.4...penny-v0.151.5) (2026-06-26)
+
+
+### Bug Fixes
+
+* **settings:** size subpanel overlay in explicit pixels so it actually opens ([#1077](https://github.com/heywood8/money-tracker/issues/1077)) ([37b93b4](https://github.com/heywood8/money-tracker/commit/37b93b4de1c8363f9577d610eabd3d0b28f0ac54))
+
 ## [0.151.4](https://github.com/heywood8/money-tracker/compare/penny-v0.151.3...penny-v0.151.4) (2026-06-26)
 
 
