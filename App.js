@@ -1,5 +1,7 @@
 import { logService } from './app/services/LogService';
 logService.install();
+import { initSentry, Sentry } from './app/services/sentry';
+initSentry();
 import * as SplashScreen from 'expo-splash-screen';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 import React from 'react';
@@ -61,7 +63,7 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function App() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={styles.container}>
@@ -104,6 +106,8 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);
 
 const styles = StyleSheet.create({
   blurred: {

@@ -69,12 +69,13 @@ The app follows a feature-based organization under the `app/` directory:
   - `useIncomeData.js`, `useBalanceHistory.js`, `useCategoryMonthlySpending.js`
   - `useLogEntries.js`
 
-- **services/** (17 files) - Business logic and data access layer
+- **services/** (18 files) - Business logic and data access layer
   - Database: `AccountsDB.js`, `BudgetsDB.js`, `CategoriesDB.js`, `OperationsDB.js`
   - Database: `PlannedOperationsDB.js`, `BalanceHistoryDB.js`, `PreferencesDB.js`
   - Utilities: `BackupRestore.js`, `currency.js`, `db.js`, `eventEmitter.js`, `LastAccount.js`
   - Features: `GoogleSheetsService.js`, `DailyBackupService.js`, `AppUpdateService.js`
   - Logging: `LogService.js`, `LogsFile.js`
+  - Monitoring: `sentry.js` - Privacy-protective crash/error reporting (Sentry)
 
 - **db/** (1 file) - Database schema
   - `schema.js` - Drizzle ORM schema (tables: accounts, categories, operations, budgets, plannedOperations, balanceHistory, appMetadata)

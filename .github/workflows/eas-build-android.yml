@@ -42,6 +42,9 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
           echo "Building with profile: $PROFILE"
