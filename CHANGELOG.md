@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.153.2](https://github.com/heywood8/money-tracker/compare/penny-v0.153.1...penny-v0.153.2) (2026-06-26)
+
+
+### Bug Fixes
+
+* **search:** restore visible/tappable search pill (broken by the morph) ([#1095](https://github.com/heywood8/money-tracker/issues/1095)) ([4e5fe68](https://github.com/heywood8/money-tracker/commit/4e5fe68967b3c6ece5e65bd7c61c16b89f1d45af))
+
 ## [0.153.1](https://github.com/heywood8/money-tracker/compare/penny-v0.153.0...penny-v0.153.1) (2026-06-26)
 
 
