@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.152.0](https://github.com/heywood8/money-tracker/compare/penny-v0.151.6...penny-v0.152.0) (2026-06-26)
+
+
+### Features
+
+* add Sentry crash and error reporting ([#1079](https://github.com/heywood8/money-tracker/issues/1079)) ([34f5e59](https://github.com/heywood8/money-tracker/commit/34f5e5914515060f2236ed2443e811d05bdc65e5))
+
 ## [0.151.6](https://github.com/heywood8/money-tracker/compare/penny-v0.151.5...penny-v0.151.6) (2026-06-26)
 
 
