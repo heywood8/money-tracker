@@ -279,11 +279,20 @@ const addPackageRegistration = (config) =>
       return config;
     }
 
-    const anchor = 'val packages = PackageList(this).packages';
-    if (contents.includes(anchor)) {
+    // Modern Expo/RN templates (SDK 50+, RN 0.73+) return
+    // `PackageList(this).packages.apply { … }`, so we add inside the apply
+    // block. Older templates assign to a `val packages` first; handle that too.
+    const applyAnchor = 'PackageList(this).packages.apply {';
+    const valAnchor = 'val packages = PackageList(this).packages';
+    if (contents.includes(applyAnchor)) {
       contents = contents.replace(
-        anchor,
-        `${anchor}\n            packages.add(${PACKAGE_CLASS}())`,
+        applyAnchor,
+        `${applyAnchor}\n            add(${PACKAGE_CLASS}())`,
+      );
+    } else if (contents.includes(valAnchor)) {
+      contents = contents.replace(
+        valAnchor,
+        `${valAnchor}\n            packages.add(${PACKAGE_CLASS}())`,
       );
     } else {
       throw new Error(

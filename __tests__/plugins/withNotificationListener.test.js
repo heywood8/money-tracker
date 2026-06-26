@@ -58,7 +58,24 @@ describe('withNotificationListener', () => {
     expect(() => manifestCb(config)).toThrow(/application/);
   });
 
-  it('registers the native package in MainApplication', () => {
+  it('registers the native package in a modern apply-block MainApplication', () => {
+    withNotificationListener({});
+    const config = {
+      modResults: {
+        language: 'kt',
+        contents: [
+          'override fun getPackages(): List<ReactPackage> =',
+          '    PackageList(this).packages.apply {',
+          '      // add(MyReactNativePackage())',
+          '    }',
+        ].join('\n'),
+      },
+    };
+    const out = mainAppCb(config);
+    expect(out.modResults.contents).toContain('add(PennyNotificationsPackage())');
+  });
+
+  it('registers the native package in an older val-based MainApplication', () => {
     withNotificationListener({});
     const config = {
       modResults: {
