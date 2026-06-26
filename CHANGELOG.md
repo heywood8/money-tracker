@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.156.0](https://github.com/heywood8/money-tracker/compare/penny-v0.155.2...penny-v0.156.0) (2026-06-26)
+
+
+### Features
+
+* **e2e:** claude-native PR verifier (/verify-pr) ([#1107](https://github.com/heywood8/money-tracker/issues/1107)) ([26143d3](https://github.com/heywood8/money-tracker/commit/26143d3511daeaca8009a16b3d9bdd6b7470d063))
+
 ## [0.155.2](https://github.com/heywood8/money-tracker/compare/penny-v0.155.1...penny-v0.155.2) (2026-06-26)
 
 
