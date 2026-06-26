@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.155.2](https://github.com/heywood8/money-tracker/compare/penny-v0.155.1...penny-v0.155.2) (2026-06-26)
+
+
+### Bug Fixes
+
+* **android:** dedupe repeated notifications in the access subpanel ([#1105](https://github.com/heywood8/money-tracker/issues/1105)) ([e9ef9d8](https://github.com/heywood8/money-tracker/commit/e9ef9d842d19cba097e62df48cc9f7f632273004))
+
 ## [0.155.1](https://github.com/heywood8/money-tracker/compare/penny-v0.155.0...penny-v0.155.1) (2026-06-26)
 
 
