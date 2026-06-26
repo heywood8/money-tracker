@@ -1,8 +1,8 @@
 # Privacy Policy for Penny Personal Finance Tracker
 
 **Effective Date:** January 5, 2026
-**Last Updated:** January 5, 2026
-**Version:** 1.0
+**Last Updated:** June 26, 2026
+**Version:** 1.1
 **Developer:** heywood8
 
 ---
@@ -20,7 +20,7 @@ Welcome to Penny, a personal finance tracking application built with your privac
 - **Local-First Design**: All your financial data is stored locally on your device, not on our servers
 - **No Personal Information Required**: Penny doesn't require or collect names, emails, phone numbers, or any personally identifiable information
 - **You Control Your Data**: Export, backup, and delete your data at any time
-- **Minimal External Services**: We use only essential services (app updates and optional Google Sheets export) with privacy protections
+- **Minimal External Services**: We use only essential services (app updates, optional Google Sheets export, and privacy-protective crash diagnostics) with privacy protections
 
 ---
 
@@ -77,6 +77,19 @@ Penny offers an optional feature to export your financial data directly to a Goo
 
 **Google's Privacy Policy**: [https://policies.google.com/privacy](https://policies.google.com/privacy)
 
+#### Crash & Error Diagnostics (Sentry)
+
+Penny uses [Sentry](https://sentry.io) to capture crashes and unhandled errors so reliability issues can be diagnosed and fixed. It is configured conservatively for privacy:
+
+- **What is sent**: Error messages and stack traces, the app version/build, and technical device context (e.g., device model, OS version, available memory). Events are reported **only from release builds**.
+- **No personal identifiers**: IP addresses, cookies, and user identifiers are not attached (`sendDefaultPii` is disabled).
+- **No financial data**: Your accounts, transactions, balances, and budgets are never sent. Console/diagnostic logs — which may reference such data — are excluded from reports.
+- **Sampled**: Only a sample of performance traces is collected.
+
+Sentry data contains no information that identifies you personally.
+
+**Sentry's Privacy Policy**: [https://sentry.io/privacy/](https://sentry.io/privacy/)
+
 ### 2.3 Information We Do NOT Collect
 
 Penny does **not** collect, store, or have access to:
@@ -90,7 +103,7 @@ Penny does **not** collect, store, or have access to:
 - Social media profiles or connections
 - Browsing history or activity outside the app
 - Device identifiers for advertising purposes
-- Crash logs, error reports, or usage analytics (Penny has no crash reporting service)
+- Usage analytics, behavioral tracking, or advertising identifiers (crash/error diagnostics are collected via Sentry — see Section 2.2 — but contain no financial data or personal identifiers)
 
 ---
 
@@ -116,7 +129,7 @@ Penny does **not** collect, store, or have access to:
 - Use your financial data for any purpose other than providing app functionality
 - Track your behavior for analytics or advertising purposes
 - Profile users or create marketing segments
-- Collect crash reports, error logs, or usage analytics
+- Collect usage analytics, track your behavior, or use advertising identifiers (crash/error diagnostics via Sentry are limited to technical error data — no financial data or personal identifiers)
 
 ---
 
@@ -158,7 +171,7 @@ Penny allows you to manually export your data in three formats:
 
 ### Third-Party Services:
 
-Penny integrates with three third-party services:
+Penny integrates with four third-party services:
 
 1. **Expo OTA Updates**: Minor update checks sent to Expo's servers. No personal or financial data transmitted.
 
@@ -166,9 +179,11 @@ Penny integrates with three third-party services:
 
 3. **Google Sheets API (optional)**: When you use the Google Sheets export feature, your financial data is sent to Google's API and stored in your Google Drive. This is entirely opt-in and only happens when you explicitly trigger it.
 
+4. **Sentry (crash & error diagnostics)**: Crash and error reports — stack traces, app version, and technical device context — are sent to Sentry to diagnose reliability issues. No financial data or personal identifiers are transmitted. See Section 2.2 for details.
+
 ### No Data Sharing:
 - We do **not** share, sell, rent, or trade your data with any third parties
-- We do **not** use analytics or crash reporting services (no Sentry, no Firebase, no Google Analytics, etc.)
+- We use Sentry **only** for crash/error diagnostics (no financial data, no personal identifiers); we do **not** use usage analytics or behavioral tracking services (no Firebase Analytics, no Google Analytics, etc.)
 - We do **not** integrate with advertising networks
 - We do **not** send your financial data to our own servers
 
@@ -211,6 +226,8 @@ You have complete control over your data in Penny:
 
 **Google Sheets Data**: If you use the Sheets export feature, data is retained in your Google Drive until you delete it. Subject to Google's data retention policies.
 
+**Sentry Diagnostics Data**: Crash/error reports are retained by Sentry according to its configured retention period (typically up to 90 days). They contain no financial data or personal identifiers.
+
 ---
 
 ## 8. Children's Privacy (COPPA Compliance)
@@ -237,6 +254,8 @@ If you have concerns about a child under 13 using Penny, please contact us at lo
 **GitHub API**: Update version checks contact GitHub's US-based servers. Only app version metadata is transmitted.
 
 **Google Sheets Export (if used)**: Your financial data is transmitted to Google's servers, which may be located in multiple countries depending on your Google account settings. Subject to Google's data transfer policies and GDPR compliance measures.
+
+**Sentry (crash diagnostics)**: Crash/error reports are transmitted to Sentry's servers, which may be located outside your country. Only technical error data is sent — no financial data or personal identifiers.
 
 ---
 
@@ -304,6 +323,7 @@ We may update this Privacy Policy periodically to reflect:
 - Continued use of Penny after changes constitutes acceptance
 
 ### Version History:
+- **Version 1.1** (June 26, 2026) - Disclosed Sentry crash/error diagnostics (no financial data or personal identifiers collected)
 - **Version 1.0** (January 5, 2026) - Initial privacy policy
 
 We encourage you to review this policy periodically. The current version is always available at: [https://heywood8.github.io/money-tracker/PRIVACY_POLICY](https://heywood8.github.io/money-tracker/PRIVACY_POLICY)
@@ -342,16 +362,16 @@ This section summarizes how Penny's data practices align with Google Play Store'
 - ❌ No location data
 - ❌ No photos, videos, or audio
 - ❌ No contacts or calendar data
-- ❌ No crash logs or error reports (Penny has no crash reporting service)
+- ✅ Crash logs and error diagnostics — collected via Sentry to fix reliability issues; contain no financial data or personal identifiers
 - ✅ Financial data — stored locally on device only, never collected by us
 - ✅ Google account used for optional Sheets export (not stored by us)
 
 ### Data Usage:
 - **App functionality**: All financial data stored locally on device
 - **Optional export**: Financial data sent to Google Sheets only when you explicitly trigger it
-- **No analytics or crash reporting**
+- **Crash/error diagnostics**: Collected via Sentry (no financial data, no personal identifiers); no usage analytics
 - **No advertising**
-- **No data shared with third parties** except Google (only if you use the Sheets export feature)
+- **No data shared with third parties** except Google (only if you use the Sheets export feature) and Sentry (crash/error diagnostics only)
 
 ### Data Security:
 - Data encrypted in transit (HTTPS for Expo/GitHub/Google APIs)

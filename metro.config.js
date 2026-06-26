@@ -1,6 +1,8 @@
-const { getDefaultConfig } = require('expo/metro-config');
+// Sentry wraps Expo's default Metro config to inject Debug IDs into the bundle
+// and source maps, which is what links uploaded source maps to captured events.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // Add support for WASM files
 config.resolver.assetExts = config.resolver.assetExts || [];

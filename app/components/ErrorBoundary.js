@@ -2,6 +2,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { captureException } from '../services/sentry';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,7 +16,12 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error Boundary caught an error:', error, errorInfo);
-    // In production, you could log to an error tracking service
+    // Report to Sentry (no-op when Sentry is not configured).
+    captureException(error, {
+      contexts: {
+        react: { componentStack: errorInfo?.componentStack },
+      },
+    });
   }
 
   handleReset = () => {

@@ -138,6 +138,29 @@ jest.mock('react-native-uuid', () => ({
   v4: jest.fn(() => 'test-uuid-1234'),
 }));
 
+// Mock @sentry/react-native (native module). `wrap` must pass the component
+// through unchanged so wrapped components still render normally in tests.
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: jest.fn((component) => component),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  setTag: jest.fn(),
+  setUser: jest.fn(),
+  setExtra: jest.fn(),
+  setContext: jest.fn(),
+}));
+
+// Mock expo-constants with no Sentry config by default, so Sentry is a no-op in
+// tests. Individual tests can override expoConfig.extra via jest.resetModules.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: {
+    expoConfig: { extra: {} },
+  },
+}));
+
 // Mock Appearance API
 jest.mock('react-native/Libraries/Utilities/Appearance', () => ({
   getColorScheme: jest.fn(() => 'light'),

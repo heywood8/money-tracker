@@ -33,6 +33,15 @@ module.exports = {
       eas: {
         projectId: '89372eb2-93f5-475a-a630-9caa827d8406',
       },
+      // Sentry runtime config, read by app/services/sentry.js via expo-constants.
+      // The DSN is a public client key (safe to embed in the app). It is sourced
+      // from the SENTRY_DSN build-time env var; replace the fallback below with
+      // your DSN string if you prefer to hardcode it. When empty, Sentry is a
+      // complete no-op.
+      sentry: {
+        dsn: process.env.SENTRY_DSN || '',
+        environment: process.env.APP_VARIANT || undefined,
+      },
     },
     owner: 'lopatinikita',
     platforms: ['android'],
@@ -48,6 +57,17 @@ module.exports = {
             // For production, build all architectures (default)
             ...(ANDROID_ARCHITECTURES && { buildArchs: ANDROID_ARCHITECTURES }),
           },
+        },
+      ],
+      [
+        // Sets up native Sentry and uploads source maps + ProGuard mappings at
+        // build time. Authentication uses the SENTRY_AUTH_TOKEN env var; the
+        // organization/project slugs are not secret and may be provided as env
+        // vars or hardcoded here.
+        '@sentry/react-native/expo',
+        {
+          organization: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
         },
       ],
       './plugins/withR8Config.js',
