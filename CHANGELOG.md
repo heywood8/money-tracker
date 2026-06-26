@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.151.4](https://github.com/heywood8/money-tracker/compare/penny-v0.151.3...penny-v0.151.4) (2026-06-26)
+
+
+### Bug Fixes
+
+* **settings:** make subpanel fill the screen on Reanimated 4 / RN 0.85 ([#1075](https://github.com/heywood8/money-tracker/issues/1075)) ([127b6e0](https://github.com/heywood8/money-tracker/commit/127b6e0d3420b72c68b58a148f7bca546a8eb2c2))
+
 ## [0.151.3](https://github.com/heywood8/money-tracker/compare/penny-v0.151.2...penny-v0.151.3) (2026-06-25)
 
 
