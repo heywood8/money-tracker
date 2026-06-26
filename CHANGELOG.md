@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.152.2](https://github.com/heywood8/money-tracker/compare/penny-v0.152.1...penny-v0.152.2) (2026-06-26)
+
+
+### Styles
+
+* **search:** float the search bar and match the type-button height ([#1084](https://github.com/heywood8/money-tracker/issues/1084)) ([35963cc](https://github.com/heywood8/money-tracker/commit/35963cce8a0a2440fc771dc01052e7023d6865e4))
+
 ## [0.152.1](https://github.com/heywood8/money-tracker/compare/penny-v0.152.0...penny-v0.152.1) (2026-06-26)
 
 
