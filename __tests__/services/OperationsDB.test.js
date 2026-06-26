@@ -1330,7 +1330,7 @@ describe('OperationsDB Service', () => {
       // ...and the inline expression wraps each searchable column in LOWER()+REPLACE().
       expect(sqlCall).toContain('LOWER(o.description)');
       expect(sqlCall).toContain('LOWER(c.name)');
-      expect(sqlCall).toContain("REPLACE(");
+      expect(sqlCall).toContain('REPLACE(');
       expect(sqlCall).toContain("'Ё', 'е'");
       // The query term is still normalized (ё → е) so both halves use the same alphabet.
       expect(params).toContain('%самолет%');
