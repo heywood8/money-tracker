@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.153.1](https://github.com/heywood8/money-tracker/compare/penny-v0.153.0...penny-v0.153.1) (2026-06-26)
+
+
+### Styles
+
+* **search:** unify pill size and animate the collapsed↔open morph ([#1092](https://github.com/heywood8/money-tracker/issues/1092)) ([305880f](https://github.com/heywood8/money-tracker/commit/305880faaf4f90335bfbb80cd3dfb0f21dbc4ebe))
+
 ## [0.153.0](https://github.com/heywood8/money-tracker/compare/penny-v0.152.2...penny-v0.153.0) (2026-06-26)
 
 
