@@ -1,6 +1,5 @@
 /* global __DEV__ */
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
 import PropTypes from 'prop-types';
 import * as OperationsDB from '../services/OperationsDB';
 import { useAccountsActions } from './AccountsActionsContext';
@@ -153,9 +152,10 @@ export const OperationsActionsProvider = ({ children }) => {
       _setHasMoreOperations(!allDatesLoaded);
       _setDataLoaded(true);
 
-      // Pre-warm cache after first non-text load so subsequent text searches are instant
+      // Pre-warm cache after first non-text load so subsequent text searches are instant.
+      // Deferred to idle time so it never competes with rendering the freshly loaded list.
       if (!hasTextSearch && !Array.isArray(allOpsCacheRef.current)) {
-        InteractionManager.runAfterInteractions(() => { _loadCache(); });
+        requestIdleCallback(() => { _loadCache(); });
       }
     } catch (error) {
       console.error('Failed to load initial operations:', error);

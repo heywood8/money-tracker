@@ -34,6 +34,19 @@ if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 }
 
+// React Native provides requestIdleCallback/cancelIdleCallback globally, but the
+// jest-expo test environment does not. Polyfill them so code that schedules idle
+// work (replacing the deprecated InteractionManager) runs in tests.
+// setImmediate matches how the now-replaced InteractionManager.runAfterInteractions
+// scheduled its callbacks, so deferred work fires at the same point in the event loop.
+if (typeof global.requestIdleCallback === 'undefined') {
+  global.requestIdleCallback = (cb) =>
+    setImmediate(() => cb({ didTimeout: false, timeRemaining: () => 50 }));
+}
+if (typeof global.cancelIdleCallback === 'undefined') {
+  global.cancelIdleCallback = (id) => clearImmediate(id);
+}
+
 // Mock expo-clipboard
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(() => Promise.resolve()),
