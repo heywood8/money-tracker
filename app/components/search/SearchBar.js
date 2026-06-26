@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Text, Keyboard, Platform } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import PropTypes from 'prop-types';
-import { HORIZONTAL_PADDING } from '../../styles/layout';
+import { HORIZONTAL_PADDING, SPACING } from '../../styles/layout';
 
 // Append an alpha channel to a 6-digit hex color (alpha 0..1).
 // Mirrors the helper used by the bottom tab bar so the collapsed search
@@ -77,7 +77,7 @@ const SearchBar = ({
   // soft border, elevation). Tapping it expands the full-width search bar.
   if (collapsed) {
     return (
-      <View testID="search-bar-container" style={styles.collapsedContainer}>
+      <View testID="search-bar-container" style={styles.collapsedContainer} pointerEvents="box-none">
         <TouchableOpacity
           testID="search-input-container"
           activeOpacity={0.6}
@@ -93,7 +93,7 @@ const SearchBar = ({
           ]}
         >
           <View style={styles.iconWrapper}>
-            <Icon name="magnify" size={20} color={colors.text} />
+            <Icon name="magnify" size={18} color={colors.text} />
             {filterCount > 0 && (
               <View testID="filter-count-badge-collapsed" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.filterBadgeText}>{filterCount}</Text>
@@ -108,67 +108,69 @@ const SearchBar = ({
     );
   }
 
+  // Open/active state: the search field, clear, filter, and close controls live
+  // inside the same translucent rounded pill as the collapsed state, so the
+  // floating look is preserved while typing.
   return (
-    <View
-      testID="search-bar-container"
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <TouchableOpacity
-        testID="search-input-container"
-        activeOpacity={1}
+    <View testID="search-bar-container" style={styles.openContainer} pointerEvents="box-none">
+      <View
+        testID="search-pill"
         style={[
-          styles.searchInputContainer,
-          { backgroundColor: colors.background, borderBottomColor: colors.border },
+          styles.openPill,
+          {
+            backgroundColor: withAlpha(colors.surface, 0.87),
+            borderColor: withAlpha(colors.border, 0.5),
+          },
         ]}
       >
-        <View style={styles.iconWrapper}>
+        <View testID="search-input-container" style={styles.searchInputContainer}>
           <Icon name="magnify" size={20} color={colors.text} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            value={localText}
+            onChangeText={setLocalText}
+            placeholder={t('search_operations_placeholder')}
+            placeholderTextColor={colors.mutedText}
+            autoFocus
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {localText.length > 0 && (
+            <TouchableOpacity
+              testID="clear-search-button"
+              onPress={handleClear}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="close-circle" size={20} color={colors.mutedText} />
+            </TouchableOpacity>
+          )}
         </View>
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          value={localText}
-          onChangeText={setLocalText}
-          placeholder={t('search_operations_placeholder')}
-          placeholderTextColor={colors.mutedText}
-          autoFocus
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {localText.length > 0 && (
+        <View style={styles.buttonContainer}>
           <TouchableOpacity
-            testID="clear-search-button"
-            onPress={handleClear}
+            testID="filters-toggle-button"
+            onPress={() => { Keyboard.dismiss(); onToggleFilters(); }}
+            style={[styles.iconButton, filterCount > 0 && { backgroundColor: `${colors.primary}15` }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.filterButtonContent}>
+              <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
+              {filterCount > 0 && (
+                <View testID="filter-count-badge" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.filterBadgeText}>{filterCount}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="close-search-button"
+            onPress={onClose}
+            style={styles.iconButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="close-circle" size={20} color={colors.mutedText} />
+            <Icon name="close" size={22} color={colors.text} />
           </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          testID="filters-toggle-button"
-          onPress={() => { Keyboard.dismiss(); onToggleFilters(); }}
-          style={[styles.iconButton, filterCount > 0 && { backgroundColor: `${colors.primary}15` }]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-        >
-          <View style={styles.filterButtonContent}>
-            <Icon name="filter-variant" size={22} color={filterCount > 0 ? colors.primary : colors.text} />
-            {filterCount > 0 && (
-              <View testID="filter-count-badge" style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.filterBadgeText}>{filterCount}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="close-search-button"
-          onPress={onClose}
-          style={styles.iconButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icon name="close" size={22} color={colors.text} />
-        </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -181,7 +183,6 @@ SearchBar.propTypes = {
   onClose: PropTypes.func.isRequired,
   filterCount: PropTypes.number,
   colors: PropTypes.shape({
-    background: PropTypes.string.isRequired,
     surface: PropTypes.string.isRequired,
     border: PropTypes.string.isRequired,
     text: PropTypes.string.isRequired,
@@ -201,29 +202,31 @@ SearchBar.defaultProps = {
 
 const styles = StyleSheet.create({
   buttonContainer: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.sm,
     width: 96, // 44 + 44 + 8
   },
   collapsedContainer: {
     alignItems: 'center',
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 6,
+    paddingVertical: SPACING.xs,
     width: '100%',
-    zIndex: 100,
   },
   collapsedLabel: {
-    fontSize: 16,
+    fontSize: 14,
   },
+  // Matches the Расход/Доход/Перевод type buttons: same vertical padding,
+  // border, icon (18) and text (14) so the resting search pill is the same height.
   collapsedPill: {
     alignItems: 'center',
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
-    height: 44,
+    gap: SPACING.sm,
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
     width: '70%',
     ...Platform.select({
       android: {
@@ -236,14 +239,6 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
       },
     }),
-  },
-  container: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingVertical: 2,
-    width: '100%',
-    zIndex: 100,
   },
   filterBadge: {
     alignItems: 'center',
@@ -274,6 +269,30 @@ const styles = StyleSheet.create({
   iconWrapper: {
     position: 'relative',
   },
+  openContainer: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingVertical: SPACING.xs,
+    width: '100%',
+  },
+  openPill: {
+    alignItems: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: 'row',
+    paddingLeft: SPACING.lg,
+    paddingRight: SPACING.xs,
+    ...Platform.select({
+      android: {
+        elevation: 8,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+    }),
+  },
   searchInput: {
     flex: 1,
     fontSize: 16,
@@ -281,14 +300,10 @@ const styles = StyleSheet.create({
   },
   searchInputContainer: {
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderRadius: 4,
     flex: 1,
     flexDirection: 'row',
-    gap: 12,
-    height: 44,
-    marginRight: 12,
-    paddingHorizontal: 12,
+    gap: SPACING.md,
+    height: 48,
   },
 });
 

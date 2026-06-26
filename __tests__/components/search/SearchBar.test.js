@@ -184,32 +184,33 @@ describe('SearchBar', () => {
   });
 
   describe('SearchBar visual style', () => {
-    it('search input container has clean rounded style', async () => {
+    // The open search now lives inside the same translucent rounded "pill" as the
+    // collapsed state (matching the floating bottom menu), so the field itself no
+    // longer carries the underline/background — the pill does.
+    it('search pill has a rounded translucent container', async () => {
       const { getByTestId } = await render(<SearchBar {...defaultProps} />);
-      const container = getByTestId('search-input-container');
+      const pill = getByTestId('search-pill');
 
-      const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.borderBottomWidth).toBe(1);
-      expect(containerStyle.borderWidth).toBeUndefined();
-      expect(containerStyle.borderRadius).toBe(4);
-      expect(containerStyle.height).toBe(44);
+      const pillStyle = StyleSheet.flatten(pill.props.style);
+      expect(pillStyle.borderRadius).toBe(24);
+      expect(pillStyle.borderWidth).toBe(1);
     });
 
-    it('search input container has subtle background for visibility', async () => {
+    it('search pill uses a translucent surface background', async () => {
       const { getByTestId } = await render(<SearchBar {...defaultProps} />);
-      const container = getByTestId('search-input-container');
+      const pill = getByTestId('search-pill');
 
-      const containerStyle = StyleSheet.flatten(container.props.style);
-      // Solid dark background for clear visual definition
-      expect(containerStyle.backgroundColor).toBe('#1f1f1f');
+      const pillStyle = StyleSheet.flatten(pill.props.style);
+      // surface (#FFFFFF) with an appended alpha channel (e.g. #FFFFFFde)
+      expect(pillStyle.backgroundColor).toMatch(/^#FFFFFF/i);
     });
 
-    it('search input container has proper padding', async () => {
+    it('search input region stretches and keeps comfortable spacing', async () => {
       const { getByTestId } = await render(<SearchBar {...defaultProps} />);
       const container = getByTestId('search-input-container');
 
       const containerStyle = StyleSheet.flatten(container.props.style);
-      expect(containerStyle.paddingHorizontal).toBe(12);
+      expect(containerStyle.flex).toBe(1);
       expect(containerStyle.gap).toBe(12);
     });
   });
