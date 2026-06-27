@@ -122,6 +122,12 @@ const isSchemaComplete = async (rawDb) => {
     const opsCols = await rawDb.getAllAsync('PRAGMA table_info(operations)');
     if (!opsCols.some(c => c.name === 'original_balance')) return false;
 
+    // Check operations has BOTH latitude and longitude (migration 0009). Both are
+    // checked because applyPendingMigrations runs each ADD COLUMN as a separate
+    // statement and continues on failure — a half-applied 0009 (latitude added,
+    // longitude not) must not be mistaken for complete, or every INSERT would throw.
+    if (!opsCols.some(c => c.name === 'latitude') || !opsCols.some(c => c.name === 'longitude')) return false;
+
     // Check operations has integer account_id (migration 0002)
     const opsAccountId = opsCols.find(c => c.name === 'account_id');
     if (!opsAccountId || opsAccountId.type.toLowerCase() !== 'integer') return false;
@@ -357,6 +363,16 @@ const detectAppliedMigrations = async (rawDb) => {
     const accCols = await getColumns('accounts');
     if (accCols.some(c => c.name === 'deleted_at')) {
       applied.push(8);
+    }
+  }
+
+  // Migration 0009: Adds latitude/longitude columns to operations.
+  // Require BOTH columns — a half-applied 0009 (latitude only) is not "applied",
+  // so the pending statements re-run and add the missing longitude column.
+  if (await tableExists('operations')) {
+    const opsCols = await getColumns('operations');
+    if (opsCols.some(c => c.name === 'latitude') && opsCols.some(c => c.name === 'longitude')) {
+      applied.push(9);
     }
   }
 

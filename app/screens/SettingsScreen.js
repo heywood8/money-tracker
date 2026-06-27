@@ -30,6 +30,7 @@ import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaul
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
+import { ensureLocationPermission } from '../services/LocationService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import { openNotificationAccessSettings, isNotificationAccessEnabled, getRecentNotifications } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
@@ -63,6 +64,56 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
+// Red used for the inline "location permission denied" hint under the toggle row.
+const ERROR_TEXT_COLOR = '#e53935';
+
+/**
+ * A settings row with an animated on/off switch. Extracted so the three toggle
+ * rows (hide balances, theme, attach location) share one implementation — a
+ * future restyle or a11y fix touches one place instead of three. `hintError`
+ * renders the hint in the error colour (used for the location "permission
+ * denied" state).
+ */
+const SettingToggleRow = ({ icon, label, hint, value, onToggle, hintError = false, testID }) => {
+  const { colors } = useThemeColors();
+  const progress = useSharedValue(value ? 1 : 0);
+  useEffect(() => {
+    progress.value = withSpring(value ? 1 : 0, SPRING_CONFIG);
+  }, [value, progress]);
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: 2 + progress.value * 20 }],
+  }));
+
+  return (
+    <TouchableRipple onPress={onToggle} style={styles.settingsRow} testID={testID}>
+      <View style={styles.settingsRowContent}>
+        <View style={styles.settingsRowLeft}>
+          <Ionicons name={icon} size={22} color={colors.text} />
+          <View style={styles.settingsRowText}>
+            <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.settingsRowValue, { color: hintError ? ERROR_TEXT_COLOR : colors.mutedText }]}>
+              {hint}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.switchTrack, { backgroundColor: value ? colors.primary : colors.border }]}>
+          <Animated.View style={[styles.switchThumb, thumbStyle]} />
+        </View>
+      </View>
+    </TouchableRipple>
+  );
+};
+
+SettingToggleRow.propTypes = {
+  icon: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  hint: PropTypes.string,
+  value: PropTypes.bool,
+  onToggle: PropTypes.func.isRequired,
+  hintError: PropTypes.bool,
+  testID: PropTypes.string,
+};
+
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 5000;
 
@@ -77,7 +128,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
-  const { hideBalances, setHideBalances } = useDisplaySettings();
+  const { hideBalances, setHideBalances, attachLocation, setAttachLocation } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
@@ -90,6 +141,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // RN 0.85's Yoga (leaving the panel invisible / seemingly not opening).
   const [containerSize, setContainerSize] = useState(null);
   const [pinnedAccountId, setPinnedAccountId] = useState(null);
+  // Inline hint shown under the "Attach location" row when the OS permission was
+  // denied while turning the toggle on. Cleared on a successful grant / toggle off.
+  const [locationDenied, setLocationDenied] = useState(false);
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -127,25 +181,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
     : t('latest_used');
 
-  // Toggle animations using reanimated shared values
-  const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
-  useEffect(() => {
-    toggleProgress.value = withSpring(hideBalances ? 1 : 0, SPRING_CONFIG);
-  }, [hideBalances, toggleProgress]);
-
-  const toggleThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + toggleProgress.value * 20 }],
-  }));
-
-  const themeToggleProgress = useSharedValue(colorScheme === 'dark' ? 1 : 0);
-  useEffect(() => {
-    themeToggleProgress.value = withSpring(colorScheme === 'dark' ? 1 : 0, SPRING_CONFIG);
-  }, [colorScheme, themeToggleProgress]);
-
-  const themeToggleThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + themeToggleProgress.value * 20 }],
-  }));
-
   const handleToggleDarkMode = useCallback(() => {
     setTheme(colorScheme === 'dark' ? 'light' : 'dark');
   }, [colorScheme, setTheme]);
@@ -173,6 +208,27 @@ export default function SettingsScreen({ setSubPanelActive }) {
       );
     }
   }, [hideBalances, setHideBalances, t, showDialog]);
+
+  const handleToggleAttachLocation = useCallback(async () => {
+    // Turning OFF is non-destructive and needs no permission: just persist false.
+    // Coordinates already stored on past operations are left untouched (R1.5).
+    if (attachLocation) {
+      setAttachLocation(false);
+      setLocationDenied(false);
+      return;
+    }
+    // Turning ON: request the OS permission in this clear context. If it isn't
+    // granted, leave the toggle off and show an inline hint — never nag, never
+    // flip the toggle on without permission.
+    const { granted } = await ensureLocationPermission();
+    if (granted) {
+      setLocationDenied(false);
+      setAttachLocation(true);
+    } else {
+      setLocationDenied(true);
+      setAttachLocation(false);
+    }
+  }, [attachLocation, setAttachLocation]);
 
   const loadStoredBackups = useCallback(async () => {
     setBackupsLoading(true);
@@ -1511,39 +1567,34 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </View>
         </TouchableRipple>
 
-        <TouchableRipple onPress={handleToggleHideBalances} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="eye-off-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('hide_balances') || 'Hide balances'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('hide_balances_hint') || 'Mask account balances for privacy'}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
-              <Animated.View style={[styles.switchThumb, toggleThumbStyle]} />
-            </View>
-          </View>
-        </TouchableRipple>
+        <SettingToggleRow
+          icon="eye-off-outline"
+          label={t('hide_balances') || 'Hide balances'}
+          hint={t('hide_balances_hint') || 'Mask account balances for privacy'}
+          value={hideBalances}
+          onToggle={handleToggleHideBalances}
+        />
 
-        <TouchableRipple onPress={handleToggleDarkMode} style={styles.settingsRow} testID="settings-theme-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'} size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.switchTrack, { backgroundColor: colorScheme === 'dark' ? colors.primary : colors.border }]}>
-              <Animated.View style={[styles.switchThumb, themeToggleThumbStyle]} />
-            </View>
-          </View>
-        </TouchableRipple>
+        <SettingToggleRow
+          icon="location-outline"
+          label={t('attach_location') || 'Attach location to operations'}
+          hint={locationDenied
+            ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
+            : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
+          hintError={locationDenied}
+          value={attachLocation}
+          onToggle={handleToggleAttachLocation}
+          testID="settings-location-row"
+        />
+
+        <SettingToggleRow
+          icon={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'}
+          label={t('theme') || 'Theme'}
+          hint={colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
+          value={colorScheme === 'dark'}
+          onToggle={handleToggleDarkMode}
+          testID="settings-theme-row"
+        />
 
         <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
           <View style={styles.settingsRowContent}>

@@ -667,6 +667,92 @@ describe('BackupRestore', () => {
     });
   });
 
+  describe('Location columns round-trip (issue #1091)', () => {
+    const makeDbInstance = () => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() => {
+          insertCount++;
+          return Promise.resolve({ lastInsertRowId: insertCount });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-adjustment-expense' },
+          { id: 'shadow-adjustment-income' },
+        ]),
+      };
+    };
+
+    const opInsert = (dbInstance) =>
+      dbInstance.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+
+    it('restores latitude/longitude from a backup that has them', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: mockAccounts,
+          categories: mockCategories,
+          operations: [{ ...mockOperations[0], latitude: '40.5', longitude: '44.5' }],
+          app_metadata: mockMetadata,
+        },
+      });
+
+      const call = opInsert(dbInstance);
+      expect(call[0]).toContain('latitude, longitude');
+      expect(call[1]).toEqual(expect.arrayContaining(['40.5', '44.5']));
+    });
+
+    it('tolerates older backups without latitude/longitude (treats them as null)', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      // mockOperations[0] has no latitude/longitude keys (legacy backup).
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: mockAccounts,
+          categories: mockCategories,
+          operations: mockOperations,
+          app_metadata: mockMetadata,
+        },
+      });
+
+      const call = opInsert(dbInstance);
+      expect(call).toBeTruthy();
+      const params = call[1];
+      // Column list ends with latitude, longitude → last two params default to null.
+      expect(params[params.length - 2]).toBeNull();
+      expect(params[params.length - 1]).toBeNull();
+    });
+
+    it('includes latitude/longitude columns in CSV export', async () => {
+      mockDb.queryAll.mockImplementation((query) => {
+        if (query.includes('operations')) {
+          return Promise.resolve([{ ...mockOperations[0], latitude: '40.5', longitude: '44.5' }]);
+        }
+        if (query.includes('accounts')) return Promise.resolve(mockAccounts);
+        if (query.includes('categories')) return Promise.resolve(mockCategories);
+        return Promise.resolve([]);
+      });
+
+      await BackupRestore.exportBackup('csv');
+
+      const written = mockFileSystem.writeAsStringAsync.mock.calls[0][1];
+      // The operations CSV header lists the new columns, and the row carries values.
+      expect(written).toContain('latitude,longitude');
+      expect(written).toContain('40.5');
+      expect(written).toContain('44.5');
+    });
+  });
+
   describe('importBackup - JSON format', () => {
     it('imports JSON backup file', async () => {
       const validBackup = {

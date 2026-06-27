@@ -64,6 +64,13 @@
       "when": 1766300000000,
       "tag": "0008_soft_delete_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1766400000000,
+      "tag": "0009_add_operation_location",
+      "breakpoints": true
     }
   ]
 }

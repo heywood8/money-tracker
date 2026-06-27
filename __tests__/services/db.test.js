@@ -470,6 +470,10 @@ describe('Database Service', () => {
             { name: 'id', type: 'INTEGER' },
             { name: 'account_id', type: 'INTEGER' },
             { name: 'original_balance', type: 'TEXT' },
+            // 0009 columns — a complete schema has BOTH (a half-applied 0009 with
+            // only latitude must not count as complete).
+            { name: 'latitude', type: 'TEXT' },
+            { name: 'longitude', type: 'TEXT' },
           ]);
         }
         if (query.includes('PRAGMA table_info(categories)')) {

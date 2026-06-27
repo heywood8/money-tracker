@@ -50,6 +50,8 @@ const mapOperationFields = (dbOperation) => {
     destinationAmount: dbOperation.destination_amount,
     sourceCurrency: dbOperation.source_currency,
     destinationCurrency: dbOperation.destination_currency,
+    latitude: dbOperation.latitude,
+    longitude: dbOperation.longitude,
   };
 };
 
@@ -494,15 +496,19 @@ export const createOperationInTx = async (db, operation) => {
     destination_amount: operation.destinationAmount || null,
     source_currency: operation.sourceCurrency || null,
     destination_currency: operation.destinationCurrency || null,
+    // ?? (not ||) so a valid 0.0 coordinate (equator / prime meridian) survives.
+    latitude: operation.latitude ?? null,
+    longitude: operation.longitude ?? null,
   };
 
   const result = await db.runAsync(
-    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       operationData.type, operationData.amount, operationData.account_id,
       operationData.category_id, operationData.to_account_id, operationData.date,
       operationData.created_at, operationData.description, operationData.exchange_rate,
       operationData.destination_amount, operationData.source_currency, operationData.destination_currency,
+      operationData.latitude, operationData.longitude,
     ],
   );
 
@@ -631,6 +637,14 @@ export const updateOperation = async (id, updates) => {
         fields.push('destination_currency = ?');
         values.push(updates.destinationCurrency || null);
       }
+      if (updates.latitude !== undefined) {
+        fields.push('latitude = ?');
+        values.push(updates.latitude ?? null); // ?? keeps a valid 0.0 coordinate
+      }
+      if (updates.longitude !== undefined) {
+        fields.push('longitude = ?');
+        values.push(updates.longitude ?? null);
+      }
 
       if (fields.length === 0) {
         return; // Nothing to update
@@ -757,6 +771,8 @@ export const splitOperation = async (id, updates, newOperationData) => {
       if (updates.destinationAmount !== undefined) { fields.push('destination_amount = ?'); vals.push(updates.destinationAmount || null); }
       if (updates.sourceCurrency !== undefined) { fields.push('source_currency = ?'); vals.push(updates.sourceCurrency || null); }
       if (updates.destinationCurrency !== undefined) { fields.push('destination_currency = ?'); vals.push(updates.destinationCurrency || null); }
+      if (updates.latitude !== undefined) { fields.push('latitude = ?'); vals.push(updates.latitude ?? null); }
+      if (updates.longitude !== undefined) { fields.push('longitude = ?'); vals.push(updates.longitude ?? null); }
 
       if (fields.length > 0) {
         vals.push(id);
@@ -768,7 +784,8 @@ export const splitOperation = async (id, updates, newOperationData) => {
         [id],
       );
 
-      // Step 3: insert new (split) operation
+      // Step 3: insert new (split) operation. The sibling inherits the parent's
+      // coordinates (same place) unless the caller explicitly supplies its own.
       const newRow = {
         type: newOperationData.type,
         amount: newOperationData.amount,
@@ -782,14 +799,21 @@ export const splitOperation = async (id, updates, newOperationData) => {
         destination_amount: newOperationData.destinationAmount || null,
         source_currency: newOperationData.sourceCurrency || null,
         destination_currency: newOperationData.destinationCurrency || null,
+        latitude: newOperationData.latitude !== undefined
+          ? (newOperationData.latitude ?? null)
+          : (oldOperation.latitude ?? null),
+        longitude: newOperationData.longitude !== undefined
+          ? (newOperationData.longitude ?? null)
+          : (oldOperation.longitude ?? null),
       };
 
       const result = await db.runAsync(
-        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newRow.type, newRow.amount, newRow.account_id, newRow.category_id,
           newRow.to_account_id, newRow.date, newRow.created_at, newRow.description,
           newRow.exchange_rate, newRow.destination_amount, newRow.source_currency, newRow.destination_currency,
+          newRow.latitude, newRow.longitude,
         ],
       );
 
@@ -1974,6 +1998,49 @@ export const getDistinctDescriptions = async (limit = 100, categoryId = null, am
 };
 
 /**
+ * Aggregate raw {description, cnt, category_id?} rows into a ranked label list.
+ * Single source of truth for the label-ranking rules shared by getDistinctLabels
+ * and getLabelsNearLocation: parse labels out of each description, drop hidden /
+ * system labels (imported Account:/Category:/... metadata + the [MoneyOK] marker),
+ * sum per-label frequency, then order by — when a categoryId is given —
+ * in-category first → frequency desc → locale-aware label compare.
+ * @param {Array<{description: string, cnt: number, category_id?: *}>} rows
+ * @param {Object} [opts]
+ * @param {number} opts.limit - Maximum number of labels to return
+ * @param {string|null} [opts.categoryId] - When set, labels used in this category rank first
+ * @returns {string[]}
+ */
+const aggregateLabelRows = (rows, { limit, categoryId = null } = {}) => {
+  const byLabel = new Map(); // lowercased label -> { label, count, inCategory }
+  for (const row of (rows || [])) {
+    const labels = parseLabels(row.description);
+    for (const label of labels) {
+      if (isHiddenLabel(label)) continue;
+      const key = label.toLowerCase();
+      let entry = byLabel.get(key);
+      if (!entry) {
+        entry = { label, count: 0, inCategory: false };
+        byLabel.set(key, entry);
+      }
+      entry.count += Number(row.cnt) || 0;
+      if (categoryId != null && row.category_id != null && String(row.category_id) === String(categoryId)) {
+        entry.inCategory = true;
+      }
+    }
+  }
+
+  const sorted = Array.from(byLabel.values()).sort((a, b) => {
+    if (categoryId != null && a.inCategory !== b.inCategory) {
+      return a.inCategory ? -1 : 1;
+    }
+    if (b.count !== a.count) return b.count - a.count;
+    return a.label.localeCompare(b.label);
+  });
+
+  return sorted.slice(0, limit).map(entry => entry.label);
+};
+
+/**
  * Get distinct labels across all operations, ordered by usage frequency.
  * Labels are parsed out of the description column (see labelUtils). When a
  * categoryId is provided, labels that have been used in that category are
@@ -2000,39 +2067,75 @@ export const getDistinctLabels = async (limit = 50, categoryId = null) => {
        LIMIT ${SCAN_GROUP_LIMIT}`,
     );
 
-    // Aggregate per-label frequency (summed across descriptions) and whether the
-    // label has ever been used in the requested category.
-    const byLabel = new Map(); // lowercased label -> { label, count, inCategory }
-    for (const row of (rows || [])) {
-      const labels = parseLabels(row.description);
-      for (const label of labels) {
-        // Imported metadata (Account:/Category:/Category group:) and the [MoneyOK]
-        // marker are never offered as suggestions.
-        if (isHiddenLabel(label)) continue;
-        const key = label.toLowerCase();
-        let entry = byLabel.get(key);
-        if (!entry) {
-          entry = { label, count: 0, inCategory: false };
-          byLabel.set(key, entry);
-        }
-        entry.count += Number(row.cnt) || 0;
-        if (categoryId != null && String(row.category_id) === String(categoryId)) {
-          entry.inCategory = true;
-        }
-      }
-    }
-
-    const sorted = Array.from(byLabel.values()).sort((a, b) => {
-      if (categoryId != null && a.inCategory !== b.inCategory) {
-        return a.inCategory ? -1 : 1;
-      }
-      if (b.count !== a.count) return b.count - a.count;
-      return a.label.localeCompare(b.label);
-    });
-
-    return sorted.slice(0, limit).map(entry => entry.label);
+    return aggregateLabelRows(rows, { limit, categoryId });
   } catch (error) {
     console.error('Failed to get distinct labels:', error);
     throw error;
+  }
+};
+
+/**
+ * Most-frequent labels used on past operations within a ~radiusMeters bounding
+ * box of (lat, lng) — "proximity recall". Mirrors getDistinctLabels' shape: a
+ * single bounded SELECT grouped by description, then per-label frequency
+ * aggregation in JS with hidden/system labels excluded.
+ *
+ * The query is a square bounding box (no haversine refine, no distance
+ * weighting) — simple and well within usable accuracy at a ~150 m radius.
+ * Rows with null coordinates are skipped by the IS NOT NULL filter and never
+ * poison the result. Never throws: any failure resolves to [] so a save or the
+ * suggestion strip is never blocked.
+ *
+ * @param {number|string} lat - Latitude in decimal degrees
+ * @param {number|string} lng - Longitude in decimal degrees
+ * @param {Object} [opts]
+ * @param {number} [opts.radiusMeters=150] - Half-size of the bounding box in metres
+ * @param {number} [opts.limit=8] - Maximum number of labels to return
+ * @returns {Promise<string[]>} Labels ranked by frequency, de-duplicated, hidden labels excluded
+ */
+export const getLabelsNearLocation = async (lat, lng, { radiusMeters = 150, limit = 8 } = {}) => {
+  try {
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    if (!isFinite(latNum) || !isFinite(lngNum)) return [];
+
+    // Convert the metre radius to lat/lng deltas. 1° latitude ≈ 111320 m anywhere;
+    // 1° longitude shrinks by cos(latitude). Floor |cos| so a fix near the poles
+    // can't blow the longitude delta up to infinity.
+    const dLat = radiusMeters / 111320;
+    const cosLat = Math.cos((latNum * Math.PI) / 180);
+    const dLng = radiusMeters / (111320 * Math.max(Math.abs(cosLat), 1e-6));
+
+    const minLat = latNum - dLat;
+    const maxLat = latNum + dLat;
+    const minLng = lngNum - dLng;
+    const maxLng = lngNum + dLng;
+
+    // Bounding-box filter. Coordinates are stored as text, so CAST to REAL for a
+    // numeric (not lexicographic) range comparison; this also means a text index
+    // can't serve the range, which is why none exists (see migration 0009). The
+    // scan window is capped like getDistinctLabels so modal open stays fast even
+    // with a large history.
+    const SCAN_GROUP_LIMIT = 2000;
+    const rows = await queryAll(
+      `SELECT description, COUNT(*) AS cnt
+       FROM operations
+       WHERE latitude IS NOT NULL
+         AND longitude IS NOT NULL
+         AND CAST(latitude AS REAL) BETWEEN ? AND ?
+         AND CAST(longitude AS REAL) BETWEEN ? AND ?
+         AND description IS NOT NULL AND description != ''
+       GROUP BY description
+       ORDER BY cnt DESC
+       LIMIT ${SCAN_GROUP_LIMIT}`,
+      [minLat, maxLat, minLng, maxLng],
+    );
+
+    // Rank by frequency (no category dimension here) using the shared aggregator,
+    // so the hidden-label rules and tie-break stay single-sourced with getDistinctLabels.
+    return aggregateLabelRows(rows, { limit });
+  } catch (error) {
+    console.error('Failed to get labels near location:', error);
+    return [];
   }
 };

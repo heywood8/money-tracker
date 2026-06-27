@@ -67,6 +67,13 @@ export const operations = sqliteTable('operations', {
   sourceCurrency: text('source_currency'),
   destinationCurrency: text('destination_currency'),
   originalBalance: text('original_balance'),
+  // Optional device geolocation captured at save time (decimal degrees, stored as
+  // string per the codebase's "numbers as strings" convention; parseFloat at use).
+  // Nullable — only populated when the user opts in to attaching location. No index:
+  // the proximity query compares CAST(... AS REAL), which a text index can't serve,
+  // and getLabelsNearLocation already scans like getDistinctLabels.
+  latitude: text('latitude'),
+  longitude: text('longitude'),
 }, (table) => ({
   dateIdx: index('idx_operations_date').on(table.date),
   accountIdx: index('idx_operations_account').on(table.accountId),

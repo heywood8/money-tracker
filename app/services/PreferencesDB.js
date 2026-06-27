@@ -10,6 +10,7 @@ export const PREF_KEYS = {
   UPDATE_LAST_PROMPTED_VERSION: 'update_last_prompted_version',
   UPDATE_SKIP_UNTIL: 'update_skip_until',
   HIDE_BALANCES: 'hide_balances',
+  ATTACH_LOCATION: 'attach_location',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
 };
