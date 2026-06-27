@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.157.0](https://github.com/heywood8/money-tracker/compare/penny-v0.156.0...penny-v0.157.0) (2026-06-27)
+
+
+### Features
+
+* **operations:** geolocation coordinates + location-based label suggestions (v1) ([#1110](https://github.com/heywood8/money-tracker/issues/1110)) ([e12aea9](https://github.com/heywood8/money-tracker/commit/e12aea938e987ea9b380a2c472fddd0a6b439b07))
+
 ## [0.156.0](https://github.com/heywood8/money-tracker/compare/penny-v0.155.2...penny-v0.156.0) (2026-06-26)
 
 
