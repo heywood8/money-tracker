@@ -69,7 +69,9 @@ export const operations = sqliteTable('operations', {
   originalBalance: text('original_balance'),
   // Optional device geolocation captured at save time (decimal degrees, stored as
   // string per the codebase's "numbers as strings" convention; parseFloat at use).
-  // Nullable — only populated when the user opts in to attaching location.
+  // Nullable — only populated when the user opts in to attaching location. No index:
+  // the proximity query compares CAST(... AS REAL), which a text index can't serve,
+  // and getLabelsNearLocation already scans like getDistinctLabels.
   latitude: text('latitude'),
   longitude: text('longitude'),
 }, (table) => ({
@@ -77,8 +79,6 @@ export const operations = sqliteTable('operations', {
   accountIdx: index('idx_operations_account').on(table.accountId),
   categoryIdx: index('idx_operations_category').on(table.categoryId),
   typeIdx: index('idx_operations_type').on(table.type),
-  // Composite index powering the bounding-box prefilter in getLabelsNearLocation.
-  locationIdx: index('idx_operations_location').on(table.latitude, table.longitude),
 }));
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   View,
@@ -87,6 +87,24 @@ const mergeSuggestions = (nearby, base) => {
   return result;
 };
 
+/**
+ * Build the latitude/longitude overrides to persist on save, or null when none
+ * should be written. Single source of truth shared by both save paths (full save
+ * and the quick category-add) so the non-destructive R1.5 rule is applied
+ * consistently: persist coordinates when the feature is on, OR when the operation
+ * already carries coordinates (preserve them even with the toggle off). `??` (not
+ * `||`) keeps a valid 0.0 coordinate.
+ * @param {boolean} attachLocation
+ * @param {{latitude: *, longitude: *}|null} location
+ * @returns {{latitude: *, longitude: *}|null}
+ */
+const buildLocationOverrides = (attachLocation, location) => {
+  if (attachLocation || (location && location.latitude != null)) {
+    return { latitude: location?.latitude ?? null, longitude: location?.longitude ?? null };
+  }
+  return null;
+};
+
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -171,8 +189,12 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   // Scroll ref for auto-scrolling to description field on keyboard focus
   const scrollViewRef = useRef(null);
 
-  // Autocomplete suggestions for the label editor (distinct labels, category-first)
-  const [labelSuggestions, setLabelSuggestions] = useState([]);
+  // Autocomplete suggestions for the label editor, split into two independent
+  // sources so the location-independent base query isn't re-run when a fix
+  // arrives: `baseSuggestions` (distinct labels, category-first) and
+  // `nearbySuggestions` (proximity recall). They are merged below.
+  const [baseSuggestions, setBaseSuggestions] = useState([]);
+  const [nearbySuggestions, setNearbySuggestions] = useState([]);
 
   // Ref to the label editor so Save can flush a half-typed label synchronously
   // (avoids losing a label the user typed but did not commit before tapping Save).
@@ -181,37 +203,48 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
     const flushed = labelInputRef.current?.flush();
     const overrides = {};
     if (flushed != null) overrides.description = flushed || null;
-    // Persist coordinates when the feature is on (new captures + edits with the
-    // location row visible), or when editing an operation that already carries
-    // coordinates (preserve them even with the toggle off — non-destructive, R1.5).
-    if (attachLocation || (location && location.latitude != null)) {
-      overrides.latitude = location?.latitude || null;
-      overrides.longitude = location?.longitude || null;
-    }
+    const locOverrides = buildLocationOverrides(attachLocation, location);
+    if (locOverrides) Object.assign(overrides, locOverrides);
     return handleSave(Object.keys(overrides).length > 0 ? overrides : undefined);
   }, [handleSave, attachLocation, location]);
 
+  // Base suggestions — location-independent, so keyed only on visibility/category.
+  // On a transient DB error we keep the previous list (no setState in catch) rather
+  // than clearing the strip.
   useEffect(() => {
     if (!visible) return undefined;
     let cancelled = false;
+    getDistinctLabels(50, values.categoryId || null)
+      .then(results => { if (!cancelled) setBaseSuggestions(results); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible, values.categoryId]);
 
-    // Proximity recall is an optional prepend: only queried when the feature is on
-    // AND a fix is available. Otherwise `nearby` is empty and the merged result
-    // equals today's base-only behaviour byte-for-byte (R1.3, R2.4). The effect
-    // re-runs when `location` becomes ready and when the category changes.
+  // Nearby (proximity recall) — only queried when the feature is on AND a fix is
+  // available; otherwise empty, so the merged result equals today's base-only
+  // behaviour byte-for-byte (R1.3, R2.4). Keyed on `location` so it re-runs when a
+  // fix becomes ready, without re-running the base query.
+  useEffect(() => {
+    if (!visible) return undefined;
     const lat = attachLocation && location ? location.latitude : null;
     const lng = attachLocation && location ? location.longitude : null;
-
-    (async () => {
-      const base = await getDistinctLabels(50, values.categoryId || null).catch(() => []);
-      const nearby = (lat != null && lng != null)
-        ? await getLabelsNearLocation(lat, lng).catch(() => [])
-        : [];
-      if (!cancelled) setLabelSuggestions(mergeSuggestions(nearby, base));
-    })();
-
+    if (lat == null || lng == null) {
+      setNearbySuggestions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    getLabelsNearLocation(lat, lng)
+      .then(results => { if (!cancelled) setNearbySuggestions(results); })
+      .catch(() => { if (!cancelled) setNearbySuggestions([]); });
     return () => { cancelled = true; };
-  }, [visible, values.categoryId, attachLocation, location]);
+  }, [visible, attachLocation, location]);
+
+  // Proximity-first merge (case-insensitive dedupe). When nearby is empty this
+  // equals base exactly.
+  const labelSuggestions = useMemo(
+    () => mergeSuggestions(nearbySuggestions, baseSuggestions),
+    [nearbySuggestions, baseSuggestions],
+  );
 
   // Determine if split button should be shown
   // Only for editing expense/income (not transfers, not shadow operations, not new)
@@ -336,7 +369,9 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         parseFloat(finalAmount) > 0;
 
       if (hasValidAmount) {
-        // Build operation data directly with evaluated amount
+        // Build operation data directly with evaluated amount. Attach coordinates
+        // via the shared helper so this quick-add path applies the same R1.5 rule
+        // as the full save path.
         const operationData = {
           type: values.type,
           amount: finalAmount, // Use the evaluated amount directly
@@ -344,11 +379,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           categoryId: category.id,
           date: values.date,
           description: values.description || null,
-          // Attach captured coordinates on this quick-add path too (feature on only).
-          ...(attachLocation ? {
-            latitude: location?.latitude || null,
-            longitude: location?.longitude || null,
-          } : {}),
+          ...(buildLocationOverrides(attachLocation, location) || {}),
         };
 
         try {

@@ -15,6 +15,14 @@ const hasCoords = (loc) => !!(loc && loc.latitude != null && loc.longitude != nu
  * Every path is best-effort: a denied permission or a GPS timeout lands in
  * `status` without throwing and never blocks saving (issue #1091, §5.1 / R1.4).
  *
+ * Concurrency: OperationModal is always-mounted (its `visible` prop toggles), so
+ * this hook instance persists across opens. A slow fix from a *previous* open
+ * must never write into the *current* form — so each open and each capture bump a
+ * monotonic generation token (`runIdRef`); a capture only commits its result if
+ * its snapshotted token still matches the latest. A boolean "active" flag is
+ * insufficient because a later open would re-set it to true and let the stale
+ * fix through.
+ *
  * @param {Object} params
  * @param {boolean} params.enabled - The `attachLocation` preference
  * @param {boolean} params.isNew - Whether the modal is adding a new operation
@@ -36,22 +44,24 @@ const useOperationLocation = ({ enabled = false, isNew = false, visible = false,
   const isNewRef = useRef(isNew);
   isNewRef.current = isNew;
 
-  // Auto-capture at most once per modal open.
-  const autoCapturedRef = useRef(false);
-  // Guard against state updates after the modal closes / unmounts.
-  const activeRef = useRef(false);
+  // Monotonic generation token. Bumped on every open/close (the effect below) and
+  // at the start of every capture/clear. A capture snapshots the token when it
+  // starts and discards its result if the token has since advanced — i.e. the
+  // modal closed, reopened, cleared, or a newer capture began.
+  const runIdRef = useRef(0);
 
   const capture = useCallback(async () => {
-    activeRef.current = true;
+    const runId = ++runIdRef.current;
     setStatus('capturing');
     try {
       const { granted } = await ensureLocationPermission();
+      if (runId !== runIdRef.current) return; // superseded — discard
       if (!granted) {
-        if (activeRef.current) setStatus('denied');
+        setStatus('denied');
         return;
       }
       const coords = await getCurrentLocation();
-      if (!activeRef.current) return;
+      if (runId !== runIdRef.current) return; // superseded — discard
       if (coords) {
         setLocation(coords);
         setStatus('ready');
@@ -61,33 +71,34 @@ const useOperationLocation = ({ enabled = false, isNew = false, visible = false,
       }
     } catch (error) {
       // Defensive: LocationService already swallows errors, but never let one escape.
-      if (activeRef.current) setStatus('error');
+      if (runId === runIdRef.current) setStatus('error');
     }
   }, []);
 
   const clearLocation = useCallback(() => {
+    runIdRef.current++; // cancel any in-flight capture so it can't repopulate
     setLocation(null);
     setStatus('idle');
   }, []);
 
   // On open: seed from the operation's existing coords (null for a new op) and
-  // auto-capture once for a new op when enabled. On close: drop the guards.
+  // auto-capture for a new op when enabled. On close: just bump the token so a
+  // pending capture from this open can't commit later. The token bump also makes
+  // this safe under React 18/19 StrictMode double-invoke (the first run's capture
+  // is discarded; the second run's wins).
   useEffect(() => {
+    runIdRef.current++; // new generation — invalidate any in-flight capture
     if (!visible) {
-      activeRef.current = false;
-      autoCapturedRef.current = false;
       return undefined;
     }
-    activeRef.current = true;
     const existing = hasCoords(initialRef.current) ? initialRef.current : null;
     setLocation(existing);
     setStatus(existing ? 'ready' : 'idle');
 
-    if (enabledRef.current && isNewRef.current && !autoCapturedRef.current) {
-      autoCapturedRef.current = true;
+    if (enabledRef.current && isNewRef.current) {
       capture();
     }
-    return () => { activeRef.current = false; };
+    return () => { runIdRef.current++; };
   }, [visible, capture]);
 
   return { location, status, capture, clearLocation };

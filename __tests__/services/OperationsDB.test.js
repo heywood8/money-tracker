@@ -234,6 +234,29 @@ describe('OperationsDB Service', () => {
       expect(params[params.length - 1]).toBeNull();
     });
 
+    it('preserves a valid 0 coordinate on create (uses ?? not ||)', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      // Latitude/longitude 0.0 (equator / prime meridian) is a valid fix and must
+      // not be coerced to null.
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+        latitude: 0,
+        longitude: 0,
+      });
+
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      const params = insertCall[1];
+      expect(params[params.length - 2]).toBe(0);
+      expect(params[params.length - 1]).toBe(0);
+    });
+
     it('updates latitude/longitude when provided', async () => {
       mockDb.getFirstAsync
         .mockResolvedValueOnce({ id: 1, type: 'expense', amount: '100', account_id: 'acc1', date: '2025-12-05' })

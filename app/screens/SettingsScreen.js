@@ -67,6 +67,53 @@ const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 // Red used for the inline "location permission denied" hint under the toggle row.
 const ERROR_TEXT_COLOR = '#e53935';
 
+/**
+ * A settings row with an animated on/off switch. Extracted so the three toggle
+ * rows (hide balances, theme, attach location) share one implementation — a
+ * future restyle or a11y fix touches one place instead of three. `hintError`
+ * renders the hint in the error colour (used for the location "permission
+ * denied" state).
+ */
+const SettingToggleRow = ({ icon, label, hint, value, onToggle, hintError = false, testID }) => {
+  const { colors } = useThemeColors();
+  const progress = useSharedValue(value ? 1 : 0);
+  useEffect(() => {
+    progress.value = withSpring(value ? 1 : 0, SPRING_CONFIG);
+  }, [value, progress]);
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: 2 + progress.value * 20 }],
+  }));
+
+  return (
+    <TouchableRipple onPress={onToggle} style={styles.settingsRow} testID={testID}>
+      <View style={styles.settingsRowContent}>
+        <View style={styles.settingsRowLeft}>
+          <Ionicons name={icon} size={22} color={colors.text} />
+          <View style={styles.settingsRowText}>
+            <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.settingsRowValue, { color: hintError ? ERROR_TEXT_COLOR : colors.mutedText }]}>
+              {hint}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.switchTrack, { backgroundColor: value ? colors.primary : colors.border }]}>
+          <Animated.View style={[styles.switchThumb, thumbStyle]} />
+        </View>
+      </View>
+    </TouchableRipple>
+  );
+};
+
+SettingToggleRow.propTypes = {
+  icon: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  hint: PropTypes.string,
+  value: PropTypes.bool,
+  onToggle: PropTypes.func.isRequired,
+  hintError: PropTypes.bool,
+  testID: PropTypes.string,
+};
+
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 5000;
 
@@ -133,34 +180,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const defaultAccountName = pinnedAccountId
     ? (visibleAccounts.find(a => a.id === pinnedAccountId)?.name ?? t('latest_used'))
     : t('latest_used');
-
-  // Toggle animations using reanimated shared values
-  const toggleProgress = useSharedValue(hideBalances ? 1 : 0);
-  useEffect(() => {
-    toggleProgress.value = withSpring(hideBalances ? 1 : 0, SPRING_CONFIG);
-  }, [hideBalances, toggleProgress]);
-
-  const toggleThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + toggleProgress.value * 20 }],
-  }));
-
-  const locationToggleProgress = useSharedValue(attachLocation ? 1 : 0);
-  useEffect(() => {
-    locationToggleProgress.value = withSpring(attachLocation ? 1 : 0, SPRING_CONFIG);
-  }, [attachLocation, locationToggleProgress]);
-
-  const locationToggleThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + locationToggleProgress.value * 20 }],
-  }));
-
-  const themeToggleProgress = useSharedValue(colorScheme === 'dark' ? 1 : 0);
-  useEffect(() => {
-    themeToggleProgress.value = withSpring(colorScheme === 'dark' ? 1 : 0, SPRING_CONFIG);
-  }, [colorScheme, themeToggleProgress]);
-
-  const themeToggleThumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: 2 + themeToggleProgress.value * 20 }],
-  }));
 
   const handleToggleDarkMode = useCallback(() => {
     setTheme(colorScheme === 'dark' ? 'light' : 'dark');
@@ -1548,58 +1567,34 @@ export default function SettingsScreen({ setSubPanelActive }) {
           </View>
         </TouchableRipple>
 
-        <TouchableRipple onPress={handleToggleHideBalances} style={styles.settingsRow}>
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="eye-off-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('hide_balances') || 'Hide balances'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('hide_balances_hint') || 'Mask account balances for privacy'}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
-              <Animated.View style={[styles.switchThumb, toggleThumbStyle]} />
-            </View>
-          </View>
-        </TouchableRipple>
+        <SettingToggleRow
+          icon="eye-off-outline"
+          label={t('hide_balances') || 'Hide balances'}
+          hint={t('hide_balances_hint') || 'Mask account balances for privacy'}
+          value={hideBalances}
+          onToggle={handleToggleHideBalances}
+        />
 
-        <TouchableRipple onPress={handleToggleAttachLocation} style={styles.settingsRow} testID="settings-location-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="location-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('attach_location') || 'Attach location to operations'}</Text>
-                <Text style={[styles.settingsRowValue, { color: locationDenied ? ERROR_TEXT_COLOR : colors.mutedText }]}>
-                  {locationDenied
-                    ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
-                    : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.switchTrack, { backgroundColor: attachLocation ? colors.primary : colors.border }]}>
-              <Animated.View style={[styles.switchThumb, locationToggleThumbStyle]} />
-            </View>
-          </View>
-        </TouchableRipple>
+        <SettingToggleRow
+          icon="location-outline"
+          label={t('attach_location') || 'Attach location to operations'}
+          hint={locationDenied
+            ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
+            : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
+          hintError={locationDenied}
+          value={attachLocation}
+          onToggle={handleToggleAttachLocation}
+          testID="settings-location-row"
+        />
 
-        <TouchableRipple onPress={handleToggleDarkMode} style={styles.settingsRow} testID="settings-theme-row">
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'} size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('theme') || 'Theme'}</Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.switchTrack, { backgroundColor: colorScheme === 'dark' ? colors.primary : colors.border }]}>
-              <Animated.View style={[styles.switchThumb, themeToggleThumbStyle]} />
-            </View>
-          </View>
-        </TouchableRipple>
+        <SettingToggleRow
+          icon={colorScheme === 'dark' ? 'moon-outline' : 'sunny-outline'}
+          label={t('theme') || 'Theme'}
+          hint={colorScheme === 'dark' ? t('theme_dark') : t('theme_light')}
+          value={colorScheme === 'dark'}
+          onToggle={handleToggleDarkMode}
+          testID="settings-theme-row"
+        />
 
         <TouchableRipple onPress={() => openSubPanel('accounts')} style={styles.settingsRow} testID="settings-accounts-row">
           <View style={styles.settingsRowContent}>

@@ -106,4 +106,35 @@ describe('useOperationLocation', () => {
     await act(async () => { await Promise.resolve(); });
     expect(ensureLocationPermission).not.toHaveBeenCalled();
   });
+
+  it('discards a previous open\'s slow fix instead of leaking it into a later operation', async () => {
+    // First open: a new op A starts capturing, but the fix is held pending.
+    let resolveFixA;
+    getCurrentLocation.mockReturnValueOnce(new Promise((res) => { resolveFixA = res; }));
+
+    const { result, rerender } = await renderHook(
+      (props) => useOperationLocation(props),
+      { initialProps: { enabled: true, isNew: true, visible: true, initialLocation: null } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('capturing'));
+
+    // Close A, then reopen to EDIT op B (no auto-capture, no coordinates).
+    await act(async () => {
+      rerender({ enabled: true, isNew: false, visible: false, initialLocation: null });
+    });
+    await act(async () => {
+      rerender({ enabled: true, isNew: false, visible: true, initialLocation: null });
+    });
+
+    // A's slow fix finally resolves — it belongs to a superseded generation and
+    // must NOT write into B's form.
+    await act(async () => {
+      resolveFixA({ latitude: '99.9', longitude: '88.8' });
+      await Promise.resolve();
+    });
+
+    expect(result.current.location).toBeNull();
+    expect(result.current.status).toBe('idle');
+  });
 });
