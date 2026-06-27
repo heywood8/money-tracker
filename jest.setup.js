@@ -853,6 +853,22 @@ jest.mock('expo-local-authentication', () => ({
   authenticateAsync: jest.fn(() => Promise.resolve({ success: true })),
 }));
 
+// Mock expo-location so suites that mount the operation modal / settings keep
+// passing. Defaults: permission granted and a fixed fix. Individual tests can
+// override these via require('expo-location').<fn>.mockResolvedValueOnce(...).
+jest.mock('expo-location', () => ({
+  Accuracy: { Lowest: 1, Low: 2, Balanced: 3, High: 4, Highest: 5, BestForNavigation: 6 },
+  requestForegroundPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ status: 'granted', canAskAgain: true }),
+  ),
+  getForegroundPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ status: 'granted', canAskAgain: true }),
+  ),
+  getCurrentPositionAsync: jest.fn(() =>
+    Promise.resolve({ coords: { latitude: 40.0, longitude: 44.0 } }),
+  ),
+}));
+
 // Suppress console.error and console.warn during tests to reduce noise
 // This prevents expected errors from cluttering test output with red text
 const originalConsoleError = console.error;

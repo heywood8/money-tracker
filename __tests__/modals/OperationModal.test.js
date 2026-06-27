@@ -212,6 +212,24 @@ jest.mock('../../app/utils/calculatorUtils', () => ({
   evaluateExpression: jest.fn((expr) => expr),
 }));
 
+// Location feature (issue #1091). Defaults keep the existing tests behaving
+// exactly as before: feature off, no captured location, no nearby suggestions.
+jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
+  useDisplaySettings: jest.fn(() => ({ attachLocation: false })),
+}));
+
+jest.mock('../../app/hooks/useOperationLocation', () => jest.fn(() => ({
+  location: null,
+  status: 'idle',
+  capture: jest.fn(),
+  clearLocation: jest.fn(),
+})));
+
+jest.mock('../../app/services/OperationsDB', () => ({
+  getDistinctLabels: jest.fn(() => Promise.resolve([])),
+  getLabelsNearLocation: jest.fn(() => Promise.resolve([])),
+}));
+
 describe('OperationModal', () => {
   const mockOnClose = jest.fn();
   const mockOnDelete = jest.fn();
@@ -221,6 +239,20 @@ describe('OperationModal', () => {
     // Re-apply default implementation each test to prevent mockReturnValue leakage
     const useOperationForm = require('../../app/hooks/useOperationForm');
     useOperationForm.mockImplementation(makeDefaultFormValues);
+
+    // Reset location-feature mocks to their "feature off" defaults.
+    const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+    useDisplaySettings.mockReturnValue({ attachLocation: false });
+    const useOperationLocation = require('../../app/hooks/useOperationLocation');
+    useOperationLocation.mockReturnValue({
+      location: null,
+      status: 'idle',
+      capture: jest.fn(),
+      clearLocation: jest.fn(),
+    });
+    const { getDistinctLabels, getLabelsNearLocation } = require('../../app/services/OperationsDB');
+    getDistinctLabels.mockResolvedValue([]);
+    getLabelsNearLocation.mockResolvedValue([]);
   });
 
   describe('Rendering', () => {
@@ -1603,6 +1635,170 @@ describe('OperationModal', () => {
       // verify it has an onFocus handler (forwarded from OperationModal's handleDescriptionFocus)
       const labelInput = getByTestId('label-input-field');
       expect(typeof labelInput.props.onFocus).toBe('function');
+    });
+  });
+
+  describe('Location feature (issue #1091)', () => {
+    const enableFeature = (overrides = {}) => {
+      const { useDisplaySettings } = require('../../app/contexts/DisplaySettingsContext');
+      useDisplaySettings.mockReturnValue({ attachLocation: true });
+      const useOperationLocation = require('../../app/hooks/useOperationLocation');
+      useOperationLocation.mockReturnValue({
+        location: { latitude: '40.5', longitude: '44.5' },
+        status: 'ready',
+        capture: jest.fn(),
+        clearLocation: jest.fn(),
+        ...overrides,
+      });
+    };
+
+    it('does NOT render the location row or query nearby labels when the feature is off', async () => {
+      const { getDistinctLabels, getLabelsNearLocation } = require('../../app/services/OperationsDB');
+      const { queryByTestId } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await waitFor(() => expect(getDistinctLabels).toHaveBeenCalled());
+      expect(queryByTestId('operation-location-row')).toBeNull();
+      // R1.1 / R1.3: with the feature off, proximity recall is never invoked.
+      expect(getLabelsNearLocation).not.toHaveBeenCalled();
+    });
+
+    it('renders the location row and queries nearby labels when enabled with a fix', async () => {
+      enableFeature();
+      const { getLabelsNearLocation } = require('../../app/services/OperationsDB');
+
+      const { getByTestId } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      expect(getByTestId('operation-location-row')).toBeTruthy();
+      await waitFor(() =>
+        expect(getLabelsNearLocation).toHaveBeenCalledWith('40.5', '44.5'),
+      );
+    });
+
+    it('orders nearby labels ahead of base labels in the suggestion strip', async () => {
+      enableFeature();
+      const { getDistinctLabels, getLabelsNearLocation } = require('../../app/services/OperationsDB');
+      getDistinctLabels.mockResolvedValue(['groceries', 'coffee']);
+      getLabelsNearLocation.mockResolvedValue(['coffee', 'starbucks']);
+
+      const { getByTestId, getAllByTestId } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      // Reveal the suggestion chips by focusing the label input.
+      const labelInput = getByTestId('label-input-field');
+      await fireEvent(labelInput, 'focus');
+
+      await waitFor(() => expect(getByTestId('label-suggestion-coffee')).toBeTruthy());
+
+      // Merged order: nearby first (coffee, starbucks) then base-only (groceries),
+      // de-duplicated case-insensitively so coffee appears once in its nearby slot (R2.2).
+      const labels = getAllByTestId(/^label-suggestion-/).map(
+        (c) => c.props.testID.replace('label-suggestion-', ''),
+      );
+      expect(labels.filter((l) => l === 'coffee')).toHaveLength(1);
+      expect(labels.indexOf('coffee')).toBeLessThan(labels.indexOf('groceries'));
+      expect(labels.indexOf('starbucks')).toBeLessThan(labels.indexOf('groceries'));
+    });
+
+    it('carries latitude/longitude through on save', async () => {
+      enableFeature();
+      const mockHandleSave = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...makeDefaultFormValues(),
+        handleSave: mockHandleSave,
+      });
+
+      const { getByText } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await fireEvent.press(getByText('save'));
+
+      expect(mockHandleSave).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '40.5', longitude: '44.5' }),
+      );
+    });
+
+    it('removing the location clears the captured coordinates', async () => {
+      const mockClear = jest.fn();
+      enableFeature({ clearLocation: mockClear });
+
+      const { getByTestId } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await fireEvent.press(getByTestId('operation-location-remove'));
+      expect(mockClear).toHaveBeenCalled();
+    });
+
+    it('shows an "add location" affordance that triggers capture when denied', async () => {
+      const mockCapture = jest.fn();
+      enableFeature({ location: null, status: 'denied', capture: mockCapture });
+
+      const { getByTestId } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await fireEvent.press(getByTestId('operation-location-add'));
+      expect(mockCapture).toHaveBeenCalled();
+    });
+
+    it('does not carry location on save when the feature is off (preserves today\'s behaviour)', async () => {
+      const mockHandleSave = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...makeDefaultFormValues(),
+        handleSave: mockHandleSave,
+      });
+
+      const { getByText } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} isNew={true} />,
+      );
+
+      await fireEvent.press(getByText('save'));
+
+      // Feature off + no existing coords → save called without latitude/longitude.
+      const arg = mockHandleSave.mock.calls[0][0];
+      expect(arg === undefined || (arg.latitude === undefined && arg.longitude === undefined)).toBe(true);
+    });
+
+    it('preserves existing coordinates on edit even with the feature off (R1.5, non-destructive)', async () => {
+      // Feature off, but the operation already carries coordinates: the hook
+      // surfaces them, and save must rewrite (preserve) — never wipe them.
+      const useOperationLocation = require('../../app/hooks/useOperationLocation');
+      useOperationLocation.mockReturnValue({
+        location: { latitude: '7.0', longitude: '8.0' },
+        status: 'ready',
+        capture: jest.fn(),
+        clearLocation: jest.fn(),
+      });
+
+      const mockHandleSave = jest.fn();
+      const useOperationForm = require('../../app/hooks/useOperationForm');
+      useOperationForm.mockReturnValue({
+        ...makeDefaultFormValues(),
+        handleSave: mockHandleSave,
+      });
+
+      const operation = {
+        id: 'op1', type: 'expense', amount: '50', accountId: 'acc1',
+        categoryId: 'cat2', date: '2024-01-15', latitude: '7.0', longitude: '8.0',
+      };
+
+      const { getByText } = await render(
+        <OperationModal visible={true} onClose={mockOnClose} operation={operation} isNew={false} />,
+      );
+
+      await fireEvent.press(getByText('save'));
+
+      expect(mockHandleSave).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: '7.0', longitude: '8.0' }),
+      );
     });
   });
 });

@@ -68,6 +68,7 @@ describe('PreferencesDB', () => {
         'UPDATE_LAST_PROMPTED_VERSION',
         'UPDATE_SKIP_UNTIL',
         'HIDE_BALANCES',
+        'ATTACH_LOCATION',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DEFAULT_ACCOUNT_ID',
       ]);

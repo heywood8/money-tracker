@@ -30,6 +30,7 @@ import { getPreference, setPreference, PREF_KEYS, getDefaultAccountId, setDefaul
 import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
+import { ensureLocationPermission } from '../services/LocationService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import { openNotificationAccessSettings, isNotificationAccessEnabled, getRecentNotifications } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
@@ -63,6 +64,9 @@ const LOG_FILTERS = ['all', 'error', 'warn', 'info', 'debug'];
 
 const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 200 };
 
+// Red used for the inline "location permission denied" hint under the toggle row.
+const ERROR_TEXT_COLOR = '#e53935';
+
 // How often to re-poll CI build progress while the update panel shows an in-progress build.
 const BUILD_PROGRESS_POLL_MS = 5000;
 
@@ -77,7 +81,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { colors } = useThemeColors();
   const { colorScheme, setTheme } = useThemeConfig();
   const { t, language, setLanguage, availableLanguages } = useLocalization();
-  const { hideBalances, setHideBalances } = useDisplaySettings();
+  const { hideBalances, setHideBalances, attachLocation, setAttachLocation } = useDisplaySettings();
   const { showDialog } = useDialog();
   const { resetDatabase } = useAccountsActions();
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
@@ -90,6 +94,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
   // RN 0.85's Yoga (leaving the panel invisible / seemingly not opening).
   const [containerSize, setContainerSize] = useState(null);
   const [pinnedAccountId, setPinnedAccountId] = useState(null);
+  // Inline hint shown under the "Attach location" row when the OS permission was
+  // denied while turning the toggle on. Cleared on a successful grant / toggle off.
+  const [locationDenied, setLocationDenied] = useState(false);
   const [logFilter, setLogFilter] = useState('all');
   const [storedBackups, setStoredBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -137,6 +144,15 @@ export default function SettingsScreen({ setSubPanelActive }) {
     transform: [{ translateX: 2 + toggleProgress.value * 20 }],
   }));
 
+  const locationToggleProgress = useSharedValue(attachLocation ? 1 : 0);
+  useEffect(() => {
+    locationToggleProgress.value = withSpring(attachLocation ? 1 : 0, SPRING_CONFIG);
+  }, [attachLocation, locationToggleProgress]);
+
+  const locationToggleThumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: 2 + locationToggleProgress.value * 20 }],
+  }));
+
   const themeToggleProgress = useSharedValue(colorScheme === 'dark' ? 1 : 0);
   useEffect(() => {
     themeToggleProgress.value = withSpring(colorScheme === 'dark' ? 1 : 0, SPRING_CONFIG);
@@ -173,6 +189,27 @@ export default function SettingsScreen({ setSubPanelActive }) {
       );
     }
   }, [hideBalances, setHideBalances, t, showDialog]);
+
+  const handleToggleAttachLocation = useCallback(async () => {
+    // Turning OFF is non-destructive and needs no permission: just persist false.
+    // Coordinates already stored on past operations are left untouched (R1.5).
+    if (attachLocation) {
+      setAttachLocation(false);
+      setLocationDenied(false);
+      return;
+    }
+    // Turning ON: request the OS permission in this clear context. If it isn't
+    // granted, leave the toggle off and show an inline hint — never nag, never
+    // flip the toggle on without permission.
+    const { granted } = await ensureLocationPermission();
+    if (granted) {
+      setLocationDenied(false);
+      setAttachLocation(true);
+    } else {
+      setLocationDenied(true);
+      setAttachLocation(false);
+    }
+  }, [attachLocation, setAttachLocation]);
 
   const loadStoredBackups = useCallback(async () => {
     setBackupsLoading(true);
@@ -1524,6 +1561,25 @@ export default function SettingsScreen({ setSubPanelActive }) {
             </View>
             <View style={[styles.switchTrack, { backgroundColor: hideBalances ? colors.primary : colors.border }]}>
               <Animated.View style={[styles.switchThumb, toggleThumbStyle]} />
+            </View>
+          </View>
+        </TouchableRipple>
+
+        <TouchableRipple onPress={handleToggleAttachLocation} style={styles.settingsRow} testID="settings-location-row">
+          <View style={styles.settingsRowContent}>
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="location-outline" size={22} color={colors.text} />
+              <View style={styles.settingsRowText}>
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>{t('attach_location') || 'Attach location to operations'}</Text>
+                <Text style={[styles.settingsRowValue, { color: locationDenied ? ERROR_TEXT_COLOR : colors.mutedText }]}>
+                  {locationDenied
+                    ? (t('location_permission_denied') || 'Location permission denied. Enable it in system settings.')
+                    : (t('attach_location_hint') || 'Suggest labels you used nearby before')}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.switchTrack, { backgroundColor: attachLocation ? colors.primary : colors.border }]}>
+              <Animated.View style={[styles.switchThumb, locationToggleThumbStyle]} />
             </View>
           </View>
         </TouchableRipple>

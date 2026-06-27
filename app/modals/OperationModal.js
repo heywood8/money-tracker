@@ -17,11 +17,14 @@ import { useDialog } from '../contexts/DialogContext';
 import { useOperationsActions } from '../contexts/OperationsActionsContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
+import { useDisplaySettings } from '../contexts/DisplaySettingsContext';
 import { setLastAccessedAccount } from '../services/LastAccount';
 import LabelInput from '../components/operations/LabelInput';
+import OperationLocationRow from '../components/operations/OperationLocationRow';
 import OperationFormFields from '../components/operations/OperationFormFields';
 import SplitOperationModal from '../components/operations/SplitOperationModal';
-import { getDistinctLabels } from '../services/OperationsDB';
+import { getDistinctLabels, getLabelsNearLocation } from '../services/OperationsDB';
+import useOperationLocation from '../hooks/useOperationLocation';
 import * as Currency from '../services/currency';
 import { formatDate } from '../services/BalanceHistoryDB';
 import { SPACING, BORDER_RADIUS } from '../styles/designTokens';
@@ -58,6 +61,32 @@ const getCurrencySymbol = (currencyCode) => {
   return currency ? currency.symbol : currencyCode;
 };
 
+/**
+ * Merge proximity-derived labels (higher priority, first) with the base
+ * suggestions, de-duplicating case-insensitively and keeping the first
+ * (higher-priority) occurrence. A label that is both a nearby hit and a base hit
+ * therefore appears once, promoted to its nearby position; base-only labels are
+ * never dropped, only demoted. When `nearby` is empty the result equals `base`
+ * exactly, so behaviour with the location feature off is unchanged
+ * (issue #1091, R1.3 / R2.2). Ordering is the only thing controlled here —
+ * LabelInput still filters/caps the merged list.
+ * @param {string[]} nearby
+ * @param {string[]} base
+ * @returns {string[]}
+ */
+const mergeSuggestions = (nearby, base) => {
+  const seen = new Set();
+  const result = [];
+  for (const label of [...(nearby || []), ...(base || [])]) {
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(label);
+  }
+  return result;
+};
+
 export default function OperationModal({ visible, onClose, operation, isNew, onDelete }) {
   const { colors } = useThemeColors();
   const { t } = useLocalization();
@@ -65,6 +94,24 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const { addOperation, splitOperation, updateOperation, validateOperation } = useOperationsActions();
   const { visibleAccounts: accounts } = useAccountsData();
   const { categories } = useCategories();
+  // Read defensively: this context has no default value, so a missing provider
+  // (e.g. in unit tests) yields undefined rather than throwing on destructure.
+  const displaySettings = useDisplaySettings();
+  const attachLocation = !!(displaySettings && displaySettings.attachLocation);
+
+  // Existing coordinates when editing an operation (null for a new one).
+  const initialLocation = (!isNew && operation && operation.latitude != null && operation.longitude != null)
+    ? { latitude: operation.latitude, longitude: operation.longitude }
+    : null;
+
+  // Geolocation capture lifecycle (kept out of useOperationForm). Only captures
+  // for a new operation when the feature is enabled; never blocks saving.
+  const {
+    location,
+    status: locationStatus,
+    capture: captureLocation,
+    clearLocation,
+  } = useOperationLocation({ enabled: attachLocation, isNew, visible, initialLocation });
 
   // Operation form hook (includes multi-currency logic)
   const {
@@ -132,19 +179,39 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
   const labelInputRef = useRef(null);
   const handleSaveWithLabels = useCallback(() => {
     const flushed = labelInputRef.current?.flush();
-    return handleSave(flushed != null ? { description: flushed || null } : undefined);
-  }, [handleSave]);
+    const overrides = {};
+    if (flushed != null) overrides.description = flushed || null;
+    // Persist coordinates when the feature is on (new captures + edits with the
+    // location row visible), or when editing an operation that already carries
+    // coordinates (preserve them even with the toggle off — non-destructive, R1.5).
+    if (attachLocation || (location && location.latitude != null)) {
+      overrides.latitude = location?.latitude || null;
+      overrides.longitude = location?.longitude || null;
+    }
+    return handleSave(Object.keys(overrides).length > 0 ? overrides : undefined);
+  }, [handleSave, attachLocation, location]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) return undefined;
     let cancelled = false;
-    getDistinctLabels(50, values.categoryId || null)
-      .then(results => {
-        if (!cancelled) setLabelSuggestions(results);
-      })
-      .catch(() => {});
+
+    // Proximity recall is an optional prepend: only queried when the feature is on
+    // AND a fix is available. Otherwise `nearby` is empty and the merged result
+    // equals today's base-only behaviour byte-for-byte (R1.3, R2.4). The effect
+    // re-runs when `location` becomes ready and when the category changes.
+    const lat = attachLocation && location ? location.latitude : null;
+    const lng = attachLocation && location ? location.longitude : null;
+
+    (async () => {
+      const base = await getDistinctLabels(50, values.categoryId || null).catch(() => []);
+      const nearby = (lat != null && lng != null)
+        ? await getLabelsNearLocation(lat, lng).catch(() => [])
+        : [];
+      if (!cancelled) setLabelSuggestions(mergeSuggestions(nearby, base));
+    })();
+
     return () => { cancelled = true; };
-  }, [visible, values.categoryId]);
+  }, [visible, values.categoryId, attachLocation, location]);
 
   // Determine if split button should be shown
   // Only for editing expense/income (not transfers, not shadow operations, not new)
@@ -277,6 +344,11 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           categoryId: category.id,
           date: values.date,
           description: values.description || null,
+          // Attach captured coordinates on this quick-add path too (feature on only).
+          ...(attachLocation ? {
+            latitude: location?.latitude || null,
+            longitude: location?.longitude || null,
+          } : {}),
         };
 
         try {
@@ -293,7 +365,7 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
         }
       }
     }
-  }, [values, setValues, closePicker, isNew, addOperation, onClose, hasOperation, evaluateExpression]);
+  }, [values, setValues, closePicker, isNew, addOperation, onClose, hasOperation, evaluateExpression, attachLocation, location]);
 
   // FlatList key extractor
   const keyExtractor = useCallback((item) => {
@@ -515,6 +587,18 @@ export default function OperationModal({ visible, onClose, operation, isNew, onD
           t={t}
           onFocus={handleDescriptionFocus}
         />
+
+        {/* Location row (stored as latitude/longitude). Only when the feature is on. */}
+        {attachLocation && !isShadowOperation && (
+          <OperationLocationRow
+            status={locationStatus}
+            location={location}
+            onCapture={captureLocation}
+            onClear={clearLocation}
+            colors={colors}
+            t={t}
+          />
+        )}
 
         {errors.general && <Text style={styles.error}>{errors.general}</Text>}
       </ModalShell>
@@ -741,6 +825,8 @@ OperationModal.propTypes = {
     toAccountId: PropTypes.string,
     exchangeRate: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     destinationAmount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    latitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    longitude: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   }),
   isNew: PropTypes.bool,
   onDelete: PropTypes.func,

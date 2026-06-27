@@ -156,6 +156,100 @@ describe('OperationsDB Service', () => {
     });
   });
 
+  describe('Location columns (issue #1091)', () => {
+    it('maps latitude/longitude to camelCase on read', async () => {
+      queryFirst.mockResolvedValue({
+        id: 1,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+        latitude: '40.5',
+        longitude: '44.5',
+      });
+
+      const result = await OperationsDB.getOperationById(1);
+      expect(result.latitude).toBe('40.5');
+      expect(result.longitude).toBe('44.5');
+    });
+
+    it('maps null coordinates to null (legacy rows)', async () => {
+      queryFirst.mockResolvedValue({
+        id: 2,
+        type: 'expense',
+        amount: '100',
+        account_id: 'acc1',
+        category_id: 'cat1',
+        date: '2025-12-05',
+        created_at: '2025-12-05T10:00:00Z',
+        latitude: null,
+        longitude: null,
+      });
+
+      const result = await OperationsDB.getOperationById(2);
+      expect(result.latitude).toBeNull();
+      expect(result.longitude).toBeNull();
+    });
+
+    it('persists latitude/longitude in the INSERT on create', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+        description: 'Coffee',
+        latitude: '40.5',
+        longitude: '44.5',
+      });
+
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringMatching(/INSERT INTO operations.*latitude, longitude/s),
+        expect.arrayContaining(['40.5', '44.5']),
+      );
+    });
+
+    it('writes null coordinates when none are supplied', async () => {
+      mockDb.getFirstAsync.mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.createOperation({
+        type: 'expense',
+        amount: '100',
+        accountId: 'acc1',
+        categoryId: 'cat1',
+        date: '2025-12-05',
+      });
+
+      const insertCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO operations'),
+      );
+      expect(insertCall).toBeTruthy();
+      // The INSERT column list ends with latitude, longitude → last two params are null.
+      const params = insertCall[1];
+      expect(params[params.length - 2]).toBeNull();
+      expect(params[params.length - 1]).toBeNull();
+    });
+
+    it('updates latitude/longitude when provided', async () => {
+      mockDb.getFirstAsync
+        .mockResolvedValueOnce({ id: 1, type: 'expense', amount: '100', account_id: 'acc1', date: '2025-12-05' })
+        .mockResolvedValue({ balance: '1000' });
+
+      await OperationsDB.updateOperation(1, { latitude: '12.0', longitude: '34.0' });
+
+      const updateCall = mockDb.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE operations SET'),
+      );
+      expect(updateCall[0]).toContain('latitude = ?');
+      expect(updateCall[0]).toContain('longitude = ?');
+      expect(updateCall[1]).toEqual(expect.arrayContaining(['12.0', '34.0']));
+    });
+  });
+
   describe('Create Operation', () => {
     it('creates expense operation and updates account balance', async () => {
       const operation = {

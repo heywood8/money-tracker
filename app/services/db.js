@@ -122,6 +122,9 @@ const isSchemaComplete = async (rawDb) => {
     const opsCols = await rawDb.getAllAsync('PRAGMA table_info(operations)');
     if (!opsCols.some(c => c.name === 'original_balance')) return false;
 
+    // Check operations has latitude (migration 0009)
+    if (!opsCols.some(c => c.name === 'latitude')) return false;
+
     // Check operations has integer account_id (migration 0002)
     const opsAccountId = opsCols.find(c => c.name === 'account_id');
     if (!opsAccountId || opsAccountId.type.toLowerCase() !== 'integer') return false;
@@ -357,6 +360,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const accCols = await getColumns('accounts');
     if (accCols.some(c => c.name === 'deleted_at')) {
       applied.push(8);
+    }
+  }
+
+  // Migration 0009: Adds latitude/longitude columns to operations
+  if (await tableExists('operations')) {
+    const opsCols = await getColumns('operations');
+    if (opsCols.some(c => c.name === 'latitude')) {
+      applied.push(9);
     }
   }
 

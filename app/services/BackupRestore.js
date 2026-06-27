@@ -76,7 +76,7 @@ export const createBackup = async () => {
 const TABLE_FIELDS = {
   accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'created_at', 'updated_at'],
   categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
-  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance'],
+  operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'latitude', 'longitude'],
   budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
@@ -609,10 +609,12 @@ export const restoreBackup = async (backup, cancelToken) => {
           }
         }
 
-        // Note: id is omitted as it's now auto-increment integer
+        // Note: id is omitted as it's now auto-increment integer.
+        // latitude/longitude are optional — older backups lack them, so a missing
+        // value falls through to null (?? null) rather than failing the insert.
         const opType = VALID_OPERATION_TYPES.includes(operation.type) ? operation.type : 'expense';
         await db.runAsync(
-          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO operations (type, amount, account_id, category_id, to_account_id, date, created_at, description, exchange_rate, destination_amount, source_currency, destination_currency, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             opType,
             operation.amount || '0',
@@ -626,6 +628,8 @@ export const restoreBackup = async (backup, cancelToken) => {
             operation.destination_amount || null,
             operation.source_currency || null,
             operation.destination_currency || null,
+            operation.latitude ?? null,
+            operation.longitude ?? null,
           ],
         );
       }
