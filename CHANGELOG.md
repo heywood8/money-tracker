@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.161.0](https://github.com/heywood8/money-tracker/compare/penny-v0.160.0...penny-v0.161.0) (2026-06-28)
+
+
+### Features
+
+* move default account selection into the Accounts subpanel ([#1120](https://github.com/heywood8/money-tracker/issues/1120)) ([0f3d956](https://github.com/heywood8/money-tracker/commit/0f3d9560dbe8b27c9b6263f2d6915952d87cbfc9))
+
 ## [0.160.0](https://github.com/heywood8/money-tracker/compare/penny-v0.159.0...penny-v0.160.0) (2026-06-28)
 
 
