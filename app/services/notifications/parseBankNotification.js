@@ -25,12 +25,38 @@
  * Maps a notification "kind" keyword to an operation type. Extend this table to
  * support more notification kinds (e.g. REFUND -> income) without touching the
  * parsing logic below.
+ *
+ * C2C is a client-to-client transfer (money sent to another person). It is an
+ * expense like a purchase, but unlike a merchant purchase its category cannot be
+ * inferred — see KINDS_REQUIRING_CATEGORY below.
  */
 const KIND_TO_TYPE = {
   PURCHASE: 'expense',
+  C2C: 'expense',
 };
 
 const KNOWN_KINDS = Object.keys(KIND_TO_TYPE);
+
+/**
+ * Kinds whose category must always be chosen by the user instead of being
+ * inferred from learned merchant rules. A client-to-client transfer goes to the
+ * same counterparty (a friend) for many different reasons, so any single learned
+ * category would be wrong as often as right. These always land in the review
+ * queue with the category left blank.
+ */
+const KINDS_REQUIRING_CATEGORY = new Set(['C2C']);
+
+/**
+ * Whether a notification kind must always have its category chosen manually.
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export const kindRequiresCategory = (kind) =>
+  KINDS_REQUIRING_CATEGORY.has(String(kind || '').toUpperCase());
+
+// "TO: N. DORVANYAN" — a leading recipient label on C2C transfer segments. The
+// descriptive part (the recipient) is what we keep as the merchant.
+const RECIPIENT_LABEL_RE = /^(?:TO|FROM)\s*:\s*/i;
 
 // "3,900.00 AMD" — amount with optional thousands separators followed by a
 // 3-letter currency code, anchored so "BALANCE: 133,719.97 AMD" never matches.
@@ -140,6 +166,7 @@ const toIsoDate = (day, month, year) => {
  *   country: string|null,     // ISO alpha-2, e.g. 'AM'
  *   date: string|null,        // 'YYYY-MM-DD'
  *   time: string|null,        // 'HH:MM'
+ *   requiresCategory: boolean,// true when the category must be chosen manually (C2C)
  *   packageName: string|null, // source app, passed through for rule scoping
  *   raw: string,              // the original text, kept for auditing/debugging
  * }}
@@ -218,6 +245,9 @@ export const parseBankNotification = (notification) => {
       candidate = candidate.replace(TRAILING_COUNTRY_RE, '').trim();
     }
     candidate = candidate.replace(/,\s*$/, '').trim();
+    // Strip a "TO:"/"FROM:" recipient label so a C2C transfer descriptor keeps
+    // just the counterparty's name as its merchant/description.
+    candidate = candidate.replace(RECIPIENT_LABEL_RE, '').trim();
     if (candidate) {
       merchant = candidate;
       break;
@@ -234,6 +264,8 @@ export const parseBankNotification = (notification) => {
     country,
     date,
     time,
+    // C2C transfers must always be reviewed so the user picks the category.
+    requiresCategory: kindRequiresCategory(kind),
     packageName: notification.packageName || null,
     raw: text,
   };

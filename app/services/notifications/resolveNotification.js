@@ -52,11 +52,16 @@ export const resolveAccountId = async (descriptor) => {
 
 /**
  * Resolve the category id for a descriptor via learned merchant rules.
+ *
+ * Kinds flagged `requiresCategory` (client-to-client transfers) never resolve a
+ * category automatically: the same counterparty maps to different categories
+ * across transfers, so the user must always pick one in the review queue.
+ *
  * @param {Object} descriptor - parsed notification (needs merchant, packageName)
  * @returns {Promise<string|null>}
  */
 export const resolveCategoryId = async (descriptor) => {
-  if (!descriptor || !descriptor.merchant) return null;
+  if (!descriptor || descriptor.requiresCategory || !descriptor.merchant) return null;
   return NotificationRulesDB.getCategoryForMerchant(
     descriptor.merchant,
     descriptor.packageName,

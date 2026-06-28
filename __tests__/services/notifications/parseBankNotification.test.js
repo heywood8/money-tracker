@@ -3,7 +3,10 @@
  * notification into a normalized transaction descriptor.
  */
 
-import { parseBankNotification } from '../../../app/services/notifications/parseBankNotification';
+import {
+  parseBankNotification,
+  kindRequiresCategory,
+} from '../../../app/services/notifications/parseBankNotification';
 
 // The canonical Ameria "ARCA transaction" PURCHASE notification from the design.
 const AMERIA_PURCHASE = {
@@ -71,6 +74,85 @@ describe('parseBankNotification', () => {
 
     it('keeps the raw text for auditing', () => {
       expect(result.raw).toBe(AMERIA_PURCHASE.text);
+    });
+  });
+
+  describe('canonical C2C template (client-to-client transfer)', () => {
+    // The Ameria "ARCA transaction" C2C notification from the design.
+    const AMERIA_C2C = {
+      title: 'АРКА транзакции',
+      text: 'C2C | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD',
+      packageName: 'am.ameriabank.mobile',
+      postTime: 1782000900000,
+    };
+    let result;
+    beforeEach(() => {
+      result = parseBankNotification(AMERIA_C2C);
+    });
+
+    it('recognizes C2C as a transaction', () => {
+      expect(result).not.toBeNull();
+    });
+
+    it('maps C2C to an expense operation', () => {
+      expect(result.kind).toBe('C2C');
+      expect(result.type).toBe('expense');
+    });
+
+    it('extracts and normalizes the amount', () => {
+      expect(result.amount).toBe('19200.00');
+      expect(result.currency).toBe('AMD');
+    });
+
+    it('extracts the card mask', () => {
+      expect(result.cardMask).toBe('4083***7027');
+    });
+
+    it('strips the "TO:" label and keeps the recipient as the merchant', () => {
+      expect(result.merchant).toBe('N. DORVANYAN');
+    });
+
+    it('flags that the category must be chosen manually', () => {
+      expect(result.requiresCategory).toBe(true);
+    });
+
+    it('converts the date', () => {
+      expect(result.date).toBe('2026-06-28');
+      expect(result.time).toBe('16:23');
+    });
+
+    it('recognizes the C2C keyword case-insensitively', () => {
+      const lower = parseBankNotification({ ...AMERIA_C2C, text: AMERIA_C2C.text.replace('C2C', 'c2c') });
+      expect(lower.kind).toBe('C2C');
+      expect(lower.requiresCategory).toBe(true);
+    });
+
+    it('strips a "FROM:" recipient label too', () => {
+      const incoming = parseBankNotification({
+        text: 'C2C | 5,000.00 AMD | 4083***7027 | FROM: A. PETROSYAN | 28.06.2026 16:23',
+      });
+      expect(incoming.merchant).toBe('A. PETROSYAN');
+    });
+  });
+
+  describe('PURCHASE does not require a manual category', () => {
+    it('marks a purchase as not requiring a category', () => {
+      expect(parseBankNotification(AMERIA_PURCHASE).requiresCategory).toBe(false);
+    });
+  });
+
+  describe('kindRequiresCategory', () => {
+    it('is true for C2C (any case)', () => {
+      expect(kindRequiresCategory('C2C')).toBe(true);
+      expect(kindRequiresCategory('c2c')).toBe(true);
+    });
+
+    it('is false for PURCHASE and unknown/empty kinds', () => {
+      expect(kindRequiresCategory('PURCHASE')).toBe(false);
+      expect(kindRequiresCategory('REFUND')).toBe(false);
+      expect(kindRequiresCategory('')).toBe(false);
+      expect(kindRequiresCategory(null)).toBe(false);
+      expect(kindRequiresCategory(undefined)).toBe(false);
     });
   });
 

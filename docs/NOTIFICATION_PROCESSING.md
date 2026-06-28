@@ -32,6 +32,26 @@ text:  PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026
 | date + time       | `28.06.2026 10:15`| `date: '2026-06-28'`                     |
 | balance           | `133,719.97 AMD` | **ignored**                              |
 
+### Client-to-client transfers (`C2C`)
+
+The same Ameria template also emits **C2C** notifications for transfers to
+another person:
+
+```
+text: C2C | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
+```
+
+C2C parses exactly like `PURCHASE` (also an `expense`), with two differences:
+
+- The recipient segment carries a `TO:` / `FROM:` label, which is stripped so the
+  counterparty name (`N. DORVANYAN`) becomes the `merchant`/description.
+- **The category is never inferred and never learned.** A transfer to a friend
+  can be for many different reasons (a loan, splitting a bill, a gift), so a
+  single learned `merchant → category` rule would be wrong as often as right.
+  C2C descriptors carry `requiresCategory: true`; they always land in the review
+  queue with the category blank, and the user must pick one before saving. No
+  merchant rule is stored, so the next transfer to the same person asks again.
+
 ## Agreed design decisions
 
 These were chosen up front and drive the architecture:

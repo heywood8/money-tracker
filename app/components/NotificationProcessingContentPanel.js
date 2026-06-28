@@ -17,6 +17,7 @@ import {
   resolvePendingNotification,
   dismissPendingNotification,
 } from '../services/notifications/processBankNotifications';
+import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
   isNotificationAccessEnabled,
@@ -233,7 +234,10 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
       ) : (
         pending.map((item) => {
           const choice = choices[item.id] || {};
-          const canSave = choice.accountId != null;
+          // C2C transfers must have a category chosen before they can be saved.
+          const categoryRequired = kindRequiresCategory(item.kind);
+          const canSave =
+            choice.accountId != null && (!categoryRequired || choice.categoryId != null);
           return (
             <View
               key={item.id}
@@ -266,6 +270,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                 {(t('category') || 'Category').toUpperCase()}
+                {categoryRequired ? ' *' : ''}
               </Text>
               <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
                 <SimplePicker
