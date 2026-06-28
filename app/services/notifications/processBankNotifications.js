@@ -17,7 +17,7 @@ import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import { serializeLabels } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
-import { parseBankNotification } from './parseBankNotification';
+import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
 
 // Cap on remembered signatures. The native side only ever keeps a handful of
@@ -188,8 +188,12 @@ const runProcess = async () => {
     try {
       const resolution = await resolveNotification(descriptor);
       // Auto-create only for trusted sources; everything else is reviewed.
+      // Kinds that require a manual category (C2C transfers) are never
+      // auto-created — they always wait in the queue for the user's category.
       const autoCreate =
-        resolution.fullyMatched && isAllowedSource(descriptor.packageName, allowedPackages);
+        resolution.fullyMatched &&
+        !descriptor.requiresCategory &&
+        isAllowedSource(descriptor.packageName, allowedPackages);
 
       if (autoCreate) {
         await OperationsDB.createOperation({
@@ -275,7 +279,14 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   }
 
   // Learn the merchant -> category rule (default on when both are present).
-  if (choices.learnMerchant !== false && pending.merchant && categoryId) {
+  // Never learn a rule for kinds that must always be categorized manually
+  // (C2C): a transfer to a friend has no stable category to remember.
+  if (
+    choices.learnMerchant !== false &&
+    pending.merchant &&
+    categoryId &&
+    !kindRequiresCategory(pending.kind, pending.packageName)
+  ) {
     try {
       await NotificationRulesDB.upsertMerchantRule(
         pending.merchant,

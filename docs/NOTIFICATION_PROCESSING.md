@@ -32,6 +32,26 @@ text:  PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026
 | date + time       | `28.06.2026 10:15`| `date: '2026-06-28'`                     |
 | balance           | `133,719.97 AMD` | **ignored**                              |
 
+### Client-to-client transfers (`C2C`)
+
+The same Ameria template also emits **C2C** notifications for transfers to
+another person:
+
+```
+text: C2C | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
+```
+
+C2C parses exactly like `PURCHASE` (also an `expense`), with two differences:
+
+- The recipient segment carries a `TO:` / `FROM:` label, which is stripped so the
+  counterparty name (`N. DORVANYAN`) becomes the `merchant`/description.
+- **The category is never inferred and never learned.** A transfer to a friend
+  can be for many different reasons (a loan, splitting a bill, a gift), so a
+  single learned `merchant → category` rule would be wrong as often as right.
+  C2C descriptors carry `requiresCategory: true`; they always land in the review
+  queue with the category blank, and the user must pick one before saving. No
+  merchant rule is stored, so the next transfer to the same person asks again.
+
 ## Agreed design decisions
 
 These were chosen up front and drive the architecture:
@@ -78,9 +98,23 @@ These were chosen up front and drive the architecture:
 
 ### Round 1 — Parser ✅
 
-`app/services/notifications/parseBankNotification.js`
+`app/services/notifications/parseBankNotification.js` (dispatcher) +
+`app/services/notifications/bankParsers/` (per-app parsers).
 
-A pure function: `({ title, text, packageName, postTime }) → descriptor | null`.
+**Parsing rules are grouped per source app.** Each banking app formats its
+notifications differently, so each gets its own parser module registered against
+its Android package name. Today only Ameriabank (`com.banqr.ameriabank`) is
+supported — `bankParsers/ameriabank.js` holds the `PURCHASE` / `C2C` pipe-format
+rules. Adding another bank is just another module in `bankParsers/`, registered
+in `bankParsers/index.js`; nothing in the dispatcher changes.
+
+`parseBankNotification(notification)` routes by `notification.packageName` to the
+matching parser. When the package is unknown or missing (e.g. a manual paste),
+it falls back to trying every registered parser — each returns `null` for formats
+it doesn't handle, so the first that recognizes the text wins.
+
+Each parser exposes a pure function:
+`({ title, text, packageName, postTime }) → descriptor | null`.
 
 ```js
 {

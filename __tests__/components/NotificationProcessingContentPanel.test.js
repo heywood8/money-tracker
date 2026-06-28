@@ -86,6 +86,34 @@ describe('NotificationProcessingContentPanel', () => {
     expect(pipeline.processBankNotifications).not.toHaveBeenCalled();
   });
 
+  it('keeps Save disabled for a C2C transfer until a category is chosen', async () => {
+    // Account pre-filled, but a C2C transfer must also have a category.
+    const C2C_PENDING = {
+      id: 'p2', kind: 'C2C', type: 'expense', amount: '19200.00', currency: 'AMD',
+      cardMask: '4083***7027', merchant: 'N. DORVANYAN', date: '2026-06-28',
+      accountId: 1, categoryId: null, packageName: 'am.bank',
+    };
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([C2C_PENDING]);
+    const { getByText } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('N. DORVANYAN')).toBeTruthy());
+
+    fireEvent.press(getByText('save'));
+    expect(pipeline.resolvePendingNotification).not.toHaveBeenCalled();
+  });
+
+  it('allows saving a purchase with only an account chosen (category optional)', async () => {
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+    const { getByText } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+    fireEvent.press(getByText('save'));
+    await waitFor(() =>
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+        'p1', expect.objectContaining({ accountId: 1 }),
+      ),
+    );
+  });
+
   it('dismisses a pending item', async () => {
     const { getByText } = await render(<NotificationProcessingContentPanel />);
     await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());

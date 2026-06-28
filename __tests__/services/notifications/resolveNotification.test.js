@@ -72,6 +72,13 @@ describe('resolveNotification', () => {
     it('returns null without a merchant', async () => {
       expect(await resolver.resolveCategoryId({ ...descriptor, merchant: null })).toBeNull();
     });
+
+    it('never auto-resolves a category for requiresCategory kinds (C2C)', async () => {
+      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      const c2c = { ...descriptor, requiresCategory: true };
+      expect(await resolver.resolveCategoryId(c2c)).toBeNull();
+      expect(NotificationRulesDB.getCategoryForMerchant).not.toHaveBeenCalled();
+    });
   });
 
   describe('resolveNotification', () => {
@@ -104,6 +111,16 @@ describe('resolveNotification', () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       const r = await resolver.resolveNotification(descriptor);
       expect(r.matchedAccount).toBe(true);
+      expect(r.matchedCategory).toBe(false);
+      expect(r.fullyMatched).toBe(false);
+    });
+
+    it('is never fullyMatched for a C2C transfer, even with a learned rule', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      const r = await resolver.resolveNotification({ ...descriptor, requiresCategory: true });
+      expect(r.matchedAccount).toBe(true);
+      expect(r.categoryId).toBeNull();
       expect(r.matchedCategory).toBe(false);
       expect(r.fullyMatched).toBe(false);
     });

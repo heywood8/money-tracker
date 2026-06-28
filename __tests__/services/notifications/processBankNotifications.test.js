@@ -37,7 +37,7 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
 }));
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
-const PKG = 'am.ameriabank.mobile';
+const PKG = 'com.banqr.ameriabank';
 const PURCHASE = {
   title: 'АРКА транзакции',
   text: 'PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
@@ -49,6 +49,12 @@ const PURCHASE_NO_DATE = {
   text: 'PURCHASE | 3,900.00 AMD | 4083***7027 | NAREK MEHRABYAN, AM',
   packageName: PKG,
   postTime: 1782000900000,
+};
+const C2C = {
+  title: 'АРКА транзакции',
+  text: 'C2C | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD',
+  packageName: PKG,
+  postTime: 1782002580000,
 };
 const NON_TRANSACTION = {
   title: 'Chat', text: 'Hi there', packageName: 'com.chat', postTime: 1782000800000,
@@ -138,6 +144,27 @@ describe('processBankNotifications', () => {
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ merchant: 'NAREK MEHRABYAN', cardMask: '4083***7027', accountId: 7 }),
     );
+  });
+
+  describe('C2C transfers always require a manual category', () => {
+    it('queues a C2C transfer even when the card resolves and the source is trusted', async () => {
+      NotificationAccess.getRecentNotifications.mockResolvedValue([C2C]);
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      // Even a learned rule for this person must not auto-apply or auto-create.
+      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-loan');
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+      const summary = await pipeline.processBankNotifications();
+
+      expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+      // Queued with the recipient as merchant and the category left blank.
+      expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'C2C', merchant: 'N. DORVANYAN', accountId: 7, categoryId: null,
+        }),
+      );
+    });
   });
 
   it('falls back to a valid date when the notification has none', async () => {
@@ -256,6 +283,21 @@ describe('processBankNotifications', () => {
     it('returns null for an unknown pending id', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(null);
       expect(await pipeline.resolvePendingNotification('nope', { accountId: 7 })).toBeNull();
+    });
+
+    it('does not learn a merchant rule for a C2C transfer, even with a category', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, kind: 'C2C', merchant: 'N. DORVANYAN',
+      });
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-loan' });
+
+      // The operation is still created and the card still learned...
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: 7, categoryId: 'cat-loan' }),
+      );
+      expect(AccountsDB.setAccountCardMask).toHaveBeenCalledWith(7, '4083***7027');
+      // ...but the friend -> category rule is never remembered.
+      expect(NotificationRulesDB.upsertMerchantRule).not.toHaveBeenCalled();
     });
   });
 });
