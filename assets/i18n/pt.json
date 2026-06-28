@@ -380,6 +380,7 @@
   "all_categories": "Todas as categorias",
   "all_accounts": "Todas as contas",
   "default_account": "Conta padrão",
+  "default_account_hint": "Pré-selecionar esta conta ao adicionar operações",
   "latest_used": "Último usado",
   "developer": "Desenvolvedor",
   "logs": "Registros",
