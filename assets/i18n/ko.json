@@ -380,6 +380,7 @@
   "all_categories": "모든 카테고리",
   "all_accounts": "모든 계정",
   "default_account": "기본 계좌",
+  "default_account_hint": "작업 추가 시 이 계좌를 미리 선택",
   "latest_used": "최근 사용",
   "developer": "개발자",
   "logs": "로그",

@@ -376,6 +376,7 @@
   "manual_rate_info": "Ձեռակի փոխարժեք",
   "all_accounts": "Բոլոր հաշվեր",
   "default_account": "Default account",
+  "default_account_hint": "Նախնական ընտրել այս հաշիվը գործարքներ ավելացնելիս",
   "latest_used": "Latest used",
   "planned": "Պլանավորված",
   "planned_operations": "Պլանավորված գործարկներ",

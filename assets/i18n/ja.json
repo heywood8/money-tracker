@@ -380,6 +380,7 @@
   "all_categories": "すべてのカテゴリー",
   "all_accounts": "すべての口座",
   "default_account": "デフォルト口座",
+  "default_account_hint": "操作を追加するときにこの口座を事前選択します",
   "latest_used": "最後に使用",
   "developer": "開発者",
   "logs": "ログ",

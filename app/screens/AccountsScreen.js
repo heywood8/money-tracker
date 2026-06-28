@@ -18,6 +18,7 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useAccountsActions } from '../contexts/AccountsActionsContext';
 import { useOperationsData } from '../contexts/OperationsDataContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import currencies from '../../assets/currencies.json';
 
 // Memoized currency picker modal component
@@ -343,7 +344,7 @@ NetWorthCard.defaultProps = {
 };
 
 // Memoized account row component
-const AccountRow = memo(({ item, colors, onPress, t, drag, isActive }) => {
+const AccountRow = memo(({ item, colors, onPress, t, drag, isActive, isDefault }) => {
   const { hideBalances } = useDisplaySettings();
   const decimals = currencies[item.currency]?.decimal_digits ?? 2;
   const balance = parseFloat(item.balance);
@@ -371,9 +372,20 @@ const AccountRow = memo(({ item, colors, onPress, t, drag, isActive }) => {
       >
         <View style={styles.accountRowInner}>
           <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-              {item.name}
-            </Text>
+            <View style={styles.accountNameRow}>
+              <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+                {item.name}
+              </Text>
+              {isDefault && (
+                <Icon
+                  name="star"
+                  size={16}
+                  color={colors.primary}
+                  style={styles.defaultStar}
+                  accessibilityLabel={t('default_account') || 'Default account'}
+                />
+              )}
+            </View>
             <Text style={[styles.accountCurrencyLabel, { color: colors.mutedText }]}>
               {item.currency}
             </Text>
@@ -414,6 +426,7 @@ AccountRow.propTypes = {
   t: PropTypes.func,
   drag: PropTypes.func,
   isActive: PropTypes.bool,
+  isDefault: PropTypes.bool,
 };
 
 AccountRow.defaultProps = {
@@ -422,6 +435,7 @@ AccountRow.defaultProps = {
   t: (k) => k,
   drag: () => {},
   isActive: false,
+  isDefault: false,
 };
 
 export default function AccountsScreen({ onBackStateChange }) {
@@ -429,6 +443,9 @@ export default function AccountsScreen({ onBackStateChange }) {
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [errors, setErrors] = useState({});
+  // Pinned default account for QuickAdd. A single stored id (or null = "latest
+  // used"), so making one account the default inherently clears any previous one.
+  const [defaultAccountId, setDefaultAccountIdState] = useState(null);
   const [createAdjustmentOperation, setCreateAdjustmentOperation] = useState(true);
   const [currencyPanelVisible, setCurrencyPanelVisible] = useState(false);
   const currencySlideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
@@ -667,6 +684,15 @@ export default function AccountsScreen({ onBackStateChange }) {
     setEditValues(prev => ({ ...prev, hidden: value ? 1 : 0 }));
   }, []);
 
+  // Toggling the default on the account being edited persists immediately. Because
+  // the preference holds a single id, turning it on here automatically supersedes
+  // whichever account was the default before, untoggling it everywhere.
+  const handleToggleDefaultSwitch = useCallback(async (value) => {
+    const newId = value ? editingId : null;
+    setDefaultAccountIdState(newId);
+    await setDefaultAccountId(newId);
+  }, [editingId]);
+
   const handleDeleteEditingAccount = useCallback(() => {
     deleteAccountHandler(editingId);
   }, [deleteAccountHandler, editingId]);
@@ -767,8 +793,9 @@ export default function AccountsScreen({ onBackStateChange }) {
       t={t}
       drag={drag}
       isActive={isActive}
+      isDefault={item.id === defaultAccountId}
     />
-  ), [colors, startEdit, t]);
+  ), [colors, startEdit, t, defaultAccountId]);
 
   const handleDragEnd = useCallback(({ data }) => {
     reorderAccounts(data);
@@ -789,6 +816,12 @@ export default function AccountsScreen({ onBackStateChange }) {
     if (currencyPanelVisible) { handleClosePicker(); return; }
     if (editingId !== null) { closeFormPanel(); return; }
   }, [currencyPanelVisible, editingId, handleClosePicker, closeFormPanel]);
+
+  // Load the pinned default account once so the list star and the edit-form
+  // toggle reflect the stored preference.
+  useEffect(() => {
+    getDefaultAccountId().then(id => setDefaultAccountIdState(id));
+  }, []);
 
   useEffect(() => {
     onBackStateChange?.(internalCanGoBack ? internalGoBack : null);
@@ -978,6 +1011,24 @@ export default function AccountsScreen({ onBackStateChange }) {
                 <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
                   <View style={styles.settingItemText}>
                     <Text style={[styles.settingTitle, { color: colors.text }]}>
+                      {t('default_account') || 'Default account'}
+                    </Text>
+                    <Text style={[styles.settingHint, { color: colors.mutedText }]}>
+                      {t('default_account_hint') || 'Pre-select this account when adding operations'}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="account-default-switch"
+                    value={defaultAccountId === editingId}
+                    onValueChange={handleToggleDefaultSwitch}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
+              {editingId !== 'new' && (
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: colors.border }]}>
+                  <View style={styles.settingItemText}>
+                    <Text style={[styles.settingTitle, { color: colors.text }]}>
                       {t('create_adjustment_operation') || 'Log adjustment'}
                     </Text>
                     <Text style={[styles.settingHint, { color: colors.mutedText }]}>
@@ -1133,9 +1184,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   accountName: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.1,
+  },
+  accountNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   accountRow: {
     alignItems: 'center',
@@ -1236,6 +1292,9 @@ const styles = StyleSheet.create({
   currencyPanelTitle: {
     fontSize: 17,
     fontWeight: '600',
+  },
+  defaultStar: {
+    marginLeft: SPACING.xs,
   },
   divider: {
     height: 1,

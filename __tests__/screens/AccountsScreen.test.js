@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 // Mock all dependencies
 /* eslint-disable react/prop-types */
@@ -107,6 +107,12 @@ jest.mock('../../app/contexts/DisplaySettingsContext', () => ({
   useDisplaySettings: jest.fn(() => ({
     hideBalances: false,
   })),
+}));
+
+// Default-account preference helpers used by the star indicator + edit-form toggle.
+jest.mock('../../app/services/PreferencesDB', () => ({
+  getDefaultAccountId: jest.fn(() => Promise.resolve(null)),
+  setDefaultAccountId: jest.fn(() => Promise.resolve()),
 }));
 
 // Helper functions to create complete mocks for split contexts
@@ -1170,6 +1176,106 @@ describe('AccountsScreen', () => {
       await waitFor(() => {
         expect(getByText('create_adjustment_operation')).toBeTruthy();
       });
+    });
+  });
+});
+
+describe('AccountsScreen — default account', () => {
+  const preferencesDB = require('../../app/services/PreferencesDB');
+  const accountsList = [
+    { id: 1, name: 'Cash', balance: '1000.00', currency: 'USD', order: 0, hidden: 0 },
+    { id: 2, name: 'Bank', balance: '5000.00', currency: 'USD', order: 1, hidden: 0 },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useAccountsData } = require('../../app/contexts/AccountsDataContext');
+    const { useAccountsActions } = require('../../app/contexts/AccountsActionsContext');
+    useAccountsData.mockReturnValue(createAccountsDataMock({
+      accounts: accountsList,
+      displayedAccounts: accountsList,
+    }));
+    useAccountsActions.mockReturnValue(createAccountsActionsMock());
+    preferencesDB.getDefaultAccountId.mockResolvedValue(null);
+    preferencesDB.setDefaultAccountId.mockResolvedValue(undefined);
+  });
+
+  it('shows a star indicator on the pinned default account row', async () => {
+    preferencesDB.getDefaultAccountId.mockResolvedValue(1);
+    const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+
+    const { queryAllByTestId } = await render(<AccountsScreen />);
+
+    await waitFor(() => {
+      expect(queryAllByTestId('icon-star').length).toBe(1);
+    });
+  });
+
+  it('shows no star when no account is pinned', async () => {
+    preferencesDB.getDefaultAccountId.mockResolvedValue(null);
+    const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+
+    const { queryAllByTestId } = await render(<AccountsScreen />);
+
+    await waitFor(() => {
+      expect(preferencesDB.getDefaultAccountId).toHaveBeenCalled();
+    });
+    expect(queryAllByTestId('icon-star').length).toBe(0);
+  });
+
+  it('renders the default toggle ON when editing the pinned account', async () => {
+    preferencesDB.getDefaultAccountId.mockResolvedValue(1);
+    const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+
+    const { getAllByLabelText, getByTestId } = await render(<AccountsScreen />);
+
+    await waitFor(() => expect(preferencesDB.getDefaultAccountId).toHaveBeenCalled());
+
+    // Open the edit form for the first account (id 1, the pinned default).
+    fireEvent.press(getAllByLabelText('edit_account')[0]);
+
+    await waitFor(() => {
+      expect(getByTestId('account-default-switch').props.value).toBe(true);
+    });
+  });
+
+  it('persists the account as default when the toggle is switched on', async () => {
+    preferencesDB.getDefaultAccountId.mockResolvedValue(null);
+    const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+
+    const { getAllByLabelText, getByTestId } = await render(<AccountsScreen />);
+
+    await waitFor(() => expect(preferencesDB.getDefaultAccountId).toHaveBeenCalled());
+
+    fireEvent.press(getAllByLabelText('edit_account')[1]); // edit account id 2
+
+    const toggle = await waitFor(() => getByTestId('account-default-switch'));
+    expect(toggle.props.value).toBe(false);
+
+    fireEvent(toggle, 'valueChange', true);
+
+    await waitFor(() => {
+      expect(preferencesDB.setDefaultAccountId).toHaveBeenCalledWith(2);
+    });
+  });
+
+  it('clears the default (latest used) when the toggle is switched off', async () => {
+    preferencesDB.getDefaultAccountId.mockResolvedValue(2);
+    const AccountsScreen = require('../../app/screens/AccountsScreen').default;
+
+    const { getAllByLabelText, getByTestId } = await render(<AccountsScreen />);
+
+    await waitFor(() => expect(preferencesDB.getDefaultAccountId).toHaveBeenCalled());
+
+    fireEvent.press(getAllByLabelText('edit_account')[1]); // edit account id 2 (the default)
+
+    const toggle = await waitFor(() => getByTestId('account-default-switch'));
+    expect(toggle.props.value).toBe(true);
+
+    fireEvent(toggle, 'valueChange', false);
+
+    await waitFor(() => {
+      expect(preferencesDB.setDefaultAccountId).toHaveBeenCalledWith(null);
     });
   });
 });

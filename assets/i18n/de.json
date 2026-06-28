@@ -376,6 +376,7 @@
   "all_categories": "Alle Kategorien",
   "all_accounts": "Alle Konten",
   "default_account": "Standardkonto",
+  "default_account_hint": "Dieses Konto beim Hinzufügen von Operationen vorauswählen",
   "latest_used": "Zuletzt verwendet",
   "developer": "Entwickler",
   "logs": "Protokolle",

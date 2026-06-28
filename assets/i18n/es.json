@@ -376,6 +376,7 @@
   "all_categories": "Todas las categorías",
   "all_accounts": "Todas las cuentas",
   "default_account": "Cuenta predeterminada",
+  "default_account_hint": "Preseleccionar esta cuenta al añadir operaciones",
   "latest_used": "Último usado",
   "developer": "Desarrollador",
   "logs": "Registros",

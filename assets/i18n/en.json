@@ -380,6 +380,7 @@
   "all_categories": "All categories",
   "all_accounts": "All accounts",
   "default_account": "Default account",
+  "default_account_hint": "Pre-select this account when adding operations",
   "latest_used": "Latest used",
   "developer": "Developer",
   "logs": "Logs",
