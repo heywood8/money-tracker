@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.159.0](https://github.com/heywood8/money-tracker/compare/penny-v0.158.0...penny-v0.159.0) (2026-06-28)
+
+
+### Features
+
+* merge notification access and bank notifications into one "Notification processing" screen ([#1117](https://github.com/heywood8/money-tracker/issues/1117)) ([646216b](https://github.com/heywood8/money-tracker/commit/646216b5b03278ea60d03b7411eaed66228cf705))
+
 ## [0.158.0](https://github.com/heywood8/money-tracker/compare/penny-v0.157.0...penny-v0.158.0) (2026-06-28)
 
 
