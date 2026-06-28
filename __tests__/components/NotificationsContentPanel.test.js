@@ -12,6 +12,7 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
       background: '#fff',
       surface: '#f5f5f5',
       primary: '#6200ee',
+      selected: '#e8f0ff',
       text: '#000',
       mutedText: '#888',
       border: '#ddd',
@@ -22,7 +23,7 @@ jest.mock('../../app/contexts/ThemeColorsContext', () => ({
 jest.mock('../../app/styles/layout', () => ({
   HORIZONTAL_PADDING: 16,
   SPACING: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
-  BORDER_RADIUS: { md: 8, lg: 16 },
+  BORDER_RADIUS: { sm: 4, md: 8, lg: 16 },
 }));
 
 const baseProps = {
@@ -63,6 +64,25 @@ describe('NotificationsContentPanel', () => {
     expect(getByText('Chat')).toBeTruthy();
     expect(getByText('New message')).toBeTruthy();
     expect(getByText('com.bank')).toBeTruthy();
+  });
+
+  it('highlights notifications that parse as bank transactions with a badge', async () => {
+    const notifications = [
+      // Parses as a bank transaction (Ameria ARCA layout).
+      {
+        title: 'АРКА транзакции',
+        text: 'PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+        packageName: 'am.bank',
+        postTime: 1718000000000,
+      },
+      // A plain chat notification — no badge.
+      { title: 'Chat', text: 'New message', packageName: 'com.chat', postTime: 1718000100000 },
+    ];
+    const { getByText, getAllByText } = await render(
+      <NotificationsContentPanel {...baseProps} notifications={notifications} />,
+    );
+    expect(getByText('New message')).toBeTruthy();
+    expect(getAllByText('notification_bank_badge')).toHaveLength(1);
   });
 
   it('falls back to a "no text" label when a notification has neither title nor text', async () => {
