@@ -91,6 +91,53 @@ describe('parseBankNotification', () => {
     it('handles plain decimal amounts', () => {
       expect(amountFor('42.50 EUR')).toBe('42.50');
     });
+
+    it('reads comma as the decimal separator (12,50 EUR -> 12.50)', () => {
+      expect(amountFor('12,50 EUR')).toBe('12.50');
+    });
+
+    it('reads dot-thousands + comma-decimal (1.234,56 EUR -> 1234.56)', () => {
+      expect(amountFor('1.234,56 EUR')).toBe('1234.56');
+    });
+
+    it('reads comma-thousands + dot-decimal (1,234.56 USD -> 1234.56)', () => {
+      expect(amountFor('1,234.56 USD')).toBe('1234.56');
+    });
+
+    it('treats a lone 3-digit comma group as thousands (1,234 -> 1234)', () => {
+      expect(amountFor('1,234 USD')).toBe('1234');
+    });
+
+    it('does not corrupt comma-decimal amounts by 100x', () => {
+      // Regression: previously "42,50" became "4250".
+      expect(amountFor('42,50 EUR')).not.toBe('4250');
+    });
+  });
+
+  describe('date validation', () => {
+    const dateFor = (segment) =>
+      parseBankNotification({
+        text: `PURCHASE | 100 AMD | 4083***7027 | SHOP, AM | ${segment}`,
+      })?.date;
+
+    it('rejects an impossible calendar date', () => {
+      expect(dateFor('31.02.2026 10:15')).toBeNull();
+    });
+
+    it('rejects an out-of-range month', () => {
+      expect(dateFor('15.13.2026 10:15')).toBeNull();
+    });
+
+    it('accepts a valid leap day', () => {
+      expect(dateFor('29.02.2028 10:15')).toBe('2028-02-29');
+    });
+
+    it('skips an invalid date segment and uses a later valid one', () => {
+      const result = parseBankNotification({
+        text: 'PURCHASE | 100 AMD | 4083***7027 | 31.02.2026 | SHOP, AM | 28.06.2026 10:15',
+      });
+      expect(result.date).toBe('2026-06-28');
+    });
   });
 
   describe('robustness', () => {

@@ -171,7 +171,7 @@ describe('BackupRestore', () => {
         },
       });
       expect(backup.timestamp).toBeDefined();
-      expect(mockDb.queryAll).toHaveBeenCalledTimes(7);
+      expect(mockDb.queryAll).toHaveBeenCalledTimes(8);
     });
 
     it('includes empty arrays when tables are empty', async () => {
@@ -556,12 +556,13 @@ describe('BackupRestore', () => {
 
       await BackupRestore.restoreBackup(validBackup);
 
-      expect(deleteCalls[0]).toContain('planned_operations');
-      expect(deleteCalls[1]).toContain('budgets');
-      expect(deleteCalls[2]).toContain('accounts_balance_history');
-      expect(deleteCalls[3]).toContain('operations');
-      expect(deleteCalls[4]).toContain('categories');
-      expect(deleteCalls[5]).toContain('accounts');
+      expect(deleteCalls[0]).toContain('notification_merchant_rules');
+      expect(deleteCalls[1]).toContain('planned_operations');
+      expect(deleteCalls[2]).toContain('budgets');
+      expect(deleteCalls[3]).toContain('accounts_balance_history');
+      expect(deleteCalls[4]).toContain('operations');
+      expect(deleteCalls[5]).toContain('categories');
+      expect(deleteCalls[6]).toContain('accounts');
     });
 
     it('preserves db_version metadata', async () => {
@@ -664,6 +665,81 @@ describe('BackupRestore', () => {
       await expect(BackupRestore.restoreBackup(validBackup)).rejects.toThrow(
         'Transaction failed',
       );
+    });
+  });
+
+  describe('Bank-notification data round-trip', () => {
+    const makeDbInstance = () => {
+      let insertCount = 0;
+      return {
+        runAsync: jest.fn().mockImplementation(() => {
+          insertCount++;
+          return Promise.resolve({ lastInsertRowId: insertCount });
+        }),
+        getAllAsync: jest.fn().mockResolvedValue([
+          { id: 'shadow-adjustment-expense' },
+          { id: 'shadow-adjustment-income' },
+        ]),
+      };
+    };
+
+    const findInsert = (dbInstance, table) =>
+      dbInstance.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes(`INSERT INTO ${table}`),
+      );
+    const findOrIgnoreInsert = (dbInstance, table) =>
+      dbInstance.runAsync.mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('INSERT') && c[0].includes(table),
+      );
+
+    it('restores accounts.card_mask from a backup that has it', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: [{ ...mockAccounts[0], card_mask: '4083***7027' }],
+          categories: mockCategories,
+          operations: [],
+          app_metadata: mockMetadata,
+        },
+      });
+
+      const call = findInsert(dbInstance, 'accounts');
+      expect(call[0]).toContain('card_mask');
+      expect(call[1]).toEqual(expect.arrayContaining(['4083***7027']));
+    });
+
+    it('restores learned merchant rules from a backup', async () => {
+      const dbInstance = makeDbInstance();
+      mockDb.executeTransaction.mockImplementation(async (cb) => { await cb(dbInstance); });
+
+      await BackupRestore.restoreBackup({
+        version: 1,
+        timestamp: '2024-01-01T00:00:00.000Z',
+        platform: 'native',
+        data: {
+          accounts: mockAccounts,
+          categories: mockCategories,
+          operations: [],
+          app_metadata: mockMetadata,
+          notification_merchant_rules: [
+            { id: 'r1', merchant: 'NAREK MEHRABYAN', package_name: 'am.bank', category_id: 'cat-1', created_at: 'x', updated_at: 'y' },
+          ],
+        },
+      });
+
+      const call = findOrIgnoreInsert(dbInstance, 'notification_merchant_rules');
+      expect(call).toBeTruthy();
+      expect(call[1]).toEqual(expect.arrayContaining(['NAREK MEHRABYAN', 'cat-1']));
+    });
+
+    it('includes the new data in a created backup', async () => {
+      const backup = await BackupRestore.createBackup();
+      expect(backup.data).toHaveProperty('notification_merchant_rules');
     });
   });
 

@@ -11,7 +11,7 @@ import * as AccountsDB from '../AccountsDB';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 
 /**
- * Resolve the account id for a descriptor.
+ * Resolve the account for a descriptor.
  *
  * 1. Exact card-mask binding wins.
  * 2. Otherwise, if exactly one non-hidden account matches the notification's
@@ -19,14 +19,14 @@ import * as NotificationRulesDB from '../NotificationRulesDB';
  * 3. Otherwise null — the user must choose.
  *
  * @param {Object} descriptor - parsed notification (needs cardMask, currency)
- * @returns {Promise<number|null>}
+ * @returns {Promise<Object|null>} the account row, or null
  */
-export const resolveAccountId = async (descriptor) => {
+export const resolveAccount = async (descriptor) => {
   if (!descriptor) return null;
 
   if (descriptor.cardMask) {
     const account = await AccountsDB.getAccountByCardMask(descriptor.cardMask);
-    if (account) return account.id;
+    if (account) return account;
   }
 
   if (descriptor.currency) {
@@ -34,10 +34,20 @@ export const resolveAccountId = async (descriptor) => {
     const matches = (all || []).filter(
       (a) => a.currency === descriptor.currency && !a.hidden,
     );
-    if (matches.length === 1) return matches[0].id;
+    if (matches.length === 1) return matches[0];
   }
 
   return null;
+};
+
+/**
+ * Resolve just the account id for a descriptor.
+ * @param {Object} descriptor
+ * @returns {Promise<number|null>}
+ */
+export const resolveAccountId = async (descriptor) => {
+  const account = await resolveAccount(descriptor);
+  return account ? account.id : null;
 };
 
 /**
@@ -56,23 +66,35 @@ export const resolveCategoryId = async (descriptor) => {
 /**
  * Resolve both account and category for a descriptor.
  *
+ * `fullyMatched` additionally requires the resolved account's currency to equal
+ * the notification's currency. A foreign-currency purchase on a bound card
+ * resolves the account but is NOT auto-created — booking the amount in the
+ * account's currency would be wrong — so it falls through to the review queue.
+ *
  * @param {Object} descriptor
- * @returns {Promise<{ accountId: number|null, categoryId: string|null,
- *   matchedAccount: boolean, matchedCategory: boolean, fullyMatched: boolean }>}
+ * @returns {Promise<{ accountId: number|null, accountCurrency: string|null,
+ *   categoryId: string|null, matchedAccount: boolean, matchedCategory: boolean,
+ *   currencyMatch: boolean, fullyMatched: boolean }>}
  */
 export const resolveNotification = async (descriptor) => {
-  const [accountId, categoryId] = await Promise.all([
-    resolveAccountId(descriptor),
+  const [account, categoryId] = await Promise.all([
+    resolveAccount(descriptor),
     resolveCategoryId(descriptor),
   ]);
+  const accountId = account ? account.id : null;
+  const accountCurrency = account ? account.currency : null;
   const matchedAccount = accountId != null;
   const matchedCategory = categoryId != null;
+  const currencyMatch =
+    matchedAccount && (!descriptor?.currency || accountCurrency === descriptor.currency);
   return {
     accountId,
+    accountCurrency,
     categoryId,
     matchedAccount,
     matchedCategory,
-    fullyMatched: matchedAccount && matchedCategory,
+    currencyMatch,
+    fullyMatched: matchedAccount && matchedCategory && currencyMatch,
   };
 };
 

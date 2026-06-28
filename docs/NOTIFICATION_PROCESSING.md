@@ -179,6 +179,34 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   merchant-rules manager remains a future enhancement; rules are currently
   learned automatically and editable by re-categorizing.)
 
+## Safety hardening (from code review)
+
+The money-writing path is guarded against several failure modes:
+
+- **Currency gate** — auto-create requires the resolved account's currency to
+  equal the notification's. A foreign-currency purchase on a bound card resolves
+  the account but is routed to the review queue, never booked in the wrong
+  currency.
+- **Source allowlist (learn-on-trust)** — auto-create only fires for packages the
+  user has previously resolved from the queue (`BANK_NOTIFICATIONS_PACKAGES`).
+  An unknown or forged source can at most create a *pending* item the user must
+  approve; it can never silently book money.
+- **Never-null date** — `operations.date` is NOT NULL, so a missing/invalid date
+  falls back to the notification's post-time date, then today — both in the
+  pipeline and when resolving a pending item.
+- **Concurrency guard** — overlapping `processBankNotifications` runs (foreground
+  listener + panel) share a single in-flight run, so an operation can't be
+  double-created.
+- **Card single-ownership** — binding a card mask clears it from any other
+  account, and lookups are deterministically ordered, so a card can't be
+  mis-booked to an arbitrary account.
+- **Amount/date parsing** — the parser handles both `1,234.56` and `1.234,56`
+  decimal conventions and rejects impossible calendar dates.
+- **Backup/restore** — `accounts.card_mask` and the learned
+  `notification_merchant_rules` are included in JSON/CSV/SQLite backup and
+  restore (the transient `pending_notifications` queue is intentionally not).
+- **i18n** — the new strings exist in all 11 locale files.
+
 ## Operation mapping
 
 ```js

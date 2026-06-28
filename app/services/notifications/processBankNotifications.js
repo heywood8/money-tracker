@@ -81,14 +81,72 @@ const saveSignatures = async (sigs) => {
 };
 
 /**
+ * ISO "YYYY-MM-DD" for an epoch-millis post time, or null if unusable.
+ */
+const isoDateFromPostTime = (postTime) => {
+  if (!postTime) return null;
+  const d = new Date(postTime);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+};
+
+/** Today's ISO date — the last-resort fallback for a missing date. */
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Packages whose notifications are trusted to auto-create operations. A package
+ * is added the first time the user resolves one of its notifications from the
+ * review queue, so an unknown/forged source can never silently book money — it
+ * can only ever produce a pending item the user must approve.
+ * @returns {Promise<string[]>}
+ */
+export const getAllowedPackages = async () => {
+  const list = await PreferencesDB.getJsonPreference(
+    PreferencesDB.PREF_KEYS.BANK_NOTIFICATIONS_PACKAGES,
+    [],
+  );
+  return Array.isArray(list) ? list : [];
+};
+
+/** Remember a package as a trusted auto-create source. */
+export const learnSourcePackage = async (packageName) => {
+  if (!packageName) return;
+  const list = await getAllowedPackages();
+  if (!list.includes(packageName)) {
+    await PreferencesDB.setJsonPreference(
+      PreferencesDB.PREF_KEYS.BANK_NOTIFICATIONS_PACKAGES,
+      [...list, packageName],
+    );
+  }
+};
+
+const isAllowedSource = (packageName, allowed) =>
+  !!packageName && allowed.includes(packageName);
+
+// Guards against overlapping runs (foreground listener + panel mount/refresh)
+// double-creating operations: a second call awaits the first instead of racing.
+let _inFlight = null;
+
+/**
  * Process all currently-available bank notifications once.
  *
  * Safe to call repeatedly (e.g. on app foreground): already-seen notifications
- * are skipped. Does nothing when the feature is disabled.
+ * are skipped, and overlapping invocations share a single run. Does nothing when
+ * the feature is disabled.
  *
  * @returns {Promise<{ created: number, pending: number, skipped: number }>}
  */
 export const processBankNotifications = async () => {
+  if (_inFlight) return _inFlight;
+  _inFlight = runProcess();
+  try {
+    return await _inFlight;
+  } finally {
+    _inFlight = null;
+  }
+};
+
+const runProcess = async () => {
   const summary = { created: 0, pending: 0, skipped: 0 };
 
   if (!(await isBankNotificationsEnabled())) {
@@ -101,6 +159,7 @@ export const processBankNotifications = async () => {
   }
 
   const seen = new Set(await loadSignatures());
+  const allowedPackages = await getAllowedPackages();
   const newlySeen = [];
 
   // Oldest first so operations are created in chronological order.
@@ -123,16 +182,22 @@ export const processBankNotifications = async () => {
       continue;
     }
 
+    // operations.date is NOT NULL — always supply a valid date.
+    const date = descriptor.date || isoDateFromPostTime(notification.postTime) || todayIso();
+
     try {
       const resolution = await resolveNotification(descriptor);
+      // Auto-create only for trusted sources; everything else is reviewed.
+      const autoCreate =
+        resolution.fullyMatched && isAllowedSource(descriptor.packageName, allowedPackages);
 
-      if (resolution.fullyMatched) {
+      if (autoCreate) {
         await OperationsDB.createOperation({
           type: descriptor.type,
           amount: descriptor.amount,
           accountId: resolution.accountId,
           categoryId: resolution.categoryId,
-          date: descriptor.date,
+          date,
           description: descriptor.merchant
             ? serializeLabels([descriptor.merchant])
             : null,
@@ -141,8 +206,11 @@ export const processBankNotifications = async () => {
       } else {
         await PendingNotificationsDB.addPendingNotification({
           ...descriptor,
+          date,
           accountId: resolution.accountId,
-          categoryId: resolution.categoryId,
+          // Don't pre-fill a category whose currency we couldn't match — the
+          // user should confirm the account first.
+          categoryId: resolution.currencyMatch ? resolution.categoryId : null,
         });
         summary.pending += 1;
       }
@@ -159,7 +227,8 @@ export const processBankNotifications = async () => {
     await saveSignatures([...seen]);
   }
 
-  if (summary.created > 0) {
+  // Refresh on any change so a pending badge updates too, not just on creates.
+  if (summary.created > 0 || summary.pending > 0) {
     appEvents.emit(EVENTS.RELOAD_ALL);
   }
 
@@ -191,7 +260,8 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     amount: pending.amount,
     accountId,
     categoryId: categoryId || null,
-    date: pending.date,
+    // operations.date is NOT NULL — fall back to the row's creation date / today.
+    date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
     description: pending.merchant ? serializeLabels([pending.merchant]) : null,
   });
 
@@ -214,6 +284,15 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
       );
     } catch (error) {
       console.error('[resolvePendingNotification] Failed to learn merchant rule:', error);
+    }
+  }
+
+  // Trust this source for auto-create going forward (default on).
+  if (choices.learnSource !== false && pending.packageName) {
+    try {
+      await learnSourcePackage(pending.packageName);
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn source package:', error);
     }
   }
 

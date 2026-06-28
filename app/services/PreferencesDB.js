@@ -16,6 +16,7 @@ export const PREF_KEYS = {
   // Bank-notification processing
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
   BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
+  BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
 };
 
 /**

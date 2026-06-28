@@ -88,9 +88,12 @@ export const getAccountByCardMask = async (cardMask) => {
   if (!cardMask) return null;
   try {
     const db = await getDrizzle();
+    // ORDER BY id keeps the result deterministic if two accounts ever share a
+    // mask (single-ownership is enforced on write, but data can predate that).
     const results = await db.select()
       .from(accounts)
       .where(and(eq(accounts.cardMask, cardMask), isNull(accounts.deletedAt)))
+      .orderBy(asc(accounts.id))
       .limit(1);
     return results[0] || null;
   } catch (error) {
@@ -100,13 +103,35 @@ export const getAccountByCardMask = async (cardMask) => {
 };
 
 /**
- * Bind a card mask to an account (used by learn-on-first-sight).
+ * Bind a card mask to an account (used by learn-on-first-sight), enforcing that
+ * a given mask belongs to at most one account: any other account currently
+ * holding the same mask has it cleared in the same transaction.
+ *
  * @param {number} accountId
  * @param {string} cardMask
  * @returns {Promise<void>}
  */
 export const setAccountCardMask = async (accountId, cardMask) => {
-  await updateAccount(accountId, { cardMask: cardMask || null });
+  const mask = cardMask || null;
+  try {
+    await executeTransaction(async (db) => {
+      const now = new Date().toISOString();
+      if (mask) {
+        // Strip the mask from any other account so it has a single owner.
+        await db.runAsync(
+          'UPDATE accounts SET card_mask = NULL, updated_at = ? WHERE card_mask = ? AND id != ?',
+          [now, mask, accountId],
+        );
+      }
+      await db.runAsync(
+        'UPDATE accounts SET card_mask = ?, updated_at = ? WHERE id = ?',
+        [mask, now, accountId],
+      );
+    });
+  } catch (error) {
+    console.error('Failed to set account card mask:', error);
+    throw error;
+  }
 };
 
 /**

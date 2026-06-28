@@ -75,21 +75,33 @@ describe('resolveNotification', () => {
   });
 
   describe('resolveNotification', () => {
-    it('reports fullyMatched when both resolve', async () => {
-      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7 });
+    it('reports fullyMatched when both resolve and currencies agree', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
       const r = await resolver.resolveNotification(descriptor);
       expect(r).toEqual({
         accountId: 7,
+        accountCurrency: 'AMD',
         categoryId: 'cat-food',
         matchedAccount: true,
         matchedCategory: true,
+        currencyMatch: true,
         fullyMatched: true,
       });
     });
 
+    it('is NOT fullyMatched on a currency mismatch', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
+      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      const r = await resolver.resolveNotification(descriptor); // descriptor is AMD
+      expect(r.matchedAccount).toBe(true);
+      expect(r.matchedCategory).toBe(true);
+      expect(r.currencyMatch).toBe(false);
+      expect(r.fullyMatched).toBe(false);
+    });
+
     it('reports partial match when only the account resolves', async () => {
-      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7 });
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       const r = await resolver.resolveNotification(descriptor);
       expect(r.matchedAccount).toBe(true);
       expect(r.matchedCategory).toBe(false);

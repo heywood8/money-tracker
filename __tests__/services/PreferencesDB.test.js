@@ -73,6 +73,7 @@ describe('PreferencesDB', () => {
         'DEFAULT_ACCOUNT_ID',
         'BANK_NOTIFICATIONS_ENABLED',
         'BANK_NOTIFICATIONS_PROCESSED_SIGS',
+        'BANK_NOTIFICATIONS_PACKAGES',
       ]);
     });
   });

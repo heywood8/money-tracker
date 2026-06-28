@@ -48,35 +48,81 @@ const TRAILING_COUNTRY_RE = /,\s*([A-Z]{2})\s*$/;
 /**
  * Normalize a localized amount string to a plain decimal string.
  *
- * Handles the common "1,234.56" grouping (comma thousands, dot decimal). The
- * result is a string so it can be fed straight into the decimal-based currency
- * layer without ever becoming a lossy float.
+ * Handles both grouping conventions without corrupting either:
+ * - "1,234.56" (comma thousands, dot decimal) -> "1234.56"
+ * - "1.234,56" (dot thousands, comma decimal) -> "1234.56"
+ * - "12,50" (comma decimal)                   -> "12.50"
+ *
+ * When both separators are present, the one that appears last is the decimal
+ * separator and the other is grouping. When only one separator is present it is
+ * treated as a decimal point only if it is not a 3-digit group (so "1,234" and
+ * "1.234" are read as thousands, while "12,50" is read as a decimal). The result
+ * is a string so it feeds straight into the decimal currency layer without ever
+ * becoming a lossy float.
  *
  * @param {string} raw - e.g. "3,900.00"
  * @returns {string|null} e.g. "3900.00", or null when no digits are present
  */
 const normalizeAmount = (raw) => {
   if (!raw) return null;
-  // Strip everything except digits, dots and commas, then drop comma group
-  // separators. (This bank uses "." as the decimal separator.)
-  const cleaned = raw.replace(/[^\d.,]/g, '').replace(/,/g, '');
-  if (!/\d/.test(cleaned)) return null;
-  return cleaned;
+  let s = raw.replace(/[^\d.,]/g, '');
+  if (!/\d/.test(s)) return null;
+
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+
+  if (lastDot !== -1 && lastComma !== -1) {
+    if (lastComma > lastDot) {
+      // Comma is the decimal separator: drop dot grouping, comma -> dot.
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Dot is the decimal separator: drop comma grouping.
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastComma !== -1) {
+    const parts = s.split(',');
+    if (parts.length === 2 && parts[1].length !== 3) {
+      s = s.replace(',', '.'); // single comma, not a 3-digit group -> decimal
+    } else {
+      s = s.replace(/,/g, ''); // grouping
+    }
+  } else if (lastDot !== -1) {
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      s = s.replace(/\./g, ''); // multiple dots -> grouping
+    }
+    // single dot -> keep as the decimal point
+  }
+
+  return s;
 };
 
 /**
  * Convert "DD.MM.YYYY" to an ISO "YYYY-MM-DD" date string.
  *
+ * Validates against a real calendar via a UTC round-trip, so impossible dates
+ * like "31.02.2026" are rejected (returns null) rather than producing
+ * "2026-02-31".
+ *
  * @param {string} day
  * @param {string} month
  * @param {string} year
- * @returns {string|null} ISO date, or null if the components are out of range
+ * @returns {string|null} ISO date, or null if the date is not a real calendar date
  */
 const toIsoDate = (day, month, year) => {
   const d = Number(day);
   const m = Number(month);
   const y = Number(year);
+  if (!Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y)) return null;
   if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== m - 1 ||
+    dt.getUTCDate() !== d
+  ) {
+    return null;
+  }
   return `${year}-${month}-${day}`;
 };
 
@@ -137,15 +183,20 @@ export const parseBankNotification = (notification) => {
     ? (cardSegment.match(CARD_MASK_RE) || [null])[0]
     : null;
 
-  // 4. Date / time — pull from whichever segment carries it.
+  // 4. Date / time — pull from whichever segment carries a *valid* date. Keep
+  //    scanning if a segment's date is impossible (e.g. 31.02.2026) so a valid
+  //    date elsewhere is still found.
   let date = null;
   let time = null;
   for (const segment of segments) {
     const match = segment.match(DATE_TIME_RE);
     if (match) {
-      date = toIsoDate(match[1], match[2], match[3]);
-      time = match[4] || null;
-      break;
+      const iso = toIsoDate(match[1], match[2], match[3]);
+      if (iso) {
+        date = iso;
+        time = match[4] || null;
+        break;
+      }
     }
   }
 
