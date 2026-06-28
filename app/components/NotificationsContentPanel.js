@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, Animated, Easing, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { parseBankNotification } from '../services/notifications/parseBankNotification';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 
 // Renders the "date · time" label for a notification's post time. Mirrors the
@@ -18,14 +19,25 @@ const formatPostTime = (postTime) => {
   return `${datePart} · ${timePart}`;
 };
 
-function NotificationCard({ notification, colors, t }) {
+export function NotificationCard({ notification, colors, t }) {
   const { title, text, packageName, postTime } = notification;
   const timeLabel = formatPostTime(postTime);
+  // A notification that parses into a bank transaction is surfaced with an
+  // accent tint + badge so the user can tell at a glance which of the many
+  // notifications the listener sees actually become operations.
+  const isBank = useMemo(() => parseBankNotification(notification) !== null, [notification]);
+  const cardColorStyle = isBank
+    ? { backgroundColor: colors.selected, borderColor: colors.primary, borderLeftColor: colors.primary }
+    : { backgroundColor: colors.surface, borderColor: colors.border, borderLeftColor: colors.border };
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.card, isBank && styles.cardBank, cardColorStyle]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <Ionicons name="notifications-outline" size={15} color={colors.mutedText} />
+          <Ionicons
+            name={isBank ? 'card' : 'notifications-outline'}
+            size={15}
+            color={isBank ? colors.primary : colors.mutedText}
+          />
           {packageName ? (
             <Text style={[styles.cardSource, { color: colors.mutedText }]} numberOfLines={1}>
               {packageName}
@@ -36,6 +48,14 @@ function NotificationCard({ notification, colors, t }) {
           <Text style={[styles.cardTime, { color: colors.mutedText }]}>{timeLabel}</Text>
         ) : null}
       </View>
+      {isBank ? (
+        <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+          <Ionicons name="pricetag" size={10} color="#ffffff" />
+          <Text style={styles.badgeText}>
+            {t('notification_bank_badge') || 'Bank operation'}
+          </Text>
+        </View>
+      ) : null}
       {title ? (
         <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
       ) : null}
@@ -150,12 +170,32 @@ NotificationsContentPanel.defaultProps = {
 };
 
 const styles = StyleSheet.create({
+  badge: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: BORDER_RADIUS.sm,
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
   card: {
     borderRadius: BORDER_RADIUS.md,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
+  },
+  cardBank: {
+    borderLeftWidth: 3,
   },
   cardBody: {
     fontSize: 14,

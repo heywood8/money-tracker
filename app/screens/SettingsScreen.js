@@ -32,10 +32,8 @@ import { useUpdateDownload } from '../contexts/UpdateDownloadContext';
 import { authenticateWithBiometrics, BiometricResult } from '../services/BiometricService';
 import { ensureLocationPermission } from '../services/LocationService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
-import { openNotificationAccessSettings, isNotificationAccessEnabled, getRecentNotifications } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
-import NotificationsContentPanel from '../components/NotificationsContentPanel';
-import BankNotificationsContentPanel from '../components/BankNotificationsContentPanel';
+import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
 import AccountsScreen from './AccountsScreen';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import CategoriesScreen from './CategoriesScreen';
@@ -158,8 +156,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const [updateResult, setUpdateResult] = useState(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [downloadedApks, setDownloadedApks] = useState([]);
-  const [recentNotifications, setRecentNotifications] = useState([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [importStep, setImportStep] = useState('source');
   const [importSelectedBackup, setImportSelectedBackup] = useState(null);
   const [saveLocalBackupLoading, setSaveLocalBackupLoading] = useState(false);
@@ -271,8 +267,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsImportError(null);
     setDownloadedApks([]);
-    setRecentNotifications([]);
-    setNotificationsLoading(false);
   }, []);
 
   // Back navigation is locked while a long async step (Sheets export/import) runs,
@@ -801,40 +795,6 @@ export default function SettingsScreen({ setSubPanelActive }) {
     runUpdateCheck();
   }, [openSubPanel, runUpdateCheck]);
 
-  const loadRecentNotifications = useCallback(async () => {
-    setNotificationsLoading(true);
-    try {
-      const items = await getRecentNotifications();
-      setRecentNotifications(items);
-    } catch (error) {
-      setRecentNotifications([]);
-    } finally {
-      setNotificationsLoading(false);
-    }
-  }, []);
-
-  const handleOpenNotificationAccess = useCallback(async () => {
-    // When access is already granted, drill into the subpanel that lists the
-    // most recent notifications. Otherwise send the user to the system screen
-    // where they can grant the permission.
-    const enabled = await isNotificationAccessEnabled();
-    if (enabled) {
-      openSubPanel('notifications');
-      loadRecentNotifications();
-      return;
-    }
-    try {
-      await openNotificationAccessSettings();
-    } catch (error) {
-      showDialog(
-        t('error') || 'Error',
-        t('notification_access_error') ||
-          'Could not open the notification access settings.',
-        [{ text: 'OK' }],
-      );
-    }
-  }, [openSubPanel, loadRecentNotifications, showDialog, t]);
-
   const handleUpdateFromSettings = useCallback(async (downloadUrl, checksumUrl, version) => {
     // Record the version actually chosen so the startup reminder doesn't re-nag for it. The
     // per-release buttons pass their own version; fall back to the highlighted candidate.
@@ -984,8 +944,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       if (updateResult?.type === 'available') return t('update_available_title') || 'Update available';
       return t('check_updates') || 'Check for updates';
     }
-    if (activeSubPanel === 'notifications') return t('notification_access') || 'Notification access';
-    if (activeSubPanel === 'bankNotifications') return t('bank_notifications') || 'Bank notifications';
+    if (activeSubPanel === 'notificationProcessing') return t('notification_processing') || 'Notification processing';
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
   }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, t]);
@@ -1531,20 +1490,9 @@ export default function SettingsScreen({ setSubPanelActive }) {
               </View>
             )}
 
-            {activeSubPanel === 'notifications' && (
+            {activeSubPanel === 'notificationProcessing' && (
               <View style={styles.updatePanelWrapper}>
-                <NotificationsContentPanel
-                  isLoading={notificationsLoading}
-                  notifications={recentNotifications}
-                  onRefresh={loadRecentNotifications}
-                  bottomInset={scrollBottomInset}
-                />
-              </View>
-            )}
-
-            {activeSubPanel === 'bankNotifications' && (
-              <View style={styles.updatePanelWrapper}>
-                <BankNotificationsContentPanel bottomInset={scrollBottomInset} />
+                <NotificationProcessingContentPanel bottomInset={scrollBottomInset} />
               </View>
             )}
           </View>
@@ -1654,42 +1602,20 @@ export default function SettingsScreen({ setSubPanelActive }) {
         </TouchableRipple>
 
         <TouchableRipple
-          onPress={handleOpenNotificationAccess}
+          onPress={() => openSubPanel('notificationProcessing')}
           style={styles.settingsRow}
-          testID="settings-notification-access-row"
+          testID="settings-notification-processing-row"
         >
           <View style={styles.settingsRowContent}>
             <View style={styles.settingsRowLeft}>
               <Ionicons name="notifications-outline" size={22} color={colors.text} />
               <View style={styles.settingsRowText}>
                 <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                  {t('notification_access') || 'Notification access'}
+                  {t('notification_processing') || 'Notification processing'}
                 </Text>
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('notification_access_hint') ||
-                    'Allow Penny to read notifications in the background'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
-          </View>
-        </TouchableRipple>
-
-        <TouchableRipple
-          onPress={() => openSubPanel('bankNotifications')}
-          style={styles.settingsRow}
-          testID="settings-bank-notifications-row"
-        >
-          <View style={styles.settingsRowContent}>
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="card-outline" size={22} color={colors.text} />
-              <View style={styles.settingsRowText}>
-                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
-                  {t('bank_notifications') || 'Bank notifications'}
-                </Text>
-                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
-                  {t('bank_notifications_hint') ||
-                    'Turn purchase notifications into operations'}
+                  {t('notification_processing_hint') ||
+                    'Read notifications and turn purchases into operations'}
                 </Text>
               </View>
             </View>
