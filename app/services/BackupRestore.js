@@ -29,7 +29,7 @@ export const createBackup = async () => {
     console.log('Creating database backup...');
 
     // Fetch all data from all tables
-    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations] = await Promise.all([
+    const [accounts, categories, operations, budgets, appMetadata, balanceHistory, plannedOperations, merchantRules] = await Promise.all([
       queryAll('SELECT * FROM accounts ORDER BY created_at ASC'),
       queryAll('SELECT * FROM categories ORDER BY created_at ASC'),
       queryAll('SELECT * FROM operations ORDER BY created_at ASC'),
@@ -37,6 +37,8 @@ export const createBackup = async () => {
       queryAll('SELECT * FROM app_metadata'),
       queryAll('SELECT * FROM accounts_balance_history ORDER BY account_id ASC, date ASC'),
       queryAll('SELECT * FROM planned_operations ORDER BY created_at ASC').catch(() => []),
+      // Newer table — guard so backups of pre-0010 databases don't fail.
+      queryAll('SELECT * FROM notification_merchant_rules ORDER BY created_at ASC').catch(() => []),
     ]);
 
     // Create backup object
@@ -52,6 +54,9 @@ export const createBackup = async () => {
         app_metadata: appMetadata || [],
         balance_history: balanceHistory || [],
         planned_operations: plannedOperations || [],
+        // Learned merchant -> category rules (the pending_notifications queue is
+        // transient state and intentionally not backed up).
+        notification_merchant_rules: merchantRules || [],
       },
     };
 
@@ -74,13 +79,14 @@ export const createBackup = async () => {
 // Explicit column orderings per table — guards against sparse rows where
 // Object.keys(data[0]) would silently omit columns present only on later rows.
 const TABLE_FIELDS = {
-  accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'created_at', 'updated_at'],
+  accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'created_at', 'updated_at'],
   categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
   operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'latitude', 'longitude'],
   budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
+  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'created_at', 'updated_at'],
 };
 
 /**
@@ -452,6 +458,7 @@ export const restoreBackup = async (backup, cancelToken) => {
       appEvents.emit(IMPORT_PROGRESS_EVENT, { stepId: 'clear', status: 'in_progress' });
 
       // Clear existing data (in reverse order due to foreign keys)
+      await db.runAsync('DELETE FROM notification_merchant_rules').catch(() => {});
       await db.runAsync('DELETE FROM planned_operations').catch(() => {});
       await db.runAsync('DELETE FROM budgets');
       await db.runAsync('DELETE FROM accounts_balance_history');
@@ -491,7 +498,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         if (isIntegerId) {
           // Preserve the original integer ID
           result = await db.runAsync(
-            'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, monthly_target, card_mask, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               Number(account.id),
               account.name,
@@ -500,6 +507,7 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.display_order ?? null,
               account.hidden ?? 0,
               account.monthly_target ?? null,
+              account.card_mask ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],
@@ -511,7 +519,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         } else {
           // UUID or no ID - let SQLite auto-generate integer ID
           result = await db.runAsync(
-            'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, card_mask, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               account.name,
               account.balance || '0',
@@ -519,6 +527,7 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.display_order ?? null,
               account.hidden ?? 0,
               account.monthly_target ?? null,
+              account.card_mask ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],
@@ -825,6 +834,32 @@ export const restoreBackup = async (backup, cancelToken) => {
           status: 'completed',
           data: backup.data.planned_operations.length,
         });
+      }
+
+      // Restore learned merchant -> category rules
+      if (backup.data.notification_merchant_rules && backup.data.notification_merchant_rules.length > 0) {
+        let restoredRules = 0;
+        for (const rule of backup.data.notification_merchant_rules) {
+          if (!rule.id || !rule.merchant) {
+            console.warn('Skipping merchant rule with missing id or merchant:', rule);
+            continue;
+          }
+          // INSERT OR IGNORE: a rule whose category was not restored is skipped
+          // rather than aborting the whole import.
+          await db.runAsync(
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              rule.id,
+              rule.merchant,
+              rule.package_name || null,
+              rule.category_id || null,
+              rule.created_at || new Date().toISOString(),
+              rule.updated_at || new Date().toISOString(),
+            ],
+          ).catch((e) => { console.warn('Skipping merchant rule:', e.message); });
+          restoredRules += 1;
+        }
+        console.log(`Restored ${restoredRules} merchant rules`);
       }
 
       // Post-restore upgrades: Ensure shadow categories exist

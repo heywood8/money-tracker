@@ -13,6 +13,10 @@ export const PREF_KEYS = {
   ATTACH_LOCATION: 'attach_location',
   GOOGLE_SHEETS_SPREADSHEET_ID: 'google_sheets_spreadsheet_id',
   DEFAULT_ACCOUNT_ID: 'default_account_id',
+  // Bank-notification processing
+  BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
+  BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
+  BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
 };
 
 /**

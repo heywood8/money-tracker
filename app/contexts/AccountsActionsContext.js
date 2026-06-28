@@ -86,6 +86,9 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.hidden !== undefined && updated.hidden !== currentAccount.hidden) {
           nonBalanceUpdates.hidden = updated.hidden;
         }
+        if (updated.cardMask !== undefined && updated.cardMask !== currentAccount.cardMask) {
+          nonBalanceUpdates.cardMask = updated.cardMask;
+        }
 
         if (Object.keys(nonBalanceUpdates).length > 0) {
           await AccountsDB.updateAccount(id, nonBalanceUpdates);
@@ -101,6 +104,7 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.currency !== undefined) updates.currency = updated.currency;
         if (updated.balance !== undefined) updates.balance = String(updated.balance);
         if (updated.hidden !== undefined) updates.hidden = updated.hidden;
+        if (updated.cardMask !== undefined) updates.cardMask = updated.cardMask;
 
         await AccountsDB.updateAccount(id, updates);
 

@@ -104,6 +104,7 @@ const isSchemaComplete = async (rawDb) => {
     const expectedTables = [
       'accounts', 'categories', 'operations', 'budgets',
       'app_metadata', 'accounts_balance_history', 'planned_operations',
+      'notification_merchant_rules', 'pending_notifications',
     ];
     const existingTables = await rawDb.getAllAsync(
       "SELECT name FROM sqlite_master WHERE type='table'",
@@ -150,6 +151,11 @@ const isSchemaComplete = async (rawDb) => {
 
     // Check accounts has deleted_at column (migration 0008)
     if (!accountsCols.some(c => c.name === 'deleted_at')) return false;
+
+    // Check accounts has card_mask column (migration 0010). The
+    // notification_merchant_rules / pending_notifications tables are covered by
+    // the expectedTables check above.
+    if (!accountsCols.some(c => c.name === 'card_mask')) return false;
 
     return true;
   } catch (error) {
@@ -373,6 +379,21 @@ const detectAppliedMigrations = async (rawDb) => {
     const opsCols = await getColumns('operations');
     if (opsCols.some(c => c.name === 'latitude') && opsCols.some(c => c.name === 'longitude')) {
       applied.push(9);
+    }
+  }
+
+  // Migration 0010: Adds accounts.card_mask plus the notification_merchant_rules
+  // and pending_notifications tables. Require all three markers — a half-applied
+  // 0010 must re-run so the missing pieces are created.
+  if (await tableExists('accounts')) {
+    const accCols = await getColumns('accounts');
+    const hasCardMask = accCols.some(c => c.name === 'card_mask');
+    if (
+      hasCardMask &&
+      (await tableExists('notification_merchant_rules')) &&
+      (await tableExists('pending_notifications'))
+    ) {
+      applied.push(10);
     }
   }
 

@@ -20,6 +20,10 @@ export const accounts = sqliteTable('accounts', {
   displayOrder: integer('display_order'),
   hidden: integer('hidden').default(0),
   monthlyTarget: text('monthly_target'),
+  // Masked card number (e.g. "4083***7027") used to bind incoming bank
+  // notifications to this account. Nullable — only set for accounts that
+  // receive transaction notifications.
+  cardMask: text('card_mask'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -126,6 +130,56 @@ export const plannedOperations = sqliteTable('planned_operations', {
   accountIdx: index('idx_planned_ops_account').on(table.accountId),
   typeIdx: index('idx_planned_ops_type').on(table.type),
   recurringIdx: index('idx_planned_ops_recurring').on(table.isRecurring),
+}));
+
+/**
+ * Notification merchant rules table
+ *
+ * Maps a merchant name parsed from a bank notification (e.g. "NAREK MEHRABYAN")
+ * to a category. Learned the first time the user categorizes a transaction for
+ * that merchant, then auto-applied to future notifications. Optionally scoped by
+ * the source bank app's package name so the same merchant string can map
+ * differently per bank if ever needed.
+ */
+export const notificationMerchantRules = sqliteTable('notification_merchant_rules', {
+  id: text('id').primaryKey(),
+  merchant: text('merchant').notNull(),
+  packageName: text('package_name'),
+  categoryId: text('category_id').references(() => categories.id, { onDelete: 'cascade' }),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => ({
+  merchantIdx: index('idx_merchant_rules_merchant').on(table.merchant),
+}));
+
+/**
+ * Pending notifications table
+ *
+ * Parsed bank notifications that could not be fully matched (unknown card or
+ * unknown merchant) wait here for the user to resolve them in the review queue.
+ * Fully-matched notifications are turned into operations immediately and never
+ * land here.
+ */
+export const pendingNotifications = sqliteTable('pending_notifications', {
+  id: text('id').primaryKey(),
+  kind: text('kind').notNull(),
+  type: text('type', { enum: ['expense', 'income'] }).notNull(),
+  amount: text('amount').notNull(),
+  currency: text('currency').notNull(),
+  cardMask: text('card_mask'),
+  merchant: text('merchant'),
+  country: text('country'),
+  date: text('date'),
+  time: text('time'),
+  // Best-effort resolved suggestions; one or both may be null (that's why the
+  // item is pending). The user confirms/overrides them before saving.
+  accountId: integer('account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+  categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  packageName: text('package_name'),
+  raw: text('raw'),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  createdIdx: index('idx_pending_notifications_created').on(table.createdAt),
 }));
 
 /**
