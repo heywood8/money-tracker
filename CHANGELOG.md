@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.158.0](https://github.com/heywood8/money-tracker/compare/penny-v0.157.0...penny-v0.158.0) (2026-06-28)
+
+
+### Features
+
+* process bank purchase notifications into operations ([#1113](https://github.com/heywood8/money-tracker/issues/1113)) ([5600c22](https://github.com/heywood8/money-tracker/commit/5600c226a7b32d5b8dcb7d7f5466964ecf6c7f16))
+
 ## [0.157.0](https://github.com/heywood8/money-tracker/compare/penny-v0.156.0...penny-v0.157.0) (2026-06-27)
 
 
