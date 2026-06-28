@@ -131,7 +131,10 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.sm,
-    marginTop: 0,
+    // Match the search pill → type-selector gap to the type-selector → account
+    // gap (SPACING.sm). The search bar contributes SPACING.xs of bottom padding,
+    // so add SPACING.xs here to reach SPACING.sm total above the form.
+    marginTop: SPACING.xs,
     paddingBottom: SPACING.xs,
     paddingHorizontal: SPACING.xs,
   },
