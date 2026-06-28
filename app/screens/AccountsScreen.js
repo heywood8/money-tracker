@@ -604,6 +604,10 @@ export default function AccountsScreen({ onBackStateChange }) {
     setEditValues(v => ({ ...v, name: text }));
   }, []);
 
+  const handleCardMaskChange = useCallback((text) => {
+    setEditValues(v => ({ ...v, cardMask: text }));
+  }, []);
+
   const handleBalanceChange = useCallback((text) => {
     setEditValues(v => {
       const decimals = currencies[v.currency]?.decimal_digits ?? 2;
@@ -950,6 +954,24 @@ export default function AccountsScreen({ onBackStateChange }) {
             </TouchableRipple>
             {errors.currency && <Text variant="bodySmall" style={styles.error}>{errors.currency}</Text>}
 
+            {/* Card mask (for bank-notification matching) */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('card_mask') || 'Card number').toUpperCase()}
+            </Text>
+            <PaperTextInput
+              mode="outlined"
+              theme={paperInputTheme}
+              value={editValues.cardMask || ''}
+              onChangeText={handleCardMaskChange}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="4083***7027"
+              style={modalSharedStyles.textInput}
+            />
+            <Text style={[styles.cardMaskHint, { color: colors.mutedText }]}>
+              {t('card_mask_hint') || 'Used to match bank notifications to this account'}
+            </Text>
+
             {/* Settings group */}
             <View style={[styles.settingsGroup, { borderColor: colors.border, backgroundColor: colors.surface }]}>
               {editingId !== 'new' && (
@@ -1137,6 +1159,10 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
     overflow: 'hidden',
+  },
+  cardMaskHint: {
+    fontSize: 12,
+    marginTop: 4,
   },
   centeredBodyMedium: {
     marginBottom: SPACING.lg,

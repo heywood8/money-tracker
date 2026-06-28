@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { processBankNotifications } from '../services/notifications/processBankNotifications';
 import LanguageSelectionScreen from './LanguageSelectionScreen';
 import SimpleTabs from '../navigation/SimpleTabs';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
@@ -74,6 +75,33 @@ const AppInitializer = () => {
 
       runUpdateCheck();
     }
+  }, [isFirstLaunch]);
+
+  // Process any bank notifications captured while the app was backgrounded.
+  // Runs once on open and again whenever the app returns to the foreground.
+  // The pipeline is a no-op when the feature is disabled and skips already-seen
+  // notifications, so calling it eagerly is safe.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    if (isFirstLaunch) return undefined;
+
+    const runIngestion = () => {
+      processBankNotifications().catch((error) => {
+        console.warn('[AppInitializer] Bank notification processing failed:', error);
+      });
+    };
+
+    runIngestion();
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const prev = appStateRef.current;
+      appStateRef.current = nextState;
+      if (nextState === 'active' && prev && prev.match(/inactive|background/)) {
+        runIngestion();
+      }
+    });
+
+    return () => subscription.remove();
   }, [isFirstLaunch]);
 
   const handleUpdateDismiss = useCallback(async () => {

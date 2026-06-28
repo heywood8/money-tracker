@@ -71,6 +71,8 @@ describe('PreferencesDB', () => {
         'ATTACH_LOCATION',
         'GOOGLE_SHEETS_SPREADSHEET_ID',
         'DEFAULT_ACCOUNT_ID',
+        'BANK_NOTIFICATIONS_ENABLED',
+        'BANK_NOTIFICATIONS_PROCESSED_SIGS',
       ]);
     });
   });

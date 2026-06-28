@@ -65,6 +65,7 @@ export const createAccount = async (account) => {
       displayOrder: account.display_order ?? account.displayOrder ?? newOrder,
       hidden: account.hidden ?? 0,
       monthlyTarget: account.monthly_target ?? account.monthlyTarget ?? null,
+      cardMask: account.card_mask ?? account.cardMask ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -76,6 +77,36 @@ export const createAccount = async (account) => {
     console.error('Failed to create account:', error);
     throw error;
   }
+};
+
+/**
+ * Find a non-deleted account bound to the given card mask.
+ * @param {string} cardMask - e.g. "4083***7027"
+ * @returns {Promise<Object|null>}
+ */
+export const getAccountByCardMask = async (cardMask) => {
+  if (!cardMask) return null;
+  try {
+    const db = await getDrizzle();
+    const results = await db.select()
+      .from(accounts)
+      .where(and(eq(accounts.cardMask, cardMask), isNull(accounts.deletedAt)))
+      .limit(1);
+    return results[0] || null;
+  } catch (error) {
+    console.error('Failed to get account by card mask:', error);
+    throw error;
+  }
+};
+
+/**
+ * Bind a card mask to an account (used by learn-on-first-sight).
+ * @param {number} accountId
+ * @param {string} cardMask
+ * @returns {Promise<void>}
+ */
+export const setAccountCardMask = async (accountId, cardMask) => {
+  await updateAccount(accountId, { cardMask: cardMask || null });
 };
 
 /**
@@ -99,6 +130,10 @@ export const updateAccount = async (id, updates) => {
     if (updates.monthly_target !== undefined || updates.monthlyTarget !== undefined) {
       setClauses.push('monthly_target = ?');
       params.push(updates.monthly_target ?? updates.monthlyTarget);
+    }
+    if (updates.card_mask !== undefined || updates.cardMask !== undefined) {
+      setClauses.push('card_mask = ?');
+      params.push((updates.card_mask ?? updates.cardMask) || null);
     }
 
     if (setClauses.length === 0) {

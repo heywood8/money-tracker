@@ -2,10 +2,9 @@
 
 Turn incoming bank push notifications into Penny operations automatically.
 
-This document describes the full design. The first implementation round ships
-**only the parser** (`app/services/notifications/parseBankNotification.js` + tests)
-— the safe, self-contained core. The remaining sections are the agreed plan for
-subsequent rounds.
+This document describes the full design. **All rounds are now implemented** —
+parser, storage/resolver, ingestion pipeline, and UI. The round breakdown below
+is kept as a map of the implementation; each section lists the files involved.
 
 ## Motivation
 
@@ -77,7 +76,7 @@ These were chosen up front and drive the architecture:
                   (silent)          bindings learned, then createOperation
 ```
 
-### Round 1 — Parser (this round) ✅
+### Round 1 — Parser ✅
 
 `app/services/notifications/parseBankNotification.js`
 
@@ -113,12 +112,13 @@ Key properties:
 Covered by `__tests__/services/notifications/parseBankNotification.test.js`
 (canonical template, amount normalization, robustness, and rejection cases).
 
-### Round 2 — Storage & resolver
+### Round 2 — Storage & resolver ✅
 
-**Schema changes** (Drizzle migration):
+**Schema** (migration `drizzle/0010_bank_notifications.js`, schema in
+`app/db/schema.js`):
 
 - `accounts.cardMask TEXT NULL` — the card linked to this account.
-- New table `notificationMerchantRules`:
+- `notification_merchant_rules` — learned merchant → category rules:
   | column      | type    | notes                                   |
   | ----------- | ------- | --------------------------------------- |
   | `id`        | text PK | uuid                                    |
@@ -126,42 +126,58 @@ Covered by `__tests__/services/notifications/parseBankNotification.test.js`
   | `packageName` | text NULL | scope rules per bank app when needed  |
   | `categoryId`| text FK | → categories.id                         |
   | `createdAt` / `updatedAt` | text | ISO timestamps             |
+- `pending_notifications` — the review queue (parsed descriptor + best-effort
+  account/category suggestions).
 
   > Alternative considered: store rules as a JSON blob in `appMetadata`. Rejected
   > — a real table gives indexed lookups and a clean "rules list" UI later.
 
+  > **Migration note:** this project applies migrations through a custom path
+  > (`app/services/db.js`), so adding a migration also requires updating
+  > `isSchemaComplete` and `detectAppliedMigrations` there — done for 0010.
+
+**DB services**: `app/services/NotificationRulesDB.js` (merchant-rule CRUD +
+lookup) and `app/services/PendingNotificationsDB.js` (queue CRUD). Card lookups
+live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
+
 **Resolver** (`app/services/notifications/resolveNotification.js`):
 
-- `resolveAccount(descriptor)` — find the account whose `cardMask` matches; fall
-  back to a single account matching the currency; else `null` (needs the user).
-- `resolveCategory(descriptor)` — look up `merchant` in
-  `notificationMerchantRules`; else `null`.
-- `learnMerchantRule(merchant, categoryId, packageName)` — upsert after the user
-  categorizes.
-- `learnCardMask(cardMask, accountId)` — write the mask onto the account.
+- `resolveAccountId(descriptor)` — account whose `cardMask` matches; else a
+  single currency-matching (non-hidden) account; else `null`.
+- `resolveCategoryId(descriptor)` — learned `merchant` rule, else `null`.
+- `resolveNotification(descriptor)` — both, plus a `fullyMatched` flag.
 
-### Round 3 — Ingestion & pipeline
+### Round 3 — Ingestion & pipeline ✅
 
-- Poll `getRecentNotifications()` when the app comes to the foreground; de-dupe
-  against already-processed notifications (track by `postTime + raw` hash in
-  `appMetadata` or a small `processedNotifications` table).
-- For each parsed descriptor: resolve → if fully matched, `createOperation`
-  (description seeded with `merchant` as a label, plus `country` context); else
-  enqueue into a `pendingNotifications` table.
-- **Known limitation to address here:** the native service currently keeps only
-  the **last 5** notifications and exposes them pull-only (no JS events). For
-  reliable capture, extend the Kotlin `PennyNotificationListenerService` to
-  persist a durable queue (and optionally emit a JS event) so bursts aren't lost
-  while the app is backgrounded. The parser and resolver do not depend on this.
+`app/services/notifications/processBankNotifications.js`:
 
-### Round 4 — UI
+- `processBankNotifications()` reads `getRecentNotifications()`, de-dupes against
+  a rolling set of signatures (`postTime + text hash`) persisted in preferences,
+  parses + resolves each, and either `createOperation` (fully matched,
+  description seeded with `merchant`) or enqueues a pending item. Emits
+  `RELOAD_ALL` when operations are created. No-op when disabled.
+- `resolvePendingNotification(id, choices)` — creates the operation from a
+  reviewed item and learns the card → account and merchant → category bindings.
+- Triggered on app open and on every foreground transition via an `AppState`
+  listener in `app/screens/AppInitializer.js`.
+- **Known limitation:** the native service keeps only the **last 5**
+  notifications and is pull-only (no JS events). For lossless capture under
+  bursty/backgrounded conditions, extend the Kotlin
+  `PennyNotificationListenerService` to persist a durable queue (and optionally
+  emit a JS event). The parser, resolver, and pipeline do not depend on this.
 
-- **Review queue**: a pending-notifications list (subpanel pattern per
-  `CLAUDE.md`) where the user confirms/edits the account, category, amount, and
-  date before saving. Categorizing here triggers `learnMerchantRule`; picking an
-  account for an unknown card triggers `learnCardMask`.
-- **Account editor**: a "Card mask" field.
-- **Settings**: enable/disable auto-processing; (later) a merchant-rules manager.
+### Round 4 — UI ✅
+
+- **Review queue** (`app/components/BankNotificationsContentPanel.js`, shown as a
+  Settings subpanel): an enable toggle plus the pending list, each item with an
+  account + category picker, Save and Dismiss. Saving calls
+  `resolvePendingNotification`, which learns both bindings. Wired into
+  `app/screens/SettingsScreen.js` as the `bankNotifications` subpanel.
+- **Account editor** (`app/screens/AccountsScreen.js`): a "Card number" field,
+  persisted through `AccountsActionsContext` → `AccountsDB`.
+- **Settings**: a "Bank notifications" row opens the subpanel. (A standalone
+  merchant-rules manager remains a future enhancement; rules are currently
+  learned automatically and editable by re-categorizing.)
 
 ## Operation mapping
 

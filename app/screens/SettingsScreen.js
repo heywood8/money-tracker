@@ -35,6 +35,7 @@ import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFrom
 import { openNotificationAccessSettings, isNotificationAccessEnabled, getRecentNotifications } from '../services/NotificationAccess';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import NotificationsContentPanel from '../components/NotificationsContentPanel';
+import BankNotificationsContentPanel from '../components/BankNotificationsContentPanel';
 import AccountsScreen from './AccountsScreen';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import CategoriesScreen from './CategoriesScreen';
@@ -984,6 +985,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
       return t('check_updates') || 'Check for updates';
     }
     if (activeSubPanel === 'notifications') return t('notification_access') || 'Notification access';
+    if (activeSubPanel === 'bankNotifications') return t('bank_notifications') || 'Bank notifications';
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
   }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, t]);
@@ -1539,6 +1541,12 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 />
               </View>
             )}
+
+            {activeSubPanel === 'bankNotifications' && (
+              <View style={styles.updatePanelWrapper}>
+                <BankNotificationsContentPanel bottomInset={scrollBottomInset} />
+              </View>
+            )}
           </View>
         </Animated.View>
       </GestureDetector>
@@ -1660,6 +1668,28 @@ export default function SettingsScreen({ setSubPanelActive }) {
                 <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
                   {t('notification_access_hint') ||
                     'Allow Penny to read notifications in the background'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </View>
+        </TouchableRipple>
+
+        <TouchableRipple
+          onPress={() => openSubPanel('bankNotifications')}
+          style={styles.settingsRow}
+          testID="settings-bank-notifications-row"
+        >
+          <View style={styles.settingsRowContent}>
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="card-outline" size={22} color={colors.text} />
+              <View style={styles.settingsRowText}>
+                <Text style={[styles.settingsRowLabel, { color: colors.text }]}>
+                  {t('bank_notifications') || 'Bank notifications'}
+                </Text>
+                <Text style={[styles.settingsRowValue, { color: colors.mutedText }]}>
+                  {t('bank_notifications_hint') ||
+                    'Turn purchase notifications into operations'}
                 </Text>
               </View>
             </View>

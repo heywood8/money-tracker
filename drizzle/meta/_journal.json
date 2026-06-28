@@ -71,6 +71,13 @@
       "when": 1766400000000,
       "tag": "0009_add_operation_location",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1766500000000,
+      "tag": "0010_bank_notifications",
+      "breakpoints": true
     }
   ]
 }
