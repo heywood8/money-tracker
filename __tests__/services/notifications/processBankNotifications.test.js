@@ -37,7 +37,7 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
 }));
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
-const PKG = 'am.ameriabank.mobile';
+const PKG = 'com.banqr.ameriabank';
 const PURCHASE = {
   title: 'АРКА транзакции',
   text: 'PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',

@@ -285,7 +285,7 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     choices.learnMerchant !== false &&
     pending.merchant &&
     categoryId &&
-    !kindRequiresCategory(pending.kind)
+    !kindRequiresCategory(pending.kind, pending.packageName)
   ) {
     try {
       await NotificationRulesDB.upsertMerchantRule(

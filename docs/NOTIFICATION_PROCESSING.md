@@ -98,9 +98,23 @@ These were chosen up front and drive the architecture:
 
 ### Round 1 — Parser ✅
 
-`app/services/notifications/parseBankNotification.js`
+`app/services/notifications/parseBankNotification.js` (dispatcher) +
+`app/services/notifications/bankParsers/` (per-app parsers).
 
-A pure function: `({ title, text, packageName, postTime }) → descriptor | null`.
+**Parsing rules are grouped per source app.** Each banking app formats its
+notifications differently, so each gets its own parser module registered against
+its Android package name. Today only Ameriabank (`com.banqr.ameriabank`) is
+supported — `bankParsers/ameriabank.js` holds the `PURCHASE` / `C2C` pipe-format
+rules. Adding another bank is just another module in `bankParsers/`, registered
+in `bankParsers/index.js`; nothing in the dispatcher changes.
+
+`parseBankNotification(notification)` routes by `notification.packageName` to the
+matching parser. When the package is unknown or missing (e.g. a manual paste),
+it falls back to trying every registered parser — each returns `null` for formats
+it doesn't handle, so the first that recognizes the text wins.
+
+Each parser exposes a pure function:
+`({ title, text, packageName, postTime }) → descriptor | null`.
 
 ```js
 {

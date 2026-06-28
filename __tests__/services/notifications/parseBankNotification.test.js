@@ -12,7 +12,7 @@ import {
 const AMERIA_PURCHASE = {
   title: 'АРКА транзакции',
   text: 'PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
-  packageName: 'am.ameriabank.mobile',
+  packageName: 'com.banqr.ameriabank',
   postTime: 1782000900000,
 };
 
@@ -69,7 +69,7 @@ describe('parseBankNotification', () => {
     });
 
     it('passes through the source package name', () => {
-      expect(result.packageName).toBe('am.ameriabank.mobile');
+      expect(result.packageName).toBe('com.banqr.ameriabank');
     });
 
     it('keeps the raw text for auditing', () => {
@@ -82,7 +82,7 @@ describe('parseBankNotification', () => {
     const AMERIA_C2C = {
       title: 'АРКА транзакции',
       text: 'C2C | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD',
-      packageName: 'am.ameriabank.mobile',
+      packageName: 'com.banqr.ameriabank',
       postTime: 1782000900000,
     };
     let result;
@@ -153,6 +153,41 @@ describe('parseBankNotification', () => {
       expect(kindRequiresCategory('')).toBe(false);
       expect(kindRequiresCategory(null)).toBe(false);
       expect(kindRequiresCategory(undefined)).toBe(false);
+    });
+  });
+
+  describe('source-app dispatch', () => {
+    it('parses notifications from the registered Ameriabank package', () => {
+      const result = parseBankNotification({
+        text: 'PURCHASE | 3,900.00 AMD | 4083***7027 | SHOP, AM | 28.06.2026 10:15',
+        packageName: 'com.banqr.ameriabank',
+      });
+      expect(result).not.toBeNull();
+      expect(result.kind).toBe('PURCHASE');
+      expect(result.packageName).toBe('com.banqr.ameriabank');
+    });
+
+    it('falls back to known parsers for an unknown/missing source app', () => {
+      // A manual paste (no packageName) or a different app still parses if its
+      // text matches a known format.
+      const noPkg = parseBankNotification({
+        text: 'PURCHASE | 3,900.00 AMD | 4083***7027 | SHOP, AM | 28.06.2026 10:15',
+      });
+      expect(noPkg).not.toBeNull();
+      expect(noPkg.kind).toBe('PURCHASE');
+
+      const otherPkg = parseBankNotification({
+        text: 'C2C | 5,000.00 AMD | 4083***7027 | TO: A. PETROSYAN | 28.06.2026 10:15',
+        packageName: 'com.some.otherbank',
+      });
+      expect(otherPkg).not.toBeNull();
+      expect(otherPkg.kind).toBe('C2C');
+      expect(otherPkg.requiresCategory).toBe(true);
+    });
+
+    it('scopes kindRequiresCategory to the source app when given one', () => {
+      expect(kindRequiresCategory('C2C', 'com.banqr.ameriabank')).toBe(true);
+      expect(kindRequiresCategory('PURCHASE', 'com.banqr.ameriabank')).toBe(false);
     });
   });
 

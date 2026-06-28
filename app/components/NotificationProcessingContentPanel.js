@@ -235,7 +235,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
         pending.map((item) => {
           const choice = choices[item.id] || {};
           // C2C transfers must have a category chosen before they can be saved.
-          const categoryRequired = kindRequiresCategory(item.kind);
+          const categoryRequired = kindRequiresCategory(item.kind, item.packageName);
           const canSave =
             choice.accountId != null && (!categoryRequired || choice.categoryId != null);
           return (
