@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.160.0](https://github.com/heywood8/money-tracker/compare/penny-v0.159.0...penny-v0.160.0) (2026-06-28)
+
+
+### Features
+
+* process C2C transfer notifications, always asking for category ([#1119](https://github.com/heywood8/money-tracker/issues/1119)) ([f4a9f38](https://github.com/heywood8/money-tracker/commit/f4a9f38a084801b7e6006bc27bcb807f44996b05))
+
 ## [0.159.0](https://github.com/heywood8/money-tracker/compare/penny-v0.158.0...penny-v0.159.0) (2026-06-28)
 
 
