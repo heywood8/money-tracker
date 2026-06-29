@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.161.1](https://github.com/heywood8/money-tracker/compare/penny-v0.161.0...penny-v0.161.1) (2026-06-29)
+
+
+### Miscellaneous Chores
+
+* add pull request template ([#1124](https://github.com/heywood8/money-tracker/issues/1124)) ([0d11f7e](https://github.com/heywood8/money-tracker/commit/0d11f7e64d75cfe1ef0ed71a4cfa0e8534f90720))
+
 ## [0.161.0](https://github.com/heywood8/money-tracker/compare/penny-v0.160.0...penny-v0.161.0) (2026-06-28)
 
 
