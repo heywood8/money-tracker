@@ -13,6 +13,7 @@ import { getRecentNotifications } from '../NotificationAccess';
 import * as PreferencesDB from '../PreferencesDB';
 import * as OperationsDB from '../OperationsDB';
 import * as AccountsDB from '../AccountsDB';
+import * as Currency from '../currency';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
 import { serializeLabels } from '../../utils/labelUtils';
@@ -92,6 +93,62 @@ const isoDateFromPostTime = (postTime) => {
 
 /** Today's ISO date — the last-resort fallback for a missing date. */
 const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Build the amount + multi-currency fields for booking a parsed notification
+ * against an account whose currency may differ from the notification's.
+ *
+ * A bank notification can be charged in a currency other than the card's account
+ * currency (e.g. a 129.99 EUR purchase on an AMD card). This mirrors how a
+ * manually-entered foreign-currency operation is stored so the balance is hit in
+ * the account currency while the original foreign value is preserved:
+ *   amount              = value in the account currency (what hits the balance)
+ *   destinationAmount   = original notification amount (foreign currency)
+ *   exchangeRate        = account→foreign rate
+ *   sourceCurrency      = foreign currency
+ *   destinationCurrency = account currency
+ *
+ * The conversion uses the *current* exchange rate (live, with offline fallback),
+ * the same source the operation form uses. When the currencies already match (or
+ * either is unknown) the amount is booked as-is.
+ *
+ * @param {{ amount: string, currency: string }} item - parsed descriptor / pending row
+ * @param {string|null|undefined} accountCurrency - currency of the booking account
+ * @returns {Promise<Object|null>} operation field overrides, or null when a
+ *   conversion is required but no exchange rate is available (caller must not
+ *   book a wrong amount — leave it for manual review).
+ */
+export const buildOperationCurrencyFields = async (item, accountCurrency) => {
+  if (!accountCurrency || !item.currency || item.currency === accountCurrency) {
+    // Same currency (or unknown account): book as-is, but normalize to the
+    // account currency's decimal places when known, matching the manual-entry
+    // path (useOperationForm) so notification and hand-entered amounts agree.
+    return {
+      amount: accountCurrency
+        ? Currency.formatAmount(item.amount, accountCurrency)
+        : item.amount,
+    };
+  }
+
+  // foreign → account rate (e.g. EUR→AMD), at the current rate.
+  const { rate } = await Currency.fetchLiveExchangeRate(item.currency, accountCurrency);
+  if (!rate) return null;
+
+  const convertedAmount = Currency.convertAmount(item.amount, item.currency, accountCurrency, rate);
+  if (!convertedAmount) return null;
+
+  // Store the account→foreign rate, inverted with decimal precision.
+  const exchangeRate = Currency.invertRate(rate);
+  if (!exchangeRate) return null;
+
+  return {
+    amount: convertedAmount,                                              // account currency
+    destinationAmount: Currency.formatAmount(item.amount, item.currency), // foreign currency
+    exchangeRate,                                                         // account→foreign
+    sourceCurrency: item.currency,                                        // foreign currency
+    destinationCurrency: accountCurrency,                                 // account currency
+  };
+};
 
 /**
  * Packages whose notifications are trusted to auto-create operations. A package
@@ -187,18 +244,38 @@ const runProcess = async () => {
 
     try {
       const resolution = await resolveNotification(descriptor);
-      // Auto-create only for trusted sources; everything else is reviewed.
-      // Kinds that require a manual category (C2C transfers) are never
-      // auto-created — they always wait in the queue for the user's category.
-      const autoCreate =
-        resolution.fullyMatched &&
+
+      // Everything an auto-create needs except the currency match. Computed first
+      // so a queue-bound notification never pays for the exchange-rate fetch
+      // below (whose result the pending branch would just discard and recompute
+      // at resolve time). Auto-create only for trusted sources; kinds that
+      // require a manual category (C2C transfers) always wait in the queue.
+      const eligibleForAutoCreate =
+        resolution.matchedAccount &&
+        resolution.matchedCategory &&
         !descriptor.requiresCategory &&
         isAllowedSource(descriptor.packageName, allowedPackages);
+
+      // When the account currency differs from the notification currency, convert
+      // the amount at the current exchange rate (same principle as a manually
+      // entered foreign-currency operation). A failed conversion (no rate) means
+      // we must not book a wrong amount — leave it for manual review.
+      let currencyFields = { amount: descriptor.amount };
+      let currencyResolved = resolution.currencyMatch;
+      if (eligibleForAutoCreate && !resolution.currencyMatch) {
+        const built = await buildOperationCurrencyFields(descriptor, resolution.accountCurrency);
+        if (built) {
+          currencyFields = built;
+          currencyResolved = true;
+        }
+      }
+
+      const autoCreate = eligibleForAutoCreate && currencyResolved;
 
       if (autoCreate) {
         await OperationsDB.createOperation({
           type: descriptor.type,
-          amount: descriptor.amount,
+          ...currencyFields,
           accountId: resolution.accountId,
           categoryId: resolution.categoryId,
           date,
@@ -212,9 +289,10 @@ const runProcess = async () => {
           ...descriptor,
           date,
           accountId: resolution.accountId,
-          // Don't pre-fill a category whose currency we couldn't match — the
-          // user should confirm the account first.
-          categoryId: resolution.currencyMatch ? resolution.categoryId : null,
+          // Pre-fill the resolved category whenever we have an account to book
+          // against; a currency mismatch is no longer a blocker since it is
+          // resolved by conversion at save time.
+          categoryId: resolution.matchedAccount ? resolution.categoryId : null,
         });
         summary.pending += 1;
       }
@@ -259,9 +337,28 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     throw new Error('Cannot resolve pending notification without an account');
   }
 
+  // Convert to the chosen account's currency at the current rate when they
+  // differ (e.g. a EUR purchase booked against an AMD account). Unlike the
+  // auto-create path (which silently re-queues when no rate is available), this
+  // is a user-driven save with no further fallback — so a missing rate throws
+  // rather than booking a wrong amount, surfacing the failure to the caller.
+  let currencyFields = { amount: pending.amount };
+  if (pending.currency) {
+    const account = await AccountsDB.getAccountById(accountId);
+    const accountCurrency = account ? account.currency : null;
+    const built = await buildOperationCurrencyFields(pending, accountCurrency);
+    if (built) {
+      currencyFields = built;
+    } else {
+      throw new Error(
+        `Cannot resolve pending notification ${pendingId}: no exchange rate for ${pending.currency}→${accountCurrency}`,
+      );
+    }
+  }
+
   const operation = await OperationsDB.createOperation({
     type: pending.type,
-    amount: pending.amount,
+    ...currencyFields,
     accountId,
     categoryId: categoryId || null,
     // operations.date is NOT NULL — fall back to the row's creation date / today.

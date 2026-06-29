@@ -135,6 +135,50 @@ describe('parseBankNotification', () => {
     });
   });
 
+  describe('E-POS PURCHASE template (online point-of-sale, foreign currency)', () => {
+    // The Ameria "ARCA transaction" E-POS PURCHASE notification: a EUR charge on
+    // an AMD card account (note the balance segment is in AMD, the charge in EUR).
+    const AMERIA_EPOS = {
+      title: 'АРКА транзакции',
+      text: 'E-POS PURCHASE | 129.99 EUR | 4083***7027, | Nike ES, ES | 29.06.2026 15:14 | BALANCE: 27,608.20 AMD',
+      packageName: 'com.banqr.ameriabank',
+      postTime: 1782062040000,
+    };
+    let result;
+    beforeEach(() => {
+      result = parseBankNotification(AMERIA_EPOS);
+    });
+
+    it('recognizes E-POS PURCHASE as a transaction', () => {
+      expect(result).not.toBeNull();
+    });
+
+    it('maps E-POS PURCHASE to an expense operation', () => {
+      expect(result.kind).toBe('E-POS PURCHASE');
+      expect(result.type).toBe('expense');
+    });
+
+    it('reports the transaction currency as charged (EUR, not the AMD balance)', () => {
+      expect(result.amount).toBe('129.99');
+      expect(result.currency).toBe('EUR');
+    });
+
+    it('extracts the merchant and trailing country code', () => {
+      expect(result.merchant).toBe('Nike ES');
+      expect(result.country).toBe('ES');
+    });
+
+    it('does not require a manual category (merchant rules can resolve it)', () => {
+      expect(result.requiresCategory).toBe(false);
+    });
+
+    it('extracts the card mask, date and time', () => {
+      expect(result.cardMask).toBe('4083***7027');
+      expect(result.date).toBe('2026-06-29');
+      expect(result.time).toBe('15:14');
+    });
+  });
+
   describe('PURCHASE does not require a manual category', () => {
     it('marks a purchase as not requiring a category', () => {
       expect(parseBankNotification(AMERIA_PURCHASE).requiresCategory).toBe(false);

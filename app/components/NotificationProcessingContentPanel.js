@@ -26,6 +26,7 @@ import {
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
+import * as Currency from '../services/currency';
 
 /**
  * "Notification processing" settings subpanel — the main view.
@@ -186,6 +187,15 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           const categoryRequired = kindRequiresCategory(item.kind, item.packageName);
           const canSave =
             choice.accountId != null && (!categoryRequired || choice.categoryId != null);
+          // Preview the converted amount when the chosen account's currency differs
+          // from the charge currency — the operation is booked in the account
+          // currency at save time, so show an estimate (offline rate) up front so
+          // the user can sanity-check it. The actual booking uses the live rate.
+          const chosenAccount = accounts.find((a) => a.id === choice.accountId);
+          const convertedPreview =
+            chosenAccount && item.currency && chosenAccount.currency !== item.currency
+              ? Currency.convertAmount(item.amount, item.currency, chosenAccount.currency)
+              : null;
           return (
             <View
               key={item.id}
@@ -202,6 +212,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
               <Text style={[styles.cardMeta, { color: colors.mutedText }]}>
                 {[item.date, item.cardMask].filter(Boolean).join(' · ')}
               </Text>
+              {convertedPreview && (
+                <Text style={[styles.cardConversion, { color: colors.mutedText }]}>
+                  ≈ {convertedPreview} {chosenAccount.currency}
+                </Text>
+              )}
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                 {(t('account') || 'Account').toUpperCase()}
@@ -349,6 +364,11 @@ const styles = StyleSheet.create({
   cardAmount: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  cardConversion: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   cardHeader: {
     alignItems: 'center',
