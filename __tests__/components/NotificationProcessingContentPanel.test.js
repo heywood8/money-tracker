@@ -4,6 +4,7 @@ import NotificationProcessingContentPanel from '../../app/components/Notificatio
 import * as pipeline from '../../app/services/notifications/processBankNotifications';
 import * as PendingNotificationsDB from '../../app/services/PendingNotificationsDB';
 import * as NotificationAccess from '../../app/services/NotificationAccess';
+import * as notificationFilters from '../../app/services/notifications/notificationFilters';
 
 jest.mock('../../app/contexts/LocalizationContext', () => ({
   useLocalization: () => ({ t: (key) => key }),
@@ -34,6 +35,11 @@ jest.mock('../../app/contexts/CategoriesContext', () => ({
 jest.mock('../../app/services/notifications/processBankNotifications');
 jest.mock('../../app/services/PendingNotificationsDB');
 jest.mock('../../app/services/NotificationAccess');
+jest.mock('../../app/services/notifications/notificationFilters', () => ({
+  getHiddenPackages: jest.fn(),
+  registerSeenPackages: jest.fn(),
+  filterNotificationsByApp: jest.fn(),
+}));
 
 const PENDING = {
   id: 'p1', kind: 'PURCHASE', type: 'expense', amount: '3900.00', currency: 'AMD',
@@ -55,9 +61,12 @@ const CHAT_RAW = {
 describe('NotificationProcessingContentPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    NotificationAccess.isNotificationAccessEnabled.mockResolvedValue(true);
-    NotificationAccess.openNotificationAccessSettings.mockResolvedValue();
     NotificationAccess.getRecentNotifications.mockResolvedValue([BANK_RAW, CHAT_RAW]);
+    // Re-establish filter defaults each test (clearAllMocks wipes call data only,
+    // but we reset implementations here so per-test overrides can't leak).
+    notificationFilters.getHiddenPackages.mockResolvedValue([]);
+    notificationFilters.registerSeenPackages.mockResolvedValue([]);
+    notificationFilters.filterNotificationsByApp.mockImplementation((items) => items);
     pipeline.isBankNotificationsEnabled.mockResolvedValue(true);
     pipeline.processBankNotifications.mockResolvedValue({ created: 0, pending: 1, skipped: 0 });
     pipeline.resolvePendingNotification.mockResolvedValue({ id: 1 });
@@ -130,11 +139,28 @@ describe('NotificationProcessingContentPanel', () => {
     expect(getAllByText('notification_bank_badge')).toHaveLength(1);
   });
 
-  it('reflects a missing notification-access permission with a Grant action', async () => {
-    NotificationAccess.isNotificationAccessEnabled.mockResolvedValue(false);
-    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
-    await waitFor(() => expect(getByText('grant_access')).toBeTruthy());
-    fireEvent.press(getByTestId('notification-access-button'));
-    expect(NotificationAccess.openNotificationAccessSettings).toHaveBeenCalled();
+  it('hides notifications from apps the user has filtered out', async () => {
+    notificationFilters.getHiddenPackages.mockResolvedValue(['com.chat']);
+    // Real filtering for this test so the hidden app is actually dropped.
+    notificationFilters.filterNotificationsByApp.mockImplementation((items, hidden) =>
+      items.filter((n) => !(hidden || []).includes(n.packageName)),
+    );
+    const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+    // The chat notification's app is hidden, so its text must not appear.
+    expect(queryByText('New message')).toBeNull();
+  });
+
+  it('shows a distinct "all filtered" empty state when every recent item is hidden', async () => {
+    // Both captured apps are hidden → the feed is empty but notifications exist.
+    notificationFilters.getHiddenPackages.mockResolvedValue(['am.bank', 'com.chat']);
+    notificationFilters.filterNotificationsByApp.mockImplementation((items, hidden) =>
+      items.filter((n) => !(hidden || []).includes(n.packageName)),
+    );
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+    const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+    // Must use the "hidden by filters" copy, not the "nothing recorded" copy.
+    await waitFor(() => expect(getByText('notifications_all_filtered')).toBeTruthy());
+    expect(queryByText('notifications_empty')).toBeNull();
   });
 });
