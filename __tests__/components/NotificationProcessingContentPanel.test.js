@@ -150,4 +150,17 @@ describe('NotificationProcessingContentPanel', () => {
     // The chat notification's app is hidden, so its text must not appear.
     expect(queryByText('New message')).toBeNull();
   });
+
+  it('shows a distinct "all filtered" empty state when every recent item is hidden', async () => {
+    // Both captured apps are hidden → the feed is empty but notifications exist.
+    notificationFilters.getHiddenPackages.mockResolvedValue(['am.bank', 'com.chat']);
+    notificationFilters.filterNotificationsByApp.mockImplementation((items, hidden) =>
+      items.filter((n) => !(hidden || []).includes(n.packageName)),
+    );
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([]);
+    const { getByText, queryByText } = await render(<NotificationProcessingContentPanel />);
+    // Must use the "hidden by filters" copy, not the "nothing recorded" copy.
+    await waitFor(() => expect(getByText('notifications_all_filtered')).toBeTruthy());
+    expect(queryByText('notifications_empty')).toBeNull();
+  });
 });

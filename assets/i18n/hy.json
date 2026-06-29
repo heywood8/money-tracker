@@ -39,6 +39,7 @@
   "notifications_recent": "Վերջին ծանուցումները",
   "notifications_loading": "Վերջին ծանուցումների բեռնում…",
   "notifications_empty": "Դեռ ոչ մի ծանուցում չի գրանցվել։ Նոր ծանուցումները կհայտնվեն այստեղ։",
+  "notifications_all_filtered": "Բոլոր վերջին ծանուցումները թաքցված են ձեր հավելվածների զտիչներով։",
   "notification_no_text": "Տեքստ չկա",
   "notification_filters": "Զտիչներ",
   "notification_filter_apps": "Հավելվածներ",

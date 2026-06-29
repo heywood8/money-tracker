@@ -39,6 +39,7 @@
   "notifications_recent": "최근 알림",
   "notifications_loading": "최근 알림을 불러오는 중…",
   "notifications_empty": "아직 기록된 알림이 없습니다. 새 알림이 여기에 표시됩니다.",
+  "notifications_all_filtered": "최근 알림이 모두 앱 필터로 숨겨졌습니다.",
   "notification_no_text": "텍스트 없음",
   "notification_filters": "필터",
   "notification_filter_apps": "앱",

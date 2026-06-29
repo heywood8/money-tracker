@@ -39,6 +39,7 @@
   "notifications_recent": "Последние уведомления",
   "notifications_loading": "Загрузка последних уведомлений…",
   "notifications_empty": "Уведомления пока не записаны. Новые уведомления появятся здесь.",
+  "notifications_all_filtered": "Все недавние уведомления скрыты фильтрами приложений.",
   "notification_no_text": "Без текста",
   "notification_filters": "Фильтры",
   "notification_filter_apps": "Приложения",

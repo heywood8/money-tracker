@@ -39,6 +39,7 @@
   "notifications_recent": "Notificaciones recientes",
   "notifications_loading": "Cargando notificaciones recientes…",
   "notifications_empty": "Aún no hay notificaciones registradas. Las nuevas notificaciones aparecerán aquí.",
+  "notifications_all_filtered": "Todas las notificaciones recientes están ocultas por tus filtros de apps.",
   "notification_no_text": "Sin texto",
   "notification_filters": "Filtros",
   "notification_filter_apps": "Aplicaciones",

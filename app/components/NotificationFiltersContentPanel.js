@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
@@ -19,7 +19,8 @@ import {
 import {
   getHiddenPackages,
   registerSeenPackages,
-  setPackageVisible,
+  togglePackageVisibility,
+  isPackageHidden,
 } from '../services/notifications/notificationFilters';
 
 /**
@@ -43,12 +44,18 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
   const [enabled, setEnabled] = useState(false);
   const [known, setKnown] = useState([]);
   const [hidden, setHidden] = useState([]);
+  // Guards the async setters below from firing after the panel unmounts (it is
+  // unmounted/remounted whenever the user toggles between the main and filters
+  // views), which would otherwise update state on a dead component.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const reload = useCallback(async () => {
     const [access, isOn] = await Promise.all([
       isNotificationAccessEnabled(),
       isBankNotificationsEnabled(),
     ]);
+    if (!mountedRef.current) return;
     setAccessEnabled(access);
     setEnabled(isOn);
     // Fold any apps in the current feed into the persisted known list so the
@@ -57,12 +64,12 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
     const recentList = Array.isArray(recent) ? recent : [];
     const knownList = await registerSeenPackages(recentList.map((n) => n.packageName));
     const hiddenList = await getHiddenPackages();
+    if (!mountedRef.current) return;
     setKnown(Array.isArray(knownList) ? knownList : []);
     setHidden(Array.isArray(hiddenList) ? hiddenList : []);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
@@ -70,10 +77,9 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
       } catch (error) {
         // Non-fatal; show whatever loaded.
       } finally {
-        if (!cancelled) setLoading(false);
+        if (mountedRef.current) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
   }, [reload]);
 
   const handleRefresh = useCallback(async () => {
@@ -81,25 +87,41 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
     try {
       await reload();
     } finally {
-      setRefreshing(false);
+      if (mountedRef.current) setRefreshing(false);
     }
   }, [reload]);
 
   const handleToggle = useCallback(async (value) => {
     setEnabled(value);
-    await setBankNotificationsEnabled(value);
-    if (value) {
-      // Enabling should act immediately on whatever is already captured.
-      await processBankNotifications();
+    try {
+      await setBankNotificationsEnabled(value);
+      if (value) {
+        // Enabling should act immediately on whatever is already captured.
+        await processBankNotifications();
+      }
+    } catch (error) {
+      // Persisting/processing failed — revert the optimistic switch so the UI
+      // matches the still-unchanged stored state.
+      if (mountedRef.current) setEnabled(!value);
     }
   }, []);
 
   const handleToggleApp = useCallback(async (packageName) => {
-    const currentlyHidden = hidden.includes(packageName);
-    // currentlyHidden → tapping makes it visible again, and vice-versa.
-    const next = await setPackageVisible(packageName, currentlyHidden);
-    setHidden(Array.isArray(next) ? next : []);
-  }, [hidden]);
+    try {
+      // Flip from the persisted source of truth (no reliance on a possibly-stale
+      // `hidden` snapshot), so rapid taps can't desync the checkbox.
+      const next = await togglePackageVisibility(packageName);
+      if (mountedRef.current) setHidden(Array.isArray(next) ? next : []);
+    } catch (error) {
+      // Write failed — resync from storage so the row reflects reality.
+      try {
+        const current = await getHiddenPackages();
+        if (mountedRef.current) setHidden(Array.isArray(current) ? current : []);
+      } catch (resyncError) {
+        // Leave the row as-is; nothing more we can do.
+      }
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -182,7 +204,7 @@ export default function NotificationFiltersContentPanel({ bottomInset }) {
         </View>
       ) : (
         known.map((pkg) => {
-          const checked = !hidden.includes(pkg);
+          const checked = !isPackageHidden(pkg, hidden);
           return (
             <TouchableOpacity
               key={pkg}

@@ -44,34 +44,34 @@ export const getHiddenPackages = async () => {
 };
 
 /**
- * Persist the full set of hidden packages (de-duplicated).
+ * Persist the full set of hidden packages (de-duplicated). Propagates the
+ * underlying write error so a caller acting on a user toggle can tell the write
+ * failed (rather than reporting a change that was never saved).
  * @param {string[]} list
  * @returns {Promise<void>}
  */
 export const setHiddenPackages = async (list) => {
-  try {
-    await PreferencesDB.setJsonPreference(
-      PreferencesDB.PREF_KEYS.NOTIFICATION_FILTER_HIDDEN,
-      Array.from(new Set(asArray(list).filter(Boolean))),
-    );
-  } catch (error) {
-    console.error('[notificationFilters] Failed to save hidden packages:', error);
-  }
+  await PreferencesDB.setJsonPreference(
+    PreferencesDB.PREF_KEYS.NOTIFICATION_FILTER_HIDDEN,
+    Array.from(new Set(asArray(list).filter(Boolean))),
+  );
 };
 
 /**
- * Show or hide a single app, updating the persisted hidden set.
+ * Flip a single app's visibility based on the CURRENT persisted state rather
+ * than a caller-supplied flag. Reading-then-flipping from the source of truth
+ * keeps rapid repeated taps from desyncing: a stale "is it hidden?" snapshot in
+ * the UI can't make two taps both add (or both remove) the same package.
  * @param {string} packageName
- * @param {boolean} visible - true = shown (filtered in), false = hidden (filtered out)
  * @returns {Promise<string[]>} the updated hidden list
  */
-export const setPackageVisible = async (packageName, visible) => {
-  if (!packageName) return getHiddenPackages();
+export const togglePackageVisibility = async (packageName) => {
   const hidden = new Set(await getHiddenPackages());
-  if (visible) {
-    hidden.delete(packageName);
+  if (!packageName) return Array.from(hidden);
+  if (hidden.has(packageName)) {
+    hidden.delete(packageName); // was hidden → show it
   } else {
-    hidden.add(packageName);
+    hidden.add(packageName); // was visible → hide it
   }
   const next = Array.from(hidden);
   await setHiddenPackages(next);

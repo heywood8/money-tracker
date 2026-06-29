@@ -35,7 +35,8 @@ describe('NotificationFiltersContentPanel', () => {
     pipeline.processBankNotifications.mockResolvedValue({ created: 0, pending: 0, skipped: 0 });
     notificationFilters.registerSeenPackages.mockResolvedValue(KNOWN);
     notificationFilters.getHiddenPackages.mockResolvedValue(['com.android.systemui']);
-    notificationFilters.setPackageVisible.mockResolvedValue([]);
+    notificationFilters.togglePackageVisibility.mockResolvedValue([]);
+    notificationFilters.isPackageHidden.mockImplementation((pkg, hidden) => (hidden || []).includes(pkg));
   });
 
   it('shows the notification-access control and the bank toggle', async () => {
@@ -65,25 +66,24 @@ describe('NotificationFiltersContentPanel', () => {
     expect(getByTestId('app-filter-org.telegram.messenger').props.accessibilityState.checked).toBe(true);
   });
 
-  it('hides a visible app when its row is tapped', async () => {
+  it('toggles a visible app off when its row is tapped', async () => {
     const { getByTestId } = await render(<NotificationFiltersContentPanel />);
     await waitFor(() => expect(getByTestId('app-filter-org.telegram.messenger')).toBeTruthy());
 
     fireEvent.press(getByTestId('app-filter-org.telegram.messenger'));
-    // Currently visible → toggling makes it hidden (visible=false).
+    // Toggle is driven by package name only; the service flips from fresh state.
     await waitFor(() =>
-      expect(notificationFilters.setPackageVisible).toHaveBeenCalledWith('org.telegram.messenger', false),
+      expect(notificationFilters.togglePackageVisibility).toHaveBeenCalledWith('org.telegram.messenger'),
     );
   });
 
-  it('re-shows a hidden app when its row is tapped', async () => {
+  it('toggles a hidden app back on when its row is tapped', async () => {
     const { getByTestId } = await render(<NotificationFiltersContentPanel />);
     await waitFor(() => expect(getByTestId('app-filter-com.android.systemui')).toBeTruthy());
 
     fireEvent.press(getByTestId('app-filter-com.android.systemui'));
-    // Currently hidden → toggling makes it visible (visible=true).
     await waitFor(() =>
-      expect(notificationFilters.setPackageVisible).toHaveBeenCalledWith('com.android.systemui', true),
+      expect(notificationFilters.togglePackageVisibility).toHaveBeenCalledWith('com.android.systemui'),
     );
   });
 });

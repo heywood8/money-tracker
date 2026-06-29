@@ -39,6 +39,7 @@
   "notifications_recent": "Letzte Benachrichtigungen",
   "notifications_loading": "Letzte Benachrichtigungen werden geladen…",
   "notifications_empty": "Noch keine Benachrichtigungen aufgezeichnet. Neue Benachrichtigungen erscheinen hier.",
+  "notifications_all_filtered": "Alle aktuellen Benachrichtigungen sind durch deine App-Filter ausgeblendet.",
   "notification_no_text": "Kein Text",
   "notification_filters": "Filter",
   "notification_filter_apps": "Apps",

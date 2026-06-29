@@ -39,6 +39,7 @@
   "notifications_recent": "最近の通知",
   "notifications_loading": "最近の通知を読み込んでいます…",
   "notifications_empty": "まだ通知は記録されていません。新しい通知はここに表示されます。",
+  "notifications_all_filtered": "最近の通知はすべてアプリフィルターで非表示になっています。",
   "notification_no_text": "テキストなし",
   "notification_filters": "フィルター",
   "notification_filter_apps": "アプリ",

@@ -3,7 +3,7 @@ import {
   DEFAULT_FILTER_PACKAGES,
   getHiddenPackages,
   setHiddenPackages,
-  setPackageVisible,
+  togglePackageVisibility,
   getKnownPackages,
   registerSeenPackages,
   isPackageHidden,
@@ -60,22 +60,37 @@ describe('notificationFilters', () => {
     });
   });
 
-  describe('setPackageVisible', () => {
-    it('hides an app by adding it to the hidden set', async () => {
-      const next = await setPackageVisible('com.chat', false);
+  describe('togglePackageVisibility', () => {
+    it('hides a visible app by adding it to the hidden set', async () => {
+      const next = await togglePackageVisibility('com.chat');
       expect(next).toContain('com.chat');
       expect(store.hidden).toContain('com.chat');
     });
 
-    it('shows an app by removing it from the hidden set', async () => {
+    it('shows a hidden app by removing it from the hidden set', async () => {
       store.hidden = ['com.chat'];
-      const next = await setPackageVisible('com.chat', true);
+      const next = await togglePackageVisibility('com.chat');
       expect(next).not.toContain('com.chat');
+      expect(store.hidden).not.toContain('com.chat');
     });
 
-    it('is a no-op for an empty package name', async () => {
-      const next = await setPackageVisible('', false);
-      expect(next).toEqual([]);
+    it('flips based on the persisted state, not a caller flag (double toggle returns to start)', async () => {
+      const after1 = await togglePackageVisibility('com.chat'); // visible -> hidden
+      expect(after1).toContain('com.chat');
+      const after2 = await togglePackageVisibility('com.chat'); // hidden -> visible
+      expect(after2).not.toContain('com.chat');
+    });
+
+    it('is a no-op for an empty package name and does not persist', async () => {
+      store.hidden = ['a'];
+      const next = await togglePackageVisibility('');
+      expect(next).toEqual(['a']);
+      expect(PreferencesDB.setJsonPreference).not.toHaveBeenCalled();
+    });
+
+    it('propagates a persistence failure to the caller', async () => {
+      PreferencesDB.setJsonPreference.mockRejectedValueOnce(new Error('disk full'));
+      await expect(togglePackageVisibility('com.chat')).rejects.toThrow('disk full');
     });
   });
 

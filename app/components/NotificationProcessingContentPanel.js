@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -55,6 +55,10 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const [hidden, setHidden] = useState([]);
   // Per-item chosen { accountId, categoryId } keyed by pending id.
   const [choices, setChoices] = useState({});
+  // Guards async setters from firing after unmount — the panel is remounted
+  // whenever the user toggles between the main and filters views.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const accountItems = accounts.map((a) => ({
     label: a.name,
@@ -71,6 +75,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
+    if (!mountedRef.current) return;
     setPending(items);
     // Seed choices with any suggested account/category already on the item.
     setChoices((prev) => {
@@ -87,34 +92,33 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const reloadRecent = useCallback(async () => {
     const items = await getRecentNotifications();
     const list = Array.isArray(items) ? items : [];
-    setRecent(list);
     // Remember which apps we've seen so they appear in the Filters list, and
     // refresh the hidden set so the feed reflects the latest filter choices.
     await registerSeenPackages(list.map((n) => n.packageName));
     const hiddenList = await getHiddenPackages();
+    if (!mountedRef.current) return;
+    setRecent(list);
     setHidden(Array.isArray(hiddenList) ? hiddenList : []);
   }, []);
 
   // On mount: read the feature flag, process once (if enabled), then load the
   // review queue and the recent-notifications feed.
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const isOn = await isBankNotificationsEnabled();
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         if (isOn) {
           await processBankNotifications();
         }
-        if (!cancelled) await Promise.all([reloadPending(), reloadRecent()]);
+        if (mountedRef.current) await Promise.all([reloadPending(), reloadRecent()]);
       } catch (error) {
         // Non-fatal; show whatever loaded.
       } finally {
-        if (!cancelled) setLoading(false);
+        if (mountedRef.current) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
   }, [reloadPending, reloadRecent]);
 
   const handleRefresh = useCallback(async () => {
@@ -125,7 +129,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
       }
       await Promise.all([reloadPending(), reloadRecent()]);
     } finally {
-      setProcessing(false);
+      if (mountedRef.current) setProcessing(false);
     }
   }, [reloadPending, reloadRecent]);
 
@@ -268,10 +272,19 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
       {visibleRecent.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="notifications-off-outline" size={40} color={colors.mutedText} />
+          {/* Distinguish "nothing captured" from "everything is hidden by the
+              app filters" so an empty feed never looks like a broken listener. */}
+          <Ionicons
+            name={recent.length > 0 ? 'funnel-outline' : 'notifications-off-outline'}
+            size={40}
+            color={colors.mutedText}
+          />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {t('notifications_empty') ||
-              'No notifications recorded yet. New notifications will appear here.'}
+            {recent.length > 0
+              ? (t('notifications_all_filtered') ||
+                'All recent notifications are hidden by your app filters.')
+              : (t('notifications_empty') ||
+                'No notifications recorded yet. New notifications will appear here.')}
           </Text>
         </View>
       ) : (
