@@ -8,6 +8,8 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
+import CategoryGridSelector from './CategoryGridSelector';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import {
@@ -59,13 +61,6 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     subLabel: a.currency,
     value: a.id,
   }));
-
-  // Leaf, non-shadow categories grouped by expense/income for the picker.
-  const categoryItemsFor = useCallback((type) => {
-    return categories
-      .filter((c) => c.type === 'entry' && !c.isShadow && c.categoryType === type)
-      .map((c) => ({ label: c.name, value: c.id }));
-  }, [categories]);
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
@@ -268,19 +263,28 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
                 />
               </View>
 
-              <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('category') || 'Category').toUpperCase()}
-                {categoryRequired ? ' *' : ''}
-              </Text>
-              <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
-                <SimplePicker
-                  value={choice.categoryId}
-                  onValueChange={(v) => setChoice(item.id, { categoryId: v })}
-                  items={categoryItemsFor(item.type)}
-                  colors={colors}
-                  closeLabel={t('close') || 'Close'}
-                />
+              <View style={styles.categoryLabelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('category') || 'Category').toUpperCase()}
+                  {categoryRequired ? ' *' : ''}
+                </Text>
+                {choice.categoryId ? (
+                  <View style={styles.selectedCategoryRow}>
+                    <Ionicons name="pricetag" size={12} color={colors.primary} />
+                    <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
+                      {getCategoryDisplayName(choice.categoryId, categories, t)}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
+              <CategoryGridSelector
+                categories={categories}
+                categoryType={item.type}
+                selectedCategoryId={choice.categoryId || null}
+                onSelect={(categoryId) => setChoice(item.id, { categoryId })}
+                colors={colors}
+                t={t}
+              />
 
               <View style={styles.actions}>
                 <TouchableOpacity
@@ -430,6 +434,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  categoryLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'space-between',
+  },
   centered: {
     alignItems: 'center',
     flex: 1,
@@ -467,6 +477,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
+  },
+  selectedCategoryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 4,
+  },
+  selectedCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   toggleHint: {
     fontSize: 12,

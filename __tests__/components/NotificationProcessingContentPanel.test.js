@@ -25,8 +25,10 @@ jest.mock('../../app/contexts/AccountsDataContext', () => ({
 jest.mock('../../app/contexts/CategoriesContext', () => ({
   useCategories: () => ({
     categories: [
-      { id: 'c1', name: 'Food', type: 'entry', categoryType: 'expense', isShadow: false },
-      { id: 'c2', name: 'Salary', type: 'entry', categoryType: 'income', isShadow: false },
+      { id: 'c1', name: 'Food', type: 'entry', categoryType: 'expense', parentId: null, isShadow: false },
+      { id: 'c2', name: 'Salary', type: 'entry', categoryType: 'income', parentId: null, isShadow: false },
+      { id: 'f1', name: 'Bills', type: 'folder', categoryType: 'expense', parentId: null, isShadow: false },
+      { id: 'c3', name: 'Rent', type: 'entry', categoryType: 'expense', parentId: 'f1', isShadow: false },
     ],
   }),
 }));
@@ -110,6 +112,49 @@ describe('NotificationProcessingContentPanel', () => {
     await waitFor(() =>
       expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
         'p1', expect.objectContaining({ accountId: 1 }),
+      ),
+    );
+  });
+
+  it('saves a category picked from the inline grid', async () => {
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+    const { getByText, getByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+    // Expense categories render as grid chips; tap "Food" and wait for it to
+    // register as the selection before saving.
+    fireEvent.press(getByTestId('category-grid-c1'));
+    await waitFor(() =>
+      expect(getByTestId('category-grid-c1').props.accessibilityState.selected).toBe(true),
+    );
+
+    fireEvent.press(getByText('save'));
+    await waitFor(() =>
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+        'p1', expect.objectContaining({ accountId: 1, categoryId: 'c1' }),
+      ),
+    );
+  });
+
+  it('drills into a folder to reach and save a nested category', async () => {
+    PendingNotificationsDB.getPendingNotifications.mockResolvedValue([{ ...PENDING, accountId: 1 }]);
+    const { getByText, getByTestId, queryByTestId } = await render(<NotificationProcessingContentPanel />);
+    await waitFor(() => expect(getByText('NAREK MEHRABYAN')).toBeTruthy());
+
+    // The nested "Rent" category is hidden until its "Bills" folder is opened.
+    expect(queryByTestId('category-grid-c3')).toBeNull();
+    fireEvent.press(getByTestId('category-grid-f1'));
+    await waitFor(() => expect(getByTestId('category-grid-c3')).toBeTruthy());
+
+    fireEvent.press(getByTestId('category-grid-c3'));
+    await waitFor(() =>
+      expect(getByTestId('category-grid-c3').props.accessibilityState.selected).toBe(true),
+    );
+
+    fireEvent.press(getByText('save'));
+    await waitFor(() =>
+      expect(pipeline.resolvePendingNotification).toHaveBeenCalledWith(
+        'p1', expect.objectContaining({ accountId: 1, categoryId: 'c3' }),
       ),
     );
   });
