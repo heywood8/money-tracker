@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "Trasforma automaticamente le notifiche di acquisto in operazioni",
   "bank_notifications_review": "Coda di revisione",
   "bank_notifications_empty": "Niente da revisionare. Le notifiche abbinate vengono salvate automaticamente.",
+  "bank_notifications_custom_label": "Nome personalizzato",
+  "bank_notifications_custom_label_help": "Usato come etichetta per questa e le future transazioni di questo negozio",
   "card_mask": "Numero carta",
   "card_mask_hint": "Usato per abbinare le notifiche bancarie a questo conto",
   "dismiss": "Ignora",

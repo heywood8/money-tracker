@@ -140,12 +140,18 @@ export const plannedOperations = sqliteTable('planned_operations', {
  * that merchant, then auto-applied to future notifications. Optionally scoped by
  * the source bank app's package name so the same merchant string can map
  * differently per bank if ever needed.
+ *
+ * `labelOverride` is an optional user-chosen display name for the merchant
+ * (e.g. "ECOSENSE BYUZAND" -> "Ecosense"). When set, operations created from
+ * future notifications for this merchant carry the override as their label
+ * instead of the raw shop name. Nullable — most rules only learn a category.
  */
 export const notificationMerchantRules = sqliteTable('notification_merchant_rules', {
   id: text('id').primaryKey(),
   merchant: text('merchant').notNull(),
   packageName: text('package_name'),
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'cascade' }),
+  labelOverride: text('label_override'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => ({

@@ -33,6 +33,8 @@
   "bank_notifications_enable_hint": "Turn purchase notifications into operations automatically",
   "bank_notifications_review": "Review queue",
   "bank_notifications_empty": "Nothing to review. Matched notifications are saved automatically.",
+  "bank_notifications_custom_label": "Custom name",
+  "bank_notifications_custom_label_help": "Used as the label for this and future transactions from this shop",
   "card_mask": "Card number",
   "card_mask_hint": "Used to match bank notifications to this account",
   "dismiss": "Dismiss",

@@ -157,6 +157,10 @@ const isSchemaComplete = async (rawDb) => {
     // the expectedTables check above.
     if (!accountsCols.some(c => c.name === 'card_mask')) return false;
 
+    // Check notification_merchant_rules has label_override column (migration 0011).
+    const merchantRuleCols = await rawDb.getAllAsync('PRAGMA table_info(notification_merchant_rules)');
+    if (!merchantRuleCols.some(c => c.name === 'label_override')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -394,6 +398,14 @@ const detectAppliedMigrations = async (rawDb) => {
       (await tableExists('pending_notifications'))
     ) {
       applied.push(10);
+    }
+  }
+
+  // Migration 0011: Adds notification_merchant_rules.label_override column.
+  if (await tableExists('notification_merchant_rules')) {
+    const ruleCols = await getColumns('notification_merchant_rules');
+    if (ruleCols.some(c => c.name === 'label_override')) {
+      applied.push(11);
     }
   }
 

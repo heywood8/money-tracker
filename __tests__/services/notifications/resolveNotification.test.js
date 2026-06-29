@@ -24,6 +24,7 @@ describe('resolveNotification', () => {
     AccountsDB.getAccountByCardMask.mockResolvedValue(null);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
     NotificationRulesDB.getCategoryForMerchant.mockResolvedValue(null);
+    NotificationRulesDB.getLabelForMerchant.mockResolvedValue(null);
   });
 
   describe('resolveAccountId', () => {
@@ -81,7 +82,32 @@ describe('resolveNotification', () => {
     });
   });
 
+  describe('resolveLabelOverride', () => {
+    it('returns the learned label override for the merchant', async () => {
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
+      expect(await resolver.resolveLabelOverride(descriptor)).toBe('Ecosense');
+      expect(NotificationRulesDB.getLabelForMerchant).toHaveBeenCalledWith('NAREK MEHRABYAN', 'am.bank');
+    });
+
+    it('returns null without a merchant', async () => {
+      expect(await resolver.resolveLabelOverride({ ...descriptor, merchant: null })).toBeNull();
+      expect(NotificationRulesDB.getLabelForMerchant).not.toHaveBeenCalled();
+    });
+
+    it('resolves an override even for requiresCategory (C2C) kinds', async () => {
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Mom');
+      expect(await resolver.resolveLabelOverride({ ...descriptor, requiresCategory: true })).toBe('Mom');
+    });
+  });
+
   describe('resolveNotification', () => {
+    it('surfaces the learned label override', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
+      const r = await resolver.resolveNotification(descriptor);
+      expect(r.labelOverride).toBe('Ecosense');
+    });
+
     it('reports fullyMatched when both resolve and currencies agree', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
       NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
@@ -90,6 +116,7 @@ describe('resolveNotification', () => {
         accountId: 7,
         accountCurrency: 'AMD',
         categoryId: 'cat-food',
+        labelOverride: null,
         matchedAccount: true,
         matchedCategory: true,
         currencyMatch: true,

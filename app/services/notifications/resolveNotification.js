@@ -69,6 +69,23 @@ export const resolveCategoryId = async (descriptor) => {
 };
 
 /**
+ * Resolve the user-chosen display label for a descriptor's merchant, or null.
+ *
+ * Unlike the category, a label override applies to every kind (including C2C
+ * transfers) — it is purely a display name for the counterparty/shop.
+ *
+ * @param {Object} descriptor - parsed notification (needs merchant, packageName)
+ * @returns {Promise<string|null>}
+ */
+export const resolveLabelOverride = async (descriptor) => {
+  if (!descriptor || !descriptor.merchant) return null;
+  return NotificationRulesDB.getLabelForMerchant(
+    descriptor.merchant,
+    descriptor.packageName,
+  );
+};
+
+/**
  * Resolve both account and category for a descriptor.
  *
  * `fullyMatched` additionally requires the resolved account's currency to equal
@@ -82,9 +99,10 @@ export const resolveCategoryId = async (descriptor) => {
  *   currencyMatch: boolean, fullyMatched: boolean }>}
  */
 export const resolveNotification = async (descriptor) => {
-  const [account, categoryId] = await Promise.all([
+  const [account, categoryId, labelOverride] = await Promise.all([
     resolveAccount(descriptor),
     resolveCategoryId(descriptor),
+    resolveLabelOverride(descriptor),
   ]);
   const accountId = account ? account.id : null;
   const accountCurrency = account ? account.currency : null;
@@ -96,6 +114,7 @@ export const resolveNotification = async (descriptor) => {
     accountId,
     accountCurrency,
     categoryId,
+    labelOverride,
     matchedAccount,
     matchedCategory,
     currencyMatch,

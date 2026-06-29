@@ -86,7 +86,7 @@ const TABLE_FIELDS = {
   app_metadata:       ['key', 'value', 'updated_at'],
   balance_history:    ['id', 'account_id', 'date', 'balance', 'created_at'],
   planned_operations: ['id', 'name', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'description', 'is_recurring', 'last_executed_month', 'display_order', 'created_at', 'updated_at'],
-  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'created_at', 'updated_at'],
+  notification_merchant_rules: ['id', 'merchant', 'package_name', 'category_id', 'label_override', 'created_at', 'updated_at'],
 };
 
 /**
@@ -847,12 +847,13 @@ export const restoreBackup = async (backup, cancelToken) => {
           // INSERT OR IGNORE: a rule whose category was not restored is skipped
           // rather than aborting the whole import.
           await db.runAsync(
-            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT OR IGNORE INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [
               rule.id,
               rule.merchant,
               rule.package_name || null,
               rule.category_id || null,
+              rule.label_override || null,
               rule.created_at || new Date().toISOString(),
               rule.updated_at || new Date().toISOString(),
             ],

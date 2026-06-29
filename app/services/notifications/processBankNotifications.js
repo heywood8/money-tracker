@@ -15,7 +15,7 @@ import * as OperationsDB from '../OperationsDB';
 import * as AccountsDB from '../AccountsDB';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
-import { serializeLabels } from '../../utils/labelUtils';
+import { serializeLabels, sanitizeLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
@@ -196,15 +196,16 @@ const runProcess = async () => {
         isAllowedSource(descriptor.packageName, allowedPackages);
 
       if (autoCreate) {
+        // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins
+        // over the raw merchant for the operation's label.
+        const label = resolution.labelOverride || descriptor.merchant;
         await OperationsDB.createOperation({
           type: descriptor.type,
           amount: descriptor.amount,
           accountId: resolution.accountId,
           categoryId: resolution.categoryId,
           date,
-          description: descriptor.merchant
-            ? serializeLabels([descriptor.merchant])
-            : null,
+          description: label ? serializeLabels([label]) : null,
         });
         summary.created += 1;
       } else {
@@ -259,6 +260,18 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     throw new Error('Cannot resolve pending notification without an account');
   }
 
+  // Resolve the operation's label: an override typed during review wins, then any
+  // previously-learned override for this merchant, then the raw shop name.
+  const typedLabel = sanitizeLabel(choices.labelOverride);
+  let learnedLabel = null;
+  if (!typedLabel && pending.merchant) {
+    learnedLabel = await NotificationRulesDB.getLabelForMerchant(
+      pending.merchant,
+      pending.packageName,
+    );
+  }
+  const label = typedLabel || learnedLabel || pending.merchant;
+
   const operation = await OperationsDB.createOperation({
     type: pending.type,
     amount: pending.amount,
@@ -266,8 +279,23 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     categoryId: categoryId || null,
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
-    description: pending.merchant ? serializeLabels([pending.merchant]) : null,
+    description: label ? serializeLabels([label]) : null,
   });
+
+  // Remember a typed display-name override so future notifications from this
+  // merchant reuse it. A label is just a display name, so — unlike the category —
+  // it is learned for every kind, including C2C transfers.
+  if (pending.merchant && typedLabel) {
+    try {
+      await NotificationRulesDB.upsertMerchantLabel(
+        pending.merchant,
+        typedLabel,
+        pending.packageName,
+      );
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn merchant label:', error);
+    }
+  }
 
   // Learn the card -> account binding (default on when a card mask is present).
   if (choices.learnCardMask !== false && pending.cardMask && accountId != null) {

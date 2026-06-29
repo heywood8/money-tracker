@@ -106,6 +106,20 @@ describe('processBankNotifications', () => {
     expect(emitSpy).toHaveBeenCalledWith(EVENTS.RELOAD_ALL);
   });
 
+  it('uses a learned label override as the operation label on auto-create', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+    NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    await pipeline.processBankNotifications();
+
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Ecosense' }),
+    );
+  });
+
   it('queues instead of auto-creating when the source is not trusted', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
@@ -283,6 +297,53 @@ describe('processBankNotifications', () => {
     it('returns null for an unknown pending id', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(null);
       expect(await pipeline.resolvePendingNotification('nope', { accountId: 7 })).toBeNull();
+    });
+
+    it('applies and learns a typed label override', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, merchant: 'ECOSENSE BYUZAND',
+      });
+      await pipeline.resolvePendingNotification('p1', {
+        accountId: 7, categoryId: 'cat-health', labelOverride: 'Ecosense',
+      });
+
+      // The operation carries the override, not the raw shop name...
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Ecosense' }),
+      );
+      // ...and the override is remembered for future notifications.
+      expect(NotificationRulesDB.upsertMerchantLabel).toHaveBeenCalledWith(
+        'ECOSENSE BYUZAND', 'Ecosense', PKG,
+      );
+      // A typed override never consults the learned one.
+      expect(NotificationRulesDB.getLabelForMerchant).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a previously-learned override when none is typed', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, merchant: 'ECOSENSE BYUZAND',
+      });
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue('Ecosense');
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-health' });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Ecosense' }),
+      );
+      // Nothing new typed, so no learning happens.
+      expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
+    });
+
+    it('uses the raw merchant when there is no override at all', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pending);
+      NotificationRulesDB.getLabelForMerchant.mockResolvedValue(null);
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'NAREK MEHRABYAN' }),
+      );
+      expect(NotificationRulesDB.upsertMerchantLabel).not.toHaveBeenCalled();
     });
 
     it('does not learn a merchant rule for a C2C transfer, even with a category', async () => {

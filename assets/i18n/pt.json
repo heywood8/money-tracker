@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "Transformar automaticamente notificações de compra em operações",
   "bank_notifications_review": "Fila de revisão",
   "bank_notifications_empty": "Nada para revisar. Notificações correspondentes são salvas automaticamente.",
+  "bank_notifications_custom_label": "Nome personalizado",
+  "bank_notifications_custom_label_help": "Usado como rótulo para esta e futuras transações desta loja",
   "card_mask": "Número do cartão",
   "card_mask_hint": "Usado para associar notificações bancárias a esta conta",
   "dismiss": "Dispensar",

@@ -8,6 +8,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
+import FormInput from './FormInput';
 import { NotificationCard } from './NotificationsContentPanel';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import {
@@ -23,6 +24,7 @@ import {
   filterNotificationsByApp,
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
+import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 
 /**
@@ -75,14 +77,27 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
+    // Pre-fill the custom-name field with any override already learned for the
+    // merchant, so the user edits (rather than re-types) a known shop's name.
+    const overrides = await Promise.all(
+      items.map((item) =>
+        item.merchant
+          ? getLabelForMerchant(item.merchant, item.packageName).catch(() => null)
+          : Promise.resolve(null),
+      ),
+    );
     if (!mountedRef.current) return;
     setPending(items);
-    // Seed choices with any suggested account/category already on the item.
+    // Seed choices with any suggested account/category and learned label.
     setChoices((prev) => {
       const next = { ...prev };
-      items.forEach((item) => {
+      items.forEach((item, i) => {
         if (!next[item.id]) {
-          next[item.id] = { accountId: item.accountId ?? null, categoryId: item.categoryId ?? null };
+          next[item.id] = {
+            accountId: item.accountId ?? null,
+            categoryId: item.categoryId ?? null,
+            labelOverride: overrides[i] ?? '',
+          };
         }
       });
       return next;
@@ -143,6 +158,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     await resolvePendingNotification(item.id, {
       accountId: choice.accountId,
       categoryId: choice.categoryId || null,
+      labelOverride: choice.labelOverride || null,
     });
     await reloadPending();
   }, [choices, reloadPending]);
@@ -206,6 +222,19 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
               </View>
               <Text style={[styles.cardMeta, { color: colors.mutedText }]}>
                 {[item.date, item.cardMask].filter(Boolean).join(' · ')}
+              </Text>
+
+              <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                {(t('bank_notifications_custom_label') || 'Custom name').toUpperCase()}
+              </Text>
+              <FormInput
+                value={choice.labelOverride ?? ''}
+                onChangeText={(v) => setChoice(item.id, { labelOverride: v })}
+                placeholder={item.merchant || ''}
+              />
+              <Text style={[styles.helpText, { color: colors.mutedText }]}>
+                {t('bank_notifications_custom_label_help')
+                  || 'Used as the label for this and future transactions from this shop'}
               </Text>
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
@@ -384,6 +413,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 4,
     marginTop: SPACING.sm,
+  },
+  helpText: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
   },
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,
