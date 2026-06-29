@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Linking, ActivityIndicator, BackHandler } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
-import { Text, Divider, TouchableRipple } from 'react-native-paper';
+import { Text, Divider, TouchableRipple, Menu } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -34,6 +34,7 @@ import { ensureLocationPermission } from '../services/LocationService';
 import { getValidAccessToken, signIn as googleSignIn, exportToSheets, importFromSheets } from '../services/GoogleSheetsService';
 import UpdateContentPanel from '../components/UpdateContentPanel';
 import NotificationProcessingContentPanel from '../components/NotificationProcessingContentPanel';
+import NotificationFiltersContentPanel from '../components/NotificationFiltersContentPanel';
 import AccountsScreen from './AccountsScreen';
 import CategoriesScreen from './CategoriesScreen';
 
@@ -132,6 +133,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const { startImport, cancelImport, completeImport, getCancelToken } = useImportProgress();
   const { startDownload, isDownloading, downloadProgress, downloadPhase } = useUpdateDownload();
   const [activeSubPanel, setActiveSubPanel] = useState(null);
+  // Nested view within the notification-processing subpanel: 'main' shows the
+  // review queue + feed, 'filters' shows access/toggle/app-filter controls.
+  const [notificationView, setNotificationView] = useState('main');
+  // Controls the notification-processing header overflow (three-dots) menu.
+  const [notificationMenuVisible, setNotificationMenuVisible] = useState(false);
   // Measured size of the settings container. The subpanel overlay is sized in
   // explicit pixels from this rather than relying on `absoluteFillObject`'s
   // top+bottom inset stretch, which collapses to zero height under Reanimated 4 /
@@ -261,6 +267,8 @@ export default function SettingsScreen({ setSubPanelActive }) {
     setSheetsImportSteps(SHEETS_IMPORT_STEPS.map(s => ({ ...s, status: 'pending' })));
     setSheetsImportError(null);
     setDownloadedApks([]);
+    setNotificationView('main');
+    setNotificationMenuVisible(false);
   }, []);
 
   // Back navigation is locked while a long async step (Sheets export/import) runs,
@@ -299,9 +307,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
   const canSwipeStepBack = useMemo(() => {
     if (activeSubPanel === 'import') return importStep !== 'source';
     if (activeSubPanel === 'export') return exportStep !== 'list';
+    if (activeSubPanel === 'notificationProcessing') return notificationView !== 'main';
     if (activeSubPanel === 'accounts' || activeSubPanel === 'categories') return embeddedCanGoBack;
     return false;
-  }, [activeSubPanel, importStep, exportStep, embeddedCanGoBack]);
+  }, [activeSubPanel, importStep, exportStep, notificationView, embeddedCanGoBack]);
 
   // Unified back navigation for the swipe, hardware-back, and the header arrow.
   // The resolver is defined further down (it depends on dismissPanel, which this
@@ -334,6 +343,10 @@ export default function SettingsScreen({ setSubPanelActive }) {
     }
     if (panel === 'export') {
       setExportStep('list');
+    }
+    if (panel === 'notificationProcessing') {
+      setNotificationView('main');
+      setNotificationMenuVisible(false);
     }
     setActiveSubPanel(panel);
     openPanelAnim();
@@ -927,10 +940,14 @@ export default function SettingsScreen({ setSubPanelActive }) {
       if (updateResult?.type === 'available') return t('update_available_title') || 'Update available';
       return t('check_updates') || 'Check for updates';
     }
-    if (activeSubPanel === 'notificationProcessing') return t('notification_processing') || 'Notification processing';
+    if (activeSubPanel === 'notificationProcessing') {
+      return notificationView === 'filters'
+        ? (t('notification_filters') || 'Filters')
+        : (t('notification_processing') || 'Notification processing');
+    }
     if (activeSubPanel === 'reset') return t('reset_database') || 'Reset Database';
     return '';
-  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, t]);
+  }, [activeSubPanel, exportStep, importStep, isCheckingUpdate, updateResult, notificationView, t]);
 
   const handleSubPanelBack = useMemo(() => {
     if (activeSubPanel === 'import') return handleImportBack;
@@ -947,11 +964,58 @@ export default function SettingsScreen({ setSubPanelActive }) {
       embeddedBackRef.current();
       return;
     }
+    // The Filters view is nested inside the notification-processing panel — step
+    // back to its main view rather than closing the whole panel.
+    if (activeSubPanel === 'notificationProcessing' && notificationView !== 'main') {
+      setNotificationView('main');
+      return;
+    }
     handleSubPanelBack();
   };
 
 
   // ─── RENDER ───
+  // Header action slot (opposite the back arrow). The import "local backups" list
+  // gets a refresh button; the notification-processing main view gets a
+  // three-dots overflow menu that opens the Filters view; everything else gets an
+  // empty spacer so the title stays centered.
+  let headerRightSlot = <View style={styles.backButton} />;
+  if (activeSubPanel === 'import' && importStep === 'local-list') {
+    headerRightSlot = (
+      <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
+        <Ionicons name="refresh-outline" size={22} color={colors.text} />
+      </TouchableOpacity>
+    );
+  } else if (activeSubPanel === 'notificationProcessing' && notificationView === 'main') {
+    headerRightSlot = (
+      <Menu
+        visible={notificationMenuVisible}
+        onDismiss={() => setNotificationMenuVisible(false)}
+        anchor={(
+          <TouchableOpacity
+            onPress={() => setNotificationMenuVisible(true)}
+            style={styles.backButton}
+            testID="notification-overflow-button"
+            accessibilityRole="button"
+            accessibilityLabel={t('notification_filters') || 'Filters'}
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
+          </TouchableOpacity>
+        )}
+      >
+        <Menu.Item
+          onPress={() => {
+            setNotificationMenuVisible(false);
+            setNotificationView('filters');
+          }}
+          title={t('notification_filters') || 'Filters'}
+          leadingIcon="filter-variant"
+          testID="notification-filters-menu-item"
+        />
+      </Menu>
+    );
+  }
+
   // The subpanel is an overlay that slides over the main settings list. Keeping
   // the list mounted behind it lets a rightward swipe (or the back arrow) reveal
   // it Telegram-style as the panel follows the finger off the right edge.
@@ -983,13 +1047,7 @@ export default function SettingsScreen({ setSubPanelActive }) {
             <Text variant="titleLarge" style={[styles.subPanelTitle, { color: colors.text }]}>
               {subPanelTitle}
             </Text>
-            {activeSubPanel === 'import' && importStep === 'local-list' ? (
-              <TouchableOpacity onPress={loadStoredBackups} style={styles.backButton}>
-                <Ionicons name="refresh-outline" size={22} color={colors.text} />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.backButton} />
-            )}
+            {headerRightSlot}
           </View>
 
           <Divider />
@@ -1439,7 +1497,11 @@ export default function SettingsScreen({ setSubPanelActive }) {
 
             {activeSubPanel === 'notificationProcessing' && (
               <View style={styles.updatePanelWrapper}>
-                <NotificationProcessingContentPanel bottomInset={scrollBottomInset} />
+                {notificationView === 'filters' ? (
+                  <NotificationFiltersContentPanel bottomInset={scrollBottomInset} />
+                ) : (
+                  <NotificationProcessingContentPanel bottomInset={scrollBottomInset} />
+                )}
               </View>
             )}
           </View>

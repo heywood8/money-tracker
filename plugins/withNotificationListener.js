@@ -60,7 +60,7 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
     companion object {
         const val PREFS_NAME = "penny_notification_access"
         const val KEY_RECENT = "recent_notifications"
-        const val MAX_STORED = 5
+        const val MAX_STORED = 20
 
         @Synchronized
         fun record(

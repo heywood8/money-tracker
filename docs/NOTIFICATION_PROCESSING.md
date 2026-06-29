@@ -194,7 +194,7 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
   reviewed item and learns the card → account and merchant → category bindings.
 - Triggered on app open and on every foreground transition via an `AppState`
   listener in `app/screens/AppInitializer.js`.
-- **Known limitation:** the native service keeps only the **last 5**
+- **Known limitation:** the native service keeps only the **last 20**
   notifications and is pull-only (no JS events). For lossless capture under
   bursty/backgrounded conditions, extend the Kotlin
   `PennyNotificationListenerService` to persist a durable queue (and optionally
@@ -212,6 +212,31 @@ live on `AccountsDB` (`getAccountByCardMask`, `setAccountCardMask`).
 - **Settings**: a "Bank notifications" row opens the subpanel. (A standalone
   merchant-rules manager remains a future enhancement; rules are currently
   learned automatically and editable by re-categorizing.)
+
+### App filters
+
+The notification-processing page (`app/components/NotificationProcessingContentPanel.js`)
+shows the review queue and the recent-notifications feed. Its header overflow menu
+(three-dots → **Filters**) opens a nested **Filters** view
+(`app/components/NotificationFiltersContentPanel.js`) that groups:
+
+- **Notification access** (grant/manage the OS listener permission) and the
+  **Process bank notifications** toggle — moved here from the main page.
+- **App filters** — a checkbox per app. Every app is shown by default; unchecking
+  one hides its notifications from the feed.
+
+`app/services/notifications/notificationFilters.js` backs this with two persisted
+lists in `appMetadata`:
+
+- `NOTIFICATION_FILTER_KNOWN` — every package seen, merged with the shipped
+  defaults (`com.banq.ameriabank`, `com.android.systemui`,
+  `org.telegram.messenger`) so the list is never empty and stays stable even as
+  apps age out of the native rolling window.
+- `NOTIFICATION_FILTER_HIDDEN` — packages the user unchecked. An app is visible
+  iff it is not in this set, so new/unknown apps default to visible.
+
+The filter is display-only: it curates the feed, while the auto-create path keeps
+its own source allowlist (learn-on-trust) for safety.
 
 ## Safety hardening (from code review)
 
@@ -267,7 +292,7 @@ pending item and is not exported.
 
 - `plugins/withNotificationListener.js` — Expo config plugin that installs the
   Android `NotificationListenerService`, a bridge module, and its package. Stores
-  the latest 5 notifications (`{title, text, packageName, postTime}`) in private
+  the latest 20 notifications (`{title, text, packageName, postTime}`) in private
   SharedPreferences.
 - `app/services/NotificationAccess.js` — JS wrapper: `isNotificationAccessEnabled()`,
   `getRecentNotifications()`, `openNotificationAccessSettings()`.

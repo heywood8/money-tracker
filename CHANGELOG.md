@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.162.0](https://github.com/heywood8/money-tracker/compare/penny-v0.161.1...penny-v0.162.0) (2026-06-29)
+
+
+### Features
+
+* add per-app notification filters and a Filters view ([#1123](https://github.com/heywood8/money-tracker/issues/1123)) ([5b1f685](https://github.com/heywood8/money-tracker/commit/5b1f6857d77a54c9bf4cafe15166b99663954d94))
+
 ## [0.161.1](https://github.com/heywood8/money-tracker/compare/penny-v0.161.0...penny-v0.161.1) (2026-06-29)
 
 
