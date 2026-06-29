@@ -37,6 +37,14 @@ jest.mock('../../../app/services/PreferencesDB', () => ({
 }));
 import * as PreferencesDB from '../../../app/services/PreferencesDB';
 
+// Use the real currency math but stub the live-rate fetch so conversions are
+// deterministic and never hit the network.
+jest.mock('../../../app/services/currency', () => {
+  const actual = jest.requireActual('../../../app/services/currency');
+  return { ...actual, fetchLiveExchangeRate: jest.fn() };
+});
+import * as Currency from '../../../app/services/currency';
+
 const PKG = 'com.banqr.ameriabank';
 const PURCHASE = {
   title: 'АРКА транзакции',
@@ -49,6 +57,13 @@ const PURCHASE_NO_DATE = {
   text: 'PURCHASE | 3,900.00 AMD | 4083***7027 | NAREK MEHRABYAN, AM',
   packageName: PKG,
   postTime: 1782000900000,
+};
+// E-POS (online point-of-sale) purchase charged in EUR on an AMD card account.
+const EPOS_EUR = {
+  title: 'АРКА транзакции',
+  text: 'E-POS PURCHASE | 129.99 EUR | 4083***7027, | Nike ES, ES | 29.06.2026 15:14 | BALANCE: 27,608.20 AMD',
+  packageName: PKG,
+  postTime: 1782062040000,
 };
 const C2C = {
   title: 'АРКА транзакции',
@@ -78,6 +93,8 @@ describe('processBankNotifications', () => {
     NotificationRulesDB.getCategoryForMerchant.mockResolvedValue(null);
     OperationsDB.createOperation.mockResolvedValue({ id: 1 });
     PendingNotificationsDB.addPendingNotification.mockResolvedValue({ id: 'p1' });
+    AccountsDB.getAccountById.mockResolvedValue(null);
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
   });
 
   it('does nothing when disabled', async () => {
@@ -117,18 +134,69 @@ describe('processBankNotifications', () => {
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalled();
   });
 
-  it('queues (does not auto-create) on a currency mismatch even if trusted', async () => {
+  it('auto-creates with a converted amount on a currency mismatch (trusted, fully matched)', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900 AMD
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
+    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('AMD', 'USD');
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'expense',
+        accountId: 7,
+        categoryId: 'cat-food',
+        amount: '10.14', // 3900 AMD * 0.0026 → USD
+        destinationAmount: '3900', // original foreign value (AMD, 0 decimals)
+        sourceCurrency: 'AMD',
+        destinationCurrency: 'USD',
+      }),
+    );
+  });
+
+  it('queues a foreign-currency purchase when no exchange rate is available', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // AMD
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
     NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
     PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
 
     const summary = await pipeline.processBankNotifications();
 
     expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
     expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    // Account + category are still suggested for the review queue.
     expect(PendingNotificationsDB.addPendingNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ accountId: 7, categoryId: null }),
+      expect.objectContaining({ accountId: 7, categoryId: 'cat-food' }),
+    );
+  });
+
+  it('auto-creates an E-POS PURCHASE, converting the foreign amount to the account currency', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]); // 129.99 EUR
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-shopping');
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '418.5', source: 'offline' });
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('EUR', 'AMD');
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'expense',
+        accountId: 7,
+        categoryId: 'cat-shopping',
+        amount: '54401', // 129.99 EUR * 418.5 → AMD (0 decimals)
+        destinationAmount: '129.99',
+        sourceCurrency: 'EUR',
+        destinationCurrency: 'AMD',
+        description: 'Nike ES',
+      }),
     );
   });
 
@@ -255,6 +323,41 @@ describe('processBankNotifications', () => {
         'bank_notifications_packages', [PKG],
       );
       expect(PendingNotificationsDB.deletePendingNotification).toHaveBeenCalledWith('p1');
+    });
+
+    it('converts the amount to the chosen account currency when they differ', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, amount: '129.99', currency: 'EUR', merchant: 'Nike ES',
+      });
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD' });
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '418.5', source: 'offline' });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-shopping' });
+
+      expect(Currency.fetchLiveExchangeRate).toHaveBeenCalledWith('EUR', 'AMD');
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: 7,
+          categoryId: 'cat-shopping',
+          amount: '54401', // 129.99 EUR * 418.5 → AMD
+          destinationAmount: '129.99',
+          sourceCurrency: 'EUR',
+          destinationCurrency: 'AMD',
+        }),
+      );
+    });
+
+    it('throws (does not book a wrong amount) when no rate is available for a foreign purchase', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, amount: '129.99', currency: 'EUR',
+      });
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD' });
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: null, source: 'none' });
+
+      await expect(
+        pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-shopping' }),
+      ).rejects.toThrow(/exchange rate/);
+      expect(OperationsDB.createOperation).not.toHaveBeenCalled();
     });
 
     it('falls back to a valid date when the pending row has none', async () => {

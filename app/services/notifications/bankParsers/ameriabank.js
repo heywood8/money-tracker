@@ -2,10 +2,15 @@
  * Bank notification parser for the Ameriabank app (`com.banqr.ameriabank`).
  *
  * Ameria posts each card event as a single pipe-delimited "ARCA transaction"
- * line. Two kinds are recognized today:
+ * line. Three kinds are recognized today:
  *
- *   PURCHASE | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD
- *   C2C      | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
+ *   PURCHASE       | 3,900.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD
+ *   E-POS PURCHASE | 129.99 EUR   | 4083***7027, | Nike ES, ES         | 29.06.2026 15:14 | BALANCE: 27,608.20 AMD
+ *   C2C            | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
+ *
+ * Note the E-POS PURCHASE example: the transaction is charged in EUR while the
+ * card account is in AMD. The parser reports the transaction currency as-is
+ * (EUR); converting to the account currency is the ingestion layer's job.
  *
  * The `parse` function is *pure* (no side effects) so it can be exhaustively
  * unit-tested and reused regardless of how notifications are ingested (polling,
@@ -38,6 +43,10 @@ export const PACKAGE_NAMES = ['com.banqr.ameriabank'];
  */
 const KIND_TO_TYPE = {
   PURCHASE: 'expense',
+  // Card-not-present / online point-of-sale purchase (e.g. a webshop). Behaves
+  // exactly like an in-store PURCHASE: a merchant expense whose category can be
+  // inferred from learned rules. Often charged in a foreign currency.
+  'E-POS PURCHASE': 'expense',
   C2C: 'expense',
 };
 
