@@ -55,8 +55,12 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const [pending, setPending] = useState([]);
   const [recent, setRecent] = useState([]);
   const [hidden, setHidden] = useState([]);
-  // Per-item chosen { accountId, categoryId } keyed by pending id.
+  // Per-item chosen { accountId, categoryId, labelOverride } keyed by pending id.
   const [choices, setChoices] = useState({});
+  // Mirror of `choices` so reloadPending can read the latest values without
+  // taking `choices` as a dependency (which would re-create it on every keystroke).
+  const choicesRef = useRef(choices);
+  useEffect(() => { choicesRef.current = choices; }, [choices]);
   // Guards async setters from firing after unmount — the panel is remounted
   // whenever the user toggles between the main and filters views.
   const mountedRef = useRef(true);
@@ -77,14 +81,20 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
+    const prevChoices = choicesRef.current;
     // Pre-fill the custom-name field with any override already learned for the
-    // merchant, so the user edits (rather than re-types) a known shop's name.
+    // merchant. Cards whose field already holds a name are settled and skipped —
+    // avoiding an O(N) lookup fan-out on every reload (each save/dismiss reloads).
+    // New and still-blank cards are looked up, so a name just learned on one card
+    // surfaces on its siblings from the same shop.
     const overrides = await Promise.all(
-      items.map((item) =>
-        item.merchant
+      items.map((item) => {
+        const settled = prevChoices[item.id]?.labelOverride;
+        if (settled) return Promise.resolve(settled);
+        return item.merchant
           ? getLabelForMerchant(item.merchant, item.packageName).catch(() => null)
-          : Promise.resolve(null),
-      ),
+          : Promise.resolve(null);
+      }),
     );
     if (!mountedRef.current) return;
     setPending(items);
@@ -92,12 +102,17 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     setChoices((prev) => {
       const next = { ...prev };
       items.forEach((item, i) => {
+        const learned = overrides[i] ?? '';
         if (!next[item.id]) {
           next[item.id] = {
             accountId: item.accountId ?? null,
             categoryId: item.categoryId ?? null,
-            labelOverride: overrides[i] ?? '',
+            labelOverride: learned,
           };
+        } else if (learned && !next[item.id].labelOverride) {
+          // A sibling save just learned this shop's name — surface it on a
+          // still-blank card without clobbering a value the user is editing.
+          next[item.id] = { ...next[item.id], labelOverride: learned };
         }
       });
       return next;
@@ -158,7 +173,9 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     await resolvePendingNotification(item.id, {
       accountId: choice.accountId,
       categoryId: choice.categoryId || null,
-      labelOverride: choice.labelOverride || null,
+      // Send the field verbatim (string, possibly blank) so resolve treats it as
+      // authoritative — a cleared field reverts to the raw shop name.
+      labelOverride: choice.labelOverride ?? '',
     });
     await reloadPending();
   }, [choices, reloadPending]);

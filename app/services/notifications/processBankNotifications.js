@@ -260,17 +260,17 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     throw new Error('Cannot resolve pending notification without an account');
   }
 
-  // Resolve the operation's label: an override typed during review wins, then any
-  // previously-learned override for this merchant, then the raw shop name.
-  const typedLabel = sanitizeLabel(choices.labelOverride);
-  let learnedLabel = null;
-  if (!typedLabel && pending.merchant) {
-    learnedLabel = await NotificationRulesDB.getLabelForMerchant(
-      pending.merchant,
-      pending.packageName,
-    );
-  }
-  const label = typedLabel || learnedLabel || pending.merchant;
+  // Resolve the operation's label. When the review UI supplies a `labelOverride`
+  // (always a string from that flow) it is authoritative: its text is the label,
+  // and a blank field means "no override — use the raw shop name". Programmatic
+  // callers that omit the field fall back to any previously-learned override.
+  const hasLabelChoice = typeof choices.labelOverride === 'string';
+  const typedLabel = sanitizeLabel(choices.labelOverride); // '' when blank/absent
+  const learnedLabel = pending.merchant
+    ? (await NotificationRulesDB.getLabelForMerchant(pending.merchant, pending.packageName)) || ''
+    : '';
+  const chosenLabel = hasLabelChoice ? typedLabel : learnedLabel;
+  const label = chosenLabel || pending.merchant;
 
   const operation = await OperationsDB.createOperation({
     type: pending.type,
@@ -282,10 +282,12 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     description: label ? serializeLabels([label]) : null,
   });
 
-  // Remember a typed display-name override so future notifications from this
-  // merchant reuse it. A label is just a display name, so — unlike the category —
+  // Persist an override change only when the user actually changed it in the
+  // review UI: a new/edited name is learned, a blanked field clears the override.
+  // An unchanged value writes nothing — avoiding updated_at churn that would
+  // reorder the rules list. A label is a display name, so — unlike the category —
   // it is learned for every kind, including C2C transfers.
-  if (pending.merchant && typedLabel) {
+  if (hasLabelChoice && pending.merchant && typedLabel !== learnedLabel) {
     try {
       await NotificationRulesDB.upsertMerchantLabel(
         pending.merchant,

@@ -179,6 +179,23 @@ describe('NotificationRulesDB', () => {
       );
       expect(rule.labelOverride).toBeNull();
     });
+
+    it('updates an existing unscoped row instead of inserting a shadowing scoped row', async () => {
+      // No package-scoped row, but an unscoped rule already holds a learned
+      // category. Learning a scoped label must reuse that row (the same way
+      // getMerchantRule reads it) rather than create a second row that hides it.
+      mockDb.queryFirst
+        .mockResolvedValueOnce(null) // scoped lookup misses
+        .mockResolvedValueOnce({ id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat-x' });
+      const rule = await NotificationRulesDB.upsertMerchantLabel('shop', 'Ecosense', 'am.bank');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE notification_merchant_rules SET label_override = ?'),
+        ['Ecosense', expect.any(String), 'r1'],
+      );
+      // The learned category on the reused row is preserved.
+      expect(rule.categoryId).toBe('cat-x');
+      expect(rule.labelOverride).toBe('Ecosense');
+    });
   });
 
   describe('deleteMerchantRule', () => {
