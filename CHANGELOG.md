@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.164.0](https://github.com/heywood8/money-tracker/compare/penny-v0.163.0...penny-v0.164.0) (2026-06-29)
+
+
+### Features
+
+* **notifications:** process E-POS purchases and convert foreign-currency charges ([#1129](https://github.com/heywood8/money-tracker/issues/1129)) ([604b5e4](https://github.com/heywood8/money-tracker/commit/604b5e47c446664b1cb76729445123b5f732aafa))
+
+## [0.163.0](https://github.com/heywood8/money-tracker/compare/penny-v0.162.0...penny-v0.163.0) (2026-06-29)
+
+
+### Features
+
+* **notifications:** show category grid in review queue ([#1127](https://github.com/heywood8/money-tracker/issues/1127)) ([ae228a6](https://github.com/heywood8/money-tracker/commit/ae228a6f34cc700197384f8c2075c83c9703fe39))
+
 ## [0.162.0](https://github.com/heywood8/money-tracker/compare/penny-v0.161.1...penny-v0.162.0) (2026-06-29)
 
 

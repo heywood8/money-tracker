@@ -9,6 +9,8 @@ import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
 import FormInput from './FormInput';
+import CategoryGridSelector from './CategoryGridSelector';
+import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import {
@@ -26,6 +28,7 @@ import {
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
+import * as Currency from '../services/currency';
 
 /**
  * "Notification processing" settings subpanel — the main view.
@@ -71,13 +74,6 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     subLabel: a.currency,
     value: a.id,
   }));
-
-  // Leaf, non-shadow categories grouped by expense/income for the picker.
-  const categoryItemsFor = useCallback((type) => {
-    return categories
-      .filter((c) => c.type === 'entry' && !c.isShadow && c.categoryType === type)
-      .map((c) => ({ label: c.name, value: c.id }));
-  }, [categories]);
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
@@ -224,6 +220,15 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           const categoryRequired = kindRequiresCategory(item.kind, item.packageName);
           const canSave =
             choice.accountId != null && (!categoryRequired || choice.categoryId != null);
+          // Preview the converted amount when the chosen account's currency differs
+          // from the charge currency — the operation is booked in the account
+          // currency at save time, so show an estimate (offline rate) up front so
+          // the user can sanity-check it. The actual booking uses the live rate.
+          const chosenAccount = accounts.find((a) => a.id === choice.accountId);
+          const convertedPreview =
+            chosenAccount && item.currency && chosenAccount.currency !== item.currency
+              ? Currency.convertAmount(item.amount, item.currency, chosenAccount.currency)
+              : null;
           return (
             <View
               key={item.id}
@@ -240,6 +245,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
               <Text style={[styles.cardMeta, { color: colors.mutedText }]}>
                 {[item.date, item.cardMask].filter(Boolean).join(' · ')}
               </Text>
+              {convertedPreview && (
+                <Text style={[styles.cardConversion, { color: colors.mutedText }]}>
+                  ≈ {convertedPreview} {chosenAccount.currency}
+                </Text>
+              )}
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                 {(t('bank_notifications_custom_label') || 'Custom name').toUpperCase()}
@@ -267,19 +277,28 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
                 />
               </View>
 
-              <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('category') || 'Category').toUpperCase()}
-                {categoryRequired ? ' *' : ''}
-              </Text>
-              <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
-                <SimplePicker
-                  value={choice.categoryId}
-                  onValueChange={(v) => setChoice(item.id, { categoryId: v })}
-                  items={categoryItemsFor(item.type)}
-                  colors={colors}
-                  closeLabel={t('close') || 'Close'}
-                />
+              <View style={styles.categoryLabelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                  {(t('category') || 'Category').toUpperCase()}
+                  {categoryRequired ? ' *' : ''}
+                </Text>
+                {choice.categoryId ? (
+                  <View style={styles.selectedCategoryRow}>
+                    <Ionicons name="pricetag" size={12} color={colors.primary} />
+                    <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
+                      {getCategoryDisplayName(choice.categoryId, categories, t)}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
+              <CategoryGridSelector
+                categories={categories}
+                categoryType={item.type}
+                selectedCategoryId={choice.categoryId || null}
+                onSelect={(categoryId) => setChoice(item.id, { categoryId })}
+                colors={colors}
+                t={t}
+              />
 
               <View style={styles.actions}>
                 <TouchableOpacity
@@ -392,6 +411,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  cardConversion: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
   cardHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -406,6 +430,12 @@ const styles = StyleSheet.create({
   cardMeta: {
     fontSize: 12,
     marginTop: 2,
+  },
+  categoryLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'space-between',
   },
   centered: {
     alignItems: 'center',
@@ -449,5 +479,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
+  },
+  selectedCategoryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 4,
+  },
+  selectedCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
