@@ -74,6 +74,8 @@ describe('PreferencesDB', () => {
         'BANK_NOTIFICATIONS_ENABLED',
         'BANK_NOTIFICATIONS_PROCESSED_SIGS',
         'BANK_NOTIFICATIONS_PACKAGES',
+        'NOTIFICATION_FILTER_KNOWN',
+        'NOTIFICATION_FILTER_HIDDEN',
       ]);
     });
   });

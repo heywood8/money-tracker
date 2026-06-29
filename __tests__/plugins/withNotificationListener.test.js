@@ -17,6 +17,12 @@ jest.mock('@expo/config-plugins', () => ({
   },
 }));
 
+// Capture the native sources the dangerous mod writes without touching disk.
+jest.mock('fs', () => ({
+  mkdirSync: jest.fn(),
+  writeFileSync: jest.fn(),
+}));
+
 const withNotificationListener = require('../../plugins/withNotificationListener');
 
 describe('withNotificationListener', () => {
@@ -117,5 +123,19 @@ describe('withNotificationListener', () => {
     withNotificationListener({});
     const config = { modResults: { language: 'kt', contents: 'class MainApplication' } };
     expect(() => mainAppCb(config)).toThrow(/package list/);
+  });
+
+  it('records the latest 20 notifications in the listener service', async () => {
+    const fs = require('fs');
+    fs.writeFileSync.mockClear();
+    withNotificationListener({});
+    await dangerousCb({ modRequest: { projectRoot: '/proj' } });
+
+    const serviceWrite = fs.writeFileSync.mock.calls.find(
+      ([filePath]) =>
+        typeof filePath === 'string' && filePath.endsWith('PennyNotificationListenerService.kt'),
+    );
+    expect(serviceWrite).toBeTruthy();
+    expect(serviceWrite[1]).toContain('const val MAX_STORED = 20');
   });
 });

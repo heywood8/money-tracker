@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
-import { Text, Switch } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../contexts/ThemeColorsContext';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -12,30 +12,33 @@ import { NotificationCard } from './NotificationsContentPanel';
 import { HORIZONTAL_PADDING, SPACING, BORDER_RADIUS } from '../styles/layout';
 import {
   isBankNotificationsEnabled,
-  setBankNotificationsEnabled,
   processBankNotifications,
   resolvePendingNotification,
   dismissPendingNotification,
 } from '../services/notifications/processBankNotifications';
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
-import { getPendingNotifications } from '../services/PendingNotificationsDB';
 import {
-  isNotificationAccessEnabled,
-  openNotificationAccessSettings,
-  getRecentNotifications,
-} from '../services/NotificationAccess';
+  getHiddenPackages,
+  registerSeenPackages,
+  filterNotificationsByApp,
+} from '../services/notifications/notificationFilters';
+import { getPendingNotifications } from '../services/PendingNotificationsDB';
+import { getRecentNotifications } from '../services/NotificationAccess';
 
 /**
- * Combined "Notification processing" settings subpanel.
+ * "Notification processing" settings subpanel — the main view.
  *
- * Merges what used to be two separate rows — system notification access and
- * bank-notification processing — into a single screen:
- *   1. Access section: grant/manage the OS notification-listener permission.
- *   2. Bank processing: toggle that turns purchase notifications into operations,
- *      plus the review queue for notifications that couldn't be matched
- *      automatically.
- *   3. Recent notifications: the raw feed the listener has captured, where the
- *      ones that parse as bank transactions are highlighted (see NotificationCard).
+ * Shows two things:
+ *   1. Review queue: notifications that parsed as bank transactions but couldn't
+ *      be matched automatically, each with an account + category picker.
+ *   2. Recent notifications: the raw feed the listener has captured, with the
+ *      bank-parseable ones highlighted (see NotificationCard). The feed is
+ *      filtered by the per-app filters the user manages from the "Filters" menu
+ *      (three-dots → Filters), so hidden apps don't clutter the list.
+ *
+ * The notification-access permission and the "process bank notifications" toggle
+ * live on the Filters subpanel (NotificationFiltersContentPanel), reachable from
+ * the header overflow menu.
  *
  * The panel owns all of its async state so the host screen only has to mount it.
  */
@@ -45,12 +48,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const { accounts } = useAccountsData();
   const { categories } = useCategories();
 
-  const [accessEnabled, setAccessEnabled] = useState(false);
-  const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [pending, setPending] = useState([]);
   const [recent, setRecent] = useState([]);
+  const [hidden, setHidden] = useState([]);
   // Per-item chosen { accountId, categoryId } keyed by pending id.
   const [choices, setChoices] = useState({});
 
@@ -84,23 +86,24 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadRecent = useCallback(async () => {
     const items = await getRecentNotifications();
-    setRecent(Array.isArray(items) ? items : []);
+    const list = Array.isArray(items) ? items : [];
+    setRecent(list);
+    // Remember which apps we've seen so they appear in the Filters list, and
+    // refresh the hidden set so the feed reflects the latest filter choices.
+    await registerSeenPackages(list.map((n) => n.packageName));
+    const hiddenList = await getHiddenPackages();
+    setHidden(Array.isArray(hiddenList) ? hiddenList : []);
   }, []);
 
-  // On mount: read access + feature flag, process once (if enabled), then load
-  // the review queue and the recent-notifications feed.
+  // On mount: read the feature flag, process once (if enabled), then load the
+  // review queue and the recent-notifications feed.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [access, isOn] = await Promise.all([
-          isNotificationAccessEnabled(),
-          isBankNotificationsEnabled(),
-        ]);
+        const isOn = await isBankNotificationsEnabled();
         if (cancelled) return;
-        setAccessEnabled(access);
-        setEnabled(isOn);
         if (isOn) {
           await processBankNotifications();
         }
@@ -114,34 +117,17 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     return () => { cancelled = true; };
   }, [reloadPending, reloadRecent]);
 
-  const handleToggle = useCallback(async (value) => {
-    setEnabled(value);
-    await setBankNotificationsEnabled(value);
-    if (value) {
-      setProcessing(true);
-      try {
-        await processBankNotifications();
-        await reloadPending();
-      } finally {
-        setProcessing(false);
-      }
-    }
-  }, [reloadPending]);
-
   const handleRefresh = useCallback(async () => {
     setProcessing(true);
     try {
-      // Re-check access too: the user may have just granted it in system settings.
-      const access = await isNotificationAccessEnabled();
-      setAccessEnabled(access);
-      if (enabled) {
+      if (await isBankNotificationsEnabled()) {
         await processBankNotifications();
       }
       await Promise.all([reloadPending(), reloadRecent()]);
     } finally {
       setProcessing(false);
     }
-  }, [enabled, reloadPending, reloadRecent]);
+  }, [reloadPending, reloadRecent]);
 
   const setChoice = useCallback((id, patch) => {
     setChoices((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -162,6 +148,12 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     await reloadPending();
   }, [reloadPending]);
 
+  // The feed, with hidden apps filtered out.
+  const visibleRecent = useMemo(
+    () => filterNotificationsByApp(recent, hidden),
+    [recent, hidden],
+  );
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -176,49 +168,6 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
       contentContainerStyle={{ paddingBottom: bottomInset, paddingHorizontal: HORIZONTAL_PADDING }}
       refreshControl={<RefreshControl refreshing={processing} onRefresh={handleRefresh} />}
     >
-      {/* ── Notification access ── */}
-      <View style={[styles.accessRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <Ionicons
-          name={accessEnabled ? 'checkmark-circle' : 'alert-circle-outline'}
-          size={22}
-          color={accessEnabled ? colors.income : colors.primary}
-        />
-        <View style={styles.accessText}>
-          <Text style={[styles.accessTitle, { color: colors.text }]}>
-            {t('notification_access') || 'Notification access'}
-          </Text>
-          <Text style={[styles.accessHint, { color: colors.mutedText }]}>
-            {accessEnabled
-              ? (t('notification_access_granted') || 'Penny can read notifications in the background.')
-              : (t('notification_access_hint') || 'Allow Penny to read notifications in the background')}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={openNotificationAccessSettings}
-          style={[styles.accessButton, { borderColor: colors.primary }]}
-          accessibilityRole="button"
-          testID="notification-access-button"
-        >
-          <Text style={[styles.accessButtonText, { color: colors.primary }]}>
-            {accessEnabled ? (t('manage') || 'Manage') : (t('grant_access') || 'Grant')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Bank processing toggle ── */}
-      <View style={[styles.toggleRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <View style={styles.toggleText}>
-          <Text style={[styles.toggleTitle, { color: colors.text }]}>
-            {t('bank_notifications_enable') || 'Process bank notifications'}
-          </Text>
-          <Text style={[styles.toggleHint, { color: colors.mutedText }]}>
-            {t('bank_notifications_enable_hint') ||
-              'Turn purchase notifications into operations automatically'}
-          </Text>
-        </View>
-        <Switch value={enabled} onValueChange={handleToggle} color={colors.primary} />
-      </View>
-
       {/* ── Review queue ── */}
       <Text style={[styles.sectionTitle, { color: colors.mutedText }]}>
         {(t('bank_notifications_review') || 'Review queue').toUpperCase()}
@@ -317,7 +266,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
         {(t('notifications_recent') || 'Recent notifications').toUpperCase()}
       </Text>
 
-      {recent.length === 0 ? (
+      {visibleRecent.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="notifications-off-outline" size={40} color={colors.mutedText} />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
@@ -326,7 +275,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           </Text>
         </View>
       ) : (
-        recent.map((notification, index) => (
+        visibleRecent.map((notification, index) => (
           <NotificationCard
             // Notifications carry no stable id; post time + index keeps keys
             // unique even when two arrive at the same millisecond.
@@ -350,37 +299,6 @@ NotificationProcessingContentPanel.defaultProps = {
 };
 
 const styles = StyleSheet.create({
-  accessButton: {
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-  },
-  accessButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  accessHint: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 2,
-  },
-  accessRow: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
-    padding: SPACING.md,
-  },
-  accessText: {
-    flex: 1,
-  },
-  accessTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
   actionButton: {
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.sm,
@@ -467,27 +385,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
-  },
-  toggleHint: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 2,
-  },
-  toggleRow: {
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.md,
-    padding: SPACING.md,
-  },
-  toggleText: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  toggleTitle: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });

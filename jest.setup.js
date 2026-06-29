@@ -658,6 +658,21 @@ jest.mock('react-native-paper', () => {
     visible ? React.createElement(View, { style, ...props }, React.createElement(Text, {}, children)) : null;
   Snackbar.propTypes = { children: PropTypes.node, visible: PropTypes.bool, onDismiss: PropTypes.func, duration: PropTypes.number, style: PropTypes.any };
 
+  // Renders the anchor always and the menu items only while "open", so tests can
+  // press the anchor to open and then press an item.
+  const Menu = ({ visible, onDismiss, anchor, children, ...props }) =>
+    React.createElement(View, props, anchor, visible ? children : null);
+  Menu.propTypes = {
+    visible: PropTypes.bool,
+    onDismiss: PropTypes.func,
+    anchor: PropTypes.node,
+    children: PropTypes.node,
+  };
+  const MenuItem = ({ onPress, title, leadingIcon, ...props }) =>
+    React.createElement(TouchableOpacity, { onPress, ...props }, React.createElement(Text, {}, title));
+  MenuItem.propTypes = { onPress: PropTypes.func, title: PropTypes.node, leadingIcon: PropTypes.string };
+  Menu.Item = MenuItem;
+
   return {
     Card,
     TouchableRipple,
@@ -672,6 +687,7 @@ jest.mock('react-native-paper', () => {
     Switch,
     Provider,
     Snackbar,
+    Menu,
   };
 });
 

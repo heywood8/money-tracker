@@ -17,6 +17,9 @@ export const PREF_KEYS = {
   BANK_NOTIFICATIONS_ENABLED: 'bank_notifications_enabled',
   BANK_NOTIFICATIONS_PROCESSED_SIGS: 'bank_notifications_processed_sigs',
   BANK_NOTIFICATIONS_PACKAGES: 'bank_notifications_packages',
+  // Notification feed app filters (which apps' notifications are shown)
+  NOTIFICATION_FILTER_KNOWN: 'notification_filter_known_packages',
+  NOTIFICATION_FILTER_HIDDEN: 'notification_filter_hidden_packages',
 };
 
 /**
