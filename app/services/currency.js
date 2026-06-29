@@ -460,6 +460,32 @@ export const reverseConvert = (destinationAmount, fromCurrency, toCurrency, cust
 };
 
 /**
+ * Invert an exchange rate with decimal precision.
+ *
+ * Computing `1 / rate` in JavaScript floats loses precision (and violates the
+ * decimal.js arithmetic convention used everywhere else here). This does the
+ * division with Decimal so a foreign→account rate can be stored as the inverse
+ * account→foreign rate without float error.
+ *
+ * @param {string|number} rate - rate to invert
+ * @param {number} decimals - decimal places to keep (default 6, matching the
+ *   precision used elsewhere for stored exchange rates)
+ * @returns {string|null} the inverted rate as a string, or null when the input
+ *   is not a positive, finite number
+ */
+export const invertRate = (rate, decimals = 6) => {
+  try {
+    const rateDecimal = toDecimal(rate);
+    if (!rateDecimal.isFinite() || rateDecimal.lessThanOrEqualTo(0)) {
+      return null;
+    }
+    return new Decimal(1).dividedBy(rateDecimal).toFixed(decimals);
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
  * Validate that an exchange rate is reasonable
  * @param {string|number} rate - Exchange rate to validate
  * @param {string} fromCurrency - Source currency code

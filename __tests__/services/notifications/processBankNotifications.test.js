@@ -175,6 +175,34 @@ describe('processBankNotifications', () => {
     );
   });
 
+  it('does not fetch an exchange rate for a foreign-currency notification destined for the review queue', async () => {
+    // Account resolves (currency mismatch) but the merchant has no learned
+    // category, so the item will be queued — converting now would be wasted work
+    // (the result is discarded and recomputed at resolve time).
+    NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]); // EUR
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue(null); // no category
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+    expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch an exchange rate for a foreign-currency notification from an untrusted source', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]); // EUR
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-shopping');
+    // allowlist empty → not trusted → not eligible for auto-create
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 0, pending: 1, skipped: 0 });
+    expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+  });
+
   it('auto-creates an E-POS PURCHASE, converting the foreign amount to the account currency', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([EPOS_EUR]); // 129.99 EUR
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
@@ -344,6 +372,22 @@ describe('processBankNotifications', () => {
           sourceCurrency: 'EUR',
           destinationCurrency: 'AMD',
         }),
+      );
+    });
+
+    it('normalizes the amount to the account currency decimal places when currencies match', async () => {
+      // AMD has 0 decimal places: a '3900.00' charge should be stored as '3900',
+      // matching how a hand-entered AMD operation is formatted.
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, amount: '3900.00', currency: 'AMD',
+      });
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD' });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      expect(Currency.fetchLiveExchangeRate).not.toHaveBeenCalled();
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: '3900' }),
       );
     });
 

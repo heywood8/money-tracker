@@ -502,6 +502,36 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('invertRate', () => {
+    it('inverts a rate with decimal precision (default 6 places)', () => {
+      expect(Currency.invertRate('418.5')).toBe('0.002389');
+      expect(Currency.invertRate('0.92')).toBe('1.086957');
+      expect(Currency.invertRate('2')).toBe('0.500000');
+    });
+
+    it('honours a custom number of decimals', () => {
+      expect(Currency.invertRate('3', 4)).toBe('0.3333');
+      expect(Currency.invertRate('8', 2)).toBe('0.13');
+    });
+
+    it('accepts a numeric rate', () => {
+      expect(Currency.invertRate(4)).toBe('0.250000');
+    });
+
+    it('returns null for non-positive or invalid rates', () => {
+      expect(Currency.invertRate('0')).toBe(null);
+      expect(Currency.invertRate('-2')).toBe(null);
+      expect(Currency.invertRate(null)).toBe(null);
+      expect(Currency.invertRate('abc')).toBe(null);
+    });
+
+    it('round-trips: inverting twice returns approximately the original', () => {
+      const once = Currency.invertRate('418.5', 10);
+      const twice = Currency.invertRate(once, 4);
+      expect(twice).toBe('418.5000');
+    });
+  });
+
   describe('isReasonableRate', () => {
     it('returns true for reasonable rates within 50% of expected', async () => {
       // Expected USD->EUR rate is 0.92
