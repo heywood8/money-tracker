@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.166.1](https://github.com/heywood8/money-tracker/compare/penny-v0.166.0...penny-v0.166.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **notifications:** ignore PRE-PURCHASE hold, only process PRE-PURCHASE COMPLETION ([#1137](https://github.com/heywood8/money-tracker/issues/1137)) ([26afd78](https://github.com/heywood8/money-tracker/commit/26afd78f0995f40291247da0a227ae6fa5359d20))
+
 ## [0.166.0](https://github.com/heywood8/money-tracker/compare/penny-v0.165.2...penny-v0.166.0) (2026-06-30)
 
 
