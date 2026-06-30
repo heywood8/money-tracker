@@ -1038,7 +1038,7 @@ export default function AccountsScreen({ onBackStateChange }) {
                     <Text
                       style={[
                         styles.roundingOptionText,
-                        { color: selected ? '#fff' : colors.text },
+                        selected ? styles.roundingOptionTextSelected : { color: colors.text },
                       ]}
                     >
                       {opt.value === null ? (t('rounding_off') || 'Off') : opt.label}
@@ -1492,6 +1492,9 @@ const styles = StyleSheet.create({
   roundingOptionText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  roundingOptionTextSelected: {
+    color: '#fff',
   },
   roundingRow: {
     borderRadius: 10,
