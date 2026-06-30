@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.167.0](https://github.com/heywood8/money-tracker/compare/penny-v0.166.1...penny-v0.167.0) (2026-06-30)
+
+
+### Features
+
+* **accounts:** round automatic transactions per-account (10/100/1000) ([#1140](https://github.com/heywood8/money-tracker/issues/1140)) ([e5d85c2](https://github.com/heywood8/money-tracker/commit/e5d85c2cb5b88aca270157eea43b73fd1d5e6f77))
+
 ## [0.166.1](https://github.com/heywood8/money-tracker/compare/penny-v0.166.0...penny-v0.166.1) (2026-06-30)
 
 
