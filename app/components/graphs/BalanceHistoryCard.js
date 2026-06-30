@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
-import { LineChart } from 'react-native-chart-kit';
-import { Line, Text as SvgText, G } from 'react-native-svg';
+import { LineChart } from 'react-native-chart-kit/v2';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import SimplePicker from '../SimplePicker';
 import currencies from '../../../assets/currencies.json';
@@ -291,6 +290,63 @@ const BalanceHistoryCard = ({
     };
   }, [balanceHistoryData, spendingPrediction, isCurrentMonth, selectedYear, selectedMonth, selectedAccount]);
 
+  // v2 LineChart consumes an array of records (xKey + per-series yKeys) instead of
+  // the legacy parallel { labels, datasets } shape. The actual line is split into a
+  // solid "actual" series (up to today) and a dashed "forecast" series (today onward),
+  // which makes the "today" boundary self-evident — replacing the old hand-drawn
+  // vertical decorator line and its hardcoded chart geometry.
+  const chartData = useMemo(() => {
+    if (!chartComputed) return [];
+    const { combinedActualForecast, plainAvgData, currentDay, hasForecast } = chartComputed;
+    const prevMonth = balanceHistoryData.prevMonth || [];
+    const showForecast = isCurrentMonth && hasForecast;
+    return balanceHistoryData.labels.map((day, i) => {
+      const raw = combinedActualForecast[i];
+      const value = raw === undefined ? null : raw;
+      const isForecastDay = showForecast && day > currentDay;
+      const isBoundaryDay = showForecast && day === currentDay;
+      return {
+        day: String(day),
+        actual: isForecastDay ? null : value,
+        // include the boundary day in the forecast series too so the segments touch
+        forecast: (isForecastDay || isBoundaryDay) ? value : null,
+        plainAvg: plainAvgData[i] ?? null,
+        prevMonth: prevMonth[i] ?? null,
+        zero: 0,
+      };
+    });
+  }, [chartComputed, balanceHistoryData, isCurrentMonth]);
+
+  const chartSeries = useMemo(() => {
+    if (!chartComputed) return [];
+    const series = [
+      { yKey: 'actual', label: 'actual', color: colors.primary, strokeWidth: 3, dot: { radius: 2 } },
+    ];
+    if (isCurrentMonth && chartComputed.hasForecast) {
+      series.push({ yKey: 'forecast', label: 'forecast', color: colors.primary, strokeWidth: 3, strokeDasharray: [5, 5], dot: false });
+    }
+    series.push({ yKey: 'plainAvg', label: 'plainAvg', color: 'rgba(128, 128, 128, 0.4)', strokeWidth: 2, dot: false });
+    if (chartComputed.hasPrevMonthData) {
+      series.push({ yKey: 'prevMonth', label: 'prevMonth', color: 'rgba(156, 39, 176, 0.5)', strokeWidth: 2, dot: false });
+    }
+    series.push({ yKey: 'zero', label: 'zero', color: 'rgba(128, 128, 128, 0.5)', strokeWidth: 1, dot: false });
+    return series;
+  }, [chartComputed, colors.primary, isCurrentMonth]);
+
+  const chartTheme = useMemo(() => ({
+    background: colors.altRow,
+    plotBackground: colors.altRow,
+    grid: colors.border,
+    axis: colors.mutedText,
+    text: colors.mutedText,
+    tooltip: {
+      background: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: colors.mutedText,
+    },
+  }), [colors.altRow, colors.border, colors.mutedText, colors.surface, colors.text]);
+
   return (
     <View style={[styles.balanceHistoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.balanceHistoryHeader}>
@@ -373,42 +429,15 @@ const BalanceHistoryCard = ({
               >
                 {chartComputed && (
                   <LineChart
-                    data={{
-                      labels: balanceHistoryData.labels.map(d => d.toString()),
-                      datasets: [
-                        {
-                          data: chartComputed.combinedActualForecast.filter(v => v !== undefined),
-                          color: () => colors.primary,
-                          strokeWidth: 3,
-                        },
-                        {
-                          data: chartComputed.plainAvgData,
-                          color: () => 'rgba(128, 128, 128, 0.4)',
-                          strokeWidth: 2,
-                          withDots: false,
-                        },
-                        ...(balanceHistoryData.prevMonth && balanceHistoryData.prevMonth.some(v => v !== undefined) ? [{
-                          data: balanceHistoryData.prevMonth.map(v => v ?? null),
-                          color: () => 'rgba(156, 39, 176, 0.5)',
-                          strokeWidth: 2,
-                          withDots: false,
-                        }] : []),
-                        {
-                          data: balanceHistoryData.labels.map(() => 0),
-                          color: () => 'rgba(128, 128, 128, 0.5)',
-                          strokeWidth: 1,
-                          withDots: false,
-                        },
-                      ],
-                    }}
+                    data={chartData}
+                    xKey="day"
+                    series={chartSeries}
                     width={screenWidth - 33}
                     height={220}
-                    paddingLeft="40"
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    yAxisInterval={chartComputed.niceInterval}
-                    segments={4}
-                    fromZero={!chartComputed.hasNegativeValues}
+                    theme={chartTheme}
+                    curve="monotone"
+                    connectNulls
+                    yDomain={chartComputed.hasNegativeValues || !chartComputed.niceMax ? 'auto' : [0, chartComputed.niceMax]}
                     formatYLabel={hideBalances ? () => '' : (value) => {
                       const numValue = parseFloat(value);
                       if (numValue === 0) return '';
@@ -432,76 +461,12 @@ const BalanceHistoryCard = ({
                       }
                       return '';
                     }}
-                    chartConfig={{
-                      backgroundColor: colors.altRow,
-                      backgroundGradientFrom: colors.altRow,
-                      backgroundGradientTo: colors.altRow,
-                      decimalPlaces: 0,
-                      color: (_opacity = 1) => colors.text,
-                      labelColor: (_opacity = 1) => colors.mutedText,
-                      style: {
-                        borderRadius: 16,
-                      },
-                      propsForDots: {
-                        r: '2',
-                        strokeWidth: '2',
-                      },
-                      propsForBackgroundLines: {
-                        strokeWidth: 1,
-                        stroke: colors.border,
-                        strokeDasharray: '0',
-                      },
-                    }}
-                    decorator={() => {
-                      // react-native-chart-kit places data using paddingRight (default 64) as
-                      // the left origin: x = paddingRight + i*(width-paddingRight)/n
-                      const chartWidth = screenWidth - 33; // must match width prop
-                      const chartPaddingRight = 64; // library default, acts as left margin
-                      const usableWidth = chartWidth - chartPaddingRight;
-                      const dataLength = balanceHistoryData.labels.length;
-                      const xStep = usableWidth / dataLength;
-                      const chartTop = 12;
-                      const chartBottom = 181;
-
-                      const elements = [];
-
-                      if (isCurrentMonth && chartComputed) {
-                        const todayIndex = chartComputed.currentDay - 1;
-                        const xPosition = chartPaddingRight + (todayIndex * xStep);
-                        elements.push(
-                          <Line
-                            key="today-line"
-                            x1={xPosition}
-                            y1={chartTop}
-                            x2={xPosition}
-                            y2={chartBottom}
-                            stroke={colors.primary}
-                            strokeWidth={1}
-                            strokeDasharray="4,4"
-                            opacity={0.6}
-                          />,
-                          <SvgText
-                            key="today-label"
-                            x={xPosition}
-                            y={10}
-                            fontSize={10}
-                            fill={colors.primary}
-                            textAnchor="middle"
-                            fontWeight="bold"
-                          >
-                            {chartComputed.currentDay}
-                          </SvgText>,
-                        );
-                      }
-
-                      return elements.length > 0 ? <G>{elements}</G> : null;
-                    }}
-                    bezier
-                    withInnerLines={true}
-                    withOuterLines={true}
-                    withVerticalLines={false}
-                    withHorizontalLines={true}
-                    withLegend={false}
+                    showHorizontalGridLines
+                    showVerticalGridLines={false}
+                    legend={false}
+                    crosshair
+                    tooltip={!hideBalances}
+                    accessibilityLabel={t('balance_history') || 'Balance history chart'}
                     style={styles.lineChartStyle}
                   />
                 )}

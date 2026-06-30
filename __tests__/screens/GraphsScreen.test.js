@@ -12,6 +12,10 @@ jest.mock('react-native-chart-kit', () => ({
   PieChart: () => 'PieChart',
 }));
 
+jest.mock('react-native-chart-kit/v2', () => ({
+  LineChart: () => 'LineChart',
+}));
+
 jest.mock('../../app/contexts/ThemeColorsContext', () => ({
   useThemeColors: jest.fn(() => ({
     colors: {
