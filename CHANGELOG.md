@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.165.0](https://github.com/heywood8/money-tracker/compare/penny-v0.164.0...penny-v0.165.0) (2026-06-30)
+
+
+### Features
+
+* **operations:** per-merchant label override for bank notifications ([#1130](https://github.com/heywood8/money-tracker/issues/1130)) ([370fe7b](https://github.com/heywood8/money-tracker/commit/370fe7bf945f2839c9c42b94151fb7bdc98a10a7))
+
 ## [0.164.0](https://github.com/heywood8/money-tracker/compare/penny-v0.163.0...penny-v0.164.0) (2026-06-29)
 
 
