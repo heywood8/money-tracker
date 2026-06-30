@@ -8,6 +8,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAccountsData } from '../contexts/AccountsDataContext';
 import { useCategories } from '../contexts/CategoriesContext';
 import SimplePicker from './SimplePicker';
+import FormInput from './FormInput';
 import CategoryGridSelector from './CategoryGridSelector';
 import { getCategoryDisplayName } from '../utils/categoryUtils';
 import { NotificationCard } from './NotificationsContentPanel';
@@ -25,6 +26,7 @@ import {
   filterNotificationsByApp,
 } from '../services/notifications/notificationFilters';
 import { getPendingNotifications } from '../services/PendingNotificationsDB';
+import { getLabelForMerchant } from '../services/NotificationRulesDB';
 import { getRecentNotifications } from '../services/NotificationAccess';
 import * as Currency from '../services/currency';
 
@@ -56,8 +58,12 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const [pending, setPending] = useState([]);
   const [recent, setRecent] = useState([]);
   const [hidden, setHidden] = useState([]);
-  // Per-item chosen { accountId, categoryId } keyed by pending id.
+  // Per-item chosen { accountId, categoryId, labelOverride } keyed by pending id.
   const [choices, setChoices] = useState({});
+  // Mirror of `choices` so reloadPending can read the latest values without
+  // taking `choices` as a dependency (which would re-create it on every keystroke).
+  const choicesRef = useRef(choices);
+  useEffect(() => { choicesRef.current = choices; }, [choices]);
   // Guards async setters from firing after unmount — the panel is remounted
   // whenever the user toggles between the main and filters views.
   const mountedRef = useRef(true);
@@ -71,14 +77,38 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
+    const prevChoices = choicesRef.current;
+    // Pre-fill the custom-name field with any override already learned for the
+    // merchant. Cards whose field already holds a name are settled and skipped —
+    // avoiding an O(N) lookup fan-out on every reload (each save/dismiss reloads).
+    // New and still-blank cards are looked up, so a name just learned on one card
+    // surfaces on its siblings from the same shop.
+    const overrides = await Promise.all(
+      items.map((item) => {
+        const settled = prevChoices[item.id]?.labelOverride;
+        if (settled) return Promise.resolve(settled);
+        return item.merchant
+          ? getLabelForMerchant(item.merchant, item.packageName).catch(() => null)
+          : Promise.resolve(null);
+      }),
+    );
     if (!mountedRef.current) return;
     setPending(items);
-    // Seed choices with any suggested account/category already on the item.
+    // Seed choices with any suggested account/category and learned label.
     setChoices((prev) => {
       const next = { ...prev };
-      items.forEach((item) => {
+      items.forEach((item, i) => {
+        const learned = overrides[i] ?? '';
         if (!next[item.id]) {
-          next[item.id] = { accountId: item.accountId ?? null, categoryId: item.categoryId ?? null };
+          next[item.id] = {
+            accountId: item.accountId ?? null,
+            categoryId: item.categoryId ?? null,
+            labelOverride: learned,
+          };
+        } else if (learned && !next[item.id].labelOverride) {
+          // A sibling save just learned this shop's name — surface it on a
+          // still-blank card without clobbering a value the user is editing.
+          next[item.id] = { ...next[item.id], labelOverride: learned };
         }
       });
       return next;
@@ -139,6 +169,9 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     await resolvePendingNotification(item.id, {
       accountId: choice.accountId,
       categoryId: choice.categoryId || null,
+      // Send the field verbatim (string, possibly blank) so resolve treats it as
+      // authoritative — a cleared field reverts to the raw shop name.
+      labelOverride: choice.labelOverride ?? '',
     });
     await reloadPending();
   }, [choices, reloadPending]);
@@ -217,6 +250,19 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
                   ≈ {convertedPreview} {chosenAccount.currency}
                 </Text>
               )}
+
+              <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                {(t('bank_notifications_custom_label') || 'Custom name').toUpperCase()}
+              </Text>
+              <FormInput
+                value={choice.labelOverride ?? ''}
+                onChangeText={(v) => setChoice(item.id, { labelOverride: v })}
+                placeholder={item.merchant || ''}
+              />
+              <Text style={[styles.helpText, { color: colors.mutedText }]}>
+                {t('bank_notifications_custom_label_help')
+                  || 'Used as the label for this and future transactions from this shop'}
+              </Text>
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
                 {(t('account') || 'Account').toUpperCase()}
@@ -414,6 +460,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 4,
     marginTop: SPACING.sm,
+  },
+  helpText: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
   },
   pickerWrap: {
     borderRadius: BORDER_RADIUS.sm,

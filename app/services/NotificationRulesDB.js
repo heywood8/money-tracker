@@ -1,5 +1,6 @@
 import uuid from 'react-native-uuid';
 import { executeQuery, queryAll, queryFirst } from './db';
+import { sanitizeLabel } from '../utils/labelUtils';
 
 /**
  * Merchant -> category rules for bank-notification processing.
@@ -25,6 +26,7 @@ const mapRuleFields = (row) => {
     merchant: row.merchant,
     packageName: row.package_name,
     categoryId: row.category_id,
+    labelOverride: row.label_override ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -75,6 +77,82 @@ export const getCategoryForMerchant = async (merchant, packageName = null) => {
 };
 
 /**
+ * Resolve the user-chosen display label for a merchant, or null.
+ *
+ * When set, operations created from this merchant's notifications use this
+ * label instead of the raw shop name (e.g. "ECOSENSE BYUZAND" -> "Ecosense").
+ *
+ * @param {string} merchant
+ * @param {string|null} packageName
+ * @returns {Promise<string|null>}
+ */
+export const getLabelForMerchant = async (merchant, packageName = null) => {
+  const rule = await getMerchantRule(merchant, packageName);
+  return rule && rule.labelOverride ? rule.labelOverride : null;
+};
+
+/**
+ * Find-or-create the (merchant, packageName) rule row and set the given columns.
+ *
+ * Shared by the category- and label-learning upserts so the NULL-matching
+ * lookup and the INSERT column list live in exactly one place. Columns not named
+ * in `columns` are left untouched on an existing row and default to NULL on a new
+ * one — so learning a label never disturbs a learned category and vice versa.
+ *
+ * @param {string} key - already-normalized merchant key (non-empty)
+ * @param {string|null} packageName
+ * @param {Object} columns - DB column -> value to set (e.g. { category_id } or { label_override })
+ * @returns {Promise<Object>} the stored rule
+ */
+const upsertRuleRow = async (key, packageName, columns) => {
+  const now = new Date().toISOString();
+  let existing = await queryFirst(
+    packageName
+      ? 'SELECT * FROM notification_merchant_rules WHERE merchant = ? AND package_name = ?'
+      : 'SELECT * FROM notification_merchant_rules WHERE merchant = ? AND package_name IS NULL',
+    packageName ? [key, packageName] : [key],
+  );
+
+  // When scoping by package but no scoped row exists, fall back to an unscoped
+  // row for the same merchant. getMerchantRule reads the same way (scoped wins,
+  // unscoped fallback), so updating that row keeps the learned value visible
+  // instead of inserting a scoped row that would shadow the unscoped one and
+  // hide whatever it had already learned (e.g. a category).
+  if (!existing && packageName) {
+    existing = await queryFirst(
+      'SELECT * FROM notification_merchant_rules WHERE merchant = ? AND package_name IS NULL',
+      [key],
+    );
+  }
+
+  if (existing) {
+    const names = Object.keys(columns);
+    const assignments = names.map((c) => `${c} = ?`).join(', ');
+    await executeQuery(
+      `UPDATE notification_merchant_rules SET ${assignments}, updated_at = ? WHERE id = ?`,
+      [...names.map((c) => columns[c]), now, existing.id],
+    );
+    return mapRuleFields({ ...existing, ...columns, updated_at: now });
+  }
+
+  const row = {
+    id: uuid.v4(),
+    merchant: key,
+    package_name: packageName || null,
+    category_id: null,
+    label_override: null,
+    ...columns,
+    created_at: now,
+    updated_at: now,
+  };
+  await executeQuery(
+    'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, label_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [row.id, row.merchant, row.package_name, row.category_id, row.label_override, row.created_at, row.updated_at],
+  );
+  return mapRuleFields(row);
+};
+
+/**
  * Create or update the merchant -> category rule (learn-on-categorize).
  *
  * Upserts on the (merchant, packageName) pair. A null/empty categoryId is
@@ -89,37 +167,36 @@ export const upsertMerchantRule = async (merchant, categoryId, packageName = nul
   const key = normalizeMerchant(merchant);
   if (!key || !categoryId) return null;
   try {
-    const now = new Date().toISOString();
-    const existing = await queryFirst(
-      packageName
-        ? 'SELECT * FROM notification_merchant_rules WHERE merchant = ? AND package_name = ?'
-        : 'SELECT * FROM notification_merchant_rules WHERE merchant = ? AND package_name IS NULL',
-      packageName ? [key, packageName] : [key],
-    );
-
-    if (existing) {
-      await executeQuery(
-        'UPDATE notification_merchant_rules SET category_id = ?, updated_at = ? WHERE id = ?',
-        [categoryId, now, existing.id],
-      );
-      return mapRuleFields({ ...existing, category_id: categoryId, updated_at: now });
-    }
-
-    const id = uuid.v4();
-    await executeQuery(
-      'INSERT INTO notification_merchant_rules (id, merchant, package_name, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, key, packageName || null, categoryId, now, now],
-    );
-    return mapRuleFields({
-      id,
-      merchant: key,
-      package_name: packageName || null,
-      category_id: categoryId,
-      created_at: now,
-      updated_at: now,
-    });
+    return await upsertRuleRow(key, packageName, { category_id: categoryId });
   } catch (error) {
     console.error('Failed to upsert merchant rule:', error);
+    throw error;
+  }
+};
+
+/**
+ * Set (or clear) the display-label override for a merchant.
+ *
+ * Upserts on the (merchant, packageName) pair, touching only the label column so
+ * a learned category on the same row is preserved. A label override can exist
+ * without any category — unlike category learning, a user may name a shop before
+ * (or without ever) categorizing it. An empty/blank label clears the override.
+ *
+ * @param {string} merchant
+ * @param {string} labelOverride
+ * @param {string|null} packageName
+ * @returns {Promise<Object|null>} the stored rule, or null if merchant is empty
+ */
+export const upsertMerchantLabel = async (merchant, labelOverride, packageName = null) => {
+  const key = normalizeMerchant(merchant);
+  if (!key) return null;
+  // sanitizeLabel strips the label delimiter and clamps the length; '' -> null
+  // so a blank entry clears any previous override rather than storing junk.
+  const value = sanitizeLabel(labelOverride) || null;
+  try {
+    return await upsertRuleRow(key, packageName, { label_override: value });
+  } catch (error) {
+    console.error('Failed to upsert merchant label:', error);
     throw error;
   }
 };

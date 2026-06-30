@@ -12,6 +12,7 @@ import m0007 from './0007_add_enum_check_constraints.js';
 import m0008 from './0008_soft_delete_accounts.js';
 import m0009 from './0009_add_operation_location.js';
 import m0010 from './0010_bank_notifications.js';
+import m0011 from './0011_merchant_label_override.js';
 
 export default {
   journal,
@@ -27,6 +28,7 @@ export default {
     m0008,
     m0009,
     m0010,
+    m0011,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

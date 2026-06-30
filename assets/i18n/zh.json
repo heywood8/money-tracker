@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "自动将购买通知转换为交易",
   "bank_notifications_review": "审核队列",
   "bank_notifications_empty": "没有需要审核的内容。匹配的通知会自动保存。",
+  "bank_notifications_custom_label": "自定义名称",
+  "bank_notifications_custom_label_help": "用作该商家本次及以后交易的标签",
   "card_mask": "卡号",
   "card_mask_hint": "用于将银行通知与此账户匹配",
   "dismiss": "忽略",

@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "Convierte automáticamente las notificaciones de compra en operaciones",
   "bank_notifications_review": "Cola de revisión",
   "bank_notifications_empty": "Nada que revisar. Las notificaciones coincidentes se guardan automáticamente.",
+  "bank_notifications_custom_label": "Nombre personalizado",
+  "bank_notifications_custom_label_help": "Se usa como etiqueta para esta y futuras transacciones de esta tienda",
   "card_mask": "Número de tarjeta",
   "card_mask_hint": "Se usa para asociar las notificaciones bancarias con esta cuenta",
   "dismiss": "Descartar",

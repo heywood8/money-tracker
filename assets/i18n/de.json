@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "Kaufbenachrichtigungen automatisch in Buchungen umwandeln",
   "bank_notifications_review": "Prüfliste",
   "bank_notifications_empty": "Nichts zu prüfen. Zugeordnete Benachrichtigungen werden automatisch gespeichert.",
+  "bank_notifications_custom_label": "Eigener Name",
+  "bank_notifications_custom_label_help": "Wird als Bezeichnung für diese und künftige Transaktionen dieses Geschäfts verwendet",
   "card_mask": "Kartennummer",
   "card_mask_hint": "Wird verwendet, um Bankbenachrichtigungen diesem Konto zuzuordnen",
   "dismiss": "Verwerfen",

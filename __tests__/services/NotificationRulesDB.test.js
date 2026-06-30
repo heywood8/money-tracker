@@ -114,6 +114,90 @@ describe('NotificationRulesDB', () => {
     });
   });
 
+  describe('getLabelForMerchant', () => {
+    it('returns the label override of the matched rule', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        {
+          id: 'r1', merchant: 'ECOSENSE BYUZAND', package_name: null,
+          category_id: 'cat-health', label_override: 'Ecosense',
+        },
+      ]);
+      expect(await NotificationRulesDB.getLabelForMerchant('Ecosense Byuzand')).toBe('Ecosense');
+    });
+    it('returns null when the rule has no override', async () => {
+      mockDb.queryAll.mockResolvedValue([
+        { id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat', label_override: null },
+      ]);
+      expect(await NotificationRulesDB.getLabelForMerchant('shop')).toBeNull();
+    });
+    it('returns null when no rule exists', async () => {
+      mockDb.queryAll.mockResolvedValue([]);
+      expect(await NotificationRulesDB.getLabelForMerchant('nobody')).toBeNull();
+    });
+  });
+
+  describe('upsertMerchantLabel', () => {
+    it('returns null for an empty merchant key', async () => {
+      const result = await NotificationRulesDB.upsertMerchantLabel('', 'Ecosense');
+      expect(result).toBeNull();
+      expect(mockDb.executeQuery).not.toHaveBeenCalled();
+    });
+
+    it('inserts a new label-only rule when none exists', async () => {
+      mockDb.queryFirst.mockResolvedValue(null);
+      const rule = await NotificationRulesDB.upsertMerchantLabel('Ecosense Byuzand', 'Ecosense', 'am.bank');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO notification_merchant_rules'),
+        expect.arrayContaining(['ECOSENSE BYUZAND', 'am.bank', null, 'Ecosense']),
+      );
+      expect(rule.merchant).toBe('ECOSENSE BYUZAND');
+      expect(rule.labelOverride).toBe('Ecosense');
+      expect(rule.categoryId).toBeNull();
+    });
+
+    it('updates only the label on an existing rule, preserving its category', async () => {
+      mockDb.queryFirst.mockResolvedValue({
+        id: 'r1', merchant: 'ECOSENSE BYUZAND', package_name: null, category_id: 'cat-health',
+      });
+      const rule = await NotificationRulesDB.upsertMerchantLabel('ecosense byuzand', 'Ecosense');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE notification_merchant_rules SET label_override = ?'),
+        ['Ecosense', expect.any(String), 'r1'],
+      );
+      expect(rule.labelOverride).toBe('Ecosense');
+      expect(rule.categoryId).toBe('cat-health');
+    });
+
+    it('clears the override when given a blank label', async () => {
+      mockDb.queryFirst.mockResolvedValue({
+        id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat', label_override: 'Old',
+      });
+      const rule = await NotificationRulesDB.upsertMerchantLabel('shop', '   ');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE notification_merchant_rules SET label_override = ?'),
+        [null, expect.any(String), 'r1'],
+      );
+      expect(rule.labelOverride).toBeNull();
+    });
+
+    it('updates an existing unscoped row instead of inserting a shadowing scoped row', async () => {
+      // No package-scoped row, but an unscoped rule already holds a learned
+      // category. Learning a scoped label must reuse that row (the same way
+      // getMerchantRule reads it) rather than create a second row that hides it.
+      mockDb.queryFirst
+        .mockResolvedValueOnce(null) // scoped lookup misses
+        .mockResolvedValueOnce({ id: 'r1', merchant: 'SHOP', package_name: null, category_id: 'cat-x' });
+      const rule = await NotificationRulesDB.upsertMerchantLabel('shop', 'Ecosense', 'am.bank');
+      expect(mockDb.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE notification_merchant_rules SET label_override = ?'),
+        ['Ecosense', expect.any(String), 'r1'],
+      );
+      // The learned category on the reused row is preserved.
+      expect(rule.categoryId).toBe('cat-x');
+      expect(rule.labelOverride).toBe('Ecosense');
+    });
+  });
+
   describe('deleteMerchantRule', () => {
     it('deletes by id', async () => {
       await NotificationRulesDB.deleteMerchantRule('r1');

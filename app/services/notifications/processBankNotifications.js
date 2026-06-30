@@ -16,7 +16,7 @@ import * as AccountsDB from '../AccountsDB';
 import * as Currency from '../currency';
 import * as NotificationRulesDB from '../NotificationRulesDB';
 import * as PendingNotificationsDB from '../PendingNotificationsDB';
-import { serializeLabels } from '../../utils/labelUtils';
+import { serializeLabels, sanitizeLabel } from '../../utils/labelUtils';
 import { appEvents, EVENTS } from '../eventEmitter';
 import { parseBankNotification, kindRequiresCategory } from './parseBankNotification';
 import { resolveNotification } from './resolveNotification';
@@ -273,15 +273,16 @@ const runProcess = async () => {
       const autoCreate = eligibleForAutoCreate && currencyResolved;
 
       if (autoCreate) {
+        // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins
+        // over the raw merchant for the operation's label.
+        const label = resolution.labelOverride || descriptor.merchant;
         await OperationsDB.createOperation({
           type: descriptor.type,
           ...currencyFields,
           accountId: resolution.accountId,
           categoryId: resolution.categoryId,
           date,
-          description: descriptor.merchant
-            ? serializeLabels([descriptor.merchant])
-            : null,
+          description: label ? serializeLabels([label]) : null,
         });
         summary.created += 1;
       } else {
@@ -337,6 +338,18 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     throw new Error('Cannot resolve pending notification without an account');
   }
 
+  // Resolve the operation's label. When the review UI supplies a `labelOverride`
+  // (always a string from that flow) it is authoritative: its text is the label,
+  // and a blank field means "no override — use the raw shop name". Programmatic
+  // callers that omit the field fall back to any previously-learned override.
+  const hasLabelChoice = typeof choices.labelOverride === 'string';
+  const typedLabel = sanitizeLabel(choices.labelOverride); // '' when blank/absent
+  const learnedLabel = pending.merchant
+    ? (await NotificationRulesDB.getLabelForMerchant(pending.merchant, pending.packageName)) || ''
+    : '';
+  const chosenLabel = hasLabelChoice ? typedLabel : learnedLabel;
+  const label = chosenLabel || pending.merchant;
+
   // Convert to the chosen account's currency at the current rate when they
   // differ (e.g. a EUR purchase booked against an AMD account). Unlike the
   // auto-create path (which silently re-queues when no rate is available), this
@@ -363,8 +376,25 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
     categoryId: categoryId || null,
     // operations.date is NOT NULL — fall back to the row's creation date / today.
     date: pending.date || (pending.createdAt ? pending.createdAt.slice(0, 10) : todayIso()),
-    description: pending.merchant ? serializeLabels([pending.merchant]) : null,
+    description: label ? serializeLabels([label]) : null,
   });
+
+  // Persist an override change only when the user actually changed it in the
+  // review UI: a new/edited name is learned, a blanked field clears the override.
+  // An unchanged value writes nothing — avoiding updated_at churn that would
+  // reorder the rules list. A label is a display name, so — unlike the category —
+  // it is learned for every kind, including C2C transfers.
+  if (hasLabelChoice && pending.merchant && typedLabel !== learnedLabel) {
+    try {
+      await NotificationRulesDB.upsertMerchantLabel(
+        pending.merchant,
+        typedLabel,
+        pending.packageName,
+      );
+    } catch (error) {
+      console.error('[resolvePendingNotification] Failed to learn merchant label:', error);
+    }
+  }
 
   // Learn the card -> account binding (default on when a card mask is present).
   if (choices.learnCardMask !== false && pending.cardMask && accountId != null) {

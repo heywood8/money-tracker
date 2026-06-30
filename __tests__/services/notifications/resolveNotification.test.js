@@ -23,7 +23,10 @@ describe('resolveNotification', () => {
     jest.clearAllMocks();
     AccountsDB.getAccountByCardMask.mockResolvedValue(null);
     AccountsDB.getAllAccounts.mockResolvedValue([]);
-    NotificationRulesDB.getCategoryForMerchant.mockResolvedValue(null);
+    // resolveNotification (and the resolveCategoryId/resolveLabelOverride
+    // helpers) now read the merchant rule once via getMerchantRule and derive
+    // category + label override from it.
+    NotificationRulesDB.getMerchantRule.mockResolvedValue(null);
   });
 
   describe('resolveAccountId', () => {
@@ -64,9 +67,9 @@ describe('resolveNotification', () => {
 
   describe('resolveCategoryId', () => {
     it('uses the learned merchant rule', async () => {
-      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
       expect(await resolver.resolveCategoryId(descriptor)).toBe('cat-food');
-      expect(NotificationRulesDB.getCategoryForMerchant).toHaveBeenCalledWith('NAREK MEHRABYAN', 'am.bank');
+      expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledWith('NAREK MEHRABYAN', 'am.bank');
     });
 
     it('returns null without a merchant', async () => {
@@ -74,22 +77,57 @@ describe('resolveNotification', () => {
     });
 
     it('never auto-resolves a category for requiresCategory kinds (C2C)', async () => {
-      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
       const c2c = { ...descriptor, requiresCategory: true };
       expect(await resolver.resolveCategoryId(c2c)).toBeNull();
-      expect(NotificationRulesDB.getCategoryForMerchant).not.toHaveBeenCalled();
+      expect(NotificationRulesDB.getMerchantRule).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveLabelOverride', () => {
+    it('returns the learned label override for the merchant', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Ecosense' });
+      expect(await resolver.resolveLabelOverride(descriptor)).toBe('Ecosense');
+      expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledWith('NAREK MEHRABYAN', 'am.bank');
+    });
+
+    it('returns null without a merchant', async () => {
+      expect(await resolver.resolveLabelOverride({ ...descriptor, merchant: null })).toBeNull();
+      expect(NotificationRulesDB.getMerchantRule).not.toHaveBeenCalled();
+    });
+
+    it('resolves an override even for requiresCategory (C2C) kinds', async () => {
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Mom' });
+      expect(await resolver.resolveLabelOverride({ ...descriptor, requiresCategory: true })).toBe('Mom');
     });
   });
 
   describe('resolveNotification', () => {
+    it('surfaces the learned label override', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ labelOverride: 'Ecosense' });
+      const r = await resolver.resolveNotification(descriptor);
+      expect(r.labelOverride).toBe('Ecosense');
+    });
+
+    it('reads the merchant rule only once for category and label', async () => {
+      AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food', labelOverride: 'Ecosense' });
+      const r = await resolver.resolveNotification(descriptor);
+      expect(r.categoryId).toBe('cat-food');
+      expect(r.labelOverride).toBe('Ecosense');
+      expect(NotificationRulesDB.getMerchantRule).toHaveBeenCalledTimes(1);
+    });
+
     it('reports fullyMatched when both resolve and currencies agree', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
       const r = await resolver.resolveNotification(descriptor);
       expect(r).toEqual({
         accountId: 7,
         accountCurrency: 'AMD',
         categoryId: 'cat-food',
+        labelOverride: null,
         matchedAccount: true,
         matchedCategory: true,
         currencyMatch: true,
@@ -99,7 +137,7 @@ describe('resolveNotification', () => {
 
     it('is NOT fullyMatched on a currency mismatch', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD' });
-      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
       const r = await resolver.resolveNotification(descriptor); // descriptor is AMD
       expect(r.matchedAccount).toBe(true);
       expect(r.matchedCategory).toBe(true);
@@ -117,7 +155,7 @@ describe('resolveNotification', () => {
 
     it('is never fullyMatched for a C2C transfer, even with a learned rule', async () => {
       AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });
-      NotificationRulesDB.getCategoryForMerchant.mockResolvedValue('cat-food');
+      NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
       const r = await resolver.resolveNotification({ ...descriptor, requiresCategory: true });
       expect(r.matchedAccount).toBe(true);
       expect(r.categoryId).toBeNull();

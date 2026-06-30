@@ -25,6 +25,8 @@
   "bank_notifications_enable_hint": "Автоматически превращать уведомления о покупках в операции",
   "bank_notifications_review": "Очередь проверки",
   "bank_notifications_empty": "Нечего проверять. Совпавшие уведомления сохраняются автоматически.",
+  "bank_notifications_custom_label": "Своё название",
+  "bank_notifications_custom_label_help": "Используется как метка для этой и будущих операций этого магазина",
   "card_mask": "Номер карты",
   "card_mask_hint": "Используется для сопоставления банковских уведомлений с этим счётом",
   "dismiss": "Отклонить",

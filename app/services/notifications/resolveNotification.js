@@ -51,21 +51,58 @@ export const resolveAccountId = async (descriptor) => {
 };
 
 /**
- * Resolve the category id for a descriptor via learned merchant rules.
+ * Derive the category id from an already-fetched merchant rule.
  *
  * Kinds flagged `requiresCategory` (client-to-client transfers) never resolve a
  * category automatically: the same counterparty maps to different categories
  * across transfers, so the user must always pick one in the review queue.
+ *
+ * @param {Object} descriptor
+ * @param {Object|null} rule - merchant rule row, or null
+ * @returns {string|null}
+ */
+const categoryFromRule = (descriptor, rule) => {
+  if (!descriptor || descriptor.requiresCategory || !descriptor.merchant || !rule) return null;
+  return rule.categoryId || null;
+};
+
+/**
+ * Derive the user-chosen display label from an already-fetched merchant rule.
+ *
+ * Unlike the category, a label override applies to every kind (including C2C
+ * transfers) — it is purely a display name for the counterparty/shop.
+ *
+ * @param {Object} descriptor
+ * @param {Object|null} rule - merchant rule row, or null
+ * @returns {string|null}
+ */
+const labelFromRule = (descriptor, rule) => {
+  if (!descriptor || !descriptor.merchant || !rule || !rule.labelOverride) return null;
+  return rule.labelOverride;
+};
+
+/**
+ * Resolve the category id for a descriptor via learned merchant rules.
  *
  * @param {Object} descriptor - parsed notification (needs merchant, packageName)
  * @returns {Promise<string|null>}
  */
 export const resolveCategoryId = async (descriptor) => {
   if (!descriptor || descriptor.requiresCategory || !descriptor.merchant) return null;
-  return NotificationRulesDB.getCategoryForMerchant(
-    descriptor.merchant,
-    descriptor.packageName,
-  );
+  const rule = await NotificationRulesDB.getMerchantRule(descriptor.merchant, descriptor.packageName);
+  return categoryFromRule(descriptor, rule);
+};
+
+/**
+ * Resolve the user-chosen display label for a descriptor's merchant, or null.
+ *
+ * @param {Object} descriptor - parsed notification (needs merchant, packageName)
+ * @returns {Promise<string|null>}
+ */
+export const resolveLabelOverride = async (descriptor) => {
+  if (!descriptor || !descriptor.merchant) return null;
+  const rule = await NotificationRulesDB.getMerchantRule(descriptor.merchant, descriptor.packageName);
+  return labelFromRule(descriptor, rule);
 };
 
 /**
@@ -82,10 +119,16 @@ export const resolveCategoryId = async (descriptor) => {
  *   currencyMatch: boolean, fullyMatched: boolean }>}
  */
 export const resolveNotification = async (descriptor) => {
-  const [account, categoryId] = await Promise.all([
+  // Read the merchant rule once and derive both category and label from it,
+  // rather than issuing a separate lookup per field.
+  const [account, rule] = await Promise.all([
     resolveAccount(descriptor),
-    resolveCategoryId(descriptor),
+    descriptor && descriptor.merchant
+      ? NotificationRulesDB.getMerchantRule(descriptor.merchant, descriptor.packageName)
+      : Promise.resolve(null),
   ]);
+  const categoryId = categoryFromRule(descriptor, rule);
+  const labelOverride = labelFromRule(descriptor, rule);
   const accountId = account ? account.id : null;
   const accountCurrency = account ? account.currency : null;
   const matchedAccount = accountId != null;
@@ -96,6 +139,7 @@ export const resolveNotification = async (descriptor) => {
     accountId,
     accountCurrency,
     categoryId,
+    labelOverride,
     matchedAccount,
     matchedCategory,
     currencyMatch,
