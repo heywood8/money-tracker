@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.166.0](https://github.com/heywood8/money-tracker/compare/penny-v0.165.2...penny-v0.166.0) (2026-06-30)
+
+
+### Features
+
+* **notifications:** handle PRE-PURCHASE and PRE-PURCHASE COMPLETION from Ameriabank ([#1135](https://github.com/heywood8/money-tracker/issues/1135)) ([8b4b56c](https://github.com/heywood8/money-tracker/commit/8b4b56c4fd75715175afc1041d177278bba8c1e7))
+
 ## [0.165.2](https://github.com/heywood8/money-tracker/compare/penny-v0.165.1...penny-v0.165.2) (2026-06-30)
 
 
