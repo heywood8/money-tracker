@@ -161,6 +161,9 @@ const isSchemaComplete = async (rawDb) => {
     const merchantRuleCols = await rawDb.getAllAsync('PRAGMA table_info(notification_merchant_rules)');
     if (!merchantRuleCols.some(c => c.name === 'label_override')) return false;
 
+    // Check accounts has auto_txn_rounding column (migration 0012).
+    if (!accountsCols.some(c => c.name === 'auto_txn_rounding')) return false;
+
     return true;
   } catch (error) {
     console.warn('[DB] isSchemaComplete check failed:', error.message);
@@ -406,6 +409,14 @@ const detectAppliedMigrations = async (rawDb) => {
     const ruleCols = await getColumns('notification_merchant_rules');
     if (ruleCols.some(c => c.name === 'label_override')) {
       applied.push(11);
+    }
+  }
+
+  // Migration 0012: Adds accounts.auto_txn_rounding column.
+  if (await tableExists('accounts')) {
+    const accCols = await getColumns('accounts');
+    if (accCols.some(c => c.name === 'auto_txn_rounding')) {
+      applied.push(12);
     }
   }
 
