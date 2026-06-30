@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.167.1](https://github.com/heywood8/money-tracker/compare/penny-v0.167.0...penny-v0.167.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **db:** apply auto_txn_rounding migration on existing databases ([#1142](https://github.com/heywood8/money-tracker/issues/1142)) ([cbe5b9f](https://github.com/heywood8/money-tracker/commit/cbe5b9f63d15803f5571c7066eb6529ea70ad3ee))
+
 ## [0.167.0](https://github.com/heywood8/money-tracker/compare/penny-v0.166.1...penny-v0.167.0) (2026-06-30)
 
 
