@@ -13,6 +13,7 @@ import m0008 from './0008_soft_delete_accounts.js';
 import m0009 from './0009_add_operation_location.js';
 import m0010 from './0010_bank_notifications.js';
 import m0011 from './0011_merchant_label_override.js';
+import m0012 from './0012_account_auto_txn_rounding.js';
 
 export default {
   journal,
@@ -29,6 +30,7 @@ export default {
     m0009,
     m0010,
     m0011,
+    m0012,
   },
   postMigrationHandlers: {
     m0003: m0003PostMigration,

@@ -261,10 +261,21 @@ The money-writing path is guarded against several failure modes:
   mis-booked to an arbitrary account.
 - **Amount/date parsing** — the parser handles both `1,234.56` and `1.234,56`
   decimal conventions and rejects impossible calendar dates.
-- **Backup/restore** — `accounts.card_mask` and the learned
-  `notification_merchant_rules` are included in JSON/CSV/SQLite backup and
+- **Backup/restore** — `accounts.card_mask`, `accounts.auto_txn_rounding`, and the
+  learned `notification_merchant_rules` are included in JSON/CSV/SQLite backup and
   restore (the transient `pending_notifications` queue is intentionally not).
 - **i18n** — the new strings exist in all 11 locale files.
+
+### Automatic-transaction rounding
+
+Accounts have an optional `auto_txn_rounding` setting (10, 100, or 1000; null/0 =
+off). When set, the amount of an operation **auto-created** from a notification is
+rounded to the nearest multiple of the step, with ties rounded up — e.g. with step
+100, `1216 → 1200` and `150 → 200`; with step 1000, `2500 → 3000`. Only the booked
+`amount` (in the account currency) is rounded; on a currency mismatch the rounding
+is applied to the converted amount while the preserved foreign `destination_amount`
+keeps the original charged value. Rounding applies only to the silent auto-create
+path — items resolved manually from the review queue are booked as-is.
 
 ## Operation mapping
 

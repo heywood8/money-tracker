@@ -21,6 +21,16 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { getDefaultAccountId, setDefaultAccountId } from '../services/PreferencesDB';
 import currencies from '../../assets/currencies.json';
 
+// Rounding steps offered for operations auto-created from bank notifications.
+// `null` means no rounding (the default). Labels are static; the "Off" option is
+// localized at render time.
+const ROUNDING_OPTIONS = [
+  { label: 'Off', value: null },
+  { label: '10', value: 10 },
+  { label: '100', value: 100 },
+  { label: '1000', value: 1000 },
+];
+
 // Memoized currency picker modal component
 const CurrencyPickerModal = memo(({ visible, onClose, currencies, colors, t, onSelect }) => {
   const renderCurrencyItem = useCallback(({ item }) => {
@@ -625,6 +635,10 @@ export default function AccountsScreen({ onBackStateChange }) {
     setEditValues(v => ({ ...v, cardMask: text }));
   }, []);
 
+  const handleRoundingSelect = useCallback((value) => {
+    setEditValues(v => ({ ...v, autoTxnRounding: value }));
+  }, []);
+
   const handleBalanceChange = useCallback((text) => {
     setEditValues(v => {
       const decimals = currencies[v.currency]?.decimal_digits ?? 2;
@@ -1003,6 +1017,38 @@ export default function AccountsScreen({ onBackStateChange }) {
             />
             <Text style={[styles.cardMaskHint, { color: colors.mutedText }]}>
               {t('card_mask_hint') || 'Used to match bank notifications to this account'}
+            </Text>
+
+            {/* Automatic-transaction rounding (for bank-notification operations) */}
+            <Text style={[modalSharedStyles.fieldLabel, { color: colors.mutedText }]}>
+              {(t('auto_txn_rounding') || 'Round automatic transactions').toUpperCase()}
+            </Text>
+            <View style={[styles.roundingRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {ROUNDING_OPTIONS.map((opt) => {
+                const selected = (editValues.autoTxnRounding || null) === opt.value;
+                return (
+                  <TouchableRipple
+                    key={opt.label}
+                    onPress={() => handleRoundingSelect(opt.value)}
+                    style={[
+                      styles.roundingOption,
+                      selected && { backgroundColor: colors.primary },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.roundingOptionText,
+                        { color: selected ? '#fff' : colors.text },
+                      ]}
+                    >
+                      {opt.value === null ? (t('rounding_off') || 'Off') : opt.label}
+                    </Text>
+                  </TouchableRipple>
+                );
+              })}
+            </View>
+            <Text style={[styles.cardMaskHint, { color: colors.mutedText }]}>
+              {t('auto_txn_rounding_hint') || 'Round amounts from bank notifications to the nearest 10/100/1000'}
             </Text>
 
             {/* Settings group */}
@@ -1436,6 +1482,24 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: {
     fontSize: 16,
+  },
+  roundingOption: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    paddingVertical: 10,
+  },
+  roundingOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  roundingRow: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+    padding: 4,
   },
   scrollContent: {
     paddingBottom: 180,

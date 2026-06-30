@@ -273,6 +273,22 @@ const runProcess = async () => {
       const autoCreate = eligibleForAutoCreate && currencyResolved;
 
       if (autoCreate) {
+        // Apply the account's automatic-transaction rounding (10/100/1000) to the
+        // amount that hits the balance. Ties round up (e.g. 1216 → 1200, 150 →
+        // 200 with step 100). A null/0 step leaves the amount untouched. Only the
+        // booked `amount` is rounded; any preserved foreign `destinationAmount`
+        // keeps the original charged value.
+        if (resolution.accountRounding) {
+          currencyFields = {
+            ...currencyFields,
+            amount: Currency.roundToNearest(
+              currencyFields.amount,
+              resolution.accountRounding,
+              resolution.accountCurrency,
+            ),
+          };
+        }
+
         // A learned label override (e.g. "ECOSENSE BYUZAND" -> "Ecosense") wins
         // over the raw merchant for the operation's label.
         const label = resolution.labelOverride || descriptor.merchant;

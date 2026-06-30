@@ -93,6 +93,40 @@ export const formatAmount = (amount, currencyOrDecimals = 2) => {
 };
 
 /**
+ * Round an amount to the nearest multiple of `step` (e.g. 10, 100, 1000).
+ *
+ * Half-way values are rounded up (away from zero): with step 100, 150 → 200 and
+ * 1216 → 1200; with step 1000, 2500 → 3000. Used to round the amount of
+ * operations created automatically from bank notifications, per the account's
+ * rounding setting.
+ *
+ * @param {string|number} amount - Amount to round
+ * @param {number|string} step - Rounding step. A falsy, non-finite, or
+ *   non-positive step returns the amount unchanged (just formatted).
+ * @param {string} currencyCode - Currency code for formatting the result (optional)
+ * @returns {string} Rounded amount as string
+ */
+export const roundToNearest = (amount, step, currencyCode = null) => {
+  const decimal = toDecimal(amount);
+  const stepDecimal = toDecimal(step);
+
+  if (!stepDecimal.isFinite() || stepDecimal.lessThanOrEqualTo(0)) {
+    return currencyCode ? formatAmount(decimal, currencyCode) : decimal.toFixed(2);
+  }
+
+  // Nearest multiple of step, ties rounded away from zero (half-up).
+  const rounded = decimal
+    .dividedBy(stepDecimal)
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .times(stepDecimal);
+
+  if (currencyCode) {
+    return formatAmount(rounded, currencyCode);
+  }
+  return rounded.toFixed(2);
+};
+
+/**
  * Legacy toCents function - kept for backward compatibility
  * Converts amount to smallest unit (cents) as integer
  * @param {string|number} amount - Amount as string or number
