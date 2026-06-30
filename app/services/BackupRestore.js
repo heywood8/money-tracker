@@ -79,7 +79,7 @@ export const createBackup = async () => {
 // Explicit column orderings per table — guards against sparse rows where
 // Object.keys(data[0]) would silently omit columns present only on later rows.
 const TABLE_FIELDS = {
-  accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'created_at', 'updated_at'],
+  accounts:           ['id', 'name', 'balance', 'currency', 'display_order', 'hidden', 'monthly_target', 'card_mask', 'auto_txn_rounding', 'created_at', 'updated_at'],
   categories:         ['id', 'name', 'type', 'category_type', 'parent_id', 'icon', 'color', 'is_shadow', 'created_at', 'updated_at'],
   operations:         ['id', 'type', 'amount', 'account_id', 'category_id', 'to_account_id', 'date', 'created_at', 'description', 'exchange_rate', 'destination_amount', 'source_currency', 'destination_currency', 'original_balance', 'latitude', 'longitude'],
   budgets:            ['id', 'category_id', 'amount', 'currency', 'period_type', 'start_date', 'end_date', 'is_recurring', 'rollover_enabled', 'created_at', 'updated_at'],
@@ -498,7 +498,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         if (isIntegerId) {
           // Preserve the original integer ID
           result = await db.runAsync(
-            'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, monthly_target, card_mask, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO accounts (id, name, balance, currency, display_order, hidden, monthly_target, card_mask, auto_txn_rounding, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               Number(account.id),
               account.name,
@@ -508,6 +508,7 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.hidden ?? 0,
               account.monthly_target ?? null,
               account.card_mask ?? null,
+              account.auto_txn_rounding ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],
@@ -519,7 +520,7 @@ export const restoreBackup = async (backup, cancelToken) => {
         } else {
           // UUID or no ID - let SQLite auto-generate integer ID
           result = await db.runAsync(
-            'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, card_mask, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO accounts (name, balance, currency, display_order, hidden, monthly_target, card_mask, auto_txn_rounding, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               account.name,
               account.balance || '0',
@@ -528,6 +529,7 @@ export const restoreBackup = async (backup, cancelToken) => {
               account.hidden ?? 0,
               account.monthly_target ?? null,
               account.card_mask ?? null,
+              account.auto_txn_rounding ?? null,
               account.created_at || new Date().toISOString(),
               account.updated_at || new Date().toISOString(),
             ],

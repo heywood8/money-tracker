@@ -532,6 +532,47 @@ describe('Currency Service', () => {
     });
   });
 
+  describe('roundToNearest', () => {
+    it('rounds down when below the half-way point', () => {
+      expect(Currency.roundToNearest('1216', 100)).toBe('1200.00');
+      expect(Currency.roundToNearest('149', 100)).toBe('100.00');
+      expect(Currency.roundToNearest('14', 10)).toBe('10.00');
+      expect(Currency.roundToNearest('2499', 1000)).toBe('2000.00');
+    });
+
+    it('rounds up when above the half-way point', () => {
+      expect(Currency.roundToNearest('1260', 100)).toBe('1300.00');
+      expect(Currency.roundToNearest('16', 10)).toBe('20.00');
+      expect(Currency.roundToNearest('2600', 1000)).toBe('3000.00');
+    });
+
+    it('rounds half up (ties away from zero)', () => {
+      expect(Currency.roundToNearest('150', 100)).toBe('200.00');
+      expect(Currency.roundToNearest('2500', 1000)).toBe('3000.00');
+      expect(Currency.roundToNearest('15', 10)).toBe('20.00');
+    });
+
+    it('formats with the currency decimal places when provided', () => {
+      // AMD has 0 decimal places
+      expect(Currency.roundToNearest('1216', 100, 'AMD')).toBe('1200');
+      expect(Currency.roundToNearest('150', 100, 'AMD')).toBe('200');
+      // USD has 2 decimal places
+      expect(Currency.roundToNearest('1216', 100, 'USD')).toBe('1200.00');
+    });
+
+    it('leaves an already-multiple amount unchanged', () => {
+      expect(Currency.roundToNearest('1200', 100)).toBe('1200.00');
+      expect(Currency.roundToNearest('3000', 1000)).toBe('3000.00');
+    });
+
+    it('returns the amount unchanged for a falsy/invalid/non-positive step', () => {
+      expect(Currency.roundToNearest('1216', 0)).toBe('1216.00');
+      expect(Currency.roundToNearest('1216', null)).toBe('1216.00');
+      expect(Currency.roundToNearest('1216', -100)).toBe('1216.00');
+      expect(Currency.roundToNearest('1216.50', 0, 'USD')).toBe('1216.50');
+    });
+  });
+
   describe('isReasonableRate', () => {
     it('returns true for reasonable rates within 50% of expected', async () => {
       // Expected USD->EUR rate is 0.92

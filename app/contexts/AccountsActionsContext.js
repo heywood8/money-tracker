@@ -89,6 +89,9 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.cardMask !== undefined && updated.cardMask !== currentAccount.cardMask) {
           nonBalanceUpdates.cardMask = updated.cardMask;
         }
+        if (updated.autoTxnRounding !== undefined && updated.autoTxnRounding !== currentAccount.autoTxnRounding) {
+          nonBalanceUpdates.autoTxnRounding = updated.autoTxnRounding;
+        }
 
         if (Object.keys(nonBalanceUpdates).length > 0) {
           await AccountsDB.updateAccount(id, nonBalanceUpdates);
@@ -105,6 +108,7 @@ export const AccountsActionsProvider = ({ children }) => {
         if (updated.balance !== undefined) updates.balance = String(updated.balance);
         if (updated.hidden !== undefined) updates.hidden = updated.hidden;
         if (updated.cardMask !== undefined) updates.cardMask = updated.cardMask;
+        if (updated.autoTxnRounding !== undefined) updates.autoTxnRounding = updated.autoTxnRounding;
 
         await AccountsDB.updateAccount(id, updates);
 

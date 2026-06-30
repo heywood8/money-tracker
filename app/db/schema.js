@@ -24,6 +24,10 @@ export const accounts = sqliteTable('accounts', {
   // notifications to this account. Nullable — only set for accounts that
   // receive transaction notifications.
   cardMask: text('card_mask'),
+  // Rounding step for operations created automatically from bank notifications
+  // (10, 100, or 1000). When set, an auto-created amount is rounded to the
+  // nearest multiple (ties up). Nullable / 0 means no rounding.
+  autoTxnRounding: integer('auto_txn_rounding'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),

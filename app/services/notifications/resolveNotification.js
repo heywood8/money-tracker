@@ -115,8 +115,8 @@ export const resolveLabelOverride = async (descriptor) => {
  *
  * @param {Object} descriptor
  * @returns {Promise<{ accountId: number|null, accountCurrency: string|null,
- *   categoryId: string|null, matchedAccount: boolean, matchedCategory: boolean,
- *   currencyMatch: boolean, fullyMatched: boolean }>}
+ *   accountRounding: number|null, categoryId: string|null, matchedAccount: boolean,
+ *   matchedCategory: boolean, currencyMatch: boolean, fullyMatched: boolean }>}
  */
 export const resolveNotification = async (descriptor) => {
   // Read the merchant rule once and derive both category and label from it,
@@ -131,6 +131,8 @@ export const resolveNotification = async (descriptor) => {
   const labelOverride = labelFromRule(descriptor, rule);
   const accountId = account ? account.id : null;
   const accountCurrency = account ? account.currency : null;
+  // Rounding step for auto-created operations (null/0 = no rounding).
+  const accountRounding = account ? account.autoTxnRounding : null;
   const matchedAccount = accountId != null;
   const matchedCategory = categoryId != null;
   const currencyMatch =
@@ -138,6 +140,7 @@ export const resolveNotification = async (descriptor) => {
   return {
     accountId,
     accountCurrency,
+    accountRounding,
     categoryId,
     labelOverride,
     matchedAccount,

@@ -139,6 +139,57 @@ describe('processBankNotifications', () => {
     );
   });
 
+  it('rounds the auto-created amount per the account rounding setting', async () => {
+    const ROUNDED = {
+      ...PURCHASE,
+      text: 'PURCHASE | 3,916.00 AMD | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD',
+    };
+    NotificationAccess.getRecentNotifications.mockResolvedValue([ROUNDED]);
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100 });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    const summary = await pipeline.processBankNotifications();
+
+    expect(summary).toEqual({ created: 1, pending: 0, skipped: 0 });
+    // 3916 AMD rounded to the nearest 100 → 3900 (AMD has 0 decimals)
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '3900' }),
+    );
+  });
+
+  it('rounds the converted amount on a currency mismatch, leaving the foreign value intact', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900 AMD
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'USD', autoTxnRounding: 10 });
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+    Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
+
+    await pipeline.processBankNotifications();
+
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: '10.00',          // 10.14 USD rounded to the nearest 10
+        destinationAmount: '3900', // original foreign value preserved (unrounded)
+        sourceCurrency: 'AMD',
+        destinationCurrency: 'USD',
+      }),
+    );
+  });
+
+  it('does not round the auto-created amount when no rounding is set', async () => {
+    NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]); // 3,900.00 AMD
+    AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' }); // no autoTxnRounding
+    NotificationRulesDB.getMerchantRule.mockResolvedValue({ categoryId: 'cat-food' });
+    PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [PKG])(key));
+
+    await pipeline.processBankNotifications();
+
+    expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '3900.00' }),
+    );
+  });
+
   it('queues instead of auto-creating when the source is not trusted', async () => {
     NotificationAccess.getRecentNotifications.mockResolvedValue([PURCHASE]);
     AccountsDB.getAccountByCardMask.mockResolvedValue({ id: 7, currency: 'AMD' });

@@ -66,6 +66,7 @@ export const createAccount = async (account) => {
       hidden: account.hidden ?? 0,
       monthlyTarget: account.monthly_target ?? account.monthlyTarget ?? null,
       cardMask: account.card_mask ?? account.cardMask ?? null,
+      autoTxnRounding: account.auto_txn_rounding ?? account.autoTxnRounding ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -159,6 +160,10 @@ export const updateAccount = async (id, updates) => {
     if (updates.card_mask !== undefined || updates.cardMask !== undefined) {
       setClauses.push('card_mask = ?');
       params.push((updates.card_mask ?? updates.cardMask) || null);
+    }
+    if (updates.auto_txn_rounding !== undefined || updates.autoTxnRounding !== undefined) {
+      setClauses.push('auto_txn_rounding = ?');
+      params.push((updates.auto_txn_rounding ?? updates.autoTxnRounding) || null);
     }
 
     if (setClauses.length === 0) {
