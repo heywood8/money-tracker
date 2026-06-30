@@ -179,42 +179,6 @@ describe('parseBankNotification', () => {
     });
   });
 
-  describe('PRE-PURCHASE template (authorization hold)', () => {
-    const AMERIA_PRE_PURCHASE = {
-      title: 'АРКА транзакции',
-      text: 'PRE-PURCHASE | 2,800.00 AMD | 4083***7027, | YANDEX.GO, AM | 30.06.2026 10:51 | BALANCE: 19,095.20 AMD',
-      packageName: 'com.banqr.ameriabank',
-      postTime: 1782000900000,
-    };
-    let result;
-    beforeEach(() => {
-      result = parseBankNotification(AMERIA_PRE_PURCHASE);
-    });
-
-    it('recognizes PRE-PURCHASE as a transaction', () => {
-      expect(result).not.toBeNull();
-    });
-
-    it('maps PRE-PURCHASE to an expense operation', () => {
-      expect(result.kind).toBe('PRE-PURCHASE');
-      expect(result.type).toBe('expense');
-    });
-
-    it('extracts amount, currency, card mask, merchant, country, date and time', () => {
-      expect(result.amount).toBe('2800.00');
-      expect(result.currency).toBe('AMD');
-      expect(result.cardMask).toBe('4083***7027');
-      expect(result.merchant).toBe('YANDEX.GO');
-      expect(result.country).toBe('AM');
-      expect(result.date).toBe('2026-06-30');
-      expect(result.time).toBe('10:51');
-    });
-
-    it('does not require a manual category', () => {
-      expect(result.requiresCategory).toBe(false);
-    });
-  });
-
   describe('PRE-PURCHASE COMPLETION template (settlement of hold)', () => {
     const AMERIA_PRE_PURCHASE_COMPLETION = {
       title: 'АРКА транзакции',
@@ -258,6 +222,17 @@ describe('parseBankNotification', () => {
       expect(result).not.toBeNull();
       expect(result.amount).toBe('2500.00');
       expect(result.kind).toBe('PRE-PURCHASE COMPLETION');
+    });
+  });
+
+  describe('PRE-PURCHASE (authorization hold) is ignored to avoid duplicates', () => {
+    it('returns null for a PRE-PURCHASE notification', () => {
+      expect(
+        parseBankNotification({
+          text: 'PRE-PURCHASE | 2,800.00 AMD | 4083***7027, | YANDEX.GO, AM | 30.06.2026 10:51 | BALANCE: 19,095.20 AMD',
+          packageName: 'com.banqr.ameriabank',
+        }),
+      ).toBeNull();
     });
   });
 

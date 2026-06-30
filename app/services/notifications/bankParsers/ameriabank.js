@@ -2,13 +2,16 @@
  * Bank notification parser for the Ameriabank app (`com.banqr.ameriabank`).
  *
  * Ameria posts each card event as a single pipe-delimited "ARCA transaction"
- * line. Five kinds are recognized today:
+ * line. Four kinds are recognized today:
  *
  *   PURCHASE                | 3,900.00 AMD  | 4083***7027, | NAREK MEHRABYAN, AM | 28.06.2026 10:15 | BALANCE: 133,719.97 AMD
  *   E-POS PURCHASE          | 129.99 EUR    | 4083***7027, | Nike ES, ES         | 29.06.2026 15:14 | BALANCE: 27,608.20 AMD
  *   C2C                     | 19,200.00 AMD | 4083***7027, | TO: N. DORVANYAN | AMERIABANK API GATE, AM | 28.06.2026 16:23 | BALANCE: 106,819.97 AMD
- *   PRE-PURCHASE            | 2,800.00 AMD  | 4083***7027, | YANDEX.GO, AM | 30.06.2026 10:51 | BALANCE: 19,095.20 AMD
  *   PRE-PURCHASE COMPLETION | 2,800.00 AMD  | 4083***7027, | YANDEX.GO, AM | 30.06.2026 13:51 | BALANCE: 19,095.20 AMD
+ *
+ * PRE-PURCHASE (the initial authorization hold) is intentionally ignored —
+ * PRE-PURCHASE COMPLETION is the actual settled charge, so recording both
+ * would create duplicate entries for the same transaction.
  *
  * Note the E-POS PURCHASE example: the transaction is charged in EUR while the
  * card account is in AMD. The parser reports the transaction currency as-is
@@ -50,11 +53,9 @@ const KIND_TO_TYPE = {
   // inferred from learned rules. Often charged in a foreign currency.
   'E-POS PURCHASE': 'expense',
   C2C: 'expense',
-  // Temporary authorization hold placed before the final charge is settled.
-  // Processed as an expense so the user sees the pending amount immediately.
-  'PRE-PURCHASE': 'expense',
-  // Settlement of a prior PRE-PURCHASE hold. The final charged amount may differ
-  // from the original hold (e.g. a taxi fare calculated after the ride).
+  // Settlement of a prior PRE-PURCHASE authorization hold. The final charged
+  // amount may differ from the hold (e.g. a taxi fare calculated after the ride).
+  // PRE-PURCHASE itself is intentionally omitted to avoid duplicate entries.
   'PRE-PURCHASE COMPLETION': 'expense',
 };
 
