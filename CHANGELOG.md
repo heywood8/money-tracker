@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.165.2](https://github.com/heywood8/money-tracker/compare/penny-v0.165.1...penny-v0.165.2) (2026-06-30)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump react-native-chart-kit from 6.12.3 to 7.0.1 ([#1115](https://github.com/heywood8/money-tracker/issues/1115)) ([a092501](https://github.com/heywood8/money-tracker/commit/a09250172526b75ccce68b821ec93d31768f2691))
+
 ## [0.165.1](https://github.com/heywood8/money-tracker/compare/penny-v0.165.0...penny-v0.165.1) (2026-06-30)
 
 
