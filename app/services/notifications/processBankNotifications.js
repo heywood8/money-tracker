@@ -543,6 +543,11 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   const chosenLabel = hasLabelChoice ? typedLabel : learnedLabel;
   const label = chosenLabel || pending.merchant;
 
+  // Fetch the chosen account once: its currency drives conversion and its
+  // rounding setting is applied to the booked amount below.
+  const account = await AccountsDB.getAccountById(accountId);
+  const accountCurrency = account ? account.currency : null;
+
   // Convert to the chosen account's currency at the current rate when they
   // differ (e.g. a EUR purchase booked against an AMD account). Unlike the
   // auto-create path (which silently re-queues when no rate is available), this
@@ -550,8 +555,6 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
   // rather than booking a wrong amount, surfacing the failure to the caller.
   let currencyFields = { amount: pending.amount };
   if (pending.currency) {
-    const account = await AccountsDB.getAccountById(accountId);
-    const accountCurrency = account ? account.currency : null;
     const built = await buildOperationCurrencyFields(pending, accountCurrency);
     if (built) {
       currencyFields = built;
@@ -560,6 +563,18 @@ export const resolvePendingNotification = async (pendingId, choices = {}) => {
         `Cannot resolve pending notification ${pendingId}: no exchange rate for ${pending.currency}→${accountCurrency}`,
       );
     }
+  }
+
+  // Apply the account's automatic-transaction rounding (10/100/1000) to the
+  // amount that hits the balance, matching the auto-create path. Only the booked
+  // `amount` is rounded; any preserved foreign `destinationAmount` keeps the
+  // original charged value.
+  const accountRounding = account ? account.autoTxnRounding : null;
+  if (accountRounding) {
+    currencyFields = {
+      ...currencyFields,
+      amount: Currency.roundToNearest(currencyFields.amount, accountRounding, accountCurrency),
+    };
   }
 
   const operation = await OperationsDB.createOperation({
@@ -668,11 +683,23 @@ const resolvePendingTransfer = async (pending, choices = {}) => {
   // Unlike auto-create (which re-queues on a missing rate) this is a user-driven
   // save with no further fallback, so a missing rate throws rather than booking a
   // wrong amount.
-  const transferFields = await buildTransferCurrencyFields(pending, sourceCurrency, targetCurrency);
+  let transferFields = await buildTransferCurrencyFields(pending, sourceCurrency, targetCurrency);
   if (!transferFields) {
     throw new Error(
       `Cannot resolve pending transfer ${pending.id}: no exchange rate for ${pending.currency}→${sourceCurrency}→${targetCurrency}`,
     );
+  }
+
+  // Round the source-side amount only for a same-currency transfer, where the
+  // target receives the identical amount; a cross-currency transfer keeps its
+  // rate-derived destinationAmount intact so both sides stay consistent. Mirrors
+  // the auto-create transfer path.
+  const accountRounding = sourceAccount ? sourceAccount.autoTxnRounding : null;
+  if (accountRounding && !transferFields.destinationAmount) {
+    transferFields = {
+      ...transferFields,
+      amount: Currency.roundToNearest(transferFields.amount, accountRounding, sourceCurrency),
+    };
   }
 
   // An optional custom name typed in the review UI becomes the operation label;

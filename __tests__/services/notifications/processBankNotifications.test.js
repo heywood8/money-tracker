@@ -524,6 +524,39 @@ describe('processBankNotifications', () => {
       );
     });
 
+    it('rounds the booked amount per the account rounding setting (regression)', async () => {
+      // A merchant charge of 7160 AMD resolved from the review queue against an
+      // account with rounding=100 must be stored as 7200 — matching the
+      // auto-create path, which previously rounded while this path did not.
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, amount: '7160.00', currency: 'AMD',
+      });
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100 });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-food' });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: '7200' }),
+      );
+    });
+
+    it('rounds the converted amount on a currency mismatch, leaving the foreign value intact', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pending, amount: '129.99', currency: 'EUR', merchant: 'Nike ES',
+      });
+      AccountsDB.getAccountById.mockResolvedValue({ id: 7, currency: 'AMD', autoTxnRounding: 100 });
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '418.5', source: 'offline' });
+
+      await pipeline.resolvePendingNotification('p1', { accountId: 7, categoryId: 'cat-shopping' });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: '54400',           // 54401 AMD rounded to the nearest 100
+          destinationAmount: '129.99', // original foreign value preserved (unrounded)
+        }),
+      );
+    });
+
     it('throws (does not book a wrong amount) when no rate is available for a foreign purchase', async () => {
       PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
         ...pending, amount: '129.99', currency: 'EUR',
@@ -729,6 +762,36 @@ describe('processBankNotifications', () => {
         pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 7 }),
       ).rejects.toThrow(/same source and target/);
       expect(OperationsDB.createOperation).not.toHaveBeenCalled();
+    });
+
+    it('rounds a same-currency transfer amount per the source account rounding (regression)', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue({
+        ...pendingTransfer, amount: '200160.00',
+      });
+      AccountsDB.getAccountById.mockImplementation(async (id) =>
+        id === 7 ? { id: 7, currency: 'AMD', autoTxnRounding: 100 } : id === 9 ? { id: 9, currency: 'AMD' } : null);
+      PreferencesDB.getJsonPreference.mockImplementation((key) => prefs([], [])(key));
+
+      await pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 9 });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'transfer', amount: '200200' }),
+      );
+    });
+
+    it('does not round a cross-currency transfer amount (destination amount kept intact)', async () => {
+      PendingNotificationsDB.getPendingNotificationById.mockResolvedValue(pendingTransfer);
+      AccountsDB.getAccountById.mockImplementation(async (id) =>
+        id === 7 ? { id: 7, currency: 'AMD', autoTxnRounding: 100 } : id === 9 ? { id: 9, currency: 'USD' } : null);
+      Currency.fetchLiveExchangeRate.mockResolvedValue({ rate: '0.0026', source: 'offline' });
+
+      await pipeline.resolvePendingNotification('pt1', { accountId: 7, toAccountId: 9 });
+
+      expect(OperationsDB.createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: '200000', destinationAmount: '520.00',
+        }),
+      );
     });
 
     it('books a cross-currency transfer with a destination amount and rate', async () => {
