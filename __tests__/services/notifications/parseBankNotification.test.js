@@ -6,6 +6,7 @@
 import {
   parseBankNotification,
   kindRequiresCategory,
+  kindIsTransfer,
 } from '../../../app/services/notifications/parseBankNotification';
 
 // The canonical Ameria "ARCA transaction" PURCHASE notification from the design.
@@ -268,6 +269,69 @@ describe('parseBankNotification', () => {
       });
       expect(lower.kind).toBe('DEBIT ACCOUNT');
       expect(lower.requiresCategory).toBe(true);
+    });
+  });
+
+  describe('ATM CASH template (cash withdrawal → transfer)', () => {
+    // The Ameria "ARCA transaction" ATM CASH notification from the screenshot.
+    const AMERIA_ATM_CASH = {
+      title: 'АРКА транзакции',
+      text: 'ATM CASH | 200,000.00 AMD | 4083***7027, | ATM 401 REPUBLIC 67/1, AM | 01.07.2026 09:13 | BALANCE: 111,820.20 AMD',
+      packageName: 'com.banqr.ameriabank',
+      postTime: 1782000900000,
+    };
+    let result;
+    beforeEach(() => {
+      result = parseBankNotification(AMERIA_ATM_CASH);
+    });
+
+    it('recognizes ATM CASH as a transaction', () => {
+      expect(result).not.toBeNull();
+    });
+
+    it('maps ATM CASH to a transfer operation', () => {
+      expect(result.kind).toBe('ATM CASH');
+      expect(result.type).toBe('transfer');
+      expect(result.isTransfer).toBe(true);
+    });
+
+    it('extracts amount, currency, card mask, ATM location, country, date and time', () => {
+      expect(result.amount).toBe('200000.00');
+      expect(result.currency).toBe('AMD');
+      expect(result.cardMask).toBe('4083***7027');
+      expect(result.merchant).toBe('ATM 401 REPUBLIC 67/1');
+      expect(result.country).toBe('AM');
+      expect(result.date).toBe('2026-07-01');
+      expect(result.time).toBe('09:13');
+    });
+
+    it('does not require a category (a transfer has none)', () => {
+      expect(result.requiresCategory).toBe(false);
+    });
+
+    it('recognizes the ATM CASH keyword case-insensitively', () => {
+      const lower = parseBankNotification({
+        ...AMERIA_ATM_CASH,
+        text: AMERIA_ATM_CASH.text.replace('ATM CASH', 'atm cash'),
+      });
+      expect(lower.kind).toBe('ATM CASH');
+      expect(lower.isTransfer).toBe(true);
+    });
+  });
+
+  describe('kindIsTransfer', () => {
+    it('is true for ATM CASH (any case)', () => {
+      expect(kindIsTransfer('ATM CASH')).toBe(true);
+      expect(kindIsTransfer('atm cash')).toBe(true);
+    });
+
+    it('is false for purchases, transfers-to-others and unknown/empty kinds', () => {
+      expect(kindIsTransfer('PURCHASE')).toBe(false);
+      expect(kindIsTransfer('C2C')).toBe(false);
+      expect(kindIsTransfer('DEBIT ACCOUNT')).toBe(false);
+      expect(kindIsTransfer('')).toBe(false);
+      expect(kindIsTransfer(null)).toBe(false);
+      expect(kindIsTransfer(undefined)).toBe(false);
     });
   });
 

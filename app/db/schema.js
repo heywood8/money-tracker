@@ -173,7 +173,7 @@ export const notificationMerchantRules = sqliteTable('notification_merchant_rule
 export const pendingNotifications = sqliteTable('pending_notifications', {
   id: text('id').primaryKey(),
   kind: text('kind').notNull(),
-  type: text('type', { enum: ['expense', 'income'] }).notNull(),
+  type: text('type', { enum: ['expense', 'income', 'transfer'] }).notNull(),
   amount: text('amount').notNull(),
   currency: text('currency').notNull(),
   cardMask: text('card_mask'),

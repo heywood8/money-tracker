@@ -18,6 +18,8 @@ import {
   processBankNotifications,
   resolvePendingNotification,
   dismissPendingNotification,
+  reAddNotification,
+  resolveAtmTargetAccount,
 } from '../services/notifications/processBankNotifications';
 import { kindRequiresCategory } from '../services/notifications/parseBankNotification';
 import {
@@ -58,8 +60,11 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const [pending, setPending] = useState([]);
   const [recent, setRecent] = useState([]);
   const [hidden, setHidden] = useState([]);
-  // Per-item chosen { accountId, categoryId, labelOverride } keyed by pending id.
+  // Per-item chosen { accountId, categoryId, toAccountId, labelOverride } keyed by
+  // pending id. `toAccountId` is only used by transfer items (ATM withdrawals).
   const [choices, setChoices] = useState({});
+  // Per-recent-card re-add feedback: key -> 'loading' | 'created' | 'pending'.
+  const [reAddState, setReAddState] = useState({});
   // Mirror of `choices` so reloadPending can read the latest values without
   // taking `choices` as a dependency (which would re-create it on every keystroke).
   const choicesRef = useRef(choices);
@@ -77,6 +82,14 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
 
   const reloadPending = useCallback(async () => {
     const items = await getPendingNotifications();
+    // The bound cash account pre-fills the target picker on transfer (ATM) items.
+    let atmAccount = null;
+    try {
+      atmAccount = await resolveAtmTargetAccount();
+    } catch (error) {
+      atmAccount = null;
+    }
+    const atmId = atmAccount ? atmAccount.id : null;
     const prevChoices = choicesRef.current;
     // Pre-fill the custom-name field with any override already learned for the
     // merchant. Cards whose field already holds a name are settled and skipped —
@@ -94,7 +107,7 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
     );
     if (!mountedRef.current) return;
     setPending(items);
-    // Seed choices with any suggested account/category and learned label.
+    // Seed choices with any suggested account/category/target and learned label.
     setChoices((prev) => {
       const next = { ...prev };
       items.forEach((item, i) => {
@@ -103,6 +116,8 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           next[item.id] = {
             accountId: item.accountId ?? null,
             categoryId: item.categoryId ?? null,
+            // Transfer (ATM) items pre-fill the target with the bound cash account.
+            toAccountId: item.type === 'transfer' ? atmId : null,
             labelOverride: learned,
           };
         } else if (learned && !next[item.id].labelOverride) {
@@ -166,9 +181,14 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const handleSave = useCallback(async (item) => {
     const choice = choices[item.id] || {};
     if (choice.accountId == null) return;
+    // Transfers (ATM withdrawals) need a target account and no category.
+    if (item.type === 'transfer' && (choice.toAccountId == null || choice.toAccountId === choice.accountId)) {
+      return;
+    }
     await resolvePendingNotification(item.id, {
       accountId: choice.accountId,
       categoryId: choice.categoryId || null,
+      toAccountId: choice.toAccountId ?? null,
       // Send the field verbatim (string, possibly blank) so resolve treats it as
       // authoritative — a cleared field reverts to the raw shop name.
       labelOverride: choice.labelOverride ?? '',
@@ -179,6 +199,27 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
   const handleDismiss = useCallback(async (item) => {
     await dismissPendingNotification(item.id);
     await reloadPending();
+  }, [reloadPending]);
+
+  // Re-add an already-processed bank notification from the recent feed. Shows a
+  // brief spinner, then created/queued feedback, and refreshes the review queue.
+  const handleReAdd = useCallback(async (notification, key) => {
+    setReAddState((prev) => ({ ...prev, [key]: 'loading' }));
+    try {
+      const result = await reAddNotification(notification);
+      const outcome = result.created > 0 ? 'created' : result.pending > 0 ? 'pending' : undefined;
+      await reloadPending();
+      if (!mountedRef.current) return;
+      setReAddState((prev) => ({ ...prev, [key]: outcome }));
+    } catch (error) {
+      if (mountedRef.current) {
+        setReAddState((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    }
   }, [reloadPending]);
 
   // The feed, with hidden apps filtered out.
@@ -216,10 +257,19 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
       ) : (
         pending.map((item) => {
           const choice = choices[item.id] || {};
-          // C2C transfers must have a category chosen before they can be saved.
+          // ATM withdrawals resolve to a target (cash) account instead of a
+          // category — they are booked as a transfer between the user's accounts.
+          const isTransfer = item.type === 'transfer';
+          // C2C transfers / DEBIT ACCOUNT must have a category chosen before saving.
           const categoryRequired = kindRequiresCategory(item.kind, item.packageName);
-          const canSave =
-            choice.accountId != null && (!categoryRequired || choice.categoryId != null);
+          const canSave = isTransfer
+            ? (choice.accountId != null
+              && choice.toAccountId != null
+              && choice.toAccountId !== choice.accountId)
+            : (choice.accountId != null && (!categoryRequired || choice.categoryId != null));
+          // Target-account options exclude the chosen source account (a transfer
+          // must move money between two different accounts).
+          const targetAccountItems = accountItems.filter((a) => a.value !== choice.accountId);
           // Preview the converted amount when the chosen account's currency differs
           // from the charge currency — the operation is booked in the account
           // currency at save time, so show an estimate (offline rate) up front so
@@ -260,12 +310,17 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
                 placeholder={item.merchant || ''}
               />
               <Text style={[styles.helpText, { color: colors.mutedText }]}>
-                {t('bank_notifications_custom_label_help')
-                  || 'Used as the label for this and future transactions from this shop'}
+                {isTransfer
+                  ? (t('bank_notifications_transfer_label_help')
+                    || 'Optional label for this transfer')
+                  : (t('bank_notifications_custom_label_help')
+                    || 'Used as the label for this and future transactions from this shop')}
               </Text>
 
               <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                {(t('account') || 'Account').toUpperCase()}
+                {(isTransfer
+                  ? (t('bank_notifications_transfer_from') || 'From account')
+                  : (t('account') || 'Account')).toUpperCase()}
               </Text>
               <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
                 <SimplePicker
@@ -277,28 +332,50 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
                 />
               </View>
 
-              <View style={styles.categoryLabelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
-                  {(t('category') || 'Category').toUpperCase()}
-                  {categoryRequired ? ' *' : ''}
-                </Text>
-                {choice.categoryId ? (
-                  <View style={styles.selectedCategoryRow}>
-                    <Ionicons name="pricetag" size={12} color={colors.primary} />
-                    <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
-                      {getCategoryDisplayName(choice.categoryId, categories, t)}
-                    </Text>
+              {isTransfer ? (
+                <>
+                  {/* ATM withdrawals move money from the card account into a cash
+                      account. The chosen target is bound and reused next time. */}
+                  <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                    {(t('bank_notifications_transfer_to') || 'To account').toUpperCase()}
+                    {' *'}
+                  </Text>
+                  <View style={[styles.pickerWrap, { borderColor: colors.border }]}>
+                    <SimplePicker
+                      value={choice.toAccountId}
+                      onValueChange={(v) => setChoice(item.id, { toAccountId: v })}
+                      items={targetAccountItems}
+                      colors={colors}
+                      closeLabel={t('close') || 'Close'}
+                    />
                   </View>
-                ) : null}
-              </View>
-              <CategoryGridSelector
-                categories={categories}
-                categoryType={item.type}
-                selectedCategoryId={choice.categoryId || null}
-                onSelect={(categoryId) => setChoice(item.id, { categoryId })}
-                colors={colors}
-                t={t}
-              />
+                </>
+              ) : (
+                <>
+                  <View style={styles.categoryLabelRow}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>
+                      {(t('category') || 'Category').toUpperCase()}
+                      {categoryRequired ? ' *' : ''}
+                    </Text>
+                    {choice.categoryId ? (
+                      <View style={styles.selectedCategoryRow}>
+                        <Ionicons name="pricetag" size={12} color={colors.primary} />
+                        <Text style={[styles.selectedCategoryText, { color: colors.text }]} numberOfLines={1}>
+                          {getCategoryDisplayName(choice.categoryId, categories, t)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <CategoryGridSelector
+                    categories={categories}
+                    categoryType={item.type}
+                    selectedCategoryId={choice.categoryId || null}
+                    onSelect={(categoryId) => setChoice(item.id, { categoryId })}
+                    colors={colors}
+                    t={t}
+                  />
+                </>
+              )}
 
               <View style={styles.actions}>
                 <TouchableOpacity
@@ -353,16 +430,21 @@ export default function NotificationProcessingContentPanel({ bottomInset }) {
           </Text>
         </View>
       ) : (
-        visibleRecent.map((notification, index) => (
-          <NotificationCard
-            // Notifications carry no stable id; post time + index keeps keys
-            // unique even when two arrive at the same millisecond.
-            key={`${notification.postTime || 0}-${index}`}
-            notification={notification}
-            colors={colors}
-            t={t}
-          />
-        ))
+        visibleRecent.map((notification, index) => {
+          // Notifications carry no stable id; post time + index keeps keys unique
+          // even when two arrive at the same millisecond.
+          const key = `${notification.postTime || 0}-${index}`;
+          return (
+            <NotificationCard
+              key={key}
+              notification={notification}
+              colors={colors}
+              t={t}
+              onReAdd={(n) => handleReAdd(n, key)}
+              reAddState={reAddState[key]}
+            />
+          );
+        })
       )}
     </ScrollView>
   );

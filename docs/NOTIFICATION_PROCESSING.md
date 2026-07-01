@@ -52,6 +52,46 @@ C2C parses exactly like `PURCHASE` (also an `expense`), with two differences:
   queue with the category blank, and the user must pick one before saving. No
   merchant rule is stored, so the next transfer to the same person asks again.
 
+### ATM cash withdrawals (`ATM CASH`) — transfers, not expenses
+
+Ameria also emits an **ATM CASH** notification when the user withdraws cash:
+
+```
+text: ATM CASH | 200,000.00 AMD | 4083***7027, | ATM 401 REPUBLIC 67/1, AM | 01.07.2026 09:13 | BALANCE: 111,820.20 AMD
+```
+
+A withdrawal does not reduce net worth — the money moves from the card account
+into physical cash — so it is booked as an operation `type: 'transfer'`, not an
+expense. It therefore needs a **target account** (a "cash" account) instead of a
+category:
+
+- The parser maps `ATM CASH` to `type: 'transfer'` and flags the descriptor with
+  `isTransfer: true` (see `TRANSFER_KINDS` / `kindIsTransfer` in
+  `bankParsers/ameriabank.js`). The ATM location (`ATM 401 REPUBLIC 67/1`) becomes
+  the operation's description.
+- The destination is the account bound in the `BANK_NOTIFICATIONS_ATM_ACCOUNT`
+  preference. **Bound on first sight:** the first ATM withdrawal lands in the
+  review queue with a "To account" picker; saving it remembers the chosen account
+  (and the card → source-account binding) so subsequent withdrawals auto-create a
+  transfer silently.
+- Auto-create fires only when the card resolves to a source account, a target cash
+  account is bound, and the source is trusted (same learn-on-trust gate as
+  purchases). Cross-currency withdrawals are converted at the current rate exactly
+  like a manual multi-currency transfer (`amount` in source currency,
+  `destinationAmount` in target currency, `exchangeRate` source→target); a missing
+  rate routes to review instead of booking a wrong amount.
+
+### Re-adding an already-processed notification
+
+Each already-processed notification stays visible in the **Recent notifications**
+feed. A bank-parseable card there shows a **Re-add operation** action that
+re-runs the parse → resolve → book pipeline for just that notification
+(`reAddNotification` in `processBankNotifications.js`), bypassing the
+seen-signature dedup and the learn-on-trust gate (the user is explicitly asking
+for it). It creates the operation when it fully resolves, or enqueues it for
+review otherwise — useful after deleting the original operation or dismissing a
+review item by mistake.
+
 ## Agreed design decisions
 
 These were chosen up front and drive the architecture:
