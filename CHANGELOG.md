@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.169.0](https://github.com/heywood8/money-tracker/compare/penny-v0.168.0...penny-v0.169.0) (2026-07-01)
+
+
+### Features
+
+* **notifications:** ATM cash transfers and re-adding processed notifications ([#1146](https://github.com/heywood8/money-tracker/issues/1146)) ([acb6cb6](https://github.com/heywood8/money-tracker/commit/acb6cb6b9982cd9faad3dcdd4a572914da4a4a2b))
+
 ## [0.168.0](https://github.com/heywood8/money-tracker/compare/penny-v0.167.1...penny-v0.168.0) (2026-07-01)
 
 
